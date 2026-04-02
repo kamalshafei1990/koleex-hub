@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KOLEEX — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23000'/><text x='16' y='22' text-anchor='middle' fill='white' font-family='Helvetica' font-weight='700' font-size='16'>K</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-left">
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <line x1="3" y1="5" x2="17" y2="5"/>
+          <line x1="3" y1="10" x2="17" y2="10"/>
+          <line x1="3" y1="15" x2="17" y2="15"/>
+        </svg>
+      </button>
+      <a href="index.html" class="logo">
+        <svg class="logo-mark" viewBox="0 0 719.83 107.57" fill="currentColor">
+          <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z"/>
+          <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z"/>
+          <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z"/>
+          <path d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"/>
+          <path d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"/>
+          <path d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31h0Z"/>
+        </svg>
+      </a>
+    </div>
+
+    <div class="header-center">
+      <div class="search-container" id="searchContainer">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="7" cy="7" r="4.5"/>
+          <line x1="10.5" y1="10.5" x2="14" y2="14"/>
+        </svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search...">
+        <kbd class="search-kbd">⌘K</kbd>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="lang-pill" id="langPill" role="radiogroup" aria-label="Language">
+        <button class="lang-option active" data-lang="en" role="radio" aria-checked="true">EN</button>
+        <button class="lang-option" data-lang="zh" role="radio" aria-checked="false">中文</button>
+        <button class="lang-option" data-lang="ar" role="radio" aria-checked="false">عر</button>
+        <div class="lang-indicator"></div>
+      </div>
+
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+        <svg class="theme-icon theme-icon--light" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="9" cy="9" r="4"/>
+          <line x1="9" y1="1" x2="9" y2="3"/><line x1="9" y1="15" x2="9" y2="17"/>
+          <line x1="1" y1="9" x2="3" y2="9"/><line x1="15" y1="9" x2="17" y2="9"/>
+          <line x1="3.34" y1="3.34" x2="4.75" y2="4.75"/><line x1="13.25" y1="13.25" x2="14.66" y2="14.66"/>
+          <line x1="3.34" y1="14.66" x2="4.75" y2="13.25"/><line x1="13.25" y1="4.75" x2="14.66" y2="3.34"/>
+        </svg>
+        <svg class="theme-icon theme-icon--dark" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15.5 9.87a7 7 0 0 1-8.37-8.37A7 7 0 1 0 15.5 9.87Z"/>
+        </svg>
+      </button>
+
+      <div class="user-container" id="userContainer">
+        <div class="user-avatar"><span>KS</span></div>
+        <div class="user-info">
+          <span class="user-name">Kamal Shafei</span>
+          <span class="user-role">Administrator</span>
+        </div>
+        <svg class="user-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 4.5L6 7.5L9 4.5"/>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <a href="index.html" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="7" height="7" rx="2"/>
+            <rect x="11" y="2" width="7" height="7" rx="2"/>
+            <rect x="2" y="11" width="7" height="7" rx="2"/>
+            <rect x="11" y="11" width="7" height="7" rx="2"/>
+          </svg>
+          <span>All Apps</span>
+        </a>
+
+        <div class="sidebar-section-label">Overview</div>
+        <a href="dashboard.html" class="sidebar-item active">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="6" height="8" rx="1"/>
+            <rect x="12" y="2" width="6" height="4" rx="1"/>
+            <rect x="12" y="10" width="6" height="8" rx="1"/>
+            <rect x="2" y="14" width="6" height="4" rx="1"/>
+          </svg>
+          <span>Dashboard</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 6 11.5 12.5 7.5 8.5 2 14"/>
+            <polyline points="13 6 18 6 18 11"/>
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        <div class="sidebar-section-label">Modules</div>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 6 11.5 12.5 7.5 8.5 2 14"/>
+            <polyline points="13 6 18 6 18 11"/>
+          </svg>
+          <span>Sales</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="10" y1="1" x2="10" y2="19"/>
+            <path d="M14 4H8a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H5"/>
+          </svg>
+          <span>Finance</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 13V7a2 2 0 0 0-1-1.73l-6-3.4a2 2 0 0 0-2 0l-6 3.4A2 2 0 0 0 1 7v6a2 2 0 0 0 1 1.73l6 3.4a2 2 0 0 0 2 0l6-3.4A2 2 0 0 0 17 13z"/>
+          </svg>
+          <span>Inventory</span>
+        </a>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10" cy="6" r="3"/>
+            <path d="M4 18v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/>
+          </svg>
+          <span>People</span>
+        </a>
+
+        <div class="sidebar-section-label">System</div>
+        <a href="#" class="sidebar-item">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10" cy="10" r="2"/>
+            <path d="M16.2 12.5a1.4 1.4 0 0 0 .28 1.54l.05.05a1.7 1.7 0 1 1-2.4 2.4l-.05-.05a1.4 1.4 0 0 0-1.54-.28 1.4 1.4 0 0 0-.85 1.28V18a1.7 1.7 0 0 1-3.4 0v-.08a1.4 1.4 0 0 0-.92-1.28 1.4 1.4 0 0 0-1.54.28l-.05.05a1.7 1.7 0 1 1-2.4-2.4l.05-.05A1.4 1.4 0 0 0 3.7 13a1.4 1.4 0 0 0-1.28-.85H2a1.7 1.7 0 0 1 0-3.4h.08A1.4 1.4 0 0 0 3.36 8a1.4 1.4 0 0 0-.28-1.54l-.05-.05A1.7 1.7 0 1 1 5.43 4l.05.05A1.4 1.4 0 0 0 7 4.33 1.4 1.4 0 0 0 7.85 3V2.5a1.7 1.7 0 0 1 3.4 0V3a1.4 1.4 0 0 0 .85 1.28 1.4 1.4 0 0 0 1.54-.28l.05-.05A1.7 1.7 0 1 1 16.1 6.35l-.05.05a1.4 1.4 0 0 0-.28 1.54V8a1.4 1.4 0 0 0 1.28.85h.45a1.7 1.7 0 0 1 0 3.4h-.08a1.4 1.4 0 0 0-1.28.85z"/>
+          </svg>
+          <span>Settings</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-version"><span>Platform v2.4</span></div>
+      </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main" id="mainContent">
+      <!-- Dashboard Header -->
+      <div class="dash-header">
+        <div class="dash-greeting">
+          <h1 class="dash-title">Dashboard</h1>
+          <p class="dash-subtitle" id="dashGreeting">Good morning, Kamal</p>
+        </div>
+        <div class="dash-header-actions">
+          <div class="dash-period" id="dashPeriod">
+            <button class="period-btn active" data-period="day">Today</button>
+            <button class="period-btn" data-period="week">Week</button>
+            <button class="period-btn" data-period="month">Month</button>
+            <button class="period-btn" data-period="year">Year</button>
+          </div>
+          <span class="dash-date" id="dashDate"></span>
+        </div>
+      </div>
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" id="kpiGrid">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Charts Row -->
+      <div class="dash-row dash-row--2col">
+        <div class="dash-card dash-card--chart">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Revenue</h3>
+            <span class="dash-card-meta" id="revenueTotal">$248,520</span>
+          </div>
+          <div class="chart-container" id="revenueChart">
+            <!-- SVG chart injected by JS -->
+          </div>
+        </div>
+        <div class="dash-card dash-card--chart">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Orders</h3>
+            <span class="dash-card-meta" id="ordersTotal">1,284</span>
+          </div>
+          <div class="chart-container" id="ordersChart">
+            <!-- SVG chart injected by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Row -->
+      <div class="dash-row dash-row--3col">
+        <!-- Order Status -->
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Order Status</h3>
+          </div>
+          <div class="status-list" id="orderStatus">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Top Products -->
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Top Products</h3>
+          </div>
+          <div class="product-list" id="topProducts">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Quick Actions</h3>
+          </div>
+          <div class="actions-grid" id="quickActions">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row -->
+      <div class="dash-row dash-row--2col">
+        <!-- Recent Activity -->
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Recent Activity</h3>
+            <a href="#" class="dash-card-link">View all</a>
+          </div>
+          <div class="activity-list" id="activityList">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Upcoming -->
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h3 class="dash-card-title">Upcoming</h3>
+            <a href="#" class="dash-card-link">Calendar</a>
+          </div>
+          <div class="upcoming-list" id="upcomingList">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Floating AI Button -->
+  <button class="ai-button" id="aiButton" aria-label="Open AI Assistant">
+    <div class="ai-button-glow"></div>
+    <div class="ai-button-inner">
+      <svg class="ai-icon" width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M11 1L13.5 8.5L21 11L13.5 13.5L11 21L8.5 13.5L1 11L8.5 8.5L11 1Z" fill="currentColor" opacity="0.9"/>
+      </svg>
+      <span class="ai-label">AI</span>
+    </div>
+  </button>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
