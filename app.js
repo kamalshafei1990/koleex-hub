@@ -240,6 +240,8 @@ function applyLanguage(lang) {
 
   const searchInput = $('#searchInput');
   if (searchInput) searchInput.placeholder = t.searchPlaceholder;
+  const mobileSearchInput = $('#mobileSearchInput');
+  if (mobileSearchInput) mobileSearchInput.placeholder = t.searchPlaceholder;
 
   // Update app labels
   $$('.app-card').forEach(card => {
@@ -362,38 +364,51 @@ function renderAppGrid(filter = 'all') {
 }
 
 // ── Search ──
-function initSearch() {
-  const input = $('#searchInput');
-  if (!input) return;
+function performSearch(query) {
+  const cards = $$('.app-card');
+  const labels = $$('.app-category-label');
 
-  input.addEventListener('input', () => {
-    const query = input.value.toLowerCase().trim();
-    const cards = $$('.app-card');
-    const labels = $$('.app-category-label');
-
-    if (!query) {
-      cards.forEach(c => c.classList.remove('hidden'));
-      labels.forEach(l => l.classList.remove('hidden'));
-      updateAppCount();
-      return;
-    }
-
-    const visibleCategories = new Set();
-
-    cards.forEach(card => {
-      const label = card.querySelector('.app-label').textContent.toLowerCase();
-      const id = card.dataset.app;
-      const match = label.includes(query) || id.includes(query);
-      card.classList.toggle('hidden', !match);
-      if (match) visibleCategories.add(card.dataset.category);
-    });
-
-    labels.forEach(label => {
-      label.classList.toggle('hidden', !visibleCategories.has(label.dataset.category));
-    });
-
+  if (!query) {
+    cards.forEach(c => c.classList.remove('hidden'));
+    labels.forEach(l => l.classList.remove('hidden'));
     updateAppCount();
+    return;
+  }
+
+  const visibleCategories = new Set();
+
+  cards.forEach(card => {
+    const label = card.querySelector('.app-label').textContent.toLowerCase();
+    const id = card.dataset.app;
+    const match = label.includes(query) || id.includes(query);
+    card.classList.toggle('hidden', !match);
+    if (match) visibleCategories.add(card.dataset.category);
   });
+
+  labels.forEach(label => {
+    label.classList.toggle('hidden', !visibleCategories.has(label.dataset.category));
+  });
+
+  updateAppCount();
+}
+
+function initSearch() {
+  const desktopInput = $('#searchInput');
+  const mobileInput = $('#mobileSearchInput');
+
+  // Sync both inputs and share search logic
+  function handleSearch(source, target) {
+    const query = source.value.toLowerCase().trim();
+    if (target) target.value = source.value;
+    performSearch(query);
+  }
+
+  if (desktopInput) {
+    desktopInput.addEventListener('input', () => handleSearch(desktopInput, mobileInput));
+  }
+  if (mobileInput) {
+    mobileInput.addEventListener('input', () => handleSearch(mobileInput, desktopInput));
+  }
 }
 
 // ── Sidebar ──
@@ -462,15 +477,19 @@ function initKeyboardShortcuts() {
     // Cmd/Ctrl + K — focus search
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
-      const input = $('#searchInput');
+      const isMobile = window.innerWidth <= 768;
+      const input = isMobile ? $('#mobileSearchInput') : $('#searchInput');
       if (input) input.focus();
     }
     // Escape — clear search / close sidebar
     if (e.key === 'Escape') {
-      const input = $('#searchInput');
-      if (input && document.activeElement === input) {
+      const input = document.activeElement;
+      if (input && (input.id === 'searchInput' || input.id === 'mobileSearchInput')) {
         input.value = '';
-        input.dispatchEvent(new Event('input'));
+        // Clear the other input too
+        const other = input.id === 'searchInput' ? $('#mobileSearchInput') : $('#searchInput');
+        if (other) other.value = '';
+        performSearch('');
         input.blur();
       }
       if (sidebarOpen) {

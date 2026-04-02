@@ -879,6 +879,20 @@ body {
 }
 
 /* ============================================================
+   MOBILE SEARCH BAR (shown below header on mobile)
+   ============================================================ */
+.mobile-search {
+  display: none;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mobile-search .search-container {
+  height: 40px;
+}
+
+/* ============================================================
    RESPONSIVE — Mobile / Small Tablet
    ============================================================ */
 @media (max-width: 768px) {
@@ -892,7 +906,7 @@ body {
 
   .sidebar {
     transform: translateX(-100%);
-    width: 260px;
+    width: 280px;
     box-shadow: var(--shadow-xl);
   }
   [dir="rtl"] .sidebar {
@@ -902,13 +916,19 @@ body {
     transform: translateX(0);
   }
 
-  .sidebar-overlay.active {
+  .sidebar-overlay {
     display: block;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .sidebar-overlay.active {
+    pointer-events: auto;
+    opacity: 1;
   }
 
   .main {
     margin-left: 0;
-    padding: var(--space-6) var(--space-5) var(--space-16);
+    padding: var(--space-6) var(--space-4) var(--space-16);
   }
   [dir="rtl"] .main {
     margin-right: 0;
@@ -918,19 +938,51 @@ body {
     display: none;
   }
 
+  .mobile-search {
+    display: block;
+    position: sticky;
+    top: var(--header-h);
+    z-index: 30;
+  }
+
   .header {
-    padding: 0 var(--space-4);
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .header-left {
+    gap: var(--space-2);
+  }
+
+  .header-right {
+    gap: var(--space-2);
+  }
+
+  .user-container {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .user-chevron {
+    display: none;
   }
 
   .main-header {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-3);
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-6);
   }
 
   .main-title {
-    font-size: 26px;
+    font-size: 24px;
+  }
+
+  .main-subtitle {
+    font-size: 13px;
   }
 
   .app-grid {
@@ -944,9 +996,13 @@ body {
     border-radius: var(--radius-m);
   }
 
+  .app-card:hover {
+    transform: none;
+  }
+
   .app-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
   .app-icon svg {
     width: 24px;
@@ -957,11 +1013,25 @@ body {
     font-size: 11px;
   }
 
+  .app-category-label {
+    font-size: 10px;
+    padding: var(--space-4) 0 var(--space-2);
+  }
+
   .ai-button {
     bottom: var(--space-5);
     right: var(--space-5);
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .ai-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ai-label {
+    font-size: 8px;
   }
 }
 
@@ -973,8 +1043,29 @@ body {
     display: none;
   }
 
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+  }
+
   .logo-mark {
     height: 16px;
+  }
+
+  .main {
+    padding: var(--space-4) var(--space-3) var(--space-16);
+  }
+
+  .main-title {
+    font-size: 22px;
+  }
+
+  .mobile-search {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .mobile-search .search-container {
+    height: 36px;
   }
 
   .app-grid {
@@ -983,8 +1074,54 @@ body {
   }
 
   .app-card {
-    min-height: 88px;
+    min-height: 84px;
     padding: var(--space-3) var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .app-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .app-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .app-label {
+    font-size: 10px;
+  }
+
+  .sidebar {
+    width: 260px;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — Very Small Mobile (iPhone SE, etc)
+   ============================================================ */
+@media (max-width: 360px) {
+  .app-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .app-card {
+    min-height: 78px;
+    padding: var(--space-2);
+  }
+
+  .app-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-label {
+    font-size: 9px;
+  }
+
+  .main-title {
+    font-size: 20px;
   }
 }
 
