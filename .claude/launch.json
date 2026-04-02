@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "koleex-erp",
+      "runtimeExecutable": "/Users/kamalshafei/.nvm/versions/node/v24.14.1/bin/node",
+      "runtimeArgs": ["-e", "const h=require('http'),f=require('fs'),p=require('path'),d='/Users/kamalshafei/Desktop/Koleex HUB',m={'html':'text/html','css':'text/css','js':'application/javascript','svg':'image/svg+xml','json':'application/json','png':'image/png'};h.createServer((q,r)=>{let u=q.url==='/'?'/index.html':q.url;let fp=p.join(d,decodeURIComponent(u));f.readFile(fp,(e,c)=>{if(e){r.writeHead(404);r.end('Not found');return}let ext=p.extname(fp).slice(1);r.writeHead(200,{'Content-Type':m[ext]||'application/octet-stream'});r.end(c)})}).listen(3000,()=>console.log('Serving on 3000'))"],
+      "port": 3000
+    }
+  ]
+}
