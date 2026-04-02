@@ -349,11 +349,28 @@ function renderAppGrid(filter = 'all') {
 
       card.addEventListener('click', (e) => {
         e.preventDefault();
-        const routeMap = {
-          '/dashboard': 'dashboard.html'
+
+        // Internal pages (same origin)
+        const internalRoutes = {
+          '/dashboard': 'dashboard.html',
         };
-        const page = routeMap[app.route];
-        if (page) window.location.href = page;
+
+        // External routes — Koleex ERP / Admin system
+        const erpBase = 'https://koleex-website.vercel.app';
+        const externalRoutes = {
+          '/products':         erpBase + '/admin/products',
+          '/inventory':        erpBase + '/admin/products',
+          '/settings':         erpBase + '/admin',
+        };
+
+        const internal = internalRoutes[app.route];
+        const external = externalRoutes[app.route];
+
+        if (internal) {
+          window.location.href = internal;
+        } else if (external) {
+          window.open(external, '_blank');
+        }
       });
 
       grid.appendChild(card);
