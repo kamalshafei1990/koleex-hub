@@ -11,21 +11,11 @@ export default function NotFound() {
       <div className="relative z-10 flex flex-col items-center text-center">
         {/* Logo */}
         <div className="mb-10">
-          <svg width="48" height="48" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#111" stroke="#222" strokeWidth="1" />
-            <text
-              x="16"
-              y="22"
-              textAnchor="middle"
-              fill="white"
-              fontFamily="Helvetica, Arial, sans-serif"
-              fontWeight="700"
-              fontSize="16"
-              opacity="0.4"
-            >
-              K
-            </text>
-          </svg>
+          <img
+            src="/koleex-hub-logo.png"
+            alt="Koleex HUB"
+            className="h-8 w-auto opacity-40"
+          />
         </div>
 
         {/* Construction icon */}
