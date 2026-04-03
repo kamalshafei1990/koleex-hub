@@ -78,29 +78,29 @@ export async function fetchContactsByType(type: string): Promise<ContactRow[]> {
   return (data as ContactRow[]) || [];
 }
 
-export async function createContact(obj: Record<string, unknown>): Promise<ContactRow | null> {
+export async function createContact(obj: Record<string, unknown>): Promise<{ data: ContactRow | null; error: string | null }> {
   const { data, error } = await supabase.from("contacts").insert(obj).select().single();
   if (error) {
     console.error("[Contacts] Create:", error.message);
-    return null;
+    return { data: null, error: error.message };
   }
-  return data as ContactRow;
+  return { data: data as ContactRow, error: null };
 }
 
-export async function updateContact(id: string, obj: Record<string, unknown>): Promise<boolean> {
+export async function updateContact(id: string, obj: Record<string, unknown>): Promise<{ ok: boolean; error: string | null }> {
   const { error } = await supabase.from("contacts").update(obj).eq("id", id);
   if (error) {
     console.error("[Contacts] Update:", error.message);
-    return false;
+    return { ok: false, error: error.message };
   }
-  return true;
+  return { ok: true, error: null };
 }
 
-export async function deleteContact(id: string): Promise<boolean> {
+export async function deleteContact(id: string): Promise<{ ok: boolean; error: string | null }> {
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) {
     console.error("[Contacts] Delete:", error.message);
-    return false;
+    return { ok: false, error: error.message };
   }
-  return true;
+  return { ok: true, error: null };
 }

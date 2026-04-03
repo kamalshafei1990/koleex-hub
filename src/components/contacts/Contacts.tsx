@@ -155,7 +155,34 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS business_card_back text;
 CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts (contact_type);
 CREATE INDEX IF NOT EXISTS idx_contacts_customer_type ON contacts (customer_type);
 CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts (first_name, last_name);
-CREATE INDEX IF NOT EXISTS idx_contacts_active ON contacts (is_active);`;
+CREATE INDEX IF NOT EXISTS idx_contacts_active ON contacts (is_active);
+
+-- RLS Policies (allow anon key full access)
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Allow public select" ON contacts FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Allow public insert" ON contacts FOR INSERT WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow public update" ON contacts FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow public delete" ON contacts FOR DELETE USING (true);`;
+
+const RLS_FIX_SQL = `-- Fix: Allow anon key to read/write contacts
+-- Run this in Supabase Dashboard > SQL Editor > New Query
+
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='contacts' AND policyname='Allow public select') THEN
+    CREATE POLICY "Allow public select" ON contacts FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='contacts' AND policyname='Allow public insert') THEN
+    CREATE POLICY "Allow public insert" ON contacts FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='contacts' AND policyname='Allow public update') THEN
+    CREATE POLICY "Allow public update" ON contacts FOR UPDATE USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='contacts' AND policyname='Allow public delete') THEN
+    CREATE POLICY "Allow public delete" ON contacts FOR DELETE USING (true);
+  END IF;
+END $$;`;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
@@ -286,7 +313,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
 /* ── Detail view section wrapper ── */
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="border-b border-[#222] px-6 py-4">
+    <div className="border-b border-[#222] px-4 md:px-6 py-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-white/30">{icon}</span>
         <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
@@ -370,7 +397,7 @@ function LabelSelect({ value, onChange, options }: { value: string; onChange: (v
 /* ── Form section wrapper ── */
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border-b border-[#222] px-6 py-5">
+    <div className="border-b border-[#222] px-4 md:px-6 py-4 md:py-5">
       <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
       {children}
     </div>
@@ -656,6 +683,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [showTypeChooser, setShowTypeChooser] = useState(false);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [rlsCopied, setRlsCopied] = useState(false);
 
   /* ── Load ── */
   const loadContacts = useCallback(async () => {
@@ -726,26 +755,35 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const handleSave = async () => {
     if (!form.first_name && !form.last_name && !form.company) return;
     setSaving(true);
+    setSaveError(null);
     const row = formToRow(form);
-    if (editingId) {
-      const ok = await updateContact(editingId, row);
-      if (ok) {
-        await loadContacts();
-        setView("detail");
+    try {
+      if (editingId) {
+        const { ok, error } = await updateContact(editingId, row);
+        if (ok) {
+          await loadContacts();
+          setView("detail");
+        } else {
+          setSaveError(error || "Failed to update contact. Check your database RLS policies.");
+        }
+      } else {
+        const { data: created, error } = await createContact(row);
+        if (created) {
+          await loadContacts();
+          setSelectedId(created.id);
+          setView("detail");
+        } else {
+          setSaveError(error || "Failed to create contact. Check your database RLS policies.");
+        }
       }
-    } else {
-      const created = await createContact(row);
-      if (created) {
-        await loadContacts();
-        setSelectedId(created.id);
-        setView("detail");
-      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "An unexpected error occurred.");
     }
     setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
-    const ok = await deleteContact(id);
+    const { ok } = await deleteContact(id);
     if (ok) {
       setContacts(prev => prev.filter(c => c.id !== id));
       if (selectedId === id) { setSelectedId(null); setView("list"); setMobileShowDetail(false); }
@@ -896,7 +934,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
               Back to Hub
             </Link>
-            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 transition-colors">
+            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-white text-black font-medium hover:bg-white/90 transition-colors">
               I&apos;ve Run the SQL &mdash; Retry
             </button>
           </div>
@@ -931,11 +969,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <span className="hidden sm:inline">Hub</span>
           </Link>
           <h1 className="text-lg font-semibold text-white">
-            {filterType ? CONTACT_TYPES.find(t => t.value === filterType)?.label + "s" : "Contacts"}
+            {filterType ? (filterType === "company" ? "Companies" : filterType === "people" ? "People" : CONTACT_TYPES.find(t => t.value === filterType)?.label + "s") : "Contacts"}
           </h1>
           <button
             onClick={() => setShowTypeChooser(true)}
-            className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition-colors"
           >
             <Plus size={16} />
           </button>
@@ -979,7 +1017,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     typeTab === t.value ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
                   }`}
                 >
-                  {t.icon} {t.label}s ({count})
+                  {t.icon} {t.value === "company" ? "Companies" : t.value === "people" ? "People" : t.label + "s"} ({count})
                 </button>
               );
             })}
@@ -1082,13 +1120,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       <div className="h-full overflow-y-auto">
         {/* Back button (mobile) */}
         <div className="md:hidden px-4 py-3 border-b border-[#222]">
-          <button onClick={handleBack} className="flex items-center gap-2 text-blue-400 text-sm">
+          <button onClick={handleBack} className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors">
             <ArrowLeft size={16} /> Contacts
           </button>
         </div>
 
         {/* Header card */}
-        <div className="px-6 py-8 text-center border-b border-[#222]">
+        <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
           <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden">
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
@@ -1337,15 +1375,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const statesForCountry = form.country_code ? State.getStatesOfCountry(form.country_code) : [];
     const hasStates = statesForCountry.length > 0;
 
-    /* Determine if city dropdown should show */
-    const showCity = !!form.country_code && (hasStates ? !!form.province_code : true);
+    /* City always shows once country is selected; province is optional */
+    const showCity = !!form.country_code;
 
     return (
       <div className="h-full overflow-y-auto">
         {/* Form header */}
-        <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between sticky top-0 bg-[#111] z-10">
+        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[#222] flex items-center justify-between sticky top-0 bg-[#111] z-10">
           <div className="flex items-center gap-3">
-            <button onClick={handleBack} className="md:hidden text-blue-400">
+            <button onClick={handleBack} className="md:hidden text-white/60 hover:text-white transition-colors">
               <ArrowLeft size={18} />
             </button>
             <h2 className="text-lg font-semibold text-white">
@@ -1353,23 +1391,50 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleCancel} className="px-4 py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
+            <button onClick={handleCancel} className="px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving || (!form.first_name && !form.last_name && !form.company)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Save size={14} />}
+              {saving ? <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Save size={14} />}
               {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
 
+        {/* Save error banner */}
+        {saveError && (
+          <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-400 font-medium">Save Failed</p>
+                <p className="text-xs text-red-400/70 mt-0.5">{saveError}</p>
+              </div>
+              <button onClick={() => setSaveError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="mt-3 flex items-center gap-2 ml-6">
+              <p className="text-xs text-white/40 flex-1">
+                This is usually caused by missing RLS policies. Copy the fix SQL and run it in Supabase Dashboard &rarr; SQL Editor.
+              </p>
+              <button
+                onClick={() => { navigator.clipboard.writeText(RLS_FIX_SQL); setRlsCopied(true); setTimeout(() => setRlsCopied(false), 2000); }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-white/10 hover:bg-white/15 text-white/70 shrink-0 transition-colors"
+              >
+                {rlsCopied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy Fix SQL</>}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Photo + Type */}
-        <div className="px-6 py-6 text-center border-b border-[#222]">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden">
+        <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[#222]">
+          <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden">
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -1401,12 +1466,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
 
           {/* Contact Type selector */}
-          <div className="flex items-center justify-center gap-2 mt-4">
+          <div className="flex items-center gap-2 mt-4 overflow-x-auto md:overflow-visible no-scrollbar px-2 pb-1 md:justify-center md:flex-wrap">
             {CONTACT_TYPES.map(t => (
               <button
                 key={t.value}
                 onClick={() => setField("contact_type", t.value)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
                   form.contact_type === t.value
                     ? `border-white/20 bg-white/10 ${t.color}`
                     : "border-[#222] text-white/30 hover:text-white/50"
@@ -1789,14 +1854,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="h-screen bg-[#0A0A0A] text-white flex">
+    <div className="h-screen bg-[#0A0A0A] text-white flex overflow-hidden">
       {/* Left panel -- contact list */}
       <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111]`}>
         {renderListPanel()}
       </div>
 
       {/* Right panel -- detail / form */}
-      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 h-full bg-[#0A0A0A]`}>
+      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[#0A0A0A]`}>
         {view === "form" ? renderFormPanel() : renderDetailPanel()}
       </div>
 
