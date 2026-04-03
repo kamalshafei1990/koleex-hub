@@ -21,6 +21,9 @@ export interface ContactRow {
   email: string | null;
   phone: string | null;
   country: string | null;
+  country_code: string | null;
+  province: string | null;
+  province_code: string | null;
   city: string | null;
   birthday: string | null;
   notes: string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Search, X, Trash2, Edit3, Save, Phone, Mail,
@@ -13,6 +13,7 @@ import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
   type ContactRow,
 } from "@/lib/contacts-admin";
+import { Country, State, City } from "country-state-city";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -44,6 +45,9 @@ interface ContactForm {
   company: string;
   position: string;
   country: string;
+  country_code: string;
+  province: string;
+  province_code: string;
   city: string;
   birthday: string;
   notes: string;
@@ -101,6 +105,9 @@ const EMPTY_FORM: ContactForm = {
   company: "",
   position: "",
   country: "",
+  country_code: "",
+  province: "",
+  province_code: "",
   city: "",
   birthday: "",
   notes: "",
@@ -130,6 +137,9 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS "position" text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS birthday date;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS customer_type text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS country_code text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS province text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS province_code text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS phones jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS emails jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS addresses jsonb DEFAULT '[]'::jsonb;
@@ -189,6 +199,15 @@ function getTierInfo(tier: string | null) {
   return CUSTOMER_TIERS.find(t => t.value === tier);
 }
 
+/** Derive flag emoji from a 2-letter ISO country code */
+function countryCodeToFlag(code: string): string {
+  if (!code || code.length !== 2) return "";
+  const upper = code.toUpperCase();
+  return String.fromCodePoint(
+    ...Array.from(upper).map(c => 0x1f1e6 + c.charCodeAt(0) - 65)
+  );
+}
+
 function contactToForm(c: ContactRow): ContactForm {
   return {
     contact_type: (c.contact_type as ContactType) || "people",
@@ -200,6 +219,9 @@ function contactToForm(c: ContactRow): ContactForm {
     company: c.company || "",
     position: c.position || "",
     country: c.country || "",
+    country_code: c.country_code || "",
+    province: c.province || "",
+    province_code: c.province_code || "",
     city: c.city || "",
     birthday: c.birthday || "",
     notes: c.notes || "",
@@ -235,6 +257,9 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     email: f.emails[0]?.email || null,
     phone: f.phones[0]?.number || null,
     country: f.country || null,
+    country_code: f.country_code || null,
+    province: f.province || null,
+    province_code: f.province_code || null,
     city: f.city || null,
     birthday: f.birthday || null,
     notes: f.notes || null,
@@ -252,6 +277,362 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     business_card_front: f.business_card_front || null,
     business_card_back: f.business_card_back || null,
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE-LEVEL REUSABLE COMPONENTS (extracted from render functions for perf)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Detail view section wrapper ── */
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="border-b border-[#222] px-6 py-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-white/30">{icon}</span>
+        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ── Form text input ── */
+function Input({ label, value, onChange, type = "text", placeholder }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-white/40 mb-1 block">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder || label}
+        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-colors"
+      />
+    </div>
+  );
+}
+
+/* ── Form select input ── */
+function SelectInput({ label, value, onChange, options }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[];
+}) {
+  return (
+    <div>
+      <label className="text-xs text-white/40 mb-1 block">{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
+      >
+        <option value="" className="bg-[#111]">Select...</option>
+        {options.map(o => <option key={o} value={o} className="bg-[#111]">{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/* ── Green add button ── */
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 py-2 transition-colors">
+      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+        <Plus size={14} className="text-white" />
+      </div>
+      {label}
+    </button>
+  );
+}
+
+/* ── Red remove button ── */
+function RemoveBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 hover:bg-red-400 transition-colors">
+      <Minus size={14} className="text-white" />
+    </button>
+  );
+}
+
+/* ── Inline label select ── */
+function LabelSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="h-10 px-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none cursor-pointer min-w-[80px]"
+    >
+      {options.map(o => <option key={o} value={o} className="bg-[#111] text-white">{o}</option>)}
+    </select>
+  );
+}
+
+/* ── Form section wrapper ── */
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border-b border-[#222] px-6 py-5">
+      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COUNTRY / PROVINCE / CITY CASCADE COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface CountryOption {
+  name: string;
+  isoCode: string;
+  flag: string;
+}
+
+const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
+  name: c.name,
+  isoCode: c.isoCode,
+  flag: countryCodeToFlag(c.isoCode),
+}));
+
+/* ── Searchable Country Dropdown ── */
+function CountryDropdown({ value, displayValue, onChange }: {
+  value: string; // isoCode
+  displayValue: string; // country name shown
+  onChange: (name: string, isoCode: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return ALL_COUNTRIES;
+    const q = query.toLowerCase();
+    return ALL_COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.isoCode.toLowerCase().includes(q));
+  }, [query]);
+
+  const handleSelect = (c: CountryOption) => {
+    onChange(c.name, c.isoCode);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const selectedFlag = value ? countryCodeToFlag(value) : "";
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="text-xs text-white/40 mb-1 block">Country</label>
+      <div
+        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        {selectedFlag && <span className="text-base">{selectedFlag}</span>}
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : displayValue}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search country..."
+          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+        />
+        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-white/30">No countries found</div>
+          ) : (
+            filtered.map(c => (
+              <button
+                key={c.isoCode}
+                onClick={() => handleSelect(c)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
+                  c.isoCode === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                }`}
+              >
+                <span className="text-base">{c.flag}</span>
+                <span className="truncate">{c.name}</span>
+                <span className="text-[10px] text-white/20 ml-auto">{c.isoCode}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Province/State Dropdown ── */
+function ProvinceDropdown({ countryCode, value, displayValue, onChange }: {
+  countryCode: string;
+  value: string; // stateCode
+  displayValue: string;
+  onChange: (name: string, isoCode: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const states = useMemo(() => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode);
+  }, [countryCode]);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return states;
+    const q = query.toLowerCase();
+    return states.filter(s => s.name.toLowerCase().includes(q) || s.isoCode.toLowerCase().includes(q));
+  }, [query, states]);
+
+  if (states.length === 0) return null;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="text-xs text-white/40 mb-1 block">Province / State</label>
+      <div
+        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : displayValue}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search province..."
+          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+        />
+        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-white/30">No provinces found</div>
+          ) : (
+            filtered.map(s => (
+              <button
+                key={s.isoCode}
+                onClick={() => { onChange(s.name, s.isoCode); setOpen(false); setQuery(""); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
+                  s.isoCode === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                }`}
+              >
+                <span className="truncate">{s.name}</span>
+                <span className="text-[10px] text-white/20 ml-auto">{s.isoCode}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── City Dropdown ── */
+function CityDropdown({ countryCode, stateCode, value, onChange }: {
+  countryCode: string;
+  stateCode: string;
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const cities = useMemo(() => {
+    if (!countryCode) return [];
+    if (stateCode) return City.getCitiesOfState(countryCode, stateCode);
+    return City.getCitiesOfCountry(countryCode) || [];
+  }, [countryCode, stateCode]);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return cities;
+    const q = query.toLowerCase();
+    return cities.filter(c => c.name.toLowerCase().includes(q));
+  }, [query, cities]);
+
+  // Fallback to plain text input if no city data available
+  if (cities.length === 0) {
+    return (
+      <Input label="City" value={value} onChange={onChange} placeholder="City" />
+    );
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="text-xs text-white/40 mb-1 block">City</label>
+      <div
+        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : value}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search city..."
+          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+        />
+        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-white/30">No cities found</div>
+          ) : (
+            filtered.map((c, idx) => (
+              <button
+                key={`${c.name}-${idx}`}
+                onClick={() => { onChange(c.name); setOpen(false); setQuery(""); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
+                  c.name === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                }`}
+              >
+                <span className="truncate">{c.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -452,13 +833,38 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const arr = [...form.custom_fields]; arr[i] = { ...arr[i], [field]: val }; setField("custom_fields", arr);
   };
 
+  /* ── Location cascade handlers ── */
+  const handleCountryChange = useCallback((name: string, isoCode: string) => {
+    setForm(prev => ({
+      ...prev,
+      country: name,
+      country_code: isoCode,
+      province: "",
+      province_code: "",
+      city: "",
+    }));
+  }, []);
+
+  const handleProvinceChange = useCallback((name: string, isoCode: string) => {
+    setForm(prev => ({
+      ...prev,
+      province: name,
+      province_code: isoCode,
+      city: "",
+    }));
+  }, []);
+
+  const handleCityChange = useCallback((name: string) => {
+    setField("city", name);
+  }, []);
+
   /* ═════════════════════════════════════════════════════════════════════════
      SETUP SCREEN
      ═════════════════════════════════════════════════════════════════════════ */
 
   if (setupNeeded) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6">
         <div className="max-w-2xl w-full">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
@@ -470,12 +876,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ml-1">
                 Supabase Dashboard
               </a>
-              {" "}→ SQL Editor → New Query.
+              {" "}&rarr; SQL Editor &rarr; New Query.
             </p>
           </div>
 
-          <div className="relative rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/[0.03]">
+          <div className="relative rounded-xl border border-[#222] bg-white/[0.02] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[#222] bg-white/[0.03]">
               <span className="text-xs text-white/40 font-mono">SQL Migration</span>
               <button onClick={copySql} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors">
                 {copied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy</>}
@@ -487,11 +893,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
 
           <div className="flex items-center justify-center gap-3 mt-6">
-            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
               Back to Hub
             </Link>
             <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 transition-colors">
-              I&apos;ve Run the SQL — Retry
+              I&apos;ve Run the SQL &mdash; Retry
             </button>
           </div>
         </div>
@@ -505,7 +911,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
       </div>
     );
@@ -518,7 +924,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderListPanel = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
+      <div className="px-4 pt-4 pb-3 border-b border-[#222]">
         <div className="flex items-center justify-between mb-3">
           <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm">
             <ArrowLeft size={16} />
@@ -543,7 +949,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             placeholder="Search contacts..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/30 outline-none focus:border-blue-500/50 transition-colors"
+            className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/30 outline-none focus:border-white/20 transition-colors"
           />
           {search && (
             <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
@@ -601,8 +1007,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <button
                     key={c.id}
                     onClick={() => handleSelectContact(c)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.04] ${
-                      isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.03] ${
+                      isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.03]"
                     }`}
                   >
                     {/* Avatar */}
@@ -631,7 +1037,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
                         </span>
                         {c.company && (
-                          <span className="text-xs text-white/30 truncate">· {c.company}</span>
+                          <span className="text-xs text-white/30 truncate">&middot; {c.company}</span>
                         )}
                       </div>
                     </div>
@@ -672,27 +1078,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const related: RelatedName[] = Array.isArray(c.related_names) ? c.related_names : [];
     const customs: CustomField[] = Array.isArray(c.custom_fields) ? c.custom_fields : [];
 
-    const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-      <div className="border-b border-white/[0.06] px-6 py-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-white/30">{icon}</span>
-          <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
-        </div>
-        {children}
-      </div>
-    );
-
     return (
       <div className="h-full overflow-y-auto">
         {/* Back button (mobile) */}
-        <div className="md:hidden px-4 py-3 border-b border-white/[0.06]">
+        <div className="md:hidden px-4 py-3 border-b border-[#222]">
           <button onClick={handleBack} className="flex items-center gap-2 text-blue-400 text-sm">
             <ArrowLeft size={16} /> Contacts
           </button>
         </div>
 
         {/* Header card */}
-        <div className="px-6 py-8 text-center border-b border-white/[0.06]">
+        <div className="px-6 py-8 text-center border-b border-[#222]">
           <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden">
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
@@ -705,7 +1101,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {c.company && <p className="text-sm text-white/40">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-white/10 ${getTypeColor(c.contact_type)}`}>
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
               {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
             </span>
             {tierInfo && (
@@ -722,7 +1118,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
           {/* Action buttons */}
           <div className="flex items-center justify-center gap-2 mt-5">
-            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm transition-colors">
+            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/5 border border-[#222] hover:bg-white/10 text-sm transition-colors">
               <Edit3 size={14} /> Edit
             </button>
             <button
@@ -780,10 +1176,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Country / City */}
-        {(c.country || c.city) && (
+        {/* Country / Province / City */}
+        {(c.country || c.province || c.city) && (
           <Section title="Location" icon={<MapPin size={14} />}>
-            <p className="text-sm text-white">{[c.city, c.country].filter(Boolean).join(", ")}</p>
+            <div className="flex items-center gap-2">
+              {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
+              <p className="text-sm text-white">
+                {[c.city, c.province, c.country].filter(Boolean).join(", ")}
+              </p>
+            </div>
           </Section>
         )}
 
@@ -819,7 +1220,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-sm text-white">{s.username || s.url}</p>
                 </div>
                 {s.qr_code_url && (
-                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-white/10" />
+                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-[#222]" />
                 )}
               </div>
             ))}
@@ -842,7 +1243,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {family.length > 0 && (
           <Section title="Family Members" icon={<Heart size={14} />}>
             {family.map((f, i) => (
-              <div key={i} className="py-2 border-b border-white/[0.04] last:border-0">
+              <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50 overflow-hidden">
                     {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" /> : (f.first_name?.[0] || "?").toUpperCase()}
@@ -870,13 +1271,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {c.business_card_front && (
                 <div>
                   <span className="text-xs text-white/40 mb-1.5 block">Front</span>
-                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-white/10" />
+                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[#222]" />
                 </div>
               )}
               {c.business_card_back && (
                 <div>
                   <span className="text-xs text-white/40 mb-1.5 block">Back</span>
-                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-white/10" />
+                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[#222]" />
                 </div>
               )}
             </div>
@@ -905,13 +1306,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Delete confirm */}
         {deleteConfirm === c.id && (
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full">
+            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-sm w-full">
               <h3 className="text-lg font-semibold text-white mb-2">Delete Contact</h3>
               <p className="text-sm text-white/50 mb-6">
                 Are you sure you want to delete <strong className="text-white">{contactDisplayName(c)}</strong>? This cannot be undone.
               </p>
               <div className="flex gap-3 justify-end">
-                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-white/10 hover:bg-white/5 transition-colors">
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[#222] hover:bg-white/5 transition-colors">
                   Cancel
                 </button>
                 <button onClick={() => handleDelete(c.id)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 transition-colors">
@@ -932,74 +1333,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderFormPanel = () => {
     const isCustomer = form.contact_type === "customer";
 
-    /* ── Reusable form pieces ── */
-    const Input = ({ label, value, onChange, type = "text", placeholder }: {
-      label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
-    }) => (
-      <div>
-        <label className="text-xs text-white/40 mb-1 block">{label}</label>
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder || label}
-          className="w-full h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50 transition-colors"
-        />
-      </div>
-    );
+    /* Determine if province dropdown should show */
+    const statesForCountry = form.country_code ? State.getStatesOfCountry(form.country_code) : [];
+    const hasStates = statesForCountry.length > 0;
 
-    const SelectInput = ({ label, value, onChange, options }: {
-      label: string; value: string; onChange: (v: string) => void; options: string[];
-    }) => (
-      <div>
-        <label className="text-xs text-white/40 mb-1 block">{label}</label>
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="w-full h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none focus:border-blue-500/50 transition-colors appearance-none cursor-pointer"
-        >
-          <option value="" className="bg-zinc-900">Select...</option>
-          {options.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}
-        </select>
-      </div>
-    );
-
-    const AddButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
-      <button onClick={onClick} className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 py-2 transition-colors">
-        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-          <Plus size={14} className="text-white" />
-        </div>
-        {label}
-      </button>
-    );
-
-    const RemoveBtn = ({ onClick }: { onClick: () => void }) => (
-      <button onClick={onClick} className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 hover:bg-red-400 transition-colors">
-        <Minus size={14} className="text-white" />
-      </button>
-    );
-
-    const LabelSelect = ({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) => (
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="h-10 px-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none cursor-pointer min-w-[80px]"
-      >
-        {options.map(o => <option key={o} value={o} className="bg-zinc-900 text-white">{o}</option>)}
-      </select>
-    );
-
-    const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-      <div className="border-b border-white/[0.06] px-6 py-5">
-        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
-        {children}
-      </div>
-    );
+    /* Determine if city dropdown should show */
+    const showCity = !!form.country_code && (hasStates ? !!form.province_code : true);
 
     return (
       <div className="h-full overflow-y-auto">
         {/* Form header */}
-        <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-zinc-950 z-10">
+        <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between sticky top-0 bg-[#111] z-10">
           <div className="flex items-center gap-3">
             <button onClick={handleBack} className="md:hidden text-blue-400">
               <ArrowLeft size={18} />
@@ -1009,7 +1353,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleCancel} className="px-4 py-2 rounded-lg text-sm border border-white/10 hover:bg-white/5 transition-colors">
+            <button onClick={handleCancel} className="px-4 py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
               Cancel
             </button>
             <button
@@ -1024,7 +1368,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </div>
 
         {/* Photo + Type */}
-        <div className="px-6 py-6 text-center border-b border-white/[0.06]">
+        <div className="px-6 py-6 text-center border-b border-[#222]">
           <div className="w-28 h-28 rounded-full bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden">
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" />
@@ -1065,7 +1409,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
                   form.contact_type === t.value
                     ? `border-white/20 bg-white/10 ${t.color}`
-                    : "border-white/[0.06] text-white/30 hover:text-white/50"
+                    : "border-[#222] text-white/30 hover:text-white/50"
                 }`}
               >
                 {t.icon} {t.label}
@@ -1099,7 +1443,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={p.number}
                 onChange={e => updatePhone(i, "number", e.target.value)}
                 placeholder="Phone number"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
               />
             </div>
           ))}
@@ -1117,7 +1461,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={e.email}
                 onChange={ev => updateEmail(i, "email", ev.target.value)}
                 placeholder="Email address"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
               />
             </div>
           ))}
@@ -1127,20 +1471,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Addresses */}
         <FormSection title="Addresses">
           {form.addresses.map((a, i) => (
-            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
               <div className="flex items-center gap-2 mb-3">
                 <RemoveBtn onClick={() => removeAddress(i)} />
                 <LabelSelect value={a.label} onChange={v => updateAddress(i, "label", v)} options={ADDRESS_LABELS} />
               </div>
               <div className="space-y-2 ml-8">
-                <input value={a.street} onChange={e => updateAddress(i, "street", e.target.value)} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                <input value={a.street} onChange={e => updateAddress(i, "street", e.target.value)} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={a.city} onChange={e => updateAddress(i, "city", e.target.value)} placeholder="City" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
-                  <input value={a.state} onChange={e => updateAddress(i, "state", e.target.value)} placeholder="State" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  <input value={a.city} onChange={e => updateAddress(i, "city", e.target.value)} placeholder="City" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                  <input value={a.state} onChange={e => updateAddress(i, "state", e.target.value)} placeholder="State" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={a.zip} onChange={e => updateAddress(i, "zip", e.target.value)} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
-                  <input value={a.country} onChange={e => updateAddress(i, "country", e.target.value)} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  <input value={a.zip} onChange={e => updateAddress(i, "zip", e.target.value)} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                  <input value={a.country} onChange={e => updateAddress(i, "country", e.target.value)} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 </div>
               </div>
             </div>
@@ -1148,11 +1492,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <AddButton label="add address" onClick={addAddress} />
         </FormSection>
 
-        {/* Location (country/city top-level) */}
+        {/* Location (country/province/city cascade) */}
         <FormSection title="Location">
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Country" value={form.country} onChange={v => setField("country", v)} />
-            <Input label="City" value={form.city} onChange={v => setField("city", v)} />
+          <div className="space-y-3">
+            <CountryDropdown
+              value={form.country_code}
+              displayValue={form.country}
+              onChange={handleCountryChange}
+            />
+            {form.country_code && hasStates && (
+              <ProvinceDropdown
+                countryCode={form.country_code}
+                value={form.province_code}
+                displayValue={form.province}
+                onChange={handleProvinceChange}
+              />
+            )}
+            {showCity && (
+              <CityDropdown
+                countryCode={form.country_code}
+                stateCode={form.province_code}
+                value={form.city}
+                onChange={handleCityChange}
+              />
+            )}
           </div>
         </FormSection>
 
@@ -1167,7 +1530,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={w.url}
                 onChange={e => updateWebsite(i, "url", e.target.value)}
                 placeholder="https://"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
               />
             </div>
           ))}
@@ -1182,19 +1545,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Social Profiles */}
         <FormSection title="Social Profiles">
           {form.social_profiles.map((s, i) => (
-            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
               <div className="flex items-center gap-2 mb-3">
                 <RemoveBtn onClick={() => removeSocial(i)} />
                 <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} />
               </div>
               <div className="space-y-2 ml-8">
-                <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder="Username / Handle" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
-                <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder="Profile URL" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder="Username / Handle" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder="Profile URL" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">QR Code Image URL</label>
-                  <input value={s.qr_code_url} onChange={e => updateSocial(i, "qr_code_url", e.target.value)} placeholder="QR Code image URL" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  <input value={s.qr_code_url} onChange={e => updateSocial(i, "qr_code_url", e.target.value)} placeholder="QR Code image URL" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                   {s.qr_code_url && (
-                    <img src={s.qr_code_url} alt="QR" className="w-16 h-16 mt-2 rounded border border-white/10" />
+                    <img src={s.qr_code_url} alt="QR" className="w-16 h-16 mt-2 rounded border border-[#222]" />
                   )}
                 </div>
               </div>
@@ -1213,7 +1576,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={r.name}
                 onChange={e => updateRelated(i, "name", e.target.value)}
                 placeholder="Name"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
               />
             </div>
           ))}
@@ -1223,7 +1586,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Family Members */}
         <FormSection title="Family Members">
           {form.family_members.map((f, i) => (
-            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
               <div className="flex items-center gap-2 p-3">
                 <RemoveBtn onClick={() => removeFamily(i)} />
                 <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={FAMILY_RELATIONSHIPS} />
@@ -1231,32 +1594,32 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   value={f.first_name}
                   onChange={e => updateFamily(i, "first_name", e.target.value)}
                   placeholder="First Name"
-                  className="flex-1 h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                  className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
                 />
                 <button
                   onClick={() => setExpandedFamily(expandedFamily === i ? null : i)}
-                  className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                  className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
                 >
                   <ChevronDown size={14} className={`transition-transform ${expandedFamily === i ? "rotate-180" : ""}`} />
                 </button>
               </div>
               {expandedFamily === i && (
-                <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.04]">
+                <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
                   <div className="grid grid-cols-3 gap-2 mt-2">
-                    <select value={f.title} onChange={e => updateFamily(i, "title", e.target.value)} className="h-9 px-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none">
-                      <option value="" className="bg-zinc-900">Title</option>
-                      {TITLES.map(t => <option key={t} value={t} className="bg-zinc-900">{t}</option>)}
+                    <select value={f.title} onChange={e => updateFamily(i, "title", e.target.value)} className="h-9 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none">
+                      <option value="" className="bg-[#111]">Title</option>
+                      {TITLES.map(t => <option key={t} value={t} className="bg-[#111]">{t}</option>)}
                     </select>
-                    <input value={f.middle_name} onChange={e => updateFamily(i, "middle_name", e.target.value)} placeholder="Middle Name" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder="Last Name" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.middle_name} onChange={e => updateFamily(i, "middle_name", e.target.value)} placeholder="Middle Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder="Last Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
                   </div>
-                  <input type="date" value={f.birthday} onChange={e => updateFamily(i, "birthday", e.target.value)} className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none w-full" />
-                  <input value={f.photo_url} onChange={e => updateFamily(i, "photo_url", e.target.value)} placeholder="Photo URL" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none w-full" />
-                  <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                  <input type="date" value={f.birthday} onChange={e => updateFamily(i, "birthday", e.target.value)} className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none w-full" />
+                  <input value={f.photo_url} onChange={e => updateFamily(i, "photo_url", e.target.value)} placeholder="Photo URL" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none w-full" />
+                  <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
                 </div>
               )}
             </div>
@@ -1271,7 +1634,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             onChange={e => setField("notes", e.target.value)}
             placeholder="Add notes..."
             rows={4}
-            className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50 resize-none"
+            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
           />
         </FormSection>
 
@@ -1290,7 +1653,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={cf.field_value}
                 onChange={e => updateCustomField(i, "field_value", e.target.value)}
                 placeholder="Value"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
               />
             </div>
           ))}
@@ -1303,7 +1666,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Front</label>
-                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_front ? (
                     <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" />
                   ) : (
@@ -1323,7 +1686,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Back</label>
-                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_back ? (
                     <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" />
                   ) : (
@@ -1368,7 +1731,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                         form.customer_type === tier.value
                           ? `${tier.bg} ${tier.color} border-white/20 ring-1 ring-white/10`
-                          : "border-white/[0.06] text-white/30 hover:text-white/50 hover:border-white/10"
+                          : "border-[#222] text-white/30 hover:text-white/50 hover:border-[#333]"
                       }`}
                     >
                       {tier.value === "end_user" && <User size={14} />}
@@ -1397,7 +1760,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderTypeChooser = () => (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowTypeChooser(false)}>
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-semibold text-white mb-1">New Contact</h3>
         <p className="text-sm text-white/40 mb-5">Choose the contact type</p>
         <div className="grid grid-cols-2 gap-3">
@@ -1405,16 +1768,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <button
               key={t.value}
               onClick={() => handleAdd(t.value)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-white/[0.08] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
             >
-              <div className="w-12 h-12 rounded-full bg-white/[0.06] flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
+              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
                 {t.icon}
               </div>
               <span className="text-sm font-medium">{t.label}</span>
             </button>
           ))}
         </div>
-        <button onClick={() => setShowTypeChooser(false)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-white/[0.06] hover:bg-white/5 transition-colors">
+        <button onClick={() => setShowTypeChooser(false)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors">
           Cancel
         </button>
       </div>
@@ -1426,14 +1789,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="h-screen bg-black text-white flex">
-      {/* Left panel — contact list */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-white/[0.06] shrink-0 h-full bg-zinc-950`}>
+    <div className="h-screen bg-[#0A0A0A] text-white flex">
+      {/* Left panel -- contact list */}
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111]`}>
         {renderListPanel()}
       </div>
 
-      {/* Right panel — detail / form */}
-      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 h-full bg-black`}>
+      {/* Right panel -- detail / form */}
+      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 h-full bg-[#0A0A0A]`}>
         {view === "form" ? renderFormPanel() : renderDetailPanel()}
       </div>
 
