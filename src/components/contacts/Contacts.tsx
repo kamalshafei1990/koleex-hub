@@ -92,8 +92,7 @@ const EMAIL_LABELS = ["home", "work", "iCloud", "other"];
 const ADDRESS_LABELS = ["home", "work", "other"];
 const WEBSITE_LABELS = ["homepage", "work", "blog", "other"];
 const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Skype", "Other"];
-const RELATIONSHIP_LABELS = ["spouse", "child", "parent", "sibling", "friend", "colleague", "assistant", "manager", "partner", "other"];
-const FAMILY_RELATIONSHIPS = ["Spouse", "Son", "Daughter", "Father", "Mother", "Brother", "Sister", "Grandfather", "Grandmother", "Uncle", "Aunt", "Cousin", "Other"];
+const RELATED_PEOPLE_LABELS = ["Parent", "Father", "Mother", "Brother", "Sister", "Child", "Son", "Daughter", "Spouse", "Friend", "Assistant", "Manager", "Other"];
 
 /** Countries where Province/State is commonly used in addresses */
 const COUNTRIES_WITH_STATES = new Set([
@@ -242,6 +241,27 @@ function countryCodeToFlag(code: string): string {
   return String.fromCodePoint(
     ...Array.from(upper).map(c => 0x1f1e6 + c.charCodeAt(0) - 65)
   );
+}
+
+/** Compress an image file to a smaller base64 string for faster saves */
+async function compressImage(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function contactToForm(c: ContactRow): ContactForm {
@@ -410,6 +430,49 @@ function FormSection({ title, children }: { title: string; children: React.React
     <div className="border-b border-[#222] px-4 md:px-6 py-4 md:py-5">
       <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+/* ── Birthday Picker (DD/MM/YYYY) ── */
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const parts = value ? value.split("-") : ["", "", ""];
+  const year = parts[0] || "";
+  const month = parts[1] || "";
+  const day = parts[2] || "";
+
+  const update = (d: string, m: string, y: string) => {
+    if (d && m && y) onChange(`${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`);
+    else if (!d && !m && !y) onChange("");
+  };
+
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <div>
+        <label className="text-xs text-white/40 mb-1 block">Day</label>
+        <select value={day} onChange={e => update(e.target.value, month, year)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
+          <option value="" className="bg-[#111]">DD</option>
+          {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={String(i + 1).padStart(2, "0")} className="bg-[#111]">{i + 1}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-white/40 mb-1 block">Month</label>
+        <select value={month} onChange={e => update(day, e.target.value, year)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
+          <option value="" className="bg-[#111]">MM</option>
+          {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")} className="bg-[#111]">{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-white/40 mb-1 block">Year</label>
+        <select value={year} onChange={e => update(day, month, e.target.value)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
+          <option value="" className="bg-[#111]">YYYY</option>
+          {Array.from({ length: 100 }, (_, i) => { const y = currentYear - i; return <option key={y} value={String(y)} className="bg-[#111]">{y}</option>; })}
+        </select>
+      </div>
     </div>
   );
 }
@@ -1275,21 +1338,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Related Names */}
-        {related.length > 0 && (
-          <Section title="Related Names" icon={<Users size={14} />}>
-            {related.map((r, i) => (
-              <div key={i} className="py-1.5">
-                <span className="text-xs text-blue-400 font-medium">{r.relationship}</span>
-                <p className="text-sm text-white">{r.name}</p>
-              </div>
-            ))}
-          </Section>
-        )}
-
-        {/* Family Members */}
+        {/* Related People */}
         {family.length > 0 && (
-          <Section title="Family Members" icon={<Heart size={14} />}>
+          <Section title="Related People" icon={<Users size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                 <div className="flex items-center gap-3">
@@ -1459,7 +1510,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 Change Photo
                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
-                  if (file) { const r = new FileReader(); r.onload = () => setField("photo_url", r.result as string); r.readAsDataURL(file); }
+                  if (file) compressImage(file).then(url => setField("photo_url", url));
                 }} />
               </label>
               <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">Remove</button>
@@ -1469,7 +1520,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               Add Photo
               <input type="file" accept="image/*" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
-                if (file) { const r = new FileReader(); r.onload = () => setField("photo_url", r.result as string); r.readAsDataURL(file); }
+                if (file) compressImage(file).then(url => setField("photo_url", url));
               }} />
             </label>
           )}
@@ -1613,7 +1664,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Birthday */}
         <FormSection title="Birthday">
-          <Input label="Birthday" value={form.birthday} onChange={v => setField("birthday", v)} type="date" />
+          <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
         </FormSection>
 
         {/* Social Profiles */}
@@ -1628,11 +1679,23 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder="Username / Handle" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder="Profile URL" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">QR Code Image URL</label>
-                  <input value={s.qr_code_url} onChange={e => updateSocial(i, "qr_code_url", e.target.value)} placeholder="QR Code image URL" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                  {s.qr_code_url && (
-                    <img src={s.qr_code_url} alt="QR" className="w-16 h-16 mt-2 rounded border border-[#222]" />
-                  )}
+                  <label className="text-xs text-white/40 mb-1 block">QR Code</label>
+                  <div className="flex items-center gap-3">
+                    {s.qr_code_url && (
+                      <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[#222] object-cover" />
+                    )}
+                    <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/60 cursor-pointer hover:bg-white/10 transition-colors">
+                      <Camera size={14} />
+                      {s.qr_code_url ? "Change" : "Upload QR"}
+                      <input type="file" accept="image/*" className="hidden" onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) compressImage(file, 400, 0.8).then(url => updateSocial(i, "qr_code_url", url));
+                      }} />
+                    </label>
+                    {s.qr_code_url && (
+                      <button onClick={() => updateSocial(i, "qr_code_url", "")} className="text-xs text-white/30 hover:text-white">Remove</button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1640,34 +1703,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <AddButton label="add social profile" onClick={addSocial} />
         </FormSection>
 
-        {/* Related Names */}
-        <FormSection title="Related Names">
-          {form.related_names.map((r, i) => (
-            <div key={i} className="flex items-center gap-2 mb-3">
-              <RemoveBtn onClick={() => removeRelated(i)} />
-              <LabelSelect value={r.relationship} onChange={v => updateRelated(i, "relationship", v)} options={RELATIONSHIP_LABELS} />
-              <input
-                value={r.name}
-                onChange={e => updateRelated(i, "name", e.target.value)}
-                placeholder="Name"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
-              />
-            </div>
-          ))}
-          <AddButton label="add related name" onClick={addRelated} />
-        </FormSection>
-
-        {/* Family Members */}
-        <FormSection title="Family Members">
+        {/* Related People */}
+        <FormSection title="Related People">
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
               <div className="flex items-center gap-2 p-3">
                 <RemoveBtn onClick={() => removeFamily(i)} />
-                <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={FAMILY_RELATIONSHIPS} />
+                <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={RELATED_PEOPLE_LABELS} />
                 <input
                   value={f.first_name}
                   onChange={e => updateFamily(i, "first_name", e.target.value)}
-                  placeholder="First Name"
+                  placeholder="Name"
                   className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
                 />
                 <button
@@ -1679,26 +1725,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               {expandedFamily === i && (
                 <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <select value={f.title} onChange={e => updateFamily(i, "title", e.target.value)} className="h-9 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none">
-                      <option value="" className="bg-[#111]">Title</option>
-                      {TITLES.map(t => <option key={t} value={t} className="bg-[#111]">{t}</option>)}
-                    </select>
-                    <input value={f.middle_name} onChange={e => updateFamily(i, "middle_name", e.target.value)} placeholder="Middle Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                     <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder="Last Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
                     <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
                   </div>
-                  <input type="date" value={f.birthday} onChange={e => updateFamily(i, "birthday", e.target.value)} className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none w-full" />
-                  <input value={f.photo_url} onChange={e => updateFamily(i, "photo_url", e.target.value)} placeholder="Photo URL" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none w-full" />
+                  <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
                   <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
                 </div>
               )}
             </div>
           ))}
-          <AddButton label="add family member" onClick={addFamily} />
+          <AddButton label="add related person" onClick={addFamily} />
         </FormSection>
 
         {/* Notes */}
@@ -1737,21 +1774,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Business Card (customers only) */}
         {isCustomer && (
           <FormSection title="Business Card">
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Front</label>
-                <label className="flex flex-col items-center justify-center w-full aspect-[1.75/1] rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_front ? (
-                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-contain" />
+                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="flex flex-col items-center gap-2 text-white/30">
-                      <CreditCard size={28} />
-                      <span className="text-sm">Upload Front</span>
+                    <div className="flex flex-col items-center gap-1 text-white/30">
+                      <CreditCard size={18} />
+                      <span className="text-[11px]">Upload Front</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
-                    if (file) { const r = new FileReader(); r.onload = () => setField("business_card_front", r.result as string); r.readAsDataURL(file); }
+                    if (file) compressImage(file).then(url => setField("business_card_front", url));
                   }} />
                 </label>
                 {form.business_card_front && (
@@ -1760,18 +1797,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Back</label>
-                <label className="flex flex-col items-center justify-center w-full aspect-[1.75/1] rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_back ? (
-                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-contain" />
+                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="flex flex-col items-center gap-2 text-white/30">
-                      <CreditCard size={28} />
-                      <span className="text-sm">Upload Back</span>
+                    <div className="flex flex-col items-center gap-1 text-white/30">
+                      <CreditCard size={18} />
+                      <span className="text-[11px]">Upload Back</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
-                    if (file) { const r = new FileReader(); r.onload = () => setField("business_card_back", r.result as string); r.readAsDataURL(file); }
+                    if (file) compressImage(file).then(url => setField("business_card_back", url));
                   }} />
                 </label>
                 {form.business_card_back && (
