@@ -7,7 +7,7 @@ import {
   MapPin, Globe, Calendar, Users, Building2, User, Crown, ChevronDown,
   ChevronRight, Copy, Check, AlertTriangle, Camera, Minus, UserPlus,
   Briefcase, Heart, Share2, FileText, Star, Shield, Gem, Award,
-  CreditCard, BadgeCheck,
+  CreditCard, BadgeCheck, UserCheck, TrendingUp, MapPinned,
 } from "lucide-react";
 import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
@@ -800,6 +800,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const selectedContact = useMemo(() => contacts.find(c => c.id === selectedId) || null, [contacts, selectedId]);
 
+  /* ── Customer KPI stats ── */
+  const customerKpis = useMemo(() => {
+    if (!filterType) return null;
+    const all = contacts.filter(c => c.contact_type === filterType);
+    const active = all.filter(c => c.is_active);
+    const countries = new Set(all.map(c => c.country_code).filter(Boolean));
+    const vip = all.filter(c => c.customer_type === "diamond" || c.customer_type === "platinum");
+    const now = new Date();
+    const thisMonth = all.filter(c => {
+      if (!c.created_at) return false;
+      const d = new Date(c.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    return { total: all.length, active: active.length, countries: countries.size, vip: vip.length, newThisMonth: thisMonth.length };
+  }, [contacts, filterType]);
+
   /* ── Handlers ── */
   const handleSelectContact = (c: ContactRow) => {
     setSelectedId(c.id);
@@ -1100,6 +1116,55 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Contact list */}
       <div className="flex-1 overflow-y-auto">
+        {/* KPI Cards — shown when filterType is set */}
+        {customerKpis && (
+          <div className="grid grid-cols-2 gap-3 px-4 py-4 border-b border-[#222]">
+            {/* Total */}
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-white/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/10">
+                  <Crown size={14} className="text-amber-400" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-white">{customerKpis.total}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40 mt-0.5">Total</p>
+            </div>
+
+            {/* Active */}
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/10">
+                  <UserCheck size={14} className="text-emerald-400" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-emerald-400">{customerKpis.active}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/40 mt-0.5">Active</p>
+            </div>
+
+            {/* VIP (Diamond + Platinum) */}
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-violet-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/10">
+                  <Gem size={14} className="text-violet-400" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-violet-400">{customerKpis.vip}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/40 mt-0.5">VIP</p>
+            </div>
+
+            {/* Countries */}
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-blue-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-500/10">
+                  <MapPinned size={14} className="text-blue-400" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-blue-400">{customerKpis.countries}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/40 mt-0.5">Countries</p>
+            </div>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-white/30 gap-2">
             <Users size={32} />
