@@ -1116,51 +1116,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       {/* Contact list */}
       <div className="flex-1 overflow-y-auto">
-        {/* KPI Cards — shown when filterType is set */}
+        {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
         {customerKpis && (
-          <div className="grid grid-cols-2 gap-3 px-4 py-4 border-b border-[#222]">
-            {/* Total */}
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-white/20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/10">
-                  <Crown size={14} className="text-amber-400" />
-                </div>
-              </div>
-              <p className="text-xl font-bold text-white">{customerKpis.total}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40 mt-0.5">Total</p>
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-white">{customerKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
             </div>
-
-            {/* Active */}
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-emerald-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/10">
-                  <UserCheck size={14} className="text-emerald-400" />
-                </div>
-              </div>
-              <p className="text-xl font-bold text-emerald-400">{customerKpis.active}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/40 mt-0.5">Active</p>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-emerald-400">{customerKpis.active}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
             </div>
-
-            {/* VIP (Diamond + Platinum) */}
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-violet-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/10">
-                  <Gem size={14} className="text-violet-400" />
-                </div>
-              </div>
-              <p className="text-xl font-bold text-violet-400">{customerKpis.vip}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/40 mt-0.5">VIP</p>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-violet-400">{customerKpis.vip}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-violet-400/40">VIP</p>
             </div>
-
-            {/* Countries */}
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-xl p-4 transition-all hover:border-blue-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-500/10">
-                  <MapPinned size={14} className="text-blue-400" />
-                </div>
-              </div>
-              <p className="text-xl font-bold text-blue-400">{customerKpis.countries}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/40 mt-0.5">Countries</p>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-blue-400">{customerKpis.countries}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">Countries</p>
             </div>
           </div>
         )}
@@ -1235,6 +1208,140 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderDetailPanel = () => {
     if (!selectedContact) {
+      /* ── KPI Dashboard (shown when filterType is set and no contact selected) ── */
+      if (customerKpis) {
+        const tierCounts = {
+          diamond: contacts.filter(c => c.contact_type === filterType && c.customer_type === "diamond").length,
+          platinum: contacts.filter(c => c.contact_type === filterType && c.customer_type === "platinum").length,
+          gold: contacts.filter(c => c.contact_type === filterType && c.customer_type === "gold").length,
+          silver: contacts.filter(c => c.contact_type === filterType && c.customer_type === "silver").length,
+          end_user: contacts.filter(c => c.contact_type === filterType && c.customer_type === "end_user").length,
+          none: contacts.filter(c => c.contact_type === filterType && !c.customer_type).length,
+        };
+        const inactive = customerKpis.total - customerKpis.active;
+        return (
+          <div className="h-full overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+              {/* Title */}
+              <div>
+                <h2 className="text-2xl font-bold text-white">Customer Overview</h2>
+                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+              </div>
+
+              {/* Main KPI Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Total */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-white/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
+                      <Crown size={16} className="text-amber-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-white">{customerKpis.total}</p>
+                  <p className="text-xs text-white/30 mt-1">All customers</p>
+                </div>
+
+                {/* Active */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-emerald-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
+                      <UserCheck size={16} className="text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{customerKpis.active}</p>
+                  <p className="text-xs text-white/30 mt-1">{customerKpis.total > 0 ? Math.round((customerKpis.active / customerKpis.total) * 100) : 0}% of total</p>
+                </div>
+
+                {/* VIP */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-violet-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/10">
+                      <Gem size={16} className="text-violet-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">VIP</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-violet-400">{customerKpis.vip}</p>
+                  <p className="text-xs text-white/30 mt-1">Diamond & Platinum</p>
+                </div>
+
+                {/* Countries */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
+                      <MapPinned size={16} className="text-blue-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">Countries</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-blue-400">{customerKpis.countries}</p>
+                  <p className="text-xs text-white/30 mt-1">Global reach</p>
+                </div>
+              </div>
+
+              {/* Tier Breakdown */}
+              <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Customer Tiers</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: "Diamond", count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-300" },
+                    { label: "Platinum", count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-300" },
+                    { label: "Gold", count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-300" },
+                    { label: "Silver", count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-300" },
+                    { label: "End User", count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-300" },
+                  ].map(tier => (
+                    <div key={tier.label} className="flex items-center gap-3">
+                      <span className={`text-xs font-medium w-20 ${tier.textColor}`}>{tier.label}</span>
+                      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${tier.color} rounded-full transition-all duration-500`}
+                          style={{ width: customerKpis.total > 0 ? `${(tier.count / customerKpis.total) * 100}%` : "0%" }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-white/60 w-8 text-right">{tier.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Breakdown */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                  </div>
+                  <p className="text-3xl font-bold text-emerald-400">{customerKpis.active}</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                  </div>
+                  <p className="text-3xl font-bold text-red-400">{inactive}</p>
+                </div>
+              </div>
+
+              {/* New This Month */}
+              {customerKpis.newThisMonth > 0 && (
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 flex items-center gap-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
+                    <TrendingUp size={20} className="text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-green-400">+{customerKpis.newThisMonth}</p>
+                    <p className="text-xs text-white/40">New customers this month</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Hint */}
+              <p className="text-xs text-white/20 text-center pt-2">Select a customer from the list to view details</p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col items-center justify-center h-full text-white/20 gap-3">
           <User size={48} />
