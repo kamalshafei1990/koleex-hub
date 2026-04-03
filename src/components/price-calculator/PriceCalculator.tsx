@@ -10,9 +10,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  TrendingDown,
   TrendingUp,
-  Minus,
   DollarSign,
   Globe,
   Users,
@@ -20,6 +18,14 @@ import {
   Percent,
   ShieldCheck,
   Zap,
+  Tag,
+  Copy,
+  FileText,
+  Printer,
+  Share2,
+  Info,
+  Activity,
+  Layers,
 } from "lucide-react";
 
 /* ════════════════════════════════════════════════════════════════════
@@ -154,6 +160,7 @@ export default function PriceCalculator() {
   const [overrideMode, setOverrideMode] = useState<OverrideMode>("percentage");
   const [overrideValue, setOverrideValue] = useState(0);
   const [fxRisk, setFxRisk] = useState<FxRisk>("stable");
+  const [showFxManager, setShowFxManager] = useState(false);
   const [countryCode, setCountryCode] = useState("EG");
   const [customerType, setCustomerType] = useState("enduser");
   const [discountPct, setDiscountPct] = useState(0);
@@ -187,6 +194,7 @@ export default function PriceCalculator() {
     setOverrideMode("percentage");
     setOverrideValue(0);
     setFxRisk("stable");
+    setShowFxManager(false);
     setCountryCode("EG");
     setCustomerType("enduser");
     setDiscountPct(0);
@@ -327,15 +335,22 @@ export default function PriceCalculator() {
   /* ── Derived ── */
   const selectedCountry = COUNTRIES.find((c) => c.code === countryCode)!;
 
+  /* ── Input class helpers ── */
+  const inputCls =
+    "w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all";
+  const selectCls =
+    "w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer";
+  const labelCls = "block text-[11px] text-white/50 mb-1.5 uppercase tracking-wider font-medium";
+
   /* ════════════════════════════════════════════════════════════════════
      RENDER
      ════════════════════════════════════════════════════════════════════ */
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white">
-      {/* ── Header ── */}
+      {/* ── Sticky Header ── */}
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-[#222]">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
+        <div className="max-w-[700px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -360,659 +375,740 @@ export default function PriceCalculator() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* ════════════════════════════════════════
-             LEFT COLUMN: INPUTS
-             ════════════════════════════════════════ */}
-          <div className="lg:col-span-5 space-y-5">
-            {/* ── Products ── */}
-            <section className="bg-[#111] border border-[#222] rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Package size={16} className="text-blue-400" />
-                  <h2 className="text-sm font-semibold">Products</h2>
-                </div>
-                <button
-                  onClick={addProduct}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 transition-colors"
+      {/* ── Single Column Content ── */}
+      <main className="max-w-[700px] mx-auto px-4 sm:px-6 py-6 md:py-10 space-y-6">
+        {/* Page subtitle */}
+        <p className="text-sm text-white/40">
+          Generate channel pricing with shipping-adjusted ERP logic.
+        </p>
+
+        {/* ════════════════════════════════════════════════════════════
+           FORM CARD — all inputs in one card
+           ════════════════════════════════════════════════════════════ */}
+        <div className="bg-[#111] border border-[#222] rounded-xl p-5 sm:p-6 space-y-7">
+
+          {/* ── Block 1: Products (Cost + Quantity) ── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package size={16} className="text-blue-400" />
+                <h2 className="text-sm font-semibold">Products (Cost + Quantity)</h2>
+              </div>
+              <button
+                onClick={addProduct}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-500 transition-colors"
+              >
+                <Plus size={14} />
+                Add Item
+              </button>
+            </div>
+            <p className="text-[11px] text-white/30">
+              Enter product name, unit cost, and quantity manually.
+            </p>
+
+            <div className="space-y-2">
+              {products.map((prod, i) => (
+                <div
+                  key={prod.id}
+                  className="flex items-center gap-2"
                 >
-                  <Plus size={14} />
-                  Add Item
-                </button>
-              </div>
+                  {/* Item number */}
+                  <span className="text-[10px] text-white/30 w-5 shrink-0 text-center font-mono">
+                    {i + 1}
+                  </span>
 
-              <div className="space-y-3">
-                {products.map((prod, i) => (
-                  <div
-                    key={prod.id}
-                    className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3.5 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
-                        Item {i + 1}
-                      </span>
-                      {products.length > 1 && (
-                        <button
-                          onClick={() => removeProduct(prod.id)}
-                          className="text-red-400/60 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-white/50 mb-1">Product Name</label>
-                      <input
-                        type="text"
-                        value={prod.name}
-                        onChange={(e) => updateProduct(prod.id, "name", e.target.value)}
-                        placeholder="e.g. Solar Panel 400W"
-                        className="w-full h-9 px-3 bg-[#0A0A0A] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] text-white/50 mb-1">
-                          Unit Cost (CNY)
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={prod.costCny || ""}
-                          onChange={(e) =>
-                            updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)
-                          }
-                          placeholder="0.00"
-                          className="w-full h-9 px-3 bg-[#0A0A0A] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-white/50 mb-1">Quantity</label>
-                        <input
-                          type="number"
-                          min={1}
-                          step={1}
-                          value={prod.qty || ""}
-                          onChange={(e) =>
-                            updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)
-                          }
-                          placeholder="1"
-                          className="w-full h-9 px-3 bg-[#0A0A0A] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+                  {/* Product Name */}
+                  <input
+                    type="text"
+                    value={prod.name}
+                    onChange={(e) => updateProduct(prod.id, "name", e.target.value)}
+                    placeholder="Product Name"
+                    className="flex-1 min-w-0 h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                  />
 
-            {/* ── Exchange Rate & Category ── */}
-            <section className="bg-[#111] border border-[#222] rounded-xl p-5 space-y-4">
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign size={16} className="text-green-400" />
-                <h2 className="text-sm font-semibold">Pricing Parameters</h2>
-              </div>
-
-              {/* Exchange Rate */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">
-                  Exchange Rate (USD/CNY)
-                </label>
-                <input
-                  type="number"
-                  min={0.01}
-                  step="0.01"
-                  value={exchangeRate || ""}
-                  onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">Margin Category</label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="auto">Auto-Detect (Smart Margin)</option>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name} ({(cat.marginPct * 100).toFixed(0)}%)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Override Margin */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] text-white/50">Override Margin</label>
-                  <button
-                    onClick={() => setOverrideActive(!overrideActive)}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${
-                      overrideActive ? "bg-blue-600" : "bg-[#333]"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                        overrideActive ? "left-5.5 translate-x-0" : "left-0.5"
-                      }`}
-                      style={{
-                        left: overrideActive ? "22px" : "2px",
-                      }}
-                    />
-                  </button>
-                </div>
-
-                {overrideActive && (
-                  <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 space-y-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setOverrideMode("percentage")}
-                        className={`flex-1 h-8 rounded-md text-xs font-medium transition-all ${
-                          overrideMode === "percentage"
-                            ? "bg-blue-600 text-white"
-                            : "bg-[#0A0A0A] text-white/50 hover:text-white border border-[#333]"
-                        }`}
-                      >
-                        <Percent size={12} className="inline mr-1" />
-                        Percentage
-                      </button>
-                      <button
-                        onClick={() => setOverrideMode("amount")}
-                        className={`flex-1 h-8 rounded-md text-xs font-medium transition-all ${
-                          overrideMode === "amount"
-                            ? "bg-blue-600 text-white"
-                            : "bg-[#0A0A0A] text-white/50 hover:text-white border border-[#333]"
-                        }`}
-                      >
-                        <DollarSign size={12} className="inline mr-1" />
-                        Amount (USD)
-                      </button>
-                    </div>
+                  {/* Unit Cost */}
+                  <div className="relative w-28 shrink-0">
                     <input
                       type="number"
                       min={0}
-                      step={overrideMode === "percentage" ? "0.1" : "0.01"}
-                      value={overrideValue || ""}
-                      onChange={(e) => setOverrideValue(parseFloat(e.target.value) || 0)}
-                      placeholder={overrideMode === "percentage" ? "e.g. 12" : "e.g. 150.00"}
-                      className="w-full h-9 px-3 bg-[#0A0A0A] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                      step="0.01"
+                      value={prod.costCny || ""}
+                      onChange={(e) =>
+                        updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)
+                      }
+                      placeholder="Cost CNY"
+                      className="w-full h-9 px-3 pr-10 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
                     />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
+                      CNY
+                    </span>
                   </div>
-                )}
-              </div>
-            </section>
 
-            {/* ── FX Risk & Country & Customer ── */}
-            <section className="bg-[#111] border border-[#222] rounded-xl p-5 space-y-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Globe size={16} className="text-purple-400" />
-                <h2 className="text-sm font-semibold">Market & Customer</h2>
-              </div>
+                  {/* Quantity */}
+                  <div className="relative w-20 shrink-0">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={prod.qty || ""}
+                      onChange={(e) =>
+                        updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)
+                      }
+                      placeholder="Qty"
+                      className="w-full h-9 px-3 pr-8 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
+                      x
+                    </span>
+                  </div>
 
-              {/* FX Risk Manager */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">FX Risk Manager</label>
+                  {/* Remove */}
+                  {products.length > 1 ? (
+                    <button
+                      onClick={() => removeProduct(prod.id)}
+                      className="text-red-400/50 hover:text-red-400 transition-colors shrink-0"
+                      title="Remove item"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <span className="w-[14px] shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 2: Override Default Profit Margin ── */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={overrideActive}
+                onChange={() => setOverrideActive(!overrideActive)}
+                className="w-4 h-4 rounded border-[#444] bg-[#1a1a1a] text-blue-600 focus:ring-blue-500/30 focus:ring-offset-0 accent-blue-600 cursor-pointer"
+              />
+              <Percent size={14} className="text-yellow-400" />
+              <span className="text-sm font-medium">Override Default Profit Margin</span>
+            </label>
+
+            {overrideActive && (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <div>
+                  <label className={labelCls}>Override Type</label>
+                  <select
+                    value={overrideMode}
+                    onChange={(e) => setOverrideMode(e.target.value as OverrideMode)}
+                    className={selectCls}
+                  >
+                    <option value="percentage">By Percentage</option>
+                    <option value="amount">By Amount USD</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Override Value</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={overrideMode === "percentage" ? "0.1" : "0.01"}
+                    value={overrideValue || ""}
+                    onChange={(e) => setOverrideValue(parseFloat(e.target.value) || 0)}
+                    placeholder={overrideMode === "percentage" ? "e.g. 12" : "e.g. 150.00"}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 3: Manual Discount (%) ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag size={14} className="text-orange-400" />
+                <label className="text-sm font-medium">Manual Discount (%)</label>
+              </div>
+              <span className="text-sm font-mono font-semibold text-blue-400 tabular-nums">
+                {discountPct}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={1}
+              value={discountPct}
+              onChange={(e) => setDiscountPct(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-500"
+              style={{
+                background: `linear-gradient(to right, #3b82f6 ${discountPct * 10}%, #333 ${discountPct * 10}%)`,
+              }}
+            />
+            <div className="flex justify-between text-[10px] text-white/20 px-0.5">
+              <span>0%</span>
+              <span>5%</span>
+              <span>10%</span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 4: Exchange Rate ── */}
+          <div className="space-y-2">
+            <label className={labelCls}>
+              <DollarSign size={12} className="inline text-green-400 mr-1" />
+              USD/CNY Exchange Rate
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={exchangeRate || ""}
+                onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                className={`${inputCls} flex-1`}
+              />
+              <button
+                onClick={() => {
+                  /* Live rate placeholder -- could fetch from API */
+                  setExchangeRate(7.24);
+                }}
+                className="h-9 px-3 rounded-lg text-[11px] font-medium border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-all whitespace-nowrap"
+              >
+                Live Rate
+              </button>
+              <button
+                onClick={() => setShowFxManager(!showFxManager)}
+                className={`h-9 px-3 rounded-lg text-[11px] font-medium border whitespace-nowrap transition-all ${
+                  showFxManager
+                    ? "border-purple-500/50 text-purple-400 bg-purple-500/10"
+                    : "border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                }`}
+              >
+                FX Risk Manager
+              </button>
+            </div>
+
+            {showFxManager && (
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 space-y-2 mt-1">
                 <select
                   value={fxRisk}
                   onChange={(e) => setFxRisk(e.target.value as FxRisk)}
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+                  className={selectCls}
                 >
-                  <option value="stable">Stable</option>
-                  <option value="usd_down">USD to Fall</option>
-                  <option value="usd_up">USD to Rise</option>
+                  <option value="stable">Stable (No change)</option>
+                  <option value="usd_down">Expect USD to Fall</option>
+                  <option value="usd_up">Expect USD to Rise</option>
                 </select>
-              </div>
-
-              {/* Target Country */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">Target Country</label>
-                <select
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.name} ({c.currency})
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="text-[10px] text-white/30">Country adjustment:</span>
-                  <span
-                    className={`text-[10px] font-medium ${
-                      selectedCountry.adjustmentPct > 0
-                        ? "text-green-400"
-                        : selectedCountry.adjustmentPct < 0
-                        ? "text-red-400"
-                        : "text-white/40"
-                    }`}
-                  >
-                    {selectedCountry.adjustmentPct >= 0 ? "+" : ""}
-                    {(selectedCountry.adjustmentPct * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Target Customer Type */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">Target Customer Type</label>
-                <select
-                  value={customerType}
-                  onChange={(e) => setCustomerType(e.target.value)}
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
-                >
-                  {CUSTOMER_RULES.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Manual Discount */}
-              <div>
-                <label className="block text-[11px] text-white/50 mb-1">
-                  Manual Discount (%)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={10}
-                  step="0.1"
-                  value={discountPct || ""}
-                  onChange={(e) => {
-                    let v = parseFloat(e.target.value) || 0;
-                    if (v > 10) v = 10;
-                    if (v < 0) v = 0;
-                    setDiscountPct(v);
-                  }}
-                  placeholder="0 - 10"
-                  className="w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
-                />
-              </div>
-
-              {/* Tax Refund Toggle */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-emerald-400" />
-                  <label className="text-xs text-white/70">
-                    Include Profit + Tax Refund ({(PRICE_CALC_TAX_REFUND_DEFAULT * 100).toFixed(0)}
-                    %)
-                  </label>
-                </div>
-                <button
-                  onClick={() => setIncludeTaxRefund(!includeTaxRefund)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    includeTaxRefund ? "bg-emerald-600" : "bg-[#333]"
-                  }`}
-                >
-                  <span
-                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
-                    style={{
-                      left: includeTaxRefund ? "22px" : "2px",
-                    }}
-                  />
-                </button>
-              </div>
-            </section>
-
-            {/* ── Generate Button ── */}
-            <button
-              onClick={generate}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20"
-            >
-              <Zap size={18} />
-              Generate Price
-            </button>
-          </div>
-
-          {/* ════════════════════════════════════════
-             RIGHT COLUMN: RESULTS
-             ════════════════════════════════════════ */}
-          <div className="lg:col-span-7 space-y-5">
-            {!result ? (
-              <div className="bg-[#111] border border-[#222] rounded-xl flex flex-col items-center justify-center py-24 px-6 text-center">
-                <div className="w-14 h-14 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center mb-4">
-                  <Calculator size={24} className="text-white/20" />
-                </div>
-                <p className="text-white/30 text-sm">
-                  Configure your pricing parameters and click{" "}
-                  <span className="text-blue-400 font-medium">Generate Price</span> to see results.
+                <p className="text-[10px] text-white/30">
+                  FX mode adjusts margin sensitivity before country/discount adjustments.
                 </p>
               </div>
-            ) : (
-              <>
-                {/* ── Summary Cards ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <SummaryCard label="Total Cost (CNY)" value={`\u00A5${fmt(result.totalCostCny)}`} />
-                  <SummaryCard label="Total Cost (USD)" value={`$${fmt(result.totalCostUsd)}`} />
-                  <SummaryCard label="Exchange Rate" value={`${fmt(result.exchangeRate)}`} />
-                  <SummaryCard
-                    label="Items / Qty"
-                    value={`${result.totalItems} items / ${result.totalQty} units`}
-                  />
-                  <SummaryCard label="Category" value={result.categoryName} small />
-                  <SummaryCard
-                    label={`Country (${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(0)}%)`}
-                    value={result.countryName}
-                  />
-                  <SummaryCard
-                    label="Customer Type"
-                    value={CUSTOMER_RULES.find((r) => r.id === result.customerType)?.name || ""}
-                  />
-                  {result.discountPct > 0 && (
-                    <SummaryCard label="Discount" value={`${result.discountPct}%`} />
-                  )}
-                  {result.fxRisk !== "stable" && (
-                    <SummaryCard
-                      label="FX Risk"
-                      value={result.fxRisk === "usd_down" ? "USD to Fall" : "USD to Rise"}
-                    />
-                  )}
-                </div>
-
-                {/* ── Breakdown Info ── */}
-                <section className="bg-[#111] border border-[#222] rounded-xl p-5 space-y-3">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingUp size={16} className="text-yellow-400" />
-                    Pricing Breakdown
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-xs">
-                    <BreakdownRow
-                      label="Effective Margin"
-                      value={pct(result.items[0].marginPct)}
-                    />
-                    <BreakdownRow
-                      label="Margin (USD/unit)"
-                      value={`$${fmt(result.items[0].marginUsd)}`}
-                    />
-                    {result.overrideActive && (
-                      <BreakdownRow
-                        label="Override"
-                        value={
-                          result.overrideMode === "percentage"
-                            ? `${result.overrideValue}%`
-                            : `$${fmt(result.overrideValue)}`
-                        }
-                      />
-                    )}
-                    <BreakdownRow
-                      label="Country Adjustment"
-                      value={`${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(1)}%`}
-                    />
-                    <BreakdownRow
-                      label="Initial Base (USD)"
-                      value={`$${fmt(result.items[0].initialBase)}`}
-                    />
-                    <BreakdownRow
-                      label="After Country Adj."
-                      value={`$${fmt(result.items[0].countryAdjusted)}`}
-                    />
-                    {result.discountPct > 0 && (
-                      <BreakdownRow
-                        label="After Discount"
-                        value={`$${fmt(result.items[0].finalBase)}`}
-                      />
-                    )}
-                    <BreakdownRow
-                      label="Final Base Price (USD)"
-                      value={`$${fmt(result.items[0].finalBase)}`}
-                      highlight
-                    />
-                  </div>
-                </section>
-
-                {/* ── Pricing Table (aggregated) ── */}
-                <section className="bg-[#111] border border-[#222] rounded-xl overflow-hidden">
-                  <div className="p-5 pb-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Users size={16} className="text-cyan-400" />
-                      Channel Pricing
-                    </h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-t border-b border-[#222] text-[11px] text-white/40 uppercase tracking-wider">
-                          <th className="text-left px-5 py-3 font-medium">Channel</th>
-                          <th className="text-right px-5 py-3 font-medium">Unit Price (USD)</th>
-                          <th className="text-right px-5 py-3 font-medium">Total (USD)</th>
-                          <th className="text-right px-5 py-3 font-medium">Profit/Unit</th>
-                          {result.includeTaxRefund && (
-                            <th className="text-right px-5 py-3 font-medium">Profit+Tax/Unit</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ROW_ORDER.map((row) => {
-                          // Aggregate across all items
-                          let totalUnitPrice = 0;
-                          let totalTotal = 0;
-                          let totalProfit = 0;
-                          let totalProfitTax = 0;
-
-                          for (const item of result.items) {
-                            const up = item.channelPrices[row.id];
-                            totalUnitPrice += up;
-                            totalTotal += up * item.qty;
-                            totalProfit += item.channelProfits[row.id];
-                            totalProfitTax += item.channelProfitsWithTax[row.id];
-                          }
-
-                          // If single item, show per-unit values directly
-                          const unitPrice =
-                            result.items.length === 1
-                              ? result.items[0].channelPrices[row.id]
-                              : totalUnitPrice;
-                          const profit =
-                            result.items.length === 1
-                              ? result.items[0].channelProfits[row.id]
-                              : totalProfit;
-                          const profitTax =
-                            result.items.length === 1
-                              ? result.items[0].channelProfitsWithTax[row.id]
-                              : totalProfitTax;
-
-                          const isTarget = row.id === result.customerType;
-
-                          return (
-                            <tr
-                              key={row.id}
-                              className={`border-b border-[#1a1a1a] transition-colors ${
-                                isTarget
-                                  ? "bg-blue-600/10 border-l-2 border-l-blue-500"
-                                  : "hover:bg-[#1a1a1a]"
-                              }`}
-                            >
-                              <td className="px-5 py-3 font-medium flex items-center gap-2">
-                                {row.name}
-                                {isTarget && (
-                                  <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">
-                                    Target
-                                  </span>
-                                )}
-                              </td>
-                              <td className="text-right px-5 py-3 font-mono text-white/80">
-                                ${fmt(unitPrice)}
-                              </td>
-                              <td className="text-right px-5 py-3 font-mono text-white/80">
-                                ${fmt(totalTotal)}
-                              </td>
-                              <td
-                                className={`text-right px-5 py-3 font-mono ${
-                                  profit >= 0 ? "text-green-400" : "text-red-400"
-                                }`}
-                              >
-                                {profit >= 0 ? "+" : ""}${fmt(profit)}
-                              </td>
-                              {result.includeTaxRefund && (
-                                <td
-                                  className={`text-right px-5 py-3 font-mono ${
-                                    profitTax >= 0 ? "text-emerald-400" : "text-red-400"
-                                  }`}
-                                >
-                                  {profitTax >= 0 ? "+" : ""}${fmt(profitTax)}
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-
-                {/* ── Per-Item Detail (if multiple items) ── */}
-                {result.items.length > 1 && (
-                  <section className="space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2 px-1">
-                      <Package size={16} className="text-orange-400" />
-                      Per-Item Breakdown
-                    </h3>
-                    {result.items.map((item, idx) => {
-                      const isExpanded = expandedItems.has(idx);
-                      return (
-                        <div
-                          key={idx}
-                          className="bg-[#111] border border-[#222] rounded-xl overflow-hidden"
-                        >
-                          <button
-                            onClick={() => toggleItemExpand(idx)}
-                            className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-medium">{item.name}</span>
-                              <span className="text-[10px] text-white/30">
-                                Qty: {item.qty} | Cost: \u00A5{fmt(item.costCny)} | $
-                                {fmt(item.costUsd)}
-                              </span>
-                            </div>
-                            {isExpanded ? (
-                              <ChevronUp size={16} className="text-white/40" />
-                            ) : (
-                              <ChevronDown size={16} className="text-white/40" />
-                            )}
-                          </button>
-
-                          {isExpanded && (
-                            <div className="border-t border-[#222]">
-                              <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-2 text-xs">
-                                <BreakdownRow label="Category" value={item.categoryName} />
-                                <BreakdownRow label="Margin %" value={pct(item.marginPct)} />
-                                <BreakdownRow
-                                  label="Margin USD"
-                                  value={`$${fmt(item.marginUsd)}`}
-                                />
-                                <BreakdownRow
-                                  label="Initial Base"
-                                  value={`$${fmt(item.initialBase)}`}
-                                />
-                                <BreakdownRow
-                                  label="After Country"
-                                  value={`$${fmt(item.countryAdjusted)}`}
-                                />
-                                <BreakdownRow
-                                  label="Final Base"
-                                  value={`$${fmt(item.finalBase)}`}
-                                  highlight
-                                />
-                                {result.includeTaxRefund && (
-                                  <BreakdownRow
-                                    label="Tax Refund/Unit"
-                                    value={`$${fmt(item.taxRefundPerUnit)}`}
-                                  />
-                                )}
-                              </div>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="border-t border-b border-[#222] text-[10px] text-white/40 uppercase tracking-wider">
-                                      <th className="text-left px-5 py-2 font-medium">Channel</th>
-                                      <th className="text-right px-5 py-2 font-medium">
-                                        Unit (USD)
-                                      </th>
-                                      <th className="text-right px-5 py-2 font-medium">
-                                        Total (USD)
-                                      </th>
-                                      <th className="text-right px-5 py-2 font-medium">
-                                        Profit/Unit
-                                      </th>
-                                      {result.includeTaxRefund && (
-                                        <th className="text-right px-5 py-2 font-medium">
-                                          +Tax/Unit
-                                        </th>
-                                      )}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {ROW_ORDER.map((row) => {
-                                      const up = item.channelPrices[row.id];
-                                      const pr = item.channelProfits[row.id];
-                                      const pt = item.channelProfitsWithTax[row.id];
-                                      const isTarget = row.id === result.customerType;
-                                      return (
-                                        <tr
-                                          key={row.id}
-                                          className={`border-b border-[#1a1a1a] ${
-                                            isTarget
-                                              ? "bg-blue-600/10"
-                                              : "hover:bg-[#1a1a1a]"
-                                          }`}
-                                        >
-                                          <td className="px-5 py-2 font-medium">
-                                            {row.name}
-                                            {isTarget && (
-                                              <span className="ml-2 text-[8px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">
-                                                Target
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="text-right px-5 py-2 font-mono text-white/80">
-                                            ${fmt(up)}
-                                          </td>
-                                          <td className="text-right px-5 py-2 font-mono text-white/80">
-                                            ${fmt(up * item.qty)}
-                                          </td>
-                                          <td
-                                            className={`text-right px-5 py-2 font-mono ${
-                                              pr >= 0 ? "text-green-400" : "text-red-400"
-                                            }`}
-                                          >
-                                            {pr >= 0 ? "+" : ""}${fmt(pr)}
-                                          </td>
-                                          {result.includeTaxRefund && (
-                                            <td
-                                              className={`text-right px-5 py-2 font-mono ${
-                                                pt >= 0 ? "text-emerald-400" : "text-red-400"
-                                              }`}
-                                            >
-                                              {pt >= 0 ? "+" : ""}${fmt(pt)}
-                                            </td>
-                                          )}
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </section>
-                )}
-              </>
             )}
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 5: Product Category ── */}
+          <div className="space-y-1.5">
+            <label className={labelCls}>
+              <Layers size={12} className="inline text-cyan-400 mr-1" />
+              Product Category
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className={selectCls}
+            >
+              <option value="auto">Auto-Detect (Smart Margin)</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({(cat.marginPct * 100).toFixed(0)}%)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 6: Target Country ── */}
+          <div className="space-y-1.5">
+            <label className={labelCls}>
+              <Globe size={12} className="inline text-purple-400 mr-1" />
+              Target Country
+            </label>
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className={selectCls}
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.currency})
+                </option>
+              ))}
+            </select>
+            {/* Blue info bar */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 flex items-center gap-2 mt-1.5">
+              <Info size={14} className="text-blue-400 shrink-0" />
+              <span className="text-[12px] text-blue-300">
+                Country band adjustment:{" "}
+                <span className="font-semibold">
+                  {selectedCountry.adjustmentPct >= 0 ? "+" : ""}
+                  {(selectedCountry.adjustmentPct * 100).toFixed(0)}%
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 7: Target Customer Type ── */}
+          <div className="space-y-1.5">
+            <label className={labelCls}>
+              <Users size={12} className="inline text-pink-400 mr-1" />
+              Target Customer Type
+            </label>
+            <select
+              value={customerType}
+              onChange={(e) => setCustomerType(e.target.value)}
+              className={selectCls}
+            >
+              {CUSTOMER_RULES.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Block 8: Tax Refund Toggle ── */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeTaxRefund}
+                onChange={() => setIncludeTaxRefund(!includeTaxRefund)}
+                className="w-4 h-4 rounded border-[#444] bg-[#1a1a1a] text-emerald-600 focus:ring-emerald-500/30 focus:ring-offset-0 accent-emerald-600 cursor-pointer"
+              />
+              <ShieldCheck size={14} className="text-emerald-400" />
+              <span className="text-sm font-medium">
+                Include Profit + Tax Refund column ({(PRICE_CALC_TAX_REFUND_DEFAULT * 100).toFixed(0)}% default)
+              </span>
+            </label>
+            <p className="text-[10px] text-white/30 pl-6">
+              Tax refund is calculated from cost USD using the default refund rate.
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[#222]" />
+
+          {/* ── Generate Price Button ── */}
+          <button
+            onClick={generate}
+            className="w-full h-12 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20"
+          >
+            <Zap size={18} />
+            Generate Price
+          </button>
         </div>
+
+        {/* ════════════════════════════════════════════════════════════
+           RESULT CARD — appears below form after Generate
+           ════════════════════════════════════════════════════════════ */}
+        {result && (
+          <div className="bg-[#111] border border-[#222] rounded-xl p-5 sm:p-6 space-y-6">
+            {/* ── Result Header ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Activity size={18} className="text-blue-400" />
+                <h2 className="text-lg font-semibold">Quotation Details</h2>
+              </div>
+              <p className="text-[12px] text-white/40 mb-3">
+                Results are generated from your selected workflow inputs.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/25 text-[11px] font-medium text-purple-300">
+                  <Globe size={12} />
+                  {result.countryName}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/15 border border-pink-500/25 text-[11px] font-medium text-pink-300">
+                  <Users size={12} />
+                  {CUSTOMER_RULES.find((r) => r.id === result.customerType)?.name || result.customerType}
+                </span>
+              </div>
+            </div>
+
+            {/* ── Breakdown Box ── */}
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden">
+              <BreakdownKV label="Cost CNY" value={`\u00A5${fmt(result.totalCostCny)}`} />
+              <BreakdownKV label="Cost USD" value={`$${fmt(result.totalCostUsd)}`} />
+              <BreakdownKV
+                label="Items / Qty"
+                value={`${result.totalItems} items / ${result.totalQty} units`}
+              />
+              <BreakdownKV label="Margin %" value={pct(result.items[0].marginPct)} />
+              <BreakdownKV
+                label="Country Adjustment"
+                value={`${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(1)}%`}
+              />
+              {result.discountPct > 0 && (
+                <BreakdownKV label="Discount" value={`${result.discountPct}%`} />
+              )}
+              {/* Final Base Price - highlighted */}
+              <div className="flex items-center justify-between px-4 py-3 bg-blue-600/10 border-t border-[#222]">
+                <span className="text-[13px] font-semibold text-blue-300">Final Base Price USD</span>
+                <span className="text-[14px] font-bold font-mono text-blue-400">
+                  ${fmt(result.items[0].finalBase)}
+                </span>
+              </div>
+              {/* Total Profit - highlighted green */}
+              {(() => {
+                const targetProfit = result.items.reduce(
+                  (sum, item) => sum + item.channelProfits[result.customerType] * item.qty,
+                  0
+                );
+                return (
+                  <div className="flex items-center justify-between px-4 py-3 bg-emerald-600/10 border-t border-[#222]">
+                    <span className="text-[13px] font-semibold text-emerald-300">Total Profit</span>
+                    <span
+                      className={`text-[14px] font-bold font-mono ${
+                        targetProfit >= 0 ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {targetProfit >= 0 ? "+" : ""}${fmt(targetProfit)}
+                    </span>
+                  </div>
+                );
+              })()}
+              <BreakdownKV
+                label="Tax Refund"
+                value={result.includeTaxRefund ? "Enabled" : "Disabled"}
+                last
+              />
+            </div>
+
+            {/* ── Per-Product Pricing Details (if multiple items) ── */}
+            {result.items.length > 1 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Package size={16} className="text-orange-400" />
+                  <h3 className="text-sm font-semibold">Per-Product Pricing Details</h3>
+                </div>
+
+                {result.items.map((item, idx) => {
+                  const isExpanded = expandedItems.has(idx);
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden"
+                    >
+                      <button
+                        onClick={() => toggleItemExpand(idx)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#161616] transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-sm font-medium truncate">{item.name}</span>
+                          <span className="text-[10px] text-white/30 shrink-0">
+                            Qty: {item.qty} | \u00A5{fmt(item.costCny)} | ${fmt(item.costUsd)}
+                          </span>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp size={16} className="text-white/40 shrink-0" />
+                        ) : (
+                          <ChevronDown size={16} className="text-white/40 shrink-0" />
+                        )}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-[#222]">
+                          {/* Mini breakdown */}
+                          <div className="px-4 py-3 space-y-0">
+                            <BreakdownKV label="Category" value={item.categoryName} />
+                            <BreakdownKV label="Margin %" value={pct(item.marginPct)} />
+                            <BreakdownKV label="Margin USD" value={`$${fmt(item.marginUsd)}`} />
+                            <BreakdownKV label="Initial Base" value={`$${fmt(item.initialBase)}`} />
+                            <BreakdownKV label="After Country" value={`$${fmt(item.countryAdjusted)}`} />
+                            <BreakdownKV label="Final Base" value={`$${fmt(item.finalBase)}`} />
+                            {result.includeTaxRefund && (
+                              <BreakdownKV label="Tax Refund/Unit" value={`$${fmt(item.taxRefundPerUnit)}`} last />
+                            )}
+                          </div>
+
+                          {/* Mini channel table */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-t border-b border-[#222] text-[10px] text-white/40 uppercase tracking-wider">
+                                  <th className="text-left px-4 py-2 font-medium">Channel</th>
+                                  <th className="text-right px-4 py-2 font-medium">Unit (USD)</th>
+                                  <th className="text-right px-4 py-2 font-medium">Total (USD)</th>
+                                  <th className="text-right px-4 py-2 font-medium">Profit/Unit</th>
+                                  {result.includeTaxRefund && (
+                                    <th className="text-right px-4 py-2 font-medium">+Tax/Unit</th>
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ROW_ORDER.map((row) => {
+                                  const up = item.channelPrices[row.id];
+                                  const pr = item.channelProfits[row.id];
+                                  const pt = item.channelProfitsWithTax[row.id];
+                                  const isTarget = row.id === result.customerType;
+                                  return (
+                                    <tr
+                                      key={row.id}
+                                      className={`border-b border-[#1a1a1a] ${
+                                        isTarget ? "bg-blue-600/10" : "hover:bg-[#111]"
+                                      }`}
+                                    >
+                                      <td className="px-4 py-2 font-medium">
+                                        {row.name}
+                                        {isTarget && (
+                                          <span className="ml-2 text-[8px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">
+                                            Target
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="text-right px-4 py-2 font-mono text-white/80">
+                                        ${fmt(up)}
+                                      </td>
+                                      <td className="text-right px-4 py-2 font-mono text-white/80">
+                                        ${fmt(up * item.qty)}
+                                      </td>
+                                      <td
+                                        className={`text-right px-4 py-2 font-mono ${
+                                          pr >= 0 ? "text-green-400" : "text-red-400"
+                                        }`}
+                                      >
+                                        {pr >= 0 ? "+" : ""}${fmt(pr)}
+                                      </td>
+                                      {result.includeTaxRefund && (
+                                        <td
+                                          className={`text-right px-4 py-2 font-mono ${
+                                            pt >= 0 ? "text-emerald-400" : "text-red-400"
+                                          }`}
+                                        >
+                                          {pt >= 0 ? "+" : ""}${fmt(pt)}
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Grand Total Pricing Table ── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp size={16} className="text-cyan-400" />
+                <h3 className="text-sm font-semibold">Grand Total Pricing Table</h3>
+              </div>
+
+              <div className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#222] text-[11px] text-white/40 uppercase tracking-wider">
+                        <th className="text-left px-4 py-3 font-medium">Channel Type</th>
+                        <th className="text-right px-4 py-3 font-medium">Unit Price</th>
+                        <th className="text-right px-4 py-3 font-medium">Total Price</th>
+                        <th className="text-right px-4 py-3 font-medium">Profit</th>
+                        {result.includeTaxRefund && (
+                          <th className="text-right px-4 py-3 font-medium">Profit + Tax Refund</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ROW_ORDER.map((row) => {
+                        // Aggregate across all items
+                        let totalUnitPrice = 0;
+                        let totalTotal = 0;
+                        let totalProfit = 0;
+                        let totalProfitTax = 0;
+
+                        for (const item of result.items) {
+                          const up = item.channelPrices[row.id];
+                          totalUnitPrice += up;
+                          totalTotal += up * item.qty;
+                          totalProfit += item.channelProfits[row.id];
+                          totalProfitTax += item.channelProfitsWithTax[row.id];
+                        }
+
+                        // If single item, show per-unit values directly
+                        const unitPrice =
+                          result.items.length === 1
+                            ? result.items[0].channelPrices[row.id]
+                            : totalUnitPrice;
+                        const profit =
+                          result.items.length === 1
+                            ? result.items[0].channelProfits[row.id]
+                            : totalProfit;
+                        const profitTax =
+                          result.items.length === 1
+                            ? result.items[0].channelProfitsWithTax[row.id]
+                            : totalProfitTax;
+
+                        const isTarget = row.id === result.customerType;
+
+                        return (
+                          <tr
+                            key={row.id}
+                            className={`border-b border-[#1a1a1a] transition-colors ${
+                              isTarget
+                                ? "bg-blue-600/10 border-l-2 border-l-blue-500"
+                                : "hover:bg-[#111]"
+                            }`}
+                          >
+                            <td className="px-4 py-3 font-medium flex items-center gap-2">
+                              {row.name}
+                              {isTarget && (
+                                <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">
+                                  Target
+                                </span>
+                              )}
+                            </td>
+                            <td className="text-right px-4 py-3 font-mono text-white/80">
+                              ${fmt(unitPrice)}
+                            </td>
+                            <td className="text-right px-4 py-3 font-mono text-white/80">
+                              ${fmt(totalTotal)}
+                            </td>
+                            <td
+                              className={`text-right px-4 py-3 font-mono ${
+                                profit >= 0 ? "text-green-400" : "text-red-400"
+                              }`}
+                            >
+                              {profit >= 0 ? "+" : ""}${fmt(profit)}
+                            </td>
+                            {result.includeTaxRefund && (
+                              <td
+                                className={`text-right px-4 py-3 font-mono ${
+                                  profitTax >= 0 ? "text-emerald-400" : "text-red-400"
+                                }`}
+                              >
+                                {profitTax >= 0 ? "+" : ""}${fmt(profitTax)}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {/* Table footer totals */}
+                    <tfoot>
+                      {(() => {
+                        const targetRow = result.customerType;
+                        let footerTotal = 0;
+                        let footerProfit = 0;
+                        let footerProfitTax = 0;
+
+                        for (const item of result.items) {
+                          footerTotal += item.channelPrices[targetRow] * item.qty;
+                          footerProfit += item.channelProfits[targetRow] * item.qty;
+                          footerProfitTax += item.channelProfitsWithTax[targetRow] * item.qty;
+                        }
+
+                        return (
+                          <tr className="border-t border-[#333] bg-[#111]">
+                            <td className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/60">
+                              Grand Total
+                            </td>
+                            <td className="text-right px-4 py-3 font-mono font-semibold text-white/60">
+                              --
+                            </td>
+                            <td className="text-right px-4 py-3 font-mono font-bold text-white">
+                              ${fmt(footerTotal)}
+                            </td>
+                            <td
+                              className={`text-right px-4 py-3 font-mono font-bold ${
+                                footerProfit >= 0 ? "text-green-400" : "text-red-400"
+                              }`}
+                            >
+                              {footerProfit >= 0 ? "+" : ""}${fmt(footerProfit)}
+                            </td>
+                            {result.includeTaxRefund && (
+                              <td
+                                className={`text-right px-4 py-3 font-mono font-bold ${
+                                  footerProfitTax >= 0 ? "text-emerald-400" : "text-red-400"
+                                }`}
+                              >
+                                {footerProfitTax >= 0 ? "+" : ""}${fmt(footerProfitTax)}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })()}
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Result Actions ── */}
+            <div className="flex items-center gap-2 flex-wrap pt-2">
+              <button
+                onClick={() => {
+                  /* Copy to clipboard placeholder */
+                  const text = `Quotation: ${result.countryName} | ${CUSTOMER_RULES.find((r) => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`;
+                  navigator.clipboard?.writeText(text);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+              >
+                <Copy size={14} />
+                Copy
+              </button>
+              <button
+                onClick={() => {
+                  /* Export PDF placeholder */
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+              >
+                <FileText size={14} />
+                Export PDF
+              </button>
+              <button
+                onClick={() => {
+                  window.print();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+              >
+                <Printer size={14} />
+                Print
+              </button>
+              <button
+                onClick={() => {
+                  /* Share placeholder */
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -1022,42 +1118,23 @@ export default function PriceCalculator() {
    SUB-COMPONENTS
    ════════════════════════════════════════════════════════════════════ */
 
-function SummaryCard({
+function BreakdownKV({
   label,
   value,
-  small,
+  last,
 }: {
   label: string;
   value: string;
-  small?: boolean;
+  last?: boolean;
 }) {
   return (
-    <div className="bg-[#111] border border-[#222] rounded-xl px-4 py-3">
-      <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">{label}</div>
-      <div
-        className={`font-semibold truncate ${
-          small ? "text-xs text-white/80" : "text-sm text-white"
-        }`}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function BreakdownRow({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="flex justify-between py-1">
-      <span className="text-white/40">{label}</span>
-      <span className={highlight ? "text-blue-400 font-semibold" : "text-white/80"}>{value}</span>
+    <div
+      className={`flex items-center justify-between px-4 py-2.5 ${
+        last ? "" : "border-b border-[#1a1a1a]"
+      }`}
+    >
+      <span className="text-[12px] text-white/40">{label}</span>
+      <span className="text-[13px] font-mono text-white/80">{value}</span>
     </div>
   );
 }
