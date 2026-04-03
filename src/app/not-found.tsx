@@ -12,9 +12,9 @@ export default function NotFound() {
         {/* Logo */}
         <div className="mb-10">
           <img
-            src="/koleex-hub-logo.png"
+            src="/koleex-hub-logo.svg"
             alt="Koleex HUB"
-            className="h-8 w-auto opacity-40"
+            className="h-10 w-auto opacity-40"
           />
         </div>
 

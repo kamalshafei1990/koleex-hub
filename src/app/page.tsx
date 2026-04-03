@@ -99,7 +99,7 @@ const sidebarItems: ({ id: string; label: string; icon: React.ReactNode } | { se
 function KoleexLogo({ className }: { className?: string }) {
   return (
     <img
-      src="/koleex-hub-logo.png"
+      src="/koleex-hub-logo.svg"
       alt="Koleex HUB"
       className={className}
       style={{ objectFit: "contain" }}
@@ -177,7 +177,7 @@ export default function HomePage() {
             <Menu size={20} />
           </button>
           <Link href="/" className={dk ? "text-white" : "text-black"}>
-            <KoleexLogo className="h-5 w-auto" />
+            <KoleexLogo className="h-14 w-auto" />
           </Link>
         </div>
 
