@@ -8,7 +8,7 @@ import {
   Users, Truck, Contact, Globe, CreditCard, Briefcase, UserSearch,
   Star, Clock, CalendarCheck, MessageSquare, Calendar, CheckSquare,
   Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Database,
-  Sparkles, Menu, Search, Sun, Moon,
+  Sparkles, Menu, Search, Sun, Moon, PanelTop,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -67,6 +67,7 @@ const apps: AppItem[] = [
   { id: "discuss", name: "Discuss", icon: <MessageSquare size={iconSize} />, category: "communication", route: "/discuss" },
   { id: "calendar", name: "Calendar", icon: <Calendar size={iconSize} />, category: "communication", route: "/calendar" },
   { id: "todo", name: "To-do", icon: <CheckSquare size={iconSize} />, category: "communication", route: "/todo" },
+  { id: "website", name: "Website", icon: <PanelTop size={iconSize} />, category: "marketing", route: "/website" },
   { id: "marketing", name: "Marketing", icon: <Megaphone size={iconSize} />, category: "marketing", route: "/marketing" },
   { id: "marketing-cards", name: "Marketing Cards", icon: <Monitor size={iconSize} />, category: "marketing", route: "/marketing-cards" },
   { id: "events", name: "Events", icon: <Bell size={iconSize} />, category: "marketing", route: "/events" },
