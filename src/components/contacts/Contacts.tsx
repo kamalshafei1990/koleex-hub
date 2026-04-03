@@ -1,0 +1,1444 @@
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft, Plus, Search, X, Trash2, Edit3, Save, Phone, Mail,
+  MapPin, Globe, Calendar, Users, Building2, User, Crown, ChevronDown,
+  ChevronRight, Copy, Check, AlertTriangle, Camera, Minus, UserPlus,
+  Briefcase, Heart, Share2, FileText, Star, Shield, Gem, Award,
+  CreditCard, BadgeCheck,
+} from "lucide-react";
+import {
+  checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
+  type ContactRow,
+} from "@/lib/contacts-admin";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+type ContactType = "customer" | "supplier" | "company" | "people" | "employee";
+type CustomerTier = "end_user" | "silver" | "gold" | "platinum" | "diamond";
+type ViewMode = "list" | "detail" | "form";
+
+interface PhoneEntry { label: string; number: string }
+interface EmailEntry { label: string; email: string }
+interface AddressEntry { label: string; street: string; city: string; state: string; zip: string; country: string }
+interface WebsiteEntry { label: string; url: string }
+interface SocialProfile { platform: string; username: string; url: string; qr_code_url: string }
+interface FamilyMember {
+  relationship: string; title: string; first_name: string; middle_name: string;
+  last_name: string; phone: string; email: string; birthday: string; notes: string; photo_url: string;
+}
+interface RelatedName { name: string; relationship: string }
+interface CustomField { field_name: string; field_value: string }
+
+interface ContactForm {
+  contact_type: ContactType;
+  photo_url: string;
+  title: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  company: string;
+  position: string;
+  country: string;
+  city: string;
+  birthday: string;
+  notes: string;
+  is_active: boolean;
+  customer_type: CustomerTier | "";
+  phones: PhoneEntry[];
+  emails: EmailEntry[];
+  addresses: AddressEntry[];
+  websites: WebsiteEntry[];
+  social_profiles: SocialProfile[];
+  family_members: FamilyMember[];
+  related_names: RelatedName[];
+  custom_fields: CustomField[];
+  business_card_front: string;
+  business_card_back: string;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSTANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const CONTACT_TYPES: { value: ContactType; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: "customer", label: "Customer", icon: <Crown size={16} />, color: "text-amber-400" },
+  { value: "supplier", label: "Supplier", icon: <Building2 size={16} />, color: "text-blue-400" },
+  { value: "company", label: "Company", icon: <Briefcase size={16} />, color: "text-purple-400" },
+  { value: "employee", label: "Employee", icon: <BadgeCheck size={16} />, color: "text-teal-400" },
+  { value: "people", label: "People", icon: <User size={16} />, color: "text-green-400" },
+];
+
+const CUSTOMER_TIERS: { value: CustomerTier; label: string; color: string; bg: string }[] = [
+  { value: "end_user", label: "End User", color: "text-zinc-300", bg: "bg-zinc-700" },
+  { value: "silver", label: "Silver", color: "text-slate-300", bg: "bg-slate-600" },
+  { value: "gold", label: "Gold", color: "text-amber-300", bg: "bg-amber-700/60" },
+  { value: "platinum", label: "Platinum", color: "text-cyan-200", bg: "bg-cyan-800/50" },
+  { value: "diamond", label: "Diamond", color: "text-violet-200", bg: "bg-violet-700/50" },
+];
+
+const TITLES = ["Mr.", "Mrs.", "Ms.", "Dr.", "Prof.", "Eng.", "Sheikh", "H.E."];
+
+const PHONE_LABELS = ["mobile", "home", "work", "main", "work fax", "home fax", "pager", "other"];
+const EMAIL_LABELS = ["home", "work", "iCloud", "other"];
+const ADDRESS_LABELS = ["home", "work", "other"];
+const WEBSITE_LABELS = ["homepage", "work", "blog", "other"];
+const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Skype", "Other"];
+const RELATIONSHIP_LABELS = ["spouse", "child", "parent", "sibling", "friend", "colleague", "assistant", "manager", "partner", "other"];
+const FAMILY_RELATIONSHIPS = ["Spouse", "Son", "Daughter", "Father", "Mother", "Brother", "Sister", "Grandfather", "Grandmother", "Uncle", "Aunt", "Cousin", "Other"];
+
+const EMPTY_FORM: ContactForm = {
+  contact_type: "customer",
+  photo_url: "",
+  title: "",
+  first_name: "",
+  middle_name: "",
+  last_name: "",
+  company: "",
+  position: "",
+  country: "",
+  city: "",
+  birthday: "",
+  notes: "",
+  is_active: true,
+  customer_type: "",
+  phones: [],
+  emails: [],
+  addresses: [],
+  websites: [],
+  social_profiles: [],
+  family_members: [],
+  related_names: [],
+  custom_fields: [],
+  business_card_front: "",
+  business_card_back: "",
+};
+
+const MIGRATION_SQL = `-- Contacts Module Migration for Koleex HUB
+-- Run this in Supabase Dashboard > SQL Editor > New Query
+
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS contact_type text DEFAULT 'people';
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS title text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS middle_name text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_name text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS "position" text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS birthday date;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS customer_type text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS phones jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS emails jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS addresses jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS websites jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS social_profiles jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS family_members jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS related_names jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS custom_fields jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS business_card_front text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS business_card_back text;
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts (contact_type);
+CREATE INDEX IF NOT EXISTS idx_contacts_customer_type ON contacts (customer_type);
+CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts (first_name, last_name);
+CREATE INDEX IF NOT EXISTS idx_contacts_active ON contacts (is_active);`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function buildFullName(f: ContactForm): string {
+  return [f.title, f.first_name, f.middle_name, f.last_name].filter(Boolean).join(" ").trim();
+}
+
+function buildDisplayName(f: ContactForm): string {
+  if (f.first_name || f.last_name) return [f.first_name, f.last_name].filter(Boolean).join(" ");
+  if (f.company) return f.company;
+  return "Unnamed Contact";
+}
+
+function getInitials(contact: ContactRow): string {
+  const fn = contact.first_name || "";
+  const ln = contact.last_name || "";
+  if (fn && ln) return (fn[0] + ln[0]).toUpperCase();
+  if (fn) return fn.slice(0, 2).toUpperCase();
+  if (contact.company) return contact.company.slice(0, 2).toUpperCase();
+  return "?";
+}
+
+function contactDisplayName(c: ContactRow): string {
+  if (c.first_name || c.last_name) return [c.first_name, c.last_name].filter(Boolean).join(" ");
+  if (c.display_name) return c.display_name;
+  if (c.company) return c.company;
+  return "Unnamed";
+}
+
+function contactSortKey(c: ContactRow): string {
+  return (c.first_name || c.last_name || c.company || c.display_name || "zzz").toLowerCase();
+}
+
+function getTypeColor(type: string): string {
+  return CONTACT_TYPES.find(t => t.value === type)?.color || "text-zinc-400";
+}
+
+function getTierInfo(tier: string | null) {
+  return CUSTOMER_TIERS.find(t => t.value === tier);
+}
+
+function contactToForm(c: ContactRow): ContactForm {
+  return {
+    contact_type: (c.contact_type as ContactType) || "people",
+    photo_url: c.photo_url || "",
+    title: c.title || "",
+    first_name: c.first_name || "",
+    middle_name: c.middle_name || "",
+    last_name: c.last_name || "",
+    company: c.company || "",
+    position: c.position || "",
+    country: c.country || "",
+    city: c.city || "",
+    birthday: c.birthday || "",
+    notes: c.notes || "",
+    is_active: c.is_active ?? true,
+    customer_type: (c.customer_type as CustomerTier) || "",
+    phones: Array.isArray(c.phones) ? c.phones : [],
+    emails: Array.isArray(c.emails) ? c.emails : [],
+    addresses: Array.isArray(c.addresses) ? c.addresses : [],
+    websites: Array.isArray(c.websites) ? c.websites : [],
+    social_profiles: Array.isArray(c.social_profiles) ? c.social_profiles : [],
+    family_members: Array.isArray(c.family_members) ? c.family_members : [],
+    related_names: Array.isArray(c.related_names) ? c.related_names : [],
+    custom_fields: Array.isArray(c.custom_fields) ? c.custom_fields : [],
+    business_card_front: c.business_card_front || "",
+    business_card_back: c.business_card_back || "",
+  };
+}
+
+function formToRow(f: ContactForm): Record<string, unknown> {
+  const fullName = buildFullName(f);
+  const displayName = buildDisplayName(f);
+  return {
+    contact_type: f.contact_type,
+    photo_url: f.photo_url || null,
+    title: f.title || null,
+    first_name: f.first_name || null,
+    middle_name: f.middle_name || null,
+    last_name: f.last_name || null,
+    full_name: fullName || null,
+    display_name: displayName,
+    company: f.company || null,
+    position: f.position || null,
+    email: f.emails[0]?.email || null,
+    phone: f.phones[0]?.number || null,
+    country: f.country || null,
+    city: f.city || null,
+    birthday: f.birthday || null,
+    notes: f.notes || null,
+    website: f.websites[0]?.url || null,
+    is_active: f.is_active,
+    customer_type: f.contact_type === "customer" && f.is_active ? (f.customer_type || null) : null,
+    phones: f.phones,
+    emails: f.emails,
+    addresses: f.addresses,
+    websites: f.websites,
+    social_profiles: f.social_profiles,
+    family_members: f.family_members,
+    related_names: f.related_names,
+    custom_fields: f.custom_fields,
+    business_card_front: f.business_card_front || null,
+    business_card_back: f.business_card_back || null,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export default function Contacts({ filterType }: { filterType?: ContactType } = {}) {
+  /* ── State ── */
+  const [contacts, setContacts] = useState<ContactRow[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>("list");
+  const [typeTab, setTypeTab] = useState<ContactType | "all">(filterType || "all");
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState<ContactForm>({ ...EMPTY_FORM });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [setupNeeded, setSetupNeeded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showTypeChooser, setShowTypeChooser] = useState(false);
+  const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
+
+  /* ── Load ── */
+  const loadContacts = useCallback(async () => {
+    setLoading(true);
+    const ok = await checkContactsSetup();
+    if (!ok) { setSetupNeeded(true); setLoading(false); return; }
+    const data = await fetchContacts();
+    setContacts(data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadContacts(); }, [loadContacts]);
+
+  /* ── Filtered + grouped contacts ── */
+  const filtered = useMemo(() => {
+    let list = contacts;
+    const tab = filterType || typeTab;
+    if (tab !== "all") list = list.filter(c => c.contact_type === tab);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(c =>
+        contactDisplayName(c).toLowerCase().includes(q) ||
+        (c.company || "").toLowerCase().includes(q) ||
+        (c.email || "").toLowerCase().includes(q) ||
+        (c.phone || "").includes(q)
+      );
+    }
+    return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
+  }, [contacts, typeTab, filterType, search]);
+
+  const grouped = useMemo(() => {
+    const map: Record<string, ContactRow[]> = {};
+    filtered.forEach(c => {
+      const letter = contactSortKey(c)[0]?.toUpperCase() || "#";
+      if (!map[letter]) map[letter] = [];
+      map[letter].push(c);
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
+  const selectedContact = useMemo(() => contacts.find(c => c.id === selectedId) || null, [contacts, selectedId]);
+
+  /* ── Handlers ── */
+  const handleSelectContact = (c: ContactRow) => {
+    setSelectedId(c.id);
+    setView("detail");
+    setMobileShowDetail(true);
+    setEditingId(null);
+  };
+
+  const handleAdd = (type: ContactType) => {
+    setForm({ ...EMPTY_FORM, contact_type: type });
+    setEditingId(null);
+    setView("form");
+    setShowTypeChooser(false);
+    setMobileShowDetail(true);
+    setExpandedFamily(null);
+  };
+
+  const handleEdit = () => {
+    if (!selectedContact) return;
+    setForm(contactToForm(selectedContact));
+    setEditingId(selectedContact.id);
+    setView("form");
+    setExpandedFamily(null);
+  };
+
+  const handleSave = async () => {
+    if (!form.first_name && !form.last_name && !form.company) return;
+    setSaving(true);
+    const row = formToRow(form);
+    if (editingId) {
+      const ok = await updateContact(editingId, row);
+      if (ok) {
+        await loadContacts();
+        setView("detail");
+      }
+    } else {
+      const created = await createContact(row);
+      if (created) {
+        await loadContacts();
+        setSelectedId(created.id);
+        setView("detail");
+      }
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    const ok = await deleteContact(id);
+    if (ok) {
+      setContacts(prev => prev.filter(c => c.id !== id));
+      if (selectedId === id) { setSelectedId(null); setView("list"); setMobileShowDetail(false); }
+      setDeleteConfirm(null);
+    }
+  };
+
+  const handleCancel = () => {
+    if (editingId && selectedContact) {
+      setView("detail");
+    } else {
+      setView("list");
+      setMobileShowDetail(false);
+    }
+    setEditingId(null);
+  };
+
+  const handleBack = () => {
+    setMobileShowDetail(false);
+    setView("list");
+    setEditingId(null);
+  };
+
+  const copySql = () => {
+    navigator.clipboard.writeText(MIGRATION_SQL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  /* ── Form updaters ── */
+  const setField = <K extends keyof ContactForm>(key: K, val: ContactForm[K]) =>
+    setForm(prev => ({ ...prev, [key]: val }));
+
+  const addPhone = () => setField("phones", [...form.phones, { label: "mobile", number: "" }]);
+  const removePhone = (i: number) => setField("phones", form.phones.filter((_, idx) => idx !== i));
+  const updatePhone = (i: number, field: keyof PhoneEntry, val: string) => {
+    const arr = [...form.phones]; arr[i] = { ...arr[i], [field]: val }; setField("phones", arr);
+  };
+
+  const addEmail = () => setField("emails", [...form.emails, { label: "home", email: "" }]);
+  const removeEmail = (i: number) => setField("emails", form.emails.filter((_, idx) => idx !== i));
+  const updateEmail = (i: number, field: keyof EmailEntry, val: string) => {
+    const arr = [...form.emails]; arr[i] = { ...arr[i], [field]: val }; setField("emails", arr);
+  };
+
+  const addAddress = () => setField("addresses", [...form.addresses, { label: "home", street: "", city: "", state: "", zip: "", country: "" }]);
+  const removeAddress = (i: number) => setField("addresses", form.addresses.filter((_, idx) => idx !== i));
+  const updateAddress = (i: number, field: keyof AddressEntry, val: string) => {
+    const arr = [...form.addresses]; arr[i] = { ...arr[i], [field]: val }; setField("addresses", arr);
+  };
+
+  const addWebsite = () => setField("websites", [...form.websites, { label: "homepage", url: "" }]);
+  const removeWebsite = (i: number) => setField("websites", form.websites.filter((_, idx) => idx !== i));
+  const updateWebsite = (i: number, field: keyof WebsiteEntry, val: string) => {
+    const arr = [...form.websites]; arr[i] = { ...arr[i], [field]: val }; setField("websites", arr);
+  };
+
+  const addSocial = () => setField("social_profiles", [...form.social_profiles, { platform: "WhatsApp", username: "", url: "", qr_code_url: "" }]);
+  const removeSocial = (i: number) => setField("social_profiles", form.social_profiles.filter((_, idx) => idx !== i));
+  const updateSocial = (i: number, field: keyof SocialProfile, val: string) => {
+    const arr = [...form.social_profiles]; arr[i] = { ...arr[i], [field]: val }; setField("social_profiles", arr);
+  };
+
+  const addRelated = () => setField("related_names", [...form.related_names, { name: "", relationship: "friend" }]);
+  const removeRelated = (i: number) => setField("related_names", form.related_names.filter((_, idx) => idx !== i));
+  const updateRelated = (i: number, field: keyof RelatedName, val: string) => {
+    const arr = [...form.related_names]; arr[i] = { ...arr[i], [field]: val }; setField("related_names", arr);
+  };
+
+  const addFamily = () => setField("family_members", [...form.family_members, {
+    relationship: "Spouse", title: "", first_name: "", middle_name: "", last_name: "",
+    phone: "", email: "", birthday: "", notes: "", photo_url: "",
+  }]);
+  const removeFamily = (i: number) => {
+    setField("family_members", form.family_members.filter((_, idx) => idx !== i));
+    if (expandedFamily === i) setExpandedFamily(null);
+  };
+  const updateFamily = (i: number, field: keyof FamilyMember, val: string) => {
+    const arr = [...form.family_members]; arr[i] = { ...arr[i], [field]: val }; setField("family_members", arr);
+  };
+
+  const addCustomField = () => setField("custom_fields", [...form.custom_fields, { field_name: "", field_value: "" }]);
+  const removeCustomField = (i: number) => setField("custom_fields", form.custom_fields.filter((_, idx) => idx !== i));
+  const updateCustomField = (i: number, field: keyof CustomField, val: string) => {
+    const arr = [...form.custom_fields]; arr[i] = { ...arr[i], [field]: val }; setField("custom_fields", arr);
+  };
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     SETUP SCREEN
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  if (setupNeeded) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="text-amber-400" size={32} />
+            </div>
+            <h1 className="text-2xl font-semibold mb-2">Database Setup Required</h1>
+            <p className="text-white/50 text-sm">
+              The contacts table needs additional columns. Copy the SQL below and run it in your
+              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ml-1">
+                Supabase Dashboard
+              </a>
+              {" "}→ SQL Editor → New Query.
+            </p>
+          </div>
+
+          <div className="relative rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/[0.03]">
+              <span className="text-xs text-white/40 font-mono">SQL Migration</span>
+              <button onClick={copySql} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors">
+                {copied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy</>}
+              </button>
+            </div>
+            <pre className="p-4 text-xs text-white/70 font-mono overflow-x-auto max-h-80 overflow-y-auto leading-relaxed">
+              {MIGRATION_SQL}
+            </pre>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+              Back to Hub
+            </Link>
+            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 transition-colors">
+              I&apos;ve Run the SQL — Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     LOADING
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     RENDER: CONTACT LIST PANEL
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  const renderListPanel = () => (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between mb-3">
+          <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm">
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">Hub</span>
+          </Link>
+          <h1 className="text-lg font-semibold text-white">
+            {filterType ? CONTACT_TYPES.find(t => t.value === filterType)?.label + "s" : "Contacts"}
+          </h1>
+          <button
+            onClick={() => setShowTypeChooser(true)}
+            className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 flex items-center justify-center transition-colors"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <input
+            type="text"
+            placeholder="Search contacts..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/30 outline-none focus:border-blue-500/50 transition-colors"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Type tabs */}
+        {!filterType && (
+          <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setTypeTab("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                typeTab === "all" ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              All ({contacts.length})
+            </button>
+            {CONTACT_TYPES.map(t => {
+              const count = contacts.filter(c => c.contact_type === t.value).length;
+              return (
+                <button
+                  key={t.value}
+                  onClick={() => setTypeTab(t.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                    typeTab === t.value ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  {t.icon} {t.label}s ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Contact list */}
+      <div className="flex-1 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-white/30 gap-2">
+            <Users size={32} />
+            <p className="text-sm">No contacts found</p>
+          </div>
+        ) : (
+          grouped.map(([letter, items]) => (
+            <div key={letter}>
+              <div className="px-4 py-1.5 text-xs font-semibold text-white/30 bg-white/[0.02] sticky top-0 backdrop-blur-sm">
+                {letter}
+              </div>
+              {items.map(c => {
+                const isSelected = selectedId === c.id;
+                const tierInfo = c.contact_type === "customer" ? getTierInfo(c.customer_type) : null;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSelectContact(c)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.04] ${
+                      isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden">
+                      {c.photo_url ? (
+                        <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(c)
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white truncate">
+                          {contactDisplayName(c)}
+                        </span>
+                        {tierInfo && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${tierInfo.bg} ${tierInfo.color} font-medium`}>
+                            {tierInfo.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
+                          {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
+                        </span>
+                        {c.company && (
+                          <span className="text-xs text-white/30 truncate">· {c.company}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <ChevronRight size={14} className="text-white/20 shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     RENDER: CONTACT DETAIL PANEL
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  const renderDetailPanel = () => {
+    if (!selectedContact) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-white/20 gap-3">
+          <User size={48} />
+          <p className="text-sm">Select a contact to view details</p>
+        </div>
+      );
+    }
+
+    const c = selectedContact;
+    const tierInfo = c.contact_type === "customer" ? getTierInfo(c.customer_type) : null;
+    const phones: PhoneEntry[] = Array.isArray(c.phones) ? c.phones : [];
+    const emails: EmailEntry[] = Array.isArray(c.emails) ? c.emails : [];
+    const addresses: AddressEntry[] = Array.isArray(c.addresses) ? c.addresses : [];
+    const websitesList: WebsiteEntry[] = Array.isArray(c.websites) ? c.websites : [];
+    const socials: SocialProfile[] = Array.isArray(c.social_profiles) ? c.social_profiles : [];
+    const family: FamilyMember[] = Array.isArray(c.family_members) ? c.family_members : [];
+    const related: RelatedName[] = Array.isArray(c.related_names) ? c.related_names : [];
+    const customs: CustomField[] = Array.isArray(c.custom_fields) ? c.custom_fields : [];
+
+    const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+      <div className="border-b border-white/[0.06] px-6 py-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-white/30">{icon}</span>
+          <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
+        </div>
+        {children}
+      </div>
+    );
+
+    return (
+      <div className="h-full overflow-y-auto">
+        {/* Back button (mobile) */}
+        <div className="md:hidden px-4 py-3 border-b border-white/[0.06]">
+          <button onClick={handleBack} className="flex items-center gap-2 text-blue-400 text-sm">
+            <ArrowLeft size={16} /> Contacts
+          </button>
+        </div>
+
+        {/* Header card */}
+        <div className="px-6 py-8 text-center border-b border-white/[0.06]">
+          <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden">
+            {c.photo_url ? (
+              <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              getInitials(c)
+            )}
+          </div>
+          <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
+          {c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          {c.company && <p className="text-sm text-white/40">{c.company}</p>}
+
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-white/10 ${getTypeColor(c.contact_type)}`}>
+              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
+            </span>
+            {tierInfo && (
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tierInfo.bg} ${tierInfo.color}`}>
+                {tierInfo.label}
+              </span>
+            )}
+            {!c.is_active && (
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/20 text-red-400">
+                Inactive
+              </span>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-center gap-2 mt-5">
+            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm transition-colors">
+              <Edit3 size={14} /> Edit
+            </button>
+            <button
+              onClick={() => setDeleteConfirm(c.id)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          </div>
+        </div>
+
+        {/* Phone numbers */}
+        {(phones.length > 0 || c.phone) && (
+          <Section title="Phone" icon={<Phone size={14} />}>
+            {phones.map((p, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5">
+                <div>
+                  <span className="text-xs text-blue-400 font-medium">{p.label}</span>
+                  <p className="text-sm text-white">{p.number}</p>
+                </div>
+              </div>
+            ))}
+            {phones.length === 0 && c.phone && (
+              <p className="text-sm text-white">{c.phone}</p>
+            )}
+          </Section>
+        )}
+
+        {/* Emails */}
+        {(emails.length > 0 || c.email) && (
+          <Section title="Email" icon={<Mail size={14} />}>
+            {emails.map((e, i) => (
+              <div key={i} className="py-1.5">
+                <span className="text-xs text-blue-400 font-medium">{e.label}</span>
+                <p className="text-sm text-white">{e.email}</p>
+              </div>
+            ))}
+            {emails.length === 0 && c.email && (
+              <p className="text-sm text-white">{c.email}</p>
+            )}
+          </Section>
+        )}
+
+        {/* Addresses */}
+        {addresses.length > 0 && (
+          <Section title="Address" icon={<MapPin size={14} />}>
+            {addresses.map((a, i) => (
+              <div key={i} className="py-1.5">
+                <span className="text-xs text-blue-400 font-medium">{a.label}</span>
+                <p className="text-sm text-white">
+                  {[a.street, a.city, a.state, a.zip, a.country].filter(Boolean).join(", ")}
+                </p>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Country / City */}
+        {(c.country || c.city) && (
+          <Section title="Location" icon={<MapPin size={14} />}>
+            <p className="text-sm text-white">{[c.city, c.country].filter(Boolean).join(", ")}</p>
+          </Section>
+        )}
+
+        {/* Websites */}
+        {(websitesList.length > 0 || c.website) && (
+          <Section title="Website" icon={<Globe size={14} />}>
+            {websitesList.map((w, i) => (
+              <div key={i} className="py-1.5">
+                <span className="text-xs text-blue-400 font-medium">{w.label}</span>
+                <p className="text-sm text-blue-400 hover:underline cursor-pointer">{w.url}</p>
+              </div>
+            ))}
+            {websitesList.length === 0 && c.website && (
+              <p className="text-sm text-blue-400">{c.website}</p>
+            )}
+          </Section>
+        )}
+
+        {/* Birthday */}
+        {c.birthday && (
+          <Section title="Birthday" icon={<Calendar size={14} />}>
+            <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+          </Section>
+        )}
+
+        {/* Social Profiles */}
+        {socials.length > 0 && (
+          <Section title="Social Profiles" icon={<Share2 size={14} />}>
+            {socials.map((s, i) => (
+              <div key={i} className="flex items-center gap-3 py-2">
+                <div className="flex-1">
+                  <span className="text-xs text-blue-400 font-medium">{s.platform}</span>
+                  <p className="text-sm text-white">{s.username || s.url}</p>
+                </div>
+                {s.qr_code_url && (
+                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-white/10" />
+                )}
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Related Names */}
+        {related.length > 0 && (
+          <Section title="Related Names" icon={<Users size={14} />}>
+            {related.map((r, i) => (
+              <div key={i} className="py-1.5">
+                <span className="text-xs text-blue-400 font-medium">{r.relationship}</span>
+                <p className="text-sm text-white">{r.name}</p>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Family Members */}
+        {family.length > 0 && (
+          <Section title="Family Members" icon={<Heart size={14} />}>
+            {family.map((f, i) => (
+              <div key={i} className="py-2 border-b border-white/[0.04] last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50 overflow-hidden">
+                    {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" /> : (f.first_name?.[0] || "?").toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="text-xs text-blue-400 font-medium">{f.relationship}</span>
+                    <p className="text-sm text-white">{[f.title, f.first_name, f.middle_name, f.last_name].filter(Boolean).join(" ")}</p>
+                  </div>
+                </div>
+                {(f.phone || f.email) && (
+                  <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
+                    {f.phone && <p>Phone: {f.phone}</p>}
+                    {f.email && <p>Email: {f.email}</p>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Business Card (customers only) */}
+        {c.contact_type === "customer" && (c.business_card_front || c.business_card_back) && (
+          <Section title="Business Card" icon={<CreditCard size={14} />}>
+            <div className="grid grid-cols-2 gap-3">
+              {c.business_card_front && (
+                <div>
+                  <span className="text-xs text-white/40 mb-1.5 block">Front</span>
+                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-white/10" />
+                </div>
+              )}
+              {c.business_card_back && (
+                <div>
+                  <span className="text-xs text-white/40 mb-1.5 block">Back</span>
+                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-white/10" />
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* Custom Fields */}
+        {customs.length > 0 && (
+          <Section title="Custom Fields" icon={<FileText size={14} />}>
+            {customs.map((cf, i) => (
+              <div key={i} className="py-1.5">
+                <span className="text-xs text-blue-400 font-medium">{cf.field_name}</span>
+                <p className="text-sm text-white">{cf.field_value}</p>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Notes */}
+        {c.notes && (
+          <Section title="Notes" icon={<FileText size={14} />}>
+            <p className="text-sm text-white/70 whitespace-pre-wrap">{c.notes}</p>
+          </Section>
+        )}
+
+        {/* Delete confirm */}
+        {deleteConfirm === c.id && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-semibold text-white mb-2">Delete Contact</h3>
+              <p className="text-sm text-white/50 mb-6">
+                Are you sure you want to delete <strong className="text-white">{contactDisplayName(c)}</strong>? This cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-white/10 hover:bg-white/5 transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => handleDelete(c.id)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     RENDER: FORM PANEL
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  const renderFormPanel = () => {
+    const isCustomer = form.contact_type === "customer";
+
+    /* ── Reusable form pieces ── */
+    const Input = ({ label, value, onChange, type = "text", placeholder }: {
+      label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+    }) => (
+      <div>
+        <label className="text-xs text-white/40 mb-1 block">{label}</label>
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder || label}
+          className="w-full h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50 transition-colors"
+        />
+      </div>
+    );
+
+    const SelectInput = ({ label, value, onChange, options }: {
+      label: string; value: string; onChange: (v: string) => void; options: string[];
+    }) => (
+      <div>
+        <label className="text-xs text-white/40 mb-1 block">{label}</label>
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none focus:border-blue-500/50 transition-colors appearance-none cursor-pointer"
+        >
+          <option value="" className="bg-zinc-900">Select...</option>
+          {options.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}
+        </select>
+      </div>
+    );
+
+    const AddButton = ({ label, onClick }: { label: string; onClick: () => void }) => (
+      <button onClick={onClick} className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 py-2 transition-colors">
+        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+          <Plus size={14} className="text-white" />
+        </div>
+        {label}
+      </button>
+    );
+
+    const RemoveBtn = ({ onClick }: { onClick: () => void }) => (
+      <button onClick={onClick} className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 hover:bg-red-400 transition-colors">
+        <Minus size={14} className="text-white" />
+      </button>
+    );
+
+    const LabelSelect = ({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) => (
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="h-10 px-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none cursor-pointer min-w-[80px]"
+      >
+        {options.map(o => <option key={o} value={o} className="bg-zinc-900 text-white">{o}</option>)}
+      </select>
+    );
+
+    const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+      <div className="border-b border-white/[0.06] px-6 py-5">
+        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
+        {children}
+      </div>
+    );
+
+    return (
+      <div className="h-full overflow-y-auto">
+        {/* Form header */}
+        <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-zinc-950 z-10">
+          <div className="flex items-center gap-3">
+            <button onClick={handleBack} className="md:hidden text-blue-400">
+              <ArrowLeft size={18} />
+            </button>
+            <h2 className="text-lg font-semibold text-white">
+              {editingId ? "Edit Contact" : "New Contact"}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleCancel} className="px-4 py-2 rounded-lg text-sm border border-white/10 hover:bg-white/5 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || (!form.first_name && !form.last_name && !form.company)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Save size={14} />}
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </div>
+
+        {/* Photo + Type */}
+        <div className="px-6 py-6 text-center border-b border-white/[0.06]">
+          <div className="w-28 h-28 rounded-full bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden">
+            {form.photo_url ? (
+              <img src={form.photo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-white/20 mb-1" />
+                <div className="w-14 h-7 rounded-t-full bg-white/15" />
+              </div>
+            )}
+          </div>
+          {form.photo_url ? (
+            <div className="flex items-center justify-center gap-3">
+              <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
+                Change Photo
+                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) { const r = new FileReader(); r.onload = () => setField("photo_url", r.result as string); r.readAsDataURL(file); }
+                }} />
+              </label>
+              <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">Remove</button>
+            </div>
+          ) : (
+            <label className="inline-block px-5 py-2 rounded-full bg-white/10 hover:bg-white/15 text-sm text-white/70 font-medium cursor-pointer transition-colors">
+              Add Photo
+              <input type="file" accept="image/*" className="hidden" onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) { const r = new FileReader(); r.onload = () => setField("photo_url", r.result as string); r.readAsDataURL(file); }
+              }} />
+            </label>
+          )}
+
+          {/* Contact Type selector */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            {CONTACT_TYPES.map(t => (
+              <button
+                key={t.value}
+                onClick={() => setField("contact_type", t.value)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                  form.contact_type === t.value
+                    ? `border-white/20 bg-white/10 ${t.color}`
+                    : "border-white/[0.06] text-white/30 hover:text-white/50"
+                }`}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Basic Info */}
+        <FormSection title="Basic Information">
+          <div className="space-y-3">
+            <SelectInput label="Title" value={form.title} onChange={v => setField("title", v)} options={TITLES} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="First Name" value={form.first_name} onChange={v => setField("first_name", v)} />
+              <Input label="Middle Name" value={form.middle_name} onChange={v => setField("middle_name", v)} />
+            </div>
+            <Input label="Last Name / Family Name" value={form.last_name} onChange={v => setField("last_name", v)} />
+            <Input label="Company" value={form.company} onChange={v => setField("company", v)} />
+            <Input label="Position" value={form.position} onChange={v => setField("position", v)} />
+          </div>
+        </FormSection>
+
+        {/* Phones */}
+        <FormSection title="Phone Numbers">
+          {form.phones.map((p, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removePhone(i)} />
+              <LabelSelect value={p.label} onChange={v => updatePhone(i, "label", v)} options={PHONE_LABELS} />
+              <input
+                type="tel"
+                value={p.number}
+                onChange={e => updatePhone(i, "number", e.target.value)}
+                placeholder="Phone number"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+              />
+            </div>
+          ))}
+          <AddButton label="add phone" onClick={addPhone} />
+        </FormSection>
+
+        {/* Emails */}
+        <FormSection title="Email Addresses">
+          {form.emails.map((e, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removeEmail(i)} />
+              <LabelSelect value={e.label} onChange={v => updateEmail(i, "label", v)} options={EMAIL_LABELS} />
+              <input
+                type="email"
+                value={e.email}
+                onChange={ev => updateEmail(i, "email", ev.target.value)}
+                placeholder="Email address"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+              />
+            </div>
+          ))}
+          <AddButton label="add email" onClick={addEmail} />
+        </FormSection>
+
+        {/* Addresses */}
+        <FormSection title="Addresses">
+          {form.addresses.map((a, i) => (
+            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center gap-2 mb-3">
+                <RemoveBtn onClick={() => removeAddress(i)} />
+                <LabelSelect value={a.label} onChange={v => updateAddress(i, "label", v)} options={ADDRESS_LABELS} />
+              </div>
+              <div className="space-y-2 ml-8">
+                <input value={a.street} onChange={e => updateAddress(i, "street", e.target.value)} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={a.city} onChange={e => updateAddress(i, "city", e.target.value)} placeholder="City" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  <input value={a.state} onChange={e => updateAddress(i, "state", e.target.value)} placeholder="State" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={a.zip} onChange={e => updateAddress(i, "zip", e.target.value)} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  <input value={a.country} onChange={e => updateAddress(i, "country", e.target.value)} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                </div>
+              </div>
+            </div>
+          ))}
+          <AddButton label="add address" onClick={addAddress} />
+        </FormSection>
+
+        {/* Location (country/city top-level) */}
+        <FormSection title="Location">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Country" value={form.country} onChange={v => setField("country", v)} />
+            <Input label="City" value={form.city} onChange={v => setField("city", v)} />
+          </div>
+        </FormSection>
+
+        {/* Websites */}
+        <FormSection title="Websites">
+          {form.websites.map((w, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removeWebsite(i)} />
+              <LabelSelect value={w.label} onChange={v => updateWebsite(i, "label", v)} options={WEBSITE_LABELS} />
+              <input
+                type="url"
+                value={w.url}
+                onChange={e => updateWebsite(i, "url", e.target.value)}
+                placeholder="https://"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+              />
+            </div>
+          ))}
+          <AddButton label="add website" onClick={addWebsite} />
+        </FormSection>
+
+        {/* Birthday */}
+        <FormSection title="Birthday">
+          <Input label="Birthday" value={form.birthday} onChange={v => setField("birthday", v)} type="date" />
+        </FormSection>
+
+        {/* Social Profiles */}
+        <FormSection title="Social Profiles">
+          {form.social_profiles.map((s, i) => (
+            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center gap-2 mb-3">
+                <RemoveBtn onClick={() => removeSocial(i)} />
+                <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} />
+              </div>
+              <div className="space-y-2 ml-8">
+                <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder="Username / Handle" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder="Profile URL" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">QR Code Image URL</label>
+                  <input value={s.qr_code_url} onChange={e => updateSocial(i, "qr_code_url", e.target.value)} placeholder="QR Code image URL" className="w-full h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50" />
+                  {s.qr_code_url && (
+                    <img src={s.qr_code_url} alt="QR" className="w-16 h-16 mt-2 rounded border border-white/10" />
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          <AddButton label="add social profile" onClick={addSocial} />
+        </FormSection>
+
+        {/* Related Names */}
+        <FormSection title="Related Names">
+          {form.related_names.map((r, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removeRelated(i)} />
+              <LabelSelect value={r.relationship} onChange={v => updateRelated(i, "relationship", v)} options={RELATIONSHIP_LABELS} />
+              <input
+                value={r.name}
+                onChange={e => updateRelated(i, "name", e.target.value)}
+                placeholder="Name"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+              />
+            </div>
+          ))}
+          <AddButton label="add related name" onClick={addRelated} />
+        </FormSection>
+
+        {/* Family Members */}
+        <FormSection title="Family Members">
+          {form.family_members.map((f, i) => (
+            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+              <div className="flex items-center gap-2 p-3">
+                <RemoveBtn onClick={() => removeFamily(i)} />
+                <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={FAMILY_RELATIONSHIPS} />
+                <input
+                  value={f.first_name}
+                  onChange={e => updateFamily(i, "first_name", e.target.value)}
+                  placeholder="First Name"
+                  className="flex-1 h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+                />
+                <button
+                  onClick={() => setExpandedFamily(expandedFamily === i ? null : i)}
+                  className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                >
+                  <ChevronDown size={14} className={`transition-transform ${expandedFamily === i ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+              {expandedFamily === i && (
+                <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.04]">
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <select value={f.title} onChange={e => updateFamily(i, "title", e.target.value)} className="h-9 px-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none">
+                      <option value="" className="bg-zinc-900">Title</option>
+                      {TITLES.map(t => <option key={t} value={t} className="bg-zinc-900">{t}</option>)}
+                    </select>
+                    <input value={f.middle_name} onChange={e => updateFamily(i, "middle_name", e.target.value)} placeholder="Middle Name" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder="Last Name" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none" />
+                  </div>
+                  <input type="date" value={f.birthday} onChange={e => updateFamily(i, "birthday", e.target.value)} className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white outline-none w-full" />
+                  <input value={f.photo_url} onChange={e => updateFamily(i, "photo_url", e.target.value)} placeholder="Photo URL" className="h-9 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none w-full" />
+                  <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                </div>
+              )}
+            </div>
+          ))}
+          <AddButton label="add family member" onClick={addFamily} />
+        </FormSection>
+
+        {/* Notes */}
+        <FormSection title="Notes">
+          <textarea
+            value={form.notes}
+            onChange={e => setField("notes", e.target.value)}
+            placeholder="Add notes..."
+            rows={4}
+            className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50 resize-none"
+          />
+        </FormSection>
+
+        {/* Custom Fields */}
+        <FormSection title="Custom Fields">
+          {form.custom_fields.map((cf, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removeCustomField(i)} />
+              <input
+                value={cf.field_name}
+                onChange={e => updateCustomField(i, "field_name", e.target.value)}
+                placeholder="Field Name"
+                className="w-32 h-10 px-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none"
+              />
+              <input
+                value={cf.field_value}
+                onChange={e => updateCustomField(i, "field_value", e.target.value)}
+                placeholder="Value"
+                className="flex-1 h-10 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/50"
+              />
+            </div>
+          ))}
+          <AddButton label="add field" onClick={addCustomField} />
+        </FormSection>
+
+        {/* Business Card (customers only) */}
+        {isCustomer && (
+          <FormSection title="Business Card">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Front</label>
+                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                  {form.business_card_front ? (
+                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-white/30">
+                      <CreditCard size={20} />
+                      <span className="text-xs">Upload Front</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) { const r = new FileReader(); r.onload = () => setField("business_card_front", r.result as string); r.readAsDataURL(file); }
+                  }} />
+                </label>
+                {form.business_card_front && (
+                  <button onClick={() => setField("business_card_front", "")} className="text-xs text-red-400 mt-1 hover:text-red-300">Remove</button>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Back</label>
+                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-white/10 hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                  {form.business_card_back ? (
+                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-white/30">
+                      <CreditCard size={20} />
+                      <span className="text-xs">Upload Back</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) { const r = new FileReader(); r.onload = () => setField("business_card_back", r.result as string); r.readAsDataURL(file); }
+                  }} />
+                </label>
+                {form.business_card_back && (
+                  <button onClick={() => setField("business_card_back", "")} className="text-xs text-red-400 mt-1 hover:text-red-300">Remove</button>
+                )}
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* Customer Type (only for customer contacts) */}
+        {isCustomer && (
+          <FormSection title="Customer Type">
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={e => setField("is_active", e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-white/5 accent-blue-500"
+                />
+                <span className="text-sm text-white">Active Customer</span>
+              </label>
+
+              {form.is_active && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {CUSTOMER_TIERS.map(tier => (
+                    <button
+                      key={tier.value}
+                      onClick={() => setField("customer_type", form.customer_type === tier.value ? "" : tier.value)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                        form.customer_type === tier.value
+                          ? `${tier.bg} ${tier.color} border-white/20 ring-1 ring-white/10`
+                          : "border-white/[0.06] text-white/30 hover:text-white/50 hover:border-white/10"
+                      }`}
+                    >
+                      {tier.value === "end_user" && <User size={14} />}
+                      {tier.value === "silver" && <Shield size={14} />}
+                      {tier.value === "gold" && <Star size={14} />}
+                      {tier.value === "platinum" && <Award size={14} />}
+                      {tier.value === "diamond" && <Gem size={14} />}
+                      {tier.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </FormSection>
+        )}
+
+        {/* Spacer at bottom */}
+        <div className="h-20" />
+      </div>
+    );
+  };
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     TYPE CHOOSER MODAL
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  const renderTypeChooser = () => (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowTypeChooser(false)}>
+      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold text-white mb-1">New Contact</h3>
+        <p className="text-sm text-white/40 mb-5">Choose the contact type</p>
+        <div className="grid grid-cols-2 gap-3">
+          {CONTACT_TYPES.map(t => (
+            <button
+              key={t.value}
+              onClick={() => handleAdd(t.value)}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-white/[0.08] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
+            >
+              <div className="w-12 h-12 rounded-full bg-white/[0.06] flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
+                {t.icon}
+              </div>
+              <span className="text-sm font-medium">{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowTypeChooser(false)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-white/[0.06] hover:bg-white/5 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     MAIN LAYOUT
+     ═════════════════════════════════════════════════════════════════════════ */
+
+  return (
+    <div className="h-screen bg-black text-white flex">
+      {/* Left panel — contact list */}
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-white/[0.06] shrink-0 h-full bg-zinc-950`}>
+        {renderListPanel()}
+      </div>
+
+      {/* Right panel — detail / form */}
+      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 h-full bg-black`}>
+        {view === "form" ? renderFormPanel() : renderDetailPanel()}
+      </div>
+
+      {/* Type chooser modal */}
+      {showTypeChooser && renderTypeChooser()}
+    </div>
+  );
+}
