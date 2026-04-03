@@ -272,6 +272,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
   const displayName = buildDisplayName(f);
   return {
     contact_type: f.contact_type,
+    entity_type: f.contact_type === "company" ? "company" : "person",
     photo_url: f.photo_url || null,
     title: f.title || null,
     first_name: f.first_name || null,
