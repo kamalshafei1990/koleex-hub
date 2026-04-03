@@ -95,6 +95,15 @@ const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebo
 const RELATIONSHIP_LABELS = ["spouse", "child", "parent", "sibling", "friend", "colleague", "assistant", "manager", "partner", "other"];
 const FAMILY_RELATIONSHIPS = ["Spouse", "Son", "Daughter", "Father", "Mother", "Brother", "Sister", "Grandfather", "Grandmother", "Uncle", "Aunt", "Cousin", "Other"];
 
+/** Countries where Province/State is commonly used in addresses */
+const COUNTRIES_WITH_STATES = new Set([
+  "US", "CA", "AU", "IN", "BR", "MX", "CN", "JP", "RU", "AR", "CL",
+  "CO", "VE", "PE", "NG", "ZA", "MY", "ID", "PH", "TH", "KR", "MM",
+  "PK", "BD", "VN", "DE", "AT", "CH", "IT", "ES", "NL", "BE", "AE",
+  "SA", "IR", "IQ", "TR", "UA", "PL", "RO", "CZ", "SE", "NO", "FI",
+  "NZ", "KE", "TZ", "ET", "GH",
+]);
+
 const EMPTY_FORM: ContactForm = {
   contact_type: "customer",
   photo_url: "",
@@ -361,23 +370,23 @@ function SelectInput({ label, value, onChange, options }: {
   );
 }
 
-/* ── Green add button ── */
+/* ── Add button ── */
 function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 py-2 transition-colors">
-      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-        <Plus size={14} className="text-white" />
+    <button onClick={onClick} className="flex items-center gap-2 text-sm text-white/50 hover:text-white py-2 transition-colors">
+      <div className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center">
+        <Plus size={14} className="text-white/60" />
       </div>
       {label}
     </button>
   );
 }
 
-/* ── Red remove button ── */
+/* ── Remove button ── */
 function RemoveBtn({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 hover:bg-red-400 transition-colors">
-      <Minus size={14} className="text-white" />
+    <button onClick={onClick} className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center shrink-0 hover:bg-white/20 transition-colors">
+      <Minus size={14} className="text-white/60" />
     </button>
   );
 }
@@ -388,7 +397,7 @@ function LabelSelect({ value, onChange, options }: { value: string; onChange: (v
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="h-10 px-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none cursor-pointer min-w-[80px]"
+      className="h-10 px-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/60 font-medium outline-none cursor-pointer min-w-[80px]"
     >
       {options.map(o => <option key={o} value={o} className="bg-[#111] text-white">{o}</option>)}
     </select>
@@ -1372,9 +1381,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderFormPanel = () => {
     const isCustomer = form.contact_type === "customer";
 
-    /* Determine if province dropdown should show */
-    const statesForCountry = form.country_code ? State.getStatesOfCountry(form.country_code) : [];
-    const hasStates = statesForCountry.length > 0;
+    /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
+    const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
 
     /* City always shows once country is selected; province is optional */
     const showCity = !!form.country_code;
@@ -1729,16 +1737,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Business Card (customers only) */}
         {isCustomer && (
           <FormSection title="Business Card">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Front</label>
-                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.75/1] rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_front ? (
-                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" />
+                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-contain" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-white/30">
-                      <CreditCard size={20} />
-                      <span className="text-xs">Upload Front</span>
+                    <div className="flex flex-col items-center gap-2 text-white/30">
+                      <CreditCard size={28} />
+                      <span className="text-sm">Upload Front</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
@@ -1747,18 +1755,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   }} />
                 </label>
                 {form.business_card_front && (
-                  <button onClick={() => setField("business_card_front", "")} className="text-xs text-red-400 mt-1 hover:text-red-300">Remove</button>
+                  <button onClick={() => setField("business_card_front", "")} className="text-xs text-white/30 hover:text-white mt-1.5">Remove</button>
                 )}
               </div>
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Back</label>
-                <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.75/1] rounded-xl border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_back ? (
-                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" />
+                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-contain" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-white/30">
-                      <CreditCard size={20} />
-                      <span className="text-xs">Upload Back</span>
+                    <div className="flex flex-col items-center gap-2 text-white/30">
+                      <CreditCard size={28} />
+                      <span className="text-sm">Upload Back</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
@@ -1767,7 +1775,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   }} />
                 </label>
                 {form.business_card_back && (
-                  <button onClick={() => setField("business_card_back", "")} className="text-xs text-red-400 mt-1 hover:text-red-300">Remove</button>
+                  <button onClick={() => setField("business_card_back", "")} className="text-xs text-white/30 hover:text-white mt-1.5">Remove</button>
                 )}
               </div>
             </div>
@@ -1857,7 +1865,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   return (
     <div className="h-screen bg-[#0A0A0A] text-white flex overflow-hidden">
       {/* Left panel -- contact list */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111]`}>
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111] min-w-0`}>
         {renderListPanel()}
       </div>
 
