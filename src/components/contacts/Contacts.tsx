@@ -512,38 +512,45 @@ const Section = React.memo(function Section({ title, icon, children }: { title: 
 });
 
 /* ── Form text input ── */
-const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder, icon }: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; icon?: React.ReactNode;
 }) {
   return (
     <div>
       <label className="text-xs text-white/40 mb-1 block">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder || label}
-        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-colors"
-      />
+      <div className="relative">
+        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">{icon}</span>}
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder || label}
+          className={`w-full h-10 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-colors ${icon ? "pl-9 pr-3" : "px-3"}`}
+        />
+      </div>
     </div>
   );
 });
 
 /* ── Form select input ── */
-const SelectInput = React.memo(function SelectInput({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void; options: string[];
+const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;
 }) {
   return (
     <div>
       <label className="text-xs text-white/40 mb-1 block">{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer"
-      >
-        <option value="" className="bg-[#111]">Select...</option>
-        {options.map(o => <option key={o} value={o} className="bg-[#111]">{o}</option>)}
-      </select>
+      <div className="relative">
+        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">{icon}</span>}
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className={`w-full h-10 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer ${icon ? "pl-9 pr-3" : "px-3"}`}
+        >
+          <option value="" className="bg-[#111]">Select...</option>
+          {options.map(o => <option key={o} value={o} className="bg-[#111]">{o}</option>)}
+        </select>
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+      </div>
     </div>
   );
 });
@@ -583,10 +590,13 @@ const LabelSelect = React.memo(function LabelSelect({ value, onChange, options }
 });
 
 /* ── Form section wrapper ── */
-const FormSection = React.memo(function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+const FormSection = React.memo(function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="border-b border-[#222] px-4 md:px-6 py-4 md:py-5">
-      <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
+      <div className="flex items-center gap-2 mb-4">
+        {icon && <span className="text-white/25">{icon}</span>}
+        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
+      </div>
       {children}
     </div>
   );
@@ -2056,7 +2066,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </div>
 
         {/* Basic Info */}
-        <FormSection title="Basic Information">
+        <FormSection title="Basic Information" icon={<User size={14} />}>
           <div className="space-y-3">
             <SelectInput label="Title" value={form.title} onChange={v => setField("title", v)} options={TITLES} />
             <div className="grid grid-cols-2 gap-3">
@@ -2064,13 +2074,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <Input label="Middle Name" value={form.middle_name} onChange={v => setField("middle_name", v)} />
             </div>
             <Input label="Last Name / Family Name" value={form.last_name} onChange={v => setField("last_name", v)} />
-            <Input label="Company" value={form.company} onChange={v => setField("company", v)} />
-            <Input label="Position" value={form.position} onChange={v => setField("position", v)} />
+            <Input label="Company" value={form.company} onChange={v => setField("company", v)} icon={<Building2 size={14} />} />
+            <Input label="Position" value={form.position} onChange={v => setField("position", v)} icon={<Briefcase size={14} />} />
           </div>
         </FormSection>
 
         {/* Phones */}
-        <FormSection title="Phone Numbers">
+        <FormSection title="Phone Numbers" icon={<Phone size={14} />}>
           {form.phones.map((p, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removePhone(i)} />
@@ -2088,7 +2098,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Emails */}
-        <FormSection title="Email Addresses">
+        <FormSection title="Email Addresses" icon={<Mail size={14} />}>
           {form.emails.map((e, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeEmail(i)} />
@@ -2106,7 +2116,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Addresses */}
-        <FormSection title="Addresses">
+        <FormSection title="Addresses" icon={<MapPin size={14} />}>
           {form.addresses.map((a, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
               <div className="flex items-center gap-2 mb-3">
@@ -2130,7 +2140,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Location (country/province/city cascade) */}
-        <FormSection title="Location">
+        <FormSection title="Location" icon={<MapPinned size={14} />}>
           <div className="space-y-3">
             <CountryDropdown
               value={form.country_code}
@@ -2157,7 +2167,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Websites */}
-        <FormSection title="Websites">
+        <FormSection title="Websites" icon={<Globe size={14} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeWebsite(i)} />
@@ -2175,12 +2185,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Birthday */}
-        <FormSection title="Birthday">
+        <FormSection title="Birthday" icon={<Calendar size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
         </FormSection>
 
         {/* Social Profiles */}
-        <FormSection title="Social Profiles">
+        <FormSection title="Social Profiles" icon={<Share2 size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
               <div className="flex items-center gap-2 mb-3">
@@ -2216,7 +2226,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Related People */}
-        <FormSection title="Related People">
+        <FormSection title="Related People" icon={<Users size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
               <div className="flex items-center gap-2 p-3">
@@ -2251,7 +2261,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Notes */}
-        <FormSection title="Notes">
+        <FormSection title="Notes" icon={<FileText size={14} />}>
           <textarea
             value={form.notes}
             onChange={e => setField("notes", e.target.value)}
@@ -2262,7 +2272,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Custom Fields */}
-        <FormSection title="Custom Fields">
+        <FormSection title="Custom Fields" icon={<Hash size={14} />}>
           {form.custom_fields.map((cf, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeCustomField(i)} />
@@ -2285,7 +2295,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Business Card (customers only) */}
         {isCustomer && (
-          <FormSection title="Business Card">
+          <FormSection title="Business Card" icon={<CreditCard size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-white/40 mb-1.5 block">Front</label>
@@ -2333,17 +2343,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Financial & Business">
+          <FormSection title="Financial & Business" icon={<DollarSign size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} />
-                <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} />
+                <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} />
+                <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Total Revenue" value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" />
-                <Input label="Outstanding Balance" value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" />
+                <Input label="Total Revenue" value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUp size={14} />} />
+                <Input label="Outstanding Balance" value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<Receipt size={14} />} />
               </div>
-              <Input label="Credit Limit" value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" />
+              <Input label="Credit Limit" value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<Wallet size={14} />} />
               <div>
                 <label className="text-xs text-white/40 mb-1 block">Last Order Date</label>
                 <input
@@ -2359,13 +2369,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Classification & Segmentation">
+          <FormSection title="Classification & Segmentation" icon={<Tag size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Industry" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} />
-                <SelectInput label="Source" value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} />
+                <SelectInput label="Industry" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} />
+                <SelectInput label="Source" value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<Target size={14} />} />
               </div>
-              <Input label="Account Manager" value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder="Name" />
+              <Input label="Account Manager" value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder="Name" icon={<UserCog size={14} />} />
               <div>
                 <label className="text-xs text-white/40 mb-1 block">Tags</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2415,11 +2425,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Relationship & Activity (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Relationship & Activity">
+          <FormSection title="Relationship & Activity" icon={<Clock size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Communication" value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} />
-                <SelectInput label="Language" value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} />
+                <SelectInput label="Communication" value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} icon={<MessageSquare size={14} />} />
+                <SelectInput label="Language" value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} icon={<Languages size={14} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -2441,13 +2451,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade & Shipping (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Trade & Shipping">
+          <FormSection title="Trade & Shipping" icon={<Ship size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Shipping Method" value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} />
-                <SelectInput label="Incoterms" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} />
+                <SelectInput label="Shipping Method" value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<Ship size={14} />} />
+                <SelectInput label="Incoterms" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} icon={<FileCheck size={14} />} />
               </div>
-              <Input label="Tax ID / Import License" value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder="License or Tax ID number" />
+              <Input label="Tax ID / Import License" value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder="License or Tax ID number" icon={<Hash size={14} />} />
               {/* Shipping Addresses */}
               <div>
                 <label className="text-xs text-white/40 mb-2 block">Shipping Addresses</label>
@@ -2478,7 +2488,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Documents / Attachments (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Documents & Attachments">
+          <FormSection title="Documents & Attachments" icon={<Paperclip size={14} />}>
             {form.attachments.map((a, i) => (
               <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-[#222]">
                 <RemoveBtn onClick={() => setField("attachments", form.attachments.filter((_, idx) => idx !== i))} />
@@ -2509,7 +2519,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Customer Type (only for customer contacts) */}
         {isCustomer && (
-          <FormSection title="Customer Type">
+          <FormSection title="Customer Type" icon={<Crown size={14} />}>
             <div className="space-y-3">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
