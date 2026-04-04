@@ -450,6 +450,7 @@ function contactDisplayName(c: ContactRow): string {
     const en = (c as any).company_name_en || "";
     if (en) return en;
   }
+  if (c.contact_type === "company" && c.company) return c.company;
   if ((c as any).entity_type === "company" && c.company) return c.company;
   if (c.first_name || c.last_name) return [c.first_name, c.last_name].filter(Boolean).join(" ");
   if (c.display_name) return c.display_name;
@@ -462,6 +463,7 @@ function contactSortKey(c: ContactRow): string {
     const en = (c as any).company_name_en || "";
     if (en) return en.toLowerCase();
   }
+  if (c.contact_type === "company" && c.company) return c.company.toLowerCase();
   if ((c as any).entity_type === "company" && c.company) return c.company.toLowerCase();
   return (c.first_name || c.last_name || c.company || c.display_name || "zzz").toLowerCase();
 }
@@ -1610,10 +1612,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     }`}
                   >
                     {/* Avatar */}
-                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
+                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
+                      ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
                         <Building2 size={16} className="text-white/30" />
                       ) : (
                         getInitials(c)
@@ -1825,10 +1827,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Header card */}
         <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 ${c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
+          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
+            ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
               <Building2 size={32} className="text-white/20" />
             ) : (
               getInitials(c)
@@ -1836,8 +1838,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
           <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
           {c.contact_type === "supplier" && (c as any).company_name_cn && <p className="text-sm text-white/40 mt-0.5">{(c as any).company_name_cn}</p>}
-          {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
-          {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
@@ -1942,8 +1944,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Birthday (hidden for suppliers and company customers) */}
-        {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
+        {/* Birthday (hidden for suppliers, company customers, and company type) */}
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
           <Section title="Birthday" icon={<Calendar size={14} />}>
             <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
@@ -1966,8 +1968,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Related People (hidden for suppliers and company customers) */}
-        {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && family.length > 0 && (
+        {/* Related People (hidden for suppliers, company customers, and company type) */}
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && family.length > 0 && (
           <Section title="Related People" icon={<Users size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
@@ -2039,6 +2041,76 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Customer: Contact Persons ── */}
         {c.contact_type === "customer" && (c as any).entity_type === "company" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+          <Section title="Contact Persons" icon={<Users size={14} />}>
+            <div className="space-y-2">
+              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                      {(cp.name?.[0] || "?").toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <div className="flex items-center gap-2">
+                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {(cp.phone || cp.mobile || cp.email) && (
+                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
+                      {cp.phone && <p>Tel: {cp.phone}</p>}
+                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
+                      {cp.email && <p>Email: {cp.email}</p>}
+                    </div>
+                  )}
+                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Company Type: Company Info ── */}
+        {c.contact_type === "company" && (c.company || c.industry || c.tax_id || c.source || c.language) && (
+          <Section title="Company Info" icon={<Building2 size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.company && (
+                <div className="col-span-2">
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name</span>
+                  <p className="text-sm text-white font-medium">{c.company}</p>
+                </div>
+              )}
+              {c.industry && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
+                  <p className="text-sm text-white">{c.industry}</p>
+                </div>
+              )}
+              {c.tax_id && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Registration</span>
+                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                </div>
+              )}
+              {c.source && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
+                  <p className="text-sm text-white">{c.source}</p>
+                </div>
+              )}
+              {c.language && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Language</span>
+                  <p className="text-sm text-white">{c.language}</p>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Company Type: Contact Persons ── */}
+        {c.contact_type === "company" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
           <Section title="Contact Persons" icon={<Users size={14} />}>
             <div className="space-y-2">
               {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
@@ -2637,6 +2709,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const isCustomer = form.contact_type === "customer";
     const isCompanyCustomer = form.contact_type === "customer" && form.entity_type === "company";
     const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
+    const isCompanyType = form.contact_type === "company";
 
     /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
     const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
@@ -2700,10 +2773,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Photo / Logo + Type */}
         <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
+          <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : form.contact_type === "supplier" || isCompanyCustomer ? (
+            ) : form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? (
               <Building2 size={32} className="text-white/20" />
             ) : (
               <div className="flex flex-col items-center">
@@ -2715,7 +2788,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {form.photo_url ? (
             <div className="flex items-center justify-center gap-3">
               <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
-                {form.contact_type === "supplier" || isCompanyCustomer ? "Change Logo" : "Change Photo"}
+                {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "Change Logo" : "Change Photo"}
                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) compressImage(file).then(url => setField("photo_url", url));
@@ -2725,7 +2798,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </div>
           ) : (
             <label className="inline-block px-5 py-2 rounded-full bg-white/10 hover:bg-white/15 text-sm text-white/70 font-medium cursor-pointer transition-colors">
-              {form.contact_type === "supplier" || isCompanyCustomer ? "Add Logo" : "Add Photo"}
+              {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "Add Logo" : "Add Photo"}
               <input type="file" accept="image/*" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) compressImage(file).then(url => setField("photo_url", url));
@@ -2856,8 +2929,113 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Basic Info (hidden for suppliers and company customers) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && (
+        {/* Company Type: Company Information */}
+        {isCompanyType && (
+        <>
+        <FormSection title="Company Information" icon={<Building2 size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Company Name</label>
+              <div className="relative">
+                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                <input
+                  value={form.company}
+                  onChange={e => setField("company", e.target.value)}
+                  placeholder="e.g. Koleex International Group"
+                  className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Industry</label>
+                <input
+                  value={form.industry}
+                  onChange={e => setField("industry", e.target.value)}
+                  placeholder="e.g. Technology"
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Source</label>
+                <input
+                  value={form.source}
+                  onChange={e => setField("source", e.target.value)}
+                  placeholder="e.g. Referral, Website"
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Tax ID / Registration No.</label>
+                <input
+                  value={form.tax_id}
+                  onChange={e => setField("tax_id", e.target.value)}
+                  placeholder="e.g. CR-12345"
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Language</label>
+                <input
+                  value={form.language}
+                  onChange={e => setField("language", e.target.value)}
+                  placeholder="e.g. English, Arabic"
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* Company Type: Contact Persons */}
+        <FormSection title="Contact Persons" icon={<Users size={14} />}>
+          <div className="space-y-3">
+            {form.contact_persons.map((cp, i) => (
+              <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+                <div className="flex items-center gap-2 p-3">
+                  <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
+                  <input
+                    value={cp.name}
+                    onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
+                    placeholder="Name"
+                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  />
+                  <input
+                    value={cp.position}
+                    onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
+                    placeholder="Position"
+                    className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  />
+                  <button
+                    onClick={() => setExpandedFamily(expandedFamily === 3000 + i ? null : 3000 + i)}
+                    className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                  >
+                    <ChevronDown size={14} className={`transition-transform ${expandedFamily === 3000 + i ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+                {expandedFamily === 3000 + i && (
+                  <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
+                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    </div>
+                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                  </div>
+                )}
+              </div>
+            ))}
+            <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+          </div>
+        </FormSection>
+        </>
+        )}
+
+        {/* Basic Info (hidden for suppliers, company customers, and company type) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
         <FormSection title="Basic Information" icon={<User size={14} />}>
           <div className="space-y-3">
             <SelectInput label="Title" value={form.title} onChange={v => setField("title", v)} options={TITLES} />
@@ -2987,8 +3165,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Birthday (hidden for suppliers and company customers) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && (
+        {/* Birthday (hidden for suppliers, company customers, and company type) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
         <FormSection title="Birthday" icon={<Calendar size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
         </FormSection>
@@ -3032,8 +3210,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Related People (hidden for suppliers and company customers) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && (
+        {/* Related People (hidden for suppliers, company customers, and company type) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
         <FormSection title="Related People" icon={<Users size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
