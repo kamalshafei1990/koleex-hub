@@ -1249,8 +1249,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const selectedContact = useMemo(() => contacts.find(c => c.id === selectedId) || null, [contacts, selectedId]);
 
-  /* ── Customer KPI stats ── */
-  const customerKpis = useMemo(() => {
+  /* ── Module KPI stats (works for any contact type) ── */
+  const moduleKpis = useMemo(() => {
     if (!filterType) return null;
     const all = contacts.filter(c => c.contact_type === filterType);
     const active = all.filter(c => c.is_active);
@@ -1263,6 +1263,38 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
     return { total: all.length, active: active.length, countries: countries.size, vip: vip.length, newThisMonth: thisMonth.length };
+  }, [contacts, filterType]);
+
+  /* ── Supplier-specific KPI stats ── */
+  const supplierKpis = useMemo(() => {
+    if (filterType !== "supplier") return null;
+    const all = contacts.filter(c => c.contact_type === "supplier");
+    const active = all.filter(c => c.is_active);
+    const countries = new Set(all.map(c => c.origin_country_code || c.country_code).filter(Boolean));
+    const rated = all.filter(c => c.rating > 0);
+    const avgRating = rated.length > 0 ? (rated.reduce((sum, c) => sum + c.rating, 0) / rated.length) : 0;
+    const withCatalogues = all.filter(c => Array.isArray((c as any).catalogues) && (c as any).catalogues.length > 0);
+    const divisions = new Set(all.map(c => (c as any).division).filter(Boolean));
+    const categories = new Set(all.map(c => (c as any).category).filter(Boolean));
+    const withContacts = all.filter(c => Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0);
+    const now = new Date();
+    const newThisMonth = all.filter(c => {
+      if (!c.created_at) return false;
+      const d = new Date(c.created_at);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    return {
+      total: all.length,
+      active: active.length,
+      countries: countries.size,
+      avgRating: Math.round(avgRating * 10) / 10,
+      ratedCount: rated.length,
+      withCatalogues: withCatalogues.length,
+      divisions: divisions.size,
+      categories: categories.size,
+      withContacts: withContacts.length,
+      newThisMonth: newThisMonth.length,
+    };
   }, [contacts, filterType]);
 
   /* ── Handlers ── */
@@ -1568,23 +1600,44 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       {/* Contact list */}
       <div className="flex-1 overflow-y-auto will-change-scroll">
         {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
-        {customerKpis && (
+        {moduleKpis && filterType === "customer" && (
           <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
             <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-white">{customerKpis.total}</p>
+              <p className="text-lg font-bold text-white">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
             </div>
             <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-emerald-400">{customerKpis.active}</p>
+              <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
             </div>
             <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-violet-400">{customerKpis.vip}</p>
+              <p className="text-lg font-bold text-violet-400">{moduleKpis.vip}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-violet-400/40">VIP</p>
             </div>
             <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-blue-400">{customerKpis.countries}</p>
+              <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">Countries</p>
+            </div>
+          </div>
+        )}
+        {/* Compact KPI strip — mobile only (supplier variant) */}
+        {supplierKpis && filterType === "supplier" && (
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-white">{supplierKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-emerald-400">{supplierKpis.active}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "—"}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">Rating</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-orange-400">{supplierKpis.countries}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-orange-400/40">Countries</p>
             </div>
           </div>
         )}
@@ -1661,8 +1714,151 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderDetailPanel = () => {
     if (!selectedContact) {
-      /* ── KPI Dashboard (shown when filterType is set and no contact selected) ── */
-      if (customerKpis) {
+      /* ── Supplier KPI Dashboard ── */
+      if (filterType === "supplier" && supplierKpis) {
+        return (
+          <div className="h-full overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+              {/* Title */}
+              <div>
+                <h2 className="text-2xl font-bold text-white">Supplier Overview</h2>
+                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+              </div>
+
+              {/* Main KPI Row - 4 cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Total Suppliers */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-white/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
+                      <Building2 size={16} className="text-blue-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-white">{supplierKpis.total}</p>
+                  <p className="text-xs text-white/30 mt-1">All suppliers</p>
+                </div>
+
+                {/* Active */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-emerald-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
+                      <UserCheck size={16} className="text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{supplierKpis.active}</p>
+                  <p className="text-xs text-white/30 mt-1">{supplierKpis.total > 0 ? Math.round((supplierKpis.active / supplierKpis.total) * 100) : 0}% of total</p>
+                </div>
+
+                {/* Countries */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-orange-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500/10">
+                      <Globe size={16} className="text-orange-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400/60">Countries</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-orange-400">{supplierKpis.countries}</p>
+                  <p className="text-xs text-white/30 mt-1">Source countries</p>
+                </div>
+
+                {/* Avg Rating */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-amber-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
+                      <Star size={16} className="text-amber-400" />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">Avg Rating</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "\u2014"}<span className="text-base text-white/20">/5</span></p>
+                  <p className="text-xs text-white/30 mt-1">{supplierKpis.ratedCount} rated</p>
+                </div>
+              </div>
+
+              {/* Supplier Details Grid - 2x2 */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Catalogues */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BookOpen size={16} className="text-violet-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Catalogues</span>
+                  </div>
+                  <p className="text-3xl font-bold text-violet-400">{supplierKpis.withCatalogues}</p>
+                  <p className="text-xs text-white/30 mt-1">Suppliers with catalogues</p>
+                </div>
+
+                {/* Contact Persons */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users size={16} className="text-cyan-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Contacts</span>
+                  </div>
+                  <p className="text-3xl font-bold text-cyan-400">{supplierKpis.withContacts}</p>
+                  <p className="text-xs text-white/30 mt-1">With contact persons</p>
+                </div>
+
+                {/* Divisions */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Briefcase size={16} className="text-pink-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Divisions</span>
+                  </div>
+                  <p className="text-3xl font-bold text-pink-400">{supplierKpis.divisions}</p>
+                  <p className="text-xs text-white/30 mt-1">Product divisions</p>
+                </div>
+
+                {/* Categories */}
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package size={16} className="text-teal-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Categories</span>
+                  </div>
+                  <p className="text-3xl font-bold text-teal-400">{supplierKpis.categories}</p>
+                  <p className="text-xs text-white/30 mt-1">Product categories</p>
+                </div>
+              </div>
+
+              {/* Status Breakdown */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                  </div>
+                  <p className="text-3xl font-bold text-emerald-400">{supplierKpis.active}</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                  </div>
+                  <p className="text-3xl font-bold text-red-400">{supplierKpis.total - supplierKpis.active}</p>
+                </div>
+              </div>
+
+              {/* New This Month */}
+              {supplierKpis.newThisMonth > 0 && (
+                <div className="bg-[#111] border border-[#222] rounded-xl p-5 flex items-center gap-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
+                    <TrendingUp size={20} className="text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-green-400">+{supplierKpis.newThisMonth}</p>
+                    <p className="text-xs text-white/40">New suppliers this month</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Hint */}
+              <p className="text-xs text-white/20 text-center pt-2">Select a supplier from the list to view details</p>
+            </div>
+          </div>
+        );
+      }
+
+      /* ── Customer KPI Dashboard ── */
+      if (filterType === "customer" && moduleKpis) {
         const tierCounts = {
           diamond: contacts.filter(c => c.contact_type === filterType && c.customer_type === "diamond").length,
           platinum: contacts.filter(c => c.contact_type === filterType && c.customer_type === "platinum").length,
@@ -1671,7 +1867,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           end_user: contacts.filter(c => c.contact_type === filterType && c.customer_type === "end_user").length,
           none: contacts.filter(c => c.contact_type === filterType && !c.customer_type).length,
         };
-        const inactive = customerKpis.total - customerKpis.active;
+        const inactive = moduleKpis.total - moduleKpis.active;
         return (
           <div className="h-full overflow-y-auto">
             <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
@@ -1691,7 +1887,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-white">{customerKpis.total}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-white">{moduleKpis.total}</p>
                   <p className="text-xs text-white/30 mt-1">All customers</p>
                 </div>
 
@@ -1703,8 +1899,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{customerKpis.active}</p>
-                  <p className="text-xs text-white/30 mt-1">{customerKpis.total > 0 ? Math.round((customerKpis.active / customerKpis.total) * 100) : 0}% of total</p>
+                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
+                  <p className="text-xs text-white/30 mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% of total</p>
                 </div>
 
                 {/* VIP */}
@@ -1715,7 +1911,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">VIP</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-violet-400">{customerKpis.vip}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-violet-400">{moduleKpis.vip}</p>
                   <p className="text-xs text-white/30 mt-1">Diamond & Platinum</p>
                 </div>
 
@@ -1727,7 +1923,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">Countries</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-400">{customerKpis.countries}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
                   <p className="text-xs text-white/30 mt-1">Global reach</p>
                 </div>
               </div>
@@ -1748,7 +1944,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${tier.color} rounded-full transition-all duration-500`}
-                          style={{ width: customerKpis.total > 0 ? `${(tier.count / customerKpis.total) * 100}%` : "0%" }}
+                          style={{ width: moduleKpis.total > 0 ? `${(tier.count / moduleKpis.total) * 100}%` : "0%" }}
                         />
                       </div>
                       <span className="text-xs font-semibold text-white/60 w-8 text-right">{tier.count}</span>
@@ -1764,7 +1960,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
                   </div>
-                  <p className="text-3xl font-bold text-emerald-400">{customerKpis.active}</p>
+                  <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                 </div>
                 <div className="bg-[#111] border border-[#222] rounded-xl p-5">
                   <div className="flex items-center gap-2 mb-3">
@@ -1776,13 +1972,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* New This Month */}
-              {customerKpis.newThisMonth > 0 && (
+              {moduleKpis.newThisMonth > 0 && (
                 <div className="bg-[#111] border border-[#222] rounded-xl p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-green-400">+{customerKpis.newThisMonth}</p>
+                    <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
                     <p className="text-xs text-white/40">New customers this month</p>
                   </div>
                 </div>
