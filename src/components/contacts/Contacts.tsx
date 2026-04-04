@@ -2788,7 +2788,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Social Profiles */}
+        {/* Social Profiles (hidden for suppliers) */}
+        {form.contact_type !== "supplier" && (
         <FormSection title="Social Profiles" icon={<Share2 size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
@@ -2823,6 +2824,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           ))}
           <AddButton label="add social profile" onClick={addSocial} />
         </FormSection>
+        )}
 
         {/* Related People (hidden for suppliers - replaced by Contact Persons) */}
         {form.contact_type !== "supplier" && (
@@ -2861,7 +2863,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Notes */}
+        {/* Notes (shared — hidden for suppliers, they have their own at the end) */}
+        {form.contact_type !== "supplier" && (
         <FormSection title="Notes" icon={<FileText size={14} />}>
           <textarea
             value={form.notes}
@@ -2871,8 +2874,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
           />
         </FormSection>
+        )}
 
-        {/* Custom Fields */}
+        {/* Custom Fields (hidden for suppliers) */}
+        {form.contact_type !== "supplier" && (
         <FormSection title="Custom Fields" icon={<Hash size={14} />}>
           {form.custom_fields.map((cf, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -2893,6 +2898,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           ))}
           <AddButton label="add field" onClick={addCustomField} />
         </FormSection>
+        )}
 
         {/* Business Card (customers only) */}
         {isCustomer && (
