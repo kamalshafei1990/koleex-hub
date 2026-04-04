@@ -40,6 +40,31 @@ export interface ContactRow {
   custom_fields: { field_name: string; field_value: string }[];
   business_card_front: string | null;
   business_card_back: string | null;
+  /* Financial & Business */
+  total_revenue: string | null;
+  last_order_date: string | null;
+  payment_terms: string | null;
+  credit_limit: string | null;
+  outstanding_balance: string | null;
+  currency: string | null;
+  /* Classification & Segmentation */
+  industry: string | null;
+  source: string | null;
+  tags: string[];
+  account_manager: string | null;
+  /* Relationship & Activity */
+  first_contact_date: string | null;
+  last_contacted: string | null;
+  follow_up_date: string | null;
+  communication_preference: string | null;
+  language: string | null;
+  /* Trade-Specific */
+  shipping_addresses: { label: string; street: string; city: string; state: string; zip: string; country: string }[];
+  preferred_shipping: string | null;
+  tax_id: string | null;
+  incoterms: string | null;
+  /* Documents */
+  attachments: { name: string; url: string; type: string; uploaded_at: string }[];
   created_at: string;
   updated_at: string;
 }

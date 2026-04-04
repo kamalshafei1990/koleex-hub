@@ -8,6 +8,9 @@ import {
   ChevronRight, Copy, Check, AlertTriangle, Camera, Minus, UserPlus,
   Briefcase, Heart, Share2, FileText, Star, Shield, Gem, Award,
   CreditCard, BadgeCheck, UserCheck, TrendingUp, MapPinned,
+  DollarSign, Tag, MessageSquare, Languages, Ship, FileCheck, Paperclip,
+  Clock, CalendarPlus, CalendarCheck, Receipt, Wallet, HandCoins,
+  Factory, Target, UserCog, Hash,
 } from "lucide-react";
 import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
@@ -34,6 +37,7 @@ interface FamilyMember {
 }
 interface RelatedName { name: string; relationship: string }
 interface CustomField { field_name: string; field_value: string }
+interface Attachment { name: string; url: string; type: string; uploaded_at: string }
 
 interface ContactForm {
   contact_type: ContactType;
@@ -63,6 +67,31 @@ interface ContactForm {
   custom_fields: CustomField[];
   business_card_front: string;
   business_card_back: string;
+  /* ── Financial & Business ── */
+  total_revenue: string;
+  last_order_date: string;
+  payment_terms: string;
+  credit_limit: string;
+  outstanding_balance: string;
+  currency: string;
+  /* ── Classification & Segmentation ── */
+  industry: string;
+  source: string;
+  tags: string[];
+  account_manager: string;
+  /* ── Relationship & Activity ── */
+  first_contact_date: string;
+  last_contacted: string;
+  follow_up_date: string;
+  communication_preference: string;
+  language: string;
+  /* ── Trade-Specific ── */
+  shipping_addresses: AddressEntry[];
+  preferred_shipping: string;
+  tax_id: string;
+  incoterms: string;
+  /* ── Documents ── */
+  attachments: Attachment[];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -93,6 +122,35 @@ const ADDRESS_LABELS = ["home", "work", "other"];
 const WEBSITE_LABELS = ["homepage", "work", "blog", "other"];
 const SOCIAL_PLATFORMS = ["WhatsApp", "WeChat", "LinkedIn", "Instagram", "Facebook", "Twitter/X", "Telegram", "Snapchat", "TikTok", "Skype", "Other"];
 const RELATED_PEOPLE_LABELS = ["Parent", "Father", "Mother", "Brother", "Sister", "Child", "Son", "Daughter", "Spouse", "Friend", "Assistant", "Manager", "Other"];
+
+const INDUSTRIES = [
+  "Agriculture", "Automotive", "Banking & Finance", "Chemicals", "Construction",
+  "Consumer Goods", "E-Commerce", "Education", "Electronics", "Energy & Utilities",
+  "F&B", "Fashion & Apparel", "Healthcare", "Hospitality", "IT & Technology",
+  "Logistics & Transport", "Manufacturing", "Media & Entertainment", "Mining",
+  "Oil & Gas", "Pharmaceuticals", "Real Estate", "Retail", "Telecom", "Other",
+];
+const LEAD_SOURCES = [
+  "Referral", "Website", "Exhibition / Trade Show", "Cold Call", "Social Media",
+  "Email Campaign", "LinkedIn", "Partner", "Walk-in", "Advertisement", "Other",
+];
+const PAYMENT_TERMS_OPTIONS = [
+  "Prepaid", "COD", "Net 15", "Net 30", "Net 45", "Net 60", "Net 90",
+  "EOM", "2/10 Net 30", "CIA", "CWO", "Upon Receipt", "Custom",
+];
+const CURRENCIES = [
+  "USD", "EUR", "GBP", "CNY", "JPY", "AED", "SAR", "EGP", "INR", "BRL",
+  "AUD", "CAD", "CHF", "KRW", "SGD", "MYR", "THB", "IDR", "PHP", "VND",
+  "TRY", "RUB", "ZAR", "NGN", "KES", "MXN", "COP", "ARS", "CLP", "PEN",
+];
+const SHIPPING_METHODS = ["Sea Freight", "Air Freight", "Land / Truck", "Express / Courier", "Rail", "Multimodal", "Other"];
+const INCOTERMS_OPTIONS = ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"];
+const COMM_PREFERENCES = ["Phone", "Email", "WhatsApp", "WeChat", "Telegram", "SMS", "In-Person", "Video Call"];
+const LANGUAGES = [
+  "English", "Arabic", "Chinese (Mandarin)", "Chinese (Cantonese)", "Spanish", "French",
+  "German", "Portuguese", "Russian", "Japanese", "Korean", "Hindi", "Turkish",
+  "Italian", "Dutch", "Thai", "Vietnamese", "Indonesian", "Malay", "Tagalog",
+];
 
 /** Countries where Province/State is commonly used in addresses */
 const COUNTRIES_WITH_STATES = new Set([
@@ -131,6 +189,31 @@ const EMPTY_FORM: ContactForm = {
   custom_fields: [],
   business_card_front: "",
   business_card_back: "",
+  /* Financial & Business */
+  total_revenue: "",
+  last_order_date: "",
+  payment_terms: "",
+  credit_limit: "",
+  outstanding_balance: "",
+  currency: "",
+  /* Classification & Segmentation */
+  industry: "",
+  source: "",
+  tags: [],
+  account_manager: "",
+  /* Relationship & Activity */
+  first_contact_date: "",
+  last_contacted: "",
+  follow_up_date: "",
+  communication_preference: "",
+  language: "",
+  /* Trade-Specific */
+  shipping_addresses: [],
+  preferred_shipping: "",
+  tax_id: "",
+  incoterms: "",
+  /* Documents */
+  attachments: [],
 };
 
 const MIGRATION_SQL = `-- Contacts Module Migration for Koleex HUB
@@ -158,6 +241,31 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS related_names jsonb DEFAULT '[]'::
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS custom_fields jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS business_card_front text;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS business_card_back text;
+-- Financial & Business
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS total_revenue text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_order_date date;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS payment_terms text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS credit_limit text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS outstanding_balance text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS currency text DEFAULT 'USD';
+-- Classification & Segmentation
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS industry text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS source text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS tags jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS account_manager text;
+-- Relationship & Activity
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS first_contact_date date;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS last_contacted date;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS follow_up_date date;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS communication_preference text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS language text;
+-- Trade-Specific
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS shipping_addresses jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS preferred_shipping text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS tax_id text;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS incoterms text;
+-- Documents
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS attachments jsonb DEFAULT '[]'::jsonb;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts (contact_type);
@@ -293,6 +401,31 @@ function contactToForm(c: ContactRow): ContactForm {
     custom_fields: Array.isArray(c.custom_fields) ? c.custom_fields : [],
     business_card_front: c.business_card_front || "",
     business_card_back: c.business_card_back || "",
+    /* Financial & Business */
+    total_revenue: c.total_revenue || "",
+    last_order_date: c.last_order_date || "",
+    payment_terms: c.payment_terms || "",
+    credit_limit: c.credit_limit || "",
+    outstanding_balance: c.outstanding_balance || "",
+    currency: c.currency || "",
+    /* Classification & Segmentation */
+    industry: c.industry || "",
+    source: c.source || "",
+    tags: Array.isArray(c.tags) ? c.tags : [],
+    account_manager: c.account_manager || "",
+    /* Relationship & Activity */
+    first_contact_date: c.first_contact_date || "",
+    last_contacted: c.last_contacted || "",
+    follow_up_date: c.follow_up_date || "",
+    communication_preference: c.communication_preference || "",
+    language: c.language || "",
+    /* Trade-Specific */
+    shipping_addresses: Array.isArray(c.shipping_addresses) ? c.shipping_addresses : [],
+    preferred_shipping: c.preferred_shipping || "",
+    tax_id: c.tax_id || "",
+    incoterms: c.incoterms || "",
+    /* Documents */
+    attachments: Array.isArray(c.attachments) ? c.attachments : [],
   };
 }
 
@@ -333,6 +466,31 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     custom_fields: f.custom_fields,
     business_card_front: f.business_card_front || null,
     business_card_back: f.business_card_back || null,
+    /* Financial & Business */
+    total_revenue: f.total_revenue || null,
+    last_order_date: f.last_order_date || null,
+    payment_terms: f.payment_terms || null,
+    credit_limit: f.credit_limit || null,
+    outstanding_balance: f.outstanding_balance || null,
+    currency: f.currency || null,
+    /* Classification & Segmentation */
+    industry: f.industry || null,
+    source: f.source || null,
+    tags: f.tags.length > 0 ? f.tags : null,
+    account_manager: f.account_manager || null,
+    /* Relationship & Activity */
+    first_contact_date: f.first_contact_date || null,
+    last_contacted: f.last_contacted || null,
+    follow_up_date: f.follow_up_date || null,
+    communication_preference: f.communication_preference || null,
+    language: f.language || null,
+    /* Trade-Specific */
+    shipping_addresses: f.shipping_addresses.length > 0 ? f.shipping_addresses : null,
+    preferred_shipping: f.preferred_shipping || null,
+    tax_id: f.tax_id || null,
+    incoterms: f.incoterms || null,
+    /* Documents */
+    attachments: f.attachments.length > 0 ? f.attachments : null,
   };
 }
 
@@ -1558,6 +1716,178 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
+        {/* ── Financial & Business (customer only) ── */}
+        {c.contact_type === "customer" && (c.total_revenue || c.outstanding_balance || c.credit_limit || c.payment_terms || c.currency || c.last_order_date) && (
+          <Section title="Financial & Business" icon={<DollarSign size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.total_revenue && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Total Revenue</span>
+                  <p className="text-sm text-emerald-400 font-semibold">{c.currency || "USD"} {Number(c.total_revenue).toLocaleString()}</p>
+                </div>
+              )}
+              {c.outstanding_balance && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Outstanding</span>
+                  <p className="text-sm text-amber-400 font-semibold">{c.currency || "USD"} {Number(c.outstanding_balance).toLocaleString()}</p>
+                </div>
+              )}
+              {c.credit_limit && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Credit Limit</span>
+                  <p className="text-sm text-white">{c.currency || "USD"} {Number(c.credit_limit).toLocaleString()}</p>
+                </div>
+              )}
+              {c.payment_terms && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Payment Terms</span>
+                  <p className="text-sm text-white">{c.payment_terms}</p>
+                </div>
+              )}
+              {c.currency && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Currency</span>
+                  <p className="text-sm text-white">{c.currency}</p>
+                </div>
+              )}
+              {c.last_order_date && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Last Order</span>
+                  <p className="text-sm text-white">{new Date(c.last_order_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Classification & Segmentation (customer only) ── */}
+        {c.contact_type === "customer" && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
+          <Section title="Classification" icon={<Tag size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.industry && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
+                  <p className="text-sm text-white">{c.industry}</p>
+                </div>
+              )}
+              {c.source && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
+                  <p className="text-sm text-white">{c.source}</p>
+                </div>
+              )}
+              {c.account_manager && (
+                <div className="col-span-2">
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Account Manager</span>
+                  <p className="text-sm text-white">{c.account_manager}</p>
+                </div>
+              )}
+            </div>
+            {Array.isArray(c.tags) && c.tags.length > 0 && (
+              <div className="mt-3">
+                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Tags</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {c.tags.map((tag: string, i: number) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* ── Relationship & Activity ── */}
+        {c.contact_type === "customer" && (c.first_contact_date || c.last_contacted || c.follow_up_date || c.communication_preference || c.language) && (
+          <Section title="Relationship & Activity" icon={<Clock size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.first_contact_date && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">First Contact</span>
+                  <p className="text-sm text-white">{new Date(c.first_contact_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              )}
+              {c.last_contacted && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Last Contacted</span>
+                  <p className="text-sm text-white">{new Date(c.last_contacted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              )}
+              {c.follow_up_date && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Follow-up Date</span>
+                  <p className={`text-sm font-medium ${new Date(c.follow_up_date) < new Date() ? "text-red-400" : "text-blue-400"}`}>{new Date(c.follow_up_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              )}
+              {c.communication_preference && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Prefers</span>
+                  <p className="text-sm text-white">{c.communication_preference}</p>
+                </div>
+              )}
+              {c.language && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Language</span>
+                  <p className="text-sm text-white">{c.language}</p>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Trade-Specific (customer only) ── */}
+        {c.contact_type === "customer" && (c.preferred_shipping || c.tax_id || c.incoterms || (Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0)) && (
+          <Section title="Trade & Shipping" icon={<Ship size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.preferred_shipping && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Shipping Method</span>
+                  <p className="text-sm text-white">{c.preferred_shipping}</p>
+                </div>
+              )}
+              {c.incoterms && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Incoterms</span>
+                  <p className="text-sm text-white font-mono">{c.incoterms}</p>
+                </div>
+              )}
+              {c.tax_id && (
+                <div className="col-span-2">
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Import License</span>
+                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                </div>
+              )}
+            </div>
+            {Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block">Shipping Addresses</span>
+                {c.shipping_addresses.map((a: AddressEntry, i: number) => (
+                  <div key={i} className="py-1.5">
+                    <span className="text-xs text-blue-400 font-medium">{a.label}</span>
+                    <p className="text-sm text-white">{[a.street, a.city, a.state, a.zip, a.country].filter(Boolean).join(", ")}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* ── Attachments ── */}
+        {Array.isArray(c.attachments) && c.attachments.length > 0 && (
+          <Section title="Documents" icon={<Paperclip size={14} />}>
+            <div className="space-y-2">
+              {c.attachments.map((a: Attachment, i: number) => (
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                  <FileCheck size={16} className="text-blue-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{a.name}</p>
+                    <p className="text-[10px] text-white/30">{a.type} &middot; {a.uploaded_at ? new Date(a.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {/* Custom Fields */}
         {customs.length > 0 && (
           <Section title="Custom Fields" icon={<FileText size={14} />}>
@@ -1991,6 +2321,182 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 )}
               </div>
             </div>
+          </FormSection>
+        )}
+
+        {/* ── Financial & Business (customer only) ── */}
+        {isCustomer && (
+          <FormSection title="Financial & Business">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} />
+                <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Total Revenue" value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" />
+                <Input label="Outstanding Balance" value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" />
+              </div>
+              <Input label="Credit Limit" value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" />
+              <div>
+                <label className="text-xs text-white/40 mb-1 block">Last Order Date</label>
+                <input
+                  type="date"
+                  value={form.last_order_date}
+                  onChange={e => setField("last_order_date", e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Classification & Segmentation (customer only) ── */}
+        {isCustomer && (
+          <FormSection title="Classification & Segmentation">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label="Industry" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} />
+                <SelectInput label="Source" value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} />
+              </div>
+              <Input label="Account Manager" value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder="Name" />
+              <div>
+                <label className="text-xs text-white/40 mb-1 block">Tags</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {form.tags.map((tag, i) => (
+                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">
+                      {tag}
+                      <button onClick={() => setField("tags", form.tags.filter((_, idx) => idx !== i))} className="text-white/30 hover:text-white">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    id="tag-input"
+                    placeholder="Add tag..."
+                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val && !form.tags.includes(val)) {
+                          setField("tags", [...form.tags, val]);
+                          (e.target as HTMLInputElement).value = "";
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const input = document.getElementById("tag-input") as HTMLInputElement;
+                      const val = input?.value.trim();
+                      if (val && !form.tags.includes(val)) {
+                        setField("tags", [...form.tags, val]);
+                        input.value = "";
+                      }
+                    }}
+                    className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-xs text-white/50 hover:text-white transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Relationship & Activity (customer only) ── */}
+        {isCustomer && (
+          <FormSection title="Relationship & Activity">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label="Communication" value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} />
+                <SelectInput label="Language" value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">First Contact</label>
+                  <input type="date" value={form.first_contact_date} onChange={e => setField("first_contact_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Last Contacted</label>
+                  <input type="date" value={form.last_contacted} onChange={e => setField("last_contacted", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1 block">Follow-up Date</label>
+                <input type="date" value={form.follow_up_date} onChange={e => setField("follow_up_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Trade & Shipping (customer only) ── */}
+        {isCustomer && (
+          <FormSection title="Trade & Shipping">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label="Shipping Method" value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} />
+                <SelectInput label="Incoterms" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} />
+              </div>
+              <Input label="Tax ID / Import License" value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder="License or Tax ID number" />
+              {/* Shipping Addresses */}
+              <div>
+                <label className="text-xs text-white/40 mb-2 block">Shipping Addresses</label>
+                {form.shipping_addresses.map((a, i) => (
+                  <div key={i} className="mb-3 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RemoveBtn onClick={() => setField("shipping_addresses", form.shipping_addresses.filter((_, idx) => idx !== i))} />
+                      <LabelSelect value={a.label} onChange={v => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], label: v }; setField("shipping_addresses", arr); }} options={["warehouse", "port", "office", "other"]} />
+                    </div>
+                    <div className="space-y-2 ml-8">
+                      <input value={a.street} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], street: e.target.value }; setField("shipping_addresses", arr); }} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={a.city} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], city: e.target.value }; setField("shipping_addresses", arr); }} placeholder="City" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        <input value={a.state} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], state: e.target.value }; setField("shipping_addresses", arr); }} placeholder="State" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={a.zip} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], zip: e.target.value }; setField("shipping_addresses", arr); }} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        <input value={a.country} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], country: e.target.value }; setField("shipping_addresses", arr); }} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <AddButton label="add shipping address" onClick={() => setField("shipping_addresses", [...form.shipping_addresses, { label: "warehouse", street: "", city: "", state: "", zip: "", country: "" }])} />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Documents / Attachments (customer only) ── */}
+        {isCustomer && (
+          <FormSection title="Documents & Attachments">
+            {form.attachments.map((a, i) => (
+              <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-[#222]">
+                <RemoveBtn onClick={() => setField("attachments", form.attachments.filter((_, idx) => idx !== i))} />
+                <FileCheck size={14} className="text-blue-400 shrink-0" />
+                <span className="text-sm text-white truncate flex-1">{a.name}</span>
+                <span className="text-[10px] text-white/30">{a.type}</span>
+              </div>
+            ))}
+            <label className="flex items-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-dashed border-[#222] hover:border-white/20 cursor-pointer transition-colors">
+              <Paperclip size={14} className="text-white/40" />
+              <span className="text-xs text-white/40">Upload document (contract, license, ID...)</span>
+              <input type="file" className="hidden" onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  compressImage(file, 1200, 0.8).then(url => {
+                    setField("attachments", [...form.attachments, {
+                      name: file.name,
+                      url,
+                      type: file.type.split("/").pop()?.toUpperCase() || "FILE",
+                      uploaded_at: new Date().toISOString(),
+                    }]);
+                  });
+                }
+              }} />
+            </label>
           </FormSection>
         )}
 
