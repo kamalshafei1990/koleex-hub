@@ -253,14 +253,19 @@ export default function HomePage() {
 
         {/* MAIN */}
         <main className="flex-1 md:ml-[220px] px-4 md:px-10 py-8 md:py-10 pb-20 max-w-[1400px]">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-            <div>
-              <h1 className={`text-2xl md:text-[32px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>Applications</h1>
-              <p className={`text-sm mt-1 ${dk ? "text-white/60" : "text-black/60"}`}>Access your enterprise modules and tools</p>
+          <div className="mb-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+              <div>
+                <h1 className={`text-3xl md:text-[40px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>Koleex Hub</h1>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className={`text-xs font-medium ${dk ? "text-white/30" : "text-black/30"}`}>{today}</span>
+                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.length} apps</span>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className={`text-xs font-medium ${dk ? "text-white/30" : "text-black/30"}`}>{today}</span>
-              <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.length} apps</span>
+            <div className="mt-3">
+              <p className={`text-base md:text-lg font-medium ${dk ? "text-white/70" : "text-black/70"}`}>Applications</p>
+              <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-black/40"}`}>Access your enterprise modules and tools</p>
             </div>
           </div>
 
