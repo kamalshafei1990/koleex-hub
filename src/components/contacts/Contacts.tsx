@@ -1249,7 +1249,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [selectedContact]);
 
   const handleSave = async () => {
-    if (!form.first_name && !form.last_name && !form.company) return;
+    if (!form.first_name && !form.last_name && !form.company && !form.company_name_en) return;
     setSaving(true);
     setSaveError(null);
     const row = formToRow(form);
