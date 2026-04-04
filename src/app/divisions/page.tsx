@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import AdminAuth from "@/components/admin/AdminAuth";
 import TaxonomyAdmin from "@/components/admin/TaxonomyAdmin";
 import {
   fetchDivisions, createDivision, updateDivision, deleteDivision,
@@ -60,9 +59,5 @@ function DivisionsContent() {
 }
 
 export default function DivisionsPage() {
-  return (
-    <AdminAuth title="Taxonomy Admin" subtitle="Manage product divisions">
-      <DivisionsContent />
-    </AdminAuth>
-  );
+  return <DivisionsContent />;
 }

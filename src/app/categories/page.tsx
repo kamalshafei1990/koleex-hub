@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import AdminAuth from "@/components/admin/AdminAuth";
 import TaxonomyAdmin from "@/components/admin/TaxonomyAdmin";
 import {
   fetchDivisions, fetchCategories, createCategory, updateCategory,
@@ -69,9 +68,5 @@ function CategoriesContent() {
 }
 
 export default function CategoriesPage() {
-  return (
-    <AdminAuth title="Taxonomy Admin" subtitle="Manage product categories">
-      <CategoriesContent />
-    </AdminAuth>
-  );
+  return <CategoriesContent />;
 }
