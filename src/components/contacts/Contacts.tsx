@@ -1185,16 +1185,33 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (tab !== "all") list = list.filter(c => c.contact_type === tab);
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
+      const isShort = q.length <= 2;
       list = list.filter(c => {
-        if (contactDisplayName(c).toLowerCase().includes(q)) return true;
-        if ((c.company || "").toLowerCase().includes(q)) return true;
+        const name = contactDisplayName(c).toLowerCase();
+        const firstName = (c.first_name || "").toLowerCase();
+        const lastName = (c.last_name || "").toLowerCase();
+        const company = (c.company || "").toLowerCase();
+        const companyEn = (c.company_name_en || "").toLowerCase();
+        const companyCn = (c.company_name_cn || "");
+        /* Short query (1-2 chars): match start of name / company only */
+        if (isShort) {
+          if (name.startsWith(q)) return true;
+          if (firstName.startsWith(q)) return true;
+          if (lastName.startsWith(q)) return true;
+          if (company.startsWith(q)) return true;
+          if (companyEn.startsWith(q)) return true;
+          if (companyCn.startsWith(q)) return true;
+          return false;
+        }
+        /* Longer query: search across all fields */
+        if (name.includes(q)) return true;
+        if (company.includes(q)) return true;
         if ((c.email || "").toLowerCase().includes(q)) return true;
         if ((c.phone || "").includes(q)) return true;
-        if ((c.first_name || "").toLowerCase().includes(q)) return true;
-        if ((c.last_name || "").toLowerCase().includes(q)) return true;
-        /* Supplier-specific fields */
-        if ((c.company_name_en || "").toLowerCase().includes(q)) return true;
-        if ((c.company_name_cn || "").includes(q)) return true;
+        if (firstName.includes(q)) return true;
+        if (lastName.includes(q)) return true;
+        if (companyEn.includes(q)) return true;
+        if (companyCn.includes(q)) return true;
         if ((c.supplier_email || "").toLowerCase().includes(q)) return true;
         if ((c.supplier_tel || "").includes(q)) return true;
         if ((c.supplier_mobile || "").includes(q)) return true;
