@@ -79,21 +79,30 @@ const apps: AppItem[] = [
   { id: "settings", name: "Settings", icon: <Settings size={iconSize} />, category: "system", route: "/settings" },
 ];
 
-const sidebarItems: ({ id: string; label: string; icon: React.ReactNode } | { section: string })[] = [
-  { id: "all", label: "All Apps", icon: <LayoutGrid size={20} /> },
-  { section: "Core" },
-  { id: "operations", label: "Operations", icon: <Settings size={20} /> },
-  { id: "commercial", label: "Commercial", icon: <Layers size={20} /> },
-  { id: "finance", label: "Finance", icon: <CreditCard size={20} /> },
-  { section: "People" },
-  { id: "people", label: "People", icon: <Users size={20} /> },
-  { id: "communication", label: "Communication", icon: <MessageSquare size={20} /> },
-  { section: "Growth" },
-  { id: "marketing", label: "Marketing", icon: <Megaphone size={20} /> },
-  { id: "planning", label: "Planning", icon: <Kanban size={20} /> },
-  { section: "System" },
-  { id: "knowledge", label: "Knowledge", icon: <BookOpen size={20} /> },
-  { id: "system", label: "Settings", icon: <Settings size={20} /> },
+type SidebarItem =
+  | { type: "filter"; id: string; label: string; icon: React.ReactNode }
+  | { type: "link"; label: string; icon: React.ReactNode; route: string }
+  | { type: "section"; label: string };
+
+const sidebarItems: SidebarItem[] = [
+  { type: "filter", id: "all", label: "All Apps", icon: <LayoutGrid size={20} /> },
+  { type: "section", label: "Quick Access" },
+  { type: "link", label: "Contacts", icon: <Contact size={20} />, route: "/contacts" },
+  { type: "link", label: "Quotations", icon: <ClipboardList size={20} />, route: "/quotations" },
+  { type: "link", label: "Landed Cost", icon: <DollarSign size={20} />, route: "/landed-cost" },
+  { type: "section", label: "Core" },
+  { type: "filter", id: "operations", label: "Operations", icon: <Settings size={20} /> },
+  { type: "filter", id: "commercial", label: "Commercial", icon: <Layers size={20} /> },
+  { type: "filter", id: "finance", label: "Finance", icon: <CreditCard size={20} /> },
+  { type: "section", label: "People" },
+  { type: "filter", id: "people", label: "People", icon: <Users size={20} /> },
+  { type: "filter", id: "communication", label: "Communication", icon: <MessageSquare size={20} /> },
+  { type: "section", label: "Growth" },
+  { type: "filter", id: "marketing", label: "Marketing", icon: <Megaphone size={20} /> },
+  { type: "filter", id: "planning", label: "Planning", icon: <Kanban size={20} /> },
+  { type: "section", label: "System" },
+  { type: "filter", id: "knowledge", label: "Knowledge", icon: <BookOpen size={20} /> },
+  { type: "filter", id: "system", label: "Settings", icon: <Settings size={20} /> },
 ];
 
 function KoleexLogo({ className }: { className?: string }) {
@@ -213,19 +222,29 @@ export default function HomePage() {
         {/* SIDEBAR */}
         <aside className={`fixed top-14 bottom-0 w-[220px] ${dk ? "bg-[#0A0A0A] border-white/[0.08]" : "bg-[#FAFAFA] border-black/[0.08]"} border-r flex-col z-50 overflow-y-auto transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:flex`}>
           <nav className="flex-1 p-3 flex flex-col gap-0.5">
-            {sidebarItems.map((item, i) =>
-              "section" in item ? (
-                <div key={i} className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/30" : "text-black/30"} px-3 pt-5 pb-2`}>{item.section}</div>
-              ) : (
-                <button key={item.id} onClick={() => { setActiveCategory(item.id!); setSidebarOpen(false); }}
+            {sidebarItems.map((item, i) => {
+              if (item.type === "section") {
+                return <div key={i} className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/30" : "text-black/30"} px-3 pt-5 pb-2`}>{item.label}</div>;
+              }
+              if (item.type === "link") {
+                return (
+                  <Link key={i} href={item.route} onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${dk ? "text-white/60 hover:text-white hover:bg-white/[0.04]" : "text-black/60 hover:text-black hover:bg-black/[0.04]"}`}>
+                    <span className={dk ? "text-white/30" : "text-black/30"}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              }
+              return (
+                <button key={item.id} onClick={() => { setActiveCategory(item.id); setSidebarOpen(false); }}
                   className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${activeCategory === item.id
                     ? dk ? "bg-white/10 text-white font-semibold" : "bg-black/10 text-black font-semibold"
                     : dk ? "text-white/60 hover:text-white hover:bg-white/[0.04]" : "text-black/60 hover:text-black hover:bg-black/[0.04]"}`}>
                   <span className={activeCategory === item.id ? (dk ? "text-white" : "text-black") : (dk ? "text-white/30" : "text-black/30")}>{item.icon}</span>
                   <span>{item.label}</span>
                 </button>
-              )
-            )}
+              );
+            })}
           </nav>
           <div className={`px-6 py-4 border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"}`}>
             <span className={`text-[11px] ${dk ? "text-white/30" : "text-black/30"}`}>Platform v2.4</span>
