@@ -892,6 +892,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const handleBack = () => {
     setMobileShowDetail(false);
+    setSelectedId(null);
     setView("list");
     setEditingId(null);
   };
@@ -1361,12 +1362,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const related: RelatedName[] = Array.isArray(c.related_names) ? c.related_names : [];
     const customs: CustomField[] = Array.isArray(c.custom_fields) ? c.custom_fields : [];
 
+    const backLabel = filterType ? filterType.charAt(0).toUpperCase() + filterType.slice(1) + " Overview" : "Contacts";
+
     return (
       <div className="h-full overflow-y-auto">
-        {/* Back button (mobile) */}
-        <div className="md:hidden px-4 py-3 border-b border-[#222]">
+        {/* Back button */}
+        <div className="px-4 py-3 border-b border-[#222]">
           <button onClick={handleBack} className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors">
-            <ArrowLeft size={16} /> Contacts
+            <ArrowLeft size={16} /> {backLabel}
           </button>
         </div>
 
@@ -1615,7 +1618,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Form header */}
         <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[#222] flex items-center justify-between sticky top-0 bg-[#111] z-10">
           <div className="flex items-center gap-3">
-            <button onClick={handleBack} className="md:hidden text-white/60 hover:text-white transition-colors">
+            <button onClick={handleBack} className="text-white/60 hover:text-white transition-colors">
               <ArrowLeft size={18} />
             </button>
             <h2 className="text-lg font-semibold text-white">
