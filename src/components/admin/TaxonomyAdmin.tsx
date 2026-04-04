@@ -159,7 +159,7 @@ export default function TaxonomyAdmin({
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-[900px] mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8">
           <div className="flex items-center gap-3">

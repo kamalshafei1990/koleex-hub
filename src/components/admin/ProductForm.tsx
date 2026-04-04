@@ -378,7 +378,7 @@ export default function ProductForm({ productId }: Props) {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-[900px] mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -395,10 +395,10 @@ export default function ProductForm({ productId }: Props) {
           <button
             onClick={save}
             disabled={saving}
-            className="h-10 px-6 rounded-lg bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-50"
+            className="h-9 md:h-10 px-4 md:px-6 rounded-lg bg-white text-black text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving..." : "Save Product"}
+            {saving ? "Saving..." : <><span className="hidden sm:inline">Save Product</span><span className="sm:hidden">Save</span></>}
           </button>
         </div>
 
@@ -432,7 +432,7 @@ export default function ProductForm({ productId }: Props) {
         </div>
 
         {/* Tab content */}
-        <div className="bg-[#141414] rounded-2xl border border-white/[0.06] p-6 sm:p-8">
+        <div className="bg-[#141414] rounded-xl md:rounded-2xl border border-white/[0.06] p-4 md:p-6 lg:p-8">
           {tab === "Classification" && (
             <ClassificationSection
               data={product}
