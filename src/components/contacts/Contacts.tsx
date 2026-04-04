@@ -539,11 +539,11 @@ function getInitials(contact: ContactRow): string {
 
 function contactDisplayName(c: ContactRow): string {
   if (c.contact_type === "supplier") {
-    const en = (c as any).company_name_en || "";
+    const en = c.company_name_en || "";
     if (en) return en;
   }
   if (c.contact_type === "company" && c.company) return c.company;
-  if ((c as any).entity_type === "company" && c.company) return c.company;
+  if (c.entity_type === "company" && c.company) return c.company;
   if (c.first_name || c.last_name) return [c.first_name, c.last_name].filter(Boolean).join(" ");
   if (c.display_name) return c.display_name;
   if (c.company) return c.company;
@@ -552,11 +552,11 @@ function contactDisplayName(c: ContactRow): string {
 
 function contactSortKey(c: ContactRow): string {
   if (c.contact_type === "supplier") {
-    const en = (c as any).company_name_en || "";
+    const en = c.company_name_en || "";
     if (en) return en.toLowerCase();
   }
   if (c.contact_type === "company" && c.company) return c.company.toLowerCase();
-  if ((c as any).entity_type === "company" && c.company) return c.company.toLowerCase();
+  if (c.entity_type === "company" && c.company) return c.company.toLowerCase();
   return (c.first_name || c.last_name || c.company || c.display_name || "zzz").toLowerCase();
 }
 
@@ -644,7 +644,7 @@ function downloadFile(dataURL: string, filename: string) {
 function contactToForm(c: ContactRow): ContactForm {
   return {
     contact_type: (c.contact_type as ContactType) || "people",
-    entity_type: (c as any).entity_type || "",
+    entity_type: (c.entity_type as "person" | "company" | "") || "",
     photo_url: c.photo_url || "",
     title: c.title || "",
     first_name: c.first_name || "",
@@ -713,54 +713,54 @@ function contactToForm(c: ContactRow): ContactForm {
     sample_status: c.sample_status || "",
     factory_visit_date: c.factory_visit_date || "",
     /* Supplier Redesign */
-    company_name_en: (c as any).company_name_en || "",
-    company_name_cn: (c as any).company_name_cn || "",
-    additional_company_names: Array.isArray((c as any).additional_company_names) ? (c as any).additional_company_names : [],
-    supplier_tel: (c as any).supplier_tel || "",
-    supplier_mobile: (c as any).supplier_mobile || "",
-    supplier_email: (c as any).supplier_email || "",
-    supplier_website: (c as any).supplier_website || "",
-    supplier_address: (c as any).supplier_address || "",
-    division: (c as any).division || "",
-    category: (c as any).category || "",
-    catalogues: Array.isArray((c as any).catalogues) ? (c as any).catalogues : [],
-    documents: Array.isArray((c as any).documents) ? (c as any).documents : [],
-    contact_persons: Array.isArray((c as any).contact_persons) ? (c as any).contact_persons : [],
-    bank_accounts: Array.isArray((c as any).bank_accounts) ? (c as any).bank_accounts : [],
-    payment_info: (c as any).payment_info || "",
+    company_name_en: c.company_name_en || "",
+    company_name_cn: c.company_name_cn || "",
+    additional_company_names: Array.isArray(c.additional_company_names) ? c.additional_company_names : [],
+    supplier_tel: c.supplier_tel || "",
+    supplier_mobile: c.supplier_mobile || "",
+    supplier_email: c.supplier_email || "",
+    supplier_website: c.supplier_website || "",
+    supplier_address: c.supplier_address || "",
+    division: c.division || "",
+    category: c.category || "",
+    catalogues: Array.isArray(c.catalogues) ? c.catalogues : [],
+    documents: Array.isArray(c.documents) ? c.documents : [],
+    contact_persons: Array.isArray(c.contact_persons) ? c.contact_persons : [],
+    bank_accounts: Array.isArray(c.bank_accounts) ? c.bank_accounts : [],
+    payment_info: c.payment_info || "",
     /* Employee-Specific */
-    work_email: (c as any).work_email || "",
-    work_tel: (c as any).work_tel || "",
-    work_mobile: (c as any).work_mobile || "",
-    management: (c as any).management || "",
-    department: (c as any).department || "",
-    job_position: (c as any).job_position || "",
-    job_title: (c as any).job_title || "",
-    manager: (c as any).manager || "",
-    work_address: (c as any).work_address || "",
-    work_location: (c as any).work_location || "",
-    resume_lines: Array.isArray((c as any).resume_lines) ? (c as any).resume_lines : [],
-    private_email: (c as any).private_email || "",
-    private_phone: (c as any).private_phone || "",
-    employee_bank_account: (c as any).employee_bank_account || "",
-    legal_name: (c as any).legal_name || "",
-    place_of_birth: (c as any).place_of_birth || "",
-    gender: (c as any).gender || "",
-    emergency_contacts: Array.isArray((c as any).emergency_contacts) ? (c as any).emergency_contacts : [],
-    visa_no: (c as any).visa_no || "",
-    work_permit: (c as any).work_permit || "",
-    visa_documents: Array.isArray((c as any).visa_documents) ? (c as any).visa_documents : [],
-    nationality: (c as any).nationality || "",
-    nationality_code: (c as any).nationality_code || "",
-    id_no: (c as any).id_no || "",
-    ssn_no: (c as any).ssn_no || "",
-    passport_no: (c as any).passport_no || "",
-    private_address: (c as any).private_address || "",
-    home_work_distance: (c as any).home_work_distance || "",
-    marital_status: (c as any).marital_status || "",
-    number_of_children: (c as any).number_of_children || "",
-    certificate_level: (c as any).certificate_level || "",
-    field_of_study: (c as any).field_of_study || "",
+    work_email: c.work_email || "",
+    work_tel: c.work_tel || "",
+    work_mobile: c.work_mobile || "",
+    management: c.management || "",
+    department: c.department || "",
+    job_position: c.job_position || "",
+    job_title: c.job_title || "",
+    manager: c.manager || "",
+    work_address: c.work_address || "",
+    work_location: c.work_location || "",
+    resume_lines: Array.isArray(c.resume_lines) ? (c.resume_lines as ResumeLineEntry[]) : [],
+    private_email: c.private_email || "",
+    private_phone: c.private_phone || "",
+    employee_bank_account: c.employee_bank_account || "",
+    legal_name: c.legal_name || "",
+    place_of_birth: c.place_of_birth || "",
+    gender: c.gender || "",
+    emergency_contacts: Array.isArray(c.emergency_contacts) ? c.emergency_contacts : [],
+    visa_no: c.visa_no || "",
+    work_permit: c.work_permit || "",
+    visa_documents: Array.isArray(c.visa_documents) ? c.visa_documents : [],
+    nationality: c.nationality || "",
+    nationality_code: c.nationality_code || "",
+    id_no: c.id_no || "",
+    ssn_no: c.ssn_no || "",
+    passport_no: c.passport_no || "",
+    private_address: c.private_address || "",
+    home_work_distance: c.home_work_distance || "",
+    marital_status: c.marital_status || "",
+    number_of_children: c.number_of_children || "",
+    certificate_level: c.certificate_level || "",
+    field_of_study: c.field_of_study || "",
   };
 }
 
@@ -1432,10 +1432,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const countries = new Set(all.map(c => c.origin_country_code || c.country_code).filter(Boolean));
     const rated = all.filter(c => c.rating > 0);
     const avgRating = rated.length > 0 ? (rated.reduce((sum, c) => sum + c.rating, 0) / rated.length) : 0;
-    const withCatalogues = all.filter(c => Array.isArray((c as any).catalogues) && (c as any).catalogues.length > 0);
-    const divisions = new Set(all.map(c => (c as any).division).filter(Boolean));
-    const categories = new Set(all.map(c => (c as any).category).filter(Boolean));
-    const withContacts = all.filter(c => Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0);
+    const withCatalogues = all.filter(c => Array.isArray(c.catalogues) && c.catalogues.length > 0);
+    const divisions = new Set(all.map(c => c.division).filter(Boolean));
+    const categories = new Set(all.map(c => c.category).filter(Boolean));
+    const withContacts = all.filter(c => Array.isArray(c.contact_persons) && c.contact_persons.length > 0);
     const now = new Date();
     const newThisMonth = all.filter(c => {
       if (!c.created_at) return false;
@@ -1738,7 +1738,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {filterType ? (filterType === "company" ? "Companies" : filterType === "people" ? "People" : CONTACT_TYPES.find(t => t.value === filterType)?.label + "s") : "Contacts"}
           </h1>
           <button
-            onClick={() => setShowTypeChooser(true)}
+            onClick={() => {
+              if (filterType && filterType !== "customer") {
+                handleAdd(filterType);
+              } else {
+                setShowTypeChooser(true);
+              }
+            }}
             className="w-8 h-8 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition-colors"
           >
             <Plus size={16} />
@@ -1836,6 +1842,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
 
+        {/* Compact KPI strip — mobile only (employee/company/people) */}
+        {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-white">{moduleKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">Countries</p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">New</p>
+            </div>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-white/30 gap-2">
             <Users size={32} />
@@ -1859,10 +1887,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     }`}
                   >
                     {/* Avatar */}
-                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
+                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
+                      ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
                         <Building2 size={16} className="text-white/30" />
                       ) : (
                         getInitials(c)
@@ -2185,6 +2213,85 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         );
       }
 
+      /* ── Generic KPI Dashboard (Employee / Company / People) ── */
+      if (filterType && moduleKpis) {
+        const typeLabel = filterType === "company" ? "Company" : filterType === "people" ? "People" : filterType === "employee" ? "Employee" : filterType.charAt(0).toUpperCase() + filterType.slice(1);
+        const typeIcon = filterType === "employee" ? <BadgeCheck size={16} className="text-teal-400" /> : filterType === "company" ? <Briefcase size={16} className="text-purple-400" /> : <User size={16} className="text-green-400" />;
+        const accentColor = filterType === "employee" ? "teal" : filterType === "company" ? "purple" : "green";
+        return (
+          <div className="h-full overflow-y-auto">
+            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{typeLabel} Overview</h2>
+                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${accentColor}-500/10`}>{typeIcon}</div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-white">{moduleKpis.total}</p>
+                  <p className="text-xs text-white/30 mt-1">All {typeLabel.toLowerCase()}s</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10"><UserCheck size={16} className="text-emerald-400" /></div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
+                  <p className="text-xs text-white/30 mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% of total</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10"><MapPinned size={16} className="text-blue-400" /></div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">Countries</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
+                  <p className="text-xs text-white/30 mt-1">Global reach</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10"><TrendingUp size={16} className="text-amber-400" /></div>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">New</span>
+                  </div>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
+                  <p className="text-xs text-white/30 mt-1">Added this month</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                  </div>
+                  <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
+                </div>
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                  </div>
+                  <p className="text-3xl font-bold text-red-400">{moduleKpis.total - moduleKpis.active}</p>
+                </div>
+              </div>
+              {moduleKpis.newThisMonth > 0 && (
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
+                    <TrendingUp size={20} className="text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
+                    <p className="text-xs text-white/40">New {typeLabel.toLowerCase()}s this month</p>
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-white/20 text-center pt-2">Select a {typeLabel.toLowerCase()} from the list to view details</p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col items-center justify-center h-full text-white/20 gap-3">
           <User size={48} />
@@ -2217,26 +2324,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Header card */}
         <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
+          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
+            ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
               <Building2 size={32} className="text-white/20" />
             ) : (
               getInitials(c)
             )}
           </div>
           <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
-          {c.contact_type === "supplier" && (c as any).company_name_cn && <p className="text-sm text-white/40 mt-0.5">{(c as any).company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
-          {c.contact_type === "employee" && ((c as any).job_position || (c as any).department) && (
-            <p className="text-sm text-white/40">{[(c as any).job_position, (c as any).department].filter(Boolean).join(" \u00B7 ")}</p>
+          {c.contact_type === "supplier" && c.company_name_cn && <p className="text-sm text-white/40 mt-0.5">{c.company_name_cn}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          {c.contact_type === "employee" && (c.job_position || c.department) && (
+            <p className="text-sm text-white/40">{[c.job_position, c.department].filter(Boolean).join(" \u00B7 ")}</p>
           )}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
-              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}{c.contact_type === "customer" && (c as any).entity_type === "company" ? " · Business" : c.contact_type === "customer" && (c as any).entity_type === "person" ? " · Individual" : ""}
+              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}{c.contact_type === "customer" && c.entity_type === "company" ? " · Business" : c.contact_type === "customer" && c.entity_type === "person" ? " · Individual" : ""}
             </span>
             {tierInfo && (
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tierInfo.bg} ${tierInfo.color}`}>
@@ -2338,14 +2445,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
-        {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.birthday && (
           <Section title="Birthday" icon={<Calendar size={14} />}>
             <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
         )}
 
         {/* Social Profiles (hidden for company customers) */}
-        {!(c.contact_type === "customer" && (c as any).entity_type === "company") && socials.length > 0 && (
+        {!(c.contact_type === "customer" && c.entity_type === "company") && socials.length > 0 && (
           <Section title="Social Profiles" icon={<Share2 size={14} />}>
             {socials.map((s, i) => (
               <div key={i} className="flex items-center gap-3 py-2">
@@ -2362,7 +2469,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Related People (hidden for suppliers, company customers, and company type) */}
-        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && family.length > 0 && (
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && family.length > 0 && (
           <Section title="Related People" icon={<Users size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
@@ -2407,7 +2514,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Company Customer: Company Info ── */}
-        {c.contact_type === "customer" && (c as any).entity_type === "company" && (c.company || c.industry || c.tax_id) && (
+        {c.contact_type === "customer" && c.entity_type === "company" && (c.company || c.industry || c.tax_id) && (
           <Section title="Company Info" icon={<Building2 size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
@@ -2433,10 +2540,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Company Customer: Contact Persons ── */}
-        {c.contact_type === "customer" && (c as any).entity_type === "company" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+        {c.contact_type === "customer" && c.entity_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title="Contact Persons" icon={<Users size={14} />}>
             <div className="space-y-2">
-              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
@@ -2503,10 +2610,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Company Type: Contact Persons ── */}
-        {c.contact_type === "company" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+        {c.contact_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title="Contact Persons" icon={<Users size={14} />}>
             <div className="space-y-2">
-              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
@@ -2710,24 +2817,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "supplier" && (
           <Section title="Company Name" icon={<Building2 size={14} />}>
             <div className="space-y-2">
-              {(c as any).company_name_en && (
+              {c.company_name_en && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">English</span>
-                  <p className="text-sm text-white font-medium">{(c as any).company_name_en}</p>
+                  <p className="text-sm text-white font-medium">{c.company_name_en}</p>
                 </div>
               )}
-              {(c as any).company_name_cn && (
+              {c.company_name_cn && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Chinese</span>
-                  <p className="text-sm text-white font-medium">{(c as any).company_name_cn}</p>
+                  <p className="text-sm text-white font-medium">{c.company_name_cn}</p>
                 </div>
               )}
             </div>
-            {Array.isArray((c as any).additional_company_names) && (c as any).additional_company_names.length > 0 && (
+            {Array.isArray(c.additional_company_names) && c.additional_company_names.length > 0 && (
               <div className="mt-3">
                 <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Other Names</span>
                 <div className="space-y-1">
-                  {(c as any).additional_company_names.map((entry: { language: string; name: string }, i: number) => (
+                  {c.additional_company_names.map((entry: { language: string; name: string }, i: number) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-[10px] text-blue-400 font-medium min-w-[60px]">{entry.language}</span>
                       <span className="text-sm text-white">{entry.name}</span>
@@ -2740,37 +2847,37 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 2. Contact Details ── */}
-        {c.contact_type === "supplier" && ((c as any).supplier_tel || (c as any).supplier_mobile || (c as any).supplier_email || (c as any).supplier_website || (c as any).supplier_address || c.country) && (
+        {c.contact_type === "supplier" && (c.supplier_tel || c.supplier_mobile || c.supplier_email || c.supplier_website || c.supplier_address || c.country) && (
           <Section title="Contact Details" icon={<Phone size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              {(c as any).supplier_tel && (
+              {c.supplier_tel && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tel</span>
-                  <p className="text-sm text-white">{(c as any).supplier_tel}</p>
+                  <p className="text-sm text-white">{c.supplier_tel}</p>
                 </div>
               )}
-              {(c as any).supplier_mobile && (
+              {c.supplier_mobile && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Mobile</span>
-                  <p className="text-sm text-white">{(c as any).supplier_mobile}</p>
+                  <p className="text-sm text-white">{c.supplier_mobile}</p>
                 </div>
               )}
-              {(c as any).supplier_email && (
+              {c.supplier_email && (
                 <div className="col-span-2">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Email</span>
-                  <p className="text-sm text-blue-400">{(c as any).supplier_email}</p>
+                  <p className="text-sm text-blue-400">{c.supplier_email}</p>
                 </div>
               )}
-              {(c as any).supplier_website && (
+              {c.supplier_website && (
                 <div className="col-span-2">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Website</span>
-                  <p className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => window.open((c as any).supplier_website.startsWith("http") ? (c as any).supplier_website : "https://" + (c as any).supplier_website, "_blank")}>{(c as any).supplier_website}</p>
+                  <p className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => window.open(c.supplier_website!.startsWith("http") ? c.supplier_website! : "https://" + c.supplier_website!, "_blank")}>{c.supplier_website}</p>
                 </div>
               )}
-              {(c as any).supplier_address && (
+              {c.supplier_address && (
                 <div className="col-span-2">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Address</span>
-                  <p className="text-sm text-white">{(c as any).supplier_address}</p>
+                  <p className="text-sm text-white">{c.supplier_address}</p>
                 </div>
               )}
             </div>
@@ -2784,10 +2891,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 3. Contact Persons ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+        {c.contact_type === "supplier" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title="Contact Persons" icon={<Users size={14} />}>
             <div className="space-y-2">
-              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+              {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
@@ -2816,7 +2923,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 4. Company Profile ── */}
-        {c.contact_type === "supplier" && (c.supplier_type || c.industry || c.source || (c as any).division || (c as any).category || (Array.isArray(c.brand_names) && c.brand_names.length > 0)) && (
+        {c.contact_type === "supplier" && (c.supplier_type || c.industry || c.source || c.division || c.category || (Array.isArray(c.brand_names) && c.brand_names.length > 0)) && (
           <Section title="Company Profile" icon={<Briefcase size={14} />}>
             {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
               <div className="mb-3">
@@ -2829,16 +2936,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             )}
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-              {(c as any).division && (
+              {c.division && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Division</span>
-                  <p className="text-sm text-white">{(c as any).division}</p>
+                  <p className="text-sm text-white">{c.division}</p>
                 </div>
               )}
-              {(c as any).category && (
+              {c.category && (
                 <div>
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Category</span>
-                  <p className="text-sm text-white">{(c as any).category}</p>
+                  <p className="text-sm text-white">{c.category}</p>
                 </div>
               )}
               {c.supplier_type && (
@@ -2864,7 +2971,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 5. Payment & Currency ── */}
-        {c.contact_type === "supplier" && (c.payment_terms || c.currency || (c as any).payment_info) && (
+        {c.contact_type === "supplier" && (c.payment_terms || c.currency || c.payment_info) && (
           <Section title="Payment & Currency" icon={<DollarSign size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.payment_terms && (
@@ -2880,20 +2987,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               )}
             </div>
-            {(c as any).payment_info && (
+            {c.payment_info && (
               <div className="mt-3">
                 <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1">Payment Information</span>
-                <p className="text-sm text-white/60 whitespace-pre-wrap">{(c as any).payment_info}</p>
+                <p className="text-sm text-white/60 whitespace-pre-wrap">{c.payment_info}</p>
               </div>
             )}
           </Section>
         )}
 
         {/* ── Supplier: 6. Bank Accounts ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).bank_accounts) && (c as any).bank_accounts.length > 0 && (
+        {c.contact_type === "supplier" && Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0 && (
           <Section title="Bank Accounts" icon={<Landmark size={14} />}>
             <div className="space-y-3">
-              {(c as any).bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
+              {c.bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
                 <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[#222]">
                   <div className="flex items-center gap-2 mb-2">
                     <Landmark size={14} className="text-blue-400" />
@@ -2939,10 +3046,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 7. Catalogue ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).catalogues) && (c as any).catalogues.length > 0 && (
+        {c.contact_type === "supplier" && Array.isArray(c.catalogues) && c.catalogues.length > 0 && (
           <Section title="Catalogue" icon={<BookOpen size={14} />}>
             <div className="space-y-2">
-              {(c as any).catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
+              {c.catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
                 <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
                   {cat.type === "PDF" ? <FileText size={16} className="text-red-400 shrink-0" /> : <ImageIcon size={16} className="text-blue-400 shrink-0" />}
                   <div className="flex-1 min-w-0">
@@ -2962,10 +3069,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ── Supplier: 8. Documents ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).documents) && (c as any).documents.length > 0 && (
+        {c.contact_type === "supplier" && Array.isArray(c.documents) && c.documents.length > 0 && (
           <Section title="Documents" icon={<Paperclip size={14} />}>
             <div className="space-y-2">
-              {(c as any).documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
+              {c.documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
                 <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
                   <FileCheck size={16} className="text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -3056,34 +3163,34 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {c.contact_type === "employee" && (
         <>
           {/* Work Contact */}
-          {((c as any).work_email || (c as any).work_tel || (c as any).work_mobile) && (
+          {(c.work_email || c.work_tel || c.work_mobile) && (
             <Section title="Work Contact" icon={<Phone size={14} />}>
-              {(c as any).work_email && <div className="py-1"><span className="text-xs text-white/40">Email</span><p className="text-sm text-white">{(c as any).work_email}</p></div>}
-              {(c as any).work_tel && <div className="py-1"><span className="text-xs text-white/40">Tel</span><p className="text-sm text-white">{(c as any).work_tel}</p></div>}
-              {(c as any).work_mobile && <div className="py-1"><span className="text-xs text-white/40">Mobile</span><p className="text-sm text-white">{(c as any).work_mobile}</p></div>}
+              {c.work_email && <div className="py-1"><span className="text-xs text-white/40">Email</span><p className="text-sm text-white">{c.work_email}</p></div>}
+              {c.work_tel && <div className="py-1"><span className="text-xs text-white/40">Tel</span><p className="text-sm text-white">{c.work_tel}</p></div>}
+              {c.work_mobile && <div className="py-1"><span className="text-xs text-white/40">Mobile</span><p className="text-sm text-white">{c.work_mobile}</p></div>}
             </Section>
           )}
           {/* Work */}
-          {((c as any).department || (c as any).job_position || (c as any).job_title || (c as any).management || (c as any).manager) && (
+          {(c.department || c.job_position || c.job_title || c.management || c.manager) && (
             <Section title="Work" icon={<Briefcase size={14} />}>
-              {(c as any).management && <div className="py-1"><span className="text-xs text-white/40">Management</span><p className="text-sm text-white">{(c as any).management}</p></div>}
-              {(c as any).department && <div className="py-1"><span className="text-xs text-white/40">Department</span><p className="text-sm text-white">{(c as any).department}</p></div>}
-              {(c as any).job_position && <div className="py-1"><span className="text-xs text-white/40">Position</span><p className="text-sm text-white">{(c as any).job_position}</p></div>}
-              {(c as any).job_title && <div className="py-1"><span className="text-xs text-white/40">Title</span><p className="text-sm text-white">{(c as any).job_title}</p></div>}
-              {(c as any).manager && <div className="py-1"><span className="text-xs text-white/40">Manager</span><p className="text-sm text-white">{(c as any).manager}</p></div>}
+              {c.management && <div className="py-1"><span className="text-xs text-white/40">Management</span><p className="text-sm text-white">{c.management}</p></div>}
+              {c.department && <div className="py-1"><span className="text-xs text-white/40">Department</span><p className="text-sm text-white">{c.department}</p></div>}
+              {c.job_position && <div className="py-1"><span className="text-xs text-white/40">Position</span><p className="text-sm text-white">{c.job_position}</p></div>}
+              {c.job_title && <div className="py-1"><span className="text-xs text-white/40">Title</span><p className="text-sm text-white">{c.job_title}</p></div>}
+              {c.manager && <div className="py-1"><span className="text-xs text-white/40">Manager</span><p className="text-sm text-white">{c.manager}</p></div>}
             </Section>
           )}
           {/* Work Location */}
-          {((c as any).work_address || (c as any).work_location) && (
+          {(c.work_address || c.work_location) && (
             <Section title="Work Location" icon={<MapPin size={14} />}>
-              {(c as any).work_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{(c as any).work_address}</p></div>}
-              {(c as any).work_location && <div className="py-1"><span className="text-xs text-white/40">Location</span><p className="text-sm text-white">{(c as any).work_location}</p></div>}
+              {c.work_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{c.work_address}</p></div>}
+              {c.work_location && <div className="py-1"><span className="text-xs text-white/40">Location</span><p className="text-sm text-white">{c.work_location}</p></div>}
             </Section>
           )}
           {/* Resume */}
-          {Array.isArray((c as any).resume_lines) && (c as any).resume_lines.length > 0 && (
+          {Array.isArray(c.resume_lines) && c.resume_lines.length > 0 && (
             <Section title="Resume" icon={<FileText size={14} />}>
-              {(c as any).resume_lines.map((rl: any, i: number) => (
+              {c.resume_lines.map((rl: any, i: number) => (
                 <div key={i} className="py-2 border-b border-[#222] last:border-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
@@ -3104,18 +3211,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </Section>
           )}
           {/* Personal Info */}
-          {((c as any).legal_name || c.birthday || (c as any).place_of_birth || (c as any).gender) && (
+          {(c.legal_name || c.birthday || c.place_of_birth || c.gender) && (
             <Section title="Personal Information" icon={<User size={14} />}>
-              {(c as any).legal_name && <div className="py-1"><span className="text-xs text-white/40">Legal Name</span><p className="text-sm text-white">{(c as any).legal_name}</p></div>}
+              {c.legal_name && <div className="py-1"><span className="text-xs text-white/40">Legal Name</span><p className="text-sm text-white">{c.legal_name}</p></div>}
               {c.birthday && <div className="py-1"><span className="text-xs text-white/40">Birthday</span><p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p></div>}
-              {(c as any).place_of_birth && <div className="py-1"><span className="text-xs text-white/40">Place of Birth</span><p className="text-sm text-white">{(c as any).place_of_birth}</p></div>}
-              {(c as any).gender && <div className="py-1"><span className="text-xs text-white/40">Gender</span><p className="text-sm text-white capitalize">{(c as any).gender}</p></div>}
+              {c.place_of_birth && <div className="py-1"><span className="text-xs text-white/40">Place of Birth</span><p className="text-sm text-white">{c.place_of_birth}</p></div>}
+              {c.gender && <div className="py-1"><span className="text-xs text-white/40">Gender</span><p className="text-sm text-white capitalize">{c.gender}</p></div>}
             </Section>
           )}
           {/* Emergency Contact */}
-          {Array.isArray((c as any).emergency_contacts) && (c as any).emergency_contacts.length > 0 && (
+          {Array.isArray(c.emergency_contacts) && c.emergency_contacts.length > 0 && (
             <Section title="Emergency Contact" icon={<ShieldAlert size={14} />}>
-              {(c as any).emergency_contacts.map((ec: any, i: number) => (
+              {c.emergency_contacts.map((ec: any, i: number) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#222] last:border-0">
                   <span className="text-sm text-white">{ec.contact}</span>
                   <span className="text-sm text-white/50">{ec.phone}</span>
@@ -3124,40 +3231,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </Section>
           )}
           {/* Visa & Work Permit */}
-          {((c as any).visa_no || (c as any).work_permit) && (
+          {(c.visa_no || c.work_permit) && (
             <Section title="Visa & Work Permit" icon={<Plane size={14} />}>
-              {(c as any).visa_no && <div className="py-1"><span className="text-xs text-white/40">Visa No.</span><p className="text-sm text-white">{(c as any).visa_no}</p></div>}
-              {(c as any).work_permit && <div className="py-1"><span className="text-xs text-white/40">Work Permit</span><p className="text-sm text-white">{(c as any).work_permit}</p></div>}
+              {c.visa_no && <div className="py-1"><span className="text-xs text-white/40">Visa No.</span><p className="text-sm text-white">{c.visa_no}</p></div>}
+              {c.work_permit && <div className="py-1"><span className="text-xs text-white/40">Work Permit</span><p className="text-sm text-white">{c.work_permit}</p></div>}
             </Section>
           )}
           {/* Citizenship */}
-          {((c as any).nationality || (c as any).id_no || (c as any).ssn_no || (c as any).passport_no) && (
+          {(c.nationality || c.id_no || c.ssn_no || c.passport_no) && (
             <Section title="Citizenship" icon={<Globe size={14} />}>
-              {(c as any).nationality && <div className="py-1"><span className="text-xs text-white/40">Nationality</span><p className="text-sm text-white">{(c as any).nationality}</p></div>}
-              {(c as any).id_no && <div className="py-1"><span className="text-xs text-white/40">ID No.</span><p className="text-sm text-white">{(c as any).id_no}</p></div>}
-              {(c as any).ssn_no && <div className="py-1"><span className="text-xs text-white/40">SSN No.</span><p className="text-sm text-white">{(c as any).ssn_no}</p></div>}
-              {(c as any).passport_no && <div className="py-1"><span className="text-xs text-white/40">Passport No.</span><p className="text-sm text-white">{(c as any).passport_no}</p></div>}
+              {c.nationality && <div className="py-1"><span className="text-xs text-white/40">Nationality</span><p className="text-sm text-white">{c.nationality}</p></div>}
+              {c.id_no && <div className="py-1"><span className="text-xs text-white/40">ID No.</span><p className="text-sm text-white">{c.id_no}</p></div>}
+              {c.ssn_no && <div className="py-1"><span className="text-xs text-white/40">SSN No.</span><p className="text-sm text-white">{c.ssn_no}</p></div>}
+              {c.passport_no && <div className="py-1"><span className="text-xs text-white/40">Passport No.</span><p className="text-sm text-white">{c.passport_no}</p></div>}
             </Section>
           )}
           {/* Private Location */}
-          {((c as any).private_address || (c as any).home_work_distance) && (
+          {(c.private_address || c.home_work_distance) && (
             <Section title="Private Location" icon={<Home size={14} />}>
-              {(c as any).private_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{(c as any).private_address}</p></div>}
-              {(c as any).home_work_distance && <div className="py-1"><span className="text-xs text-white/40">Distance</span><p className="text-sm text-white">{(c as any).home_work_distance} KM</p></div>}
+              {c.private_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{c.private_address}</p></div>}
+              {c.home_work_distance && <div className="py-1"><span className="text-xs text-white/40">Distance</span><p className="text-sm text-white">{c.home_work_distance} KM</p></div>}
             </Section>
           )}
           {/* Family */}
-          {((c as any).marital_status || (c as any).number_of_children) && (
+          {(c.marital_status || c.number_of_children) && (
             <Section title="Family" icon={<Heart size={14} />}>
-              {(c as any).marital_status && <div className="py-1"><span className="text-xs text-white/40">Marital Status</span><p className="text-sm text-white capitalize">{(c as any).marital_status}</p></div>}
-              {(c as any).number_of_children && <div className="py-1"><span className="text-xs text-white/40">Children</span><p className="text-sm text-white">{(c as any).number_of_children}</p></div>}
+              {c.marital_status && <div className="py-1"><span className="text-xs text-white/40">Marital Status</span><p className="text-sm text-white capitalize">{c.marital_status}</p></div>}
+              {c.number_of_children && <div className="py-1"><span className="text-xs text-white/40">Children</span><p className="text-sm text-white">{c.number_of_children}</p></div>}
             </Section>
           )}
           {/* Education */}
-          {((c as any).certificate_level || (c as any).field_of_study) && (
+          {(c.certificate_level || c.field_of_study) && (
             <Section title="Education" icon={<GraduationCap size={14} />}>
-              {(c as any).certificate_level && <div className="py-1"><span className="text-xs text-white/40">Certificate Level</span><p className="text-sm text-white capitalize">{(c as any).certificate_level?.replace(/_/g, " ")}</p></div>}
-              {(c as any).field_of_study && <div className="py-1"><span className="text-xs text-white/40">Field of Study</span><p className="text-sm text-white">{(c as any).field_of_study}</p></div>}
+              {c.certificate_level && <div className="py-1"><span className="text-xs text-white/40">Certificate Level</span><p className="text-sm text-white capitalize">{c.certificate_level?.replace(/_/g, " ")}</p></div>}
+              {c.field_of_study && <div className="py-1"><span className="text-xs text-white/40">Field of Study</span><p className="text-sm text-white">{c.field_of_study}</p></div>}
             </Section>
           )}
         </>
@@ -3999,7 +4106,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <input type="file" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  compressImage(file, 1200, 0.8).then(url => {
+                  const isImage = file.type.startsWith("image/");
+                  const handler = isImage ? compressImage(file, 1200, 0.8) : readFileAsDataURL(file);
+                  handler.then(url => {
                     setField("attachments", [...form.attachments, {
                       name: file.name,
                       url,
@@ -4336,7 +4445,38 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* 11. Notes — shared section shown below */}
+            {/* 11. Notes */}
+            <FormSection title="Notes" icon={<FileText size={14} />}>
+              <textarea
+                value={form.notes}
+                onChange={e => setField("notes", e.target.value)}
+                placeholder="General notes about this supplier..."
+                rows={4}
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
+              />
+            </FormSection>
+
+            {/* 12. Custom Fields */}
+            <FormSection title="Custom Fields" icon={<Hash size={14} />}>
+              {form.custom_fields.map((cf, i) => (
+                <div key={i} className="flex items-center gap-2 mb-3">
+                  <RemoveBtn onClick={() => removeCustomField(i)} />
+                  <input
+                    value={cf.field_name}
+                    onChange={e => updateCustomField(i, "field_name", e.target.value)}
+                    placeholder="Field Name"
+                    className="w-32 h-10 px-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none"
+                  />
+                  <input
+                    value={cf.field_value}
+                    onChange={e => updateCustomField(i, "field_value", e.target.value)}
+                    placeholder="Value"
+                    className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  />
+                </div>
+              ))}
+              <AddButton label="add field" onClick={addCustomField} />
+            </FormSection>
           </>
         )}
 

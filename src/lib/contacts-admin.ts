@@ -9,6 +9,7 @@ import { supabaseAdmin as supabase } from "./supabase-admin";
 export interface ContactRow {
   id: string;
   contact_type: string;
+  entity_type: string | null;
   photo_url: string | null;
   title: string | null;
   first_name: string | null;
@@ -97,6 +98,39 @@ export interface ContactRow {
   contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
   payment_info: string | null;
+  /* Employee-Specific */
+  work_email: string | null;
+  work_tel: string | null;
+  work_mobile: string | null;
+  management: string | null;
+  department: string | null;
+  job_position: string | null;
+  job_title: string | null;
+  manager: string | null;
+  work_address: string | null;
+  work_location: string | null;
+  resume_lines: { type: string; title: string; duration_start: string; duration_end: string; is_forever: boolean; certificate_url: string; certificate_name: string; notes: string; course_type: string; external_url: string }[];
+  private_email: string | null;
+  private_phone: string | null;
+  employee_bank_account: string | null;
+  legal_name: string | null;
+  place_of_birth: string | null;
+  gender: string | null;
+  emergency_contacts: { contact: string; phone: string }[];
+  visa_no: string | null;
+  work_permit: string | null;
+  visa_documents: { name: string; url: string; type: string; uploaded_at: string }[];
+  nationality: string | null;
+  nationality_code: string | null;
+  id_no: string | null;
+  ssn_no: string | null;
+  passport_no: string | null;
+  private_address: string | null;
+  home_work_distance: string | null;
+  marital_status: string | null;
+  number_of_children: string | null;
+  certificate_level: string | null;
+  field_of_study: string | null;
   created_at: string;
   updated_at: string;
 }
