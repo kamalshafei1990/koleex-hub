@@ -378,17 +378,17 @@ export default function ProductForm({ productId }: Props) {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-[900px] mx-auto px-6 py-8">
+      <div className="max-w-[900px] mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/products"
               className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/80 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="text-[22px] font-bold text-white">
+            <h1 className="text-lg md:text-[22px] font-bold text-white">
               {isEdit ? "Edit Product" : "New Product"}
             </h1>
           </div>

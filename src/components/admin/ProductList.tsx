@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, Pencil, Eye, EyeOff, ArrowLeft, Package, Filter, X } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Eye, EyeOff, Package, Filter, X } from "lucide-react";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
   fetchModelSummaries, deleteProduct,
@@ -104,35 +104,28 @@ export default function ProductList() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-[1200px] mx-auto px-6 py-8">
+      <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/80 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="text-[24px] font-bold text-white flex items-center gap-2">
-                <Package className="h-6 w-6 text-white/40" />
-                Products
-              </h1>
-              <p className="text-[13px] text-white/30">{products.length} products in catalog</p>
-            </div>
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <div>
+            <h1 className="text-xl md:text-[24px] font-bold text-white flex items-center gap-2">
+              <Package className="h-5 w-5 md:h-6 md:w-6 text-white/40" />
+              Products
+            </h1>
+            <p className="text-[12px] md:text-[13px] text-white/30 mt-0.5">{products.length} products in catalog</p>
           </div>
           <Link
             href="/products/new"
-            className="h-10 px-5 rounded-lg bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
+            className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-white text-black text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Add Product
+            <span className="hidden sm:inline">Add Product</span>
+            <span className="sm:hidden">Add</span>
           </Link>
         </div>
 
         {/* Filters */}
-        <div className="bg-[#141414] rounded-xl border border-white/[0.06] p-4 mb-6">
+        <div className="bg-[#141414] rounded-xl border border-white/[0.06] p-3 md:p-4 mb-4 md:mb-6">
           {/* Top row: search + filter toggle */}
           <div className="flex gap-3 mb-0">
             <div className="relative flex-1">
@@ -287,89 +280,132 @@ export default function ProductList() {
           </p>
         )}
 
-        {/* Table */}
-        <div className="bg-[#141414] rounded-xl border border-white/[0.06] overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center text-white/30 text-[14px]">Loading products...</div>
-          ) : filtered.length === 0 ? (
-            <div className="p-12 text-center">
-              <Package className="h-10 w-10 text-white/10 mx-auto mb-3" />
-              <p className="text-white/30 text-[14px]">
-                {products.length === 0 ? "No products yet. Add your first product." : "No products match your filters."}
-              </p>
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Product</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Division</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Category</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Brand</th>
-                  <th className="text-center px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Models</th>
-                  <th className="text-center px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Status</th>
-                  <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="text-[14px] font-medium text-white">{p.product_name}</div>
-                      <div className="text-[11px] text-white/25 mt-0.5">{p.slug}</div>
-                    </td>
-                    <td className="px-5 py-3.5 text-[13px] text-white/50">{divMap[p.division_slug] || p.division_slug}</td>
-                    <td className="px-5 py-3.5 text-[13px] text-white/50">{catMap[p.category_slug] || p.category_slug}</td>
-                    <td className="px-5 py-3.5">
-                      {p.brand ? (
-                        <span className="text-[12px] text-white/50">{p.brand}</span>
-                      ) : (
-                        <span className="text-[12px] text-white/15">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-2 rounded-full bg-white/[0.06] text-[11px] font-medium text-white/50">
-                        {modelCounts[p.id] || 0}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <div className="flex flex-col items-center gap-0.5">
-                        {p.visible ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400/70">
-                            <Eye className="h-3 w-3" /> Visible
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-white/25">
-                            <EyeOff className="h-3 w-3" /> Hidden
-                          </span>
-                        )}
-                        {p.featured && (
-                          <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-400/60">Featured</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                          href={`/products/${p.id}/edit`}
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(p.id, p.product_name)}
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
+        {/* Product List */}
+        {loading ? (
+          <div className="bg-[#141414] rounded-xl border border-white/[0.06] p-12 text-center text-white/30 text-[14px]">Loading products...</div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-[#141414] rounded-xl border border-white/[0.06] p-12 text-center">
+            <Package className="h-10 w-10 text-white/10 mx-auto mb-3" />
+            <p className="text-white/30 text-[14px]">
+              {products.length === 0 ? "No products yet. Add your first product." : "No products match your filters."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block bg-[#141414] rounded-xl border border-white/[0.06] overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/[0.06]">
+                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Product</th>
+                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Division</th>
+                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Category</th>
+                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Brand</th>
+                    <th className="text-center px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Models</th>
+                    <th className="text-center px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Status</th>
+                    <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                </thead>
+                <tbody>
+                  {filtered.map((p) => (
+                    <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="text-[14px] font-medium text-white">{p.product_name}</div>
+                        <div className="text-[11px] text-white/25 mt-0.5">{p.slug}</div>
+                      </td>
+                      <td className="px-5 py-3.5 text-[13px] text-white/50">{divMap[p.division_slug] || p.division_slug}</td>
+                      <td className="px-5 py-3.5 text-[13px] text-white/50">{catMap[p.category_slug] || p.category_slug}</td>
+                      <td className="px-5 py-3.5">
+                        {p.brand ? (
+                          <span className="text-[12px] text-white/50">{p.brand}</span>
+                        ) : (
+                          <span className="text-[12px] text-white/15">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-2 rounded-full bg-white/[0.06] text-[11px] font-medium text-white/50">
+                          {modelCounts[p.id] || 0}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="flex flex-col items-center gap-0.5">
+                          {p.visible ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400/70">
+                              <Eye className="h-3 w-3" /> Visible
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-white/25">
+                              <EyeOff className="h-3 w-3" /> Hidden
+                            </span>
+                          )}
+                          {p.featured && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-400/60">Featured</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link
+                            href={`/products/${p.id}/edit`}
+                            className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(p.id, p.product_name)}
+                            className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {filtered.map((p) => (
+                <div key={p.id} className="bg-[#141414] rounded-xl border border-white/[0.06] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-medium text-white truncate">{p.product_name}</div>
+                      <div className="text-[11px] text-white/25 mt-0.5 truncate">{p.slug}</div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Link
+                        href={`/products/${p.id}/edit`}
+                        className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(p.id, p.product_name)}
+                        className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <span className="text-[11px] text-white/40 bg-white/[0.04] px-2 py-0.5 rounded">{divMap[p.division_slug] || p.division_slug}</span>
+                    <span className="text-[11px] text-white/40 bg-white/[0.04] px-2 py-0.5 rounded">{catMap[p.category_slug] || p.category_slug}</span>
+                    {p.brand && <span className="text-[11px] text-white/40 bg-white/[0.04] px-2 py-0.5 rounded">{p.brand}</span>}
+                    <span className="text-[11px] text-white/40 bg-white/[0.04] px-2 py-0.5 rounded">{modelCounts[p.id] || 0} models</span>
+                    {p.visible ? (
+                      <span className="text-[11px] text-emerald-400/70 bg-emerald-400/[0.08] px-2 py-0.5 rounded flex items-center gap-1"><Eye className="h-3 w-3" /> Visible</span>
+                    ) : (
+                      <span className="text-[11px] text-white/25 bg-white/[0.04] px-2 py-0.5 rounded flex items-center gap-1"><EyeOff className="h-3 w-3" /> Hidden</span>
+                    )}
+                    {p.featured && <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/60 bg-amber-400/[0.08] px-2 py-0.5 rounded">Featured</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

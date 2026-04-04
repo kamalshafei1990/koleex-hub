@@ -159,10 +159,10 @@ export default function TaxonomyAdmin({
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-[900px] mx-auto px-6 py-8">
+      <div className="max-w-[900px] mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <div className="flex items-center gap-3">
             <Link
               href={backHref}
               className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/80 transition-colors"
@@ -170,19 +170,20 @@ export default function TaxonomyAdmin({
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div>
-              <h1 className="text-[24px] font-bold text-white flex items-center gap-2">
-                <FolderTree className="h-6 w-6 text-white/40" />
+              <h1 className="text-xl md:text-[24px] font-bold text-white flex items-center gap-2">
+                <FolderTree className="h-5 w-5 md:h-6 md:w-6 text-white/40" />
                 {title}
               </h1>
-              <p className="text-[13px] text-white/30">{items.length} {title.toLowerCase()} total</p>
+              <p className="text-[12px] md:text-[13px] text-white/30">{items.length} {title.toLowerCase()} total</p>
             </div>
           </div>
           <button
             onClick={openCreate}
-            className="h-10 px-5 rounded-lg bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
+            className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-white text-black text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Add {singular}
+            <span className="hidden sm:inline">Add {singular}</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
 
