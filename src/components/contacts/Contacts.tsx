@@ -1718,7 +1718,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       if (filterType === "supplier" && supplierKpis) {
         return (
           <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
                 <h2 className="text-2xl font-bold text-white">Supplier Overview</h2>
@@ -1726,9 +1726,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Main KPI Row - 4 cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Suppliers */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-white/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
                       <Building2 size={16} className="text-blue-400" />
@@ -1740,7 +1740,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Active */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
                       <UserCheck size={16} className="text-emerald-400" />
@@ -1752,7 +1752,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-orange-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-orange-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500/10">
                       <Globe size={16} className="text-orange-400" />
@@ -1764,7 +1764,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Avg Rating */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-amber-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
                       <Star size={16} className="text-amber-400" />
@@ -1777,9 +1777,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Supplier Details Grid - 2x2 */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {/* Catalogues */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <BookOpen size={16} className="text-violet-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Catalogues</span>
@@ -1789,7 +1789,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Contact Persons */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Users size={16} className="text-cyan-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Contacts</span>
@@ -1799,7 +1799,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Divisions */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Briefcase size={16} className="text-pink-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Divisions</span>
@@ -1809,7 +1809,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Categories */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Package size={16} className="text-teal-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Categories</span>
@@ -1820,15 +1820,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Status Breakdown */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{supplierKpis.active}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
@@ -1839,7 +1839,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* New This Month */}
               {supplierKpis.newThisMonth > 0 && (
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 flex items-center gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
@@ -1870,7 +1870,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         const inactive = moduleKpis.total - moduleKpis.active;
         return (
           <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+            <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
                 <h2 className="text-2xl font-bold text-white">Customer Overview</h2>
@@ -1878,9 +1878,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Main KPI Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-white/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
                       <Crown size={16} className="text-amber-400" />
@@ -1892,7 +1892,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Active */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
                       <UserCheck size={16} className="text-emerald-400" />
@@ -1904,7 +1904,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* VIP */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-violet-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-violet-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/10">
                       <Gem size={16} className="text-violet-400" />
@@ -1916,7 +1916,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 transition-all hover:border-blue-500/20">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
                       <MapPinned size={16} className="text-blue-400" />
@@ -1929,7 +1929,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Tier Breakdown */}
-              <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+              <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                 <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Customer Tiers</h3>
                 <div className="space-y-3">
                   {[
@@ -1954,15 +1954,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
 
               {/* Status Breakdown */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
@@ -1973,7 +1973,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* New This Month */}
               {moduleKpis.newThisMonth > 0 && (
-                <div className="bg-[#111] border border-[#222] rounded-xl p-5 flex items-center gap-4">
+                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
