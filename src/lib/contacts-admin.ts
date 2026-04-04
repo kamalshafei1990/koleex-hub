@@ -65,6 +65,22 @@ export interface ContactRow {
   incoterms: string | null;
   /* Documents */
   attachments: { name: string; url: string; type: string; uploaded_at: string }[];
+  /* Supplier-Specific */
+  supplier_type: string | null;
+  product_categories: string[];
+  brand_names: string[];
+  moq: string | null;
+  lead_time: string | null;
+  total_purchases: string | null;
+  origin_country: string | null;
+  origin_country_code: string | null;
+  certifications: string[];
+  rating: number;
+  reliability_score: string | null;
+  quality_notes: string | null;
+  last_quality_issue: string | null;
+  sample_status: string | null;
+  factory_visit_date: string | null;
   created_at: string;
   updated_at: string;
 }
