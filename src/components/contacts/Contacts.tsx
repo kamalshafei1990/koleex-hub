@@ -2142,50 +2142,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Supplier: Company Information ── */}
+        {/* ── Supplier: 1. Company Name ── */}
         {c.contact_type === "supplier" && (
-          <Section title="Company Information" icon={<Building2 size={14} />}>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <Section title="Company Name" icon={<Building2 size={14} />}>
+            <div className="space-y-2">
               {(c as any).company_name_en && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name (EN)</span>
-                  <p className="text-sm text-white">{(c as any).company_name_en}</p>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">English</span>
+                  <p className="text-sm text-white font-medium">{(c as any).company_name_en}</p>
                 </div>
               )}
               {(c as any).company_name_cn && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name (CN)</span>
-                  <p className="text-sm text-white">{(c as any).company_name_cn}</p>
-                </div>
-              )}
-              {(c as any).division && (
-                <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Division</span>
-                  <p className="text-sm text-white">{(c as any).division}</p>
-                </div>
-              )}
-              {(c as any).category && (
-                <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Category</span>
-                  <p className="text-sm text-white">{(c as any).category}</p>
-                </div>
-              )}
-              {c.supplier_type && (
-                <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Supplier Type</span>
-                  <p className="text-sm text-white">{c.supplier_type}</p>
-                </div>
-              )}
-              {c.industry && (
-                <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
-                  <p className="text-sm text-white">{c.industry}</p>
-                </div>
-              )}
-              {c.source && (
-                <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
-                  <p className="text-sm text-white">{c.source}</p>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Chinese</span>
+                  <p className="text-sm text-white font-medium">{(c as any).company_name_cn}</p>
                 </div>
               )}
             </div>
@@ -2202,20 +2172,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               </div>
             )}
-            {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
-              <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Brands</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {c.brand_names.map((b: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">{b}</span>
-                  ))}
-                </div>
-              </div>
-            )}
           </Section>
         )}
 
-        {/* ── Supplier: Contact Details ── */}
+        {/* ── Supplier: 2. Contact Details ── */}
         {c.contact_type === "supplier" && ((c as any).supplier_tel || (c as any).supplier_mobile || (c as any).supplier_email || (c as any).supplier_website || (c as any).supplier_address || c.country) && (
           <Section title="Contact Details" icon={<Phone size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -2259,57 +2219,87 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Supplier: Catalogue ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).catalogues) && (c as any).catalogues.length > 0 && (
-          <Section title="Catalogue" icon={<FileText size={14} />}>
+        {/* ── Supplier: 3. Contact Persons ── */}
+        {c.contact_type === "supplier" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+          <Section title="Contact Persons" icon={<Users size={14} />}>
             <div className="space-y-2">
-              {(c as any).catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
-                  {cat.type === "PDF" ? <FileText size={16} className="text-red-400 shrink-0" /> : <ImageIcon size={16} className="text-blue-400 shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{cat.name}</p>
-                    <p className="text-[10px] text-white/30">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                      {(cp.name?.[0] || "?").toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <div className="flex items-center gap-2">
+                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                      </div>
+                    </div>
                   </div>
-                  <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                    <Eye size={10} /> Preview
-                  </button>
-                  <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                    <Download size={10} /> Download
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Supplier: Documents ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).documents) && (c as any).documents.length > 0 && (
-          <Section title="Documents" icon={<Paperclip size={14} />}>
-            <div className="space-y-2">
-              {(c as any).documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
-                  <FileCheck size={16} className="text-blue-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{doc.doc_name || doc.name}</p>
-                    <p className="text-[10px] text-white/30">{doc.type} {doc.uploaded_at ? " \u00B7 " + new Date(doc.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
-                  </div>
-                  {doc.url && (
-                    <>
-                      <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <Eye size={10} /> Preview
-                      </button>
-                      <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <Download size={10} /> Download
-                      </button>
-                    </>
+                  {(cp.phone || cp.mobile || cp.email) && (
+                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
+                      {cp.phone && <p>Tel: {cp.phone}</p>}
+                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
+                      {cp.email && <p>Email: {cp.email}</p>}
+                    </div>
                   )}
+                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
                 </div>
               ))}
             </div>
           </Section>
         )}
 
-        {/* ── Supplier: Payment & Currency ── */}
+        {/* ── Supplier: 4. Company Profile ── */}
+        {c.contact_type === "supplier" && (c.supplier_type || c.industry || c.source || (c as any).division || (c as any).category || (Array.isArray(c.brand_names) && c.brand_names.length > 0)) && (
+          <Section title="Company Profile" icon={<Briefcase size={14} />}>
+            {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
+              <div className="mb-3">
+                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Brands</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {c.brand_names.map((b: string, i: number) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">{b}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {(c as any).division && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Division</span>
+                  <p className="text-sm text-white">{(c as any).division}</p>
+                </div>
+              )}
+              {(c as any).category && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Category</span>
+                  <p className="text-sm text-white">{(c as any).category}</p>
+                </div>
+              )}
+              {c.supplier_type && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Supplier Type</span>
+                  <p className="text-sm text-white">{c.supplier_type}</p>
+                </div>
+              )}
+              {c.industry && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
+                  <p className="text-sm text-white">{c.industry}</p>
+                </div>
+              )}
+              {c.source && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
+                  <p className="text-sm text-white">{c.source}</p>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Supplier: 5. Payment & Currency ── */}
         {c.contact_type === "supplier" && (c.payment_terms || c.currency || (c as any).payment_info) && (
           <Section title="Payment & Currency" icon={<DollarSign size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -2335,9 +2325,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Supplier: Bank Accounts ── */}
+        {/* ── Supplier: 6. Bank Accounts ── */}
         {c.contact_type === "supplier" && Array.isArray((c as any).bank_accounts) && (c as any).bank_accounts.length > 0 && (
-          <Section title="Bank Accounts" icon={<CreditCard size={14} />}>
+          <Section title="Bank Accounts" icon={<Landmark size={14} />}>
             <div className="space-y-3">
               {(c as any).bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
                 <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[#222]">
@@ -2384,51 +2374,57 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Supplier: Contact Persons ── */}
-        {c.contact_type === "supplier" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
-          <Section title="Contact Persons" icon={<Users size={14} />}>
+        {/* ── Supplier: 7. Catalogue ── */}
+        {c.contact_type === "supplier" && Array.isArray((c as any).catalogues) && (c as any).catalogues.length > 0 && (
+          <Section title="Catalogue" icon={<BookOpen size={14} />}>
             <div className="space-y-2">
-              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
-                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
-                      {(cp.name?.[0] || "?").toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-white font-medium">{cp.name}</p>
-                      <div className="flex items-center gap-2">
-                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
-                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " \u00B7 " : ""}{cp.department}</span>}
-                      </div>
-                    </div>
+              {(c as any).catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                  {cat.type === "PDF" ? <FileText size={16} className="text-red-400 shrink-0" /> : <ImageIcon size={16} className="text-blue-400 shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{cat.name}</p>
+                    <p className="text-[10px] text-white/30">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
-                  {(cp.phone || cp.mobile || cp.email) && (
-                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
-                      {cp.phone && <p>Tel: {cp.phone}</p>}
-                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
-                      {cp.email && <p>Email: {cp.email}</p>}
-                    </div>
-                  )}
-                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                  <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                    <Eye size={10} /> Preview
+                  </button>
+                  <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                    <Download size={10} /> Download
+                  </button>
                 </div>
               ))}
             </div>
           </Section>
         )}
 
-        {/* ── Supplier: Products (placeholder) ── */}
-        {c.contact_type === "supplier" && (
-          <Section title="Products" icon={<Package size={14} />}>
-            <div className="flex items-center gap-3 py-3">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                <Package size={18} className="text-white/20" />
-              </div>
-              <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
+        {/* ── Supplier: 8. Documents ── */}
+        {c.contact_type === "supplier" && Array.isArray((c as any).documents) && (c as any).documents.length > 0 && (
+          <Section title="Documents" icon={<Paperclip size={14} />}>
+            <div className="space-y-2">
+              {(c as any).documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                  <FileCheck size={16} className="text-blue-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">{doc.doc_name || doc.name}</p>
+                    <p className="text-[10px] text-white/30">{doc.type} {doc.uploaded_at ? " · " + new Date(doc.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+                  </div>
+                  {doc.url && (
+                    <>
+                      <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                        <Eye size={10} /> Preview
+                      </button>
+                      <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                        <Download size={10} /> Download
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           </Section>
         )}
 
-        {/* ── Supplier: Quality & Performance ── */}
+        {/* ── Supplier: 9. Quality & Performance ── */}
         {c.contact_type === "supplier" && (c.rating || c.reliability_score || c.sample_status || c.quality_notes || c.last_quality_issue || (Array.isArray(c.certifications) && c.certifications.length > 0)) && (
           <Section title="Quality & Performance" icon={<ShieldCheck size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -2477,6 +2473,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <p className="text-sm text-white/60 whitespace-pre-wrap">{c.quality_notes}</p>
               </div>
             )}
+          </Section>
+        )}
+
+        {/* ── Supplier: 10. Products (placeholder) ── */}
+        {c.contact_type === "supplier" && (
+          <Section title="Products" icon={<Package size={14} />}>
+            <div className="flex items-center gap-3 py-3">
+              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                <Package size={18} className="text-white/20" />
+              </div>
+              <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
+            </div>
           </Section>
         )}
 
@@ -3110,11 +3118,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ══ SUPPLIER FORM SECTIONS ══ */}
+        {/* ══ SUPPLIER FORM SECTIONS (ordered by priority) ══ */}
         {form.contact_type === "supplier" && (
           <>
-            {/* A. Company Information */}
-            <FormSection title="Company Information" icon={<Building2 size={14} />}>
+            {/* 1. Company Name — Most important, identity of the supplier */}
+            <FormSection title="Company Name" icon={<Building2 size={14} />}>
               <div className="space-y-3">
                 <Input label="Company Name in English" value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder="e.g. Shenzhen ABC Trading Co., Ltd." icon={<Building2 size={14} />} />
                 <Input label="Company Name in Chinese" value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder="e.g. &#28145;&#22323;ABC&#36152;&#26131;&#26377;&#38480;&#20844;&#21496;" icon={<Languages size={14} />} />
@@ -3140,6 +3148,80 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   ))}
                   <AddButton label="add company name" onClick={() => setField("additional_company_names", [...form.additional_company_names, { language: "", name: "" }])} />
                 </div>
+              </div>
+            </FormSection>
+
+            {/* 2. Contact Details — How to reach the supplier */}
+            <FormSection title="Contact Details" icon={<Phone size={14} />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Tel" value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder="Telephone number" icon={<Phone size={14} />} />
+                  <Input label="Mobile" value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder="Mobile number" icon={<Phone size={14} />} />
+                </div>
+                <Input label="Email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<Mail size={14} />} />
+                <Input label="Website" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<Globe size={14} />} />
+                <Input label="Address" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder="Full address" icon={<MapPin size={14} />} />
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Country / Province / City</label>
+                  <div className="space-y-2">
+                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} />
+                    {form.country_code && hasStates && (
+                      <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} />
+                    )}
+                    {showCity && (
+                      <CityDropdown countryCode={form.country_code} stateCode={form.province_code} value={form.city} onChange={handleCityChange} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </FormSection>
+
+            {/* 3. Contact Persons — Key people to communicate with */}
+            <FormSection title="Contact Persons" icon={<Users size={14} />}>
+              <div className="space-y-3">
+                {form.contact_persons.map((cp, i) => (
+                  <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+                    <div className="flex items-center gap-2 p-3">
+                      <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
+                      <input
+                        value={cp.name}
+                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
+                        placeholder="Name"
+                        className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                      />
+                      <input
+                        value={cp.position}
+                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
+                        placeholder="Position"
+                        className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                      />
+                      <button
+                        onClick={() => setExpandedFamily(expandedFamily === 1000 + i ? null : 1000 + i)}
+                        className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                      >
+                        <ChevronDown size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+                    {expandedFamily === 1000 + i && (
+                      <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
+                        <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                          <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        </div>
+                        <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+              </div>
+            </FormSection>
+
+            {/* 4. Company Profile — Brand, classification, and business identity */}
+            <FormSection title="Company Profile" icon={<Briefcase size={14} />}>
+              <div className="space-y-3">
                 {/* Brand Names */}
                 <div>
                   <label className="text-xs text-white/40 mb-1 block">Brand</label>
@@ -3169,33 +3251,52 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* B. Contact Details */}
-            <FormSection title="Contact Details" icon={<Phone size={14} />}>
+            {/* 5. Payment & Currency */}
+            <FormSection title="Payment & Currency" icon={<DollarSign size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="Tel" value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder="Telephone number" icon={<Phone size={14} />} />
-                  <Input label="Mobile" value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder="Mobile number" icon={<Phone size={14} />} />
+                  <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} />
+                  <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} />
                 </div>
-                <Input label="Email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<Mail size={14} />} />
-                <Input label="Website" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<Globe size={14} />} />
-                <Input label="Address" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder="Full address" icon={<MapPin size={14} />} />
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Country / Province / City</label>
-                  <div className="space-y-2">
-                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} />
-                    {form.country_code && hasStates && (
-                      <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} />
-                    )}
-                    {showCity && (
-                      <CityDropdown countryCode={form.country_code} stateCode={form.province_code} value={form.city} onChange={handleCityChange} />
-                    )}
-                  </div>
+                  <label className="text-xs text-white/40 mb-1 block">Payment Information</label>
+                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder="Bank transfer details, payment notes, etc." rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-white/20" />
                 </div>
               </div>
             </FormSection>
 
-            {/* C. Catalogue */}
-            <FormSection title="Catalogue" icon={<FileText size={14} />}>
+            {/* 6. Bank Account Information */}
+            <FormSection title="Bank Account Information" icon={<Landmark size={14} />}>
+              <div className="space-y-3">
+                {form.bank_accounts.map((bank, i) => (
+                  <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-[#222] space-y-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
+                      <span className="text-xs text-white/50 font-medium">Account {i + 1}</span>
+                    </div>
+                    <div className="space-y-2 ml-8">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Bank Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      </div>
+                      <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Number" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder="SWIFT / BIC Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder="IBAN" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder="Branch" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder="Currency (e.g. USD)" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <AddButton label="add bank account" onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
+              </div>
+            </FormSection>
+
+            {/* 7. Catalogue */}
+            <FormSection title="Catalogue" icon={<BookOpen size={14} />}>
               <div className="space-y-2">
                 {form.catalogues.map((cat, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-[#222]">
@@ -3232,7 +3333,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* D. Documents */}
+            {/* 8. Documents */}
             <FormSection title="Documents" icon={<Paperclip size={14} />}>
               <div className="space-y-2">
                 {form.documents.map((doc, i) => (
@@ -3283,104 +3384,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* E. Payment & Currency */}
-            <FormSection title="Payment & Currency" icon={<DollarSign size={14} />}>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} />
-                  <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 mb-1 block">Payment Information</label>
-                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder="Bank transfer details, payment notes, etc." rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-white/20" />
-                </div>
-              </div>
-            </FormSection>
-
-            {/* F. Bank Account Information */}
-            <FormSection title="Bank Account Information" icon={<CreditCard size={14} />}>
-              <div className="space-y-3">
-                {form.bank_accounts.map((bank, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-[#222] space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
-                      <span className="text-xs text-white/50 font-medium">Account {i + 1}</span>
-                    </div>
-                    <div className="space-y-2 ml-8">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Bank Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                      </div>
-                      <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Number" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder="SWIFT / BIC Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder="IBAN" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder="Branch" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder="Currency (e.g. USD)" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <AddButton label="add bank account" onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
-              </div>
-            </FormSection>
-
-            {/* G. Contact Persons */}
-            <FormSection title="Contact Persons" icon={<Users size={14} />}>
-              <div className="space-y-3">
-                {form.contact_persons.map((cp, i) => (
-                  <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
-                    <div className="flex items-center gap-2 p-3">
-                      <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
-                      <input
-                        value={cp.name}
-                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder="Name"
-                        className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
-                      />
-                      <input
-                        value={cp.position}
-                        onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder="Position"
-                        className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
-                      />
-                      <button
-                        onClick={() => setExpandedFamily(expandedFamily === 1000 + i ? null : 1000 + i)}
-                        className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
-                      >
-                        <ChevronDown size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
-                      </button>
-                    </div>
-                    {expandedFamily === 1000 + i && (
-                      <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
-                        <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                          <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                        </div>
-                        <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                        <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
-              </div>
-            </FormSection>
-
-            {/* H. Products (placeholder) */}
-            <FormSection title="Products" icon={<Package size={14} />}>
-              <div className="flex items-center gap-3 py-4">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                  <Package size={18} className="text-white/20" />
-                </div>
-                <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
-              </div>
-            </FormSection>
-
-            {/* I. Quality & Performance */}
+            {/* 9. Quality & Performance */}
             <FormSection title="Quality & Performance" icon={<ShieldCheck size={14} />}>
               <div className="space-y-3">
                 <div>
@@ -3427,7 +3431,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </div>
             </FormSection>
 
-            {/* J. Notes (supplier) is shared — shown below */}
+            {/* 10. Products (placeholder) */}
+            <FormSection title="Products" icon={<Package size={14} />}>
+              <div className="flex items-center gap-3 py-4">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <Package size={18} className="text-white/20" />
+                </div>
+                <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
+              </div>
+            </FormSection>
+
+            {/* 11. Notes — shared section shown below */}
           </>
         )}
 
