@@ -20,6 +20,7 @@ interface AppItem {
   category: string;
   route: string;
   external?: boolean;
+  active?: boolean;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -43,23 +44,23 @@ const iconSize = 28;
 
 const apps: AppItem[] = [
   { id: "dashboard", name: "Dashboard", icon: <LayoutGrid size={iconSize} />, category: "operations", route: "/dashboard" },
-  { id: "products", name: "Products", icon: <Package size={iconSize} />, category: "operations", route: "/products" },
-  { id: "inventory", name: "Inventory", icon: <Warehouse size={iconSize} />, category: "operations", route: "/products" },
+  { id: "products", name: "Products", icon: <Package size={iconSize} />, category: "operations", route: "/products", active: true },
+  { id: "inventory", name: "Inventory", icon: <Warehouse size={iconSize} />, category: "operations", route: "/products", active: true },
   { id: "purchase", name: "Purchase", icon: <ShoppingCart size={iconSize} />, category: "operations", route: "/purchase" },
-  { id: "landed-cost", name: "Landed Cost", icon: <DollarSign size={iconSize} />, category: "operations", route: "/landed-cost" },
+  { id: "landed-cost", name: "Landed Cost", icon: <DollarSign size={iconSize} />, category: "operations", route: "/landed-cost", active: true },
   { id: "documents", name: "Documents", icon: <FileText size={iconSize} />, category: "operations", route: "/documents" },
   { id: "sales", name: "Sales", icon: <TrendingUp size={iconSize} />, category: "commercial", route: "/sales" },
   { id: "crm", name: "CRM", icon: <Layers size={iconSize} />, category: "commercial", route: "/crm" },
-  { id: "quotations", name: "Quotations", icon: <ClipboardList size={iconSize} />, category: "commercial", route: "/quotations" },
+  { id: "quotations", name: "Quotations", icon: <ClipboardList size={iconSize} />, category: "commercial", route: "/quotations", active: true },
   { id: "invoices", name: "Invoices", icon: <Receipt size={iconSize} />, category: "commercial", route: "/invoices" },
-  { id: "price-calculator", name: "Price Calculator", icon: <Calculator size={iconSize} />, category: "commercial", route: "/price-calculator" },
-  { id: "customers", name: "Customers", icon: <Users size={iconSize} />, category: "commercial", route: "/customers" },
-  { id: "suppliers", name: "Suppliers", icon: <Truck size={iconSize} />, category: "commercial", route: "/suppliers" },
-  { id: "contacts", name: "Contacts", icon: <Contact size={iconSize} />, category: "commercial", route: "/contacts" },
-  { id: "markets", name: "Markets", icon: <Globe size={iconSize} />, category: "commercial", route: "/markets" },
+  { id: "price-calculator", name: "Price Calculator", icon: <Calculator size={iconSize} />, category: "commercial", route: "/price-calculator", active: true },
+  { id: "customers", name: "Customers", icon: <Users size={iconSize} />, category: "commercial", route: "/customers", active: true },
+  { id: "suppliers", name: "Suppliers", icon: <Truck size={iconSize} />, category: "commercial", route: "/suppliers", active: true },
+  { id: "contacts", name: "Contacts", icon: <Contact size={iconSize} />, category: "commercial", route: "/contacts", active: true },
+  { id: "markets", name: "Markets", icon: <Globe size={iconSize} />, category: "commercial", route: "/markets", active: true },
   { id: "finance", name: "Finance", icon: <CreditCard size={iconSize} />, category: "finance", route: "/finance" },
   { id: "expenses", name: "Expenses", icon: <Briefcase size={iconSize} />, category: "finance", route: "/expenses" },
-  { id: "employees", name: "Employees", icon: <Users size={iconSize} />, category: "people", route: "/employees" },
+  { id: "employees", name: "Employees", icon: <Users size={iconSize} />, category: "people", route: "/employees", active: true },
   { id: "recruitment", name: "Recruitment", icon: <UserSearch size={iconSize} />, category: "people", route: "/recruitment" },
   { id: "appraisals", name: "Appraisals", icon: <Star size={iconSize} />, category: "people", route: "/appraisals" },
   { id: "appointments", name: "Appointments", icon: <Clock size={iconSize} />, category: "people", route: "/appointments" },
@@ -67,7 +68,7 @@ const apps: AppItem[] = [
   { id: "discuss", name: "Discuss", icon: <MessageSquare size={iconSize} />, category: "communication", route: "/discuss" },
   { id: "calendar", name: "Calendar", icon: <Calendar size={iconSize} />, category: "communication", route: "/calendar" },
   { id: "todo", name: "To-do", icon: <CheckSquare size={iconSize} />, category: "communication", route: "/todo" },
-  { id: "website", name: "Website", icon: <PanelTop size={iconSize} />, category: "marketing", route: "/website" },
+  { id: "website", name: "Website", icon: <PanelTop size={iconSize} />, category: "marketing", route: "/website", active: true },
   { id: "marketing", name: "Marketing", icon: <Megaphone size={iconSize} />, category: "marketing", route: "/marketing" },
   { id: "marketing-cards", name: "Marketing Cards", icon: <Monitor size={iconSize} />, category: "marketing", route: "/marketing-cards" },
   { id: "events", name: "Events", icon: <Bell size={iconSize} />, category: "marketing", route: "/events" },
@@ -150,6 +151,7 @@ export default function HomePage() {
   }, [filteredApps]);
 
   const handleAppClick = useCallback((app: AppItem) => {
+    if (!app.active) return;
     if (app.external) window.open(app.route, "_blank");
     else router.push(app.route);
   }, [router]);
@@ -240,7 +242,7 @@ export default function HomePage() {
               </div>
               <div className="flex items-center gap-4">
                 <span className={`text-xs font-medium ${dk ? "text-white/30" : "text-black/30"}`}>{today}</span>
-                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.length} apps</span>
+                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.filter(a => a.active).length} of {filteredApps.length} apps</span>
               </div>
             </div>
             <div className="mt-3">
@@ -256,10 +258,20 @@ export default function HomePage() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 mb-4">
                   {group.apps.map(app => (
                     <button key={app.id} onClick={() => handleAppClick(app)}
-                      className={`flex flex-col items-center justify-center gap-3 p-5 min-h-[100px] border rounded-xl transition-all cursor-pointer group
-                        ${dk ? "bg-[#111] border-white/[0.06] hover:border-white/20 hover:shadow-lg" : "bg-white border-black/[0.06] hover:border-black/20 hover:shadow-lg"}`}>
-                      <span className={`${dk ? "text-white/60 group-hover:text-white" : "text-black/60 group-hover:text-black"} transition-colors`}>{app.icon}</span>
-                      <span className={`text-[11px] md:text-xs font-medium text-center ${dk ? "text-white/60 group-hover:text-white" : "text-black/60 group-hover:text-black"} transition-colors`}>{app.name}</span>
+                      disabled={!app.active}
+                      className={`flex flex-col items-center justify-center gap-3 p-5 min-h-[100px] border rounded-xl transition-all
+                        ${app.active
+                          ? `cursor-pointer group ${dk ? "bg-[#111] border-white/[0.06] hover:border-white/20 hover:shadow-lg" : "bg-white border-black/[0.06] hover:border-black/20 hover:shadow-lg"}`
+                          : `cursor-default opacity-25 ${dk ? "bg-[#0e0e0e] border-white/[0.03]" : "bg-[#f5f5f5] border-black/[0.03]"}`
+                        }`}>
+                      <span className={`transition-colors ${app.active
+                        ? dk ? "text-white/60 group-hover:text-white" : "text-black/60 group-hover:text-black"
+                        : dk ? "text-white/30" : "text-black/30"
+                      }`}>{app.icon}</span>
+                      <span className={`text-[11px] md:text-xs font-medium text-center transition-colors ${app.active
+                        ? dk ? "text-white/60 group-hover:text-white" : "text-black/60 group-hover:text-black"
+                        : dk ? "text-white/30" : "text-black/30"
+                      }`}>{app.name}</span>
                     </button>
                   ))}
                 </div>
