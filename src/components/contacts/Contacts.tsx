@@ -1185,12 +1185,26 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     if (tab !== "all") list = list.filter(c => c.contact_type === tab);
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
-      list = list.filter(c =>
-        contactDisplayName(c).toLowerCase().includes(q) ||
-        (c.company || "").toLowerCase().includes(q) ||
-        (c.email || "").toLowerCase().includes(q) ||
-        (c.phone || "").includes(q)
-      );
+      list = list.filter(c => {
+        if (contactDisplayName(c).toLowerCase().includes(q)) return true;
+        if ((c.company || "").toLowerCase().includes(q)) return true;
+        if ((c.email || "").toLowerCase().includes(q)) return true;
+        if ((c.phone || "").includes(q)) return true;
+        if ((c.first_name || "").toLowerCase().includes(q)) return true;
+        if ((c.last_name || "").toLowerCase().includes(q)) return true;
+        /* Supplier-specific fields */
+        if ((c.company_name_en || "").toLowerCase().includes(q)) return true;
+        if ((c.company_name_cn || "").includes(q)) return true;
+        if ((c.supplier_email || "").toLowerCase().includes(q)) return true;
+        if ((c.supplier_tel || "").includes(q)) return true;
+        if ((c.supplier_mobile || "").includes(q)) return true;
+        if ((c.division || "").toLowerCase().includes(q)) return true;
+        if ((c.category || "").toLowerCase().includes(q)) return true;
+        if (c.brand_names?.some(b => b.toLowerCase().includes(q))) return true;
+        if (c.tags?.some(t => t.toLowerCase().includes(q))) return true;
+        if (c.contact_persons?.some(p => (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || (p.phone || "").includes(q))) return true;
+        return false;
+      });
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
   }, [contacts, typeTab, filterType, debouncedSearch]);
