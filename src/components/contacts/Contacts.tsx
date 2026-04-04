@@ -43,6 +43,7 @@ interface Attachment { name: string; url: string; type: string; uploaded_at: str
 
 interface ContactForm {
   contact_type: ContactType;
+  entity_type: "person" | "company" | "";
   photo_url: string;
   title: string;
   first_name: string;
@@ -211,6 +212,7 @@ const COUNTRIES_WITH_STATES = new Set([
 
 const EMPTY_FORM: ContactForm = {
   contact_type: "customer",
+  entity_type: "",
   photo_url: "",
   title: "",
   first_name: "",
@@ -432,6 +434,9 @@ function getInitials(contact: ContactRow): string {
     const en = (contact as any).company_name_en || "";
     if (en) return en.slice(0, 2).toUpperCase();
   }
+  if ((contact as any).entity_type === "company" && contact.company) {
+    return contact.company.slice(0, 2).toUpperCase();
+  }
   const fn = contact.first_name || "";
   const ln = contact.last_name || "";
   if (fn && ln) return (fn[0] + ln[0]).toUpperCase();
@@ -445,6 +450,7 @@ function contactDisplayName(c: ContactRow): string {
     const en = (c as any).company_name_en || "";
     if (en) return en;
   }
+  if ((c as any).entity_type === "company" && c.company) return c.company;
   if (c.first_name || c.last_name) return [c.first_name, c.last_name].filter(Boolean).join(" ");
   if (c.display_name) return c.display_name;
   if (c.company) return c.company;
@@ -456,6 +462,7 @@ function contactSortKey(c: ContactRow): string {
     const en = (c as any).company_name_en || "";
     if (en) return en.toLowerCase();
   }
+  if ((c as any).entity_type === "company" && c.company) return c.company.toLowerCase();
   return (c.first_name || c.last_name || c.company || c.display_name || "zzz").toLowerCase();
 }
 
@@ -543,6 +550,7 @@ function downloadFile(dataURL: string, filename: string) {
 function contactToForm(c: ContactRow): ContactForm {
   return {
     contact_type: (c.contact_type as ContactType) || "people",
+    entity_type: (c as any).entity_type || "",
     photo_url: c.photo_url || "",
     title: c.title || "",
     first_name: c.first_name || "",
@@ -634,7 +642,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
   const displayName = buildDisplayName(f);
   return {
     contact_type: f.contact_type,
-    entity_type: f.contact_type === "company" ? "company" : "person",
+    entity_type: f.entity_type || (f.contact_type === "company" ? "company" : "person"),
     photo_url: f.photo_url || null,
     title: f.title || null,
     first_name: f.first_name || null,
@@ -1154,6 +1162,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showTypeChooser, setShowTypeChooser] = useState(false);
+  const [typeChooserStep, setTypeChooserStep] = useState<1 | 2>(1);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -1262,11 +1271,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setEditingId(null);
   }, []);
 
-  const handleAdd = useCallback((type: ContactType) => {
-    setForm({ ...EMPTY_FORM, contact_type: type });
+  const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
+    setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "" });
     setEditingId(null);
     setView("form");
     setShowTypeChooser(false);
+    setTypeChooserStep(1);
     setMobileShowDetail(true);
     setExpandedFamily(null);
   }, []);
@@ -1600,10 +1610,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     }`}
                   >
                     {/* Avatar */}
-                    <div className={`w-10 h-10 ${c.contact_type === "supplier" ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
+                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : c.contact_type === "supplier" ? (
+                      ) : c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
                         <Building2 size={16} className="text-white/30" />
                       ) : (
                         getInitials(c)
@@ -1815,10 +1825,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Header card */}
         <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 ${c.contact_type === "supplier" ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
+          <div className={`w-24 h-24 ${c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : c.contact_type === "supplier" ? (
+            ) : c.contact_type === "supplier" || (c.contact_type === "customer" && (c as any).entity_type === "company") ? (
               <Building2 size={32} className="text-white/20" />
             ) : (
               getInitials(c)
@@ -1826,12 +1836,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
           <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
           {c.contact_type === "supplier" && (c as any).company_name_cn && <p className="text-sm text-white/40 mt-0.5">{(c as any).company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
-          {c.contact_type !== "supplier" && c.company && <p className="text-sm text-white/40">{c.company}</p>}
+          {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
-              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
+              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}{c.contact_type === "customer" && (c as any).entity_type === "company" ? " · Business" : c.contact_type === "customer" && (c as any).entity_type === "person" ? " · Individual" : ""}
             </span>
             {tierInfo && (
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tierInfo.bg} ${tierInfo.color}`}>
@@ -1932,15 +1942,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Birthday (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && c.birthday && (
+        {/* Birthday (hidden for suppliers and company customers) */}
+        {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
           <Section title="Birthday" icon={<Calendar size={14} />}>
             <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
         )}
 
-        {/* Social Profiles */}
-        {socials.length > 0 && (
+        {/* Social Profiles (hidden for company customers) */}
+        {!(c.contact_type === "customer" && (c as any).entity_type === "company") && socials.length > 0 && (
           <Section title="Social Profiles" icon={<Share2 size={14} />}>
             {socials.map((s, i) => (
               <div key={i} className="flex items-center gap-3 py-2">
@@ -1956,8 +1966,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Related People (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && family.length > 0 && (
+        {/* Related People (hidden for suppliers and company customers) */}
+        {c.contact_type !== "supplier" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && family.length > 0 && (
           <Section title="Related People" icon={<Users size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
@@ -1997,6 +2007,64 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[#222]" loading="lazy" decoding="async" />
                 </div>
               )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Company Customer: Company Info ── */}
+        {c.contact_type === "customer" && (c as any).entity_type === "company" && (c.company || c.industry || c.tax_id) && (
+          <Section title="Company Info" icon={<Building2 size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.company && (
+                <div className="col-span-2">
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name</span>
+                  <p className="text-sm text-white font-medium">{c.company}</p>
+                </div>
+              )}
+              {c.industry && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
+                  <p className="text-sm text-white">{c.industry}</p>
+                </div>
+              )}
+              {c.tax_id && (
+                <div>
+                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Reg. No.</span>
+                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Company Customer: Contact Persons ── */}
+        {c.contact_type === "customer" && (c as any).entity_type === "company" && Array.isArray((c as any).contact_persons) && (c as any).contact_persons.length > 0 && (
+          <Section title="Contact Persons" icon={<Users size={14} />}>
+            <div className="space-y-2">
+              {(c as any).contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
+                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                      {(cp.name?.[0] || "?").toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <div className="flex items-center gap-2">
+                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {(cp.phone || cp.mobile || cp.email) && (
+                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
+                      {cp.phone && <p>Tel: {cp.phone}</p>}
+                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
+                      {cp.email && <p>Email: {cp.email}</p>}
+                    </div>
+                  )}
+                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                </div>
+              ))}
             </div>
           </Section>
         )}
@@ -2567,6 +2635,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   const renderFormPanel = () => {
     const isCustomer = form.contact_type === "customer";
+    const isCompanyCustomer = form.contact_type === "customer" && form.entity_type === "company";
+    const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
 
     /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
     const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
@@ -2630,10 +2700,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Photo / Logo + Type */}
         <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
+          <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-            ) : form.contact_type === "supplier" ? (
+            ) : form.contact_type === "supplier" || isCompanyCustomer ? (
               <Building2 size={32} className="text-white/20" />
             ) : (
               <div className="flex flex-col items-center">
@@ -2645,7 +2715,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {form.photo_url ? (
             <div className="flex items-center justify-center gap-3">
               <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
-                {form.contact_type === "supplier" ? "Change Logo" : "Change Photo"}
+                {form.contact_type === "supplier" || isCompanyCustomer ? "Change Logo" : "Change Photo"}
                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) compressImage(file).then(url => setField("photo_url", url));
@@ -2655,7 +2725,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </div>
           ) : (
             <label className="inline-block px-5 py-2 rounded-full bg-white/10 hover:bg-white/15 text-sm text-white/70 font-medium cursor-pointer transition-colors">
-              {form.contact_type === "supplier" ? "Add Logo" : "Add Photo"}
+              {form.contact_type === "supplier" || isCompanyCustomer ? "Add Logo" : "Add Photo"}
               <input type="file" accept="image/*" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) compressImage(file).then(url => setField("photo_url", url));
@@ -2679,10 +2749,115 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               </button>
             ))}
           </div>
+
+          {/* Entity type toggle for customers */}
+          {form.contact_type === "customer" && (
+            <div className="flex items-center gap-2 mt-3 justify-center">
+              <button
+                onClick={() => setField("entity_type", "person")}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                  form.entity_type === "person" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"
+                }`}
+              >
+                <User size={14} /> Individual
+              </button>
+              <button
+                onClick={() => setField("entity_type", "company")}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                  form.entity_type === "company" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"
+                }`}
+              >
+                <Building2 size={14} /> Business
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Basic Info (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Company Customer: Company Name section */}
+        {isCompanyCustomer && (
+        <FormSection title="Company Name" icon={<Building2 size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Company Name</label>
+              <div className="relative">
+                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                <input
+                  value={form.company}
+                  onChange={e => setField("company", e.target.value)}
+                  placeholder="e.g. Acme Corporation"
+                  className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Industry</label>
+              <input
+                value={form.industry}
+                onChange={e => setField("industry", e.target.value)}
+                placeholder="e.g. Technology, Manufacturing, Retail"
+                className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Tax ID / Registration No.</label>
+              <input
+                value={form.tax_id}
+                onChange={e => setField("tax_id", e.target.value)}
+                placeholder="e.g. VAT / CR number"
+                className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+              />
+            </div>
+          </div>
+        </FormSection>
+        )}
+
+        {/* Company Customer: Contact Persons */}
+        {isCompanyCustomer && (
+        <FormSection title="Contact Persons" icon={<Users size={14} />}>
+          <div className="space-y-3">
+            {form.contact_persons.map((cp, i) => (
+              <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+                <div className="flex items-center gap-2 p-3">
+                  <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
+                  <input
+                    value={cp.name}
+                    onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
+                    placeholder="Name"
+                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  />
+                  <input
+                    value={cp.position}
+                    onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
+                    placeholder="Position"
+                    className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  />
+                  <button
+                    onClick={() => setExpandedFamily(expandedFamily === 2000 + i ? null : 2000 + i)}
+                    className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                  >
+                    <ChevronDown size={14} className={`transition-transform ${expandedFamily === 2000 + i ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+                {expandedFamily === 2000 + i && (
+                  <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
+                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    </div>
+                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                  </div>
+                )}
+              </div>
+            ))}
+            <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+          </div>
+        </FormSection>
+        )}
+
+        {/* Basic Info (hidden for suppliers and company customers) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && (
         <FormSection title="Basic Information" icon={<User size={14} />}>
           <div className="space-y-3">
             <SelectInput label="Title" value={form.title} onChange={v => setField("title", v)} options={TITLES} />
@@ -2812,15 +2987,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Birthday (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Birthday (hidden for suppliers and company customers) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && (
         <FormSection title="Birthday" icon={<Calendar size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
         </FormSection>
         )}
 
-        {/* Social Profiles (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Social Profiles (hidden for suppliers and company customers) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && (
         <FormSection title="Social Profiles" icon={<Share2 size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
@@ -2857,8 +3032,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Related People (hidden for suppliers - replaced by Contact Persons) */}
-        {form.contact_type !== "supplier" && (
+        {/* Related People (hidden for suppliers and company customers) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && (
         <FormSection title="Related People" icon={<Users size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
@@ -3533,27 +3708,67 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   const renderTypeChooser = () => (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowTypeChooser(false)}>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-white mb-1">New Contact</h3>
-        <p className="text-sm text-white/40 mb-5">Choose the contact type</p>
-        <div className="grid grid-cols-2 gap-3">
-          {CONTACT_TYPES.map(t => (
-            <button
-              key={t.value}
-              onClick={() => handleAdd(t.value)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
-            >
-              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
-                {t.icon}
-              </div>
-              <span className="text-sm font-medium">{t.label}</span>
+        {typeChooserStep === 1 ? (
+          <>
+            <h3 className="text-lg font-semibold text-white mb-1">New Contact</h3>
+            <p className="text-sm text-white/40 mb-5">Choose the contact type</p>
+            <div className="grid grid-cols-2 gap-3">
+              {CONTACT_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => {
+                    if (t.value === "customer") {
+                      setTypeChooserStep(2);
+                    } else {
+                      handleAdd(t.value);
+                    }
+                  }}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
+                    {t.icon}
+                  </div>
+                  <span className="text-sm font-medium">{t.label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors">
+              Cancel
             </button>
-          ))}
-        </div>
-        <button onClick={() => setShowTypeChooser(false)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors">
-          Cancel
-        </button>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold text-white mb-1">What type of customer?</h3>
+            <p className="text-sm text-white/40 mb-5">Select the customer entity type</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleAdd("customer", "person")}
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-amber-500/30 bg-white/[0.02] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <User size={22} />
+                </div>
+                <span className="text-sm font-medium">Individual</span>
+                <span className="text-[11px] text-white/30 text-center leading-tight">A person you do business with</span>
+              </button>
+              <button
+                onClick={() => handleAdd("customer", "company")}
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-amber-500/30 bg-white/[0.02] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                  <Building2 size={22} />
+                </div>
+                <span className="text-sm font-medium">Business</span>
+                <span className="text-[11px] text-white/30 text-center leading-tight">A company or organization</span>
+              </button>
+            </div>
+            <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
+              <ArrowLeft size={14} /> Back
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
