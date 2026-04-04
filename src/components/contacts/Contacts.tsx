@@ -4961,7 +4961,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="h-screen bg-[#0A0A0A] text-white flex overflow-hidden">
+    <div className="h-[calc(100vh-3.5rem)] bg-[#0A0A0A] text-white flex overflow-hidden">
       {/* Left panel -- contact list */}
       <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111] min-w-0`}>
         {renderListPanel()}

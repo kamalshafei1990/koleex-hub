@@ -8,7 +8,7 @@ import {
   Users, Truck, Contact, Globe, CreditCard, Briefcase, UserSearch,
   Star, Clock, CalendarCheck, MessageSquare, Calendar, CheckSquare,
   Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Database,
-  Sparkles, Menu, Search, Sun, Moon, PanelTop,
+  Sparkles, Menu, Search, PanelTop,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -105,19 +105,6 @@ const sidebarItems: SidebarItem[] = [
   { type: "filter", id: "system", label: "Settings", icon: <Settings size={20} /> },
 ];
 
-function KoleexLogo({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 719.83 107.57" fill="currentColor">
-      <path d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z"/>
-      <path d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z"/>
-      <path d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z"/>
-      <path d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"/>
-      <path d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"/>
-      <path d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31h0Z"/>
-    </svg>
-  );
-}
-
 export default function HomePage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -128,12 +115,14 @@ export default function HomePage() {
   useEffect(() => {
     const saved = localStorage.getItem("koleex-theme") as "light" | "dark" | null;
     if (saved) setTheme(saved);
+    /* Sync with MainHeader theme toggle */
+    const onThemeChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail as "light" | "dark";
+      if (detail) setTheme(detail);
+    };
+    window.addEventListener("themechange", onThemeChange);
+    return () => window.removeEventListener("themechange", onThemeChange);
   }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("koleex-theme", theme);
-  }, [theme]);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -181,42 +170,33 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-black" : "bg-white"} min-h-screen transition-colors duration-300`}>
-      {/* HEADER */}
-      <header className={`fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 md:px-6 backdrop-blur-xl border-b ${dk ? "border-white/[0.08] bg-black/80" : "border-black/[0.08] bg-white/80"}`}>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className={`md:hidden flex items-center justify-center w-9 h-9 rounded-lg ${dk ? "text-white" : "text-black"}`}>
+      {/* MOBILE: Hamburger + Search bar */}
+      <div className={`md:hidden sticky top-0 z-30 px-3 py-2 border-b ${dk ? "bg-black border-white/[0.08]" : "bg-white border-black/[0.08]"}`}>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className={`flex items-center justify-center w-9 h-9 rounded-lg ${dk ? "text-white" : "text-black"}`}>
             <Menu size={20} />
           </button>
-          <Link href="/" className={dk ? "text-white" : "text-black"}>
-            <KoleexLogo className="h-5 w-auto" />
-          </Link>
-        </div>
-
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
-          <div className={`relative flex items-center w-full h-9 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all`}>
+          <div className={`flex-1 flex items-center h-10 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2`}>
             <Search size={16} className={dk ? "text-white/30" : "text-black/30"} />
-            <input id="hub-search" type="text" placeholder="Search apps, modules, settings..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
-            <kbd className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${dk ? "bg-white/10 text-white/30" : "bg-black/10 text-black/30"}`}>⌘K</kbd>
+            <input type="text" placeholder="Search apps..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button onClick={() => setTheme(dk ? "light" : "dark")} className={`flex items-center justify-center w-9 h-9 rounded-lg border ${dk ? "border-white/[0.08] bg-white/[0.04] text-white/60" : "border-black/[0.08] bg-black/[0.04] text-black/60"} transition-all`}>
-            {dk ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${dk ? "bg-white text-black" : "bg-black text-white"} text-xs font-semibold`}>KS</div>
-        </div>
-      </header>
-
-      {/* MOBILE SEARCH */}
-      <div className={`md:hidden sticky top-14 z-30 px-3 py-2 border-b ${dk ? "bg-black border-white/[0.08]" : "bg-white border-black/[0.08]"}`}>
-        <div className={`flex items-center h-10 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2`}>
-          <Search size={16} className={dk ? "text-white/30" : "text-black/30"} />
-          <input type="text" placeholder="Search apps..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
         </div>
       </div>
 
-      <div className="flex pt-14">
+      {/* DESKTOP: Search bar in content area */}
+      <div className="hidden md:block">
+        <div className="md:ml-[220px] px-10 pt-6">
+          <div className="max-w-md">
+            <div className={`relative flex items-center w-full h-9 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all`}>
+              <Search size={16} className={dk ? "text-white/30" : "text-black/30"} />
+              <input id="hub-search" type="text" placeholder="Search apps, modules, settings..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
+              <kbd className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${dk ? "bg-white/10 text-white/30" : "bg-black/10 text-black/30"}`}>⌘K</kbd>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex">
         {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
         {/* SIDEBAR */}
@@ -252,7 +232,7 @@ export default function HomePage() {
         </aside>
 
         {/* MAIN */}
-        <main className="flex-1 md:ml-[220px] px-4 md:px-10 py-8 md:py-10 pb-20 max-w-[1400px]">
+        <main className="flex-1 md:ml-[220px] px-4 md:px-10 py-6 md:py-4 pb-20 max-w-[1400px]">
           <div className="mb-10">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
               <div>
