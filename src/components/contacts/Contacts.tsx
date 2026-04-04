@@ -499,7 +499,7 @@ function formToRow(f: ContactForm): Record<string, unknown> {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Detail view section wrapper ── */
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+const Section = React.memo(function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="border-b border-[#222] px-4 md:px-6 py-4">
       <div className="flex items-center gap-2 mb-3">
@@ -509,10 +509,10 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
       {children}
     </div>
   );
-}
+});
 
 /* ── Form text input ── */
-function Input({ label, value, onChange, type = "text", placeholder }: {
+const Input = React.memo(function Input({ label, value, onChange, type = "text", placeholder }: {
   label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
 }) {
   return (
@@ -527,10 +527,10 @@ function Input({ label, value, onChange, type = "text", placeholder }: {
       />
     </div>
   );
-}
+});
 
 /* ── Form select input ── */
-function SelectInput({ label, value, onChange, options }: {
+const SelectInput = React.memo(function SelectInput({ label, value, onChange, options }: {
   label: string; value: string; onChange: (v: string) => void; options: string[];
 }) {
   return (
@@ -546,10 +546,10 @@ function SelectInput({ label, value, onChange, options }: {
       </select>
     </div>
   );
-}
+});
 
 /* ── Add button ── */
-function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+const AddButton = React.memo(function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex items-center gap-2 text-sm text-white/50 hover:text-white py-2 transition-colors">
       <div className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center">
@@ -558,19 +558,19 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
       {label}
     </button>
   );
-}
+});
 
 /* ── Remove button ── */
-function RemoveBtn({ onClick }: { onClick: () => void }) {
+const RemoveBtn = React.memo(function RemoveBtn({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center shrink-0 hover:bg-white/20 transition-colors">
       <Minus size={14} className="text-white/60" />
     </button>
   );
-}
+});
 
 /* ── Inline label select ── */
-function LabelSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+const LabelSelect = React.memo(function LabelSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <select
       value={value}
@@ -580,22 +580,22 @@ function LabelSelect({ value, onChange, options }: { value: string; onChange: (v
       {options.map(o => <option key={o} value={o} className="bg-[#111] text-white">{o}</option>)}
     </select>
   );
-}
+});
 
 /* ── Form section wrapper ── */
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+const FormSection = React.memo(function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-[#222] px-4 md:px-6 py-4 md:py-5">
       <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">{title}</h3>
       {children}
     </div>
   );
-}
+});
 
 /* ── Birthday Picker (DD/MM/YYYY) ── */
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+const BirthdayPicker = React.memo(function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const parts = value ? value.split("-") : ["", "", ""];
   const year = parts[0] || "";
   const month = parts[1] || "";
@@ -633,7 +633,7 @@ function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: stri
       </div>
     </div>
   );
-}
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    COUNTRY / PROVINCE / CITY CASCADE COMPONENTS
@@ -929,13 +929,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
+  /* ── Debounced search for performance ── */
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 150);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   /* ── Filtered + grouped contacts ── */
   const filtered = useMemo(() => {
     let list = contacts;
     const tab = filterType || typeTab;
     if (tab !== "all") list = list.filter(c => c.contact_type === tab);
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter(c =>
         contactDisplayName(c).toLowerCase().includes(q) ||
         (c.company || "").toLowerCase().includes(q) ||
@@ -944,7 +951,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       );
     }
     return list.sort((a, b) => contactSortKey(a).localeCompare(contactSortKey(b)));
-  }, [contacts, typeTab, filterType, search]);
+  }, [contacts, typeTab, filterType, debouncedSearch]);
 
   const grouped = useMemo(() => {
     const map: Record<string, ContactRow[]> = {};
@@ -975,29 +982,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [contacts, filterType]);
 
   /* ── Handlers ── */
-  const handleSelectContact = (c: ContactRow) => {
+  const handleSelectContact = useCallback((c: ContactRow) => {
     setSelectedId(c.id);
     setView("detail");
     setMobileShowDetail(true);
     setEditingId(null);
-  };
+  }, []);
 
-  const handleAdd = (type: ContactType) => {
+  const handleAdd = useCallback((type: ContactType) => {
     setForm({ ...EMPTY_FORM, contact_type: type });
     setEditingId(null);
     setView("form");
     setShowTypeChooser(false);
     setMobileShowDetail(true);
     setExpandedFamily(null);
-  };
+  }, []);
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (!selectedContact) return;
     setForm(contactToForm(selectedContact));
     setEditingId(selectedContact.id);
     setView("form");
     setExpandedFamily(null);
-  };
+  }, [selectedContact]);
 
   const handleSave = async () => {
     if (!form.first_name && !form.last_name && !form.company) return;
@@ -1062,8 +1069,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   };
 
   /* ── Form updaters ── */
-  const setField = <K extends keyof ContactForm>(key: K, val: ContactForm[K]) =>
-    setForm(prev => ({ ...prev, [key]: val }));
+  const setField = useCallback(<K extends keyof ContactForm>(key: K, val: ContactForm[K]) =>
+    setForm(prev => ({ ...prev, [key]: val })), []);
 
   const addPhone = () => setField("phones", [...form.phones, { label: "mobile", number: "" }]);
   const removePhone = (i: number) => setField("phones", form.phones.filter((_, idx) => idx !== i));
@@ -1274,7 +1281,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       </div>
 
       {/* Contact list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto will-change-scroll">
         {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
         {customerKpis && (
           <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
@@ -1315,14 +1322,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <button
                     key={c.id}
                     onClick={() => handleSelectContact(c)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.03] ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.03] contain-layout ${
                       isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.03]"
                     }`}
                   >
                     {/* Avatar */}
                     <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden">
                       {c.photo_url ? (
-                        <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
+                        <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         getInitials(c)
                       )}
@@ -1535,7 +1542,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
           <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden">
             {c.photo_url ? (
-              <img src={c.photo_url} alt="" className="w-full h-full object-cover" />
+              <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : (
               getInitials(c)
             )}
@@ -1664,7 +1671,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <p className="text-sm text-white">{s.username || s.url}</p>
                 </div>
                 {s.qr_code_url && (
-                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-[#222]" />
+                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-[#222]" loading="lazy" decoding="async" />
                 )}
               </div>
             ))}
@@ -1678,7 +1685,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50 overflow-hidden">
-                    {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" /> : (f.first_name?.[0] || "?").toUpperCase()}
+                    {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : (f.first_name?.[0] || "?").toUpperCase()}
                   </div>
                   <div>
                     <span className="text-xs text-blue-400 font-medium">{f.relationship}</span>
@@ -1703,13 +1710,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {c.business_card_front && (
                 <div>
                   <span className="text-xs text-white/40 mb-1.5 block">Front</span>
-                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[#222]" />
+                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[#222]" loading="lazy" decoding="async" />
                 </div>
               )}
               {c.business_card_back && (
                 <div>
                   <span className="text-xs text-white/40 mb-1.5 block">Back</span>
-                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[#222]" />
+                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[#222]" loading="lazy" decoding="async" />
                 </div>
               )}
             </div>
@@ -2001,7 +2008,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[#222]">
           <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden">
             {form.photo_url ? (
-              <img src={form.photo_url} alt="" className="w-full h-full object-cover" />
+              <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : (
               <div className="flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-white/20 mb-1" />
@@ -2187,7 +2194,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <label className="text-xs text-white/40 mb-1 block">QR Code</label>
                   <div className="flex items-center gap-3">
                     {s.qr_code_url && (
-                      <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[#222] object-cover" />
+                      <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[#222] object-cover" loading="lazy" decoding="async" />
                     )}
                     <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/60 cursor-pointer hover:bg-white/10 transition-colors">
                       <Camera size={14} />
@@ -2284,7 +2291,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <label className="text-xs text-white/40 mb-1.5 block">Front</label>
                 <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_front ? (
-                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" />
+                    <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-white/30">
                       <CreditCard size={18} />
@@ -2304,7 +2311,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <label className="text-xs text-white/40 mb-1.5 block">Back</label>
                 <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_back ? (
-                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" />
+                    <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-white/30">
                       <CreditCard size={18} />
