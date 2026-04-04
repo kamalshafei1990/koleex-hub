@@ -506,6 +506,40 @@ async function readFileAsDataURL(file: File): Promise<string> {
   });
 }
 
+/** Convert a base64 data URL to a Blob URL that browsers can open/download */
+function dataURLtoBlobURL(dataURL: string): string {
+  try {
+    const [header, data] = dataURL.split(",");
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+    const binary = atob(data);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    const blob = new Blob([array], { type: mime });
+    return URL.createObjectURL(blob);
+  } catch {
+    return dataURL;
+  }
+}
+
+/** Open a data URL file in a new browser tab (works in Safari/Chrome/Firefox) */
+function openFilePreview(dataURL: string) {
+  const blobURL = dataURLtoBlobURL(dataURL);
+  window.open(blobURL, "_blank");
+}
+
+/** Trigger a download for a data URL file */
+function downloadFile(dataURL: string, filename: string) {
+  const blobURL = dataURLtoBlobURL(dataURL);
+  const a = document.createElement("a");
+  a.href = blobURL;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobURL), 1000);
+}
+
 function contactToForm(c: ContactRow): ContactForm {
   return {
     contact_type: (c.contact_type as ContactType) || "people",
@@ -2236,12 +2270,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <p className="text-sm text-white truncate">{cat.name}</p>
                     <p className="text-[10px] text-white/30">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
-                  <button onClick={() => window.open(cat.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                  <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                     <Eye size={10} /> Preview
                   </button>
-                  <a href={cat.url} download={cat.name} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                  <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                     <Download size={10} /> Download
-                  </a>
+                  </button>
                 </div>
               ))}
             </div>
@@ -2261,12 +2295,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   </div>
                   {doc.url && (
                     <>
-                      <button onClick={() => window.open(doc.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                      <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                         <Eye size={10} /> Preview
                       </button>
-                      <a href={doc.url} download={doc.name} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                      <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                         <Download size={10} /> Download
-                      </a>
+                      </button>
                     </>
                   )}
                 </div>
@@ -3169,20 +3203,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {cat.type === "PDF" ? <FileText size={14} className="text-red-400 shrink-0" /> : <ImageIcon size={14} className="text-blue-400 shrink-0" />}
                     <span className="text-sm text-white truncate flex-1">{cat.name}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 font-medium">{cat.type}</span>
-                    {cat.type !== "PDF" && cat.url && (
-                      <button onClick={() => window.open(cat.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <Eye size={10} /> Preview
-                      </button>
-                    )}
-                    {cat.type === "PDF" && cat.url && (
-                      <button onClick={() => window.open(cat.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <ExternalLink size={10} /> Open
+                    {cat.url && (
+                      <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                        {cat.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {cat.type === "PDF" ? "Open" : "Preview"}
                       </button>
                     )}
                     {cat.url && (
-                      <a href={cat.url} download={cat.name} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                      <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                         <Download size={10} /> Download
-                      </a>
+                      </button>
                     )}
                   </div>
                 ))}
@@ -3215,19 +3244,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <FileCheck size={14} className="text-blue-400 shrink-0" />
                           <span className="text-xs text-white/60 font-medium truncate">{doc.doc_name || "Untitled"}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 font-medium ml-auto">{doc.type}</span>
-                          {doc.type !== "PDF" && (
-                            <button onClick={() => window.open(doc.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                              <Eye size={10} /> Preview
-                            </button>
-                          )}
-                          {doc.type === "PDF" && (
-                            <button onClick={() => window.open(doc.url, "_blank")} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                              <ExternalLink size={10} /> Open
-                            </button>
-                          )}
-                          <a href={doc.url} download={doc.name} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                          <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                            {doc.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {doc.type === "PDF" ? "Open" : "Preview"}
+                          </button>
+                          <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
                             <Download size={10} /> Download
-                          </a>
+                          </button>
                         </>
                       ) : (
                         <>
