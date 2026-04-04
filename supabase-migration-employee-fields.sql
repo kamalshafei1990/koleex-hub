@@ -1,0 +1,37 @@
+-- Migration: Add Employee fields to contacts table
+-- Run this in the Supabase Dashboard SQL Editor:
+-- https://supabase.com/dashboard/project/yxyizbnfjrwrnmwhkvme/sql/new
+
+ALTER TABLE contacts
+  ADD COLUMN IF NOT EXISTS work_email text,
+  ADD COLUMN IF NOT EXISTS work_tel text,
+  ADD COLUMN IF NOT EXISTS work_mobile text,
+  ADD COLUMN IF NOT EXISTS management text,
+  ADD COLUMN IF NOT EXISTS department text,
+  ADD COLUMN IF NOT EXISTS job_position text,
+  ADD COLUMN IF NOT EXISTS job_title text,
+  ADD COLUMN IF NOT EXISTS manager text,
+  ADD COLUMN IF NOT EXISTS work_address text,
+  ADD COLUMN IF NOT EXISTS work_location text,
+  ADD COLUMN IF NOT EXISTS resume_lines jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS private_email text,
+  ADD COLUMN IF NOT EXISTS private_phone text,
+  ADD COLUMN IF NOT EXISTS employee_bank_account text,
+  ADD COLUMN IF NOT EXISTS legal_name text,
+  ADD COLUMN IF NOT EXISTS place_of_birth text,
+  ADD COLUMN IF NOT EXISTS gender text,
+  ADD COLUMN IF NOT EXISTS emergency_contacts jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS visa_no text,
+  ADD COLUMN IF NOT EXISTS work_permit text,
+  ADD COLUMN IF NOT EXISTS visa_documents jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS nationality text,
+  ADD COLUMN IF NOT EXISTS nationality_code text,
+  ADD COLUMN IF NOT EXISTS id_no text,
+  ADD COLUMN IF NOT EXISTS ssn_no text,
+  ADD COLUMN IF NOT EXISTS passport_no text,
+  ADD COLUMN IF NOT EXISTS private_address text,
+  ADD COLUMN IF NOT EXISTS home_work_distance text,
+  ADD COLUMN IF NOT EXISTS marital_status text,
+  ADD COLUMN IF NOT EXISTS number_of_children text,
+  ADD COLUMN IF NOT EXISTS certificate_level text,
+  ADD COLUMN IF NOT EXISTS field_of_study text;

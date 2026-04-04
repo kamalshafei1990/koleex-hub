@@ -13,6 +13,7 @@ import {
   Factory, Target, UserCog, Hash, Package, Boxes, Timer, StarIcon,
   ShieldCheck, Truck, Warehouse, ClipboardCheck, Eye,
   Download, BookOpen, Landmark, ExternalLink, ImageIcon, FilePlus,
+  GraduationCap, ShieldAlert, Plane, Home, HelpCircle,
 } from "lucide-react";
 import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
@@ -40,6 +41,31 @@ interface FamilyMember {
 interface RelatedName { name: string; relationship: string }
 interface CustomField { field_name: string; field_value: string }
 interface Attachment { name: string; url: string; type: string; uploaded_at: string }
+
+interface ResumeLineEntry {
+  type: "experience" | "education" | "training" | "certification";
+  title: string;
+  duration_start: string;
+  duration_end: string;
+  is_forever: boolean;
+  certificate_url: string;
+  certificate_name: string;
+  notes: string;
+  course_type: string;
+  external_url: string;
+}
+
+interface EmergencyContactEntry {
+  contact: string;
+  phone: string;
+}
+
+interface VisaDocEntry {
+  name: string;
+  url: string;
+  type: string;
+  uploaded_at: string;
+}
 
 interface ContactForm {
   contact_type: ContactType;
@@ -127,6 +153,39 @@ interface ContactForm {
   contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }[];
   bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
   payment_info: string;
+  /* ── Employee-Specific ── */
+  work_email: string;
+  work_tel: string;
+  work_mobile: string;
+  management: string;
+  department: string;
+  job_position: string;
+  job_title: string;
+  manager: string;
+  work_address: string;
+  work_location: string;
+  resume_lines: ResumeLineEntry[];
+  private_email: string;
+  private_phone: string;
+  employee_bank_account: string;
+  legal_name: string;
+  place_of_birth: string;
+  gender: string;
+  emergency_contacts: EmergencyContactEntry[];
+  visa_no: string;
+  work_permit: string;
+  visa_documents: VisaDocEntry[];
+  nationality: string;
+  nationality_code: string;
+  id_no: string;
+  ssn_no: string;
+  passport_no: string;
+  private_address: string;
+  home_work_distance: string;
+  marital_status: string;
+  number_of_children: string;
+  certificate_level: string;
+  field_of_study: string;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -296,6 +355,39 @@ const EMPTY_FORM: ContactForm = {
   contact_persons: [],
   bank_accounts: [],
   payment_info: "",
+  /* Employee-Specific */
+  work_email: "",
+  work_tel: "",
+  work_mobile: "",
+  management: "",
+  department: "",
+  job_position: "",
+  job_title: "",
+  manager: "",
+  work_address: "",
+  work_location: "",
+  resume_lines: [],
+  private_email: "",
+  private_phone: "",
+  employee_bank_account: "",
+  legal_name: "",
+  place_of_birth: "",
+  gender: "",
+  emergency_contacts: [],
+  visa_no: "",
+  work_permit: "",
+  visa_documents: [],
+  nationality: "",
+  nationality_code: "",
+  id_no: "",
+  ssn_no: "",
+  passport_no: "",
+  private_address: "",
+  home_work_distance: "",
+  marital_status: "",
+  number_of_children: "",
+  certificate_level: "",
+  field_of_study: "",
 };
 
 const MIGRATION_SQL = `-- Contacts Module Migration for Koleex HUB
@@ -636,6 +728,39 @@ function contactToForm(c: ContactRow): ContactForm {
     contact_persons: Array.isArray((c as any).contact_persons) ? (c as any).contact_persons : [],
     bank_accounts: Array.isArray((c as any).bank_accounts) ? (c as any).bank_accounts : [],
     payment_info: (c as any).payment_info || "",
+    /* Employee-Specific */
+    work_email: (c as any).work_email || "",
+    work_tel: (c as any).work_tel || "",
+    work_mobile: (c as any).work_mobile || "",
+    management: (c as any).management || "",
+    department: (c as any).department || "",
+    job_position: (c as any).job_position || "",
+    job_title: (c as any).job_title || "",
+    manager: (c as any).manager || "",
+    work_address: (c as any).work_address || "",
+    work_location: (c as any).work_location || "",
+    resume_lines: Array.isArray((c as any).resume_lines) ? (c as any).resume_lines : [],
+    private_email: (c as any).private_email || "",
+    private_phone: (c as any).private_phone || "",
+    employee_bank_account: (c as any).employee_bank_account || "",
+    legal_name: (c as any).legal_name || "",
+    place_of_birth: (c as any).place_of_birth || "",
+    gender: (c as any).gender || "",
+    emergency_contacts: Array.isArray((c as any).emergency_contacts) ? (c as any).emergency_contacts : [],
+    visa_no: (c as any).visa_no || "",
+    work_permit: (c as any).work_permit || "",
+    visa_documents: Array.isArray((c as any).visa_documents) ? (c as any).visa_documents : [],
+    nationality: (c as any).nationality || "",
+    nationality_code: (c as any).nationality_code || "",
+    id_no: (c as any).id_no || "",
+    ssn_no: (c as any).ssn_no || "",
+    passport_no: (c as any).passport_no || "",
+    private_address: (c as any).private_address || "",
+    home_work_distance: (c as any).home_work_distance || "",
+    marital_status: (c as any).marital_status || "",
+    number_of_children: (c as any).number_of_children || "",
+    certificate_level: (c as any).certificate_level || "",
+    field_of_study: (c as any).field_of_study || "",
   };
 }
 
@@ -733,6 +858,39 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     contact_persons: f.contact_persons.length > 0 ? f.contact_persons : null,
     bank_accounts: f.bank_accounts.length > 0 ? f.bank_accounts : null,
     payment_info: f.payment_info || null,
+    /* Employee-Specific */
+    work_email: f.work_email || null,
+    work_tel: f.work_tel || null,
+    work_mobile: f.work_mobile || null,
+    management: f.management || null,
+    department: f.department || null,
+    job_position: f.job_position || null,
+    job_title: f.job_title || null,
+    manager: f.manager || null,
+    work_address: f.work_address || null,
+    work_location: f.work_location || null,
+    resume_lines: f.resume_lines.length > 0 ? f.resume_lines : null,
+    private_email: f.private_email || null,
+    private_phone: f.private_phone || null,
+    employee_bank_account: f.employee_bank_account || null,
+    legal_name: f.legal_name || null,
+    place_of_birth: f.place_of_birth || null,
+    gender: f.gender || null,
+    emergency_contacts: f.emergency_contacts.length > 0 ? f.emergency_contacts : null,
+    visa_no: f.visa_no || null,
+    work_permit: f.work_permit || null,
+    visa_documents: f.visa_documents.length > 0 ? f.visa_documents : null,
+    nationality: f.nationality || null,
+    nationality_code: f.nationality_code || null,
+    id_no: f.id_no || null,
+    ssn_no: f.ssn_no || null,
+    passport_no: f.passport_no || null,
+    private_address: f.private_address || null,
+    home_work_distance: f.home_work_distance || null,
+    marital_status: f.marital_status || null,
+    number_of_children: f.number_of_children || null,
+    certificate_level: f.certificate_level || null,
+    field_of_study: f.field_of_study || null,
   };
 }
 
@@ -1166,6 +1324,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [showTypeChooser, setShowTypeChooser] = useState(false);
   const [typeChooserStep, setTypeChooserStep] = useState<1 | 2>(1);
   const [expandedFamily, setExpandedFamily] = useState<number | null>(null);
+  const [expandedResumeLine, setExpandedResumeLine] = useState<number | null>(null);
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [rlsCopied, setRlsCopied] = useState(false);
@@ -1436,6 +1595,41 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const updateFamily = (i: number, field: keyof FamilyMember, val: string) => {
     const arr = [...form.family_members]; arr[i] = { ...arr[i], [field]: val }; setField("family_members", arr);
   };
+
+  // Resume Line helpers
+  const addResumeLine = (type: "experience" | "education" | "training" | "certification") => {
+    setField("resume_lines", [...form.resume_lines, {
+      type,
+      title: "",
+      duration_start: "",
+      duration_end: "",
+      is_forever: false,
+      certificate_url: "",
+      certificate_name: "",
+      notes: "",
+      course_type: type === "training" ? "external" : "",
+      external_url: "",
+    }]);
+  };
+  const removeResumeLine = (i: number) => setField("resume_lines", form.resume_lines.filter((_, idx) => idx !== i));
+  const updateResumeLine = (i: number, field: string, val: any) => {
+    const arr = [...form.resume_lines];
+    arr[i] = { ...arr[i], [field]: val };
+    setField("resume_lines", arr);
+  };
+
+  // Emergency Contact helpers
+  const addEmergencyContact = () => setField("emergency_contacts", [...form.emergency_contacts, { contact: "", phone: "" }]);
+  const removeEmergencyContact = (i: number) => setField("emergency_contacts", form.emergency_contacts.filter((_, idx) => idx !== i));
+  const updateEmergencyContact = (i: number, field: string, val: string) => {
+    const arr = [...form.emergency_contacts];
+    arr[i] = { ...arr[i], [field]: val };
+    setField("emergency_contacts", arr);
+  };
+
+  // Visa Document helpers
+  const addVisaDoc = () => setField("visa_documents", [...form.visa_documents, { name: "", url: "", type: "", uploaded_at: new Date().toISOString() }]);
+  const removeVisaDoc = (i: number) => setField("visa_documents", form.visa_documents.filter((_, idx) => idx !== i));
 
   const addCustomField = () => setField("custom_fields", [...form.custom_fields, { field_name: "", field_value: "" }]);
   const removeCustomField = (i: number) => setField("custom_fields", form.custom_fields.filter((_, idx) => idx !== i));
@@ -2034,8 +2228,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
           <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
           {c.contact_type === "supplier" && (c as any).company_name_cn && <p className="text-sm text-white/40 mt-0.5">{(c as any).company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          {c.contact_type === "employee" && ((c as any).job_position || (c as any).department) && (
+            <p className="text-sm text-white/40">{[(c as any).job_position, (c as any).department].filter(Boolean).join(" \u00B7 ")}</p>
+          )}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
@@ -2140,8 +2337,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Birthday (hidden for suppliers, company customers, and company type) */}
-        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
+        {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && (c as any).entity_type === "company") && c.birthday && (
           <Section title="Birthday" icon={<Calendar size={14} />}>
             <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
@@ -2855,6 +3052,117 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
+        {/* ══ EMPLOYEE DETAIL SECTIONS ══ */}
+        {c.contact_type === "employee" && (
+        <>
+          {/* Work Contact */}
+          {((c as any).work_email || (c as any).work_tel || (c as any).work_mobile) && (
+            <Section title="Work Contact" icon={<Phone size={14} />}>
+              {(c as any).work_email && <div className="py-1"><span className="text-xs text-white/40">Email</span><p className="text-sm text-white">{(c as any).work_email}</p></div>}
+              {(c as any).work_tel && <div className="py-1"><span className="text-xs text-white/40">Tel</span><p className="text-sm text-white">{(c as any).work_tel}</p></div>}
+              {(c as any).work_mobile && <div className="py-1"><span className="text-xs text-white/40">Mobile</span><p className="text-sm text-white">{(c as any).work_mobile}</p></div>}
+            </Section>
+          )}
+          {/* Work */}
+          {((c as any).department || (c as any).job_position || (c as any).job_title || (c as any).management || (c as any).manager) && (
+            <Section title="Work" icon={<Briefcase size={14} />}>
+              {(c as any).management && <div className="py-1"><span className="text-xs text-white/40">Management</span><p className="text-sm text-white">{(c as any).management}</p></div>}
+              {(c as any).department && <div className="py-1"><span className="text-xs text-white/40">Department</span><p className="text-sm text-white">{(c as any).department}</p></div>}
+              {(c as any).job_position && <div className="py-1"><span className="text-xs text-white/40">Position</span><p className="text-sm text-white">{(c as any).job_position}</p></div>}
+              {(c as any).job_title && <div className="py-1"><span className="text-xs text-white/40">Title</span><p className="text-sm text-white">{(c as any).job_title}</p></div>}
+              {(c as any).manager && <div className="py-1"><span className="text-xs text-white/40">Manager</span><p className="text-sm text-white">{(c as any).manager}</p></div>}
+            </Section>
+          )}
+          {/* Work Location */}
+          {((c as any).work_address || (c as any).work_location) && (
+            <Section title="Work Location" icon={<MapPin size={14} />}>
+              {(c as any).work_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{(c as any).work_address}</p></div>}
+              {(c as any).work_location && <div className="py-1"><span className="text-xs text-white/40">Location</span><p className="text-sm text-white">{(c as any).work_location}</p></div>}
+            </Section>
+          )}
+          {/* Resume */}
+          {Array.isArray((c as any).resume_lines) && (c as any).resume_lines.length > 0 && (
+            <Section title="Resume" icon={<FileText size={14} />}>
+              {(c as any).resume_lines.map((rl: any, i: number) => (
+                <div key={i} className="py-2 border-b border-[#222] last:border-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
+                      rl.type === "experience" ? "bg-blue-500/10 text-blue-400" :
+                      rl.type === "education" ? "bg-green-500/10 text-green-400" :
+                      rl.type === "training" ? "bg-amber-500/10 text-amber-400" :
+                      "bg-violet-500/10 text-violet-400"
+                    }`}>{rl.type}</span>
+                    <span className="text-sm text-white font-medium">{rl.title}</span>
+                  </div>
+                  {(rl.duration_start || rl.duration_end || rl.is_forever) && (
+                    <p className="text-xs text-white/40">{rl.duration_start || ""} {"\u2192"} {rl.is_forever ? "Present" : rl.duration_end || ""}</p>
+                  )}
+                  {rl.course_type && <p className="text-xs text-white/30 mt-0.5">Type: {rl.course_type}</p>}
+                  {rl.notes && <p className="text-xs text-white/50 mt-1">{rl.notes}</p>}
+                </div>
+              ))}
+            </Section>
+          )}
+          {/* Personal Info */}
+          {((c as any).legal_name || c.birthday || (c as any).place_of_birth || (c as any).gender) && (
+            <Section title="Personal Information" icon={<User size={14} />}>
+              {(c as any).legal_name && <div className="py-1"><span className="text-xs text-white/40">Legal Name</span><p className="text-sm text-white">{(c as any).legal_name}</p></div>}
+              {c.birthday && <div className="py-1"><span className="text-xs text-white/40">Birthday</span><p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p></div>}
+              {(c as any).place_of_birth && <div className="py-1"><span className="text-xs text-white/40">Place of Birth</span><p className="text-sm text-white">{(c as any).place_of_birth}</p></div>}
+              {(c as any).gender && <div className="py-1"><span className="text-xs text-white/40">Gender</span><p className="text-sm text-white capitalize">{(c as any).gender}</p></div>}
+            </Section>
+          )}
+          {/* Emergency Contact */}
+          {Array.isArray((c as any).emergency_contacts) && (c as any).emergency_contacts.length > 0 && (
+            <Section title="Emergency Contact" icon={<ShieldAlert size={14} />}>
+              {(c as any).emergency_contacts.map((ec: any, i: number) => (
+                <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#222] last:border-0">
+                  <span className="text-sm text-white">{ec.contact}</span>
+                  <span className="text-sm text-white/50">{ec.phone}</span>
+                </div>
+              ))}
+            </Section>
+          )}
+          {/* Visa & Work Permit */}
+          {((c as any).visa_no || (c as any).work_permit) && (
+            <Section title="Visa & Work Permit" icon={<Plane size={14} />}>
+              {(c as any).visa_no && <div className="py-1"><span className="text-xs text-white/40">Visa No.</span><p className="text-sm text-white">{(c as any).visa_no}</p></div>}
+              {(c as any).work_permit && <div className="py-1"><span className="text-xs text-white/40">Work Permit</span><p className="text-sm text-white">{(c as any).work_permit}</p></div>}
+            </Section>
+          )}
+          {/* Citizenship */}
+          {((c as any).nationality || (c as any).id_no || (c as any).ssn_no || (c as any).passport_no) && (
+            <Section title="Citizenship" icon={<Globe size={14} />}>
+              {(c as any).nationality && <div className="py-1"><span className="text-xs text-white/40">Nationality</span><p className="text-sm text-white">{(c as any).nationality}</p></div>}
+              {(c as any).id_no && <div className="py-1"><span className="text-xs text-white/40">ID No.</span><p className="text-sm text-white">{(c as any).id_no}</p></div>}
+              {(c as any).ssn_no && <div className="py-1"><span className="text-xs text-white/40">SSN No.</span><p className="text-sm text-white">{(c as any).ssn_no}</p></div>}
+              {(c as any).passport_no && <div className="py-1"><span className="text-xs text-white/40">Passport No.</span><p className="text-sm text-white">{(c as any).passport_no}</p></div>}
+            </Section>
+          )}
+          {/* Private Location */}
+          {((c as any).private_address || (c as any).home_work_distance) && (
+            <Section title="Private Location" icon={<Home size={14} />}>
+              {(c as any).private_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{(c as any).private_address}</p></div>}
+              {(c as any).home_work_distance && <div className="py-1"><span className="text-xs text-white/40">Distance</span><p className="text-sm text-white">{(c as any).home_work_distance} KM</p></div>}
+            </Section>
+          )}
+          {/* Family */}
+          {((c as any).marital_status || (c as any).number_of_children) && (
+            <Section title="Family" icon={<Heart size={14} />}>
+              {(c as any).marital_status && <div className="py-1"><span className="text-xs text-white/40">Marital Status</span><p className="text-sm text-white capitalize">{(c as any).marital_status}</p></div>}
+              {(c as any).number_of_children && <div className="py-1"><span className="text-xs text-white/40">Children</span><p className="text-sm text-white">{(c as any).number_of_children}</p></div>}
+            </Section>
+          )}
+          {/* Education */}
+          {((c as any).certificate_level || (c as any).field_of_study) && (
+            <Section title="Education" icon={<GraduationCap size={14} />}>
+              {(c as any).certificate_level && <div className="py-1"><span className="text-xs text-white/40">Certificate Level</span><p className="text-sm text-white capitalize">{(c as any).certificate_level?.replace(/_/g, " ")}</p></div>}
+              {(c as any).field_of_study && <div className="py-1"><span className="text-xs text-white/40">Field of Study</span><p className="text-sm text-white">{(c as any).field_of_study}</p></div>}
+            </Section>
+          )}
+        </>
+        )}
+
         {/* Custom Fields */}
         {customs.length > 0 && (
           <Section title="Custom Fields" icon={<FileText size={14} />}>
@@ -2906,6 +3214,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const isCompanyCustomer = form.contact_type === "customer" && form.entity_type === "company";
     const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
     const isCompanyType = form.contact_type === "company";
+    const isEmployee = form.contact_type === "employee";
 
     /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
     const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
@@ -3246,8 +3555,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Phones (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Phones (hidden for suppliers and employees) */}
+        {form.contact_type !== "supplier" && !isEmployee && (
         <FormSection title="Phone Numbers" icon={<Phone size={14} />}>
           {form.phones.map((p, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3266,8 +3575,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Emails (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Emails (hidden for suppliers and employees) */}
+        {form.contact_type !== "supplier" && !isEmployee && (
         <FormSection title="Email Addresses" icon={<Mail size={14} />}>
           {form.emails.map((e, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3286,8 +3595,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Addresses (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Addresses (hidden for suppliers and employees) */}
+        {form.contact_type !== "supplier" && !isEmployee && (
         <FormSection title="Addresses" icon={<MapPin size={14} />}>
           {form.addresses.map((a, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
@@ -3312,8 +3621,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Location (country/province/city cascade) - hidden for suppliers (in Contact Details) */}
-        {form.contact_type !== "supplier" && (
+        {/* Location (country/province/city cascade) - hidden for suppliers and employees */}
+        {form.contact_type !== "supplier" && !isEmployee && (
         <FormSection title="Location" icon={<MapPinned size={14} />}>
           <div className="space-y-3">
             <CountryDropdown
@@ -3341,8 +3650,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Websites (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {/* Websites (hidden for suppliers and employees) */}
+        {form.contact_type !== "supplier" && !isEmployee && (
         <FormSection title="Websites" icon={<Globe size={14} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3361,15 +3670,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Birthday (hidden for suppliers, company customers, and company type) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
+        {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
         <FormSection title="Birthday" icon={<Calendar size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
         </FormSection>
         )}
 
-        {/* Social Profiles (hidden for suppliers and company customers) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && (
+        {/* Social Profiles (hidden for suppliers, company customers, and employees) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isEmployee && (
         <FormSection title="Social Profiles" icon={<Share2 size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
@@ -3406,8 +3715,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Related People (hidden for suppliers, company customers, and company type) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
+        {/* Related People (hidden for suppliers, company customers, company type, and employees) */}
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
         <FormSection title="Related People" icon={<Users size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
@@ -4029,6 +4338,366 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             {/* 11. Notes — shared section shown below */}
           </>
+        )}
+
+        {/* ══ EMPLOYEE FORM SECTIONS ══ */}
+        {isEmployee && (
+        <>
+        {/* 1. Work Contact */}
+        <FormSection title="Work Contact" icon={<Phone size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Work Email</label>
+              <div className="relative">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                <input value={form.work_email} onChange={e => setField("work_email", e.target.value)} placeholder="employee@company.com" className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Work Tel</label>
+                <input value={form.work_tel} onChange={e => setField("work_tel", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Work Mobile</label>
+                <input value={form.work_mobile} onChange={e => setField("work_mobile", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 2. Work */}
+        <FormSection title="Work" icon={<Briefcase size={14} />}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Management</label>
+                <input value={form.management} onChange={e => setField("management", e.target.value)} placeholder="e.g. Senior Management" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Department</label>
+                <input value={form.department} onChange={e => setField("department", e.target.value)} placeholder="e.g. Engineering" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Job Position</label>
+                <input value={form.job_position} onChange={e => setField("job_position", e.target.value)} placeholder="e.g. Software Engineer" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Job Title</label>
+                <input value={form.job_title} onChange={e => setField("job_title", e.target.value)} placeholder="e.g. Lead Developer" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Manager</label>
+              <input value={form.manager} onChange={e => setField("manager", e.target.value)} placeholder="Direct manager name" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 3. Work Location */}
+        <FormSection title="Work Location" icon={<MapPin size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Work Address</label>
+              <input value={form.work_address} onChange={e => setField("work_address", e.target.value)} placeholder="Office address" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Work Location</label>
+              <input value={form.work_location} onChange={e => setField("work_location", e.target.value)} placeholder="e.g. Dubai Office, Remote" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 4. Resume */}
+        <FormSection title="Resume" icon={<FileText size={14} />}>
+          {form.resume_lines.map((rl, i) => (
+            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+              <div className="flex items-center gap-2 p-3 cursor-pointer" onClick={() => setExpandedResumeLine(expandedResumeLine === i ? null : i)}>
+                <span onClick={e => e.stopPropagation()}><RemoveBtn onClick={() => removeResumeLine(i)} /></span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
+                  rl.type === "experience" ? "bg-blue-500/10 text-blue-400" :
+                  rl.type === "education" ? "bg-green-500/10 text-green-400" :
+                  rl.type === "training" ? "bg-amber-500/10 text-amber-400" :
+                  "bg-violet-500/10 text-violet-400"
+                }`}>{rl.type}</span>
+                <span className="flex-1 text-sm text-white/80 truncate">{rl.title || "Untitled"}</span>
+                <ChevronDown size={14} className={`text-white/30 transition-transform ${expandedResumeLine === i ? "rotate-180" : ""}`} />
+              </div>
+              {expandedResumeLine === i && (
+                <div className="px-3 pb-3 space-y-3 border-t border-[#222] pt-3">
+                  <input value={rl.title} onChange={e => updateResumeLine(i, "title", e.target.value)} placeholder="Title" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-white/40 mb-1 block">Start Date</label>
+                      <input type="date" value={rl.duration_start} onChange={e => updateResumeLine(i, "duration_start", e.target.value)} className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/40 mb-1 block">End Date</label>
+                      <input type="date" value={rl.duration_end} onChange={e => updateResumeLine(i, "duration_end", e.target.value)} disabled={rl.is_forever} className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 disabled:opacity-30" />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={rl.is_forever} onChange={e => updateResumeLine(i, "is_forever", e.target.checked)} className="w-4 h-4 rounded border-[#333] bg-white/5 accent-white" />
+                    <span className="text-xs text-white/50">Currently ongoing / No end date</span>
+                  </label>
+                  {rl.type === "training" && (
+                    <>
+                      <div>
+                        <label className="text-xs text-white/40 mb-1.5 block">Course Type</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => updateResumeLine(i, "course_type", "external")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "external" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"}`}>External</button>
+                          <button onClick={() => updateResumeLine(i, "course_type", "onsite")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "onsite" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"}`}>Onsite</button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-white/40 mb-1 block">External URL</label>
+                        <input value={rl.external_url} onChange={e => updateResumeLine(i, "external_url", e.target.value)} placeholder="https://..." className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1.5 block">Certificate</label>
+                    {rl.certificate_url ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-white/60 truncate flex-1">{rl.certificate_name || "Certificate"}</span>
+                        <button onClick={() => openFilePreview(rl.certificate_url)} className="text-xs text-blue-400 hover:text-blue-300">Open</button>
+                        <button onClick={() => { updateResumeLine(i, "certificate_url", ""); updateResumeLine(i, "certificate_name", ""); }} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-dashed border-[#333] hover:border-white/20 text-xs text-white/40 cursor-pointer transition-colors">
+                        <FilePlus size={14} />
+                        Upload certificate
+                        <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.type.startsWith("image/")) {
+                              compressImage(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
+                            } else {
+                              readFileAsDataURL(file).then(url => { updateResumeLine(i, "certificate_url", url); updateResumeLine(i, "certificate_name", file.name); });
+                            }
+                          }
+                        }} />
+                      </label>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Notes</label>
+                    <textarea value={rl.notes} onChange={e => updateResumeLine(i, "notes", e.target.value)} rows={4} placeholder="Additional details, achievements..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none" />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => addResumeLine("experience")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-500/15 transition-colors">
+              <Plus size={12} /> Experience
+            </button>
+            <button onClick={() => addResumeLine("education")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs text-green-400 font-medium hover:bg-green-500/15 transition-colors">
+              <Plus size={12} /> Education
+            </button>
+            <button onClick={() => addResumeLine("training")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 font-medium hover:bg-amber-500/15 transition-colors">
+              <Plus size={12} /> Training
+            </button>
+            <button onClick={() => addResumeLine("certification")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 font-medium hover:bg-violet-500/15 transition-colors">
+              <Plus size={12} /> Internal Certification
+            </button>
+          </div>
+        </FormSection>
+
+        {/* 5. Private Contact */}
+        <FormSection title="Private Contact" icon={<Phone size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Email</label>
+              <input value={form.private_email} onChange={e => setField("private_email", e.target.value)} placeholder="Personal email" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Phone</label>
+              <input value={form.private_phone} onChange={e => setField("private_phone", e.target.value)} placeholder="Personal phone" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Bank Account</label>
+              <input value={form.employee_bank_account} onChange={e => setField("employee_bank_account", e.target.value)} placeholder="Bank account details" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 6. Personal Information */}
+        <FormSection title="Personal Information" icon={<User size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Legal Name</label>
+              <input value={form.legal_name} onChange={e => setField("legal_name", e.target.value)} placeholder="Full legal name" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Birthday</label>
+              <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Place of Birth</label>
+                <input value={form.place_of_birth} onChange={e => setField("place_of_birth", e.target.value)} placeholder="City, Country" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Gender</label>
+                <select value={form.gender} onChange={e => setField("gender", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
+                  <option value="">Select...</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 7. Emergency Contact */}
+        <FormSection title="Emergency Contact" icon={<ShieldAlert size={14} />}>
+          {form.emergency_contacts.map((ec, i) => (
+            <div key={i} className="flex items-center gap-2 mb-3">
+              <RemoveBtn onClick={() => removeEmergencyContact(i)} />
+              <input value={ec.contact} onChange={e => updateEmergencyContact(i, "contact", e.target.value)} placeholder="Contact name" className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <input value={ec.phone} onChange={e => updateEmergencyContact(i, "phone", e.target.value)} placeholder="Phone" className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          ))}
+          <AddButton label="add emergency contact" onClick={addEmergencyContact} />
+        </FormSection>
+
+        {/* 8. Visa & Work Permit */}
+        <FormSection title="Visa & Work Permit" icon={<Plane size={14} />}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Visa No.</label>
+                <input value={form.visa_no} onChange={e => setField("visa_no", e.target.value)} placeholder="Visa number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Work Permit</label>
+                <input value={form.work_permit} onChange={e => setField("work_permit", e.target.value)} placeholder="Work permit number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Documents</label>
+              {form.visa_documents.map((vd, i) => (
+                <div key={i} className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-white/60 truncate flex-1">{vd.name || "Document"}</span>
+                  <button onClick={() => openFilePreview(vd.url)} className="text-xs text-blue-400 hover:text-blue-300">Open</button>
+                  <button onClick={() => downloadFile(vd.url, vd.name)} className="text-xs text-white/40 hover:text-white">Download</button>
+                  <button onClick={() => removeVisaDoc(i)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                </div>
+              ))}
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-dashed border-[#333] hover:border-white/20 text-xs text-white/40 cursor-pointer transition-colors">
+                <FilePlus size={14} />
+                Upload document
+                <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = (file.type.startsWith("image/") ? compressImage(file) : readFileAsDataURL(file));
+                    reader.then(url => {
+                      setField("visa_documents", [...form.visa_documents, { name: file.name, url, type: file.type, uploaded_at: new Date().toISOString() }]);
+                    });
+                  }
+                }} />
+              </label>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 9. Citizenship */}
+        <FormSection title="Citizenship" icon={<Globe size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Nationality (Country)</label>
+              <CountryDropdown value={form.nationality_code} displayValue={form.nationality} onChange={(name, code) => { setField("nationality", name); setField("nationality_code", code); }} />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block flex items-center gap-1">
+                ID No.
+                <span className="relative group">
+                  <HelpCircle size={12} className="text-white/20 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#222] text-[10px] text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">National Identity Card Number</span>
+                </span>
+              </label>
+              <input value={form.id_no} onChange={e => setField("id_no", e.target.value)} placeholder="National ID number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block flex items-center gap-1">
+                SSN No.
+                <span className="relative group">
+                  <HelpCircle size={12} className="text-white/20 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#222] text-[10px] text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Social Security Number</span>
+                </span>
+              </label>
+              <input value={form.ssn_no} onChange={e => setField("ssn_no", e.target.value)} placeholder="Social security number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Passport No.</label>
+              <input value={form.passport_no} onChange={e => setField("passport_no", e.target.value)} placeholder="Passport number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 10. Private Location */}
+        <FormSection title="Private Location" icon={<Home size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Private Address</label>
+              <input value={form.private_address} onChange={e => setField("private_address", e.target.value)} placeholder="Home address" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Home-Work Distance</label>
+              <div className="relative">
+                <input value={form.home_work_distance} onChange={e => setField("home_work_distance", e.target.value)} placeholder="0" className="w-full h-10 px-3 pr-12 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30">KM</span>
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 11. Family */}
+        <FormSection title="Family" icon={<Heart size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Marital Status</label>
+              <select value={form.marital_status} onChange={e => setField("marital_status", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
+                <option value="">Select...</option>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="divorced">Divorced</option>
+                <option value="widowed">Widowed</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Number of Children</label>
+              <input type="number" min="0" value={form.number_of_children} onChange={e => setField("number_of_children", e.target.value)} placeholder="0" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+
+        {/* 12. Education */}
+        <FormSection title="Education" icon={<GraduationCap size={14} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Certificate Level</label>
+              <select value={form.certificate_level} onChange={e => setField("certificate_level", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
+                <option value="">Select...</option>
+                <option value="high_school">High School</option>
+                <option value="diploma">Diploma</option>
+                <option value="bachelor">Bachelor&apos;s Degree</option>
+                <option value="master">Master&apos;s Degree</option>
+                <option value="doctorate">Doctorate / PhD</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1.5 block">Field of Study</label>
+              <input value={form.field_of_study} onChange={e => setField("field_of_study", e.target.value)} placeholder="e.g. Computer Science" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+            </div>
+          </div>
+        </FormSection>
+        </>
         )}
 
         {/* Customer Type (only for customer contacts) */}
