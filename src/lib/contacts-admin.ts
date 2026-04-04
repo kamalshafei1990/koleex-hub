@@ -81,6 +81,22 @@ export interface ContactRow {
   last_quality_issue: string | null;
   sample_status: string | null;
   factory_visit_date: string | null;
+  /* Supplier Redesign Fields */
+  company_name_en: string | null;
+  company_name_cn: string | null;
+  additional_company_names: { language: string; name: string }[];
+  supplier_tel: string | null;
+  supplier_mobile: string | null;
+  supplier_email: string | null;
+  supplier_website: string | null;
+  supplier_address: string | null;
+  division: string | null;
+  category: string | null;
+  catalogues: { name: string; url: string; type: string; uploaded_at: string }[];
+  documents: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }[];
+  contact_persons: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }[];
+  bank_accounts: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }[];
+  payment_info: string | null;
   created_at: string;
   updated_at: string;
 }
