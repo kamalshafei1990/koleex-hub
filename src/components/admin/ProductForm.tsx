@@ -453,7 +453,7 @@ export default function ProductForm({ productId }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+      <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ═══ TOP BAR ═══ */}
         <div className="flex items-center justify-between mb-8">
@@ -510,11 +510,11 @@ export default function ProductForm({ productId }: Props) {
         </div>
 
         {/* ═══ HERO SECTION ═══ */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4 md:gap-5">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-7 mb-6">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8">
 
             {/* Left: Main Product Image */}
-            <div className="sm:w-[160px] md:w-[180px] lg:w-[200px] shrink-0">
+            <div className="md:w-[280px] lg:w-[320px] shrink-0">
               <input
                 ref={mainImageRef}
                 type="file"
@@ -524,11 +524,11 @@ export default function ProductForm({ productId }: Props) {
               />
               <div
                 onClick={() => mainImageRef.current?.click()}
-                className="relative w-full aspect-square max-h-[200px] rounded-xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-[var(--bg-surface-subtle)]"
+                className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-[var(--bg-surface-subtle)]"
               >
                 {mainImageSrc ? (
                   <>
-                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain" />
+                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-4" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <div className="flex items-center gap-2 text-white text-sm font-medium">
                         <Camera className="h-5 w-5" />
@@ -537,13 +537,13 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                   </>
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                    <div className="h-12 w-12 rounded-xl bg-[var(--bg-surface)] flex items-center justify-center">
-                      <ImageIcon className="h-6 w-6 text-[var(--text-ghost)]" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                    <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-[var(--text-ghost)]" />
                     </div>
                     <div className="text-center">
-                      <p className="text-[12px] font-medium text-[var(--text-dim)]">Upload Photo</p>
-                      <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">Click or drag & drop</p>
+                      <p className="text-[13px] font-medium text-[var(--text-dim)]">Upload Product Photo</p>
+                      <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag & drop</p>
                     </div>
                   </div>
                 )}
@@ -551,23 +551,25 @@ export default function ProductForm({ productId }: Props) {
             </div>
 
             {/* Right: Product Identity */}
-            <div className="flex-1 flex flex-col justify-center gap-2.5">
-              {/* Row 1: Product Name + Model + Supplier */}
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr] gap-2.5">
-                <div>
-                  <label className={lbl}>Product Name *</label>
-                  <input
-                    type="text"
-                    value={product.product_name}
-                    onChange={(e) => {
-                      const updates: Partial<ProductFormState> = { product_name: e.target.value };
-                      if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                      updateProduct_(updates);
-                    }}
-                    placeholder="e.g. KX CoBot Pro"
-                    className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[15px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
-                  />
-                </div>
+            <div className="flex-1 flex flex-col justify-center gap-4">
+              {/* Product Name — prominent */}
+              <div>
+                <label className={lbl}>Product Name *</label>
+                <input
+                  type="text"
+                  value={product.product_name}
+                  onChange={(e) => {
+                    const updates: Partial<ProductFormState> = { product_name: e.target.value };
+                    if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                    updateProduct_(updates);
+                  }}
+                  placeholder="e.g. KX CoBot Pro"
+                  className="w-full h-13 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+                />
+              </div>
+
+              {/* Model + Supplier */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Boxes className="h-3 w-3" /> Product Model</span>
@@ -600,8 +602,8 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
 
-              {/* Row 2: Brand + Level + Slug + Tags */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+              {/* Brand + Level */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
@@ -630,8 +632,12 @@ export default function ProductForm({ productId }: Props) {
                     <option value="enterprise">Enterprise</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Slug + Tags */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className={lbl}>Slug</label>
+                  <label className={lbl}>Slug (URL path)</label>
                   <input
                     type="text"
                     value={product.slug}
@@ -651,85 +657,79 @@ export default function ProductForm({ productId }: Props) {
           </div>
         </div>
 
-        {/* ═══ ALL SECTIONS — 2-col grid on desktop ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
+        {/* ═══ ALL SECTIONS ═══ */}
+        <div className="space-y-4 md:space-y-5">
 
-          {/* Left column */}
-          <div className="space-y-4 md:space-y-5">
-            {/* 1. Classification */}
-            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
-              <ClassificationSection
-                data={product}
-                onChange={updateProduct_}
-                divisions={divisions}
-                categories={categories}
-                subcategories={subcategories}
-              />
-            </Section>
+          {/* 1. Classification */}
+          <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
+            <ClassificationSection
+              data={product}
+              onChange={updateProduct_}
+              divisions={divisions}
+              categories={categories}
+              subcategories={subcategories}
+            />
+          </Section>
 
-            {/* 2. Description */}
-            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
-              <DescriptionSection data={product} onChange={updateProduct_} />
-            </Section>
+          {/* 2. Description */}
+          <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
+            <DescriptionSection data={product} onChange={updateProduct_} />
+          </Section>
 
-            {/* 3. Specs + Technical combined */}
-            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications & Technical">
-              <div className="space-y-6">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
-                    <Wrench className="h-3 w-3" /> Key Specifications
-                  </p>
-                  <SpecsSection data={product} onChange={updateProduct_} />
-                </div>
-                <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
-                    <Zap className="h-3 w-3" /> Electrical & Technical
-                  </p>
-                  <TechnicalSection data={product} onChange={updateProduct_} />
-                </div>
+          {/* 3. Specs + Technical combined */}
+          <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications & Technical">
+            <div className="space-y-6">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
+                  <Wrench className="h-3 w-3" /> Key Specifications
+                </p>
+                <SpecsSection data={product} onChange={updateProduct_} />
               </div>
-            </Section>
+              <div className="border-t border-[var(--border-subtle)] pt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
+                  <Zap className="h-3 w-3" /> Electrical & Technical
+                </p>
+                <TechnicalSection data={product} onChange={updateProduct_} />
+              </div>
+            </div>
+          </Section>
 
-            {/* 4. Configuration */}
-            <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration & Visibility">
-              <ConfigSection data={product} onChange={updateProduct_} />
-            </Section>
+          {/* 4. Configuration */}
+          <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration & Visibility">
+            <ConfigSection data={product} onChange={updateProduct_} />
+          </Section>
 
-            {/* 8. Translations */}
-            <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
-              <TranslationsSection translations={translations} onChange={setTranslations} />
-            </Section>
-          </div>
+          {/* 5. Models */}
+          <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
+            <ModelsSection models={models} onChange={setModels} />
+          </Section>
 
-          {/* Right column */}
-          <div className="space-y-4 md:space-y-5">
-            {/* 5. Models */}
-            <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
-              <ModelsSection models={models} onChange={setModels} />
-            </Section>
+          {/* 6. Media */}
+          <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
+            <MediaSection
+              media={media.filter(m => m.type !== "main_image")}
+              excludeTypes={["main_image"]}
+              onChange={(filtered) => {
+                const mainImages = media.filter(m => m.type === "main_image");
+                setMedia([...mainImages, ...filtered]);
+              }}
+            />
+          </Section>
 
-            {/* 6. Media */}
-            <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
-              <MediaSection
-                media={media.filter(m => m.type !== "main_image")}
-                excludeTypes={["main_image"]}
-                onChange={(filtered) => {
-                  const mainImages = media.filter(m => m.type === "main_image");
-                  setMedia([...mainImages, ...filtered]);
-                }}
-              />
-            </Section>
+          {/* 7. Market Prices */}
+          <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
+            <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
+          </Section>
 
-            {/* 7. Market Prices */}
-            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
-              <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
-            </Section>
+          {/* 8. Translations */}
+          <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+            <TranslationsSection translations={translations} onChange={setTranslations} />
+          </Section>
 
-            {/* 9. Related Products */}
-            <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
-              <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
-            </Section>
-          </div>
+          {/* 9. Related Products */}
+          <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+            <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
+          </Section>
         </div>
 
         {/* ═══ BOTTOM SAVE BAR ═══ */}
