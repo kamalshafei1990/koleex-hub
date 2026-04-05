@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Loader2, Plus, Trash2, ChevronDown, Search } from "lucide-react";
+import { Country, State, City } from "country-state-city";
 import Modal from "./Modal";
 import { createContact } from "@/lib/contacts-admin";
 
@@ -46,6 +47,275 @@ interface ContactPerson {
   notes: string;
 }
 
+/* ── Country flag helper ── */
+function countryCodeToFlag(code: string): string {
+  if (!code || code.length !== 2) return "";
+  const upper = code.toUpperCase();
+  return String.fromCodePoint(
+    ...Array.from(upper).map(c => 0x1f1e6 + c.charCodeAt(0) - 65)
+  );
+}
+
+interface CountryOption { name: string; isoCode: string; flag: string; }
+const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
+  name: c.name,
+  isoCode: c.isoCode,
+  flag: countryCodeToFlag(c.isoCode),
+}));
+
+/* ═════════════════════════════════════════════════════
+   Searchable Country Dropdown
+   ═════════════════════════════════════════════════════ */
+function CountryPicker({ value, countryCode, onChange, label }: {
+  value: string; countryCode: string;
+  onChange: (name: string, isoCode: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false); setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return ALL_COUNTRIES;
+    const q = query.toLowerCase();
+    return ALL_COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.isoCode.toLowerCase().includes(q));
+  }, [query]);
+
+  const selectedFlag = countryCode ? countryCodeToFlag(countryCode) : "";
+
+  const inp = "w-full h-11 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-[var(--border-focus)] transition-all";
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">{label ?? "Country"}</label>
+      <div
+        className={`${inp} flex items-center gap-2 px-4 cursor-pointer`}
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        {selectedFlag && <span className="text-base">{selectedFlag}</span>}
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : value}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search country..."
+          className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
+        />
+        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-[12px] text-[var(--text-ghost)]">No countries found</div>
+          ) : (
+            filtered.map(c => (
+              <button
+                key={c.isoCode}
+                type="button"
+                onClick={() => { onChange(c.name, c.isoCode); setOpen(false); setQuery(""); }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-left hover:bg-[var(--bg-surface-subtle)] transition-colors ${
+                  c.isoCode === countryCode ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"
+                }`}
+              >
+                <span className="text-base">{c.flag}</span>
+                <span className="truncate">{c.name}</span>
+                <span className="text-[10px] text-[var(--text-ghost)] ml-auto shrink-0">{c.isoCode}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═════════════════════════════════════════════════════
+   Searchable Province/State Dropdown
+   ═════════════════════════════════════════════════════ */
+function ProvincePicker({ countryCode, value, stateCode, onChange, label }: {
+  countryCode: string; value: string; stateCode: string;
+  onChange: (name: string, isoCode: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const states = useMemo(() => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode);
+  }, [countryCode]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false); setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return states;
+    const q = query.toLowerCase();
+    return states.filter(s => s.name.toLowerCase().includes(q));
+  }, [query, states]);
+
+  if (states.length === 0) return null;
+
+  const inp = "w-full h-11 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-[var(--border-focus)] transition-all";
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">{label ?? "Province / State"}</label>
+      <div
+        className={`${inp} flex items-center gap-2 px-4 cursor-pointer`}
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : value}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search province..."
+          className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
+        />
+        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-[12px] text-[var(--text-ghost)]">No provinces found</div>
+          ) : (
+            filtered.map(s => (
+              <button
+                key={s.isoCode}
+                type="button"
+                onClick={() => { onChange(s.name, s.isoCode); setOpen(false); setQuery(""); }}
+                className={`w-full flex items-center gap-2 px-4 py-2.5 text-[13px] text-left hover:bg-[var(--bg-surface-subtle)] transition-colors ${
+                  s.isoCode === stateCode ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"
+                }`}
+              >
+                <span className="truncate">{s.name}</span>
+                <span className="text-[10px] text-[var(--text-ghost)] ml-auto shrink-0">{s.isoCode}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═════════════════════════════════════════════════════
+   Searchable City Dropdown
+   ═════════════════════════════════════════════════════ */
+function CityPicker({ countryCode, stateCode, value, onChange, label }: {
+  countryCode: string; stateCode: string; value: string;
+  onChange: (name: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const cities = useMemo(() => {
+    if (!countryCode) return [];
+    if (stateCode) return City.getCitiesOfState(countryCode, stateCode);
+    return City.getCitiesOfCountry(countryCode) || [];
+  }, [countryCode, stateCode]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false); setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return cities;
+    const q = query.toLowerCase();
+    return cities.filter(c => c.name.toLowerCase().includes(q));
+  }, [query, cities]);
+
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all";
+
+  // Fallback to text input if no city data
+  if (cities.length === 0) {
+    return (
+      <div>
+        <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">{label ?? "City"}</label>
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Enter city..." className={inp} />
+      </div>
+    );
+  }
+
+  const inpWrap = "w-full h-11 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-[var(--border-focus)] transition-all";
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">{label ?? "City"}</label>
+      <div
+        className={`${inpWrap} flex items-center gap-2 px-4 cursor-pointer`}
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : value}
+          onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search city..."
+          className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
+        />
+        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </div>
+      {open && (
+        <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-[12px] text-[var(--text-ghost)]">No cities found</div>
+          ) : (
+            filtered.map((c, idx) => (
+              <button
+                key={`${c.name}-${idx}`}
+                type="button"
+                onClick={() => { onChange(c.name); setOpen(false); setQuery(""); }}
+                className={`w-full px-4 py-2.5 text-[13px] text-left hover:bg-[var(--bg-surface-subtle)] transition-colors ${
+                  c.name === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═════════════════════════════════════════════════════
+   MAIN MODAL
+   ═════════════════════════════════════════════════════ */
 export default function CreateSupplierModal({ open, onClose, onCreated }: Props) {
   // Company info
   const [companyNameEn, setCompanyNameEn] = useState("");
@@ -60,7 +330,13 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [address, setAddress] = useState("");
-  const [country, setCountry] = useState("");
+
+  // Location (country/province/city)
+  const [countryName, setCountryName] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [provinceName, setProvinceName] = useState("");
+  const [provinceCode, setProvinceCode] = useState("");
+  const [city, setCity] = useState("");
 
   // Contact persons
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
@@ -88,7 +364,8 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
 
   const reset = () => {
     setCompanyNameEn(""); setCompanyNameCn(""); setSupplierType(""); setIndustry(""); setSource("");
-    setTel(""); setMobile(""); setEmail(""); setWebsite(""); setAddress(""); setCountry("");
+    setTel(""); setMobile(""); setEmail(""); setWebsite(""); setAddress("");
+    setCountryName(""); setCountryCode(""); setProvinceName(""); setProvinceCode(""); setCity("");
     setContactPersons([]);
     setDivision(""); setCategory(""); setBrandNames(""); setPaymentTerms(""); setCurrency("USD"); setPaymentInfo(""); setMoq(""); setLeadTime("");
     setCertifications([]); setSampleStatus(""); setRating(0);
@@ -117,7 +394,11 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
       supplier_email: email.trim() || null,
       supplier_website: website.trim() || null,
       supplier_address: address.trim() || null,
-      country: country.trim() || null,
+      country: countryName || null,
+      country_code: countryCode || null,
+      province: provinceName || null,
+      province_code: provinceCode || null,
+      city: city || null,
       contact_persons: contactPersons.filter(cp => cp.name.trim()),
       division: division.trim() || null,
       category: category.trim() || null,
@@ -275,11 +556,38 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
                 <label className={lbl}>Website</label>
                 <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://www.company.com" className={inp} />
               </div>
-              <div>
-                <label className={lbl}>Country</label>
-                <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. China" className={inp} />
-              </div>
+              <CountryPicker
+                value={countryName}
+                countryCode={countryCode}
+                onChange={(name, code) => {
+                  setCountryName(name);
+                  setCountryCode(code);
+                  // Reset province & city when country changes
+                  setProvinceName(""); setProvinceCode(""); setCity("");
+                }}
+              />
             </div>
+            {/* Province + City — appear after country is selected */}
+            {countryCode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ProvincePicker
+                  countryCode={countryCode}
+                  value={provinceName}
+                  stateCode={provinceCode}
+                  onChange={(name, code) => {
+                    setProvinceName(name);
+                    setProvinceCode(code);
+                    setCity(""); // Reset city when province changes
+                  }}
+                />
+                <CityPicker
+                  countryCode={countryCode}
+                  stateCode={provinceCode}
+                  value={city}
+                  onChange={setCity}
+                />
+              </div>
+            )}
             <div>
               <label className={lbl}>Address</label>
               <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address..." className={inp} />
