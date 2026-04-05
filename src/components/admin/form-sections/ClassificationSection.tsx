@@ -25,7 +25,7 @@ export default function ClassificationSection({ data, onChange, divisions, categ
         <select
           value={data.division_slug}
           onChange={(e) => onChange({ division_slug: e.target.value, category_slug: "", subcategory_slug: "" })}
-          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
         >
           <option value="">Select division...</option>
           {divisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
@@ -36,7 +36,7 @@ export default function ClassificationSection({ data, onChange, divisions, categ
         <select
           value={data.category_slug}
           onChange={(e) => onChange({ category_slug: e.target.value, subcategory_slug: "" })}
-          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
           disabled={!data.division_slug}
         >
           <option value="">{data.division_slug ? "Select category..." : "Select a division first"}</option>
@@ -48,7 +48,7 @@ export default function ClassificationSection({ data, onChange, divisions, categ
         <select
           value={data.subcategory_slug}
           onChange={(e) => onChange({ subcategory_slug: e.target.value })}
-          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
           disabled={!data.category_slug}
         >
           <option value="">{data.category_slug ? "Select subcategory..." : "Select a category first"}</option>
