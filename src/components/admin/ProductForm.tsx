@@ -453,7 +453,7 @@ export default function ProductForm({ productId }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
 
         {/* ═══ TOP BAR ═══ */}
         <div className="flex items-center justify-between mb-8">
