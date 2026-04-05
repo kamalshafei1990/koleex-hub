@@ -20,12 +20,12 @@ function ChipInput({ label, values, onChange, placeholder }: { label: string; va
 
   return (
     <div>
-      <label className="block text-[12px] font-medium text-white/50 mb-1.5">{label}</label>
+      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">{label}</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {values.map(v => (
-          <span key={v} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-white/[0.06] text-[12px] text-white/60">
+          <span key={v} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">
             {v}
-            <button onClick={() => onChange(values.filter(x => x !== v))} className="text-white/25 hover:text-white/60"><X className="h-3 w-3" /></button>
+            <button onClick={() => onChange(values.filter(x => x !== v))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X className="h-3 w-3" /></button>
           </span>
         ))}
       </div>
@@ -35,7 +35,7 @@ function ChipInput({ label, values, onChange, placeholder }: { label: string; va
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
         placeholder={placeholder}
-        className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[13px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+        className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
       />
     </div>
   );
@@ -46,23 +46,23 @@ export default function TechnicalSection({ data, onChange }: Props) {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-[12px] font-medium text-white/50 mb-1.5">HS Code</label>
+          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">HS Code</label>
           <input
             type="text"
             value={data.hs_code}
             onChange={(e) => onChange({ hs_code: e.target.value })}
             placeholder="e.g. 8428.90"
-            className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+            className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
           />
         </div>
         <div>
-          <label className="block text-[12px] font-medium text-white/50 mb-1.5">Watt</label>
+          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Watt</label>
           <input
             type="text"
             value={data.watt}
             onChange={(e) => onChange({ watt: e.target.value })}
             placeholder="e.g. 500W"
-            className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+            className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
           />
         </div>
       </div>

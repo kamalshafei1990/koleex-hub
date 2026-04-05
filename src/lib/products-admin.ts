@@ -308,3 +308,18 @@ export async function fetchModelSummaries(): Promise<{
   }
   return { counts, suppliers, allSuppliers: Array.from(supplierSet).sort() };
 }
+
+// ── Fetch main images for all products ──
+
+export async function fetchProductMainImages(): Promise<Record<string, string>> {
+  const { data } = await supabase
+    .from("product_media")
+    .select("product_id, url")
+    .eq("type", "main_image")
+    .order("order", { ascending: true });
+  const map: Record<string, string> = {};
+  for (const row of (data || []) as { product_id: string; url: string }[]) {
+    if (!map[row.product_id]) map[row.product_id] = row.url;
+  }
+  return map;
+}

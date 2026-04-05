@@ -66,15 +66,15 @@ export default function WebsiteCMS() {
   const iframeSrc = activeTab === "builder" ? CMS_URL : `${WEBSITE_URL}${previewPage}`;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur border-b border-[#222]">
+      <header className="sticky top-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between px-4 h-14">
           {/* Left */}
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+              className="flex items-center gap-2 text-gray-400 hover:text-[var(--text-primary)] transition-colors text-sm"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Hub</span>
@@ -94,13 +94,13 @@ export default function WebsiteCMS() {
           </div>
 
           {/* Center — Tabs */}
-          <div className="flex items-center gap-1 bg-[#111] rounded-lg p-0.5 border border-[#222]">
+          <div className="flex items-center gap-1 bg-[var(--bg-secondary)] rounded-lg p-0.5 border border-[var(--border-color)]">
             <button
               onClick={() => { setActiveTab("builder"); setIsLoading(true); }}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 activeTab === "builder"
                   ? "bg-emerald-500/20 text-emerald-400"
-                  : "text-gray-400 hover:text-white"
+                  : "text-gray-400 hover:text-[var(--text-primary)]"
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -113,7 +113,7 @@ export default function WebsiteCMS() {
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 activeTab === "preview"
                   ? "bg-blue-500/20 text-blue-400"
-                  : "text-gray-400 hover:text-white"
+                  : "text-gray-400 hover:text-[var(--text-primary)]"
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -127,7 +127,7 @@ export default function WebsiteCMS() {
           <div className="flex items-center gap-2">
             {/* Viewport switcher (preview mode) */}
             {activeTab === "preview" && (
-              <div className="hidden md:flex items-center gap-1 bg-[#111] rounded-lg p-0.5 border border-[#222]">
+              <div className="hidden md:flex items-center gap-1 bg-[var(--bg-secondary)] rounded-lg p-0.5 border border-[var(--border-color)]">
                 {([
                   { key: "full" as Viewport, icon: <Maximize2 size={13} />, title: "Full Width" },
                   { key: "desktop" as Viewport, icon: <Monitor size={13} />, title: "Desktop" },
@@ -140,8 +140,8 @@ export default function WebsiteCMS() {
                     title={title}
                     className={`p-1.5 rounded-md transition-all ${
                       viewport === key
-                        ? "bg-white/10 text-white"
-                        : "text-gray-500 hover:text-white"
+                        ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]"
+                        : "text-gray-500 hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {icon}
@@ -159,7 +159,7 @@ export default function WebsiteCMS() {
                   setIsLoading(true);
                   setIframeKey((k) => k + 1);
                 }}
-                className="hidden sm:block bg-[#111] border border-[#222] rounded-lg text-xs px-2 py-1.5 text-gray-300 focus:outline-none focus:border-[#444]"
+                className="hidden sm:block bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-xs px-2 py-1.5 text-gray-300 focus:outline-none focus:border-[#444]"
               >
                 {websitePages.map((p) => (
                   <option key={p.path} value={p.path}>
@@ -171,7 +171,7 @@ export default function WebsiteCMS() {
 
             <button
               onClick={handleRefresh}
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#111] transition-all"
+              className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
               title="Refresh"
             >
               <RefreshCw size={14} />
@@ -181,7 +181,7 @@ export default function WebsiteCMS() {
               href={activeTab === "builder" ? CMS_URL : `${WEBSITE_URL}${previewPage}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-[#111] transition-all"
+              className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
               title="Open in New Tab"
             >
               <ExternalLink size={14} />
@@ -205,7 +205,7 @@ export default function WebsiteCMS() {
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap transition-all ${
                     activeTab === "builder"
                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : "bg-[#111] text-gray-400 border border-[#222] hover:text-white hover:border-[#333]"
+                      : "bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]"
                   }`}
                 >
                   {link.icon}
@@ -217,7 +217,7 @@ export default function WebsiteCMS() {
               <Link
                 key={link.label}
                 href={link.url}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[#111] text-gray-400 border border-[#222] hover:text-white hover:border-[#333] transition-all"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all"
               >
                 {link.icon}
                 {link.label}
@@ -228,7 +228,7 @@ export default function WebsiteCMS() {
             href={WEBSITE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[#111] text-gray-400 border border-[#222] hover:text-white hover:border-[#333] transition-all ml-auto"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all ml-auto"
           >
             <Globe size={13} />
             Visit Website
@@ -238,10 +238,10 @@ export default function WebsiteCMS() {
       </header>
 
       {/* ── Iframe Container ── */}
-      <main className="flex-1 relative bg-[#0a0a0a]">
+      <main className="flex-1 relative bg-[var(--bg-primary)]">
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0A0A0A]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-primary)]">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center animate-pulse">
                 <Globe size={20} className="text-emerald-400" />
@@ -260,7 +260,7 @@ export default function WebsiteCMS() {
           <div
             className={
               viewport !== "full" && activeTab === "preview"
-                ? `${viewportStyles[viewport]} border border-[#222] rounded-xl overflow-hidden shadow-2xl mx-auto`
+                ? `${viewportStyles[viewport]} border border-[var(--border-color)] rounded-xl overflow-hidden shadow-2xl mx-auto`
                 : "w-full h-full"
             }
           >

@@ -245,15 +245,15 @@ export default function Markets() {
   if (selectedMarket) {
     const bandColor = getBandColor(selectedMarket.band);
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-white">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
         {/* Header */}
-        <div className="sticky top-0 z-30 bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-[#222]">
+        <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)]">
           <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center gap-4">
             <button
               onClick={closeMarketProfile}
-              className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/5 border border-[#222] hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
-              <ArrowLeft size={18} className="text-white/70" />
+              <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
             </button>
             <div className="flex items-center gap-3">
               <span className="text-3xl">{selectedMarket.flag}</span>
@@ -261,7 +261,7 @@ export default function Markets() {
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight">
                   {selectedMarket.name}
                 </h1>
-                <p className="text-sm text-white/50">Market Profile</p>
+                <p className="text-sm text-[var(--text-subtle)]">Market Profile</p>
               </div>
             </div>
           </div>
@@ -271,8 +271,8 @@ export default function Markets() {
           {/* Market Info Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Band Card */}
-            <div className="bg-[#111] border border-[#222] rounded-xl p-6 space-y-3">
-              <div className="flex items-center gap-2 text-white/50">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
+              <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <Shield size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Band Classification
@@ -287,15 +287,15 @@ export default function Markets() {
                   />
                   Band {selectedMarket.band}
                 </span>
-                <span className="text-white/60 text-sm">
+                <span className="text-[var(--text-muted)] text-sm">
                   {selectedMarket.bandLabel}
                 </span>
               </div>
             </div>
 
             {/* Adjustment Card */}
-            <div className="bg-[#111] border border-[#222] rounded-xl p-6 space-y-3">
-              <div className="flex items-center gap-2 text-white/50">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
+              <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <TrendingUp size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Price Adjustment
@@ -313,7 +313,7 @@ export default function Markets() {
                 >
                   {getAdjustmentDisplay(selectedMarket.adjustmentPct)}
                 </span>
-                <span className="text-white/40 text-sm">
+                <span className="text-[var(--text-faint)] text-sm">
                   {selectedMarket.adjustmentPct < 0
                     ? "discount"
                     : selectedMarket.adjustmentPct > 0
@@ -324,8 +324,8 @@ export default function Markets() {
             </div>
 
             {/* Market Status Card */}
-            <div className="bg-[#111] border border-[#222] rounded-xl p-6 space-y-3">
-              <div className="flex items-center gap-2 text-white/50">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
+              <div className="flex items-center gap-2 text-[var(--text-subtle)]">
                 <MapPin size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Market Status
@@ -333,33 +333,33 @@ export default function Markets() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-white/80 text-sm font-medium">
+                <span className="text-[var(--text-highlight)] text-sm font-medium">
                   Active Market
                 </span>
               </div>
-              <p className="text-white/40 text-xs">
+              <p className="text-[var(--text-faint)] text-xs">
                 Included in pricing engine calculations
               </p>
             </div>
           </div>
 
           {/* Customers Section */}
-          <div className="bg-[#111] border border-[#222] rounded-xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-[#222] flex items-center justify-between">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/5">
-                  <Users size={18} className="text-white/60" />
+                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)]">
+                  <Users size={18} className="text-[var(--text-muted)]" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold">
                     Customers in {selectedMarket.name}
                   </h2>
-                  <p className="text-xs text-white/40 mt-0.5">
+                  <p className="text-xs text-[var(--text-faint)] mt-0.5">
                     Accounts associated with this market
                   </p>
                 </div>
               </div>
-              <span className="text-xs text-white/30 bg-white/5 px-2.5 py-1 rounded-full">
+              <span className="text-xs text-[var(--text-dim)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-full">
                 {customers.length} found
               </span>
             </div>
@@ -367,21 +367,21 @@ export default function Markets() {
             {loadingCustomers ? (
               <div className="flex items-center justify-center py-16">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                  <span className="text-sm text-white/40">
+                  <div className="w-8 h-8 border-2 border-[var(--border-focus)] border-t-white/60 rounded-full animate-spin" />
+                  <span className="text-sm text-[var(--text-faint)]">
                     Loading customers...
                   </span>
                 </div>
               </div>
             ) : customers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-white/5">
-                  <Users size={24} className="text-white/20" />
+                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
+                  <Users size={24} className="text-[var(--text-ghost)]" />
                 </div>
-                <p className="text-white/40 text-sm font-medium">
+                <p className="text-[var(--text-faint)] text-sm font-medium">
                   No customers in this market yet
                 </p>
-                <p className="text-white/25 text-xs">
+                <p className="text-[var(--text-dim)] text-xs">
                   Customers will appear here when added to this market
                 </p>
               </div>
@@ -389,23 +389,23 @@ export default function Markets() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#222]">
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                    <tr className="border-b border-[var(--border-color)]">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Customer Name
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Company
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Email
                       </th>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                         Phone
                       </th>
                     </tr>
@@ -414,16 +414,16 @@ export default function Markets() {
                     {customers.map((c, idx) => (
                       <tr
                         key={c.id ?? idx}
-                        className="border-b border-[#1a1a1a] hover:bg-white/[0.02] transition-colors"
+                        className="border-b border-[#1a1a1a] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                       >
-                        <td className="px-6 py-4 text-white/80 font-medium">
+                        <td className="px-6 py-4 text-[var(--text-highlight)] font-medium">
                           {c.name || c.customer_name || "-"}
                         </td>
-                        <td className="px-6 py-4 text-white/60">
+                        <td className="px-6 py-4 text-[var(--text-muted)]">
                           {c.company || c.company_name || "-"}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-white/50 text-xs bg-white/5 px-2 py-1 rounded">
+                          <span className="text-[var(--text-subtle)] text-xs bg-[var(--bg-surface)] px-2 py-1 rounded">
                             {c.type || c.customer_type || "-"}
                           </span>
                         </td>
@@ -441,27 +441,27 @@ export default function Markets() {
                               {c.status}
                             </span>
                           ) : (
-                            <span className="text-white/30">-</span>
+                            <span className="text-[var(--text-dim)]">-</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           {c.email ? (
-                            <span className="flex items-center gap-1.5 text-white/50">
+                            <span className="flex items-center gap-1.5 text-[var(--text-subtle)]">
                               <Mail size={12} />
                               {c.email}
                             </span>
                           ) : (
-                            <span className="text-white/30">-</span>
+                            <span className="text-[var(--text-dim)]">-</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           {c.phone ? (
-                            <span className="flex items-center gap-1.5 text-white/50">
+                            <span className="flex items-center gap-1.5 text-[var(--text-subtle)]">
                               <Phone size={12} />
                               {c.phone}
                             </span>
                           ) : (
-                            <span className="text-white/30">-</span>
+                            <span className="text-[var(--text-dim)]">-</span>
                           )}
                         </td>
                       </tr>
@@ -478,32 +478,32 @@ export default function Markets() {
 
   /* ─────────── Directory View ─────────── */
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-[#222]">
+      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-color)]">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/5 border border-[#222] hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
-              <ArrowLeft size={18} className="text-white/70" />
+              <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
             </Link>
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-[#222]">
-                <Globe size={20} className="text-white/70" />
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                <Globe size={20} className="text-[var(--text-secondary)]" />
               </div>
               <div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight">
                   Markets
                 </h1>
-                <p className="text-xs text-white/40 hidden md:block">
+                <p className="text-xs text-[var(--text-faint)] hidden md:block">
                   Global market directory and pricing bands
                 </p>
               </div>
             </div>
           </div>
-          <span className="text-xs text-white/30 bg-white/5 px-3 py-1.5 rounded-full border border-[#222]">
+          <span className="text-xs text-[var(--text-dim)] bg-[var(--bg-surface)] px-3 py-1.5 rounded-full border border-[var(--border-color)]">
             {filteredMarkets.length} of {markets.length} markets
           </span>
         </div>
@@ -515,24 +515,24 @@ export default function Markets() {
           {/* Total Markets */}
           <button
             onClick={() => setBandFilter("all")}
-            className={`bg-[#111] border rounded-xl p-5 text-left transition-all hover:border-white/20 ${
+            className={`bg-[var(--bg-secondary)] border rounded-xl p-5 text-left transition-all hover:border-[var(--border-focus)] ${
               bandFilter === "all"
                 ? "border-white/30 ring-1 ring-white/10"
-                : "border-[#222]"
+                : "border-[var(--border-color)]"
             }`}
           >
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5">
-                <Globe size={16} className="text-white/50" />
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)]">
+                <Globe size={16} className="text-[var(--text-subtle)]" />
               </div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">
                 Total Markets
               </span>
             </div>
-            <p className="text-2xl md:text-3xl font-bold text-white">
+            <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">
               {markets.length}
             </p>
-            <p className="text-xs text-white/30 mt-1">All countries</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">All countries</p>
           </button>
 
           {/* Band A */}
@@ -540,10 +540,10 @@ export default function Markets() {
             onClick={() =>
               setBandFilter(bandFilter === "A" ? "all" : "A")
             }
-            className={`bg-[#111] border rounded-xl p-5 text-left transition-all hover:border-blue-500/30 ${
+            className={`bg-[var(--bg-secondary)] border rounded-xl p-5 text-left transition-all hover:border-blue-500/30 ${
               bandFilter === "A"
                 ? "border-blue-500/40 ring-1 ring-blue-500/10"
-                : "border-[#222]"
+                : "border-[var(--border-color)]"
             }`}
           >
             <div className="flex items-center gap-2 mb-3">
@@ -557,7 +557,7 @@ export default function Markets() {
             <p className="text-2xl md:text-3xl font-bold text-blue-400">
               {bandACounts}
             </p>
-            <p className="text-xs text-white/30 mt-1">Emerging (-3%)</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">Emerging (-3%)</p>
           </button>
 
           {/* Band B */}
@@ -565,10 +565,10 @@ export default function Markets() {
             onClick={() =>
               setBandFilter(bandFilter === "B" ? "all" : "B")
             }
-            className={`bg-[#111] border rounded-xl p-5 text-left transition-all hover:border-gray-500/30 ${
+            className={`bg-[var(--bg-secondary)] border rounded-xl p-5 text-left transition-all hover:border-gray-500/30 ${
               bandFilter === "B"
                 ? "border-gray-500/40 ring-1 ring-gray-500/10"
-                : "border-[#222]"
+                : "border-[var(--border-color)]"
             }`}
           >
             <div className="flex items-center gap-2 mb-3">
@@ -582,7 +582,7 @@ export default function Markets() {
             <p className="text-2xl md:text-3xl font-bold text-gray-400">
               {bandBCounts}
             </p>
-            <p className="text-xs text-white/30 mt-1">Standard (0%)</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">Standard (0%)</p>
           </button>
 
           {/* Band C */}
@@ -590,10 +590,10 @@ export default function Markets() {
             onClick={() =>
               setBandFilter(bandFilter === "C" ? "all" : "C")
             }
-            className={`bg-[#111] border rounded-xl p-5 text-left transition-all hover:border-amber-500/30 ${
+            className={`bg-[var(--bg-secondary)] border rounded-xl p-5 text-left transition-all hover:border-amber-500/30 ${
               bandFilter === "C"
                 ? "border-amber-500/40 ring-1 ring-amber-500/10"
-                : "border-[#222]"
+                : "border-[var(--border-color)]"
             }`}
           >
             <div className="flex items-center gap-2 mb-3">
@@ -607,46 +607,46 @@ export default function Markets() {
             <p className="text-2xl md:text-3xl font-bold text-amber-400">
               {bandCCounts}
             </p>
-            <p className="text-xs text-white/30 mt-1">Premium (+8%)</p>
+            <p className="text-xs text-[var(--text-dim)] mt-1">Premium (+8%)</p>
           </button>
         </div>
 
         {/* Search Bar */}
         <div className="relative">
-          <div className="flex items-center bg-[#111] border border-[#222] rounded-xl px-4 gap-3 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-white/5 transition-all">
-            <Search size={18} className="text-white/30 flex-shrink-0" />
+          <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 gap-3 focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-white/5 transition-all">
+            <Search size={18} className="text-[var(--text-dim)] flex-shrink-0" />
             <input
               id="markets-search"
               type="text"
               placeholder="Search markets by name, band, or classification..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/25 outline-none h-12"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-12"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="text-xs text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded bg-white/5"
+                className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors px-2 py-1 rounded bg-[var(--bg-surface)]"
               >
                 Clear
               </button>
             )}
-            <kbd className="hidden md:inline-block text-[11px] font-medium px-1.5 py-0.5 rounded bg-white/5 text-white/20 border border-[#222]">
+            <kbd className="hidden md:inline-block text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-ghost)] border border-[var(--border-color)]">
               ⌘K
             </kbd>
           </div>
         </div>
 
         {/* Markets Table */}
-        <div className="bg-[#111] border border-[#222] rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white/70">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--text-secondary)]">
               Markets Directory
             </h2>
             {bandFilter !== "all" && (
               <button
                 onClick={() => setBandFilter("all")}
-                className="text-xs text-white/40 hover:text-white/70 transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-[#222]"
+                className="text-xs text-[var(--text-faint)] hover:text-[var(--text-primary)]/70 transition-colors bg-[var(--bg-surface)] px-3 py-1.5 rounded-lg border border-[var(--border-color)]"
               >
                 Clear filter
               </button>
@@ -655,13 +655,13 @@ export default function Markets() {
 
           {filteredMarkets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-white/5">
-                <Search size={24} className="text-white/20" />
+              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
+                <Search size={24} className="text-[var(--text-ghost)]" />
               </div>
-              <p className="text-white/40 text-sm font-medium">
+              <p className="text-[var(--text-faint)] text-sm font-medium">
                 No markets found
               </p>
-              <p className="text-white/25 text-xs">
+              <p className="text-[var(--text-dim)] text-xs">
                 Try adjusting your search or filter
               </p>
             </div>
@@ -670,19 +670,19 @@ export default function Markets() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#1a1a1a]">
-                    <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                       Market Name
                     </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                       Band
                     </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider hidden md:table-cell">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden md:table-cell">
                       Adjustment
                     </th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider hidden lg:table-cell">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider hidden lg:table-cell">
                       Classification
                     </th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-white/40 uppercase tracking-wider">
+                    <th className="text-right px-6 py-3 text-xs font-medium text-[var(--text-faint)] uppercase tracking-wider">
                       Action
                     </th>
                   </tr>
@@ -693,7 +693,7 @@ export default function Markets() {
                     return (
                       <tr
                         key={idx}
-                        className="border-b border-[#1a1a1a] last:border-b-0 hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                        className="border-b border-[#1a1a1a] last:border-b-0 hover:bg-[var(--bg-surface-subtle)] transition-colors group cursor-pointer"
                         onClick={() => openMarketProfile(market)}
                       >
                         <td className="px-6 py-4">
@@ -701,7 +701,7 @@ export default function Markets() {
                             <span className="text-xl leading-none">
                               {market.flag}
                             </span>
-                            <span className="text-white/90 font-medium group-hover:text-white transition-colors">
+                            <span className="text-[var(--text-primary)]/90 font-medium group-hover:text-[var(--text-primary)] transition-colors">
                               {market.name}
                             </span>
                           </div>
@@ -723,14 +723,14 @@ export default function Markets() {
                                 ? "text-blue-400"
                                 : market.adjustmentPct > 0
                                   ? "text-amber-400"
-                                  : "text-white/40"
+                                  : "text-[var(--text-faint)]"
                             }`}
                           >
                             {getAdjustmentDisplay(market.adjustmentPct)}
                           </span>
                         </td>
                         <td className="px-6 py-4 hidden lg:table-cell">
-                          <span className="text-white/50 text-xs">
+                          <span className="text-[var(--text-subtle)] text-xs">
                             {market.bandLabel}
                           </span>
                         </td>
@@ -740,7 +740,7 @@ export default function Markets() {
                               e.stopPropagation();
                               openMarketProfile(market);
                             }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-[#222] text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-subtle)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] hover:border-[var(--border-focus)] transition-all"
                           >
                             <Eye size={13} />
                             <span className="hidden sm:inline">

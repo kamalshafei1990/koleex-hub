@@ -30,7 +30,7 @@ export default function BasicInfoSection({ data, onChange, slugEdited, onSlugEdi
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Product Name *</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Product Name *</label>
         <input
           type="text"
           value={data.product_name}
@@ -40,35 +40,35 @@ export default function BasicInfoSection({ data, onChange, slugEdited, onSlugEdi
             onChange(updates);
           }}
           placeholder="e.g. KX CoBot"
-          className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+          className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         />
       </div>
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Slug (URL)</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Slug (URL)</label>
         <input
           type="text"
           value={data.slug}
           onChange={(e) => { onSlugEdited(); onChange({ slug: e.target.value }); }}
-          className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white/60 outline-none focus:border-white/20 font-mono"
+          className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)] font-mono"
         />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-[12px] font-medium text-white/50 mb-1.5">Brand</label>
+          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Brand</label>
           <input
             type="text"
             value={data.brand}
             onChange={(e) => onChange({ brand: e.target.value })}
             placeholder="e.g. Koleex"
-            className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+            className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
           />
         </div>
         <div>
-          <label className="block text-[12px] font-medium text-white/50 mb-1.5">Level</label>
+          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Level</label>
           <select
             value={data.level}
             onChange={(e) => onChange({ level: e.target.value })}
-            className="w-full h-10 px-3 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white outline-none focus:border-white/20"
+            className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           >
             <option value="">Select...</option>
             <option value="entry">Entry</option>
@@ -79,12 +79,12 @@ export default function BasicInfoSection({ data, onChange, slugEdited, onSlugEdi
         </div>
       </div>
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Tags</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Tags</label>
         <div className="flex flex-wrap gap-1.5 mb-2">
           {data.tags.map(tag => (
-            <span key={tag} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-white/[0.06] text-[12px] text-white/60">
+            <span key={tag} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">
               {tag}
-              <button onClick={() => removeTag(tag)} className="text-white/25 hover:text-white/60"><X className="h-3 w-3" /></button>
+              <button onClick={() => removeTag(tag)} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X className="h-3 w-3" /></button>
             </span>
           ))}
         </div>
@@ -94,7 +94,7 @@ export default function BasicInfoSection({ data, onChange, slugEdited, onSlugEdi
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
           placeholder="Type and press Enter to add..."
-          className="w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+          className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
         />
       </div>
     </div>

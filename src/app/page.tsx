@@ -11,6 +11,8 @@ import {
   Sparkles, Menu, Search, PanelTop,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 
 /* ── App Data ── */
 interface AppItem {
@@ -108,6 +110,7 @@ const sidebarItems: SidebarItem[] = [
 
 export default function HomePage() {
   const router = useRouter();
+  const { t, lang } = useTranslation(hubT);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -125,7 +128,8 @@ export default function HomePage() {
     return () => window.removeEventListener("themechange", onThemeChange);
   }, []);
 
-  const today = new Date().toLocaleDateString("en-US", {
+  const dateLocale = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : "en-US";
+  const today = new Date().toLocaleDateString(dateLocale, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
@@ -134,10 +138,10 @@ export default function HomePage() {
     if (activeCategory !== "all") result = result.filter(a => a.category === activeCategory);
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(a => a.name.toLowerCase().includes(q) || a.id.includes(q));
+      result = result.filter(a => a.name.toLowerCase().includes(q) || a.id.includes(q) || t("app." + a.id).toLowerCase().includes(q));
     }
     return result;
-  }, [search, activeCategory]);
+  }, [search, activeCategory, t]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, AppItem[]>();
@@ -146,9 +150,9 @@ export default function HomePage() {
       map.get(app.category)!.push(app);
     }
     return categoryOrder.filter(cat => map.has(cat)).map(cat => ({
-      category: cat, label: categoryLabels[cat], apps: map.get(cat)!,
+      category: cat, label: t("cat." + cat), apps: map.get(cat)!,
     }));
-  }, [filteredApps]);
+  }, [filteredApps, t]);
 
   const handleAppClick = useCallback((app: AppItem) => {
     if (!app.active) return;
@@ -180,18 +184,18 @@ export default function HomePage() {
           </button>
           <div className={`flex-1 flex items-center h-10 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2`}>
             <Search size={16} className={dk ? "text-white/30" : "text-black/30"} />
-            <input type="text" placeholder="Search apps..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
+            <input type="text" placeholder={t("searchMobile")} value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
           </div>
         </div>
       </div>
 
       {/* DESKTOP: Search bar in content area */}
       <div className="hidden md:block">
-        <div className="md:ml-[220px] px-10 pt-6">
+        <div className="md:ms-[220px] px-10 pt-6">
           <div className="max-w-md">
             <div className={`relative flex items-center w-full h-9 ${dk ? "bg-white/[0.04] border-white/[0.08]" : "bg-black/[0.04] border-black/[0.08]"} border rounded-lg px-3 gap-2 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all`}>
               <Search size={16} className={dk ? "text-white/30" : "text-black/30"} />
-              <input id="hub-search" type="text" placeholder="Search apps, modules, settings..." value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
+              <input id="hub-search" type="text" placeholder={t("searchDesktop")} value={search} onChange={e => setSearch(e.target.value)} className={`flex-1 bg-transparent text-[13px] outline-none ${dk ? "text-white placeholder:text-white/30" : "text-black placeholder:text-black/30"}`} />
               <kbd className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${dk ? "bg-white/10 text-white/30" : "bg-black/10 text-black/30"}`}>⌘K</kbd>
             </div>
           </div>
@@ -202,18 +206,27 @@ export default function HomePage() {
         {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
         {/* SIDEBAR */}
-        <aside className={`fixed top-14 bottom-0 w-[220px] ${dk ? "bg-[#0A0A0A] border-white/[0.08]" : "bg-[#FAFAFA] border-black/[0.08]"} border-r flex-col z-50 overflow-y-auto transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:flex`}>
+        <aside className={`fixed top-14 bottom-0 start-0 w-[220px] ${dk ? "bg-[#0A0A0A] border-white/[0.08]" : "bg-[#FAFAFA] border-black/[0.08]"} border-e flex-col z-50 overflow-y-auto transition-transform duration-200 ${sidebarOpen ? "translate-x-0 rtl:-translate-x-0" : "-translate-x-full rtl:translate-x-full"} md:translate-x-0 md:rtl:-translate-x-0 md:flex`}>
           <nav className="flex-1 p-3 flex flex-col gap-0.5">
             {sidebarItems.map((item, i) => {
+              const sidebarLabelMap: Record<string, string> = {
+                "All Apps": "allApps", "Quick Access": "quickAccess", "Core": "core",
+                "People": "cat.people", "Growth": "growth", "System": "cat.system",
+                "Operations": "cat.operations", "Commercial": "cat.commercial", "Finance": "cat.finance",
+                "Communication": "cat.communication", "Marketing": "cat.marketing",
+                "Planning": "cat.planning", "Knowledge": "cat.knowledge", "Settings": "sidebar.settings",
+                "Contacts": "app.contacts", "Quotations": "app.quotations", "Landed Cost": "app.landed-cost",
+              };
+              const tLabel = t(sidebarLabelMap[item.label] || "", item.label);
               if (item.type === "section") {
-                return <div key={i} className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/30" : "text-black/30"} px-3 pt-5 pb-2`}>{item.label}</div>;
+                return <div key={i} className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/30" : "text-black/30"} px-3 pt-5 pb-2`}>{tLabel}</div>;
               }
               if (item.type === "link") {
                 return (
                   <Link key={i} href={item.route} onClick={() => setSidebarOpen(false)}
                     className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${dk ? "text-white/60 hover:text-white hover:bg-white/[0.04]" : "text-black/60 hover:text-black hover:bg-black/[0.04]"}`}>
                     <span className={dk ? "text-white/30" : "text-black/30"}>{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span>{tLabel}</span>
                   </Link>
                 );
               }
@@ -223,31 +236,31 @@ export default function HomePage() {
                     ? dk ? "bg-white/10 text-white font-semibold" : "bg-black/10 text-black font-semibold"
                     : dk ? "text-white/60 hover:text-white hover:bg-white/[0.04]" : "text-black/60 hover:text-black hover:bg-black/[0.04]"}`}>
                   <span className={activeCategory === item.id ? (dk ? "text-white" : "text-black") : (dk ? "text-white/30" : "text-black/30")}>{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span>{tLabel}</span>
                 </button>
               );
             })}
           </nav>
           <div className={`px-6 py-4 border-t ${dk ? "border-white/[0.08]" : "border-black/[0.08]"}`}>
-            <span className={`text-[11px] ${dk ? "text-white/30" : "text-black/30"}`}>Platform v2.4</span>
+            <span className={`text-[11px] ${dk ? "text-white/30" : "text-black/30"}`}>{t("platformVersion")}</span>
           </div>
         </aside>
 
         {/* MAIN */}
-        <main className="flex-1 md:ml-[220px] px-4 md:px-10 py-6 md:py-4 pb-20 max-w-[1400px]">
+        <main className="flex-1 md:ms-[220px] px-4 md:px-10 py-6 md:py-4 pb-20 max-w-[1400px]">
           <div className="mb-10">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
               <div>
-                <h1 className={`text-3xl md:text-[40px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>Koleex Hub</h1>
+                <h1 className={`text-3xl md:text-[40px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>{t("title")}</h1>
               </div>
               <div className="flex items-center gap-4">
                 <span className={`text-xs font-medium ${dk ? "text-white/30" : "text-black/30"}`}>{today}</span>
-                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.filter(a => a.active).length} of {filteredApps.length} apps</span>
+                <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${dk ? "text-white/30 bg-white/[0.04] border-white/[0.08]" : "text-black/30 bg-black/[0.04] border-black/[0.08]"}`}>{filteredApps.filter(a => a.active).length} {t("of")} {filteredApps.length} {t("apps")}</span>
               </div>
             </div>
             <div className="mt-3">
-              <p className={`text-base md:text-lg font-medium ${dk ? "text-white/70" : "text-black/70"}`}>Applications</p>
-              <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-black/40"}`}>Access your enterprise modules and tools</p>
+              <p className={`text-base md:text-lg font-medium ${dk ? "text-white/70" : "text-black/70"}`}>{t("applications")}</p>
+              <p className={`text-sm mt-0.5 ${dk ? "text-white/40" : "text-black/40"}`}>{t("applicationsDesc")}</p>
             </div>
           </div>
 
@@ -271,7 +284,7 @@ export default function HomePage() {
                       <span className={`text-[11px] md:text-xs font-medium text-center transition-colors ${app.active
                         ? dk ? "text-white/60 group-hover:text-white" : "text-black/60 group-hover:text-black"
                         : dk ? "text-white/30" : "text-black/30"
-                      }`}>{app.name}</span>
+                      }`}>{t("app." + app.id)}</span>
                     </button>
                   ))}
                 </div>
@@ -281,7 +294,7 @@ export default function HomePage() {
         </main>
       </div>
 
-      <button className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full ${dk ? "bg-white text-black" : "bg-black text-white"} flex flex-col items-center justify-center shadow-xl hover:scale-105 transition-transform`}>
+      <button className={`fixed bottom-6 end-6 z-40 w-14 h-14 rounded-full ${dk ? "bg-white text-black" : "bg-black text-white"} flex flex-col items-center justify-center shadow-xl hover:scale-105 transition-transform`}>
         <Sparkles size={20} />
         <span className="text-[8px] font-bold tracking-wider mt-0.5">AI</span>
       </button>

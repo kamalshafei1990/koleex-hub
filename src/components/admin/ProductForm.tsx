@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import {
+  ArrowLeft, Save, Loader2, Camera, ImageIcon, FolderTree,
+  FileText, Wrench, Sliders, Boxes, Image, DollarSign,
+  Languages, Link2, Zap, Shield, Star, Eye, Package,
+  Upload, Plus, ChevronDown,
+} from "lucide-react";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
   fetchProductById, fetchModelsByProductId, fetchMediaByProductId,
@@ -34,11 +39,30 @@ import TranslationsSection from "./form-sections/TranslationsSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 
-const TABS = [
-  "Classification", "Basic Info", "Description", "Specs",
-  "Config", "Technical", "Models", "Media",
-  "Translations", "Prices", "Related",
-] as const;
+/* ── Section wrapper with icon + title (collapsible) ── */
+function Section({ icon, title, children, id, defaultOpen = true }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section id={id} className="scroll-mt-20 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer"
+      >
+        <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+          {icon}
+        </div>
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left">{title}</h2>
+        <ChevronDown className={`h-4 w-4 text-[var(--text-dim)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-1">{children}</div>
+      )}
+    </section>
+  );
+}
 
 interface Props {
   productId?: string;
@@ -62,17 +86,19 @@ export default function ProductForm({ productId }: Props) {
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
 
   // UI state
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Classification");
   const [slugEdited, setSlugEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Track original model IDs for diff in edit mode
+  // Track original IDs for diff in edit mode
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
   const [originalTranslationIds, setOriginalTranslationIds] = useState<string[]>([]);
+
+  // Main image ref for hero
+  const mainImageRef = useRef<HTMLInputElement>(null);
 
   // Load data
   useEffect(() => {
@@ -112,7 +138,6 @@ export default function ProductForm({ productId }: Props) {
         });
         setSlugEdited(true);
 
-        // Load related data in parallel
         const dbModels = await fetchModelsByProductId(productId);
         const dbMedia = await fetchMediaByProductId(productId);
         const dbTranslations = await fetchTranslationsByProductId(productId);
@@ -120,7 +145,6 @@ export default function ProductForm({ productId }: Props) {
         const dbPrices = await fetchMarketPricesByModelIds(modelIds);
         const dbRelated = await fetchRelatedProducts(productId);
 
-        // Map models
         const mappedModels: ModelFormState[] = dbModels.map(m => ({
           _tempId: crypto.randomUUID(),
           id: m.id,
@@ -145,7 +169,6 @@ export default function ProductForm({ productId }: Props) {
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
 
-        // Map media
         const mappedMedia: MediaFormState[] = dbMedia.map(m => ({
           _tempId: crypto.randomUUID(),
           id: m.id,
@@ -159,7 +182,6 @@ export default function ProductForm({ productId }: Props) {
         setMedia(mappedMedia);
         setOriginalMediaIds(dbMedia.map(m => m.id));
 
-        // Map translations
         const mappedTranslations: TranslationFormState[] = dbTranslations.map(t => ({
           _tempId: crypto.randomUUID(),
           id: t.id,
@@ -170,7 +192,6 @@ export default function ProductForm({ productId }: Props) {
         setTranslations(mappedTranslations);
         setOriginalTranslationIds(dbTranslations.map(t => t.id));
 
-        // Map prices — link to model tempIds
         const modelIdToTempId: Record<string, string> = {};
         mappedModels.forEach(m => { if (m.id) modelIdToTempId[m.id] = m._tempId; });
 
@@ -187,7 +208,6 @@ export default function ProductForm({ productId }: Props) {
         }));
         setPrices(mappedPrices);
 
-        // Map related
         const mappedRelated: RelatedProductFormState[] = dbRelated.map(r => ({
           related_id: r.related_id,
           related_name: r.product_name || r.related_id,
@@ -204,12 +224,60 @@ export default function ProductForm({ productId }: Props) {
     setProduct(prev => ({ ...prev, ...updates }));
   }, []);
 
+  /* ── Hero: main image helpers ── */
+  const mainImage = media.find(m => m.type === "main_image");
+  const mainImageSrc = mainImage?._file
+    ? URL.createObjectURL(mainImage._file)
+    : mainImage?.url || null;
+
+  const handleMainImage = (files: FileList | null) => {
+    if (!files?.length) return;
+    const file = files[0];
+    // Remove existing main_image entries
+    const filtered = media.filter(m => m.type !== "main_image");
+    const newItem: MediaFormState = {
+      _tempId: crypto.randomUUID(),
+      type: "main_image",
+      url: "",
+      file_path: null,
+      alt_text: "",
+      order: 0,
+      model_id: null,
+      _file: file,
+    };
+    setMedia([...filtered, newItem]);
+  };
+
+  /* ── Hero: model helpers ── */
+  const ensureFirstModel = useCallback(() => {
+    if (models.length === 0) {
+      setModels([{ ...createEmptyModel(), order: 0 }]);
+    }
+  }, [models.length]);
+
+  // Auto-create first model on mount
+  useEffect(() => {
+    if (!loading && models.length === 0) ensureFirstModel();
+  }, [loading, ensureFirstModel]);
+
+  const updateFirstModel = useCallback((updates: Partial<ModelFormState>) => {
+    setModels(prev => {
+      if (prev.length === 0) return prev;
+      return [{ ...prev[0], ...updates }, ...prev.slice(1)];
+    });
+  }, []);
+
   // ── SAVE ──
   const save = async () => {
-    // Validate
-    if (!product.product_name) { setError("Product name is required"); setTab("Basic Info"); return; }
+    if (!product.product_name) {
+      setError("Product name is required");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (!product.division_slug || !product.category_slug || !product.subcategory_slug) {
-      setError("Classification is required"); setTab("Classification"); return;
+      setError("Classification is required");
+      setTimeout(() => document.getElementById("classification")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      return;
     }
 
     setSaving(true);
@@ -217,7 +285,6 @@ export default function ProductForm({ productId }: Props) {
     setSuccess("");
 
     try {
-      // 1. Product
       const productData = {
         product_name: product.product_name,
         slug: product.slug,
@@ -252,7 +319,6 @@ export default function ProductForm({ productId }: Props) {
         pid = created.id;
       }
 
-      // 2. Models — diff: create new, update existing, delete removed
       const tempIdToRealId: Record<string, string> = {};
 
       for (const m of models) {
@@ -279,17 +345,14 @@ export default function ProductForm({ productId }: Props) {
         };
 
         if (m.id) {
-          // Update existing
           await updateModel(m.id, modelData);
           tempIdToRealId[m._tempId] = m.id;
         } else {
-          // Create new — pass sku as "auto" for trigger
           const created = await createModel({ ...modelData, sku: "auto" });
           if (created) tempIdToRealId[m._tempId] = created.id;
         }
       }
 
-      // Delete removed models
       if (isEdit) {
         const currentModelIds = models.filter(m => m.id).map(m => m.id!);
         for (const oldId of originalModelIds) {
@@ -297,7 +360,6 @@ export default function ProductForm({ productId }: Props) {
         }
       }
 
-      // 3. Media — upload new files, create records, delete removed
       for (const item of media) {
         if (item._file && !item.id) {
           const uploaded = await uploadProductFile(item._file);
@@ -322,7 +384,6 @@ export default function ProductForm({ productId }: Props) {
         }
       }
 
-      // 4. Translations
       for (const t of translations) {
         await upsertTranslation({
           product_id: pid,
@@ -339,7 +400,6 @@ export default function ProductForm({ productId }: Props) {
         }
       }
 
-      // 5. Market prices
       for (const p of prices) {
         const realModelId = p.model_id || tempIdToRealId[p._modelTempId];
         if (!realModelId) continue;
@@ -354,7 +414,6 @@ export default function ProductForm({ productId }: Props) {
         });
       }
 
-      // 6. Related products
       await setRelatedProducts(pid, related.map(r => r.related_id));
 
       setSuccess("Product saved successfully!");
@@ -368,117 +427,363 @@ export default function ProductForm({ productId }: Props) {
     }
   };
 
+  // ── Section nav for quick jump ──
+  const sections = [
+    { id: "classification", label: "Classification", icon: <FolderTree className="h-3.5 w-3.5" /> },
+    { id: "description", label: "Description", icon: <FileText className="h-3.5 w-3.5" /> },
+    { id: "specs", label: "Specs", icon: <Wrench className="h-3.5 w-3.5" /> },
+    { id: "config", label: "Config", icon: <Sliders className="h-3.5 w-3.5" /> },
+    { id: "models", label: "Models", icon: <Boxes className="h-3.5 w-3.5" /> },
+    { id: "media", label: "Media", icon: <Image className="h-3.5 w-3.5" /> },
+    { id: "prices", label: "Prices", icon: <DollarSign className="h-3.5 w-3.5" /> },
+    { id: "translations", label: "Translations", icon: <Languages className="h-3.5 w-3.5" /> },
+    { id: "related", label: "Related", icon: <Link2 className="h-3.5 w-3.5" /> },
+  ];
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 text-white/30 animate-spin" />
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <Loader2 className="h-6 w-6 text-[var(--text-dim)] animate-spin" />
       </div>
     );
   }
 
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
+  const lbl = "block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5";
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+
+        {/* ═══ TOP BAR ═══ */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <Link
               href="/products"
-              className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/80 transition-colors"
+              className="h-9 w-9 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="text-lg md:text-[22px] font-bold text-white">
-              {isEdit ? "Edit Product" : "New Product"}
-            </h1>
+            <div>
+              <h1 className="text-lg md:text-xl font-bold text-[var(--text-primary)] tracking-tight">
+                {isEdit ? "Edit Product" : "New Product"}
+              </h1>
+              <p className="text-[12px] text-[var(--text-dim)] mt-0.5">
+                {isEdit ? "Update product details below" : "Fill in the product information"}
+              </p>
+            </div>
           </div>
           <button
             onClick={save}
             disabled={saving}
-            className="h-9 md:h-10 px-4 md:px-6 rounded-lg bg-white text-black text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-50"
+            className="h-10 px-5 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving..." : <><span className="hidden sm:inline">Save Product</span><span className="sm:hidden">Save</span></>}
+            {saving ? "Saving..." : "Save Product"}
           </button>
         </div>
 
         {/* Messages */}
         {error && (
-          <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-[13px] text-red-400">
-            {error}
+          <div className="mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
+            <span className="shrink-0">&#9888;</span> {error}
           </div>
         )}
         {success && (
-          <div className="mb-4 px-4 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400">
-            {success}
+          <div className="mb-6 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
+            <span className="shrink-0">&#10003;</span> {success}
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 overflow-x-auto pb-1 scrollbar-none">
-          {TABS.map(t => (
+        {/* ═══ SECTION NAV (quick jump) ═══ */}
+        <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-none">
+          {sections.map(s => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`shrink-0 h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
-                tab === t
-                  ? "bg-white/[0.10] text-white"
-                  : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
-              }`}
+              key={s.id}
+              onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="shrink-0 h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-all"
             >
-              {t}
+              {s.icon}
+              <span className="hidden sm:inline">{s.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="bg-[#141414] rounded-xl md:rounded-2xl border border-white/[0.06] p-4 md:p-6 lg:p-8">
-          {tab === "Classification" && (
-            <ClassificationSection
-              data={product}
-              onChange={updateProduct_}
-              divisions={divisions}
-              categories={categories}
-              subcategories={subcategories}
-            />
-          )}
-          {tab === "Basic Info" && (
-            <BasicInfoSection
-              data={product}
-              onChange={updateProduct_}
-              slugEdited={slugEdited}
-              onSlugEdited={() => setSlugEdited(true)}
-            />
-          )}
-          {tab === "Description" && (
-            <DescriptionSection data={product} onChange={updateProduct_} />
-          )}
-          {tab === "Specs" && (
-            <SpecsSection data={product} onChange={updateProduct_} />
-          )}
-          {tab === "Config" && (
-            <ConfigSection data={product} onChange={updateProduct_} />
-          )}
-          {tab === "Technical" && (
-            <TechnicalSection data={product} onChange={updateProduct_} />
-          )}
-          {tab === "Models" && (
-            <ModelsSection models={models} onChange={setModels} />
-          )}
-          {tab === "Media" && (
-            <MediaSection media={media} onChange={setMedia} />
-          )}
-          {tab === "Translations" && (
-            <TranslationsSection translations={translations} onChange={setTranslations} />
-          )}
-          {tab === "Prices" && (
-            <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
-          )}
-          {tab === "Related" && (
-            <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
-          )}
+        {/* ═══ HERO SECTION ═══ */}
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 md:p-5 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 md:gap-5">
+
+            {/* Left: Main Product Image */}
+            <div className="sm:w-[160px] md:w-[180px] lg:w-[200px] shrink-0">
+              <input
+                ref={mainImageRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleMainImage(e.target.files)}
+              />
+              <div
+                onClick={() => mainImageRef.current?.click()}
+                className="relative w-full aspect-square max-h-[200px] rounded-xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-[var(--bg-surface-subtle)]"
+              >
+                {mainImageSrc ? (
+                  <>
+                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="flex items-center gap-2 text-white text-sm font-medium">
+                        <Camera className="h-5 w-5" />
+                        Change Photo
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <div className="h-12 w-12 rounded-xl bg-[var(--bg-surface)] flex items-center justify-center">
+                      <ImageIcon className="h-6 w-6 text-[var(--text-ghost)]" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[12px] font-medium text-[var(--text-dim)]">Upload Photo</p>
+                      <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">Click or drag & drop</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Product Identity */}
+            <div className="flex-1 flex flex-col justify-center gap-2.5">
+              {/* Row 1: Product Name + Model + Supplier */}
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr] gap-2.5">
+                <div>
+                  <label className={lbl}>Product Name *</label>
+                  <input
+                    type="text"
+                    value={product.product_name}
+                    onChange={(e) => {
+                      const updates: Partial<ProductFormState> = { product_name: e.target.value };
+                      if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                      updateProduct_(updates);
+                    }}
+                    placeholder="e.g. KX CoBot Pro"
+                    className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[15px] font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><Boxes className="h-3 w-3" /> Product Model</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={models[0]?.model_name || ""}
+                    onChange={(e) => {
+                      if (models.length === 0) ensureFirstModel();
+                      updateFirstModel({ model_name: e.target.value, slug: (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") });
+                    }}
+                    placeholder="e.g. KX-500A"
+                    className={inp}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Supplier</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={models[0]?.supplier || ""}
+                    onChange={(e) => {
+                      if (models.length === 0) ensureFirstModel();
+                      updateFirstModel({ supplier: e.target.value });
+                    }}
+                    placeholder="e.g. Zhejiang Manufacturing Co."
+                    className={inp}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Brand + Level + Slug + Tags */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={product.brand}
+                    onChange={(e) => updateProduct_({ brand: e.target.value })}
+                    placeholder="e.g. Koleex"
+                    className={inp}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Level</span>
+                  </label>
+                  <select
+                    value={product.level}
+                    onChange={(e) => updateProduct_({ level: e.target.value })}
+                    className={inp}
+                  >
+                    <option value="">Select level...</option>
+                    <option value="entry">Entry</option>
+                    <option value="mid">Mid</option>
+                    <option value="premium">Premium</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Slug</label>
+                  <input
+                    type="text"
+                    value={product.slug}
+                    onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
+                    className={`${inp} font-mono text-[var(--text-muted)]`}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Tags</label>
+                  <TagsInput
+                    tags={product.tags}
+                    onChange={(tags) => updateProduct_({ tags })}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* ═══ ALL SECTIONS — 2-col grid on desktop ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
+
+          {/* Left column */}
+          <div className="space-y-4 md:space-y-5">
+            {/* 1. Classification */}
+            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
+              <ClassificationSection
+                data={product}
+                onChange={updateProduct_}
+                divisions={divisions}
+                categories={categories}
+                subcategories={subcategories}
+              />
+            </Section>
+
+            {/* 2. Description */}
+            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
+              <DescriptionSection data={product} onChange={updateProduct_} />
+            </Section>
+
+            {/* 3. Specs + Technical combined */}
+            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications & Technical">
+              <div className="space-y-6">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
+                    <Wrench className="h-3 w-3" /> Key Specifications
+                  </p>
+                  <SpecsSection data={product} onChange={updateProduct_} />
+                </div>
+                <div className="border-t border-[var(--border-subtle)] pt-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
+                    <Zap className="h-3 w-3" /> Electrical & Technical
+                  </p>
+                  <TechnicalSection data={product} onChange={updateProduct_} />
+                </div>
+              </div>
+            </Section>
+
+            {/* 4. Configuration */}
+            <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration & Visibility">
+              <ConfigSection data={product} onChange={updateProduct_} />
+            </Section>
+
+            {/* 8. Translations */}
+            <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+              <TranslationsSection translations={translations} onChange={setTranslations} />
+            </Section>
+          </div>
+
+          {/* Right column */}
+          <div className="space-y-4 md:space-y-5">
+            {/* 5. Models */}
+            <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
+              <ModelsSection models={models} onChange={setModels} />
+            </Section>
+
+            {/* 6. Media */}
+            <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
+              <MediaSection
+                media={media.filter(m => m.type !== "main_image")}
+                excludeTypes={["main_image"]}
+                onChange={(filtered) => {
+                  const mainImages = media.filter(m => m.type === "main_image");
+                  setMedia([...mainImages, ...filtered]);
+                }}
+              />
+            </Section>
+
+            {/* 7. Market Prices */}
+            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
+              <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
+            </Section>
+
+            {/* 9. Related Products */}
+            <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+              <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
+            </Section>
+          </div>
+        </div>
+
+        {/* ═══ BOTTOM SAVE BAR ═══ */}
+        <div className="mt-8 pt-5 border-t border-[var(--border-subtle)] flex items-center justify-between">
+          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+            Cancel
+          </Link>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="h-11 px-8 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? "Saving..." : "Save Product"}
+          </button>
+        </div>
+
+        {/* Bottom padding */}
+        <div className="h-12" />
       </div>
+    </div>
+  );
+}
+
+/* ── Inline Tags Input ── */
+function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+  const [input, setInput] = useState("");
+
+  const add = () => {
+    const t = input.trim().toLowerCase();
+    if (t && !tags.includes(t)) onChange([...tags, t]);
+    setInput("");
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tags.map(tag => (
+          <span key={tag} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">
+            {tag}
+            <button onClick={() => onChange(tags.filter(t => t !== tag))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)] ml-0.5">
+              <span className="text-xs">&times;</span>
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+        placeholder="Type tag and press Enter..."
+        className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+      />
     </div>
   );
 }

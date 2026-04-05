@@ -21,22 +21,22 @@ export default function ClassificationSection({ data, onChange, divisions, categ
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Division *</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Division *</label>
         <select
           value={data.division_slug}
           onChange={(e) => onChange({ division_slug: e.target.value, category_slug: "", subcategory_slug: "" })}
-          className="w-full h-10 px-3 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white outline-none focus:border-white/20"
+          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
         >
           <option value="">Select division...</option>
           {divisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
         </select>
       </div>
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Category *</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Category *</label>
         <select
           value={data.category_slug}
           onChange={(e) => onChange({ category_slug: e.target.value, subcategory_slug: "" })}
-          className="w-full h-10 px-3 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white outline-none focus:border-white/20"
+          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           disabled={!data.division_slug}
         >
           <option value="">{data.division_slug ? "Select category..." : "Select a division first"}</option>
@@ -44,11 +44,11 @@ export default function ClassificationSection({ data, onChange, divisions, categ
         </select>
       </div>
       <div>
-        <label className="block text-[12px] font-medium text-white/50 mb-1.5">Subcategory *</label>
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Subcategory *</label>
         <select
           value={data.subcategory_slug}
           onChange={(e) => onChange({ subcategory_slug: e.target.value })}
-          className="w-full h-10 px-3 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white outline-none focus:border-white/20"
+          className="w-full h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
           disabled={!data.category_slug}
         >
           <option value="">{data.category_slug ? "Select subcategory..." : "Select a category first"}</option>

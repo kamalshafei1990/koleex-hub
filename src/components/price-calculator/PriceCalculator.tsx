@@ -337,24 +337,24 @@ export default function PriceCalculator() {
 
   /* ── Input class helpers ── */
   const inputCls =
-    "w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all";
+    "w-full h-9 px-3 bg-[#1a1a1a] border border-[var(--border-strong)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all";
   const selectCls =
-    "w-full h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer";
-  const labelCls = "block text-[11px] text-white/50 mb-1.5 uppercase tracking-wider font-medium";
+    "w-full h-9 px-3 bg-[#1a1a1a] border border-[var(--border-strong)] rounded-lg text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer";
+  const labelCls = "block text-[11px] text-[var(--text-subtle)] mb-1.5 uppercase tracking-wider font-medium";
 
   /* ════════════════════════════════════════════════════════════════════
      RENDER
      ════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* ── Sticky Header ── */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-[#222]">
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-[var(--bg-primary)]/80 border-b border-[var(--border-color)]">
         <div className="max-w-[700px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="flex items-center gap-2 text-white/60 hover:text-white transition-colors text-sm"
+              className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors text-sm"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Back to Hub</span>
@@ -367,7 +367,7 @@ export default function PriceCalculator() {
           </div>
           <button
             onClick={resetForm}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-white border border-[#333] hover:border-[#555] transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-strong)] hover:border-[#555] transition-all"
           >
             <RefreshCw size={14} />
             Reset
@@ -378,14 +378,14 @@ export default function PriceCalculator() {
       {/* ── Single Column Content ── */}
       <main className="max-w-[700px] mx-auto px-4 sm:px-6 py-6 md:py-10 space-y-6">
         {/* Page subtitle */}
-        <p className="text-sm text-white/40">
+        <p className="text-sm text-[var(--text-faint)]">
           Generate channel pricing with shipping-adjusted ERP logic.
         </p>
 
         {/* ════════════════════════════════════════════════════════════
            FORM CARD — all inputs in one card
            ════════════════════════════════════════════════════════════ */}
-        <div className="bg-[#111] border border-[#222] rounded-xl p-5 sm:p-6 space-y-7">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 sm:p-6 space-y-7">
 
           {/* ── Block 1: Products (Cost + Quantity) ── */}
           <div className="space-y-3">
@@ -402,7 +402,7 @@ export default function PriceCalculator() {
                 Add Item
               </button>
             </div>
-            <p className="text-[11px] text-white/30">
+            <p className="text-[11px] text-[var(--text-dim)]">
               Enter product name, unit cost, and quantity manually.
             </p>
 
@@ -413,7 +413,7 @@ export default function PriceCalculator() {
                   className="flex items-center gap-2"
                 >
                   {/* Item number */}
-                  <span className="text-[10px] text-white/30 w-5 shrink-0 text-center font-mono">
+                  <span className="text-[10px] text-[var(--text-dim)] w-5 shrink-0 text-center font-mono">
                     {i + 1}
                   </span>
 
@@ -423,7 +423,7 @@ export default function PriceCalculator() {
                     value={prod.name}
                     onChange={(e) => updateProduct(prod.id, "name", e.target.value)}
                     placeholder="Product Name"
-                    className="flex-1 min-w-0 h-9 px-3 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                    className="flex-1 min-w-0 h-9 px-3 bg-[#1a1a1a] border border-[var(--border-strong)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
                   />
 
                   {/* Unit Cost */}
@@ -437,9 +437,9 @@ export default function PriceCalculator() {
                         updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)
                       }
                       placeholder="Cost CNY"
-                      className="w-full h-9 px-3 pr-10 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                      className="w-full h-9 px-3 pr-10 bg-[#1a1a1a] border border-[var(--border-strong)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-dim)]">
                       CNY
                     </span>
                   </div>
@@ -455,9 +455,9 @@ export default function PriceCalculator() {
                         updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)
                       }
                       placeholder="Qty"
-                      className="w-full h-9 px-3 pr-8 bg-[#1a1a1a] border border-[#333] rounded-lg text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                      className="w-full h-9 px-3 pr-8 bg-[#1a1a1a] border border-[var(--border-strong)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/30">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-dim)]">
                       x
                     </span>
                   </div>
@@ -480,7 +480,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 2: Override Default Profit Margin ── */}
           <div className="space-y-3">
@@ -525,7 +525,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 3: Manual Discount (%) ── */}
           <div className="space-y-2">
@@ -550,7 +550,7 @@ export default function PriceCalculator() {
                 background: `linear-gradient(to right, #3b82f6 ${discountPct * 10}%, #333 ${discountPct * 10}%)`,
               }}
             />
-            <div className="flex justify-between text-[10px] text-white/20 px-0.5">
+            <div className="flex justify-between text-[10px] text-[var(--text-ghost)] px-0.5">
               <span>0%</span>
               <span>5%</span>
               <span>10%</span>
@@ -558,7 +558,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 4: Exchange Rate ── */}
           <div className="space-y-2">
@@ -607,7 +607,7 @@ export default function PriceCalculator() {
                   <option value="usd_down">Expect USD to Fall</option>
                   <option value="usd_up">Expect USD to Rise</option>
                 </select>
-                <p className="text-[10px] text-white/30">
+                <p className="text-[10px] text-[var(--text-dim)]">
                   FX mode adjusts margin sensitivity before country/discount adjustments.
                 </p>
               </div>
@@ -615,7 +615,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 5: Product Category ── */}
           <div className="space-y-1.5">
@@ -638,7 +638,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 6: Target Country ── */}
           <div className="space-y-1.5">
@@ -671,7 +671,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 7: Target Customer Type ── */}
           <div className="space-y-1.5">
@@ -693,7 +693,7 @@ export default function PriceCalculator() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Block 8: Tax Refund Toggle ── */}
           <div className="space-y-1">
@@ -709,13 +709,13 @@ export default function PriceCalculator() {
                 Include Profit + Tax Refund column ({(PRICE_CALC_TAX_REFUND_DEFAULT * 100).toFixed(0)}% default)
               </span>
             </label>
-            <p className="text-[10px] text-white/30 pl-6">
+            <p className="text-[10px] text-[var(--text-dim)] pl-6">
               Tax refund is calculated from cost USD using the default refund rate.
             </p>
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#222]" />
+          <div className="border-t border-[var(--border-color)]" />
 
           {/* ── Generate Price Button ── */}
           <button
@@ -731,14 +731,14 @@ export default function PriceCalculator() {
            RESULT CARD — appears below form after Generate
            ════════════════════════════════════════════════════════════ */}
         {result && (
-          <div className="bg-[#111] border border-[#222] rounded-xl p-5 sm:p-6 space-y-6">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 sm:p-6 space-y-6">
             {/* ── Result Header ── */}
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Activity size={18} className="text-blue-400" />
                 <h2 className="text-lg font-semibold">Quotation Details</h2>
               </div>
-              <p className="text-[12px] text-white/40 mb-3">
+              <p className="text-[12px] text-[var(--text-faint)] mb-3">
                 Results are generated from your selected workflow inputs.
               </p>
               <div className="flex items-center gap-2 flex-wrap">
@@ -754,7 +754,7 @@ export default function PriceCalculator() {
             </div>
 
             {/* ── Breakdown Box ── */}
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden">
               <BreakdownKV label="Cost CNY" value={`\u00A5${fmt(result.totalCostCny)}`} />
               <BreakdownKV label="Cost USD" value={`$${fmt(result.totalCostUsd)}`} />
               <BreakdownKV
@@ -770,7 +770,7 @@ export default function PriceCalculator() {
                 <BreakdownKV label="Discount" value={`${result.discountPct}%`} />
               )}
               {/* Final Base Price - highlighted */}
-              <div className="flex items-center justify-between px-4 py-3 bg-blue-600/10 border-t border-[#222]">
+              <div className="flex items-center justify-between px-4 py-3 bg-blue-600/10 border-t border-[var(--border-color)]">
                 <span className="text-[13px] font-semibold text-blue-300">Final Base Price USD</span>
                 <span className="text-[14px] font-bold font-mono text-blue-400">
                   ${fmt(result.items[0].finalBase)}
@@ -783,7 +783,7 @@ export default function PriceCalculator() {
                   0
                 );
                 return (
-                  <div className="flex items-center justify-between px-4 py-3 bg-emerald-600/10 border-t border-[#222]">
+                  <div className="flex items-center justify-between px-4 py-3 bg-emerald-600/10 border-t border-[var(--border-color)]">
                     <span className="text-[13px] font-semibold text-emerald-300">Total Profit</span>
                     <span
                       className={`text-[14px] font-bold font-mono ${
@@ -815,7 +815,7 @@ export default function PriceCalculator() {
                   return (
                     <div
                       key={idx}
-                      className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden"
+                      className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden"
                     >
                       <button
                         onClick={() => toggleItemExpand(idx)}
@@ -823,19 +823,19 @@ export default function PriceCalculator() {
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span className="text-sm font-medium truncate">{item.name}</span>
-                          <span className="text-[10px] text-white/30 shrink-0">
+                          <span className="text-[10px] text-[var(--text-dim)] shrink-0">
                             Qty: {item.qty} | \u00A5{fmt(item.costCny)} | ${fmt(item.costUsd)}
                           </span>
                         </div>
                         {isExpanded ? (
-                          <ChevronUp size={16} className="text-white/40 shrink-0" />
+                          <ChevronUp size={16} className="text-[var(--text-faint)] shrink-0" />
                         ) : (
-                          <ChevronDown size={16} className="text-white/40 shrink-0" />
+                          <ChevronDown size={16} className="text-[var(--text-faint)] shrink-0" />
                         )}
                       </button>
 
                       {isExpanded && (
-                        <div className="border-t border-[#222]">
+                        <div className="border-t border-[var(--border-color)]">
                           {/* Mini breakdown */}
                           <div className="px-4 py-3 space-y-0">
                             <BreakdownKV label="Category" value={item.categoryName} />
@@ -853,7 +853,7 @@ export default function PriceCalculator() {
                           <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                               <thead>
-                                <tr className="border-t border-b border-[#222] text-[10px] text-white/40 uppercase tracking-wider">
+                                <tr className="border-t border-b border-[var(--border-color)] text-[10px] text-[var(--text-faint)] uppercase tracking-wider">
                                   <th className="text-left px-4 py-2 font-medium">Channel</th>
                                   <th className="text-right px-4 py-2 font-medium">Unit (USD)</th>
                                   <th className="text-right px-4 py-2 font-medium">Total (USD)</th>
@@ -873,21 +873,21 @@ export default function PriceCalculator() {
                                     <tr
                                       key={row.id}
                                       className={`border-b border-[#1a1a1a] ${
-                                        isTarget ? "bg-blue-600/10" : "hover:bg-[#111]"
+                                        isTarget ? "bg-blue-600/10" : "hover:bg-[var(--bg-secondary)]"
                                       }`}
                                     >
                                       <td className="px-4 py-2 font-medium">
                                         {row.name}
                                         {isTarget && (
-                                          <span className="ml-2 text-[8px] bg-blue-600 text-white px-1 py-0.5 rounded font-semibold uppercase">
+                                          <span className="ml-2 text-[8px] bg-blue-600 text-[var(--text-primary)] px-1 py-0.5 rounded font-semibold uppercase">
                                             Target
                                           </span>
                                         )}
                                       </td>
-                                      <td className="text-right px-4 py-2 font-mono text-white/80">
+                                      <td className="text-right px-4 py-2 font-mono text-[var(--text-highlight)]">
                                         ${fmt(up)}
                                       </td>
-                                      <td className="text-right px-4 py-2 font-mono text-white/80">
+                                      <td className="text-right px-4 py-2 font-mono text-[var(--text-highlight)]">
                                         ${fmt(up * item.qty)}
                                       </td>
                                       <td
@@ -927,11 +927,11 @@ export default function PriceCalculator() {
                 <h3 className="text-sm font-semibold">Grand Total Pricing Table</h3>
               </div>
 
-              <div className="bg-[#0A0A0A] border border-[#222] rounded-lg overflow-hidden">
+              <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-[#222] text-[11px] text-white/40 uppercase tracking-wider">
+                      <tr className="border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] uppercase tracking-wider">
                         <th className="text-left px-4 py-3 font-medium">Channel Type</th>
                         <th className="text-right px-4 py-3 font-medium">Unit Price</th>
                         <th className="text-right px-4 py-3 font-medium">Total Price</th>
@@ -979,21 +979,21 @@ export default function PriceCalculator() {
                             className={`border-b border-[#1a1a1a] transition-colors ${
                               isTarget
                                 ? "bg-blue-600/10 border-l-2 border-l-blue-500"
-                                : "hover:bg-[#111]"
+                                : "hover:bg-[var(--bg-secondary)]"
                             }`}
                           >
                             <td className="px-4 py-3 font-medium flex items-center gap-2">
                               {row.name}
                               {isTarget && (
-                                <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">
+                                <span className="text-[9px] bg-blue-600 text-[var(--text-primary)] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider">
                                   Target
                                 </span>
                               )}
                             </td>
-                            <td className="text-right px-4 py-3 font-mono text-white/80">
+                            <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">
                               ${fmt(unitPrice)}
                             </td>
-                            <td className="text-right px-4 py-3 font-mono text-white/80">
+                            <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">
                               ${fmt(totalTotal)}
                             </td>
                             <td
@@ -1031,14 +1031,14 @@ export default function PriceCalculator() {
                         }
 
                         return (
-                          <tr className="border-t border-[#333] bg-[#111]">
-                            <td className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/60">
+                          <tr className="border-t border-[var(--border-strong)] bg-[var(--bg-secondary)]">
+                            <td className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                               Grand Total
                             </td>
-                            <td className="text-right px-4 py-3 font-mono font-semibold text-white/60">
+                            <td className="text-right px-4 py-3 font-mono font-semibold text-[var(--text-muted)]">
                               --
                             </td>
-                            <td className="text-right px-4 py-3 font-mono font-bold text-white">
+                            <td className="text-right px-4 py-3 font-mono font-bold text-[var(--text-primary)]">
                               ${fmt(footerTotal)}
                             </td>
                             <td
@@ -1074,7 +1074,7 @@ export default function PriceCalculator() {
                   const text = `Quotation: ${result.countryName} | ${CUSTOMER_RULES.find((r) => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`;
                   navigator.clipboard?.writeText(text);
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[#555] transition-all"
               >
                 <Copy size={14} />
                 Copy
@@ -1083,7 +1083,7 @@ export default function PriceCalculator() {
                 onClick={() => {
                   /* Export PDF placeholder */
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[#555] transition-all"
               >
                 <FileText size={14} />
                 Export PDF
@@ -1092,7 +1092,7 @@ export default function PriceCalculator() {
                 onClick={() => {
                   window.print();
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[#555] transition-all"
               >
                 <Printer size={14} />
                 Print
@@ -1101,7 +1101,7 @@ export default function PriceCalculator() {
                 onClick={() => {
                   /* Share placeholder */
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[#333] text-white/60 hover:text-white hover:border-[#555] transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-[var(--border-strong)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[#555] transition-all"
               >
                 <Share2 size={14} />
                 Share
@@ -1133,8 +1133,8 @@ function BreakdownKV({
         last ? "" : "border-b border-[#1a1a1a]"
       }`}
     >
-      <span className="text-[12px] text-white/40">{label}</span>
-      <span className="text-[13px] font-mono text-white/80">{value}</span>
+      <span className="text-[12px] text-[var(--text-faint)]">{label}</span>
+      <span className="text-[13px] font-mono text-[var(--text-highlight)]">{value}</span>
     </div>
   );
 }

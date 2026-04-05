@@ -1,8 +1,97 @@
 @import "tailwindcss";
 
-:root {
+/* ── Theme-aware design tokens ── */
+:root,
+[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ffffff;
+
+  /* Backgrounds */
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #111111;
+  --bg-card: #111111;
+  --bg-surface-subtle: rgba(255,255,255,0.02);
+  --bg-surface: rgba(255,255,255,0.05);
+  --bg-surface-hover: rgba(255,255,255,0.10);
+  --bg-surface-active: rgba(255,255,255,0.15);
+  --bg-surface-bright: rgba(255,255,255,0.20);
+
+  /* Borders */
+  --border-color: #222222;
+  --border-strong: #333333;
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-faint: rgba(255,255,255,0.03);
+  --border-focus: rgba(255,255,255,0.20);
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-highlight: rgba(255,255,255,0.80);
+  --text-secondary: rgba(255,255,255,0.70);
+  --text-muted: rgba(255,255,255,0.60);
+  --text-subtle: rgba(255,255,255,0.50);
+  --text-faint: rgba(255,255,255,0.40);
+  --text-dim: rgba(255,255,255,0.30);
+  --text-ghost: rgba(255,255,255,0.20);
+  --text-whisper: rgba(255,255,255,0.15);
+  --text-barely: rgba(255,255,255,0.10);
+
+  /* Inverted (buttons etc.) */
+  --bg-inverted: #ffffff;
+  --bg-inverted-hover: rgba(255,255,255,0.90);
+  --text-inverted: #000000;
+
+  /* Overlay */
+  --bg-overlay: rgba(0,0,0,0.60);
+
+  /* Header */
+  --header-bg: rgba(0,0,0,0.80);
+  --header-border: rgba(255,255,255,0.08);
+}
+
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #000000;
+
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: #F8F8F8;
+  --bg-card: #ffffff;
+  --bg-surface-subtle: rgba(0,0,0,0.02);
+  --bg-surface: rgba(0,0,0,0.04);
+  --bg-surface-hover: rgba(0,0,0,0.08);
+  --bg-surface-active: rgba(0,0,0,0.12);
+  --bg-surface-bright: rgba(0,0,0,0.16);
+
+  /* Borders */
+  --border-color: #E5E5E5;
+  --border-strong: #D0D0D0;
+  --border-subtle: rgba(0,0,0,0.08);
+  --border-faint: rgba(0,0,0,0.04);
+  --border-focus: rgba(0,0,0,0.20);
+
+  /* Text */
+  --text-primary: #000000;
+  --text-highlight: rgba(0,0,0,0.80);
+  --text-secondary: rgba(0,0,0,0.70);
+  --text-muted: rgba(0,0,0,0.60);
+  --text-subtle: rgba(0,0,0,0.50);
+  --text-faint: rgba(0,0,0,0.40);
+  --text-dim: rgba(0,0,0,0.30);
+  --text-ghost: rgba(0,0,0,0.20);
+  --text-whisper: rgba(0,0,0,0.15);
+  --text-barely: rgba(0,0,0,0.10);
+
+  /* Inverted (buttons etc.) */
+  --bg-inverted: #000000;
+  --bg-inverted-hover: rgba(0,0,0,0.85);
+  --text-inverted: #ffffff;
+
+  /* Overlay */
+  --bg-overlay: rgba(0,0,0,0.50);
+
+  /* Header */
+  --header-bg: rgba(255,255,255,0.95);
+  --header-border: rgba(0,0,0,0.08);
 }
 
 @theme inline {

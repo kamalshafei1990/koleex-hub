@@ -1,0 +1,70 @@
+import type { Translations } from "@/lib/i18n";
+
+export const hubT: Translations = {
+  /* ── Page ── */
+  "title":            { en: "Koleex Hub",       zh: "Koleex 中心",       ar: "مركز Koleex" },
+  "applications":     { en: "Applications",     zh: "应用程序",           ar: "التطبيقات" },
+  "applicationsDesc": { en: "Access your enterprise modules and tools", zh: "访问您的企业模块和工具", ar: "الوصول إلى وحدات وأدوات المؤسسة" },
+  "searchMobile":     { en: "Search apps...",    zh: "搜索应用...",        ar: "بحث التطبيقات..." },
+  "searchDesktop":    { en: "Search apps, modules, settings...", zh: "搜索应用、模块、设置...", ar: "بحث التطبيقات والوحدات والإعدادات..." },
+  "of":               { en: "of",               zh: "/",                 ar: "من" },
+  "apps":             { en: "apps",             zh: "个应用",             ar: "تطبيقات" },
+  "platformVersion":  { en: "Platform v2.4",    zh: "平台 v2.4",         ar: "المنصة v2.4" },
+
+  /* ── Sidebar Sections ── */
+  "allApps":          { en: "All Apps",          zh: "全部应用",           ar: "جميع التطبيقات" },
+  "quickAccess":      { en: "Quick Access",      zh: "快速访问",           ar: "الوصول السريع" },
+  "core":             { en: "Core",              zh: "核心",              ar: "الأساسية" },
+  "growth":           { en: "Growth",            zh: "增长",              ar: "النمو" },
+
+  /* ── Category Labels ── */
+  "cat.operations":     { en: "Operations",        zh: "运营",              ar: "العمليات" },
+  "cat.commercial":     { en: "Commercial",        zh: "商务",              ar: "التجارية" },
+  "cat.finance":        { en: "Finance",           zh: "财务",              ar: "المالية" },
+  "cat.people":         { en: "People",            zh: "人事",              ar: "الموظفين" },
+  "cat.communication":  { en: "Communication",     zh: "沟通",              ar: "التواصل" },
+  "cat.marketing":      { en: "Marketing & Growth", zh: "营销与增长",        ar: "التسويق والنمو" },
+  "cat.planning":       { en: "Planning",          zh: "规划",              ar: "التخطيط" },
+  "cat.knowledge":      { en: "Knowledge",         zh: "知识库",            ar: "قاعدة المعرفة" },
+  "cat.system":         { en: "System",            zh: "系统",              ar: "النظام" },
+
+  /* ── Sidebar Labels (filters / links) ── */
+  "sidebar.settings":   { en: "Settings",          zh: "设置",              ar: "الإعدادات" },
+
+  /* ── App Names ── */
+  "app.dashboard":       { en: "Dashboard",        zh: "仪表盘",            ar: "لوحة التحكم" },
+  "app.products":        { en: "Products",         zh: "产品",              ar: "المنتجات" },
+  "app.inventory":       { en: "Inventory",        zh: "库存",              ar: "المخزون" },
+  "app.purchase":        { en: "Purchase",         zh: "采购",              ar: "المشتريات" },
+  "app.landed-cost":     { en: "Landed Cost",      zh: "到岸成本",          ar: "تكلفة الوصول" },
+  "app.documents":       { en: "Documents",        zh: "文件",              ar: "المستندات" },
+  "app.sales":           { en: "Sales",            zh: "销售",              ar: "المبيعات" },
+  "app.crm":             { en: "CRM",              zh: "客户管理",          ar: "إدارة العملاء" },
+  "app.quotations":      { en: "Quotations",       zh: "报价单",            ar: "عروض الأسعار" },
+  "app.invoices":        { en: "Invoices",         zh: "发票",              ar: "الفواتير" },
+  "app.price-calculator":{ en: "Price Calculator",  zh: "价格计算器",        ar: "حاسبة الأسعار" },
+  "app.customers":       { en: "Customers",        zh: "客户",              ar: "العملاء" },
+  "app.suppliers":       { en: "Suppliers",        zh: "供应商",            ar: "الموردين" },
+  "app.contacts":        { en: "Contacts",         zh: "联系人",            ar: "جهات الاتصال" },
+  "app.markets":         { en: "Markets",          zh: "市场",              ar: "الأسواق" },
+  "app.finance":         { en: "Finance",          zh: "财务",              ar: "المالية" },
+  "app.expenses":        { en: "Expenses",         zh: "费用",              ar: "المصروفات" },
+  "app.employees":       { en: "Employees",        zh: "员工",              ar: "الموظفين" },
+  "app.recruitment":     { en: "Recruitment",      zh: "招聘",              ar: "التوظيف" },
+  "app.appraisals":      { en: "Appraisals",       zh: "绩效评估",          ar: "التقييمات" },
+  "app.appointments":    { en: "Appointments",     zh: "预约",              ar: "المواعيد" },
+  "app.attendance":      { en: "Attendance",       zh: "考勤",              ar: "الحضور" },
+  "app.discuss":         { en: "Discuss",          zh: "讨论",              ar: "المناقشات" },
+  "app.calendar":        { en: "Calendar",         zh: "日历",              ar: "التقويم" },
+  "app.todo":            { en: "To-do",            zh: "待办事项",          ar: "المهام" },
+  "app.website":         { en: "Website",          zh: "网站",              ar: "الموقع" },
+  "app.marketing":       { en: "Marketing",        zh: "营销",              ar: "التسويق" },
+  "app.marketing-cards": { en: "Marketing Cards",  zh: "营销卡片",          ar: "بطاقات التسويق" },
+  "app.events":          { en: "Events",           zh: "活动",              ar: "الفعاليات" },
+  "app.planning":        { en: "Planning",         zh: "规划",              ar: "التخطيط" },
+  "app.projects":        { en: "Projects",         zh: "项目",              ar: "المشاريع" },
+  "app.knowledge":       { en: "Knowledge",        zh: "知识库",            ar: "قاعدة المعرفة" },
+  "app.database":        { en: "Database",         zh: "数据库",            ar: "قاعدة البيانات" },
+  "app.ai":              { en: "AI",               zh: "AI",               ar: "الذكاء الاصطناعي" },
+  "app.settings":        { en: "Settings",         zh: "设置",              ar: "الإعدادات" },
+};

@@ -637,7 +637,7 @@ export default function Quotations() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-gray-400 text-lg">Loading...</div>
       </div>
     );
@@ -648,14 +648,14 @@ export default function Quotations() {
      ══════════════════════════════════════════════════════════ */
   if (view === "list") {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-white">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar */}
         <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition mb-4"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[var(--text-primary)] transition mb-4"
           >
             <Home size={16} />
             Back to Home
@@ -678,7 +678,7 @@ export default function Quotations() {
             </div>
             <button
               onClick={handleNew}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-[var(--text-primary)] rounded-xl text-sm font-medium transition active:scale-95"
             >
               <Plus size={18} />
               New Quotation
@@ -707,7 +707,7 @@ export default function Quotations() {
                 return (
                   <div
                     key={q.id}
-                    className="bg-[#111] border border-white/[0.06] rounded-xl p-4 sm:p-5 hover:border-white/[0.12] transition cursor-pointer group"
+                    className="bg-[var(--bg-secondary)] border border-white/[0.06] rounded-xl p-4 sm:p-5 hover:border-white/[0.12] transition cursor-pointer group"
                     onClick={() => handleOpen(q)}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -726,7 +726,7 @@ export default function Quotations() {
                             {q.status}
                           </span>
                         </div>
-                        <p className="text-white font-medium truncate">
+                        <p className="text-[var(--text-primary)] font-medium truncate">
                           {q.customerName || "Unnamed Customer"}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
@@ -735,7 +735,7 @@ export default function Quotations() {
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-lg font-semibold text-white tabular-nums">
+                        <span className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">
                           ${fmt(gt)}
                         </span>
                         <button
@@ -766,7 +766,7 @@ export default function Quotations() {
   if (!current) return null;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
 
       {/* ── Toolbar (dark bar above A4) ── */}
@@ -784,7 +784,7 @@ export default function Quotations() {
       >
         <button
           onClick={() => setView("list")}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] rounded-lg transition"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <ArrowLeft size={15} />
           Back
@@ -802,33 +802,33 @@ export default function Quotations() {
         </span>
         <button
           onClick={() => handleSave("draft")}
-          className="px-4 py-2 text-sm text-gray-300 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg transition"
+          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           Save Draft
         </button>
         <button
           onClick={() => handleSave("final")}
-          className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold transition"
+          className="px-4 py-2 text-sm text-[var(--text-primary)] bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold transition"
         >
           Save Final
         </button>
         <button
           onClick={handlePrint}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg transition"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <Download size={14} />
           Export PDF
         </button>
         <button
           onClick={handlePrint}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg transition"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <Printer size={14} />
           Print
         </button>
         <button
           onClick={handleDeleteCurrent}
-          className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-white/[0.06] hover:bg-red-500/20 rounded-lg transition"
+          className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"
         >
           <Trash2 size={14} />
         </button>
@@ -867,7 +867,7 @@ export default function Quotations() {
               setCurrent({ ...current, customerName: e.target.value })
             }
             placeholder="e.g. Mr. Ahmed"
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
+            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
           />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -891,7 +891,7 @@ export default function Quotations() {
               setCurrent({ ...current, companyName: e.target.value })
             }
             placeholder="e.g. ABC Trading Co."
-            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
+            className="w-full bg-[#1a1a1a] border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition"
           />
         </div>
       </div>

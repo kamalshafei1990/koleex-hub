@@ -20,6 +20,8 @@ import {
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { Country, State, City } from "country-state-city";
+import { useTranslation } from "@/lib/i18n";
+import { contactsT } from "@/lib/translations/contacts";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -901,10 +903,10 @@ function formToRow(f: ContactForm): Record<string, unknown> {
 /* ── Detail view section wrapper ── */
 const Section = React.memo(function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="border-b border-[#222] px-4 md:px-6 py-4">
+    <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-white/30">{icon}</span>
-        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
+        <span className="text-[var(--text-dim)]">{icon}</span>
+        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
       </div>
       {children}
     </div>
@@ -917,15 +919,15 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
 }) {
   return (
     <div>
-      <label className="text-xs text-white/40 mb-1 block">{label}</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
       <div className="relative">
-        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">{icon}</span>}
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">{icon}</span>}
         <input
           type={type}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder || label}
-          className={`w-full h-10 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 transition-colors ${icon ? "pl-9 pr-3" : "px-3"}`}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors ${icon ? "ps-9 pe-3" : "px-3"}`}
         />
       </div>
     </div>
@@ -933,23 +935,24 @@ const Input = React.memo(function Input({ label, value, onChange, type = "text",
 });
 
 /* ── Form select input ── */
-const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon }: {
+const SelectInput = React.memo(function SelectInput({ label, value, onChange, options, icon, renderLabel, selectLabel }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; icon?: React.ReactNode;
+  renderLabel?: (o: string) => string; selectLabel?: string;
 }) {
   return (
     <div>
-      <label className="text-xs text-white/40 mb-1 block">{label}</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
       <div className="relative">
-        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">{icon}</span>}
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className={`w-full h-10 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 transition-colors appearance-none cursor-pointer ${icon ? "pl-9 pr-3" : "px-3"}`}
+          className={`w-full h-10 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors appearance-none cursor-pointer ${icon ? "ps-9 pe-3" : "px-3"}`}
         >
-          <option value="" className="bg-[#111]">Select...</option>
-          {options.map(o => <option key={o} value={o} className="bg-[#111]">{o}</option>)}
+          <option value="" className="bg-[var(--bg-secondary)]">{selectLabel ?? "Select..."}</option>
+          {options.map(o => <option key={o} value={o} className="bg-[var(--bg-secondary)]">{renderLabel ? renderLabel(o) : o}</option>)}
         </select>
-        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+        <ChevronDown size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
       </div>
     </div>
   );
@@ -958,9 +961,9 @@ const SelectInput = React.memo(function SelectInput({ label, value, onChange, op
 /* ── Add button ── */
 const AddButton = React.memo(function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-2 text-sm text-white/50 hover:text-white py-2 transition-colors">
-      <div className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center">
-        <Plus size={14} className="text-white/60" />
+    <button onClick={onClick} className="flex items-center gap-2 text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] py-2 transition-colors">
+      <div className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center">
+        <Plus size={14} className="text-[var(--text-muted)]" />
       </div>
       {label}
     </button>
@@ -970,21 +973,21 @@ const AddButton = React.memo(function AddButton({ label, onClick }: { label: str
 /* ── Remove button ── */
 const RemoveBtn = React.memo(function RemoveBtn({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-6 h-6 rounded-full bg-white/10 border border-white/[0.08] flex items-center justify-center shrink-0 hover:bg-white/20 transition-colors">
-      <Minus size={14} className="text-white/60" />
+    <button onClick={onClick} className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 hover:bg-[var(--bg-surface-bright)] transition-colors">
+      <Minus size={14} className="text-[var(--text-muted)]" />
     </button>
   );
 });
 
 /* ── Inline label select ── */
-const LabelSelect = React.memo(function LabelSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+const LabelSelect = React.memo(function LabelSelect({ value, onChange, options, renderLabel }: { value: string; onChange: (v: string) => void; options: string[]; renderLabel?: (o: string) => string }) {
   return (
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="h-10 px-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/60 font-medium outline-none cursor-pointer min-w-[80px]"
+      className="h-10 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] font-medium outline-none cursor-pointer min-w-[80px]"
     >
-      {options.map(o => <option key={o} value={o} className="bg-[#111] text-white">{o}</option>)}
+      {options.map(o => <option key={o} value={o} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">{renderLabel ? renderLabel(o) : o}</option>)}
     </select>
   );
 });
@@ -992,10 +995,10 @@ const LabelSelect = React.memo(function LabelSelect({ value, onChange, options }
 /* ── Form section wrapper ── */
 const FormSection = React.memo(function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="border-b border-[#222] px-4 md:px-6 py-4 md:py-5">
+    <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4 md:py-5">
       <div className="flex items-center gap-2 mb-4">
-        {icon && <span className="text-white/25">{icon}</span>}
-        <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider">{title}</h3>
+        {icon && <span className="text-[var(--text-dim)]">{icon}</span>}
+        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
       </div>
       {children}
     </div>
@@ -1005,7 +1008,10 @@ const FormSection = React.memo(function FormSection({ title, icon, children }: {
 /* ── Birthday Picker (DD/MM/YYYY) ── */
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-const BirthdayPicker = React.memo(function BirthdayPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+const BirthdayPicker = React.memo(function BirthdayPicker({ value, onChange, dayLabel, monthLabel, yearLabel, renderMonth }: {
+  value: string; onChange: (v: string) => void;
+  dayLabel?: string; monthLabel?: string; yearLabel?: string; renderMonth?: (m: string) => string;
+}) {
   const parts = value ? value.split("-") : ["", "", ""];
   const year = parts[0] || "";
   const month = parts[1] || "";
@@ -1021,24 +1027,24 @@ const BirthdayPicker = React.memo(function BirthdayPicker({ value, onChange }: {
   return (
     <div className="grid grid-cols-3 gap-2">
       <div>
-        <label className="text-xs text-white/40 mb-1 block">Day</label>
-        <select value={day} onChange={e => update(e.target.value, month, year)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
-          <option value="" className="bg-[#111]">DD</option>
-          {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={String(i + 1).padStart(2, "0")} className="bg-[#111]">{i + 1}</option>)}
+        <label className="text-xs text-[var(--text-faint)] mb-1 block">{dayLabel ?? "Day"}</label>
+        <select value={day} onChange={e => update(e.target.value, month, year)} className="w-full h-10 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none cursor-pointer">
+          <option value="" className="bg-[var(--bg-secondary)]">DD</option>
+          {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={String(i + 1).padStart(2, "0")} className="bg-[var(--bg-secondary)]">{i + 1}</option>)}
         </select>
       </div>
       <div>
-        <label className="text-xs text-white/40 mb-1 block">Month</label>
-        <select value={month} onChange={e => update(day, e.target.value, year)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
-          <option value="" className="bg-[#111]">MM</option>
-          {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")} className="bg-[#111]">{m}</option>)}
+        <label className="text-xs text-[var(--text-faint)] mb-1 block">{monthLabel ?? "Month"}</label>
+        <select value={month} onChange={e => update(day, e.target.value, year)} className="w-full h-10 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none cursor-pointer">
+          <option value="" className="bg-[var(--bg-secondary)]">MM</option>
+          {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")} className="bg-[var(--bg-secondary)]">{renderMonth ? renderMonth(m) : m}</option>)}
         </select>
       </div>
       <div>
-        <label className="text-xs text-white/40 mb-1 block">Year</label>
-        <select value={year} onChange={e => update(day, month, e.target.value)} className="w-full h-10 px-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
-          <option value="" className="bg-[#111]">YYYY</option>
-          {Array.from({ length: 100 }, (_, i) => { const y = currentYear - i; return <option key={y} value={String(y)} className="bg-[#111]">{y}</option>; })}
+        <label className="text-xs text-[var(--text-faint)] mb-1 block">{yearLabel ?? "Year"}</label>
+        <select value={year} onChange={e => update(day, month, e.target.value)} className="w-full h-10 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none cursor-pointer">
+          <option value="" className="bg-[var(--bg-secondary)]">YYYY</option>
+          {Array.from({ length: 100 }, (_, i) => { const y = currentYear - i; return <option key={y} value={String(y)} className="bg-[var(--bg-secondary)]">{y}</option>; })}
         </select>
       </div>
     </div>
@@ -1062,10 +1068,11 @@ const ALL_COUNTRIES: CountryOption[] = Country.getAllCountries().map(c => ({
 }));
 
 /* ── Searchable Country Dropdown ── */
-function CountryDropdown({ value, displayValue, onChange }: {
+function CountryDropdown({ value, displayValue, onChange, label, placeholder, noResults }: {
   value: string; // isoCode
   displayValue: string; // country name shown
   onChange: (name: string, isoCode: string) => void;
+  label?: string; placeholder?: string; noResults?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1100,9 +1107,9 @@ function CountryDropdown({ value, displayValue, onChange }: {
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="text-xs text-white/40 mb-1 block">Country</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "Country"}</label>
       <div
-        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
       >
         {selectedFlag && <span className="text-base">{selectedFlag}</span>}
@@ -1112,27 +1119,27 @@ function CountryDropdown({ value, displayValue, onChange }: {
           value={open ? query : displayValue}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search country..."
-          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+          placeholder={placeholder ?? "Search country..."}
+          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-white/30">No countries found</div>
+            <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No countries found"}</div>
           ) : (
             filtered.map(c => (
               <button
                 key={c.isoCode}
                 onClick={() => handleSelect(c)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
-                  c.isoCode === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${
+                  c.isoCode === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                 }`}
               >
                 <span className="text-base">{c.flag}</span>
                 <span className="truncate">{c.name}</span>
-                <span className="text-[10px] text-white/20 ml-auto">{c.isoCode}</span>
+                <span className="text-[10px] text-[var(--text-ghost)] ml-auto">{c.isoCode}</span>
               </button>
             ))
           )}
@@ -1143,11 +1150,12 @@ function CountryDropdown({ value, displayValue, onChange }: {
 }
 
 /* ── Province/State Dropdown ── */
-function ProvinceDropdown({ countryCode, value, displayValue, onChange }: {
+function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, placeholder, noResults }: {
   countryCode: string;
   value: string; // stateCode
   displayValue: string;
   onChange: (name: string, isoCode: string) => void;
+  label?: string; placeholder?: string; noResults?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1180,9 +1188,9 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange }: {
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="text-xs text-white/40 mb-1 block">Province / State</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "Province / State"}</label>
       <div
-        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
       >
         <input
@@ -1191,26 +1199,26 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange }: {
           value={open ? query : displayValue}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search province..."
-          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+          placeholder={placeholder ?? "Search province..."}
+          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-white/30">No provinces found</div>
+            <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No provinces found"}</div>
           ) : (
             filtered.map(s => (
               <button
                 key={s.isoCode}
                 onClick={() => { onChange(s.name, s.isoCode); setOpen(false); setQuery(""); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
-                  s.isoCode === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${
+                  s.isoCode === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                 }`}
               >
                 <span className="truncate">{s.name}</span>
-                <span className="text-[10px] text-white/20 ml-auto">{s.isoCode}</span>
+                <span className="text-[10px] text-[var(--text-ghost)] ml-auto">{s.isoCode}</span>
               </button>
             ))
           )}
@@ -1221,11 +1229,12 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange }: {
 }
 
 /* ── City Dropdown ── */
-function CityDropdown({ countryCode, stateCode, value, onChange }: {
+function CityDropdown({ countryCode, stateCode, value, onChange, label, placeholder, noResults }: {
   countryCode: string;
   stateCode: string;
   value: string;
   onChange: (name: string) => void;
+  label?: string; placeholder?: string; noResults?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1258,15 +1267,15 @@ function CityDropdown({ countryCode, stateCode, value, onChange }: {
   // Fallback to plain text input if no city data available
   if (cities.length === 0) {
     return (
-      <Input label="City" value={value} onChange={onChange} placeholder="City" />
+      <Input label={label ?? "City"} value={value} onChange={onChange} placeholder={label ?? "City"} />
     );
   }
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="text-xs text-white/40 mb-1 block">City</label>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label ?? "City"}</label>
       <div
-        className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white flex items-center gap-2 cursor-pointer focus-within:border-white/20 transition-colors"
+        className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] flex items-center gap-2 cursor-pointer focus-within:border-[var(--border-focus)] transition-colors"
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
       >
         <input
@@ -1275,22 +1284,22 @@ function CityDropdown({ countryCode, stateCode, value, onChange }: {
           value={open ? query : value}
           onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
-          placeholder="Search city..."
-          className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/20"
+          placeholder={placeholder ?? "Search city..."}
+          className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[#222] bg-[#111] shadow-xl">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-white/30">No cities found</div>
+            <div className="px-3 py-2 text-xs text-[var(--text-dim)]">{noResults ?? "No cities found"}</div>
           ) : (
             filtered.map((c, idx) => (
               <button
                 key={`${c.name}-${idx}`}
                 onClick={() => { onChange(c.name); setOpen(false); setQuery(""); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
-                  c.name === value ? "bg-white/[0.03] text-white" : "text-white/70"
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-[var(--bg-surface)] transition-colors ${
+                  c.name === value ? "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                 }`}
               >
                 <span className="truncate">{c.name}</span>
@@ -1308,6 +1317,11 @@ function CityDropdown({ countryCode, stateCode, value, onChange }: {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function Contacts({ filterType }: { filterType?: ContactType } = {}) {
+  /* ── i18n ── */
+  const { t, lang } = useTranslation(contactsT);
+  /** Translate a dropdown option value. Falls back to the raw value. */
+  const tOpt = (val: string) => t("opt." + val, val);
+
   /* ── State ── */
   const [contacts, setContacts] = useState<ContactRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1494,7 +1508,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           await loadContacts();
           setView("detail");
         } else {
-          setSaveError(error || "Failed to update contact. Check your database RLS policies.");
+          setSaveError(error || t("error.updateFailed"));
         }
       } else {
         const { data: created, error } = await createContact(row);
@@ -1503,11 +1517,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           setSelectedId(created.id);
           setView("detail");
         } else {
-          setSaveError(error || "Failed to create contact. Check your database RLS policies.");
+          setSaveError(error || t("error.createFailed"));
         }
       }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setSaveError(err instanceof Error ? err.message : t("error.unexpected"));
     }
     setSaving(false);
   };
@@ -1668,40 +1682,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   if (setupNeeded) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center p-6">
         <div className="max-w-2xl w-full">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="text-amber-400" size={32} />
             </div>
-            <h1 className="text-2xl font-semibold mb-2">Database Setup Required</h1>
-            <p className="text-white/50 text-sm">
-              The contacts table needs additional columns. Copy the SQL below and run it in your
-              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ml-1">
+            <h1 className="text-2xl font-semibold mb-2">{t("setup.title")}</h1>
+            <p className="text-[var(--text-subtle)] text-sm">
+              {t("setup.desc")}
+              <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline ms-1">
                 Supabase Dashboard
               </a>
               {" "}&rarr; SQL Editor &rarr; New Query.
             </p>
           </div>
 
-          <div className="relative rounded-xl border border-[#222] bg-white/[0.02] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#222] bg-white/[0.03]">
-              <span className="text-xs text-white/40 font-mono">SQL Migration</span>
-              <button onClick={copySql} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors">
-                {copied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy</>}
+          <div className="relative rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-surface-subtle)]">
+              <span className="text-xs text-[var(--text-faint)] font-mono">{t("setup.sqlMigration")}</span>
+              <button onClick={copySql} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] transition-colors">
+                {copied ? <><Check size={12} className="text-green-400" /> {t("btn.copied")}</> : <><Copy size={12} /> {t("btn.copy")}</>}
               </button>
             </div>
-            <pre className="p-4 text-xs text-white/70 font-mono overflow-x-auto max-h-80 overflow-y-auto leading-relaxed">
+            <pre className="p-4 text-xs text-[var(--text-secondary)] font-mono overflow-x-auto max-h-80 overflow-y-auto leading-relaxed">
               {MIGRATION_SQL}
             </pre>
           </div>
 
           <div className="flex items-center justify-center gap-3 mt-6">
-            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
-              Back to Hub
+            <Link href="/" className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+              {t("btn.backToHub")}
             </Link>
-            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-white text-black font-medium hover:bg-white/90 transition-colors">
-              I&apos;ve Run the SQL &mdash; Retry
+            <button onClick={() => { setSetupNeeded(false); loadContacts(); }} className="px-4 py-2 rounded-lg text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] transition-colors">
+              {t("btn.retry")}
             </button>
           </div>
         </div>
@@ -1715,8 +1729,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-[var(--border-focus)] border-t-white rounded-full animate-spin" />
       </div>
     );
   }
@@ -1728,14 +1742,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const renderListPanel = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-[#222]">
+      <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between mb-3">
-          <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm">
-            <ArrowLeft size={16} />
-            <span className="hidden sm:inline">Hub</span>
+          <Link href="/" className="flex items-center gap-2 text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors text-sm">
+            <ArrowLeft size={16} className="rtl:rotate-180" />
+            <span className="hidden sm:inline">{t("hub")}</span>
           </Link>
-          <h1 className="text-lg font-semibold text-white">
-            {filterType ? (filterType === "company" ? "Companies" : filterType === "people" ? "People" : CONTACT_TYPES.find(t => t.value === filterType)?.label + "s") : "Contacts"}
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">
+            {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : filterType === "employee" ? t("tab.employees") : t("tab.customers")) : t("title")}
           </h1>
           <button
             onClick={() => {
@@ -1745,7 +1759,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 setShowTypeChooser(true);
               }
             }}
-            className="w-8 h-8 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:bg-[var(--bg-inverted-hover)] flex items-center justify-center transition-colors"
           >
             <Plus size={16} />
           </button>
@@ -1753,16 +1767,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Search */}
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+          <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
-            placeholder="Search contacts..."
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/30 outline-none focus:border-white/20 transition-colors"
+            className="w-full h-9 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
+            <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]">
               <X size={14} />
             </button>
           )}
@@ -1774,22 +1788,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <button
               onClick={() => setTypeTab("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                typeTab === "all" ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                typeTab === "all" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
-              All ({contacts.length})
+              {t("tab.all")} ({contacts.length})
             </button>
-            {CONTACT_TYPES.map(t => {
-              const count = contacts.filter(c => c.contact_type === t.value).length;
+            {CONTACT_TYPES.map(ct => {
+              const count = contacts.filter(c => c.contact_type === ct.value).length;
               return (
                 <button
-                  key={t.value}
-                  onClick={() => setTypeTab(t.value)}
+                  key={ct.value}
+                  onClick={() => setTypeTab(ct.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-                    typeTab === t.value ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                    typeTab === ct.value ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                 >
-                  {t.icon} {t.value === "company" ? "Companies" : t.value === "people" ? "People" : t.label + "s"} ({count})
+                  {ct.icon} {ct.value === "company" ? t("tab.companies") : ct.value === "people" ? t("tab.people") : ct.value === "supplier" ? t("tab.suppliers") : ct.value === "employee" ? t("tab.employees") : t("tab.customers")} ({count})
                 </button>
               );
             })}
@@ -1801,78 +1815,78 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       <div className="flex-1 overflow-y-auto will-change-scroll">
         {/* Compact KPI strip — mobile only (main dashboard is in right panel on desktop) */}
         {moduleKpis && filterType === "customer" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-white">{moduleKpis.total}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-violet-400">{moduleKpis.vip}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-violet-400/40">VIP</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-violet-400/40">{t("kpi.vip")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">Countries</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">{t("kpi.countries")}</p>
             </div>
           </div>
         )}
         {/* Compact KPI strip — mobile only (supplier variant) */}
         {supplierKpis && filterType === "supplier" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-white">{supplierKpis.total}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{supplierKpis.active}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "—"}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">Rating</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">{t("field.rating")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-orange-400">{supplierKpis.countries}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-orange-400/40">Countries</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-orange-400/40">{t("kpi.countries")}</p>
             </div>
           </div>
         )}
 
         {/* Compact KPI strip — mobile only (employee/company/people) */}
         {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
-          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#222]">
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-white">{moduleKpis.total}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-white/30">Total</p>
+          <div className="md:hidden grid grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-emerald-400">{moduleKpis.active}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">Active</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-emerald-400/40">{t("kpi.active")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-blue-400">{moduleKpis.countries}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">Countries</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-blue-400/40">{t("kpi.countries")}</p>
             </div>
-            <div className="bg-[#0A0A0A] border border-[#222] rounded-lg p-2.5 text-center">
+            <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
-              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">New</p>
+              <p className="text-[8px] font-semibold uppercase tracking-widest text-amber-400/40">{t("kpi.new")}</p>
             </div>
           </div>
         )}
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-white/30 gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-[var(--text-dim)] gap-2">
             <Users size={32} />
-            <p className="text-sm">No contacts found</p>
+            <p className="text-sm">{t("noContactsFound")}</p>
           </div>
         ) : (
           grouped.map(([letter, items]) => (
             <div key={letter}>
-              <div className="px-4 py-1.5 text-xs font-semibold text-white/30 bg-white/[0.02] sticky top-0 backdrop-blur-sm">
+              <div className="px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 backdrop-blur-sm">
                 {letter}
               </div>
               {items.map(c => {
@@ -1882,16 +1896,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <button
                     key={c.id}
                     onClick={() => handleSelectContact(c)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/[0.03] contain-layout ${
-                      isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.03]"
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-start transition-colors border-b border-[var(--border-faint)] contain-layout ${
+                      isSelected ? "bg-[var(--bg-surface)]" : "hover:bg-[var(--bg-surface-subtle)]"
                     }`}
                   >
                     {/* Avatar */}
-                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-white/10 flex items-center justify-center text-sm font-semibold text-white/60 shrink-0 overflow-hidden`}>
+                    <div className={`w-10 h-10 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-lg" : "rounded-full"} bg-[var(--bg-surface-hover)] flex items-center justify-center text-sm font-semibold text-[var(--text-muted)] shrink-0 overflow-hidden`}>
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
-                        <Building2 size={16} className="text-white/30" />
+                        <Building2 size={16} className="text-[var(--text-dim)]" />
                       ) : (
                         getInitials(c)
                       )}
@@ -1900,7 +1914,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white truncate">
+                        <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                           {contactDisplayName(c)}
                         </span>
                         {tierInfo && (
@@ -1911,15 +1925,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] font-medium ${getTypeColor(c.contact_type)}`}>
-                          {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}
+                          {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}
                         </span>
                         {c.company && (
-                          <span className="text-xs text-white/30 truncate">&middot; {c.company}</span>
+                          <span className="text-xs text-[var(--text-dim)] truncate">&middot; {c.company}</span>
                         )}
                       </div>
                     </div>
 
-                    <ChevronRight size={14} className="text-white/20 shrink-0" />
+                    <ChevronRight size={14} className="text-[var(--text-ghost)] shrink-0 rtl:rotate-180" />
                   </button>
                 );
               })}
@@ -1943,117 +1957,117 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
-                <h2 className="text-2xl font-bold text-white">Supplier Overview</h2>
-                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t("type.supplier")} {t("kpi.overview")}</h2>
+                <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
 
               {/* Main KPI Row - 4 cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total Suppliers */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
                       <Building2 size={16} className="text-blue-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-white">{supplierKpis.total}</p>
-                  <p className="text-xs text-white/30 mt-1">All suppliers</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.allSuppliers")}</p>
                 </div>
 
                 {/* Active */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
                       <UserCheck size={16} className="text-emerald-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-emerald-400">{supplierKpis.active}</p>
-                  <p className="text-xs text-white/30 mt-1">{supplierKpis.total > 0 ? Math.round((supplierKpis.active / supplierKpis.total) * 100) : 0}% of total</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{supplierKpis.total > 0 ? Math.round((supplierKpis.active / supplierKpis.total) * 100) : 0}% {t("kpi.ofTotal")}</p>
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-orange-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-orange-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500/10">
                       <Globe size={16} className="text-orange-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400/60">Countries</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400/60">{t("kpi.countries")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-orange-400">{supplierKpis.countries}</p>
-                  <p className="text-xs text-white/30 mt-1">Source countries</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.sourceCountries")}</p>
                 </div>
 
                 {/* Avg Rating */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
                       <Star size={16} className="text-amber-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">Avg Rating</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("kpi.avgRating")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "\u2014"}<span className="text-base text-white/20">/5</span></p>
-                  <p className="text-xs text-white/30 mt-1">{supplierKpis.ratedCount} rated</p>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-400">{supplierKpis.avgRating > 0 ? supplierKpis.avgRating : "\u2014"}<span className="text-base text-[var(--text-ghost)]">/5</span></p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{supplierKpis.ratedCount} {t("kpi.rated")}</p>
                 </div>
               </div>
 
               {/* Supplier Details Grid - 2x2 */}
               <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {/* Catalogues */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <BookOpen size={16} className="text-violet-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Catalogues</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.catalogues")}</span>
                   </div>
                   <p className="text-3xl font-bold text-violet-400">{supplierKpis.withCatalogues}</p>
-                  <p className="text-xs text-white/30 mt-1">Suppliers with catalogues</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.suppliersCatalogues")}</p>
                 </div>
 
                 {/* Contact Persons */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Users size={16} className="text-cyan-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Contacts</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.contacts")}</span>
                   </div>
                   <p className="text-3xl font-bold text-cyan-400">{supplierKpis.withContacts}</p>
-                  <p className="text-xs text-white/30 mt-1">With contact persons</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.withContactPersons")}</p>
                 </div>
 
                 {/* Divisions */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Briefcase size={16} className="text-pink-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Divisions</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.divisions")}</span>
                   </div>
                   <p className="text-3xl font-bold text-pink-400">{supplierKpis.divisions}</p>
-                  <p className="text-xs text-white/30 mt-1">Product divisions</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.productDivisions")}</p>
                 </div>
 
                 {/* Categories */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Package size={16} className="text-teal-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Categories</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.categories")}</span>
                   </div>
                   <p className="text-3xl font-bold text-teal-400">{supplierKpis.categories}</p>
-                  <p className="text-xs text-white/30 mt-1">Product categories</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.productCategories")}</p>
                 </div>
               </div>
 
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.active")}</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{supplierKpis.active}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.inactive")}</span>
                   </div>
                   <p className="text-3xl font-bold text-red-400">{supplierKpis.total - supplierKpis.active}</p>
                 </div>
@@ -2061,19 +2075,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* New This Month */}
               {supplierKpis.newThisMonth > 0 && (
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{supplierKpis.newThisMonth}</p>
-                    <p className="text-xs text-white/40">New suppliers this month</p>
+                    <p className="text-xs text-[var(--text-faint)]">{t("kpi.newSuppliersMonth")}</p>
                   </div>
                 </div>
               )}
 
               {/* Hint */}
-              <p className="text-xs text-white/20 text-center pt-2">Select a supplier from the list to view details</p>
+              <p className="text-xs text-[var(--text-ghost)] text-center pt-2">{t("kpi.selectSupplier")}</p>
             </div>
           </div>
         );
@@ -2095,81 +2109,81 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               {/* Title */}
               <div>
-                <h2 className="text-2xl font-bold text-white">Customer Overview</h2>
-                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t("type.customer")} {t("kpi.overview")}</h2>
+                <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
 
               {/* Main KPI Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Total */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
                       <Crown size={16} className="text-amber-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-white">{moduleKpis.total}</p>
-                  <p className="text-xs text-white/30 mt-1">All customers</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.allCustomers")}</p>
                 </div>
 
                 {/* Active */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
                       <UserCheck size={16} className="text-emerald-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
-                  <p className="text-xs text-white/30 mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% of total</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% {t("kpi.ofTotal")}</p>
                 </div>
 
                 {/* VIP */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-violet-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-violet-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/10">
                       <Gem size={16} className="text-violet-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">VIP</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">{t("kpi.vip")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-violet-400">{moduleKpis.vip}</p>
-                  <p className="text-xs text-white/30 mt-1">Diamond & Platinum</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.diamondPlatinum")}</p>
                 </div>
 
                 {/* Countries */}
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
                       <MapPinned size={16} className="text-blue-400" />
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">Countries</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
-                  <p className="text-xs text-white/30 mt-1">Global reach</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.globalReach")}</p>
                 </div>
               </div>
 
               {/* Tier Breakdown */}
-              <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
-                <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Customer Tiers</h3>
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
+                <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4">{t("kpi.customerTiers")}</h3>
                 <div className="space-y-3">
                   {[
-                    { label: "Diamond", count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-300" },
-                    { label: "Platinum", count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-300" },
-                    { label: "Gold", count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-300" },
-                    { label: "Silver", count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-300" },
-                    { label: "End User", count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-300" },
+                    { key: "diamond", label: t("tier.diamond"), count: tierCounts.diamond, color: "bg-violet-500", textColor: "text-violet-300" },
+                    { key: "platinum", label: t("tier.platinum"), count: tierCounts.platinum, color: "bg-cyan-500", textColor: "text-cyan-300" },
+                    { key: "gold", label: t("tier.gold"), count: tierCounts.gold, color: "bg-amber-500", textColor: "text-amber-300" },
+                    { key: "silver", label: t("tier.silver"), count: tierCounts.silver, color: "bg-slate-400", textColor: "text-slate-300" },
+                    { key: "end_user", label: t("tier.end_user"), count: tierCounts.end_user, color: "bg-zinc-500", textColor: "text-zinc-300" },
                   ].map(tier => (
-                    <div key={tier.label} className="flex items-center gap-3">
+                    <div key={tier.key} className="flex items-center gap-3">
                       <span className={`text-xs font-medium w-20 ${tier.textColor}`}>{tier.label}</span>
-                      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                         <div
                           className={`h-full ${tier.color} rounded-full transition-all duration-500`}
                           style={{ width: moduleKpis.total > 0 ? `${(tier.count / moduleKpis.total) * 100}%` : "0%" }}
                         />
                       </div>
-                      <span className="text-xs font-semibold text-white/60 w-8 text-right">{tier.count}</span>
+                      <span className="text-xs font-semibold text-[var(--text-muted)] w-8 text-end">{tier.count}</span>
                     </div>
                   ))}
                 </div>
@@ -2177,17 +2191,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.active")}</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.inactive")}</span>
                   </div>
                   <p className="text-3xl font-bold text-red-400">{inactive}</p>
                 </div>
@@ -2195,19 +2209,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
               {/* New This Month */}
               {moduleKpis.newThisMonth > 0 && (
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
-                    <p className="text-xs text-white/40">New customers this month</p>
+                    <p className="text-xs text-[var(--text-faint)]">{t("kpi.newCustomersMonth")}</p>
                   </div>
                 </div>
               )}
 
               {/* Hint */}
-              <p className="text-xs text-white/20 text-center pt-2">Select a customer from the list to view details</p>
+              <p className="text-xs text-[var(--text-ghost)] text-center pt-2">{t("kpi.selectCustomer")}</p>
             </div>
           </div>
         );
@@ -2215,87 +2229,86 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       /* ── Generic KPI Dashboard (Employee / Company / People) ── */
       if (filterType && moduleKpis) {
-        const typeLabel = filterType === "company" ? "Company" : filterType === "people" ? "People" : filterType === "employee" ? "Employee" : filterType.charAt(0).toUpperCase() + filterType.slice(1);
+        const typeLabel = t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1));
         const typeIcon = filterType === "employee" ? <BadgeCheck size={16} className="text-teal-400" /> : filterType === "company" ? <Briefcase size={16} className="text-purple-400" /> : <User size={16} className="text-green-400" />;
         const accentColor = filterType === "employee" ? "teal" : filterType === "company" ? "purple" : "green";
         return (
           <div className="h-full overflow-y-auto">
             <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
               <div>
-                <h2 className="text-2xl font-bold text-white">{typeLabel} Overview</h2>
-                <p className="text-sm text-white/40 mt-1">Key metrics and insights</p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{typeLabel} {t("kpi.overview")}</h2>
+                <p className="text-sm text-[var(--text-faint)] mt-1">{t("kpi.keyMetrics")}</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-white/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-${accentColor}-500/10`}>{typeIcon}</div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Total</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
-                  <p className="text-2xl md:text-3xl font-bold text-white">{moduleKpis.total}</p>
-                  <p className="text-xs text-white/30 mt-1">All {typeLabel.toLowerCase()}s</p>
+                  <p className="text-2xl md:text-3xl font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10"><UserCheck size={16} className="text-emerald-400" /></div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">Active</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
-                  <p className="text-xs text-white/30 mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% of total</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{moduleKpis.total > 0 ? Math.round((moduleKpis.active / moduleKpis.total) * 100) : 0}% {t("kpi.ofTotal")}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10"><MapPinned size={16} className="text-blue-400" /></div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">Countries</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
-                  <p className="text-xs text-white/30 mt-1">Global reach</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.globalReach")}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10"><TrendingUp size={16} className="text-amber-400" /></div>
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">New</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("kpi.new")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
-                  <p className="text-xs text-white/30 mt-1">Added this month</p>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">{t("kpi.addedThisMonth")}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Active</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.active")}</span>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
                 </div>
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Inactive</span>
+                    <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.inactive")}</span>
                   </div>
                   <p className="text-3xl font-bold text-red-400">{moduleKpis.total - moduleKpis.active}</p>
                 </div>
               </div>
               {moduleKpis.newThisMonth > 0 && (
-                <div className="bg-[#111] border border-[#222] rounded-xl p-3 md:p-5 flex items-center gap-4">
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
                     <TrendingUp size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
-                    <p className="text-xs text-white/40">New {typeLabel.toLowerCase()}s this month</p>
+                    <p className="text-xs text-[var(--text-faint)]">{t("kpi.addedThisMonth")}</p>
                   </div>
                 </div>
               )}
-              <p className="text-xs text-white/20 text-center pt-2">Select a {typeLabel.toLowerCase()} from the list to view details</p>
+              <p className="text-xs text-[var(--text-ghost)] text-center pt-2">{t("selectContact")}</p>
             </div>
           </div>
         );
       }
 
       return (
-        <div className="flex flex-col items-center justify-center h-full text-white/20 gap-3">
+        <div className="flex flex-col items-center justify-center h-full text-[var(--text-ghost)] gap-3">
           <User size={48} />
-          <p className="text-sm">Select a contact to view details</p>
+          <p className="text-sm">{t("selectContact")}</p>
         </div>
       );
     }
@@ -2311,39 +2324,39 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const related: RelatedName[] = Array.isArray(c.related_names) ? c.related_names : [];
     const customs: CustomField[] = Array.isArray(c.custom_fields) ? c.custom_fields : [];
 
-    const backLabel = filterType ? filterType.charAt(0).toUpperCase() + filterType.slice(1) + " Overview" : "Contacts";
+    const backLabel = filterType ? t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1)) + " " + t("kpi.overview") : t("title");
 
     return (
       <div className="h-full overflow-y-auto">
         {/* Back button */}
-        <div className="px-4 py-3 border-b border-[#222]">
-          <button onClick={handleBack} className="flex items-center gap-2 text-white/60 hover:text-white text-sm transition-colors">
-            <ArrowLeft size={16} /> {backLabel}
+        <div className="px-4 py-3 border-b border-[var(--border-color)]">
+          <button onClick={handleBack} className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
+            <ArrowLeft size={16} className="rtl:rotate-180" /> {backLabel}
           </button>
         </div>
 
         {/* Header card */}
-        <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[#222]">
-          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-white/10 flex items-center justify-center text-2xl font-bold text-white/50 mx-auto mb-4 overflow-hidden`}>
+        <div className="px-4 md:px-6 py-6 md:py-8 text-center border-b border-[var(--border-color)]">
+          <div className={`w-24 h-24 ${c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? "rounded-2xl" : "rounded-full"} bg-[var(--bg-surface-hover)] flex items-center justify-center text-2xl font-bold text-[var(--text-subtle)] mx-auto mb-4 overflow-hidden`}>
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
-              <Building2 size={32} className="text-white/20" />
+              <Building2 size={32} className="text-[var(--text-ghost)]" />
             ) : (
               getInitials(c)
             )}
           </div>
-          <h2 className="text-xl font-semibold text-white">{contactDisplayName(c)}</h2>
-          {c.contact_type === "supplier" && c.company_name_cn && <p className="text-sm text-white/40 mt-0.5">{c.company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-white/50 mt-1">{c.position}</p>}
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{contactDisplayName(c)}</h2>
+          {c.contact_type === "supplier" && c.company_name_cn && <p className="text-sm text-[var(--text-faint)] mt-0.5">{c.company_name_cn}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-[var(--text-subtle)] mt-1">{c.position}</p>}
           {c.contact_type === "employee" && (c.job_position || c.department) && (
-            <p className="text-sm text-white/40">{[c.job_position, c.department].filter(Boolean).join(" \u00B7 ")}</p>
+            <p className="text-sm text-[var(--text-faint)]">{[c.job_position, c.department].filter(Boolean).join(" \u00B7 ")}</p>
           )}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-white/40">{c.company}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-[var(--text-faint)]">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[#222] ${getTypeColor(c.contact_type)}`}>
-              {c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1)}{c.contact_type === "customer" && c.entity_type === "company" ? " · Business" : c.contact_type === "customer" && c.entity_type === "person" ? " · Individual" : ""}
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[var(--border-color)] ${getTypeColor(c.contact_type)}`}>
+              {t("type." + c.contact_type, c.contact_type?.charAt(0).toUpperCase() + c.contact_type?.slice(1))}{c.contact_type === "customer" && c.entity_type === "company" ? " · " + t("entity.business") : c.contact_type === "customer" && c.entity_type === "person" ? " · " + t("entity.individual") : ""}
             </span>
             {tierInfo && (
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${tierInfo.bg} ${tierInfo.color}`}>
@@ -2352,64 +2365,64 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             )}
             {!c.is_active && (
               <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-500/20 text-red-400">
-                Inactive
+                {t("kpi.inactive")}
               </span>
             )}
           </div>
 
           {/* Action buttons */}
           <div className="flex items-center justify-center gap-2 mt-5">
-            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/5 border border-[#222] hover:bg-white/10 text-sm transition-colors">
-              <Edit3 size={14} /> Edit
+            <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors">
+              <Edit3 size={14} /> {t("btn.edit")}
             </button>
             <button
               onClick={() => setDeleteConfirm(c.id)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
             >
-              <Trash2 size={14} /> Delete
+              <Trash2 size={14} /> {t("btn.delete")}
             </button>
           </div>
         </div>
 
         {/* Phone numbers (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (phones.length > 0 || c.phone) && (
-          <Section title="Phone" icon={<Phone size={14} />}>
+          <Section title={t("detail.phone")} icon={<Phone size={14} />}>
             {phones.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5">
                 <div>
                   <span className="text-xs text-blue-400 font-medium">{p.label}</span>
-                  <p className="text-sm text-white">{p.number}</p>
+                  <p className="text-sm text-[var(--text-primary)]">{p.number}</p>
                 </div>
               </div>
             ))}
             {phones.length === 0 && c.phone && (
-              <p className="text-sm text-white">{c.phone}</p>
+              <p className="text-sm text-[var(--text-primary)]">{c.phone}</p>
             )}
           </Section>
         )}
 
         {/* Emails (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (emails.length > 0 || c.email) && (
-          <Section title="Email" icon={<Mail size={14} />}>
+          <Section title={t("detail.email")} icon={<Mail size={14} />}>
             {emails.map((e, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{e.label}</span>
-                <p className="text-sm text-white">{e.email}</p>
+                <p className="text-sm text-[var(--text-primary)]">{e.email}</p>
               </div>
             ))}
             {emails.length === 0 && c.email && (
-              <p className="text-sm text-white">{c.email}</p>
+              <p className="text-sm text-[var(--text-primary)]">{c.email}</p>
             )}
           </Section>
         )}
 
         {/* Addresses (hidden for suppliers) */}
         {c.contact_type !== "supplier" && addresses.length > 0 && (
-          <Section title="Address" icon={<MapPin size={14} />}>
+          <Section title={t("detail.address")} icon={<MapPin size={14} />}>
             {addresses.map((a, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{a.label}</span>
-                <p className="text-sm text-white">
+                <p className="text-sm text-[var(--text-primary)]">
                   {[a.street, a.city, a.state, a.zip, a.country].filter(Boolean).join(", ")}
                 </p>
               </div>
@@ -2419,10 +2432,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Country / Province / City (hidden for suppliers - shown in Contact Details) */}
         {c.contact_type !== "supplier" && (c.country || c.province || c.city) && (
-          <Section title="Location" icon={<MapPin size={14} />}>
+          <Section title={t("section.location")} icon={<MapPin size={14} />}>
             <div className="flex items-center gap-2">
               {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
-              <p className="text-sm text-white">
+              <p className="text-sm text-[var(--text-primary)]">
                 {[c.city, c.province, c.country].filter(Boolean).join(", ")}
               </p>
             </div>
@@ -2431,7 +2444,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (websitesList.length > 0 || c.website) && (
-          <Section title="Website" icon={<Globe size={14} />}>
+          <Section title={t("detail.website")} icon={<Globe size={14} />}>
             {websitesList.map((w, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{w.label}</span>
@@ -2446,22 +2459,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
         {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.birthday && (
-          <Section title="Birthday" icon={<Calendar size={14} />}>
-            <p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+          <Section title={t("section.birthday")} icon={<Calendar size={14} />}>
+            <p className="text-sm text-[var(--text-primary)]">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
         )}
 
         {/* Social Profiles (hidden for company customers) */}
         {!(c.contact_type === "customer" && c.entity_type === "company") && socials.length > 0 && (
-          <Section title="Social Profiles" icon={<Share2 size={14} />}>
+          <Section title={t("section.socialProfiles")} icon={<Share2 size={14} />}>
             {socials.map((s, i) => (
               <div key={i} className="flex items-center gap-3 py-2">
                 <div className="flex-1">
                   <span className="text-xs text-blue-400 font-medium">{s.platform}</span>
-                  <p className="text-sm text-white">{s.username || s.url}</p>
+                  <p className="text-sm text-[var(--text-primary)]">{s.username || s.url}</p>
                 </div>
                 {s.qr_code_url && (
-                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-[#222]" loading="lazy" decoding="async" />
+                  <img src={s.qr_code_url} alt="QR" className="w-10 h-10 rounded border border-[var(--border-color)]" loading="lazy" decoding="async" />
                 )}
               </div>
             ))}
@@ -2470,22 +2483,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Related People (hidden for suppliers, company customers, and company type) */}
         {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && family.length > 0 && (
-          <Section title="Related People" icon={<Users size={14} />}>
+          <Section title={t("section.relatedPeople")} icon={<Users size={14} />}>
             {family.map((f, i) => (
-              <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+              <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)] overflow-hidden">
                     {f.photo_url ? <img src={f.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : (f.first_name?.[0] || "?").toUpperCase()}
                   </div>
                   <div>
                     <span className="text-xs text-blue-400 font-medium">{f.relationship}</span>
-                    <p className="text-sm text-white">{[f.title, f.first_name, f.middle_name, f.last_name].filter(Boolean).join(" ")}</p>
+                    <p className="text-sm text-[var(--text-primary)]">{[f.title, f.first_name, f.middle_name, f.last_name].filter(Boolean).join(" ")}</p>
                   </div>
                 </div>
                 {(f.phone || f.email) && (
-                  <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
-                    {f.phone && <p>Phone: {f.phone}</p>}
-                    {f.email && <p>Email: {f.email}</p>}
+                  <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
+                    {f.phone && <p>{t("detail.phone")}: {f.phone}</p>}
+                    {f.email && <p>{t("detail.email")}: {f.email}</p>}
                   </div>
                 )}
               </div>
@@ -2495,18 +2508,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Business Card (customers only) */}
         {c.contact_type === "customer" && (c.business_card_front || c.business_card_back) && (
-          <Section title="Business Card" icon={<CreditCard size={14} />}>
+          <Section title={t("section.businessCard")} icon={<CreditCard size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               {c.business_card_front && (
                 <div>
-                  <span className="text-xs text-white/40 mb-1.5 block">Front</span>
-                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[#222]" loading="lazy" decoding="async" />
+                  <span className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.front")}</span>
+                  <img src={c.business_card_front!} alt="Business Card Front" className="w-full rounded-lg border border-[var(--border-color)]" loading="lazy" decoding="async" />
                 </div>
               )}
               {c.business_card_back && (
                 <div>
-                  <span className="text-xs text-white/40 mb-1.5 block">Back</span>
-                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[#222]" loading="lazy" decoding="async" />
+                  <span className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.back")}</span>
+                  <img src={c.business_card_back!} alt="Business Card Back" className="w-full rounded-lg border border-[var(--border-color)]" loading="lazy" decoding="async" />
                 </div>
               )}
             </div>
@@ -2515,24 +2528,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Customer: Company Info ── */}
         {c.contact_type === "customer" && c.entity_type === "company" && (c.company || c.industry || c.tax_id) && (
-          <Section title="Company Info" icon={<Building2 size={14} />}>
+          <Section title={t("section.companyInfo")} icon={<Building2 size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name</span>
-                  <p className="text-sm text-white font-medium">{c.company}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.companyName")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-medium">{c.company}</p>
                 </div>
               )}
               {c.industry && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
-                  <p className="text-sm text-white">{c.industry}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.industry")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.industry}</p>
                 </div>
               )}
               {c.tax_id && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Reg. No.</span>
-                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.taxId")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-mono">{c.tax_id}</p>
                 </div>
               )}
             </div>
@@ -2541,30 +2554,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Customer: Contact Persons ── */}
         {c.contact_type === "customer" && c.entity_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title="Contact Persons" icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
-                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                    <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
                       <div className="flex items-center gap-2">
-                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
-                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                        {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
                       </div>
                     </div>
                   </div>
                   {(cp.phone || cp.mobile || cp.email) && (
-                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
-                      {cp.phone && <p>Tel: {cp.phone}</p>}
-                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
-                      {cp.email && <p>Email: {cp.email}</p>}
+                    <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
+                      {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
+                      {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
+                      {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
                     </div>
                   )}
-                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                  {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
                 </div>
               ))}
             </div>
@@ -2573,36 +2586,36 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Type: Company Info ── */}
         {c.contact_type === "company" && (c.company || c.industry || c.tax_id || c.source || c.language) && (
-          <Section title="Company Info" icon={<Building2 size={14} />}>
+          <Section title={t("section.companyInfo")} icon={<Building2 size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Company Name</span>
-                  <p className="text-sm text-white font-medium">{c.company}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.companyName")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-medium">{c.company}</p>
                 </div>
               )}
               {c.industry && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
-                  <p className="text-sm text-white">{c.industry}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.industry")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.industry}</p>
                 </div>
               )}
               {c.tax_id && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Registration</span>
-                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.taxId")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-mono">{c.tax_id}</p>
                 </div>
               )}
               {c.source && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
-                  <p className="text-sm text-white">{c.source}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.source")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.source}</p>
                 </div>
               )}
               {c.language && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Language</span>
-                  <p className="text-sm text-white">{c.language}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.language")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.language}</p>
                 </div>
               )}
             </div>
@@ -2611,30 +2624,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Type: Contact Persons ── */}
         {c.contact_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title="Contact Persons" icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
-                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                    <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
                       <div className="flex items-center gap-2">
-                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
-                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                        {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
                       </div>
                     </div>
                   </div>
                   {(cp.phone || cp.mobile || cp.email) && (
-                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
-                      {cp.phone && <p>Tel: {cp.phone}</p>}
-                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
-                      {cp.email && <p>Email: {cp.email}</p>}
+                    <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
+                      {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
+                      {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
+                      {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
                     </div>
                   )}
-                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                  {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
                 </div>
               ))}
             </div>
@@ -2643,42 +2656,42 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only) ── */}
         {c.contact_type === "customer" && (c.total_revenue || c.outstanding_balance || c.credit_limit || c.payment_terms || c.currency || c.last_order_date) && (
-          <Section title="Financial & Business" icon={<DollarSign size={14} />}>
+          <Section title={t("section.financialBusiness")} icon={<DollarSign size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.total_revenue && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Total Revenue</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.totalRevenue")}</span>
                   <p className="text-sm text-emerald-400 font-semibold">{c.currency || "USD"} {Number(c.total_revenue).toLocaleString()}</p>
                 </div>
               )}
               {c.outstanding_balance && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Outstanding</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.outstanding")}</span>
                   <p className="text-sm text-amber-400 font-semibold">{c.currency || "USD"} {Number(c.outstanding_balance).toLocaleString()}</p>
                 </div>
               )}
               {c.credit_limit && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Credit Limit</span>
-                  <p className="text-sm text-white">{c.currency || "USD"} {Number(c.credit_limit).toLocaleString()}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.creditLimit")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.currency || "USD"} {Number(c.credit_limit).toLocaleString()}</p>
                 </div>
               )}
               {c.payment_terms && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Payment Terms</span>
-                  <p className="text-sm text-white">{c.payment_terms}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.paymentTerms")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.payment_terms}</p>
                 </div>
               )}
               {c.currency && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Currency</span>
-                  <p className="text-sm text-white">{c.currency}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.currency")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.currency}</p>
                 </div>
               )}
               {c.last_order_date && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Last Order</span>
-                  <p className="text-sm text-white">{new Date(c.last_order_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.lastOrder")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{new Date(c.last_order_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
                 </div>
               )}
             </div>
@@ -2687,33 +2700,33 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only) ── */}
         {c.contact_type === "customer" && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
-          <Section title="Classification" icon={<Tag size={14} />}>
+          <Section title={t("section.classification")} icon={<Tag size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.industry && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
-                  <p className="text-sm text-white">{c.industry}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.industry")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.industry}</p>
                 </div>
               )}
               {c.source && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
-                  <p className="text-sm text-white">{c.source}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.source")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.source}</p>
                 </div>
               )}
               {c.account_manager && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Account Manager</span>
-                  <p className="text-sm text-white">{c.account_manager}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.accountManager")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.account_manager}</p>
                 </div>
               )}
             </div>
             {Array.isArray(c.tags) && c.tags.length > 0 && (
               <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Tags</span>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.tags")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {c.tags.map((tag: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">{tag}</span>
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">{tag}</span>
                   ))}
                 </div>
               </div>
@@ -2723,36 +2736,36 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Relationship & Activity ── */}
         {c.contact_type === "customer" && (c.first_contact_date || c.last_contacted || c.follow_up_date || c.communication_preference || c.language) && (
-          <Section title="Relationship & Activity" icon={<Clock size={14} />}>
+          <Section title={t("section.relationshipActivity")} icon={<Clock size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.first_contact_date && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">First Contact</span>
-                  <p className="text-sm text-white">{new Date(c.first_contact_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.firstContact")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{new Date(c.first_contact_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
                 </div>
               )}
               {c.last_contacted && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Last Contacted</span>
-                  <p className="text-sm text-white">{new Date(c.last_contacted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.lastContacted")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{new Date(c.last_contacted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
                 </div>
               )}
               {c.follow_up_date && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Follow-up Date</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.followUpDate")}</span>
                   <p className={`text-sm font-medium ${new Date(c.follow_up_date) < new Date() ? "text-red-400" : "text-blue-400"}`}>{new Date(c.follow_up_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
                 </div>
               )}
               {c.communication_preference && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Prefers</span>
-                  <p className="text-sm text-white">{c.communication_preference}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.prefers")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.communication_preference}</p>
                 </div>
               )}
               {c.language && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Language</span>
-                  <p className="text-sm text-white">{c.language}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.language")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.language}</p>
                 </div>
               )}
             </div>
@@ -2761,34 +2774,34 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade-Specific (customer only) ── */}
         {c.contact_type === "customer" && (c.preferred_shipping || c.tax_id || c.incoterms || (Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0)) && (
-          <Section title="Trade & Shipping" icon={<Ship size={14} />}>
+          <Section title={t("section.tradeShipping")} icon={<Ship size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.preferred_shipping && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Shipping Method</span>
-                  <p className="text-sm text-white">{c.preferred_shipping}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.shippingMethod")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.preferred_shipping}</p>
                 </div>
               )}
               {c.incoterms && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Incoterms</span>
-                  <p className="text-sm text-white font-mono">{c.incoterms}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.incoterms")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-mono">{c.incoterms}</p>
                 </div>
               )}
               {c.tax_id && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tax ID / Import License</span>
-                  <p className="text-sm text-white font-mono">{c.tax_id}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.taxIdImport")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-mono">{c.tax_id}</p>
                 </div>
               )}
             </div>
             {Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0 && (
               <div className="mt-3 space-y-2">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block">Shipping Addresses</span>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block">{t("field.shippingAddresses")}</span>
                 {c.shipping_addresses.map((a: AddressEntry, i: number) => (
                   <div key={i} className="py-1.5">
                     <span className="text-xs text-blue-400 font-medium">{a.label}</span>
-                    <p className="text-sm text-white">{[a.street, a.city, a.state, a.zip, a.country].filter(Boolean).join(", ")}</p>
+                    <p className="text-sm text-[var(--text-primary)]">{[a.street, a.city, a.state, a.zip, a.country].filter(Boolean).join(", ")}</p>
                   </div>
                 ))}
               </div>
@@ -2798,14 +2811,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Attachments (hidden for suppliers) ── */}
         {c.contact_type !== "supplier" && Array.isArray(c.attachments) && c.attachments.length > 0 && (
-          <Section title="Documents" icon={<Paperclip size={14} />}>
+          <Section title={t("section.documents")} icon={<Paperclip size={14} />}>
             <div className="space-y-2">
               {c.attachments.map((a: Attachment, i: number) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   <FileCheck size={16} className="text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{a.name}</p>
-                    <p className="text-[10px] text-white/30">{a.type} &middot; {a.uploaded_at ? new Date(a.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+                    <p className="text-sm text-[var(--text-primary)] truncate">{a.name}</p>
+                    <p className="text-[10px] text-[var(--text-dim)]">{a.type} &middot; {a.uploaded_at ? new Date(a.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
                 </div>
               ))}
@@ -2815,29 +2828,29 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 1. Company Name ── */}
         {c.contact_type === "supplier" && (
-          <Section title="Company Name" icon={<Building2 size={14} />}>
+          <Section title={t("section.companyName")} icon={<Building2 size={14} />}>
             <div className="space-y-2">
               {c.company_name_en && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">English</span>
-                  <p className="text-sm text-white font-medium">{c.company_name_en}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.english")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-medium">{c.company_name_en}</p>
                 </div>
               )}
               {c.company_name_cn && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Chinese</span>
-                  <p className="text-sm text-white font-medium">{c.company_name_cn}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.chinese")}</span>
+                  <p className="text-sm text-[var(--text-primary)] font-medium">{c.company_name_cn}</p>
                 </div>
               )}
             </div>
             {Array.isArray(c.additional_company_names) && c.additional_company_names.length > 0 && (
               <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Other Names</span>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.otherNames")}</span>
                 <div className="space-y-1">
                   {c.additional_company_names.map((entry: { language: string; name: string }, i: number) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="text-[10px] text-blue-400 font-medium min-w-[60px]">{entry.language}</span>
-                      <span className="text-sm text-white">{entry.name}</span>
+                      <span className="text-sm text-[var(--text-primary)]">{entry.name}</span>
                     </div>
                   ))}
                 </div>
@@ -2848,43 +2861,43 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 2. Contact Details ── */}
         {c.contact_type === "supplier" && (c.supplier_tel || c.supplier_mobile || c.supplier_email || c.supplier_website || c.supplier_address || c.country) && (
-          <Section title="Contact Details" icon={<Phone size={14} />}>
+          <Section title={t("section.contactDetails")} icon={<Phone size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.supplier_tel && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Tel</span>
-                  <p className="text-sm text-white">{c.supplier_tel}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.tel")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.supplier_tel}</p>
                 </div>
               )}
               {c.supplier_mobile && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Mobile</span>
-                  <p className="text-sm text-white">{c.supplier_mobile}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.mobile")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.supplier_mobile}</p>
                 </div>
               )}
               {c.supplier_email && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Email</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.email")}</span>
                   <p className="text-sm text-blue-400">{c.supplier_email}</p>
                 </div>
               )}
               {c.supplier_website && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Website</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.website")}</span>
                   <p className="text-sm text-blue-400 hover:underline cursor-pointer" onClick={() => window.open(c.supplier_website!.startsWith("http") ? c.supplier_website! : "https://" + c.supplier_website!, "_blank")}>{c.supplier_website}</p>
                 </div>
               )}
               {c.supplier_address && (
                 <div className="col-span-2">
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Address</span>
-                  <p className="text-sm text-white">{c.supplier_address}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.address")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.supplier_address}</p>
                 </div>
               )}
             </div>
             {(c.country || c.province || c.city) && (
               <div className="mt-3 flex items-center gap-2">
                 {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
-                <p className="text-sm text-white">{[c.city, c.province, c.country].filter(Boolean).join(", ")}</p>
+                <p className="text-sm text-[var(--text-primary)]">{[c.city, c.province, c.country].filter(Boolean).join(", ")}</p>
               </div>
             )}
           </Section>
@@ -2892,30 +2905,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 3. Contact Persons ── */}
         {c.contact_type === "supplier" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title="Contact Persons" icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
-                <div key={i} className="py-2 border-b border-white/[0.03] last:border-0">
+                <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/50">
+                    <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-hover)] flex items-center justify-center text-xs font-semibold text-[var(--text-subtle)]">
                       {(cp.name?.[0] || "?").toUpperCase()}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-white font-medium">{cp.name}</p>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">{cp.name}</p>
                       <div className="flex items-center gap-2">
-                        {cp.position && <span className="text-xs text-white/40">{cp.position}</span>}
-                        {cp.department && <span className="text-xs text-white/30">{cp.position ? " · " : ""}{cp.department}</span>}
+                        {cp.position && <span className="text-xs text-[var(--text-faint)]">{cp.position}</span>}
+                        {cp.department && <span className="text-xs text-[var(--text-dim)]">{cp.position ? " · " : ""}{cp.department}</span>}
                       </div>
                     </div>
                   </div>
                   {(cp.phone || cp.mobile || cp.email) && (
-                    <div className="ml-11 mt-1 text-xs text-white/40 space-y-0.5">
-                      {cp.phone && <p>Tel: {cp.phone}</p>}
-                      {cp.mobile && <p>Mobile: {cp.mobile}</p>}
-                      {cp.email && <p>Email: {cp.email}</p>}
+                    <div className="ms-11 mt-1 text-xs text-[var(--text-faint)] space-y-0.5">
+                      {cp.phone && <p>{t("detail.tel")}: {cp.phone}</p>}
+                      {cp.mobile && <p>{t("detail.mobile")}: {cp.mobile}</p>}
+                      {cp.email && <p>{t("detail.email")}: {cp.email}</p>}
                     </div>
                   )}
-                  {cp.notes && <p className="ml-11 mt-1 text-xs text-white/30">{cp.notes}</p>}
+                  {cp.notes && <p className="ms-11 mt-1 text-xs text-[var(--text-dim)]">{cp.notes}</p>}
                 </div>
               ))}
             </div>
@@ -2924,13 +2937,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 4. Company Profile ── */}
         {c.contact_type === "supplier" && (c.supplier_type || c.industry || c.source || c.division || c.category || (Array.isArray(c.brand_names) && c.brand_names.length > 0)) && (
-          <Section title="Company Profile" icon={<Briefcase size={14} />}>
+          <Section title={t("section.companyProfile")} icon={<Briefcase size={14} />}>
             {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
               <div className="mb-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Brands</span>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("detail.brands")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {c.brand_names.map((b: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">{b}</span>
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">{b}</span>
                   ))}
                 </div>
               </div>
@@ -2938,32 +2951,32 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.division && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Division</span>
-                  <p className="text-sm text-white">{c.division}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.division")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.division}</p>
                 </div>
               )}
               {c.category && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Category</span>
-                  <p className="text-sm text-white">{c.category}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.category")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.category}</p>
                 </div>
               )}
               {c.supplier_type && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Supplier Type</span>
-                  <p className="text-sm text-white">{c.supplier_type}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.supplierType")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.supplier_type}</p>
                 </div>
               )}
               {c.industry && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Industry</span>
-                  <p className="text-sm text-white">{c.industry}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.industry")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.industry}</p>
                 </div>
               )}
               {c.source && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Source</span>
-                  <p className="text-sm text-white">{c.source}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.source")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.source}</p>
                 </div>
               )}
             </div>
@@ -2972,25 +2985,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 5. Payment & Currency ── */}
         {c.contact_type === "supplier" && (c.payment_terms || c.currency || c.payment_info) && (
-          <Section title="Payment & Currency" icon={<DollarSign size={14} />}>
+          <Section title={t("section.paymentCurrency")} icon={<DollarSign size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.payment_terms && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Payment Terms</span>
-                  <p className="text-sm text-white">{c.payment_terms}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.paymentTerms")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.payment_terms}</p>
                 </div>
               )}
               {c.currency && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Currency</span>
-                  <p className="text-sm text-white">{c.currency}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.currency")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.currency}</p>
                 </div>
               )}
             </div>
             {c.payment_info && (
               <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1">Payment Information</span>
-                <p className="text-sm text-white/60 whitespace-pre-wrap">{c.payment_info}</p>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">{t("field.paymentInfo")}</span>
+                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">{c.payment_info}</p>
               </div>
             )}
           </Section>
@@ -2998,44 +3011,44 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 6. Bank Accounts ── */}
         {c.contact_type === "supplier" && Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0 && (
-          <Section title="Bank Accounts" icon={<Landmark size={14} />}>
+          <Section title={t("section.bankAccounts")} icon={<Landmark size={14} />}>
             <div className="space-y-3">
               {c.bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
-                <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   <div className="flex items-center gap-2 mb-2">
                     <Landmark size={14} className="text-blue-400" />
-                    <span className="text-sm text-white font-medium">{bank.bank_name || "Bank " + (i + 1)}</span>
-                    {bank.currency && <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 font-medium ml-auto">{bank.currency}</span>}
+                    <span className="text-sm text-[var(--text-primary)] font-medium">{bank.bank_name || "Bank " + (i + 1)}</span>
+                    {bank.currency && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{bank.currency}</span>}
                   </div>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 ml-5">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 ms-5">
                     {bank.account_name && (
                       <div>
-                        <span className="text-[10px] text-white/30">Account Name</span>
-                        <p className="text-xs text-white">{bank.account_name}</p>
+                        <span className="text-[10px] text-[var(--text-dim)]">{t("field.accountName")}</span>
+                        <p className="text-xs text-[var(--text-primary)]">{bank.account_name}</p>
                       </div>
                     )}
                     {bank.account_number && (
                       <div>
-                        <span className="text-[10px] text-white/30">Account Number</span>
-                        <p className="text-xs text-white font-mono">{bank.account_number}</p>
+                        <span className="text-[10px] text-[var(--text-dim)]">{t("field.accountNumber")}</span>
+                        <p className="text-xs text-[var(--text-primary)] font-mono">{bank.account_number}</p>
                       </div>
                     )}
                     {bank.swift_code && (
                       <div>
-                        <span className="text-[10px] text-white/30">SWIFT / BIC</span>
-                        <p className="text-xs text-white font-mono">{bank.swift_code}</p>
+                        <span className="text-[10px] text-[var(--text-dim)]">SWIFT / BIC</span>
+                        <p className="text-xs text-[var(--text-primary)] font-mono">{bank.swift_code}</p>
                       </div>
                     )}
                     {bank.iban && (
                       <div>
-                        <span className="text-[10px] text-white/30">IBAN</span>
-                        <p className="text-xs text-white font-mono">{bank.iban}</p>
+                        <span className="text-[10px] text-[var(--text-dim)]">IBAN</span>
+                        <p className="text-xs text-[var(--text-primary)] font-mono">{bank.iban}</p>
                       </div>
                     )}
                     {bank.branch && (
                       <div>
-                        <span className="text-[10px] text-white/30">Branch</span>
-                        <p className="text-xs text-white">{bank.branch}</p>
+                        <span className="text-[10px] text-[var(--text-dim)]">{t("field.branch")}</span>
+                        <p className="text-xs text-[var(--text-primary)]">{bank.branch}</p>
                       </div>
                     )}
                   </div>
@@ -3047,19 +3060,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 7. Catalogue ── */}
         {c.contact_type === "supplier" && Array.isArray(c.catalogues) && c.catalogues.length > 0 && (
-          <Section title="Catalogue" icon={<BookOpen size={14} />}>
+          <Section title={t("section.catalogue")} icon={<BookOpen size={14} />}>
             <div className="space-y-2">
               {c.catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   {cat.type === "PDF" ? <FileText size={16} className="text-red-400 shrink-0" /> : <ImageIcon size={16} className="text-blue-400 shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{cat.name}</p>
-                    <p className="text-[10px] text-white/30">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+                    <p className="text-sm text-[var(--text-primary)] truncate">{cat.name}</p>
+                    <p className="text-[10px] text-[var(--text-dim)]">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
-                  <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                  <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
                     <Eye size={10} /> Preview
                   </button>
-                  <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                  <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
                     <Download size={10} /> Download
                   </button>
                 </div>
@@ -3070,22 +3083,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 8. Documents ── */}
         {c.contact_type === "supplier" && Array.isArray(c.documents) && c.documents.length > 0 && (
-          <Section title="Documents" icon={<Paperclip size={14} />}>
+          <Section title={t("section.documents")} icon={<Paperclip size={14} />}>
             <div className="space-y-2">
               {c.documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/[0.02] border border-[#222]">
+                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   <FileCheck size={16} className="text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{doc.doc_name || doc.name}</p>
-                    <p className="text-[10px] text-white/30">{doc.type} {doc.uploaded_at ? " · " + new Date(doc.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
+                    <p className="text-sm text-[var(--text-primary)] truncate">{doc.doc_name || doc.name}</p>
+                    <p className="text-[10px] text-[var(--text-dim)]">{doc.type} {doc.uploaded_at ? " · " + new Date(doc.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
                   {doc.url && (
                     <>
-                      <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
+                      <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
                         <Eye size={10} /> Preview
                       </button>
-                      <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <Download size={10} /> Download
+                      <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                        <Download size={10} /> {t("btn.download")}
                       </button>
                     </>
                   )}
@@ -3097,40 +3110,40 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 9. Quality & Performance ── */}
         {c.contact_type === "supplier" && (c.rating || c.reliability_score || c.sample_status || c.quality_notes || c.last_quality_issue || (Array.isArray(c.certifications) && c.certifications.length > 0)) && (
-          <Section title="Quality & Performance" icon={<ShieldCheck size={14} />}>
+          <Section title={t("section.qualityPerformance")} icon={<ShieldCheck size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.rating > 0 && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Rating</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.rating")}</span>
                   <div className="flex items-center gap-0.5 mt-0.5">
                     {[1, 2, 3, 4, 5].map(s => (
-                      <Star key={s} size={14} className={s <= (c.rating || 0) ? "text-amber-400 fill-amber-400" : "text-white/10"} />
+                      <Star key={s} size={14} className={s <= (c.rating || 0) ? "text-amber-400 fill-amber-400" : "text-[var(--text-barely)]"} />
                     ))}
                   </div>
                 </div>
               )}
               {c.reliability_score && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Reliability</span>
-                  <p className="text-sm text-white">{c.reliability_score}%</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("detail.reliability")}</span>
+                  <p className="text-sm text-[var(--text-primary)]">{c.reliability_score}%</p>
                 </div>
               )}
               {c.sample_status && c.sample_status !== "None" && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Sample Status</span>
-                  <p className={`text-sm font-medium ${c.sample_status === "Approved" ? "text-emerald-400" : c.sample_status === "Rejected" ? "text-red-400" : "text-white"}`}>{c.sample_status}</p>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.sampleStatus")}</span>
+                  <p className={`text-sm font-medium ${c.sample_status === "Approved" ? "text-emerald-400" : c.sample_status === "Rejected" ? "text-red-400" : "text-[var(--text-primary)]"}`}>{c.sample_status}</p>
                 </div>
               )}
               {c.last_quality_issue && (
                 <div>
-                  <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Last Quality Issue</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.lastQualityIssueDate")}</span>
                   <p className="text-sm text-red-400">{new Date(c.last_quality_issue).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
                 </div>
               )}
             </div>
             {Array.isArray(c.certifications) && c.certifications.length > 0 && (
               <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1.5">Certifications</span>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.certifications")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {c.certifications.map((cert: string, i: number) => (
                     <span key={i} className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">{cert}</span>
@@ -3140,8 +3153,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             )}
             {c.quality_notes && (
               <div className="mt-3">
-                <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider block mb-1">Quality Notes</span>
-                <p className="text-sm text-white/60 whitespace-pre-wrap">{c.quality_notes}</p>
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1">{t("detail.qualityNotes")}</span>
+                <p className="text-sm text-[var(--text-muted)] whitespace-pre-wrap">{c.quality_notes}</p>
               </div>
             )}
           </Section>
@@ -3149,12 +3162,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 10. Products (placeholder) ── */}
         {c.contact_type === "supplier" && (
-          <Section title="Products" icon={<Package size={14} />}>
+          <Section title={t("section.products")} icon={<Package size={14} />}>
             <div className="flex items-center gap-3 py-3">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                <Package size={18} className="text-white/20" />
+              <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
+                <Package size={18} className="text-[var(--text-ghost)]" />
               </div>
-              <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
+              <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
             </div>
           </Section>
         )}
@@ -3164,107 +3177,107 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <>
           {/* Work Contact */}
           {(c.work_email || c.work_tel || c.work_mobile) && (
-            <Section title="Work Contact" icon={<Phone size={14} />}>
-              {c.work_email && <div className="py-1"><span className="text-xs text-white/40">Email</span><p className="text-sm text-white">{c.work_email}</p></div>}
-              {c.work_tel && <div className="py-1"><span className="text-xs text-white/40">Tel</span><p className="text-sm text-white">{c.work_tel}</p></div>}
-              {c.work_mobile && <div className="py-1"><span className="text-xs text-white/40">Mobile</span><p className="text-sm text-white">{c.work_mobile}</p></div>}
+            <Section title={t("section.workContact")} icon={<Phone size={14} />}>
+              {c.work_email && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.email")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_email}</p></div>}
+              {c.work_tel && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.tel")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_tel}</p></div>}
+              {c.work_mobile && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.mobile")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_mobile}</p></div>}
             </Section>
           )}
           {/* Work */}
           {(c.department || c.job_position || c.job_title || c.management || c.manager) && (
-            <Section title="Work" icon={<Briefcase size={14} />}>
-              {c.management && <div className="py-1"><span className="text-xs text-white/40">Management</span><p className="text-sm text-white">{c.management}</p></div>}
-              {c.department && <div className="py-1"><span className="text-xs text-white/40">Department</span><p className="text-sm text-white">{c.department}</p></div>}
-              {c.job_position && <div className="py-1"><span className="text-xs text-white/40">Position</span><p className="text-sm text-white">{c.job_position}</p></div>}
-              {c.job_title && <div className="py-1"><span className="text-xs text-white/40">Title</span><p className="text-sm text-white">{c.job_title}</p></div>}
-              {c.manager && <div className="py-1"><span className="text-xs text-white/40">Manager</span><p className="text-sm text-white">{c.manager}</p></div>}
+            <Section title={t("section.work")} icon={<Briefcase size={14} />}>
+              {c.management && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.managementLevel")}</span><p className="text-sm text-[var(--text-primary)]">{c.management}</p></div>}
+              {c.department && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.department")}</span><p className="text-sm text-[var(--text-primary)]">{c.department}</p></div>}
+              {c.job_position && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.position")}</span><p className="text-sm text-[var(--text-primary)]">{c.job_position}</p></div>}
+              {c.job_title && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.title")}</span><p className="text-sm text-[var(--text-primary)]">{c.job_title}</p></div>}
+              {c.manager && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.directManager")}</span><p className="text-sm text-[var(--text-primary)]">{c.manager}</p></div>}
             </Section>
           )}
           {/* Work Location */}
           {(c.work_address || c.work_location) && (
-            <Section title="Work Location" icon={<MapPin size={14} />}>
-              {c.work_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{c.work_address}</p></div>}
-              {c.work_location && <div className="py-1"><span className="text-xs text-white/40">Location</span><p className="text-sm text-white">{c.work_location}</p></div>}
+            <Section title={t("section.workLocation")} icon={<MapPin size={14} />}>
+              {c.work_address && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.address")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_address}</p></div>}
+              {c.work_location && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.workLocationLabel")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_location}</p></div>}
             </Section>
           )}
           {/* Resume */}
           {Array.isArray(c.resume_lines) && c.resume_lines.length > 0 && (
-            <Section title="Resume" icon={<FileText size={14} />}>
+            <Section title={t("section.resume")} icon={<FileText size={14} />}>
               {c.resume_lines.map((rl: any, i: number) => (
-                <div key={i} className="py-2 border-b border-[#222] last:border-0">
+                <div key={i} className="py-2 border-b border-[var(--border-color)] last:border-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
                       rl.type === "experience" ? "bg-blue-500/10 text-blue-400" :
                       rl.type === "education" ? "bg-green-500/10 text-green-400" :
                       rl.type === "training" ? "bg-amber-500/10 text-amber-400" :
                       "bg-violet-500/10 text-violet-400"
-                    }`}>{rl.type}</span>
-                    <span className="text-sm text-white font-medium">{rl.title}</span>
+                    }`}>{t("resumeType." + rl.type, rl.type)}</span>
+                    <span className="text-sm text-[var(--text-primary)] font-medium">{rl.title}</span>
                   </div>
                   {(rl.duration_start || rl.duration_end || rl.is_forever) && (
-                    <p className="text-xs text-white/40">{rl.duration_start || ""} {"\u2192"} {rl.is_forever ? "Present" : rl.duration_end || ""}</p>
+                    <p className="text-xs text-[var(--text-faint)]">{rl.duration_start || ""} {"\u2192"} {rl.is_forever ? "Present" : rl.duration_end || ""}</p>
                   )}
-                  {rl.course_type && <p className="text-xs text-white/30 mt-0.5">Type: {rl.course_type}</p>}
-                  {rl.notes && <p className="text-xs text-white/50 mt-1">{rl.notes}</p>}
+                  {rl.course_type && <p className="text-xs text-[var(--text-dim)] mt-0.5">{t("detail.type")}: {rl.course_type}</p>}
+                  {rl.notes && <p className="text-xs text-[var(--text-subtle)] mt-1">{rl.notes}</p>}
                 </div>
               ))}
             </Section>
           )}
           {/* Personal Info */}
           {(c.legal_name || c.birthday || c.place_of_birth || c.gender) && (
-            <Section title="Personal Information" icon={<User size={14} />}>
-              {c.legal_name && <div className="py-1"><span className="text-xs text-white/40">Legal Name</span><p className="text-sm text-white">{c.legal_name}</p></div>}
-              {c.birthday && <div className="py-1"><span className="text-xs text-white/40">Birthday</span><p className="text-sm text-white">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p></div>}
-              {c.place_of_birth && <div className="py-1"><span className="text-xs text-white/40">Place of Birth</span><p className="text-sm text-white">{c.place_of_birth}</p></div>}
-              {c.gender && <div className="py-1"><span className="text-xs text-white/40">Gender</span><p className="text-sm text-white capitalize">{c.gender}</p></div>}
+            <Section title={t("section.personalInfo")} icon={<User size={14} />}>
+              {c.legal_name && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.legalName")}</span><p className="text-sm text-[var(--text-primary)]">{c.legal_name}</p></div>}
+              {c.birthday && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.birthday")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p></div>}
+              {c.place_of_birth && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.placeOfBirth")}</span><p className="text-sm text-[var(--text-primary)]">{c.place_of_birth}</p></div>}
+              {c.gender && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.gender")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{tOpt(c.gender)}</p></div>}
             </Section>
           )}
           {/* Emergency Contact */}
           {Array.isArray(c.emergency_contacts) && c.emergency_contacts.length > 0 && (
-            <Section title="Emergency Contact" icon={<ShieldAlert size={14} />}>
+            <Section title={t("section.emergencyContact")} icon={<ShieldAlert size={14} />}>
               {c.emergency_contacts.map((ec: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-1.5 border-b border-[#222] last:border-0">
-                  <span className="text-sm text-white">{ec.contact}</span>
-                  <span className="text-sm text-white/50">{ec.phone}</span>
+                <div key={i} className="flex items-center justify-between py-1.5 border-b border-[var(--border-color)] last:border-0">
+                  <span className="text-sm text-[var(--text-primary)]">{ec.contact}</span>
+                  <span className="text-sm text-[var(--text-subtle)]">{ec.phone}</span>
                 </div>
               ))}
             </Section>
           )}
           {/* Visa & Work Permit */}
           {(c.visa_no || c.work_permit) && (
-            <Section title="Visa & Work Permit" icon={<Plane size={14} />}>
-              {c.visa_no && <div className="py-1"><span className="text-xs text-white/40">Visa No.</span><p className="text-sm text-white">{c.visa_no}</p></div>}
-              {c.work_permit && <div className="py-1"><span className="text-xs text-white/40">Work Permit</span><p className="text-sm text-white">{c.work_permit}</p></div>}
+            <Section title={t("section.visaWorkPermit")} icon={<Plane size={14} />}>
+              {c.visa_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.visaNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.visa_no}</p></div>}
+              {c.work_permit && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.workPermit")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_permit}</p></div>}
             </Section>
           )}
           {/* Citizenship */}
           {(c.nationality || c.id_no || c.ssn_no || c.passport_no) && (
-            <Section title="Citizenship" icon={<Globe size={14} />}>
-              {c.nationality && <div className="py-1"><span className="text-xs text-white/40">Nationality</span><p className="text-sm text-white">{c.nationality}</p></div>}
-              {c.id_no && <div className="py-1"><span className="text-xs text-white/40">ID No.</span><p className="text-sm text-white">{c.id_no}</p></div>}
-              {c.ssn_no && <div className="py-1"><span className="text-xs text-white/40">SSN No.</span><p className="text-sm text-white">{c.ssn_no}</p></div>}
-              {c.passport_no && <div className="py-1"><span className="text-xs text-white/40">Passport No.</span><p className="text-sm text-white">{c.passport_no}</p></div>}
+            <Section title={t("section.citizenship")} icon={<Globe size={14} />}>
+              {c.nationality && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.nationality")}</span><p className="text-sm text-[var(--text-primary)]">{c.nationality}</p></div>}
+              {c.id_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.idNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.id_no}</p></div>}
+              {c.ssn_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.ssnNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.ssn_no}</p></div>}
+              {c.passport_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.passportNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.passport_no}</p></div>}
             </Section>
           )}
           {/* Private Location */}
           {(c.private_address || c.home_work_distance) && (
-            <Section title="Private Location" icon={<Home size={14} />}>
-              {c.private_address && <div className="py-1"><span className="text-xs text-white/40">Address</span><p className="text-sm text-white">{c.private_address}</p></div>}
-              {c.home_work_distance && <div className="py-1"><span className="text-xs text-white/40">Distance</span><p className="text-sm text-white">{c.home_work_distance} KM</p></div>}
+            <Section title={t("section.privateLocation")} icon={<Home size={14} />}>
+              {c.private_address && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.address")}</span><p className="text-sm text-[var(--text-primary)]">{c.private_address}</p></div>}
+              {c.home_work_distance && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.distance")}</span><p className="text-sm text-[var(--text-primary)]">{c.home_work_distance} KM</p></div>}
             </Section>
           )}
           {/* Family */}
           {(c.marital_status || c.number_of_children) && (
-            <Section title="Family" icon={<Heart size={14} />}>
-              {c.marital_status && <div className="py-1"><span className="text-xs text-white/40">Marital Status</span><p className="text-sm text-white capitalize">{c.marital_status}</p></div>}
-              {c.number_of_children && <div className="py-1"><span className="text-xs text-white/40">Children</span><p className="text-sm text-white">{c.number_of_children}</p></div>}
+            <Section title={t("section.family")} icon={<Heart size={14} />}>
+              {c.marital_status && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.maritalStatus")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{tOpt(c.marital_status)}</p></div>}
+              {c.number_of_children && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.children")}</span><p className="text-sm text-[var(--text-primary)]">{c.number_of_children}</p></div>}
             </Section>
           )}
           {/* Education */}
           {(c.certificate_level || c.field_of_study) && (
-            <Section title="Education" icon={<GraduationCap size={14} />}>
-              {c.certificate_level && <div className="py-1"><span className="text-xs text-white/40">Certificate Level</span><p className="text-sm text-white capitalize">{c.certificate_level?.replace(/_/g, " ")}</p></div>}
-              {c.field_of_study && <div className="py-1"><span className="text-xs text-white/40">Field of Study</span><p className="text-sm text-white">{c.field_of_study}</p></div>}
+            <Section title={t("section.education")} icon={<GraduationCap size={14} />}>
+              {c.certificate_level && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.certificateLevel")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{tOpt(c.certificate_level)}</p></div>}
+              {c.field_of_study && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.fieldOfStudy")}</span><p className="text-sm text-[var(--text-primary)]">{c.field_of_study}</p></div>}
             </Section>
           )}
         </>
@@ -3272,11 +3285,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Custom Fields */}
         {customs.length > 0 && (
-          <Section title="Custom Fields" icon={<FileText size={14} />}>
+          <Section title={t("section.customFields")} icon={<FileText size={14} />}>
             {customs.map((cf, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{cf.field_name}</span>
-                <p className="text-sm text-white">{cf.field_value}</p>
+                <p className="text-sm text-[var(--text-primary)]">{cf.field_value}</p>
               </div>
             ))}
           </Section>
@@ -3284,25 +3297,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Notes */}
         {c.notes && (
-          <Section title="Notes" icon={<FileText size={14} />}>
-            <p className="text-sm text-white/70 whitespace-pre-wrap">{c.notes}</p>
+          <Section title={t("section.notes")} icon={<FileText size={14} />}>
+            <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.notes}</p>
           </Section>
         )}
 
         {/* Delete confirm */}
         {deleteConfirm === c.id && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold text-white mb-2">Delete Contact</h3>
-              <p className="text-sm text-white/50 mb-6">
-                Are you sure you want to delete <strong className="text-white">{contactDisplayName(c)}</strong>? This cannot be undone.
+          <div className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
+              <p className="text-sm text-[var(--text-subtle)] mb-6">
+                {t("delete.confirm")} <strong className="text-[var(--text-primary)]">{contactDisplayName(c)}</strong>{t("delete.cannotUndo")}
               </p>
               <div className="flex gap-3 justify-end">
-                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[#222] hover:bg-white/5 transition-colors">
-                  Cancel
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-lg text-sm border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
+                  {t("btn.cancel")}
                 </button>
                 <button onClick={() => handleDelete(c.id)} className="px-4 py-2 rounded-lg text-sm bg-red-600 hover:bg-red-500 transition-colors">
-                  Delete
+                  {t("btn.delete")}
                 </button>
               </div>
             </div>
@@ -3330,28 +3343,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const showCity = !!form.country_code;
 
     return (
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto overflow-x-hidden">
         {/* Form header */}
-        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[#222] flex items-center justify-between sticky top-0 bg-[#111] z-10">
-          <div className="flex items-center gap-3">
-            <button onClick={handleBack} className="text-white/60 hover:text-white transition-colors">
-              <ArrowLeft size={18} />
+        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between sticky top-0 bg-[var(--bg-secondary)] z-10 gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <button onClick={handleBack} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+              <ArrowLeft size={18} className="rtl:rotate-180" />
             </button>
-            <h2 className="text-lg font-semibold text-white">
-              {editingId ? "Edit Contact" : "New Contact"}
+            <h2 className="text-base md:text-lg font-semibold text-[var(--text-primary)] truncate">
+              {editingId ? t("editContact") : t("newContact")}
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleCancel} className="px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm border border-[#222] bg-white/5 hover:bg-white/10 transition-colors">
-              Cancel
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+            <button onClick={handleCancel} className="px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm border border-[var(--border-color)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+              {t("btn.cancel")}
             </button>
             <button
               onClick={handleSave}
               disabled={saving || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
-              className="flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm bg-white text-black font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Save size={14} />}
-              {saving ? "Saving..." : "Save"}
+              {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <Save size={14} />}
+              {saving ? t("btn.saving") : t("btn.save")}
             </button>
           </div>
         </div>
@@ -3362,55 +3375,55 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="flex items-start gap-2">
               <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-red-400 font-medium">Save Failed</p>
+                <p className="text-sm text-red-400 font-medium">{t("error.saveFailed")}</p>
                 <p className="text-xs text-red-400/70 mt-0.5">{saveError}</p>
               </div>
               <button onClick={() => setSaveError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
                 <X size={14} />
               </button>
             </div>
-            <div className="mt-3 flex items-center gap-2 ml-6">
-              <p className="text-xs text-white/40 flex-1">
-                This is usually caused by missing RLS policies. Copy the fix SQL and run it in Supabase Dashboard &rarr; SQL Editor.
+            <div className="mt-3 flex items-center gap-2 ms-6">
+              <p className="text-xs text-[var(--text-faint)] flex-1">
+                {t("error.rlsHint")}
               </p>
               <button
                 onClick={() => { navigator.clipboard.writeText(RLS_FIX_SQL); setRlsCopied(true); setTimeout(() => setRlsCopied(false), 2000); }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-white/10 hover:bg-white/15 text-white/70 shrink-0 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-[var(--text-secondary)] shrink-0 transition-colors"
               >
-                {rlsCopied ? <><Check size={12} className="text-green-400" /> Copied</> : <><Copy size={12} /> Copy Fix SQL</>}
+                {rlsCopied ? <><Check size={12} className="text-green-400" /> {t("btn.copied")}</> : <><Copy size={12} /> {t("btn.copyFixSql")}</>}
               </button>
             </div>
           </div>
         )}
 
         {/* Photo / Logo + Type */}
-        <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[#222]">
+        <div className="px-4 md:px-6 py-5 md:py-6 text-center border-b border-[var(--border-color)]">
           <div className={`w-24 h-24 md:w-28 md:h-28 ${form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "rounded-2xl" : "rounded-full"} bg-gradient-to-b from-white/15 to-white/5 flex items-center justify-center mx-auto mb-3 relative overflow-hidden`}>
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? (
-              <Building2 size={32} className="text-white/20" />
+              <Building2 size={32} className="text-[var(--text-ghost)]" />
             ) : (
               <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-white/20 mb-1" />
-                <div className="w-14 h-7 rounded-t-full bg-white/15" />
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-surface-bright)] mb-1" />
+                <div className="w-14 h-7 rounded-t-full bg-[var(--bg-surface-active)]" />
               </div>
             )}
           </div>
           {form.photo_url ? (
             <div className="flex items-center justify-center gap-3">
               <label className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer font-medium">
-                {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "Change Logo" : "Change Photo"}
+                {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.changeLogo") : t("photo.changePhoto")}
                 <input type="file" accept="image/*" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) compressImage(file).then(url => setField("photo_url", url));
                 }} />
               </label>
-              <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">Remove</button>
+              <button onClick={() => setField("photo_url", "")} className="text-sm text-red-400 hover:text-red-300 font-medium">{t("btn.remove")}</button>
             </div>
           ) : (
-            <label className="inline-block px-5 py-2 rounded-full bg-white/10 hover:bg-white/15 text-sm text-white/70 font-medium cursor-pointer transition-colors">
-              {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? "Add Logo" : "Add Photo"}
+            <label className="inline-block px-5 py-2 rounded-full bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-sm text-[var(--text-secondary)] font-medium cursor-pointer transition-colors">
+              {form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? t("photo.addLogo") : t("photo.addPhoto")}
               <input type="file" accept="image/*" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) compressImage(file).then(url => setField("photo_url", url));
@@ -3420,17 +3433,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
           {/* Contact Type selector */}
           <div className="flex items-center gap-2 mt-4 overflow-x-auto md:overflow-visible no-scrollbar px-2 pb-1 md:justify-center md:flex-wrap">
-            {CONTACT_TYPES.map(t => (
+            {CONTACT_TYPES.map(ct => (
               <button
-                key={t.value}
-                onClick={() => setField("contact_type", t.value)}
+                key={ct.value}
+                onClick={() => setField("contact_type", ct.value)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
-                  form.contact_type === t.value
-                    ? `border-white/20 bg-white/10 ${t.color}`
-                    : "border-[#222] text-white/30 hover:text-white/50"
+                  form.contact_type === ct.value
+                    ? `border-[var(--border-focus)] bg-[var(--bg-surface-hover)] ${ct.color}`
+                    : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"
                 }`}
               >
-                {t.icon} {t.label}
+                {ct.icon} {t("type." + ct.value, ct.label)}
               </button>
             ))}
           </div>
@@ -3441,18 +3454,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <button
                 onClick={() => setField("entity_type", "person")}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border transition-colors ${
-                  form.entity_type === "person" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"
+                  form.entity_type === "person" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"
                 }`}
               >
-                <User size={14} /> Individual
+                <User size={14} /> {t("entity.individual")}
               </button>
               <button
                 onClick={() => setField("entity_type", "company")}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium border transition-colors ${
-                  form.entity_type === "company" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"
+                  form.entity_type === "company" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"
                 }`}
               >
-                <Building2 size={14} /> Business
+                <Building2 size={14} /> {t("entity.business")}
               </button>
             </div>
           )}
@@ -3460,36 +3473,36 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Company Customer: Company Name section */}
         {isCompanyCustomer && (
-        <FormSection title="Company Name" icon={<Building2 size={14} />}>
+        <FormSection title={t("section.companyName")} icon={<Building2 size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Company Name</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.companyName")}</label>
               <div className="relative">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                <Building2 size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
                 <input
                   value={form.company}
                   onChange={e => setField("company", e.target.value)}
-                  placeholder="e.g. Acme Corporation"
-                  className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("placeholder.acme")}
+                  className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Industry</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.industry")}</label>
               <input
                 value={form.industry}
                 onChange={e => setField("industry", e.target.value)}
-                placeholder="e.g. Technology, Manufacturing, Retail"
-                className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                placeholder={t("placeholder.techMfg")}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Tax ID / Registration No.</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.taxId")}</label>
               <input
                 value={form.tax_id}
                 onChange={e => setField("tax_id", e.target.value)}
-                placeholder="e.g. VAT / CR number"
-                className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                placeholder={t("placeholder.vatCr")}
+                className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
           </div>
@@ -3498,45 +3511,45 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Company Customer: Contact Persons */}
         {isCompanyCustomer && (
-        <FormSection title="Contact Persons" icon={<Users size={14} />}>
+        <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
-              <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+              <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                 <div className="flex items-center gap-2 p-3">
                   <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
                   <input
                     value={cp.name}
                     onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
-                    placeholder="Name"
-                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("field.name")}
+                    className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                   <input
                     value={cp.position}
                     onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
-                    placeholder="Position"
-                    className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("field.position")}
+                    className="w-32 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                   <button
                     onClick={() => setExpandedFamily(expandedFamily === 2000 + i ? null : 2000 + i)}
-                    className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                    className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <ChevronDown size={14} className={`transition-transform ${expandedFamily === 2000 + i ? "rotate-180" : ""}`} />
                   </button>
                 </div>
                 {expandedFamily === 2000 + i && (
-                  <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
-                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                  <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
+                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
-                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                   </div>
                 )}
               </div>
             ))}
-            <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
           </div>
         </FormSection>
         )}
@@ -3544,57 +3557,57 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Company Type: Company Information */}
         {isCompanyType && (
         <>
-        <FormSection title="Company Information" icon={<Building2 size={14} />}>
+        <FormSection title={t("section.companyInformation")} icon={<Building2 size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Company Name</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.companyName")}</label>
               <div className="relative">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                <Building2 size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
                 <input
                   value={form.company}
                   onChange={e => setField("company", e.target.value)}
-                  placeholder="e.g. Koleex International Group"
-                  className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("placeholder.acme")}
+                  className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Industry</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.industry")}</label>
                 <input
                   value={form.industry}
                   onChange={e => setField("industry", e.target.value)}
-                  placeholder="e.g. Technology"
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("placeholder.technology")}
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Source</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.source")}</label>
                 <input
                   value={form.source}
                   onChange={e => setField("source", e.target.value)}
-                  placeholder="e.g. Referral, Website"
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("placeholder.referral")}
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Tax ID / Registration No.</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.taxId")}</label>
                 <input
                   value={form.tax_id}
                   onChange={e => setField("tax_id", e.target.value)}
-                  placeholder="e.g. CR-12345"
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("placeholder.vatCr")}
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Language</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.language")}</label>
                 <input
                   value={form.language}
                   onChange={e => setField("language", e.target.value)}
-                  placeholder="e.g. English, Arabic"
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("field.language")}
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
               </div>
             </div>
@@ -3602,45 +3615,45 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Company Type: Contact Persons */}
-        <FormSection title="Contact Persons" icon={<Users size={14} />}>
+        <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
-              <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+              <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                 <div className="flex items-center gap-2 p-3">
                   <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
                   <input
                     value={cp.name}
                     onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
-                    placeholder="Name"
-                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("field.name")}
+                    className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                   <input
                     value={cp.position}
                     onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
-                    placeholder="Position"
-                    className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("field.position")}
+                    className="w-32 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                   <button
                     onClick={() => setExpandedFamily(expandedFamily === 3000 + i ? null : 3000 + i)}
-                    className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                    className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <ChevronDown size={14} className={`transition-transform ${expandedFamily === 3000 + i ? "rotate-180" : ""}`} />
                   </button>
                 </div>
                 {expandedFamily === 3000 + i && (
-                  <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
-                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                  <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
+                    <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                      <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                     </div>
-                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                    <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                   </div>
                 )}
               </div>
             ))}
-            <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+            <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
           </div>
         </FormSection>
         </>
@@ -3648,94 +3661,97 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Basic Info (hidden for suppliers, company customers, and company type) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
-        <FormSection title="Basic Information" icon={<User size={14} />}>
+        <FormSection title={t("section.basicInfo")} icon={<User size={14} />}>
           <div className="space-y-3">
-            <SelectInput label="Title" value={form.title} onChange={v => setField("title", v)} options={TITLES} />
+            <SelectInput label={t("field.title")} value={form.title} onChange={v => setField("title", v)} options={TITLES} renderLabel={tOpt} selectLabel={t("detail.select")} />
             <div className="grid grid-cols-2 gap-3">
-              <Input label="First Name" value={form.first_name} onChange={v => setField("first_name", v)} />
-              <Input label="Middle Name" value={form.middle_name} onChange={v => setField("middle_name", v)} />
+              <Input label={t("field.firstName")} value={form.first_name} onChange={v => setField("first_name", v)} />
+              <Input label={t("field.middleName")} value={form.middle_name} onChange={v => setField("middle_name", v)} />
             </div>
-            <Input label="Last Name / Family Name" value={form.last_name} onChange={v => setField("last_name", v)} />
-            <Input label="Company" value={form.company} onChange={v => setField("company", v)} icon={<Building2 size={14} />} />
-            <Input label="Position" value={form.position} onChange={v => setField("position", v)} icon={<Briefcase size={14} />} />
+            <Input label={t("field.lastName")} value={form.last_name} onChange={v => setField("last_name", v)} />
+            <Input label={t("field.company")} value={form.company} onChange={v => setField("company", v)} icon={<Building2 size={14} />} />
+            <Input label={t("field.position")} value={form.position} onChange={v => setField("position", v)} icon={<Briefcase size={14} />} />
           </div>
         </FormSection>
         )}
 
         {/* Phones (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title="Phone Numbers" icon={<Phone size={14} />}>
+        <FormSection title={t("section.phoneNumbers")} icon={<Phone size={14} />}>
           {form.phones.map((p, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removePhone(i)} />
-              <LabelSelect value={p.label} onChange={v => updatePhone(i, "label", v)} options={PHONE_LABELS} />
+              <LabelSelect value={p.label} onChange={v => updatePhone(i, "label", v)} options={PHONE_LABELS} renderLabel={tOpt} />
               <input
                 type="tel"
                 value={p.number}
                 onChange={e => updatePhone(i, "number", e.target.value)}
-                placeholder="Phone number"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                placeholder={t("placeholder.phoneNumber")}
+                className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
           ))}
-          <AddButton label="add phone" onClick={addPhone} />
+          <AddButton label={t("add.phone")} onClick={addPhone} />
         </FormSection>
         )}
 
         {/* Emails (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title="Email Addresses" icon={<Mail size={14} />}>
+        <FormSection title={t("section.emailAddresses")} icon={<Mail size={14} />}>
           {form.emails.map((e, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeEmail(i)} />
-              <LabelSelect value={e.label} onChange={v => updateEmail(i, "label", v)} options={EMAIL_LABELS} />
+              <LabelSelect value={e.label} onChange={v => updateEmail(i, "label", v)} options={EMAIL_LABELS} renderLabel={tOpt} />
               <input
                 type="email"
                 value={e.email}
                 onChange={ev => updateEmail(i, "email", ev.target.value)}
-                placeholder="Email address"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                placeholder={t("placeholder.emailAddress")}
+                className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
           ))}
-          <AddButton label="add email" onClick={addEmail} />
+          <AddButton label={t("add.email")} onClick={addEmail} />
         </FormSection>
         )}
 
         {/* Addresses (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title="Addresses" icon={<MapPin size={14} />}>
+        <FormSection title={t("section.addresses")} icon={<MapPin size={14} />}>
           {form.addresses.map((a, i) => (
-            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
+            <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
               <div className="flex items-center gap-2 mb-3">
                 <RemoveBtn onClick={() => removeAddress(i)} />
-                <LabelSelect value={a.label} onChange={v => updateAddress(i, "label", v)} options={ADDRESS_LABELS} />
+                <LabelSelect value={a.label} onChange={v => updateAddress(i, "label", v)} options={ADDRESS_LABELS} renderLabel={tOpt} />
               </div>
-              <div className="space-y-2 ml-8">
-                <input value={a.street} onChange={e => updateAddress(i, "street", e.target.value)} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <div className="space-y-2 ms-8">
+                <input value={a.street} onChange={e => updateAddress(i, "street", e.target.value)} placeholder={t("placeholder.street")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={a.city} onChange={e => updateAddress(i, "city", e.target.value)} placeholder="City" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                  <input value={a.state} onChange={e => updateAddress(i, "state", e.target.value)} placeholder="State" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                  <input value={a.city} onChange={e => updateAddress(i, "city", e.target.value)} placeholder={t("placeholder.city")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                  <input value={a.state} onChange={e => updateAddress(i, "state", e.target.value)} placeholder={t("placeholder.state")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={a.zip} onChange={e => updateAddress(i, "zip", e.target.value)} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                  <input value={a.country} onChange={e => updateAddress(i, "country", e.target.value)} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                  <input value={a.zip} onChange={e => updateAddress(i, "zip", e.target.value)} placeholder={t("placeholder.zipCode")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                  <input value={a.country} onChange={e => updateAddress(i, "country", e.target.value)} placeholder={t("placeholder.country")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                 </div>
               </div>
             </div>
           ))}
-          <AddButton label="add address" onClick={addAddress} />
+          <AddButton label={t("add.address")} onClick={addAddress} />
         </FormSection>
         )}
 
         {/* Location (country/province/city cascade) - hidden for suppliers and employees */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title="Location" icon={<MapPinned size={14} />}>
+        <FormSection title={t("section.location")} icon={<MapPinned size={14} />}>
           <div className="space-y-3">
             <CountryDropdown
               value={form.country_code}
               displayValue={form.country}
               onChange={handleCountryChange}
+              label={t("field.country")}
+              placeholder={t("field.searchCountry")}
+              noResults={t("detail.noCountries")}
             />
             {form.country_code && hasStates && (
               <ProvinceDropdown
@@ -3743,6 +3759,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 value={form.province_code}
                 displayValue={form.province}
                 onChange={handleProvinceChange}
+                label={t("field.provinceState")}
+                placeholder={t("field.searchProvince")}
+                noResults={t("detail.noProvinces")}
               />
             )}
             {showCity && (
@@ -3751,6 +3770,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 stateCode={form.province_code}
                 value={form.city}
                 onChange={handleCityChange}
+                label={t("field.city")}
+                placeholder={t("field.searchCity")}
+                noResults={t("detail.noCities")}
               />
             )}
           </div>
@@ -3759,156 +3781,156 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title="Websites" icon={<Globe size={14} />}>
+        <FormSection title={t("section.websites")} icon={<Globe size={14} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeWebsite(i)} />
-              <LabelSelect value={w.label} onChange={v => updateWebsite(i, "label", v)} options={WEBSITE_LABELS} />
+              <LabelSelect value={w.label} onChange={v => updateWebsite(i, "label", v)} options={WEBSITE_LABELS} renderLabel={tOpt} />
               <input
                 type="url"
                 value={w.url}
                 onChange={e => updateWebsite(i, "url", e.target.value)}
                 placeholder="https://"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
           ))}
-          <AddButton label="add website" onClick={addWebsite} />
+          <AddButton label={t("add.website")} onClick={addWebsite} />
         </FormSection>
         )}
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
-        <FormSection title="Birthday" icon={<Calendar size={14} />}>
-          <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
+        <FormSection title={t("section.birthday")} icon={<Calendar size={14} />}>
+          <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} dayLabel={t("field.day")} monthLabel={t("field.month")} yearLabel={t("field.year")} renderMonth={m => t("month." + m, m)} />
         </FormSection>
         )}
 
         {/* Social Profiles (hidden for suppliers, company customers, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isEmployee && (
-        <FormSection title="Social Profiles" icon={<Share2 size={14} />}>
+        <FormSection title={t("section.socialProfiles")} icon={<Share2 size={14} />}>
           {form.social_profiles.map((s, i) => (
-            <div key={i} className="mb-4 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
+            <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
               <div className="flex items-center gap-2 mb-3">
                 <RemoveBtn onClick={() => removeSocial(i)} />
-                <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} />
+                <LabelSelect value={s.platform} onChange={v => updateSocial(i, "platform", v)} options={SOCIAL_PLATFORMS} renderLabel={tOpt} />
               </div>
-              <div className="space-y-2 ml-8">
-                <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder="Username / Handle" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder="Profile URL" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <div className="space-y-2 ms-8">
+                <input value={s.username} onChange={e => updateSocial(i, "username", e.target.value)} placeholder={t("field.username")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                <input value={s.url} onChange={e => updateSocial(i, "url", e.target.value)} placeholder={t("field.profileUrl")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">QR Code</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qrCode")}</label>
                   <div className="flex items-center gap-3">
                     {s.qr_code_url && (
-                      <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[#222] object-cover" loading="lazy" decoding="async" />
+                      <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[var(--border-color)] object-cover" loading="lazy" decoding="async" />
                     )}
-                    <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/60 cursor-pointer hover:bg-white/10 transition-colors">
+                    <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] cursor-pointer hover:bg-[var(--bg-surface-hover)] transition-colors">
                       <Camera size={14} />
-                      {s.qr_code_url ? "Change" : "Upload QR"}
+                      {s.qr_code_url ? t("btn.change") : t("photo.uploadQr")}
                       <input type="file" accept="image/*" className="hidden" onChange={e => {
                         const file = e.target.files?.[0];
                         if (file) compressImage(file, 400, 0.8).then(url => updateSocial(i, "qr_code_url", url));
                       }} />
                     </label>
                     {s.qr_code_url && (
-                      <button onClick={() => updateSocial(i, "qr_code_url", "")} className="text-xs text-white/30 hover:text-white">Remove</button>
+                      <button onClick={() => updateSocial(i, "qr_code_url", "")} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)]">{t("btn.remove")}</button>
                     )}
                   </div>
                 </div>
               </div>
             </div>
           ))}
-          <AddButton label="add social profile" onClick={addSocial} />
+          <AddButton label={t("add.socialProfile")} onClick={addSocial} />
         </FormSection>
         )}
 
         {/* Related People (hidden for suppliers, company customers, company type, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
-        <FormSection title="Related People" icon={<Users size={14} />}>
+        <FormSection title={t("section.relatedPeople")} icon={<Users size={14} />}>
           {form.family_members.map((f, i) => (
-            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+            <div key={i} className="mb-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
               <div className="flex items-center gap-2 p-3">
                 <RemoveBtn onClick={() => removeFamily(i)} />
-                <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={RELATED_PEOPLE_LABELS} />
+                <LabelSelect value={f.relationship} onChange={v => updateFamily(i, "relationship", v)} options={RELATED_PEOPLE_LABELS} renderLabel={tOpt} />
                 <input
                   value={f.first_name}
                   onChange={e => updateFamily(i, "first_name", e.target.value)}
-                  placeholder="Name"
-                  className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                  placeholder={t("field.name")}
+                  className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                 />
                 <button
                   onClick={() => setExpandedFamily(expandedFamily === i ? null : i)}
-                  className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                  className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <ChevronDown size={14} className={`transition-transform ${expandedFamily === i ? "rotate-180" : ""}`} />
                 </button>
               </div>
               {expandedFamily === i && (
-                <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
+                <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder="Last Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                    <input value={f.last_name} onChange={e => updateFamily(i, "last_name", e.target.value)} placeholder={t("field.lastNameField")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <input value={f.phone} onChange={e => updateFamily(i, "phone", e.target.value)} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                   </div>
-                  <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                  <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                  <input value={f.email} onChange={e => updateFamily(i, "email", e.target.value)} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                  <textarea value={f.notes} onChange={e => updateFamily(i, "notes", e.target.value)} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                 </div>
               )}
             </div>
           ))}
-          <AddButton label="add related person" onClick={addFamily} />
+          <AddButton label={t("add.relatedPerson")} onClick={addFamily} />
         </FormSection>
         )}
 
         {/* Notes (shared — hidden for suppliers, they have their own at the end) */}
         {form.contact_type !== "supplier" && (
-        <FormSection title="Notes" icon={<FileText size={14} />}>
+        <FormSection title={t("section.notes")} icon={<FileText size={14} />}>
           <textarea
             value={form.notes}
             onChange={e => setField("notes", e.target.value)}
-            placeholder="Add notes..."
+            placeholder={t("placeholder.addNotes")}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
+            className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none"
           />
         </FormSection>
         )}
 
         {/* Custom Fields (hidden for suppliers) */}
         {form.contact_type !== "supplier" && (
-        <FormSection title="Custom Fields" icon={<Hash size={14} />}>
+        <FormSection title={t("section.customFields")} icon={<Hash size={14} />}>
           {form.custom_fields.map((cf, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeCustomField(i)} />
               <input
                 value={cf.field_name}
                 onChange={e => updateCustomField(i, "field_name", e.target.value)}
-                placeholder="Field Name"
+                placeholder={t("placeholder.fieldName")}
                 className="w-32 h-10 px-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none"
               />
               <input
                 value={cf.field_value}
                 onChange={e => updateCustomField(i, "field_value", e.target.value)}
-                placeholder="Value"
-                className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                placeholder={t("placeholder.value")}
+                className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
           ))}
-          <AddButton label="add field" onClick={addCustomField} />
+          <AddButton label={t("add.field")} onClick={addCustomField} />
         </FormSection>
         )}
 
         {/* Business Card (customers only) */}
         {isCustomer && (
-          <FormSection title="Business Card" icon={<CreditCard size={14} />}>
+          <FormSection title={t("section.businessCard")} icon={<CreditCard size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Front</label>
-                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.front")}</label>
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_front ? (
                     <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1 text-white/30">
+                    <div className="flex flex-col items-center gap-1 text-[var(--text-dim)]">
                       <CreditCard size={18} />
-                      <span className="text-[11px]">Upload Front</span>
+                      <span className="text-[11px]">{t("photo.uploadFront")}</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
@@ -3917,18 +3939,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   }} />
                 </label>
                 {form.business_card_front && (
-                  <button onClick={() => setField("business_card_front", "")} className="text-xs text-white/30 hover:text-white mt-1.5">Remove</button>
+                  <button onClick={() => setField("business_card_front", "")} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)] mt-1.5">{t("btn.remove")}</button>
                 )}
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Back</label>
-                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[#222] hover:border-white/20 bg-white/[0.02] cursor-pointer transition-colors overflow-hidden">
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.back")}</label>
+                <label className="flex flex-col items-center justify-center w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] cursor-pointer transition-colors overflow-hidden">
                   {form.business_card_back ? (
                     <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1 text-white/30">
+                    <div className="flex flex-col items-center gap-1 text-[var(--text-dim)]">
                       <CreditCard size={18} />
-                      <span className="text-[11px]">Upload Back</span>
+                      <span className="text-[11px]">{t("photo.uploadBack")}</span>
                     </div>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
@@ -3937,7 +3959,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   }} />
                 </label>
                 {form.business_card_back && (
-                  <button onClick={() => setField("business_card_back", "")} className="text-xs text-white/30 hover:text-white mt-1.5">Remove</button>
+                  <button onClick={() => setField("business_card_back", "")} className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)] mt-1.5">{t("btn.remove")}</button>
                 )}
               </div>
             </div>
@@ -3946,24 +3968,24 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Financial & Business" icon={<DollarSign size={14} />}>
+          <FormSection title={t("section.financialBusiness")} icon={<DollarSign size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} />
-                <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} />
+                <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Total Revenue" value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUp size={14} />} />
-                <Input label="Outstanding Balance" value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<Receipt size={14} />} />
+                <Input label={t("field.totalRevenue")} value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUp size={14} />} />
+                <Input label={t("field.outstandingBalance")} value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<Receipt size={14} />} />
               </div>
-              <Input label="Credit Limit" value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<Wallet size={14} />} />
+              <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<Wallet size={14} />} />
               <div>
-                <label className="text-xs text-white/40 mb-1 block">Last Order Date</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastOrderDate")}</label>
                 <input
                   type="date"
                   value={form.last_order_date}
                   onChange={e => setField("last_order_date", e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]"
+                  className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]"
                 />
               </div>
             </div>
@@ -3972,20 +3994,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Classification & Segmentation" icon={<Tag size={14} />}>
+          <FormSection title={t("section.classification")} icon={<Tag size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Industry" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} />
-                <SelectInput label="Source" value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<Target size={14} />} />
+                <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<Target size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
-              <Input label="Account Manager" value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder="Name" icon={<UserCog size={14} />} />
+              <Input label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.name")} icon={<UserCog size={14} />} />
               <div>
-                <label className="text-xs text-white/40 mb-1 block">Tags</label>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.tags")}</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {form.tags.map((tag, i) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">
+                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
                       {tag}
-                      <button onClick={() => setField("tags", form.tags.filter((_, idx) => idx !== i))} className="text-white/30 hover:text-white">
+                      <button onClick={() => setField("tags", form.tags.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
                         <X size={10} />
                       </button>
                     </span>
@@ -3994,8 +4016,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="flex gap-2">
                   <input
                     id="tag-input"
-                    placeholder="Add tag..."
-                    className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("add.tag")}
+                    className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                     onKeyDown={e => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -4016,7 +4038,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         input.value = "";
                       }
                     }}
-                    className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-xs text-white/50 hover:text-white transition-colors"
+                    className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     Add
                   </button>
@@ -4028,25 +4050,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Relationship & Activity (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Relationship & Activity" icon={<Clock size={14} />}>
+          <FormSection title={t("section.relationshipActivity")} icon={<Clock size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Communication" value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} icon={<MessageSquare size={14} />} />
-                <SelectInput label="Language" value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} icon={<Languages size={14} />} />
+                <SelectInput label={t("field.communication")} value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} icon={<MessageSquare size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.language")} value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} icon={<Languages size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">First Contact</label>
-                  <input type="date" value={form.first_contact_date} onChange={e => setField("first_contact_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.firstContact")}</label>
+                  <input type="date" value={form.first_contact_date} onChange={e => setField("first_contact_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Last Contacted</label>
-                  <input type="date" value={form.last_contacted} onChange={e => setField("last_contacted", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastContacted")}</label>
+                  <input type="date" value={form.last_contacted} onChange={e => setField("last_contacted", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1 block">Follow-up Date</label>
-                <input type="date" value={form.follow_up_date} onChange={e => setField("follow_up_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.followUpDate")}</label>
+                <input type="date" value={form.follow_up_date} onChange={e => setField("follow_up_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
               </div>
             </div>
           </FormSection>
@@ -4054,36 +4076,36 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade & Shipping (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Trade & Shipping" icon={<Ship size={14} />}>
+          <FormSection title={t("section.tradeShipping")} icon={<Ship size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label="Shipping Method" value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<Ship size={14} />} />
-                <SelectInput label="Incoterms" value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} icon={<FileCheck size={14} />} />
+                <SelectInput label={t("field.shippingMethod")} value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<Ship size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} icon={<FileCheck size={14} />} selectLabel={t("detail.select")} />
               </div>
-              <Input label="Tax ID / Import License" value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder="License or Tax ID number" icon={<Hash size={14} />} />
+              <Input label={t("field.taxIdImport")} value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder={t("placeholder.vatCr")} icon={<Hash size={14} />} />
               {/* Shipping Addresses */}
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Shipping Addresses</label>
+                <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.shippingAddresses")}</label>
                 {form.shipping_addresses.map((a, i) => (
-                  <div key={i} className="mb-3 p-3 rounded-xl bg-white/[0.02] border border-[#222]">
+                  <div key={i} className="mb-3 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                     <div className="flex items-center gap-2 mb-2">
                       <RemoveBtn onClick={() => setField("shipping_addresses", form.shipping_addresses.filter((_, idx) => idx !== i))} />
-                      <LabelSelect value={a.label} onChange={v => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], label: v }; setField("shipping_addresses", arr); }} options={["warehouse", "port", "office", "other"]} />
+                      <LabelSelect value={a.label} onChange={v => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], label: v }; setField("shipping_addresses", arr); }} options={["warehouse", "port", "office", "other"]} renderLabel={tOpt} />
                     </div>
-                    <div className="space-y-2 ml-8">
-                      <input value={a.street} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], street: e.target.value }; setField("shipping_addresses", arr); }} placeholder="Street" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                    <div className="space-y-2 ms-8">
+                      <input value={a.street} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], street: e.target.value }; setField("shipping_addresses", arr); }} placeholder={t("placeholder.street")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={a.city} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], city: e.target.value }; setField("shipping_addresses", arr); }} placeholder="City" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                        <input value={a.state} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], state: e.target.value }; setField("shipping_addresses", arr); }} placeholder="State" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        <input value={a.city} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], city: e.target.value }; setField("shipping_addresses", arr); }} placeholder={t("placeholder.city")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <input value={a.state} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], state: e.target.value }; setField("shipping_addresses", arr); }} placeholder={t("placeholder.state")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={a.zip} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], zip: e.target.value }; setField("shipping_addresses", arr); }} placeholder="ZIP Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                        <input value={a.country} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], country: e.target.value }; setField("shipping_addresses", arr); }} placeholder="Country" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                        <input value={a.zip} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], zip: e.target.value }; setField("shipping_addresses", arr); }} placeholder={t("placeholder.zipCode")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <input value={a.country} onChange={e => { const arr = [...form.shipping_addresses]; arr[i] = { ...arr[i], country: e.target.value }; setField("shipping_addresses", arr); }} placeholder={t("placeholder.country")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                       </div>
                     </div>
                   </div>
                 ))}
-                <AddButton label="add shipping address" onClick={() => setField("shipping_addresses", [...form.shipping_addresses, { label: "warehouse", street: "", city: "", state: "", zip: "", country: "" }])} />
+                <AddButton label={t("add.shippingAddress")} onClick={() => setField("shipping_addresses", [...form.shipping_addresses, { label: "warehouse", street: "", city: "", state: "", zip: "", country: "" }])} />
               </div>
             </div>
           </FormSection>
@@ -4091,18 +4113,18 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Documents / Attachments (customer only) ── */}
         {isCustomer && (
-          <FormSection title="Documents & Attachments" icon={<Paperclip size={14} />}>
+          <FormSection title={t("section.documentsAttachments")} icon={<Paperclip size={14} />}>
             {form.attachments.map((a, i) => (
-              <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-[#222]">
+              <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                 <RemoveBtn onClick={() => setField("attachments", form.attachments.filter((_, idx) => idx !== i))} />
                 <FileCheck size={14} className="text-blue-400 shrink-0" />
-                <span className="text-sm text-white truncate flex-1">{a.name}</span>
-                <span className="text-[10px] text-white/30">{a.type}</span>
+                <span className="text-sm text-[var(--text-primary)] truncate flex-1">{a.name}</span>
+                <span className="text-[10px] text-[var(--text-dim)]">{a.type}</span>
               </div>
             ))}
-            <label className="flex items-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-dashed border-[#222] hover:border-white/20 cursor-pointer transition-colors">
-              <Paperclip size={14} className="text-white/40" />
-              <span className="text-xs text-white/40">Upload document (contract, license, ID...)</span>
+            <label className="flex items-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] cursor-pointer transition-colors">
+              <Paperclip size={14} className="text-[var(--text-faint)]" />
+              <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadDocument")}</span>
               <input type="file" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) {
@@ -4126,54 +4148,55 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {form.contact_type === "supplier" && (
           <>
             {/* 1. Company Name — Most important, identity of the supplier */}
-            <FormSection title="Company Name" icon={<Building2 size={14} />}>
+            <FormSection title={t("section.companyName")} icon={<Building2 size={14} />}>
               <div className="space-y-3">
-                <Input label="Company Name in English" value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder="e.g. Shenzhen ABC Trading Co., Ltd." icon={<Building2 size={14} />} />
-                <Input label="Company Name in Chinese" value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder="e.g. &#28145;&#22323;ABC&#36152;&#26131;&#26377;&#38480;&#20844;&#21496;" icon={<Languages size={14} />} />
+                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2 size={14} />} />
+                <Input label={t("field.companyNameCn")} value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<Languages size={14} />} />
                 {/* Additional Company Names */}
                 <div>
-                  <label className="text-xs text-white/40 mb-2 block">Additional Company Names</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.additionalNames")}</label>
                   {form.additional_company_names.map((entry, i) => (
                     <div key={i} className="flex items-center gap-2 mb-2">
                       <RemoveBtn onClick={() => setField("additional_company_names", form.additional_company_names.filter((_, idx) => idx !== i))} />
                       <input
                         value={entry.language}
                         onChange={e => { const arr = [...form.additional_company_names]; arr[i] = { ...arr[i], language: e.target.value }; setField("additional_company_names", arr); }}
-                        placeholder="Language"
+                        placeholder={t("field.language")}
                         className="w-28 h-9 px-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none"
                       />
                       <input
                         value={entry.name}
                         onChange={e => { const arr = [...form.additional_company_names]; arr[i] = { ...arr[i], name: e.target.value }; setField("additional_company_names", arr); }}
-                        placeholder="Company name in this language"
-                        className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                        placeholder={t("field.companyName")}
+
+                        className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
                     </div>
                   ))}
-                  <AddButton label="add company name" onClick={() => setField("additional_company_names", [...form.additional_company_names, { language: "", name: "" }])} />
+                  <AddButton label={t("add.companyName")} onClick={() => setField("additional_company_names", [...form.additional_company_names, { language: "", name: "" }])} />
                 </div>
               </div>
             </FormSection>
 
             {/* 2. Contact Details — How to reach the supplier */}
-            <FormSection title="Contact Details" icon={<Phone size={14} />}>
+            <FormSection title={t("section.contactDetails")} icon={<Phone size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="Tel" value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder="Telephone number" icon={<Phone size={14} />} />
-                  <Input label="Mobile" value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder="Mobile number" icon={<Phone size={14} />} />
+                  <Input label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} icon={<Phone size={14} />} />
+                  <Input label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} icon={<Phone size={14} />} />
                 </div>
-                <Input label="Email" value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<Mail size={14} />} />
-                <Input label="Website" value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<Globe size={14} />} />
-                <Input label="Address" value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder="Full address" icon={<MapPin size={14} />} />
+                <Input label={t("field.contactEmail")} value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<Mail size={14} />} />
+                <Input label={t("field.website")} value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<Globe size={14} />} />
+                <Input label={t("field.supplierAddress")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("field.supplierAddress")} icon={<MapPin size={14} />} />
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Country / Province / City</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("placeholder.countryProvCity")}</label>
                   <div className="space-y-2">
-                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} />
+                    <CountryDropdown value={form.country_code} displayValue={form.country} onChange={handleCountryChange} label={t("field.country")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
                     {form.country_code && hasStates && (
-                      <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} />
+                      <ProvinceDropdown countryCode={form.country_code} value={form.province_code} displayValue={form.province} onChange={handleProvinceChange} label={t("field.provinceState")} placeholder={t("field.searchProvince")} noResults={t("detail.noProvinces")} />
                     )}
                     {showCity && (
-                      <CityDropdown countryCode={form.country_code} stateCode={form.province_code} value={form.city} onChange={handleCityChange} />
+                      <CityDropdown countryCode={form.country_code} stateCode={form.province_code} value={form.city} onChange={handleCityChange} label={t("field.city")} placeholder={t("field.searchCity")} noResults={t("detail.noCities")} />
                     )}
                   </div>
                 </div>
@@ -4181,148 +4204,148 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 3. Contact Persons — Key people to communicate with */}
-            <FormSection title="Contact Persons" icon={<Users size={14} />}>
+            <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
               <div className="space-y-3">
                 {form.contact_persons.map((cp, i) => (
-                  <div key={i} className="rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+                  <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
                       <RemoveBtn onClick={() => setField("contact_persons", form.contact_persons.filter((_, idx) => idx !== i))} />
                       <input
                         value={cp.name}
                         onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], name: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder="Name"
-                        className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                        placeholder={t("field.name")}
+                        className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
                       <input
                         value={cp.position}
                         onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], position: e.target.value }; setField("contact_persons", arr); }}
-                        placeholder="Position"
-                        className="w-32 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                        placeholder={t("field.position")}
+                        className="w-32 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       />
                       <button
                         onClick={() => setExpandedFamily(expandedFamily === 1000 + i ? null : 1000 + i)}
-                        className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                        className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                       >
                         <ChevronDown size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
                       </button>
                     </div>
                     {expandedFamily === 1000 + i && (
-                      <div className="px-3 pb-3 pt-1 ml-8 space-y-2 border-t border-white/[0.03]">
-                        <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder="Department" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none mt-2" />
+                      <div className="px-3 pb-3 pt-1 ms-8 space-y-2 border-t border-[var(--border-faint)]">
+                        <input value={cp.department} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], department: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.department")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none mt-2" />
                         <div className="grid grid-cols-2 gap-2">
-                          <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder="Phone" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                          <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder="Mobile" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
+                          <input value={cp.phone} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], phone: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.phone")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                          <input value={cp.mobile} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], mobile: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.contactMobile")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
                         </div>
-                        <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder="Email" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none" />
-                        <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder="Notes" rows={2} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none" />
+                        <input value={cp.email} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], email: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.email")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                        <textarea value={cp.notes} onChange={e => { const arr = [...form.contact_persons]; arr[i] = { ...arr[i], notes: e.target.value }; setField("contact_persons", arr); }} placeholder={t("field.notes")} rows={2} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none" />
                       </div>
                     )}
                   </div>
                 ))}
-                <AddButton label="add contact person" onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
+                <AddButton label={t("add.contactPerson")} onClick={() => setField("contact_persons", [...form.contact_persons, { name: "", position: "", department: "", phone: "", mobile: "", email: "", notes: "" }])} />
               </div>
             </FormSection>
 
             {/* 4. Company Profile — Brand, classification, and business identity */}
-            <FormSection title="Company Profile" icon={<Briefcase size={14} />}>
+            <FormSection title={t("section.companyProfile")} icon={<Briefcase size={14} />}>
               <div className="space-y-3">
                 {/* Brand Names */}
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Brand</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.brand")}</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {form.brand_names.map((b, i) => (
-                      <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-[#222] text-xs text-white/70">
+                      <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
                         {b}
-                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-white/30 hover:text-white"><X size={10} /></button>
+                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={10} /></button>
                       </span>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input id="brand-input" placeholder="Add brand..." className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    <input id="brand-input" placeholder={t("add.brand")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                       onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const val = (e.target as HTMLInputElement).value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); (e.target as HTMLInputElement).value = ""; } } }} />
-                    <button onClick={() => { const input = document.getElementById("brand-input") as HTMLInputElement; const val = input?.value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); input.value = ""; } }} className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-xs text-white/50 hover:text-white transition-colors">Add</button>
+                    <button onClick={() => { const input = document.getElementById("brand-input") as HTMLInputElement; const val = input?.value.trim(); if (val && !form.brand_names.includes(val)) { setField("brand_names", [...form.brand_names, val]); input.value = ""; } }} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">{t("btn.add")}</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="Division" value={form.division} onChange={v => setField("division", v)} placeholder="e.g. Electronics Division" />
-                  <Input label="Category" value={form.category} onChange={v => setField("category", v)} placeholder="Optional" />
+                  <Input label={t("field.division")} value={form.division} onChange={v => setField("division", v)} placeholder={t("field.division")} />
+                  <Input label={t("field.category")} value={form.category} onChange={v => setField("category", v)} placeholder={t("field.category")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label="Supplier Type" value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2 size={14} />} />
-                  <SelectInput label="Industry" value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} />
+                  <SelectInput label={t("field.supplierType")} value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2 size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
-                <SelectInput label="Source" value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<Target size={14} />} />
+                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<Target size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
             </FormSection>
 
             {/* 5. Payment & Currency */}
-            <FormSection title="Payment & Currency" icon={<DollarSign size={14} />}>
+            <FormSection title={t("section.paymentCurrency")} icon={<DollarSign size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label="Payment Terms" value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} />
-                  <SelectInput label="Currency" value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} />
+                  <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Payment Information</label>
-                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder="Bank transfer details, payment notes, etc." rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-white/20" />
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.paymentInfo")}</label>
+                  <textarea value={form.payment_info} onChange={e => setField("payment_info", e.target.value)} placeholder={t("placeholder.bankTransfer")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
               </div>
             </FormSection>
 
             {/* 6. Bank Account Information */}
-            <FormSection title="Bank Account Information" icon={<Landmark size={14} />}>
+            <FormSection title={t("section.bankAccountInfo")} icon={<Landmark size={14} />}>
               <div className="space-y-3">
                 {form.bank_accounts.map((bank, i) => (
-                  <div key={i} className="p-3 rounded-xl bg-white/[0.02] border border-[#222] space-y-2">
+                  <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
-                      <span className="text-xs text-white/50 font-medium">Account {i + 1}</span>
+                      <span className="text-xs text-[var(--text-subtle)] font-medium">{t("misc.account")} {i + 1}</span>
                     </div>
-                    <div className="space-y-2 ml-8">
+                    <div className="space-y-2 ms-8">
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Bank Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Name" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.bank_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.bankName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        <input value={bank.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountName")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       </div>
-                      <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder="Account Number" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                      <input value={bank.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountNumber")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder="SWIFT / BIC Code" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder="IBAN" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.swiftCode")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        <input value={bank.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.iban")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder="Branch" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                        <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder="Currency (e.g. USD)" className="h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <input value={bank.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.branch")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                        <input value={bank.currency} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.currency")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       </div>
                     </div>
                   </div>
                 ))}
-                <AddButton label="add bank account" onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
+                <AddButton label={t("add.bankAccount")} onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
               </div>
             </FormSection>
 
             {/* 7. Catalogue */}
-            <FormSection title="Catalogue" icon={<BookOpen size={14} />}>
+            <FormSection title={t("section.catalogue")} icon={<BookOpen size={14} />}>
               <div className="space-y-2">
                 {form.catalogues.map((cat, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-[#222]">
+                  <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                     <RemoveBtn onClick={() => setField("catalogues", form.catalogues.filter((_, idx) => idx !== i))} />
                     {cat.type === "PDF" ? <FileText size={14} className="text-red-400 shrink-0" /> : <ImageIcon size={14} className="text-blue-400 shrink-0" />}
-                    <span className="text-sm text-white truncate flex-1">{cat.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 font-medium">{cat.type}</span>
+                    <span className="text-sm text-[var(--text-primary)] truncate flex-1">{cat.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium">{cat.type}</span>
                     {cat.url && (
-                      <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        {cat.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {cat.type === "PDF" ? "Open" : "Preview"}
+                      <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                        {cat.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {cat.type === "PDF" ? t("btn.open") : t("btn.preview")}
                       </button>
                     )}
                     {cat.url && (
-                      <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                        <Download size={10} /> Download
+                      <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                        <Download size={10} /> {t("btn.download")}
                       </button>
                     )}
                   </div>
                 ))}
-                <label className="flex items-center gap-2 px-3 py-3 rounded-lg bg-white/[0.03] border border-dashed border-[#222] hover:border-white/20 cursor-pointer transition-colors">
-                  <FilePlus size={14} className="text-white/40" />
-                  <span className="text-xs text-white/40">Upload catalogue (PDF or image)</span>
+                <label className="flex items-center gap-2 px-3 py-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] cursor-pointer transition-colors">
+                  <FilePlus size={14} className="text-[var(--text-faint)]" />
+                  <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadCatalogue")}</span>
                   <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -4338,22 +4361,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 8. Documents */}
-            <FormSection title="Documents" icon={<Paperclip size={14} />}>
+            <FormSection title={t("section.documents")} icon={<Paperclip size={14} />}>
               <div className="space-y-2">
                 {form.documents.map((doc, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-[#222] space-y-2">
+                  <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
                     <div className="flex items-center gap-2">
                       <RemoveBtn onClick={() => setField("documents", form.documents.filter((_, idx) => idx !== i))} />
                       {doc.url ? (
                         <>
                           <FileCheck size={14} className="text-blue-400 shrink-0" />
-                          <span className="text-xs text-white/60 font-medium truncate">{doc.doc_name || "Untitled"}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 font-medium ml-auto">{doc.type}</span>
-                          <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                            {doc.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {doc.type === "PDF" ? "Open" : "Preview"}
+                          <span className="text-xs text-[var(--text-muted)] font-medium truncate">{doc.doc_name || t("misc.untitled")}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{doc.type}</span>
+                          <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                            {doc.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
                           </button>
-                          <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-white/50 hover:text-white transition-colors">
-                            <Download size={10} /> Download
+                          <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
+                            <Download size={10} /> {t("btn.download")}
                           </button>
                         </>
                       ) : (
@@ -4361,11 +4384,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           <input
                             value={doc.doc_name}
                             onChange={e => { const arr = [...form.documents]; arr[i] = { ...arr[i], doc_name: e.target.value }; setField("documents", arr); }}
-                            placeholder="Document name (e.g. Business License)"
-                            className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                            placeholder={t("placeholder.docName")}
+                            className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                           />
-                          <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-[#222] text-xs text-white/50 hover:text-white cursor-pointer transition-colors shrink-0">
-                            <Paperclip size={12} /> Upload
+                          <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
+                            <Paperclip size={12} /> {t("btn.upload")}
                             <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                               const file = e.target.files?.[0];
                               if (file) {
@@ -4384,31 +4407,31 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     </div>
                   </div>
                 ))}
-                <AddButton label="add document" onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
+                <AddButton label={t("add.document")} onClick={() => setField("documents", [...form.documents, { doc_name: "", name: "", url: "", type: "", uploaded_at: "" }])} />
               </div>
             </FormSection>
 
             {/* 9. Quality & Performance */}
-            <FormSection title="Quality & Performance" icon={<ShieldCheck size={14} />}>
+            <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheck size={14} />}>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-white/40 mb-1.5 block">Rating</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.rating")}</label>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map(s => (
                       <button key={s} onClick={() => setField("rating", form.rating === s ? 0 : s)} className="p-0.5 transition-colors">
-                        <Star size={22} className={s <= form.rating ? "text-amber-400 fill-amber-400" : "text-white/15 hover:text-white/30"} />
+                        <Star size={22} className={s <= form.rating ? "text-amber-400 fill-amber-400" : "text-[var(--text-whisper)] hover:text-[var(--text-dim)]"} />
                       </button>
                     ))}
-                    {form.rating > 0 && <span className="text-xs text-white/30 ml-2">{form.rating}/5</span>}
+                    {form.rating > 0 && <span className="text-xs text-[var(--text-dim)] ms-2">{form.rating}/5</span>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label="Reliability Score (%)" value={form.reliability_score} onChange={v => setField("reliability_score", v)} placeholder="e.g. 95" icon={<TrendingUp size={14} />} />
-                  <SelectInput label="Sample Status" value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<Package size={14} />} />
+                  <Input label={t("field.reliabilityScore")} value={form.reliability_score} onChange={v => setField("reliability_score", v)} placeholder={t("placeholder.reliabilityScore")} icon={<TrendingUp size={14} />} />
+                  <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<Package size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
                 {/* Certifications */}
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Certifications</label>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.certifications")}</label>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {form.certifications.map((cert, i) => (
                       <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
@@ -4418,64 +4441,64 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <select onChange={e => { const val = e.target.value; if (val && !form.certifications.includes(val)) setField("certifications", [...form.certifications, val]); e.target.value = ""; }} className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none cursor-pointer">
-                      <option value="" className="bg-[#111]">Add certification...</option>
-                      {CERTIFICATIONS_LIST.filter(c => !form.certifications.includes(c)).map(c => <option key={c} value={c} className="bg-[#111]">{c}</option>)}
+                    <select onChange={e => { const val = e.target.value; if (val && !form.certifications.includes(val)) setField("certifications", [...form.certifications, val]); e.target.value = ""; }} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none cursor-pointer">
+                      <option value="" className="bg-[var(--bg-secondary)]">{t("add.certification")}</option>
+                      {CERTIFICATIONS_LIST.filter(c => !form.certifications.includes(c)).map(c => <option key={c} value={c} className="bg-[var(--bg-secondary)]">{c}</option>)}
                     </select>
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Last Quality Issue</label>
-                  <input type="date" value={form.last_quality_issue} onChange={e => setField("last_quality_issue", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 [color-scheme:dark]" />
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastQualityIssueDate")}</label>
+                  <input type="date" value={form.last_quality_issue} onChange={e => setField("last_quality_issue", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Quality Notes</label>
-                  <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder="Quality observations..." rows={3} className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-white/20" />
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.qualityObs")}</label>
+                  <textarea value={form.quality_notes} onChange={e => setField("quality_notes", e.target.value)} placeholder={t("placeholder.qualityObs")} rows={3} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--border-focus)]" />
                 </div>
               </div>
             </FormSection>
 
             {/* 10. Products (placeholder) */}
-            <FormSection title="Products" icon={<Package size={14} />}>
+            <FormSection title={t("section.products")} icon={<Package size={14} />}>
               <div className="flex items-center gap-3 py-4">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                  <Package size={18} className="text-white/20" />
+                <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
+                  <Package size={18} className="text-[var(--text-ghost)]" />
                 </div>
-                <p className="text-sm text-white/30">Products linked to this supplier will appear here when created in the Products module.</p>
+                <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
               </div>
             </FormSection>
 
             {/* 11. Notes */}
-            <FormSection title="Notes" icon={<FileText size={14} />}>
+            <FormSection title={t("section.notes")} icon={<FileText size={14} />}>
               <textarea
                 value={form.notes}
                 onChange={e => setField("notes", e.target.value)}
-                placeholder="General notes about this supplier..."
+                placeholder={t("placeholder.addNotes")}
                 rows={4}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none"
               />
             </FormSection>
 
             {/* 12. Custom Fields */}
-            <FormSection title="Custom Fields" icon={<Hash size={14} />}>
+            <FormSection title={t("section.customFields")} icon={<Hash size={14} />}>
               {form.custom_fields.map((cf, i) => (
                 <div key={i} className="flex items-center gap-2 mb-3">
                   <RemoveBtn onClick={() => removeCustomField(i)} />
                   <input
                     value={cf.field_name}
                     onChange={e => updateCustomField(i, "field_name", e.target.value)}
-                    placeholder="Field Name"
+                    placeholder={t("placeholder.fieldName")}
                     className="w-32 h-10 px-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium outline-none"
                   />
                   <input
                     value={cf.field_value}
                     onChange={e => updateCustomField(i, "field_value", e.target.value)}
-                    placeholder="Value"
-                    className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20"
+                    placeholder={t("placeholder.value")}
+                    className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                   />
                 </div>
               ))}
-              <AddButton label="add field" onClick={addCustomField} />
+              <AddButton label={t("add.field")} onClick={addCustomField} />
             </FormSection>
           </>
         )}
@@ -4484,76 +4507,76 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {isEmployee && (
         <>
         {/* 1. Work Contact */}
-        <FormSection title="Work Contact" icon={<Phone size={14} />}>
+        <FormSection title={t("section.workContact")} icon={<Phone size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Work Email</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workEmail")}</label>
               <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
-                <input value={form.work_email} onChange={e => setField("work_email", e.target.value)} placeholder="employee@company.com" className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <Mail size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
+                <input value={form.work_email} onChange={e => setField("work_email", e.target.value)} placeholder="employee@company.com" className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Work Tel</label>
-                <input value={form.work_tel} onChange={e => setField("work_tel", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workTel")}</label>
+                <input value={form.work_tel} onChange={e => setField("work_tel", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Work Mobile</label>
-                <input value={form.work_mobile} onChange={e => setField("work_mobile", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workMobile")}</label>
+                <input value={form.work_mobile} onChange={e => setField("work_mobile", e.target.value)} placeholder="+1 234 567 890" className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
           </div>
         </FormSection>
 
         {/* 2. Work */}
-        <FormSection title="Work" icon={<Briefcase size={14} />}>
+        <FormSection title={t("section.work")} icon={<Briefcase size={14} />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Management</label>
-                <input value={form.management} onChange={e => setField("management", e.target.value)} placeholder="e.g. Senior Management" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.managementLevel")}</label>
+                <input value={form.management} onChange={e => setField("management", e.target.value)} placeholder={t("placeholder.seniorMgmt")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Department</label>
-                <input value={form.department} onChange={e => setField("department", e.target.value)} placeholder="e.g. Engineering" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.department")}</label>
+                <input value={form.department} onChange={e => setField("department", e.target.value)} placeholder={t("placeholder.engineering")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Job Position</label>
-                <input value={form.job_position} onChange={e => setField("job_position", e.target.value)} placeholder="e.g. Software Engineer" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.jobPosition")}</label>
+                <input value={form.job_position} onChange={e => setField("job_position", e.target.value)} placeholder={t("placeholder.softwareEng")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Job Title</label>
-                <input value={form.job_title} onChange={e => setField("job_title", e.target.value)} placeholder="e.g. Lead Developer" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.jobTitle")}</label>
+                <input value={form.job_title} onChange={e => setField("job_title", e.target.value)} placeholder={t("placeholder.leadDev")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Manager</label>
-              <input value={form.manager} onChange={e => setField("manager", e.target.value)} placeholder="Direct manager name" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.directManager")}</label>
+              <input value={form.manager} onChange={e => setField("manager", e.target.value)} placeholder={t("placeholder.manager")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
 
         {/* 3. Work Location */}
-        <FormSection title="Work Location" icon={<MapPin size={14} />}>
+        <FormSection title={t("section.workLocation")} icon={<MapPin size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Work Address</label>
-              <input value={form.work_address} onChange={e => setField("work_address", e.target.value)} placeholder="Office address" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workAddress")}</label>
+              <input value={form.work_address} onChange={e => setField("work_address", e.target.value)} placeholder={t("placeholder.officeAddress")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Work Location</label>
-              <input value={form.work_location} onChange={e => setField("work_location", e.target.value)} placeholder="e.g. Dubai Office, Remote" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workLocationLabel")}</label>
+              <input value={form.work_location} onChange={e => setField("work_location", e.target.value)} placeholder={t("placeholder.workLocation")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
 
         {/* 4. Resume */}
-        <FormSection title="Resume" icon={<FileText size={14} />}>
+        <FormSection title={t("section.resume")} icon={<FileText size={14} />}>
           {form.resume_lines.map((rl, i) => (
-            <div key={i} className="mb-3 rounded-xl bg-white/[0.02] border border-[#222] overflow-hidden">
+            <div key={i} className="mb-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
               <div className="flex items-center gap-2 p-3 cursor-pointer" onClick={() => setExpandedResumeLine(expandedResumeLine === i ? null : i)}>
                 <span onClick={e => e.stopPropagation()}><RemoveBtn onClick={() => removeResumeLine(i)} /></span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ${
@@ -4561,54 +4584,54 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   rl.type === "education" ? "bg-green-500/10 text-green-400" :
                   rl.type === "training" ? "bg-amber-500/10 text-amber-400" :
                   "bg-violet-500/10 text-violet-400"
-                }`}>{rl.type}</span>
-                <span className="flex-1 text-sm text-white/80 truncate">{rl.title || "Untitled"}</span>
-                <ChevronDown size={14} className={`text-white/30 transition-transform ${expandedResumeLine === i ? "rotate-180" : ""}`} />
+                }`}>{t("resumeType." + rl.type, rl.type)}</span>
+                <span className="flex-1 text-sm text-[var(--text-highlight)] truncate">{rl.title || t("misc.untitled")}</span>
+                <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${expandedResumeLine === i ? "rotate-180" : ""}`} />
               </div>
               {expandedResumeLine === i && (
-                <div className="px-3 pb-3 space-y-3 border-t border-[#222] pt-3">
-                  <input value={rl.title} onChange={e => updateResumeLine(i, "title", e.target.value)} placeholder="Title" className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <div className="px-3 pb-3 space-y-3 border-t border-[var(--border-color)] pt-3">
+                  <input value={rl.title} onChange={e => updateResumeLine(i, "title", e.target.value)} placeholder={t("field.resumeTitle")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-white/40 mb-1 block">Start Date</label>
-                      <input type="date" value={rl.duration_start} onChange={e => updateResumeLine(i, "duration_start", e.target.value)} className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20" />
+                      <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.startDate")}</label>
+                      <input type="date" value={rl.duration_start} onChange={e => updateResumeLine(i, "duration_start", e.target.value)} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
                     </div>
                     <div>
-                      <label className="text-xs text-white/40 mb-1 block">End Date</label>
-                      <input type="date" value={rl.duration_end} onChange={e => updateResumeLine(i, "duration_end", e.target.value)} disabled={rl.is_forever} className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 disabled:opacity-30" />
+                      <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.endDate")}</label>
+                      <input type="date" value={rl.duration_end} onChange={e => updateResumeLine(i, "duration_end", e.target.value)} disabled={rl.is_forever} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] disabled:opacity-30" />
                     </div>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={rl.is_forever} onChange={e => updateResumeLine(i, "is_forever", e.target.checked)} className="w-4 h-4 rounded border-[#333] bg-white/5 accent-white" />
-                    <span className="text-xs text-white/50">Currently ongoing / No end date</span>
+                    <input type="checkbox" checked={rl.is_forever} onChange={e => updateResumeLine(i, "is_forever", e.target.checked)} className="w-4 h-4 rounded border-[var(--border-strong)] bg-[var(--bg-surface)] accent-white" />
+                    <span className="text-xs text-[var(--text-subtle)]">{t("field.currentlyOngoing")}</span>
                   </label>
                   {rl.type === "training" && (
                     <>
                       <div>
-                        <label className="text-xs text-white/40 mb-1.5 block">Course Type</label>
+                        <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.courseType")}</label>
                         <div className="flex gap-2">
-                          <button onClick={() => updateResumeLine(i, "course_type", "external")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "external" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"}`}>External</button>
-                          <button onClick={() => updateResumeLine(i, "course_type", "onsite")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "onsite" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[#222] text-white/30 hover:text-white/50"}`}>Onsite</button>
+                          <button onClick={() => updateResumeLine(i, "course_type", "external")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "external" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"}`}>{t("field.external")}</button>
+                          <button onClick={() => updateResumeLine(i, "course_type", "onsite")} className={`flex-1 h-9 rounded-lg text-xs font-medium border transition-colors ${rl.course_type === "onsite" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"}`}>{t("field.onsite")}</button>
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs text-white/40 mb-1 block">External URL</label>
-                        <input value={rl.external_url} onChange={e => updateResumeLine(i, "external_url", e.target.value)} placeholder="https://..." className="w-full h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                        <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.externalUrl")}</label>
+                        <input value={rl.external_url} onChange={e => updateResumeLine(i, "external_url", e.target.value)} placeholder="https://..." className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
                       </div>
                     </>
                   )}
                   <div>
-                    <label className="text-xs text-white/40 mb-1.5 block">Certificate</label>
+                    <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.certificate")}</label>
                     {rl.certificate_url ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-white/60 truncate flex-1">{rl.certificate_name || "Certificate"}</span>
-                        <button onClick={() => openFilePreview(rl.certificate_url)} className="text-xs text-blue-400 hover:text-blue-300">Open</button>
-                        <button onClick={() => { updateResumeLine(i, "certificate_url", ""); updateResumeLine(i, "certificate_name", ""); }} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                        <span className="text-xs text-[var(--text-muted)] truncate flex-1">{rl.certificate_name || t("field.certificate")}</span>
+                        <button onClick={() => openFilePreview(rl.certificate_url)} className="text-xs text-blue-400 hover:text-blue-300">{t("btn.open")}</button>
+                        <button onClick={() => { updateResumeLine(i, "certificate_url", ""); updateResumeLine(i, "certificate_name", ""); }} className="text-xs text-red-400 hover:text-red-300">{t("btn.remove")}</button>
                       </div>
                     ) : (
-                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-dashed border-[#333] hover:border-white/20 text-xs text-white/40 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-strong)] hover:border-[var(--border-focus)] text-xs text-[var(--text-faint)] cursor-pointer transition-colors">
                         <FilePlus size={14} />
-                        Upload certificate
+                        {t("field.uploadCertificate")}
                         <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                           const file = e.target.files?.[0];
                           if (file) {
@@ -4623,8 +4646,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     )}
                   </div>
                   <div>
-                    <label className="text-xs text-white/40 mb-1 block">Notes</label>
-                    <textarea value={rl.notes} onChange={e => updateResumeLine(i, "notes", e.target.value)} rows={4} placeholder="Additional details, achievements..." className="w-full px-3 py-2 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20 resize-none" />
+                    <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.notes")}</label>
+                    <textarea value={rl.notes} onChange={e => updateResumeLine(i, "notes", e.target.value)} rows={4} placeholder={t("placeholder.addNotes")} className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none" />
                   </div>
                 </div>
               )}
@@ -4632,61 +4655,61 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           ))}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => addResumeLine("experience")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-500/15 transition-colors">
-              <Plus size={12} /> Experience
+              <Plus size={12} /> {t("resumeType.experience")}
             </button>
             <button onClick={() => addResumeLine("education")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs text-green-400 font-medium hover:bg-green-500/15 transition-colors">
-              <Plus size={12} /> Education
+              <Plus size={12} /> {t("resumeType.education")}
             </button>
             <button onClick={() => addResumeLine("training")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 font-medium hover:bg-amber-500/15 transition-colors">
-              <Plus size={12} /> Training
+              <Plus size={12} /> {t("resumeType.training")}
             </button>
             <button onClick={() => addResumeLine("certification")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 font-medium hover:bg-violet-500/15 transition-colors">
-              <Plus size={12} /> Internal Certification
+              <Plus size={12} /> {t("resumeType.internalCert")}
             </button>
           </div>
         </FormSection>
 
         {/* 5. Private Contact */}
-        <FormSection title="Private Contact" icon={<Phone size={14} />}>
+        <FormSection title={t("section.privateContact")} icon={<Phone size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Email</label>
-              <input value={form.private_email} onChange={e => setField("private_email", e.target.value)} placeholder="Personal email" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.privateEmail")}</label>
+              <input value={form.private_email} onChange={e => setField("private_email", e.target.value)} placeholder={t("field.privateEmail")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Phone</label>
-              <input value={form.private_phone} onChange={e => setField("private_phone", e.target.value)} placeholder="Personal phone" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.privatePhone")}</label>
+              <input value={form.private_phone} onChange={e => setField("private_phone", e.target.value)} placeholder={t("field.privatePhone")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Bank Account</label>
-              <input value={form.employee_bank_account} onChange={e => setField("employee_bank_account", e.target.value)} placeholder="Bank account details" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.bankAccount")}</label>
+              <input value={form.employee_bank_account} onChange={e => setField("employee_bank_account", e.target.value)} placeholder={t("placeholder.bankAccount")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
 
         {/* 6. Personal Information */}
-        <FormSection title="Personal Information" icon={<User size={14} />}>
+        <FormSection title={t("section.personalInfo")} icon={<User size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Legal Name</label>
-              <input value={form.legal_name} onChange={e => setField("legal_name", e.target.value)} placeholder="Full legal name" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.legalName")}</label>
+              <input value={form.legal_name} onChange={e => setField("legal_name", e.target.value)} placeholder={t("placeholder.legalName")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Birthday</label>
-              <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("section.birthday")}</label>
+              <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} dayLabel={t("field.day")} monthLabel={t("field.month")} yearLabel={t("field.year")} renderMonth={m => t("month." + m, m)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Place of Birth</label>
-                <input value={form.place_of_birth} onChange={e => setField("place_of_birth", e.target.value)} placeholder="City, Country" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.placeOfBirth")}</label>
+                <input value={form.place_of_birth} onChange={e => setField("place_of_birth", e.target.value)} placeholder={t("placeholder.cityCountry")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Gender</label>
-                <select value={form.gender} onChange={e => setField("gender", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
-                  <option value="">Select...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.gender")}</label>
+                <select value={form.gender} onChange={e => setField("gender", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
+                  <option value="">{t("detail.select")}</option>
+                  <option value="male">{tOpt("male")}</option>
+                  <option value="female">{tOpt("female")}</option>
+                  <option value="other">{tOpt("Other")}</option>
                 </select>
               </div>
             </div>
@@ -4694,43 +4717,43 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 7. Emergency Contact */}
-        <FormSection title="Emergency Contact" icon={<ShieldAlert size={14} />}>
+        <FormSection title={t("section.emergencyContact")} icon={<ShieldAlert size={14} />}>
           {form.emergency_contacts.map((ec, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeEmergencyContact(i)} />
-              <input value={ec.contact} onChange={e => updateEmergencyContact(i, "contact", e.target.value)} placeholder="Contact name" className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-              <input value={ec.phone} onChange={e => updateEmergencyContact(i, "phone", e.target.value)} placeholder="Phone" className="flex-1 h-9 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <input value={ec.contact} onChange={e => updateEmergencyContact(i, "contact", e.target.value)} placeholder={t("field.contactName")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+              <input value={ec.phone} onChange={e => updateEmergencyContact(i, "phone", e.target.value)} placeholder={t("field.phone")} className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           ))}
-          <AddButton label="add emergency contact" onClick={addEmergencyContact} />
+          <AddButton label={t("add.emergencyContact")} onClick={addEmergencyContact} />
         </FormSection>
 
         {/* 8. Visa & Work Permit */}
-        <FormSection title="Visa & Work Permit" icon={<Plane size={14} />}>
+        <FormSection title={t("section.visaWorkPermit")} icon={<Plane size={14} />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Visa No.</label>
-                <input value={form.visa_no} onChange={e => setField("visa_no", e.target.value)} placeholder="Visa number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.visaNo")}</label>
+                <input value={form.visa_no} onChange={e => setField("visa_no", e.target.value)} placeholder={t("placeholder.visaNo")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-1.5 block">Work Permit</label>
-                <input value={form.work_permit} onChange={e => setField("work_permit", e.target.value)} placeholder="Work permit number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+                <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workPermit")}</label>
+                <input value={form.work_permit} onChange={e => setField("work_permit", e.target.value)} placeholder={t("placeholder.workPermit")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Documents</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.documents")}</label>
               {form.visa_documents.map((vd, i) => (
                 <div key={i} className="flex items-center gap-2 mb-2">
-                  <span className="text-xs text-white/60 truncate flex-1">{vd.name || "Document"}</span>
-                  <button onClick={() => openFilePreview(vd.url)} className="text-xs text-blue-400 hover:text-blue-300">Open</button>
-                  <button onClick={() => downloadFile(vd.url, vd.name)} className="text-xs text-white/40 hover:text-white">Download</button>
-                  <button onClick={() => removeVisaDoc(i)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                  <span className="text-xs text-[var(--text-muted)] truncate flex-1">{vd.name || t("field.documents")}</span>
+                  <button onClick={() => openFilePreview(vd.url)} className="text-xs text-blue-400 hover:text-blue-300">{t("btn.open")}</button>
+                  <button onClick={() => downloadFile(vd.url, vd.name)} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-primary)]">{t("btn.download")}</button>
+                  <button onClick={() => removeVisaDoc(i)} className="text-xs text-red-400 hover:text-red-300">{t("btn.remove")}</button>
                 </div>
               ))}
-              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-dashed border-[#333] hover:border-white/20 text-xs text-white/40 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-strong)] hover:border-[var(--border-focus)] text-xs text-[var(--text-faint)] cursor-pointer transition-colors">
                 <FilePlus size={14} />
-                Upload document
+                {t("photo.uploadDoc")}
                 <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -4746,94 +4769,94 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 9. Citizenship */}
-        <FormSection title="Citizenship" icon={<Globe size={14} />}>
+        <FormSection title={t("section.citizenship")} icon={<Globe size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Nationality (Country)</label>
-              <CountryDropdown value={form.nationality_code} displayValue={form.nationality} onChange={(name, code) => { setField("nationality", name); setField("nationality_code", code); }} />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.nationalityCountry")}</label>
+              <CountryDropdown value={form.nationality_code} displayValue={form.nationality} onChange={(name, code) => { setField("nationality", name); setField("nationality_code", code); }} label={t("field.nationality")} placeholder={t("field.searchCountry")} noResults={t("detail.noCountries")} />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block flex items-center gap-1">
-                ID No.
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block flex items-center gap-1">
+                {t("field.nationalIdNumber")}
                 <span className="relative group">
-                  <HelpCircle size={12} className="text-white/20 cursor-help" />
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#222] text-[10px] text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">National Identity Card Number</span>
+                  <HelpCircle size={12} className="text-[var(--text-ghost)] cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[var(--border-color)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t("tooltip.nationalId")}</span>
                 </span>
               </label>
-              <input value={form.id_no} onChange={e => setField("id_no", e.target.value)} placeholder="National ID number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <input value={form.id_no} onChange={e => setField("id_no", e.target.value)} placeholder={t("placeholder.nationalId")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block flex items-center gap-1">
-                SSN No.
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block flex items-center gap-1">
+                {t("field.ssn")}
                 <span className="relative group">
-                  <HelpCircle size={12} className="text-white/20 cursor-help" />
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[#222] text-[10px] text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Social Security Number</span>
+                  <HelpCircle size={12} className="text-[var(--text-ghost)] cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[var(--border-color)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t("tooltip.ssn")}</span>
                 </span>
               </label>
-              <input value={form.ssn_no} onChange={e => setField("ssn_no", e.target.value)} placeholder="Social security number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <input value={form.ssn_no} onChange={e => setField("ssn_no", e.target.value)} placeholder={t("placeholder.ssn")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Passport No.</label>
-              <input value={form.passport_no} onChange={e => setField("passport_no", e.target.value)} placeholder="Passport number" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.passportNo")}</label>
+              <input value={form.passport_no} onChange={e => setField("passport_no", e.target.value)} placeholder={t("placeholder.passport")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
 
         {/* 10. Private Location */}
-        <FormSection title="Private Location" icon={<Home size={14} />}>
+        <FormSection title={t("section.privateLocation")} icon={<Home size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Private Address</label>
-              <input value={form.private_address} onChange={e => setField("private_address", e.target.value)} placeholder="Home address" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.privateAddress")}</label>
+              <input value={form.private_address} onChange={e => setField("private_address", e.target.value)} placeholder={t("placeholder.homeAddress")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Home-Work Distance</label>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.homeWorkDistance")}</label>
               <div className="relative">
-                <input value={form.home_work_distance} onChange={e => setField("home_work_distance", e.target.value)} placeholder="0" className="w-full h-10 px-3 pr-12 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30">KM</span>
+                <input value={form.home_work_distance} onChange={e => setField("home_work_distance", e.target.value)} placeholder="0" className="w-full h-10 px-3 pe-12 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
+                <span className="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)]">KM</span>
               </div>
             </div>
           </div>
         </FormSection>
 
         {/* 11. Family */}
-        <FormSection title="Family" icon={<Heart size={14} />}>
+        <FormSection title={t("section.family")} icon={<Heart size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Marital Status</label>
-              <select value={form.marital_status} onChange={e => setField("marital_status", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
-                <option value="">Select...</option>
-                <option value="single">Single</option>
-                <option value="married">Married</option>
-                <option value="divorced">Divorced</option>
-                <option value="widowed">Widowed</option>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.maritalStatus")}</label>
+              <select value={form.marital_status} onChange={e => setField("marital_status", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
+                <option value="">{t("detail.select")}</option>
+                <option value="single">{tOpt("single")}</option>
+                <option value="married">{tOpt("married")}</option>
+                <option value="divorced">{tOpt("divorced")}</option>
+                <option value="widowed">{tOpt("widowed")}</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Number of Children</label>
-              <input type="number" min="0" value={form.number_of_children} onChange={e => setField("number_of_children", e.target.value)} placeholder="0" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.numberOfChildren")}</label>
+              <input type="number" min="0" value={form.number_of_children} onChange={e => setField("number_of_children", e.target.value)} placeholder="0" className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
 
         {/* 12. Education */}
-        <FormSection title="Education" icon={<GraduationCap size={14} />}>
+        <FormSection title={t("section.education")} icon={<GraduationCap size={14} />}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Certificate Level</label>
-              <select value={form.certificate_level} onChange={e => setField("certificate_level", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white outline-none focus:border-white/20 appearance-none">
-                <option value="">Select...</option>
-                <option value="high_school">High School</option>
-                <option value="diploma">Diploma</option>
-                <option value="bachelor">Bachelor&apos;s Degree</option>
-                <option value="master">Master&apos;s Degree</option>
-                <option value="doctorate">Doctorate / PhD</option>
-                <option value="other">Other</option>
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.certificateLevel")}</label>
+              <select value={form.certificate_level} onChange={e => setField("certificate_level", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] appearance-none">
+                <option value="">{t("detail.select")}</option>
+                <option value="high_school">{tOpt("high_school")}</option>
+                <option value="diploma">{tOpt("diploma")}</option>
+                <option value="bachelor">{tOpt("bachelor")}</option>
+                <option value="master">{tOpt("master")}</option>
+                <option value="doctorate">{tOpt("doctorate")}</option>
+                <option value="other">{tOpt("Other")}</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1.5 block">Field of Study</label>
-              <input value={form.field_of_study} onChange={e => setField("field_of_study", e.target.value)} placeholder="e.g. Computer Science" className="w-full h-10 px-3 rounded-lg bg-white/5 border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-white/20" />
+              <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.fieldOfStudy")}</label>
+              <input value={form.field_of_study} onChange={e => setField("field_of_study", e.target.value)} placeholder={t("placeholder.fieldOfStudy")} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
             </div>
           </div>
         </FormSection>
@@ -4842,16 +4865,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Customer Type (only for customer contacts) */}
         {isCustomer && (
-          <FormSection title="Customer Type" icon={<Crown size={14} />}>
+          <FormSection title={t("section.customerType")} icon={<Crown size={14} />}>
             <div className="space-y-3">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.is_active}
                   onChange={e => setField("is_active", e.target.checked)}
-                  className="w-4 h-4 rounded border-white/20 bg-white/5 accent-blue-500"
+                  className="w-4 h-4 rounded border-[var(--border-focus)] bg-[var(--bg-surface)] accent-blue-500"
                 />
-                <span className="text-sm text-white">Active Customer</span>
+                <span className="text-sm text-[var(--text-primary)]">{t("detail.activeCustomer")}</span>
               </label>
 
               {form.is_active && (
@@ -4862,8 +4885,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       onClick={() => setField("customer_type", form.customer_type === tier.value ? "" : tier.value)}
                       className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                         form.customer_type === tier.value
-                          ? `${tier.bg} ${tier.color} border-white/20 ring-1 ring-white/10`
-                          : "border-[#222] text-white/30 hover:text-white/50 hover:border-[#333]"
+                          ? `${tier.bg} ${tier.color} border-[var(--border-focus)] ring-1 ring-white/10`
+                          : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)] hover:border-[var(--border-strong)]"
                       }`}
                     >
                       {tier.value === "end_user" && <User size={14} />}
@@ -4891,64 +4914,64 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   const renderTypeChooser = () => (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
-      <div className="bg-[#111] border border-[#222] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
         {typeChooserStep === 1 ? (
           <>
-            <h3 className="text-lg font-semibold text-white mb-1">New Contact</h3>
-            <p className="text-sm text-white/40 mb-5">Choose the contact type</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t("typeChooser.title")}</h3>
+            <p className="text-sm text-[var(--text-faint)] mb-5">{t("typeChooser.desc")}</p>
             <div className="grid grid-cols-2 gap-3">
-              {CONTACT_TYPES.map(t => (
+              {CONTACT_TYPES.map(ct => (
                 <button
-                  key={t.value}
+                  key={ct.value}
                   onClick={() => {
-                    if (t.value === "customer") {
+                    if (ct.value === "customer") {
                       setTypeChooserStep(2);
                     } else {
-                      handleAdd(t.value);
+                      handleAdd(ct.value);
                     }
                   }}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.05] transition-all ${t.color}`}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] hover:bg-[var(--bg-surface)] transition-all ${ct.color}`}
                 >
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
-                    {t.icon}
+                  <div className="w-12 h-12 rounded-full bg-[var(--bg-surface)] flex items-center justify-center [&>svg]:w-[22px] [&>svg]:h-[22px]">
+                    {ct.icon}
                   </div>
-                  <span className="text-sm font-medium">{t.label}</span>
+                  <span className="text-sm font-medium">{t("type." + ct.value, ct.label)}</span>
                 </button>
               ))}
             </div>
-            <button onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors">
+            <button onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors">
               Cancel
             </button>
           </>
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-white mb-1">What type of customer?</h3>
-            <p className="text-sm text-white/40 mb-5">Select the customer entity type</p>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t("typeChooser.customerQ")}</h3>
+            <p className="text-sm text-[var(--text-faint)] mb-5">{t("typeChooser.customerDesc")}</p>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleAdd("customer", "person")}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-amber-500/30 bg-white/[0.02] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
                   <User size={22} />
                 </div>
-                <span className="text-sm font-medium">Individual</span>
-                <span className="text-[11px] text-white/30 text-center leading-tight">A person you do business with</span>
+                <span className="text-sm font-medium">{t("typeChooser.individual")}</span>
+                <span className="text-[11px] text-[var(--text-dim)] text-center leading-tight">{t("typeChooser.individualDesc")}</span>
               </button>
               <button
                 onClick={() => handleAdd("customer", "company")}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#222] hover:border-amber-500/30 bg-white/[0.02] hover:bg-amber-500/[0.05] transition-all text-amber-400"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
                   <Building2 size={22} />
                 </div>
-                <span className="text-sm font-medium">Business</span>
-                <span className="text-[11px] text-white/30 text-center leading-tight">A company or organization</span>
+                <span className="text-sm font-medium">{t("typeChooser.business")}</span>
+                <span className="text-[11px] text-[var(--text-dim)] text-center leading-tight">{t("typeChooser.businessDesc")}</span>
               </button>
             </div>
-            <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-white/50 hover:text-white border border-[#222] hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
-              <ArrowLeft size={14} /> Back
+            <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors flex items-center justify-center gap-2">
+              <ArrowLeft size={14} className="rtl:rotate-180" /> {t("back")}
             </button>
           </>
         )}
@@ -4961,14 +4984,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] bg-[#0A0A0A] text-white flex overflow-hidden">
+    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]">
       {/* Left panel -- contact list */}
-      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-r border-[#222] shrink-0 h-full bg-[#111] min-w-0`}>
+      <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
         {renderListPanel()}
       </div>
 
       {/* Right panel -- detail / form */}
-      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[#0A0A0A]`}>
+      <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
         {view === "form" ? renderFormPanel() : renderDetailPanel()}
       </div>
 

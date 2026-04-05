@@ -130,12 +130,12 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[#111] border border-[#222] rounded-xl p-5 md:p-6">
+    <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 md:p-6">
       <div className="flex items-center gap-3 mb-5">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/[0.06] text-white/60">
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)] text-[var(--text-muted)]">
           {icon}
         </div>
-        <h2 className="text-[15px] font-semibold text-white tracking-tight">
+        <h2 className="text-[15px] font-semibold text-[var(--text-primary)] tracking-tight">
           {title}
         </h2>
       </div>
@@ -157,13 +157,13 @@ function FieldText({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-white/50">{label}</span>
+      <span className="text-xs font-medium text-[var(--text-subtle)]">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder || ""}
-        className="h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+        className="h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
       />
     </label>
   );
@@ -186,7 +186,7 @@ function FieldNumber({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-white/50">{label}</span>
+      <span className="text-xs font-medium text-[var(--text-subtle)]">{label}</span>
       <div className="relative">
         <input
           type="number"
@@ -194,10 +194,10 @@ function FieldNumber({
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           min={min}
           step={step || 1}
-          className="w-full h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[#222] text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-full h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         {suffix && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 pointer-events-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)] pointer-events-none">
             {suffix}
           </span>
         )}
@@ -219,14 +219,14 @@ function FieldSelect({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-white/50">{label}</span>
+      <span className="text-xs font-medium text-[var(--text-subtle)]">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[#222] text-sm text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
+        className="h-10 px-3 rounded-lg bg-[#1a1a1a] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all appearance-none cursor-pointer"
       >
         {options.map((opt) => (
-          <option key={opt} value={opt} className="bg-[#1a1a1a] text-white">
+          <option key={opt} value={opt} className="bg-[#1a1a1a] text-[var(--text-primary)]">
             {opt}
           </option>
         ))}
@@ -250,7 +250,7 @@ function FieldCheckbox({
         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
           checked
             ? "bg-blue-500 border-blue-500"
-            : "border-[#333] group-hover:border-[#555]"
+            : "border-[var(--border-strong)] group-hover:border-[#555]"
         }`}
         onClick={() => onChange(!checked)}
       >
@@ -260,7 +260,7 @@ function FieldCheckbox({
             height="12"
             viewBox="0 0 12 12"
             fill="none"
-            className="text-white"
+            className="text-[var(--text-primary)]"
           >
             <path
               d="M2.5 6L5 8.5L9.5 3.5"
@@ -272,7 +272,7 @@ function FieldCheckbox({
           </svg>
         )}
       </div>
-      <span className="text-sm text-white/70 group-hover:text-white transition-colors">
+      <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
         {label}
       </span>
     </label>
@@ -295,19 +295,19 @@ function MetricCard({
       className={`rounded-xl border p-5 ${
         accent
           ? "bg-blue-500/10 border-blue-500/30"
-          : "bg-[#111] border-[#222]"
+          : "bg-[var(--bg-secondary)] border-[var(--border-color)]"
       }`}
     >
-      <div className="text-xs font-medium text-white/50 mb-2">{label}</div>
+      <div className="text-xs font-medium text-[var(--text-subtle)] mb-2">{label}</div>
       <div
         className={`text-2xl md:text-3xl font-bold tracking-tight ${
-          accent ? "text-blue-400" : "text-white"
+          accent ? "text-blue-400" : "text-[var(--text-primary)]"
         }`}
       >
         {value}
       </div>
       {sub && (
-        <div className="text-sm text-white/40 mt-1">{sub}</div>
+        <div className="text-sm text-[var(--text-faint)] mt-1">{sub}</div>
       )}
     </div>
   );
@@ -330,15 +330,15 @@ function BreakdownRow({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-white/70">{label}</span>
+        <span className="text-sm text-[var(--text-secondary)]">{label}</span>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white">${fmt(usd)}</span>
-          <span className="text-xs text-white/40 w-14 text-right">
+          <span className="text-sm font-medium text-[var(--text-primary)]">${fmt(usd)}</span>
+          <span className="text-xs text-[var(--text-faint)] w-14 text-right">
             {percentage}%
           </span>
         </div>
       </div>
-      <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+      <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{
@@ -497,21 +497,21 @@ export default function LandedCostSimulator() {
       : 0;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-[#222]">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[var(--bg-primary)]/80 border-b border-[var(--border-color)]">
         <div className="max-w-6xl mx-auto px-4 md:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="flex items-center gap-2 text-white/50 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors"
             >
               <ArrowLeft size={18} />
               <span className="text-sm font-medium hidden sm:inline">
                 Back to Hub
               </span>
             </Link>
-            <div className="w-px h-5 bg-[#222]" />
+            <div className="w-px h-5 bg-[var(--border-color)]" />
             <div className="flex items-center gap-2">
               <DollarSign size={20} className="text-blue-400" />
               <h1 className="text-[15px] font-semibold tracking-tight">
@@ -736,14 +736,14 @@ export default function LandedCostSimulator() {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={calculate}
-            className="flex-1 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-blue-500/20"
+            className="flex-1 h-12 rounded-xl bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-[var(--text-primary)] font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-blue-500/20"
           >
             <Calculator size={18} />
             Calculate Landed Cost
           </button>
           <button
             onClick={reset}
-            className="h-12 px-6 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-[#222] hover:border-[#333] text-white/70 hover:text-white font-medium text-sm flex items-center justify-center gap-2 transition-all"
+            className="h-12 px-6 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] border border-[var(--border-color)] hover:border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium text-sm flex items-center justify-center gap-2 transition-all"
           >
             <RotateCcw size={16} />
             Reset
@@ -790,7 +790,7 @@ export default function LandedCostSimulator() {
             </div>
 
             {/* Cost Breakdown */}
-            <div className="bg-[#111] border border-[#222] rounded-xl p-5 md:p-6">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 md:p-6">
               <div className="flex items-center gap-2 mb-5">
                 <BarChart3 size={18} className="text-blue-400" />
                 <h2 className="text-[15px] font-semibold tracking-tight">
@@ -809,16 +809,16 @@ export default function LandedCostSimulator() {
                   />
                 ))}
               </div>
-              <div className="mt-5 pt-4 border-t border-[#222] flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">Total</span>
-                <span className="text-sm font-bold text-white">
+              <div className="mt-5 pt-4 border-t border-[var(--border-color)] flex items-center justify-between">
+                <span className="text-sm font-semibold text-[var(--text-primary)]">Total</span>
+                <span className="text-sm font-bold text-[var(--text-primary)]">
                   ${fmt(results.totalLandedCost)}
                 </span>
               </div>
             </div>
 
             {/* Percentage Summary */}
-            <div className="bg-[#111] border border-[#222] rounded-xl p-5 md:p-6">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-5 md:p-6">
               <div className="flex items-center gap-2 mb-5">
                 <Percent size={18} className="text-blue-400" />
                 <h2 className="text-[15px] font-semibold tracking-tight">
@@ -829,16 +829,16 @@ export default function LandedCostSimulator() {
                 {breakdownItems.map((item) => (
                   <div
                     key={item.label}
-                    className="flex flex-col items-center gap-2 p-4 rounded-lg bg-white/[0.03] border border-[#1a1a1a]"
+                    className="flex flex-col items-center gap-2 p-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[#1a1a1a]"
                   >
                     <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-xl font-bold text-white">
+                    <span className="text-xl font-bold text-[var(--text-primary)]">
                       {item.pct}%
                     </span>
-                    <span className="text-xs text-white/50 text-center">
+                    <span className="text-xs text-[var(--text-subtle)] text-center">
                       {item.label}
                     </span>
                   </div>

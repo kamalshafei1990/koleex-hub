@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Menu, X, Home } from "lucide-react";
+import { Sun, Moon, Home, Bell } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
+import { hubT } from "@/lib/translations/hub";
 
 /* ── Koleex Logo ── */
 function KoleexLogo({ className }: { className?: string }) {
@@ -19,31 +21,43 @@ function KoleexLogo({ className }: { className?: string }) {
   );
 }
 
-/* ── Route → App Name mapping ── */
-const routeNames: Record<string, string> = {
-  "/contacts": "Contacts",
-  "/customers": "Customers",
-  "/suppliers": "Suppliers",
-  "/employees": "Employees",
-  "/products": "Products",
-  "/products/new": "New Product",
-  "/quotations": "Quotations",
-  "/price-calculator": "Price Calculator",
-  "/markets": "Markets",
-  "/landed-cost": "Landed Cost",
-  "/website": "Website",
-  "/categories": "Categories",
-  "/subcategories": "Subcategories",
-  "/divisions": "Divisions",
+/* ── Route → Translation key mapping ── */
+const routeKeys: Record<string, string> = {
+  "/contacts": "app.contacts",
+  "/customers": "app.customers",
+  "/suppliers": "app.suppliers",
+  "/employees": "app.employees",
+  "/products": "app.products",
+  "/products/new": "app.products",
+  "/quotations": "app.quotations",
+  "/price-calculator": "app.price-calculator",
+  "/markets": "app.markets",
+  "/landed-cost": "app.landed-cost",
+  "/website": "app.website",
+  "/categories": "cat.system",
+  "/subcategories": "cat.system",
+  "/divisions": "cat.system",
 };
+
+/* ── Language config ── */
+type Lang = "en" | "zh" | "ar";
+const languages: { code: Lang; label: string; short: string }[] = [
+  { code: "en", label: "English", short: "EN" },
+  { code: "zh", label: "中文", short: "中文" },
+  { code: "ar", label: "العربية", short: "عر" },
+];
 
 export default function MainHeader() {
   const pathname = usePathname();
+  const { t } = useTranslation(hubT);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [lang, setLang] = useState<Lang>("en");
 
   useEffect(() => {
-    const saved = localStorage.getItem("koleex-theme") as "light" | "dark" | null;
-    if (saved) setTheme(saved);
+    const savedTheme = localStorage.getItem("koleex-theme") as "light" | "dark" | null;
+    if (savedTheme) setTheme(savedTheme);
+    const savedLang = localStorage.getItem("koleex-lang") as Lang | null;
+    if (savedLang) setLang(savedLang);
   }, []);
 
   useEffect(() => {
@@ -52,61 +66,114 @@ export default function MainHeader() {
     window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute("lang", lang);
+    document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    localStorage.setItem("koleex-lang", lang);
+    window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));
+  }, [lang]);
+
   const dk = theme === "dark";
   const isHome = pathname === "/";
 
   /* Find current app name from route */
-  const appName = !isHome
-    ? routeNames[pathname] || routeNames[Object.keys(routeNames).find(r => pathname.startsWith(r + "/")) || ""] || null
+  const routeKey = !isHome
+    ? routeKeys[pathname] || routeKeys[Object.keys(routeKeys).find(r => pathname.startsWith(r + "/")) || ""] || null
     : null;
+  const appName = routeKey ? t(routeKey) : null;
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-4 md:px-6 backdrop-blur-xl border-b transition-colors duration-300 ${
+      dir="ltr"
+      className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 backdrop-blur-xl border-b transition-colors duration-300 ${
         dk
           ? "border-white/[0.08] bg-black/80"
-          : "border-black/[0.08] bg-white/80"
+          : "border-black/[0.08] bg-white/95"
       }`}
     >
       {/* Left: Logo + App Name */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3 min-w-0">
         {!isHome && (
           <Link
             href="/"
-            className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+            className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg shrink-0 transition-colors ${
               dk ? "text-white/60 hover:text-white hover:bg-white/[0.06]" : "text-black/60 hover:text-black hover:bg-black/[0.06]"
             }`}
           >
-            <Home size={18} />
+            <Home size={16} className="md:w-[18px] md:h-[18px]" />
           </Link>
         )}
-        <Link href="/" className={dk ? "text-white" : "text-black"}>
-          <KoleexLogo className="h-5 w-auto" />
+        <Link href="/" className={`shrink-0 ${dk ? "text-white" : "text-black"}`}>
+          <KoleexLogo className="w-auto h-4 md:h-5" />
         </Link>
         {appName && (
           <>
-            <span className={`text-sm ${dk ? "text-white/20" : "text-black/20"}`}>/</span>
-            <span className={`text-sm font-medium ${dk ? "text-white/70" : "text-black/70"}`}>
+            <span className={`text-sm hidden md:inline ${dk ? "text-white/20" : "text-black/20"}`}>/</span>
+            <span className={`text-sm font-medium hidden md:inline truncate ${dk ? "text-white/70" : "text-black/70"}`}>
               {appName}
             </span>
           </>
         )}
       </div>
 
-      {/* Right: Theme + Avatar */}
-      <div className="flex items-center gap-2">
+      {/* Right: Language + Theme + Avatar */}
+      <div className="flex items-center gap-1 md:gap-2 shrink-0">
+        {/* Language pill bar */}
+        <div
+          className={`flex items-center h-7 md:h-8 rounded-md md:rounded-lg border p-0.5 transition-colors ${
+            dk
+              ? "border-white/[0.08] bg-white/[0.03]"
+              : "border-black/[0.08] bg-black/[0.03]"
+          }`}
+        >
+          {languages.map((l) => (
+            <button
+              key={l.code}
+              onClick={() => setLang(l.code)}
+              className={`relative h-6 md:h-7 w-8 md:w-[60px] rounded-[5px] md:rounded-md text-[10px] md:text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
+                lang === l.code
+                  ? dk
+                    ? "bg-white/[0.12] text-white shadow-sm"
+                    : "bg-black/[0.10] text-black shadow-sm"
+                  : dk
+                    ? "text-white/30 hover:text-white/60"
+                    : "text-black/30 hover:text-black/60"
+              }`}
+            >
+              <span className="md:hidden">{l.short}</span>
+              <span className="hidden md:inline">{l.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Theme toggle */}
         <button
           onClick={() => setTheme(dk ? "light" : "dark")}
-          className={`flex items-center justify-center w-9 h-9 rounded-lg border transition-all ${
+          className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
             dk
               ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white"
               : "border-black/[0.08] bg-black/[0.04] text-black/60 hover:text-black"
           }`}
         >
-          {dk ? <Sun size={18} /> : <Moon size={18} />}
+          {dk ? <Sun size={15} className="md:w-4 md:h-4" /> : <Moon size={15} className="md:w-4 md:h-4" />}
         </button>
+
+        {/* Notification bell */}
+        <button
+          className={`relative flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
+            dk
+              ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white"
+              : "border-black/[0.08] bg-black/[0.04] text-black/60 hover:text-black"
+          }`}
+        >
+          <Bell size={15} className="md:w-4 md:h-4" />
+          {/* Notification dot */}
+          <span className="absolute top-1 end-1 md:top-1.5 md:end-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
+        </button>
+
+        {/* User avatar */}
         <div
-          className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold ${
+          className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full text-[10px] md:text-[11px] font-semibold ${
             dk ? "bg-white text-black" : "bg-black text-white"
           }`}
         >
