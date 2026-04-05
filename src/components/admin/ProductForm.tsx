@@ -463,9 +463,6 @@ export default function ProductForm({ productId }: Props) {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-[14px] font-semibold text-[var(--text-primary)] hidden md:block">
-              {isEdit ? "Edit Product" : "New Product"}
-            </h1>
             <button
               onClick={save}
               disabled={saving}
