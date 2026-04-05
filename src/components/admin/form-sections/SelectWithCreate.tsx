@@ -3,16 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Check, ChevronDown, Search } from "lucide-react";
 
-interface Option {
+export interface SelectOption {
   value: string;
   label: string;
+  icon?: string | null; // URL to logo/image
 }
 
 interface Props {
   value: string;
-  options: Option[];
+  options: SelectOption[];
   onChange: (value: string) => void;
-  onClickCreate?: () => void; // opens a modal in the parent
+  onClickCreate?: () => void;
   placeholder?: string;
   disabled?: boolean;
   createLabel?: string;
@@ -34,7 +35,6 @@ export default function SelectWithCreate({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -46,7 +46,6 @@ export default function SelectWithCreate({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Focus search when opened
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
@@ -55,6 +54,8 @@ export default function SelectWithCreate({
   const filtered = search
     ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
     : options;
+
+  const hasIcons = options.some(o => o.icon);
 
   const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
 
@@ -67,8 +68,11 @@ export default function SelectWithCreate({
         disabled={disabled}
         className={`${inp} flex items-center justify-between gap-2 cursor-pointer text-left ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
-        <span className={selected ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}>
-          {selected ? selected.label : placeholder}
+        <span className={`flex items-center gap-2.5 min-w-0 ${selected ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)]"}`}>
+          {selected?.icon && (
+            <img src={selected.icon} alt="" className="h-5 w-5 rounded-md object-cover shrink-0" />
+          )}
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
         <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
@@ -94,7 +98,7 @@ export default function SelectWithCreate({
           )}
 
           {/* Options list */}
-          <div className="max-h-[220px] overflow-y-auto py-1">
+          <div className="max-h-[260px] overflow-y-auto py-1">
             {/* Empty option */}
             <button
               type="button"
@@ -109,12 +113,21 @@ export default function SelectWithCreate({
                 key={o.value}
                 type="button"
                 onClick={() => { onChange(o.value); setOpen(false); setSearch(""); }}
-                className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center justify-between hover:bg-[var(--bg-surface-subtle)] transition-colors ${
+                className={`w-full px-4 py-2.5 text-left text-[13px] flex items-center gap-2.5 hover:bg-[var(--bg-surface-subtle)] transition-colors ${
                   o.value === value ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"
                 }`}
               >
-                <span>{o.label}</span>
-                {o.value === value && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+                {hasIcons && (
+                  o.icon ? (
+                    <img src={o.icon} alt="" className="h-6 w-6 rounded-md object-cover shrink-0 border border-[var(--border-subtle)]" />
+                  ) : (
+                    <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] shrink-0 flex items-center justify-center text-[10px] font-bold text-[var(--text-ghost)]">
+                      {o.label.charAt(0).toUpperCase()}
+                    </div>
+                  )
+                )}
+                <span className="truncate flex-1">{o.label}</span>
+                {o.value === value && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
               </button>
             ))}
 

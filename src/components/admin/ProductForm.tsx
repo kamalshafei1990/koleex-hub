@@ -19,7 +19,8 @@ import {
   upsertTranslation, deleteTranslation,
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
-  fetchSupplierNames, fetchUniqueBrands,
+  fetchSupplierNames, fetchUniqueBrands, fetchUniqueTags,
+  fetchBrandLogos, uploadBrandLogo,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
@@ -86,8 +87,10 @@ export default function ProductForm({ productId }: Props) {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; logo: string | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
+  const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
+  const [allTags, setAllTags] = useState<string[]>([]);
 
   // Form state
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
@@ -115,15 +118,17 @@ export default function ProductForm({ productId }: Props) {
   // Load data
   useEffect(() => {
     (async () => {
-      const [divs, cats, subs, supplierList, brandList] = await Promise.all([
+      const [divs, cats, subs, supplierList, brandList, tagList, logoMap] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
-        fetchSupplierNames(), fetchUniqueBrands(),
+        fetchSupplierNames(), fetchUniqueBrands(), fetchUniqueTags(), fetchBrandLogos(),
       ]);
       setDivisions(divs);
       setCategories(cats);
       setSubcategories(subs);
       setSuppliers(supplierList);
       setBrands(brandList);
+      setAllTags(tagList);
+      setBrandLogos(logoMap);
 
       if (isEdit && productId) {
         const p = await fetchProductById(productId);
@@ -611,7 +616,7 @@ export default function ProductForm({ productId }: Props) {
                   </label>
                   <SelectWithCreate
                     value={models[0]?.supplier || ""}
-                    options={suppliers.map(s => ({ value: s.name, label: s.name }))}
+                    options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
                     onChange={(val) => {
                       if (models.length === 0) ensureFirstModel();
                       updateFirstModel({ supplier: val });
@@ -631,7 +636,10 @@ export default function ProductForm({ productId }: Props) {
                   </label>
                   <SelectWithCreate
                     value={product.brand}
-                    options={brands.map(b => ({ value: b, label: b }))}
+                    options={brands.map(b => {
+                      const slug = b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                      return { value: b, label: b, icon: brandLogos[slug] || null };
+                    })}
                     onChange={(val) => updateProduct_({ brand: val })}
                     onClickCreate={() => setShowBrandModal(true)}
                     placeholder="Select brand..."
@@ -672,6 +680,7 @@ export default function ProductForm({ productId }: Props) {
                   <TagsInput
                     tags={product.tags}
                     onChange={(tags) => updateProduct_({ tags })}
+                    suggestions={allTags}
                   />
                 </div>
               </div>
@@ -809,7 +818,7 @@ export default function ProductForm({ productId }: Props) {
         open={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}
         onCreated={(supplier) => {
-          setSuppliers(prev => [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)));
+          setSuppliers(prev => [...prev, { ...supplier, logo: supplier.logo || null }].sort((a, b) => a.name.localeCompare(b.name)));
           // Auto-select the new supplier on the target field
           if (supplierTarget === "hero") {
             if (models.length === 0) ensureFirstModel();
@@ -823,8 +832,12 @@ export default function ProductForm({ productId }: Props) {
       <CreateBrandModal
         open={showBrandModal}
         onClose={() => setShowBrandModal(false)}
-        onCreated={(brandName) => {
+        onCreated={(brandName, logoUrl) => {
           setBrands(prev => [...new Set([...prev, brandName])].sort());
+          if (logoUrl) {
+            const slug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            setBrandLogos(prev => ({ ...prev, [slug]: logoUrl }));
+          }
           updateProduct_({ brand: brandName });
         }}
         existingBrands={brands}
@@ -833,18 +846,37 @@ export default function ProductForm({ productId }: Props) {
   );
 }
 
-/* ── Inline Tags Input ── */
-function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+/* ── Tags Input with Suggestions Dropdown ── */
+function TagsInput({ tags, onChange, suggestions = [] }: { tags: string[]; onChange: (t: string[]) => void; suggestions?: string[] }) {
   const [input, setInput] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const add = () => {
-    const t = input.trim().toLowerCase();
-    if (t && !tags.includes(t)) onChange([...tags, t]);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const available = suggestions.filter(s => !tags.includes(s));
+  const filtered = input.trim()
+    ? available.filter(s => s.toLowerCase().includes(input.toLowerCase()))
+    : available;
+  const canCreate = input.trim() && !suggestions.includes(input.trim().toLowerCase()) && !tags.includes(input.trim().toLowerCase());
+
+  const addTag = (tag: string) => {
+    const t = tag.trim().toLowerCase();
+    if (t && !tags.includes(t)) {
+      onChange([...tags, t]);
+    }
     setInput("");
+    setShowDropdown(false);
   };
 
   return (
-    <div>
+    <div ref={wrapperRef}>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {tags.map(tag => (
@@ -857,14 +889,41 @@ function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[])
           ))}
         </div>
       )}
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
-        placeholder="Type tag and press Enter..."
-        className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
-      />
+      <div className="relative">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setShowDropdown(true); }}
+          onFocus={() => setShowDropdown(true)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(input); } }}
+          placeholder="Type or choose tags..."
+          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+        />
+        {showDropdown && (filtered.length > 0 || canCreate) && (
+          <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl shadow-black/30 overflow-hidden max-h-[200px] overflow-y-auto py-1">
+            {filtered.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => addTag(s)}
+                className="w-full px-4 py-2 text-left text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => addTag(input)}
+                className="w-full px-4 py-2 text-left text-[12px] font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2 border-t border-[var(--border-subtle)] transition-colors"
+              >
+                <span className="h-4 w-4 rounded bg-blue-500/20 flex items-center justify-center text-[10px]">+</span>
+                Create &quot;{input.trim()}&quot;
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -324,17 +324,21 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
   return map;
 }
 
-// ── Supplier names (from contacts table) ──
+// ── Supplier names + logos (from contacts table) ──
 
-export async function fetchSupplierNames(): Promise<{ id: string; name: string }[]> {
+export async function fetchSupplierNames(): Promise<{ id: string; name: string; logo: string | null }[]> {
   const { data } = await supabase
     .from("contacts")
-    .select("id, company_name_en")
+    .select("id, company_name_en, photo_url")
     .eq("contact_type", "supplier")
     .order("company_name_en", { ascending: true });
   return (data || [])
     .filter((r: Record<string, unknown>) => r.company_name_en)
-    .map((r: Record<string, unknown>) => ({ id: r.id as string, name: r.company_name_en as string }));
+    .map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      name: r.company_name_en as string,
+      logo: (r.photo_url as string) || null,
+    }));
 }
 
 // ── Unique brand names (from products table) ──
@@ -346,4 +350,38 @@ export async function fetchUniqueBrands(): Promise<string[]> {
     if (row.brand) brands.add(row.brand);
   }
   return Array.from(brands).sort();
+}
+
+// ── Unique tags (from products table) ──
+
+export async function fetchUniqueTags(): Promise<string[]> {
+  const { data } = await supabase.from("products").select("tags");
+  const tags = new Set<string>();
+  for (const row of (data || []) as { tags: string[] | null }[]) {
+    for (const t of row.tags || []) tags.add(t);
+  }
+  return Array.from(tags).sort();
+}
+
+// ── Brand logos (stored in media/brands/ folder) ──
+
+export async function fetchBrandLogos(): Promise<Record<string, string>> {
+  const { data } = await supabase.storage.from(BUCKET).list("brands", { limit: 200 });
+  const map: Record<string, string> = {};
+  for (const file of data || []) {
+    const slug = file.name.replace(/\.[^.]+$/, ""); // remove extension
+    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(`brands/${file.name}`);
+    map[slug] = urlData.publicUrl;
+  }
+  return map;
+}
+
+export async function uploadBrandLogo(brandSlug: string, file: File): Promise<string | null> {
+  const ext = file.name.split(".").pop() || "png";
+  const filePath = `brands/${brandSlug}.${ext}`;
+  // Upsert — overwrite if exists
+  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: "3600", upsert: true });
+  if (error) { console.error("[BrandLogo] Upload:", error.message); return null; }
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+  return data.publicUrl;
 }

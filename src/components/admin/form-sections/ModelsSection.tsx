@@ -9,7 +9,7 @@ import SelectWithCreate from "./SelectWithCreate";
 interface Props {
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
-  suppliers?: { id: string; name: string }[];
+  suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: (modelTempId: string) => void;
 }
 
@@ -17,7 +17,7 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSup
   model: ModelFormState; idx: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
-  suppliers?: { id: string; name: string }[];
+  suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: () => void;
 }) {
   const [open, setOpen] = useState(true);
@@ -65,7 +65,7 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSup
               {suppliers ? (
                 <SelectWithCreate
                   value={model.supplier}
-                  options={suppliers.map(s => ({ value: s.name, label: s.name }))}
+                  options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
                   onChange={(val) => onUpdate({ supplier: val })}
                   onClickCreate={onClickCreateSupplier}
                   placeholder="Select supplier..."

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Loader2, Plus, Trash2, ChevronDown, Search } from "lucide-react";
+import { Loader2, Plus, Trash2, ChevronDown, Search, ImageIcon } from "lucide-react";
 import { Country, State, City } from "country-state-city";
 import Modal from "./Modal";
 import { createContact } from "@/lib/contacts-admin";
@@ -9,7 +9,7 @@ import { createContact } from "@/lib/contacts-admin";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: (supplier: { id: string; name: string }) => void;
+  onCreated: (supplier: { id: string; name: string; logo: string | null }) => void;
 }
 
 const SUPPLIER_TYPES = [
@@ -316,6 +316,27 @@ function CityPicker({ countryCode, stateCode, value, onChange, label }: {
 /* ═════════════════════════════════════════════════════
    MAIN MODAL
    ═════════════════════════════════════════════════════ */
+/** Compress image to base64 data URL for storage in DB */
+async function compressImage(file: File, maxWidth = 400, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function CreateSupplierModal({ open, onClose, onCreated }: Props) {
   // Company info
   const [companyNameEn, setCompanyNameEn] = useState("");
@@ -323,6 +344,11 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
   const [supplierType, setSupplierType] = useState("");
   const [industry, setIndustry] = useState("");
   const [source, setSource] = useState("");
+
+  // Logo
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   // Contact info
   const [tel, setTel] = useState("");
@@ -364,6 +390,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
 
   const reset = () => {
     setCompanyNameEn(""); setCompanyNameCn(""); setSupplierType(""); setIndustry(""); setSource("");
+    setLogoFile(null); setLogoPreview(null);
     setTel(""); setMobile(""); setEmail(""); setWebsite(""); setAddress("");
     setCountryName(""); setCountryCode(""); setProvinceName(""); setProvinceCode(""); setCity("");
     setContactPersons([]);
@@ -377,12 +404,19 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
     setSaving(true);
     setError("");
 
+    // Compress logo to base64 if provided
+    let photoUrl: string | null = null;
+    if (logoFile) {
+      photoUrl = await compressImage(logoFile);
+    }
+
     const brands = brandNames.split(",").map(b => b.trim()).filter(Boolean);
 
     const { data, error: createError } = await createContact({
       contact_type: "supplier",
       entity_type: "company",
       is_active: true,
+      photo_url: photoUrl,
       company_name_en: companyNameEn.trim(),
       company_name_cn: companyNameCn.trim() || null,
       first_name: companyNameEn.trim(),
@@ -440,7 +474,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
       return;
     }
 
-    onCreated({ id: data.id, name: companyNameEn.trim() });
+    onCreated({ id: data.id, name: companyNameEn.trim(), logo: photoUrl });
     reset();
     onClose();
   };
@@ -494,18 +528,46 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
 
       <div className="space-y-8">
 
-        {/* ── Company Name ── */}
+        {/* ── Company Name + Logo ── */}
         <div>
           <p className={sectionTitle}>Company Information</p>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={lbl}>Company Name (English) *</label>
-                <input type="text" value={companyNameEn} onChange={(e) => setCompanyNameEn(e.target.value)} placeholder="e.g. Shenzhen Tech Co., Ltd." className={inp} autoFocus />
+            {/* Logo + Names row */}
+            <div className="flex gap-5 items-start">
+              {/* Logo upload */}
+              <div className="shrink-0">
+                <label className={lbl}>Logo</label>
+                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  if (!e.target.files?.length) return;
+                  setLogoFile(e.target.files[0]);
+                  setLogoPreview(URL.createObjectURL(e.target.files[0]));
+                }} />
+                {logoPreview ? (
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
+                    <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null); if (logoRef.current) logoRef.current.value = ""; }}
+                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                      <span className="text-[10px]">&times;</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => logoRef.current?.click()}
+                    className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group">
+                    <ImageIcon className="h-5 w-5 text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]" />
+                    <span className="text-[9px] text-[var(--text-ghost)]">Upload</span>
+                  </button>
+                )}
               </div>
-              <div>
-                <label className={lbl}>Company Name (Chinese)</label>
-                <input type="text" value={companyNameCn} onChange={(e) => setCompanyNameCn(e.target.value)} placeholder="e.g. &#28145;&#22323;&#31185;&#25216;&#26377;&#38480;&#20844;&#21496;" className={inp} />
+              {/* Names */}
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Company Name (English) *</label>
+                  <input type="text" value={companyNameEn} onChange={(e) => setCompanyNameEn(e.target.value)} placeholder="e.g. Shenzhen Tech Co., Ltd." className={inp} autoFocus />
+                </div>
+                <div>
+                  <label className={lbl}>Company Name (Chinese)</label>
+                  <input type="text" value={companyNameCn} onChange={(e) => setCompanyNameCn(e.target.value)} placeholder="e.g. &#28145;&#22323;&#31185;&#25216;&#26377;&#38480;&#20844;&#21496;" className={inp} />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
