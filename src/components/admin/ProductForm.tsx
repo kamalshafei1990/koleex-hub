@@ -455,28 +455,30 @@ export default function ProductForm({ productId }: Props) {
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] pb-24">
-      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
-
-        {/* ═══ TOP BAR ═══ */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/products"
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* ═══ STICKY TOP BAR ═══ */}
+      <div className="sticky top-14 z-40 bg-[var(--bg-secondary)]/90 backdrop-blur-xl border-b border-[var(--border-subtle)]">
+        <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-14 flex items-center justify-between">
+          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
+          </Link>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[14px] font-semibold text-[var(--text-primary)] hidden md:block">
+              {isEdit ? "Edit Product" : "New Product"}
+            </h1>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="h-9 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
             >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">
-                {isEdit ? "Edit Product" : "New Product"}
-              </h1>
-              <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
-                {isEdit ? "Update product details below" : "Fill in the product information"}
-              </p>
-            </div>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? "Saving..." : "Save Product"}
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
 
         {/* Messages */}
         {error && (
@@ -491,7 +493,7 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══ SECTION NAV (quick jump) ═══ */}
-        <div className="sticky top-14 z-30 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 px-4 md:px-8 lg:px-12 xl:px-16 py-3 mb-6 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)]">
+        <div className="mb-6">
           <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
             {sections.map(s => (
               <button
@@ -736,22 +738,8 @@ export default function ProductForm({ productId }: Props) {
         <div className="h-8" />
       </div>
 
-      {/* ═══ STICKY BOTTOM SAVE BAR ═══ */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-secondary)]/90 backdrop-blur-xl border-t border-[var(--border-subtle)]">
-        <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-16 flex items-center justify-between">
-          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
-          </Link>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="h-10 px-8 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving..." : "Save Product"}
-          </button>
-        </div>
-      </div>
+      {/* Bottom spacer */}
+      <div className="h-12" />
     </div>
   );
 }
