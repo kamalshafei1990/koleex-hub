@@ -40,25 +40,28 @@ import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 
 /* ── Section wrapper with icon + title (collapsible) ── */
-function Section({ icon, title, children, id, defaultOpen = true }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean;
+function Section({ icon, title, children, id, defaultOpen = true, badge }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean; badge?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section id={id} className="scroll-mt-20 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+    <section id={id} className="scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer"
+        className="w-full flex items-center gap-3 px-6 py-4 hover:bg-[var(--bg-surface-subtle)]/50 transition-colors cursor-pointer"
       >
-        <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
           {icon}
         </div>
         <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left">{title}</h2>
-        <ChevronDown className={`h-4 w-4 text-[var(--text-dim)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        {badge && (
+          <span className="text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full">{badge}</span>
+        )}
+        <ChevronDown className={`h-4 w-4 text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="px-5 pb-5 pt-1">{children}</div>
+        <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>
       )}
     </section>
   );
@@ -448,70 +451,64 @@ export default function ProductForm({ productId }: Props) {
     );
   }
 
-  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
-  const lbl = "block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5";
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all";
+  const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] pb-24">
       <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
 
         {/* ═══ TOP BAR ═══ */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
             <Link
               href="/products"
-              className="h-9 w-9 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
+              className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div>
-              <h1 className="text-lg md:text-xl font-bold text-[var(--text-primary)] tracking-tight">
+              <h1 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">
                 {isEdit ? "Edit Product" : "New Product"}
               </h1>
-              <p className="text-[12px] text-[var(--text-dim)] mt-0.5">
+              <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
                 {isEdit ? "Update product details below" : "Fill in the product information"}
               </p>
             </div>
           </div>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="h-10 px-5 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving..." : "Save Product"}
-          </button>
         </div>
 
         {/* Messages */}
         {error && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
+          <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
             <span className="shrink-0">&#9888;</span> {error}
           </div>
         )}
         {success && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
+          <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
             <span className="shrink-0">&#10003;</span> {success}
           </div>
         )}
 
         {/* ═══ SECTION NAV (quick jump) ═══ */}
-        <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-none">
-          {sections.map(s => (
-            <button
-              key={s.id}
-              onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className="shrink-0 h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-all"
-            >
-              {s.icon}
-              <span className="hidden sm:inline">{s.label}</span>
-            </button>
-          ))}
+        <div className="sticky top-14 z-30 -mx-4 md:-mx-8 lg:-mx-12 xl:-mx-16 px-4 md:px-8 lg:px-12 xl:px-16 py-3 mb-6 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)]">
+          <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+            {sections.map(s => (
+              <button
+                key={s.id}
+                onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="shrink-0 h-8 px-3.5 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-all"
+              >
+                {s.icon}
+                <span className="hidden sm:inline">{s.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ═══ HERO SECTION ═══ */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-7 mb-6">
-          <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-8 mb-6 shadow-[0_1px_8px_rgba(0,0,0,0.1)]">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-10">
 
             {/* Left: Main Product Image */}
             <div className="md:w-[280px] lg:w-[320px] shrink-0">
@@ -524,22 +521,22 @@ export default function ProductForm({ productId }: Props) {
               />
               <div
                 onClick={() => mainImageRef.current?.click()}
-                className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-[var(--bg-surface-subtle)]"
+                className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
               >
                 {mainImageSrc ? (
                   <>
-                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-4" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="flex items-center gap-2 text-white text-sm font-medium">
-                        <Camera className="h-5 w-5" />
+                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-5" />
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                      <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
+                        <Camera className="h-4 w-4" />
                         Change Photo
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                    <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-[var(--text-ghost)]" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 group-hover:scale-105 transition-transform duration-300">
+                    <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
+                      <ImageIcon className="h-7 w-7 text-[var(--text-ghost)]" />
                     </div>
                     <div className="text-center">
                       <p className="text-[13px] font-medium text-[var(--text-dim)]">Upload Product Photo</p>
@@ -551,10 +548,10 @@ export default function ProductForm({ productId }: Props) {
             </div>
 
             {/* Right: Product Identity */}
-            <div className="flex-1 flex flex-col justify-center gap-4">
+            <div className="flex-1 flex flex-col justify-center gap-5">
               {/* Product Name — prominent */}
               <div>
-                <label className={lbl}>Product Name *</label>
+                <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">Product Name *</label>
                 <input
                   type="text"
                   value={product.product_name}
@@ -564,12 +561,15 @@ export default function ProductForm({ productId }: Props) {
                     updateProduct_(updates);
                   }}
                   placeholder="e.g. KX CoBot Pro"
-                  className="w-full h-13 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+                  className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
                 />
               </div>
 
+              {/* Divider */}
+              <div className="border-t border-[var(--border-subtle)]" />
+
               {/* Model + Supplier */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Boxes className="h-3 w-3" /> Product Model</span>
@@ -603,7 +603,7 @@ export default function ProductForm({ productId }: Props) {
               </div>
 
               {/* Brand + Level */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
@@ -618,7 +618,7 @@ export default function ProductForm({ productId }: Props) {
                 </div>
                 <div>
                   <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Level</span>
+                    <span className="inline-flex items-center gap-1.5"><Shield className="h-3 w-3" /> Level</span>
                   </label>
                   <select
                     value={product.level}
@@ -635,7 +635,7 @@ export default function ProductForm({ productId }: Props) {
               </div>
 
               {/* Slug + Tags */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Slug (URL path)</label>
                   <input
@@ -658,7 +658,7 @@ export default function ProductForm({ productId }: Props) {
         </div>
 
         {/* ═══ ALL SECTIONS ═══ */}
-        <div className="space-y-4 md:space-y-5">
+        <div className="space-y-5">
 
           {/* 1. Classification */}
           <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
@@ -732,23 +732,25 @@ export default function ProductForm({ productId }: Props) {
           </Section>
         </div>
 
-        {/* ═══ BOTTOM SAVE BAR ═══ */}
-        <div className="mt-8 pt-5 border-t border-[var(--border-subtle)] flex items-center justify-between">
-          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-            Cancel
+        {/* spacer for sticky bar */}
+        <div className="h-8" />
+      </div>
+
+      {/* ═══ STICKY BOTTOM SAVE BAR ═══ */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-secondary)]/90 backdrop-blur-xl border-t border-[var(--border-subtle)]">
+        <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-16 flex items-center justify-between">
+          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
           </Link>
           <button
             onClick={save}
             disabled={saving}
-            className="h-11 px-8 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
+            className="h-10 px-8 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? "Saving..." : "Save Product"}
           </button>
         </div>
-
-        {/* Bottom padding */}
-        <div className="h-12" />
       </div>
     </div>
   );
@@ -766,23 +768,25 @@ function TagsInput({ tags, onChange }: { tags: string[]; onChange: (t: string[])
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {tags.map(tag => (
-          <span key={tag} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">
-            {tag}
-            <button onClick={() => onChange(tags.filter(t => t !== tag))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)] ml-0.5">
-              <span className="text-xs">&times;</span>
-            </button>
-          </span>
-        ))}
-      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {tags.map(tag => (
+            <span key={tag} className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
+              {tag}
+              <button onClick={() => onChange(tags.filter(t => t !== tag))} className="text-[var(--text-ghost)] hover:text-red-400 ml-0.5 transition-colors">
+                <span className="text-[10px]">&times;</span>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
         placeholder="Type tag and press Enter..."
-        className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+        className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
       />
     </div>
   );
