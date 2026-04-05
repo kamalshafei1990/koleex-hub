@@ -4,16 +4,21 @@ import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
+import SelectWithCreate from "./SelectWithCreate";
 
 interface Props {
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
+  suppliers?: { id: string; name: string }[];
+  onCreateSupplier?: (name: string) => Promise<string | null>;
 }
 
-function ModelCard({ model, idx, onUpdate, onRemove }: {
+function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onCreateSupplier }: {
   model: ModelFormState; idx: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
+  suppliers?: { id: string; name: string }[];
+  onCreateSupplier?: (name: string) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -57,7 +62,19 @@ function ModelCard({ model, idx, onUpdate, onRemove }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Supplier</label>
-              <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+              {suppliers ? (
+                <SelectWithCreate
+                  value={model.supplier}
+                  options={suppliers.map(s => ({ value: s.name, label: s.name }))}
+                  onChange={(val) => onUpdate({ supplier: val })}
+                  onCreate={onCreateSupplier}
+                  placeholder="Select supplier..."
+                  createLabel="Create Supplier"
+                  className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-inverted)]/[0.05]"
+                />
+              ) : (
+                <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+              )}
             </div>
             <div>
               <label className={lbl}>Cost Price (USD)</label>
@@ -112,7 +129,7 @@ function ModelCard({ model, idx, onUpdate, onRemove }: {
   );
 }
 
-export default function ModelsSection({ models, onChange }: Props) {
+export default function ModelsSection({ models, onChange, suppliers, onCreateSupplier }: Props) {
   const addModel = () => {
     onChange([...models, { ...createEmptyModel(), order: models.length }]);
   };
@@ -151,6 +168,8 @@ export default function ModelsSection({ models, onChange }: Props) {
               idx={i}
               onUpdate={(u) => updateModel(m._tempId, u)}
               onRemove={() => removeModel(m._tempId)}
+              suppliers={suppliers}
+              onCreateSupplier={onCreateSupplier}
             />
           ))}
         </div>

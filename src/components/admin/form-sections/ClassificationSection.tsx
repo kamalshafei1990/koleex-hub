@@ -3,6 +3,7 @@
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type { ProductFormState } from "@/types/product-form";
 import { useMemo } from "react";
+import SelectWithCreate from "./SelectWithCreate";
 
 interface Props {
   data: Pick<ProductFormState, "division_slug" | "category_slug" | "subcategory_slug">;
@@ -10,50 +11,60 @@ interface Props {
   divisions: DivisionRow[];
   categories: CategoryRow[];
   subcategories: SubcategoryRow[];
+  onCreateDivision?: (name: string) => Promise<string | null>;
+  onCreateCategory?: (name: string) => Promise<string | null>;
+  onCreateSubcategory?: (name: string) => Promise<string | null>;
 }
 
-export default function ClassificationSection({ data, onChange, divisions, categories, subcategories }: Props) {
+export default function ClassificationSection({
+  data, onChange, divisions, categories, subcategories,
+  onCreateDivision, onCreateCategory, onCreateSubcategory,
+}: Props) {
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === data.division_slug)?.id, [divisions, data.division_slug]);
   const filteredCats = useMemo(() => selectedDivId ? categories.filter(c => c.division_id === selectedDivId) : [], [categories, selectedDivId]);
   const selectedCatId = useMemo(() => categories.find(c => c.slug === data.category_slug)?.id, [categories, data.category_slug]);
   const filteredSubs = useMemo(() => selectedCatId ? subcategories.filter(s => s.category_id === selectedCatId) : [], [subcategories, selectedCatId]);
 
+  const divisionOptions = divisions.map(d => ({ value: d.slug, label: d.name }));
+  const categoryOptions = filteredCats.map(c => ({ value: c.slug, label: c.name }));
+  const subcategoryOptions = filteredSubs.map(s => ({ value: s.slug, label: s.name }));
+
   return (
     <div className="space-y-5">
       <div>
         <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Division *</label>
-        <select
+        <SelectWithCreate
           value={data.division_slug}
-          onChange={(e) => onChange({ division_slug: e.target.value, category_slug: "", subcategory_slug: "" })}
-          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
-        >
-          <option value="">Select division...</option>
-          {divisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
-        </select>
+          options={divisionOptions}
+          onChange={(val) => onChange({ division_slug: val, category_slug: "", subcategory_slug: "" })}
+          onCreate={onCreateDivision}
+          placeholder="Select division..."
+          createLabel="Create Division"
+        />
       </div>
       <div>
         <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Category *</label>
-        <select
+        <SelectWithCreate
           value={data.category_slug}
-          onChange={(e) => onChange({ category_slug: e.target.value, subcategory_slug: "" })}
-          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
+          options={categoryOptions}
+          onChange={(val) => onChange({ category_slug: val, subcategory_slug: "" })}
+          onCreate={data.division_slug ? onCreateCategory : undefined}
+          placeholder={data.division_slug ? "Select category..." : "Select a division first"}
           disabled={!data.division_slug}
-        >
-          <option value="">{data.division_slug ? "Select category..." : "Select a division first"}</option>
-          {filteredCats.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-        </select>
+          createLabel="Create Category"
+        />
       </div>
       <div>
         <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Subcategory *</label>
-        <select
+        <SelectWithCreate
           value={data.subcategory_slug}
-          onChange={(e) => onChange({ subcategory_slug: e.target.value })}
-          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none"
+          options={subcategoryOptions}
+          onChange={(val) => onChange({ subcategory_slug: val })}
+          onCreate={data.category_slug ? onCreateSubcategory : undefined}
+          placeholder={data.category_slug ? "Select subcategory..." : "Select a category first"}
           disabled={!data.category_slug}
-        >
-          <option value="">{data.category_slug ? "Select subcategory..." : "Select a category first"}</option>
-          {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
-        </select>
+          createLabel="Create Subcategory"
+        />
       </div>
     </div>
   );

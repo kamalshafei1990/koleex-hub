@@ -19,7 +19,10 @@ import {
   upsertTranslation, deleteTranslation,
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
+  createDivision, createCategory, createSubcategory,
+  fetchSupplierNames, fetchUniqueBrands,
 } from "@/lib/products-admin";
+import { createContact } from "@/lib/contacts-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
   ProductFormState, ModelFormState, MediaFormState,
@@ -28,6 +31,7 @@ import type {
 import { EMPTY_PRODUCT, createEmptyModel } from "@/types/product-form";
 
 import ClassificationSection from "./form-sections/ClassificationSection";
+import SelectWithCreate from "./form-sections/SelectWithCreate";
 import BasicInfoSection from "./form-sections/BasicInfoSection";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import SpecsSection from "./form-sections/SpecsSection";
@@ -79,6 +83,8 @@ export default function ProductForm({ productId }: Props) {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
 
   // Form state
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
@@ -106,12 +112,15 @@ export default function ProductForm({ productId }: Props) {
   // Load data
   useEffect(() => {
     (async () => {
-      const [divs, cats, subs] = await Promise.all([
+      const [divs, cats, subs, supplierList, brandList] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
+        fetchSupplierNames(), fetchUniqueBrands(),
       ]);
       setDivisions(divs);
       setCategories(cats);
       setSubcategories(subs);
+      setSuppliers(supplierList);
+      setBrands(brandList);
 
       if (isEdit && productId) {
         const p = await fetchProductById(productId);
@@ -225,6 +234,80 @@ export default function ProductForm({ productId }: Props) {
 
   const updateProduct_ = useCallback((updates: Partial<ProductFormState>) => {
     setProduct(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  /* ── Inline-create callbacks ── */
+  const slugify = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  const handleCreateDivision = useCallback(async (name: string): Promise<string | null> => {
+    const slug = slugify(name);
+    const row = await createDivision({ name, slug, order: divisions.length });
+    if (!row) return null;
+    setDivisions(prev => [...prev, row]);
+    return row.slug;
+  }, [divisions.length]);
+
+  const handleCreateCategory = useCallback(async (name: string): Promise<string | null> => {
+    const divId = divisions.find(d => d.slug === product.division_slug)?.id;
+    if (!divId) return null;
+    const slug = slugify(name);
+    const row = await createCategory({ name, slug, division_id: divId, order: categories.length });
+    if (!row) return null;
+    setCategories(prev => [...prev, row]);
+    return row.slug;
+  }, [divisions, product.division_slug, categories.length]);
+
+  const handleCreateSubcategory = useCallback(async (name: string): Promise<string | null> => {
+    const catId = categories.find(c => c.slug === product.category_slug)?.id;
+    if (!catId) return null;
+    const slug = slugify(name);
+    const row = await createSubcategory({ name, slug, category_id: catId, order: subcategories.length });
+    if (!row) return null;
+    setSubcategories(prev => [...prev, row]);
+    return row.slug;
+  }, [categories, product.category_slug, subcategories.length]);
+
+  const handleCreateSupplier = useCallback(async (name: string): Promise<string | null> => {
+    const { data } = await createContact({
+      contact_type: "supplier",
+      company_name_en: name,
+      first_name: name,
+      entity_type: "company",
+      is_active: true,
+      tags: [],
+      phones: [],
+      emails: [],
+      addresses: [],
+      websites: [],
+      social_profiles: [],
+      family_members: [],
+      related_names: [],
+      custom_fields: [],
+      shipping_addresses: [],
+      attachments: [],
+      product_categories: [],
+      brand_names: [],
+      certifications: [],
+      additional_company_names: [],
+      catalogues: [],
+      documents: [],
+      contact_persons: [],
+      bank_accounts: [],
+      resume_lines: [],
+      emergency_contacts: [],
+      visa_documents: [],
+      rating: 0,
+    });
+    if (!data) return null;
+    setSuppliers(prev => [...prev, { id: data.id, name }].sort((a, b) => a.name.localeCompare(b.name)));
+    return name;
+  }, []);
+
+  const handleCreateBrand = useCallback(async (name: string): Promise<string | null> => {
+    // Brands are just strings stored on products — no separate table
+    // We add it to the local list immediately; it persists when the product is saved
+    setBrands(prev => [...new Set([...prev, name])].sort());
+    return name;
   }, []);
 
   /* ── Hero: main image helpers ── */
@@ -588,15 +671,16 @@ export default function ProductForm({ productId }: Props) {
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Supplier</span>
                   </label>
-                  <input
-                    type="text"
+                  <SelectWithCreate
                     value={models[0]?.supplier || ""}
-                    onChange={(e) => {
+                    options={suppliers.map(s => ({ value: s.name, label: s.name }))}
+                    onChange={(val) => {
                       if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ supplier: e.target.value });
+                      updateFirstModel({ supplier: val });
                     }}
-                    placeholder="e.g. Zhejiang Manufacturing Co."
-                    className={inp}
+                    onCreate={handleCreateSupplier}
+                    placeholder="Select supplier..."
+                    createLabel="Create Supplier"
                   />
                 </div>
               </div>
@@ -607,12 +691,13 @@ export default function ProductForm({ productId }: Props) {
                   <label className={lbl}>
                     <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
                   </label>
-                  <input
-                    type="text"
+                  <SelectWithCreate
                     value={product.brand}
-                    onChange={(e) => updateProduct_({ brand: e.target.value })}
-                    placeholder="e.g. Koleex"
-                    className={inp}
+                    options={brands.map(b => ({ value: b, label: b }))}
+                    onChange={(val) => updateProduct_({ brand: val })}
+                    onCreate={handleCreateBrand}
+                    placeholder="Select brand..."
+                    createLabel="Create Brand"
                   />
                 </div>
                 <div>
@@ -667,6 +752,9 @@ export default function ProductForm({ productId }: Props) {
               divisions={divisions}
               categories={categories}
               subcategories={subcategories}
+              onCreateDivision={handleCreateDivision}
+              onCreateCategory={handleCreateCategory}
+              onCreateSubcategory={handleCreateSubcategory}
             />
           </Section>
 
@@ -700,7 +788,12 @@ export default function ProductForm({ productId }: Props) {
 
           {/* 5. Models */}
           <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
-            <ModelsSection models={models} onChange={setModels} />
+            <ModelsSection
+              models={models}
+              onChange={setModels}
+              suppliers={suppliers}
+              onCreateSupplier={handleCreateSupplier}
+            />
           </Section>
 
           {/* 6. Media */}

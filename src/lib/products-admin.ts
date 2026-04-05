@@ -323,3 +323,27 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
   }
   return map;
 }
+
+// ── Supplier names (from contacts table) ──
+
+export async function fetchSupplierNames(): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabase
+    .from("contacts")
+    .select("id, company_name_en")
+    .eq("contact_type", "supplier")
+    .order("company_name_en", { ascending: true });
+  return (data || [])
+    .filter((r: Record<string, unknown>) => r.company_name_en)
+    .map((r: Record<string, unknown>) => ({ id: r.id as string, name: r.company_name_en as string }));
+}
+
+// ── Unique brand names (from products table) ──
+
+export async function fetchUniqueBrands(): Promise<string[]> {
+  const { data } = await supabase.from("products").select("brand");
+  const brands = new Set<string>();
+  for (const row of (data || []) as { brand: string | null }[]) {
+    if (row.brand) brands.add(row.brand);
+  }
+  return Array.from(brands).sort();
+}
