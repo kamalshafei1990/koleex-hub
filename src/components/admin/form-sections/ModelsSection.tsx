@@ -10,15 +10,15 @@ interface Props {
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
   suppliers?: { id: string; name: string }[];
-  onCreateSupplier?: (name: string) => Promise<string | null>;
+  onClickCreateSupplier?: (modelTempId: string) => void;
 }
 
-function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onCreateSupplier }: {
+function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSupplier }: {
   model: ModelFormState; idx: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
   suppliers?: { id: string; name: string }[];
-  onCreateSupplier?: (name: string) => Promise<string | null>;
+  onClickCreateSupplier?: () => void;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -67,7 +67,7 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onCreateSupplier
                   value={model.supplier}
                   options={suppliers.map(s => ({ value: s.name, label: s.name }))}
                   onChange={(val) => onUpdate({ supplier: val })}
-                  onCreate={onCreateSupplier}
+                  onClickCreate={onClickCreateSupplier}
                   placeholder="Select supplier..."
                   createLabel="Create Supplier"
                   className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-inverted)]/[0.05]"
@@ -129,7 +129,7 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onCreateSupplier
   );
 }
 
-export default function ModelsSection({ models, onChange, suppliers, onCreateSupplier }: Props) {
+export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier }: Props) {
   const addModel = () => {
     onChange([...models, { ...createEmptyModel(), order: models.length }]);
   };
@@ -169,7 +169,7 @@ export default function ModelsSection({ models, onChange, suppliers, onCreateSup
               onUpdate={(u) => updateModel(m._tempId, u)}
               onRemove={() => removeModel(m._tempId)}
               suppliers={suppliers}
-              onCreateSupplier={onCreateSupplier}
+              onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
             />
           ))}
         </div>

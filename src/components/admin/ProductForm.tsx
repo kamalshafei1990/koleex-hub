@@ -19,10 +19,8 @@ import {
   upsertTranslation, deleteTranslation,
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
-  createDivision, createCategory, createSubcategory,
   fetchSupplierNames, fetchUniqueBrands,
 } from "@/lib/products-admin";
-import { createContact } from "@/lib/contacts-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
   ProductFormState, ModelFormState, MediaFormState,
@@ -32,6 +30,11 @@ import { EMPTY_PRODUCT, createEmptyModel } from "@/types/product-form";
 
 import ClassificationSection from "./form-sections/ClassificationSection";
 import SelectWithCreate from "./form-sections/SelectWithCreate";
+import CreateDivisionModal from "./form-sections/CreateDivisionModal";
+import CreateCategoryModal from "./form-sections/CreateCategoryModal";
+import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
+import CreateSupplierModal from "./form-sections/CreateSupplierModal";
+import CreateBrandModal from "./form-sections/CreateBrandModal";
 import BasicInfoSection from "./form-sections/BasicInfoSection";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import SpecsSection from "./form-sections/SpecsSection";
@@ -236,79 +239,14 @@ export default function ProductForm({ productId }: Props) {
     setProduct(prev => ({ ...prev, ...updates }));
   }, []);
 
-  /* ── Inline-create callbacks ── */
-  const slugify = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-  const handleCreateDivision = useCallback(async (name: string): Promise<string | null> => {
-    const slug = slugify(name);
-    const row = await createDivision({ name, slug, order: divisions.length });
-    if (!row) return null;
-    setDivisions(prev => [...prev, row]);
-    return row.slug;
-  }, [divisions.length]);
-
-  const handleCreateCategory = useCallback(async (name: string): Promise<string | null> => {
-    const divId = divisions.find(d => d.slug === product.division_slug)?.id;
-    if (!divId) return null;
-    const slug = slugify(name);
-    const row = await createCategory({ name, slug, division_id: divId, order: categories.length });
-    if (!row) return null;
-    setCategories(prev => [...prev, row]);
-    return row.slug;
-  }, [divisions, product.division_slug, categories.length]);
-
-  const handleCreateSubcategory = useCallback(async (name: string): Promise<string | null> => {
-    const catId = categories.find(c => c.slug === product.category_slug)?.id;
-    if (!catId) return null;
-    const slug = slugify(name);
-    const row = await createSubcategory({ name, slug, category_id: catId, order: subcategories.length });
-    if (!row) return null;
-    setSubcategories(prev => [...prev, row]);
-    return row.slug;
-  }, [categories, product.category_slug, subcategories.length]);
-
-  const handleCreateSupplier = useCallback(async (name: string): Promise<string | null> => {
-    const { data } = await createContact({
-      contact_type: "supplier",
-      company_name_en: name,
-      first_name: name,
-      entity_type: "company",
-      is_active: true,
-      tags: [],
-      phones: [],
-      emails: [],
-      addresses: [],
-      websites: [],
-      social_profiles: [],
-      family_members: [],
-      related_names: [],
-      custom_fields: [],
-      shipping_addresses: [],
-      attachments: [],
-      product_categories: [],
-      brand_names: [],
-      certifications: [],
-      additional_company_names: [],
-      catalogues: [],
-      documents: [],
-      contact_persons: [],
-      bank_accounts: [],
-      resume_lines: [],
-      emergency_contacts: [],
-      visa_documents: [],
-      rating: 0,
-    });
-    if (!data) return null;
-    setSuppliers(prev => [...prev, { id: data.id, name }].sort((a, b) => a.name.localeCompare(b.name)));
-    return name;
-  }, []);
-
-  const handleCreateBrand = useCallback(async (name: string): Promise<string | null> => {
-    // Brands are just strings stored on products — no separate table
-    // We add it to the local list immediately; it persists when the product is saved
-    setBrands(prev => [...new Set([...prev, name])].sort());
-    return name;
-  }, []);
+  /* ── Modal state ── */
+  const [showDivisionModal, setShowDivisionModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  // Track which supplier field triggered the modal: "hero" or a model _tempId
+  const [supplierTarget, setSupplierTarget] = useState<"hero" | string>("hero");
 
   /* ── Hero: main image helpers ── */
   const mainImage = media.find(m => m.type === "main_image");
@@ -678,7 +616,7 @@ export default function ProductForm({ productId }: Props) {
                       if (models.length === 0) ensureFirstModel();
                       updateFirstModel({ supplier: val });
                     }}
-                    onCreate={handleCreateSupplier}
+                    onClickCreate={() => { setSupplierTarget("hero"); setShowSupplierModal(true); }}
                     placeholder="Select supplier..."
                     createLabel="Create Supplier"
                   />
@@ -695,7 +633,7 @@ export default function ProductForm({ productId }: Props) {
                     value={product.brand}
                     options={brands.map(b => ({ value: b, label: b }))}
                     onChange={(val) => updateProduct_({ brand: val })}
-                    onCreate={handleCreateBrand}
+                    onClickCreate={() => setShowBrandModal(true)}
                     placeholder="Select brand..."
                     createLabel="Create Brand"
                   />
@@ -752,9 +690,9 @@ export default function ProductForm({ productId }: Props) {
               divisions={divisions}
               categories={categories}
               subcategories={subcategories}
-              onCreateDivision={handleCreateDivision}
-              onCreateCategory={handleCreateCategory}
-              onCreateSubcategory={handleCreateSubcategory}
+              onClickCreateDivision={() => setShowDivisionModal(true)}
+              onClickCreateCategory={() => setShowCategoryModal(true)}
+              onClickCreateSubcategory={() => setShowSubcategoryModal(true)}
             />
           </Section>
 
@@ -792,7 +730,7 @@ export default function ProductForm({ productId }: Props) {
               models={models}
               onChange={setModels}
               suppliers={suppliers}
-              onCreateSupplier={handleCreateSupplier}
+              onClickCreateSupplier={(tempId) => { setSupplierTarget(tempId); setShowSupplierModal(true); }}
             />
           </Section>
 
@@ -830,6 +768,67 @@ export default function ProductForm({ productId }: Props) {
 
       {/* Bottom spacer */}
       <div className="h-12" />
+
+      {/* ═══ CREATE MODALS ═══ */}
+      <CreateDivisionModal
+        open={showDivisionModal}
+        onClose={() => setShowDivisionModal(false)}
+        onCreated={(row) => {
+          setDivisions(prev => [...prev, row]);
+          updateProduct_({ division_slug: row.slug, category_slug: "", subcategory_slug: "" });
+        }}
+        existingCount={divisions.length}
+      />
+
+      <CreateCategoryModal
+        open={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onCreated={(row) => {
+          setCategories(prev => [...prev, row]);
+          updateProduct_({ category_slug: row.slug, subcategory_slug: "" });
+        }}
+        divisionId={divisions.find(d => d.slug === product.division_slug)?.id || ""}
+        divisionName={divisions.find(d => d.slug === product.division_slug)?.name || ""}
+        existingCount={categories.length}
+      />
+
+      <CreateSubcategoryModal
+        open={showSubcategoryModal}
+        onClose={() => setShowSubcategoryModal(false)}
+        onCreated={(row) => {
+          setSubcategories(prev => [...prev, row]);
+          updateProduct_({ subcategory_slug: row.slug });
+        }}
+        categoryId={categories.find(c => c.slug === product.category_slug)?.id || ""}
+        categoryName={categories.find(c => c.slug === product.category_slug)?.name || ""}
+        divisionName={divisions.find(d => d.slug === product.division_slug)?.name || ""}
+        existingCount={subcategories.length}
+      />
+
+      <CreateSupplierModal
+        open={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        onCreated={(supplier) => {
+          setSuppliers(prev => [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)));
+          // Auto-select the new supplier on the target field
+          if (supplierTarget === "hero") {
+            if (models.length === 0) ensureFirstModel();
+            updateFirstModel({ supplier: supplier.name });
+          } else {
+            setModels(prev => prev.map(m => m._tempId === supplierTarget ? { ...m, supplier: supplier.name } : m));
+          }
+        }}
+      />
+
+      <CreateBrandModal
+        open={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onCreated={(brandName) => {
+          setBrands(prev => [...new Set([...prev, brandName])].sort());
+          updateProduct_({ brand: brandName });
+        }}
+        existingBrands={brands}
+      />
     </div>
   );
 }

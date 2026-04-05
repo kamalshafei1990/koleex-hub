@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, Check, X, ChevronDown, Search } from "lucide-react";
+import { Plus, Check, ChevronDown, Search } from "lucide-react";
 
 interface Option {
   value: string;
@@ -12,10 +12,10 @@ interface Props {
   value: string;
   options: Option[];
   onChange: (value: string) => void;
-  onCreate?: (name: string) => Promise<string | null>; // returns value or null on failure
+  onClickCreate?: () => void; // opens a modal in the parent
   placeholder?: string;
   disabled?: boolean;
-  createLabel?: string; // e.g. "Create Division"
+  createLabel?: string;
   className?: string;
 }
 
@@ -23,7 +23,7 @@ export default function SelectWithCreate({
   value,
   options,
   onChange,
-  onCreate,
+  onClickCreate,
   placeholder = "Select...",
   disabled = false,
   createLabel = "Create New",
@@ -31,19 +31,14 @@ export default function SelectWithCreate({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [saving, setSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const createInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setCreating(false);
         setSearch("");
       }
     };
@@ -56,29 +51,10 @@ export default function SelectWithCreate({
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  // Focus create input
-  useEffect(() => {
-    if (creating && createInputRef.current) createInputRef.current.focus();
-  }, [creating]);
-
   const selected = options.find(o => o.value === value);
   const filtered = search
     ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
     : options;
-
-  const handleCreate = async () => {
-    if (!newName.trim() || !onCreate) return;
-    setSaving(true);
-    const result = await onCreate(newName.trim());
-    setSaving(false);
-    if (result) {
-      onChange(result);
-      setCreating(false);
-      setNewName("");
-      setOpen(false);
-      setSearch("");
-    }
-  };
 
   const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
 
@@ -147,49 +123,16 @@ export default function SelectWithCreate({
             )}
           </div>
 
-          {/* Create New */}
-          {onCreate && (
+          {/* Create New — opens modal */}
+          {onClickCreate && (
             <div className="border-t border-[var(--border-subtle)]">
-              {creating ? (
-                <div className="p-2.5 flex items-center gap-2">
-                  <input
-                    ref={createInputRef}
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); handleCreate(); }
-                      if (e.key === "Escape") { setCreating(false); setNewName(""); }
-                    }}
-                    placeholder={`New name...`}
-                    className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-focus)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none"
-                    disabled={saving}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreate}
-                    disabled={saving || !newName.trim()}
-                    className="h-9 w-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center hover:bg-emerald-500/30 transition-colors disabled:opacity-40"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setCreating(false); setNewName(""); }}
-                    className="h-9 w-9 rounded-lg bg-[var(--bg-surface)] text-[var(--text-ghost)] flex items-center justify-center hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setCreating(true)}
-                  className="w-full px-4 py-2.5 text-left text-[12px] font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2 transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" /> {createLabel}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setSearch(""); onClickCreate(); }}
+                className="w-full px-4 py-3 text-left text-[12px] font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" /> {createLabel}
+              </button>
             </div>
           )}
         </div>
