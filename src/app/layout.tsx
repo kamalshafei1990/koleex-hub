@@ -12,7 +12,13 @@ export const metadata: Metadata = {
   title: "KOLEEX — Enterprise Platform",
   description: "Koleex ERP — Manage products, operations, and more",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23000'/><text x='16' y='22' text-anchor='middle' fill='white' font-family='Helvetica' font-weight='700' font-size='16'>K</text></svg>",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/apple-icon.png",
   },
 };
 
