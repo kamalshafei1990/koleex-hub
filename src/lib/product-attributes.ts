@@ -27,29 +27,30 @@ export interface AttributeConfig {
 }
 
 // ── Plug type SVG icons — socket face only, clean outline style ──
+const PLUG_V = "v2"; // cache-bust version
 export const DEFAULT_PLUG_TYPES: AttributeItem[] = [
   { name: "Type A", countries: ["US", "CA", "MX", "JP"], description: "Two flat parallel pins",
-    image: "/images/plug-types/A.svg" },
+    image: `/images/plug-types/A.svg?${PLUG_V}` },
   { name: "Type B", countries: ["US", "CA", "MX", "BR"], description: "Two flat parallel + round ground",
-    image: "/images/plug-types/B.svg" },
+    image: `/images/plug-types/B.svg?${PLUG_V}` },
   { name: "Type C", countries: ["EU", "KR", "EG", "SA", "AE"], description: "Two round pins — Europlug",
-    image: "/images/plug-types/C.svg" },
+    image: `/images/plug-types/C.svg?${PLUG_V}` },
   { name: "Type D", countries: ["IN", "LK", "NP"], description: "Three large round pins triangle",
-    image: "/images/plug-types/D.svg" },
+    image: `/images/plug-types/D.svg?${PLUG_V}` },
   { name: "Type F", countries: ["DE", "FR", "ES", "NL", "SE", "TR", "KR", "RU"], description: "Schuko — two round pins + grounding clips",
-    image: "/images/plug-types/F.svg" },
+    image: `/images/plug-types/F.svg?${PLUG_V}` },
   { name: "Type G", countries: ["GB", "IE", "MY", "SG", "HK", "AE", "KW", "QA"], description: "Three rectangular pins — BS 1363",
-    image: "/images/plug-types/G.svg" },
+    image: `/images/plug-types/G.svg?${PLUG_V}` },
   { name: "Type H", countries: ["IL"], description: "Three pins — V-shaped (Israel SI 32)",
-    image: "/images/plug-types/H.svg" },
+    image: `/images/plug-types/H.svg?${PLUG_V}` },
   { name: "Type I", countries: ["AU", "CN", "NZ", "AR"], description: "Two angled flat + vertical ground",
-    image: "/images/plug-types/I.svg" },
+    image: `/images/plug-types/I.svg?${PLUG_V}` },
   { name: "Type J", countries: ["CH", "LI"], description: "Three round pins — Swiss SEV 1011",
-    image: "/images/plug-types/J.svg" },
+    image: `/images/plug-types/J.svg?${PLUG_V}` },
   { name: "Type K", countries: ["DK", "GL"], description: "Three round pins — Danish DS 60884-2-D1",
-    image: "/images/plug-types/K.svg" },
+    image: `/images/plug-types/K.svg?${PLUG_V}` },
   { name: "Type L", countries: ["IT", "CL", "UY"], description: "Three round pins in a row — CEI 23-50",
-    image: "/images/plug-types/L.svg" },
+    image: `/images/plug-types/L.svg?${PLUG_V}` },
 ];
 
 const DEFAULT_CONFIG: AttributeConfig = {
