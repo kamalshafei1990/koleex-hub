@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Home, Bell } from "lucide-react";
+import { Sun, Moon, Home, Bell, ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+import { useRef } from "react";
 
 /* ── Koleex Logo ── */
 function KoleexLogo({ className }: { className?: string }) {
@@ -34,6 +35,8 @@ const routeKeys: Record<string, string> = {
   "/markets": "app.markets",
   "/landed-cost": "app.landed-cost",
   "/website": "app.website",
+  "/catalogs": "app.catalogs",
+  "/todo": "app.todo",
   "/categories": "cat.system",
   "/subcategories": "cat.system",
   "/divisions": "cat.system",
@@ -72,6 +75,17 @@ export default function MainHeader() {
     localStorage.setItem("koleex-lang", lang);
     window.dispatchEvent(new CustomEvent("langchange", { detail: lang }));
   }, [lang]);
+
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const dk = theme === "dark";
   const isHome = pathname === "/";
@@ -118,9 +132,9 @@ export default function MainHeader() {
 
       {/* Right: Language + Theme + Avatar */}
       <div className="flex items-center gap-1 md:gap-2 shrink-0">
-        {/* Language pill bar */}
+        {/* Language — desktop pill bar */}
         <div
-          className={`flex items-center h-7 md:h-8 rounded-md md:rounded-lg border p-0.5 transition-colors ${
+          className={`hidden md:flex items-center h-8 rounded-lg border p-0.5 transition-colors ${
             dk
               ? "border-white/[0.08] bg-white/[0.03]"
               : "border-black/[0.08] bg-black/[0.03]"
@@ -130,7 +144,7 @@ export default function MainHeader() {
             <button
               key={l.code}
               onClick={() => setLang(l.code)}
-              className={`relative h-6 md:h-7 w-8 md:w-[60px] rounded-[5px] md:rounded-md text-[10px] md:text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
+              className={`relative h-7 w-[60px] rounded-md text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
                 lang === l.code
                   ? dk
                     ? "bg-white/[0.12] text-white shadow-sm"
@@ -140,10 +154,51 @@ export default function MainHeader() {
                     : "text-black/30 hover:text-black/60"
               }`}
             >
-              <span className="md:hidden">{l.short}</span>
-              <span className="hidden md:inline">{l.label}</span>
+              {l.label}
             </button>
           ))}
+        </div>
+
+        {/* Language — mobile dropdown */}
+        <div ref={langRef} className="relative md:hidden">
+          <button
+            onClick={() => setLangOpen(!langOpen)}
+            className={`flex items-center gap-0.5 h-7 px-2 rounded-md border text-[10px] font-semibold transition-colors ${
+              dk
+                ? "border-white/[0.08] bg-white/[0.04] text-white/70"
+                : "border-black/[0.08] bg-black/[0.04] text-black/70"
+            }`}
+          >
+            {languages.find((l) => l.code === lang)?.short}
+            <ChevronDown size={12} className={`transition-transform ${langOpen ? "rotate-180" : ""}`} />
+          </button>
+          {langOpen && (
+            <div
+              className={`absolute top-full right-0 mt-1.5 w-28 rounded-lg border shadow-lg overflow-hidden z-50 ${
+                dk
+                  ? "border-white/[0.1] bg-[#1a1a1a]"
+                  : "border-black/[0.1] bg-white"
+              }`}
+            >
+              {languages.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => { setLang(l.code); setLangOpen(false); }}
+                  className={`w-full px-3 py-2 text-left text-[12px] font-medium transition-colors ${
+                    lang === l.code
+                      ? dk
+                        ? "bg-white/[0.08] text-white"
+                        : "bg-black/[0.06] text-black"
+                      : dk
+                        ? "text-white/60 hover:bg-white/[0.04] hover:text-white"
+                        : "text-black/60 hover:bg-black/[0.04] hover:text-black"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Theme toggle */}

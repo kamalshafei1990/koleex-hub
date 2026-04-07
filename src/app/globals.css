@@ -94,6 +94,10 @@
   --header-border: rgba(0,0,0,0.08);
 }
 
+/* Plug-type SVG icons: black in light, white in dark */
+[data-theme="dark"] .plug-icon { filter: invert(1); }
+[data-theme="light"] .plug-icon { filter: none; }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

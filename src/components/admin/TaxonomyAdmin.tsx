@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, Pencil, ArrowLeft, X, Save, Loader2, ChevronUp, ChevronDown, FolderTree } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, ArrowLeft, X, Save, Loader2, ChevronUp, ChevronDown, FolderTree, Upload, ImageIcon } from "lucide-react";
 import { slugify } from "@/types/product-form";
 
 /* ---------------------------------------------------------------------------
@@ -18,6 +18,7 @@ interface TaxonomyItem {
   order: number;
   parent_id?: string;      // division_id or category_id
   created_at: string;
+  logoUrl?: string | null;
 }
 
 interface ParentOption {
@@ -41,6 +42,8 @@ interface Props {
   onUpdate: (id: string, data: { name: string; slug: string; description: string; order: number; parent_id?: string }) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
   onReorder: (id: string, newOrder: number) => Promise<boolean>;
+  onUploadLogo?: (slug: string, file: File) => Promise<string | null>;
+  onDeleteLogo?: (slug: string) => Promise<boolean>;
 }
 
 interface FormData {
@@ -57,6 +60,7 @@ export default function TaxonomyAdmin({
   title, singular, backHref, parentLabel, parentOptions,
   items, parentMap, childCounts, childLabel,
   loading, onRefresh, onCreate, onUpdate, onDelete, onReorder,
+  onUploadLogo, onDeleteLogo,
 }: Props) {
   const [search, setSearch] = useState("");
   const [filterParent, setFilterParent] = useState("");
@@ -68,6 +72,11 @@ export default function TaxonomyAdmin({
   const [slugEdited, setSlugEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     return items.filter(item => {
@@ -82,6 +91,9 @@ export default function TaxonomyAdmin({
     setForm({ ...EMPTY_FORM, order: String(items.length) });
     setSlugEdited(false);
     setError("");
+    setLogoFile(null);
+    setLogoPreview(null);
+    setRemoveLogo(false);
     setModalOpen(true);
   };
 
@@ -96,6 +108,9 @@ export default function TaxonomyAdmin({
     });
     setSlugEdited(true);
     setError("");
+    setLogoFile(null);
+    setLogoPreview(item.logoUrl || null);
+    setRemoveLogo(false);
     setModalOpen(true);
   };
 
@@ -120,6 +135,16 @@ export default function TaxonomyAdmin({
       ok = await onUpdate(editId, data);
     } else {
       ok = await onCreate(data);
+    }
+
+    // Handle logo upload/delete after save
+    if (ok && onUploadLogo && logoFile) {
+      setUploadingLogo(true);
+      await onUploadLogo(form.slug.trim(), logoFile);
+      setUploadingLogo(false);
+    }
+    if (ok && onDeleteLogo && removeLogo && !logoFile) {
+      await onDeleteLogo(form.slug.trim());
     }
 
     setSaving(false);
@@ -229,6 +254,7 @@ export default function TaxonomyAdmin({
               <thead>
                 <tr className="border-b border-white/[0.06]">
                   <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25 w-[60px]">Order</th>
+                  {onUploadLogo && <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25 w-[60px]">Logo</th>}
                   <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Name</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">Slug</th>
                   {parentLabel && <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/25">{parentLabel}</th>}
@@ -250,6 +276,19 @@ export default function TaxonomyAdmin({
                         </button>
                       </div>
                     </td>
+                    {onUploadLogo && (
+                      <td className="px-3 py-3 text-center">
+                        {item.logoUrl ? (
+                          <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center overflow-hidden mx-auto">
+                            <img src={item.logoUrl} alt="" className="w-6 h-6 object-contain" />
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] border-dashed flex items-center justify-center mx-auto">
+                            <ImageIcon className="h-3.5 w-3.5 text-white/15" />
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-5 py-3">
                       <div className="text-[14px] font-medium text-white">{item.name}</div>
                       {item.description && <div className="text-[11px] text-white/25 mt-0.5 line-clamp-1">{item.description}</div>}
@@ -301,6 +340,9 @@ export default function TaxonomyAdmin({
           <Link href="/subcategories" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
             Subcategories
           </Link>
+          <Link href="/brands" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
+            Brands
+          </Link>
           <Link href="/products" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
             Products
           </Link>
@@ -326,6 +368,64 @@ export default function TaxonomyAdmin({
             <div className="px-6 py-5 space-y-4">
               {error && (
                 <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</div>
+              )}
+
+              {/* Logo upload */}
+              {onUploadLogo && (
+                <div>
+                  <label className="block text-[12px] font-medium text-white/50 mb-1.5">Logo</label>
+                  <div className="flex items-center gap-4">
+                    {/* Preview */}
+                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0 transition-colors ${
+                      logoPreview && !removeLogo
+                        ? "bg-white/[0.06] border border-white/[0.08]"
+                        : "bg-white/[0.03] border-2 border-dashed border-white/[0.08]"
+                    }`}>
+                      {logoPreview && !removeLogo ? (
+                        <img src={logoFile ? URL.createObjectURL(logoFile) : logoPreview} alt="" className="w-10 h-10 object-contain" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-white/15" />
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1.5">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept=".svg,.png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                            setLogoPreview(URL.createObjectURL(file));
+                            setRemoveLogo(false);
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        className="h-8 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-white/60 hover:text-white/90 flex items-center gap-1.5 transition-colors"
+                      >
+                        <Upload className="h-3 w-3" />
+                        {logoPreview && !removeLogo ? "Replace" : "Upload"}
+                      </button>
+                      {logoPreview && !removeLogo && (
+                        <button
+                          type="button"
+                          onClick={() => { setLogoFile(null); setLogoPreview(null); setRemoveLogo(true); }}
+                          className="h-8 px-3 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] font-medium text-red-400/70 hover:text-red-400 flex items-center gap-1.5 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Remove
+                        </button>
+                      )}
+                      <span className="text-[10px] text-white/20">SVG, PNG, JPG</span>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {parentLabel && parentOptions && (

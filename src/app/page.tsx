@@ -7,7 +7,7 @@ import {
   FileText, TrendingUp, Layers, ClipboardList, Receipt, Calculator,
   Users, Truck, Contact, Globe, CreditCard, Briefcase, UserSearch,
   Star, Clock, CalendarCheck, MessageSquare, Calendar, CheckSquare,
-  Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Database,
+  Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Library, Database,
   Sparkles, Menu, Search, PanelTop,
 } from "lucide-react";
 import Link from "next/link";
@@ -50,6 +50,7 @@ const apps: AppItem[] = [
   { id: "inventory", name: "Inventory", icon: <Warehouse size={iconSize} />, category: "operations", route: "/products", active: true },
   { id: "purchase", name: "Purchase", icon: <ShoppingCart size={iconSize} />, category: "operations", route: "/purchase" },
   { id: "landed-cost", name: "Landed Cost", icon: <DollarSign size={iconSize} />, category: "operations", route: "/landed-cost", active: true },
+  { id: "catalogs", name: "Catalogs", icon: <Library size={iconSize} />, category: "operations", route: "/catalogs", active: true },
   { id: "documents", name: "Documents", icon: <FileText size={iconSize} />, category: "operations", route: "/documents" },
   { id: "sales", name: "Sales", icon: <TrendingUp size={iconSize} />, category: "commercial", route: "/sales" },
   { id: "crm", name: "CRM", icon: <Layers size={iconSize} />, category: "commercial", route: "/crm" },
@@ -69,7 +70,7 @@ const apps: AppItem[] = [
   { id: "attendance", name: "Attendance", icon: <CalendarCheck size={iconSize} />, category: "people", route: "/attendance" },
   { id: "discuss", name: "Discuss", icon: <MessageSquare size={iconSize} />, category: "communication", route: "/discuss" },
   { id: "calendar", name: "Calendar", icon: <Calendar size={iconSize} />, category: "communication", route: "/calendar" },
-  { id: "todo", name: "To-do", icon: <CheckSquare size={iconSize} />, category: "communication", route: "/todo" },
+  { id: "todo", name: "To-do", icon: <CheckSquare size={iconSize} />, category: "communication", route: "/todo", active: true },
   { id: "website", name: "Website", icon: <PanelTop size={iconSize} />, category: "marketing", route: "/website", active: true },
   { id: "marketing", name: "Marketing", icon: <Megaphone size={iconSize} />, category: "marketing", route: "/marketing" },
   { id: "marketing-cards", name: "Marketing Cards", icon: <Monitor size={iconSize} />, category: "marketing", route: "/marketing-cards" },

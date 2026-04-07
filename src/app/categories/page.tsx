@@ -5,6 +5,7 @@ import TaxonomyAdmin from "@/components/admin/TaxonomyAdmin";
 import {
   fetchDivisions, fetchCategories, createCategory, updateCategory,
   deleteCategory, fetchSubcategoryCounts,
+  fetchCategoryLogos, uploadCategoryLogo, deleteCategoryLogo,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow } from "@/types/supabase";
 
@@ -12,15 +13,17 @@ function CategoriesContent() {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subCounts, setSubCounts] = useState<Record<string, number>>({});
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [divs, cats, counts] = await Promise.all([
-      fetchDivisions(), fetchCategories(), fetchSubcategoryCounts(),
+    const [divs, cats, counts, logoMap] = await Promise.all([
+      fetchDivisions(), fetchCategories(), fetchSubcategoryCounts(), fetchCategoryLogos(),
     ]);
     setDivisions(divs);
     setCategories(cats);
     setSubCounts(counts);
+    setLogos(logoMap);
     setLoading(false);
   }, []);
 
@@ -33,7 +36,8 @@ function CategoriesContent() {
     id: c.id, name: c.name, slug: c.slug,
     description: c.description, order: c.order,
     parent_id: c.division_id, created_at: c.created_at,
-  })), [categories]);
+    logoUrl: logos[c.slug] || null,
+  })), [categories, logos]);
 
   return (
     <TaxonomyAdmin
@@ -63,6 +67,8 @@ function CategoriesContent() {
       }}
       onDelete={deleteCategory}
       onReorder={async (id, newOrder) => updateCategory(id, { order: newOrder })}
+      onUploadLogo={uploadCategoryLogo}
+      onDeleteLogo={deleteCategoryLogo}
     />
   );
 }

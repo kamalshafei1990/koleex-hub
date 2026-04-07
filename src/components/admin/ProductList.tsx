@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   Plus, Search, Trash2, Pencil, Eye, EyeOff, Package, Filter, X,
-  Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List,
+  Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List, Settings,
 } from "lucide-react";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
@@ -127,13 +127,22 @@ export default function ProductList() {
             </h1>
             <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-1">{products.length} products in catalog</p>
           </div>
-          <Link
-            href="/products/new"
-            className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-          >
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/products/settings"
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Control Panel</span>
+            </Link>
+            <Link
+              href="/products/new"
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
+            >
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </div>
         </div>
 
         {/* Search + Filters */}

@@ -4,19 +4,23 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import TaxonomyAdmin from "@/components/admin/TaxonomyAdmin";
 import {
   fetchDivisions, createDivision, updateDivision, deleteDivision,
-  fetchCategoryCounts,
+  fetchCategoryCounts, fetchDivisionLogos, uploadDivisionLogo, deleteDivisionLogo,
 } from "@/lib/products-admin";
 import type { DivisionRow } from "@/types/supabase";
 
 function DivisionsContent() {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [catCounts, setCatCounts] = useState<Record<string, number>>({});
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [divs, counts] = await Promise.all([fetchDivisions(), fetchCategoryCounts()]);
+    const [divs, counts, logoMap] = await Promise.all([
+      fetchDivisions(), fetchCategoryCounts(), fetchDivisionLogos(),
+    ]);
     setDivisions(divs);
     setCatCounts(counts);
+    setLogos(logoMap);
     setLoading(false);
   }, []);
 
@@ -25,7 +29,8 @@ function DivisionsContent() {
   const items = useMemo(() => divisions.map(d => ({
     id: d.id, name: d.name, slug: d.slug,
     description: d.tagline || d.description, order: d.order, created_at: d.created_at,
-  })), [divisions]);
+    logoUrl: logos[d.slug] || null,
+  })), [divisions, logos]);
 
   return (
     <TaxonomyAdmin
@@ -54,6 +59,8 @@ function DivisionsContent() {
       }}
       onDelete={deleteDivision}
       onReorder={async (id, newOrder) => updateDivision(id, { order: newOrder })}
+      onUploadLogo={uploadDivisionLogo}
+      onDeleteLogo={deleteDivisionLogo}
     />
   );
 }

@@ -19,9 +19,10 @@ import {
   upsertTranslation, deleteTranslation,
   upsertMarketPrice, deleteMarketPrice,
   setRelatedProducts,
-  fetchSupplierNames, fetchUniqueBrands, fetchUniqueTags,
+  fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
 } from "@/lib/products-admin";
+import { fetchAttributeConfig } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
   ProductFormState, ModelFormState, MediaFormState,
@@ -91,6 +92,7 @@ export default function ProductForm({ productId }: Props) {
   const [brands, setBrands] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [allTags, setAllTags] = useState<string[]>([]);
+  const [attrSuggestions, setAttrSuggestions] = useState<{ voltage: string[]; plug_types: { name: string; image?: string | null }[]; colors: string[]; watt: string[]; levels: string[] }>({ voltage: [], plug_types: [], colors: [], watt: [], levels: [] });
 
   // Form state
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
@@ -118,21 +120,42 @@ export default function ProductForm({ productId }: Props) {
   // Load data
   useEffect(() => {
     (async () => {
-      const [divs, cats, subs, supplierList, brandList, tagList, logoMap] = await Promise.all([
+      // Fetch lookup data + attribute config in parallel
+      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
-        fetchSupplierNames(), fetchUniqueBrands(), fetchUniqueTags(), fetchBrandLogos(),
+        fetchSupplierNames(), fetchUniqueBrands(), fetchBrandLogos(),
+        fetchAttributeConfig(),
       ]);
       setDivisions(divs);
       setCategories(cats);
       setSubcategories(subs);
       setSuppliers(supplierList);
       setBrands(brandList);
-      setAllTags(tagList);
+      // Use attribute config for tags (faster than scanning products)
+      setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
+      setAttrSuggestions({
+        voltage: attrCfg.voltage,
+        plug_types: attrCfg.plug_types,
+        colors: attrCfg.colors,
+        watt: attrCfg.watt,
+        levels: attrCfg.levels,
+      });
 
       if (isEdit && productId) {
-        const p = await fetchProductById(productId);
+        // Fetch product + related data in parallel (perf fix)
+        const [p, dbModels, dbMedia, dbTranslations, dbRelated] = await Promise.all([
+          fetchProductById(productId),
+          fetchModelsByProductId(productId),
+          fetchMediaByProductId(productId),
+          fetchTranslationsByProductId(productId),
+          fetchRelatedProducts(productId),
+        ]);
         if (!p) { setError("Product not found"); setLoading(false); return; }
+
+        // Fetch prices (needs model IDs from above)
+        const modelIds = dbModels.map(m => m.id);
+        const dbPrices = await fetchMarketPricesByModelIds(modelIds);
 
         setProduct({
           division_slug: p.division_slug,
@@ -157,13 +180,6 @@ export default function ProductForm({ productId }: Props) {
           featured: p.featured,
         });
         setSlugEdited(true);
-
-        const dbModels = await fetchModelsByProductId(productId);
-        const dbMedia = await fetchMediaByProductId(productId);
-        const dbTranslations = await fetchTranslationsByProductId(productId);
-        const modelIds = dbModels.map(m => m.id);
-        const dbPrices = await fetchMarketPricesByModelIds(modelIds);
-        const dbRelated = await fetchRelatedProducts(productId);
 
         const mappedModels: ModelFormState[] = dbModels.map(m => ({
           _tempId: crypto.randomUUID(),
@@ -656,10 +672,17 @@ export default function ProductForm({ productId }: Props) {
                     className={inp}
                   >
                     <option value="">Select level...</option>
-                    <option value="entry">Entry</option>
-                    <option value="mid">Mid</option>
-                    <option value="premium">Premium</option>
-                    <option value="enterprise">Enterprise</option>
+                    {attrSuggestions.levels.length > 0
+                      ? attrSuggestions.levels.map(l => (
+                          <option key={l} value={l.toLowerCase()}>{l}</option>
+                        ))
+                      : <>
+                          <option value="entry">Entry</option>
+                          <option value="mid">Mid</option>
+                          <option value="premium">Premium</option>
+                          <option value="enterprise">Enterprise</option>
+                        </>
+                    }
                   </select>
                 </div>
               </div>
@@ -723,7 +746,7 @@ export default function ProductForm({ productId }: Props) {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
                   <Zap className="h-3 w-3" /> Electrical & Technical
                 </p>
-                <TechnicalSection data={product} onChange={updateProduct_} />
+                <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
               </div>
             </div>
           </Section>
