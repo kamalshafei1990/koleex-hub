@@ -156,8 +156,8 @@ export default function PriceCalculator() {
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div className="flex items-center gap-2 min-w-0">
-            <Calculator className="h-5 w-5 text-[var(--text-dim)] shrink-0" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
             <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
@@ -180,7 +180,7 @@ export default function PriceCalculator() {
             {/* Products Section */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <Package className="h-4 w-4 text-blue-400" />
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Package className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Products</span>
                 <button onClick={addProduct} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
                   <Plus className="h-3.5 w-3.5" /> Add
@@ -216,7 +216,7 @@ export default function PriceCalculator() {
             {/* Exchange Rate */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <DollarSign className="h-4 w-4 text-green-400" />
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><DollarSign className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Exchange Rate</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-3">
@@ -245,7 +245,7 @@ export default function PriceCalculator() {
             {/* Pricing Configuration */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <Layers className="h-4 w-4 text-cyan-400" />
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Layers className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Pricing Configuration</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-5">
@@ -278,7 +278,7 @@ export default function PriceCalculator() {
             {/* Adjustments */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <Percent className="h-4 w-4 text-yellow-400" />
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Percent className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Adjustments</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
@@ -341,7 +341,7 @@ export default function PriceCalculator() {
                 {/* Quotation Header */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                    <Activity className="h-4 w-4 text-blue-400" />
+                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Activity className="h-4 w-4" /></div>
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Quotation Details</span>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-300">
@@ -407,7 +407,7 @@ export default function PriceCalculator() {
                 {/* Grand Total Table */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                    <TrendingUp className="h-4 w-4 text-cyan-400" />
+                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><TrendingUp className="h-4 w-4" /></div>
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Grand Total Pricing</span>
                   </div>
                   <div className="overflow-x-auto border-t border-[var(--border-subtle)]">
