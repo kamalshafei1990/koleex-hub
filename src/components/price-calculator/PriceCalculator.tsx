@@ -151,27 +151,25 @@ export default function PriceCalculator() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* ── Page Header (matches Products) ── */}
-        <div className="flex items-center justify-between mb-6 md:mb-8">
-          <div>
-            <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-              <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <Calculator className="h-5 w-5 text-[var(--text-dim)]" />
-              Price Calculator
-            </h1>
-            <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-1 ml-[42px]">Generate channel pricing with shipping-adjusted ERP logic</p>
+        {/* ── Page Header ── */}
+        <div className="flex items-center gap-3 mb-1">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2 min-w-0">
+            <Calculator className="h-5 w-5 text-[var(--text-dim)] shrink-0" />
+            <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={resetForm} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <RefreshCw className="h-3.5 w-3.5" /> Reset
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+              <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
             </button>
-            <button onClick={generate} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+            <button onClick={generate} className="hidden md:flex h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold items-center gap-2 hover:opacity-90 transition-all shadow-lg">
               <Zap className="h-4 w-4" /> Generate Price
             </button>
           </div>
         </div>
+        <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Generate channel pricing with shipping-adjusted ERP logic</p>
 
         {/* ── Two Column Layout ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6 items-start">
@@ -181,29 +179,35 @@ export default function PriceCalculator() {
 
             {/* Products Section */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-              <div className="flex items-center gap-3 px-6 py-4">
+              <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <Package className="h-4 w-4 text-blue-400" />
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Products</span>
                 <button onClick={addProduct} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
                   <Plus className="h-3.5 w-3.5" /> Add
                 </button>
               </div>
-              <div className="px-6 pb-5 pt-0 border-t border-[var(--border-subtle)] space-y-2">
+              <div className="px-4 md:px-6 pb-5 pt-0 border-t border-[var(--border-subtle)] space-y-3">
                 {products.map((prod, i) => (
-                  <div key={prod.id} className="flex items-center gap-2 mt-3 first:mt-3">
-                    <span className="text-[10px] text-[var(--text-ghost)] w-4 shrink-0 text-center font-mono">{i + 1}</span>
-                    <input type="text" value={prod.name} onChange={e => updateProduct(prod.id, "name", e.target.value)} placeholder="Product name" className={`${inputCls} flex-1 min-w-0`} />
-                    <div className="relative w-28 shrink-0">
-                      <input type="number" min={0} step="0.01" value={prod.costCny || ""} onChange={e => updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)} placeholder="Cost" className={`${inputCls} pr-10`} />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">CNY</span>
+                  <div key={prod.id} className="mt-3 first:mt-3 space-y-2">
+                    {/* Row 1: Name + Delete */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[var(--text-ghost)] w-4 shrink-0 text-center font-mono">{i + 1}</span>
+                      <input type="text" value={prod.name} onChange={e => updateProduct(prod.id, "name", e.target.value)} placeholder="Product name" className={`${inputCls} flex-1 min-w-0`} />
+                      {products.length > 1
+                        ? <button onClick={() => removeProduct(prod.id)} className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                        : <span className="w-8 shrink-0 hidden md:block" />}
                     </div>
-                    <div className="relative w-20 shrink-0">
-                      <input type="number" min={1} step={1} value={prod.qty || ""} onChange={e => updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)} placeholder="Qty" className={`${inputCls} pr-7`} />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">x</span>
+                    {/* Row 2: Cost + Qty */}
+                    <div className="flex items-center gap-2 pl-6">
+                      <div className="relative flex-1">
+                        <input type="number" min={0} step="0.01" value={prod.costCny || ""} onChange={e => updateProduct(prod.id, "costCny", parseFloat(e.target.value) || 0)} placeholder="Cost" className={`${inputCls} pr-10`} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">CNY</span>
+                      </div>
+                      <div className="relative w-24 shrink-0">
+                        <input type="number" min={1} step={1} value={prod.qty || ""} onChange={e => updateProduct(prod.id, "qty", parseInt(e.target.value) || 1)} placeholder="Qty" className={`${inputCls} pr-7`} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-ghost)]">x</span>
+                      </div>
                     </div>
-                    {products.length > 1
-                      ? <button onClick={() => removeProduct(prod.id)} className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
-                      : <span className="w-8 shrink-0" />}
                   </div>
                 ))}
               </div>
@@ -211,19 +215,17 @@ export default function PriceCalculator() {
 
             {/* Exchange Rate */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-              <div className="flex items-center gap-3 px-6 py-4">
+              <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <DollarSign className="h-4 w-4 text-green-400" />
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Exchange Rate</span>
               </div>
-              <div className="px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <label className={labelCls}>USD/CNY Rate</label>
-                    <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={inputCls} />
-                  </div>
-                  <div className="flex gap-2 pt-5">
-                    <button onClick={() => setExchangeRate(7.24)} className="h-10 px-4 rounded-xl border border-green-500/30 text-green-400 text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap">Live Rate</button>
-                    <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-4 rounded-xl border text-[12px] font-medium whitespace-nowrap transition-all ${showFxManager ? "border-purple-500/50 text-purple-400 bg-purple-500/10" : "border-purple-500/30 text-purple-400 hover:bg-purple-500/10"}`}>FX Risk</button>
+              <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-3">
+                <div>
+                  <label className={labelCls}>USD/CNY Rate</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={`${inputCls} flex-1`} />
+                    <button onClick={() => setExchangeRate(7.24)} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0">Live Rate</button>
+                    <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-purple-500/50 text-purple-400 bg-purple-500/10" : "border-purple-500/30 text-purple-400 hover:bg-purple-500/10"}`}>FX Risk</button>
                   </div>
                 </div>
                 {showFxManager && (
@@ -242,11 +244,11 @@ export default function PriceCalculator() {
 
             {/* Pricing Configuration */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-              <div className="flex items-center gap-3 px-6 py-4">
+              <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <Layers className="h-4 w-4 text-cyan-400" />
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Pricing Configuration</span>
               </div>
-              <div className="px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-5">
+              <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-5">
                 <div>
                   <label className={labelCls}>Product Category</label>
                   <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls}>
@@ -275,11 +277,11 @@ export default function PriceCalculator() {
 
             {/* Adjustments */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-              <div className="flex items-center gap-3 px-6 py-4">
+              <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                 <Percent className="h-4 w-4 text-yellow-400" />
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Adjustments</span>
               </div>
-              <div className="px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
+              <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
                 {/* Override */}
                 <label className="flex items-center gap-2.5 cursor-pointer select-none">
                   <input type="checkbox" checked={overrideActive} onChange={() => setOverrideActive(!overrideActive)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-blue-600 cursor-pointer" />
@@ -338,10 +340,10 @@ export default function PriceCalculator() {
               <>
                 {/* Quotation Header */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-                  <div className="flex items-center gap-3 px-6 py-4">
+                  <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                     <Activity className="h-4 w-4 text-blue-400" />
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Quotation Details</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-300">
                         <Globe className="h-3 w-3" /> {result.countryName}
                       </span>
@@ -357,14 +359,14 @@ export default function PriceCalculator() {
                     <KV label="Margin %" value={pct(result.items[0].marginPct)} />
                     <KV label="Country Adj." value={`${result.countryAdjPct >= 0 ? "+" : ""}${(result.countryAdjPct * 100).toFixed(1)}%`} />
                     {result.discountPct > 0 && <KV label="Discount" value={`${result.discountPct}%`} />}
-                    <div className="flex items-center justify-between px-6 py-3 bg-blue-500/[0.06] border-t border-[var(--border-subtle)]">
+                    <div className="flex items-center justify-between px-4 md:px-6 py-3 bg-blue-500/[0.06] border-t border-[var(--border-subtle)]">
                       <span className="text-[12px] font-semibold text-blue-300">Final Base Price</span>
                       <span className="text-[14px] font-bold font-mono text-blue-400">${fmt(result.items[0].finalBase)}</span>
                     </div>
                     {(() => {
                       const tp = result.items.reduce((s, i) => s + i.channelProfits[result.customerType] * i.qty, 0);
                       return (
-                        <div className="flex items-center justify-between px-6 py-3 bg-emerald-500/[0.06] border-t border-[var(--border-subtle)]">
+                        <div className="flex items-center justify-between px-4 md:px-6 py-3 bg-emerald-500/[0.06] border-t border-[var(--border-subtle)]">
                           <span className="text-[12px] font-semibold text-emerald-300">Total Profit</span>
                           <span className={`text-[14px] font-bold font-mono ${tp >= 0 ? "text-emerald-400" : "text-red-400"}`}>{tp >= 0 ? "+" : ""}${fmt(tp)}</span>
                         </div>
@@ -379,7 +381,7 @@ export default function PriceCalculator() {
                   const isExp = expandedItems.has(idx);
                   return (
                     <div key={idx} className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-                      <button onClick={() => { setExpandedItems(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; }); }} className="w-full px-6 py-3.5 flex items-center justify-between hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
+                      <button onClick={() => { setExpandedItems(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; }); }} className="w-full px-4 md:px-6 py-3.5 flex items-center justify-between hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
                           <Package className="h-3.5 w-3.5 text-orange-400 shrink-0" />
                           <span className="text-[13px] font-medium truncate">{item.name}</span>
@@ -404,7 +406,7 @@ export default function PriceCalculator() {
 
                 {/* Grand Total Table */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-                  <div className="flex items-center gap-3 px-6 py-4">
+                  <div className="flex items-center gap-3 px-4 md:px-6 py-4">
                     <TrendingUp className="h-4 w-4 text-cyan-400" />
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Grand Total Pricing</span>
                   </div>
@@ -412,11 +414,11 @@ export default function PriceCalculator() {
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="bg-[var(--bg-surface-subtle)]">
-                          <th className="text-left px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
+                          <th className="text-left px-4 md:px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
                           <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Unit Price</th>
                           <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Total</th>
                           <th className="text-right px-4 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Profit</th>
-                          {result.includeTaxRefund && <th className="text-right px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+ Tax</th>}
+                          {result.includeTaxRefund && <th className="text-right px-3 md:px-6 py-3 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+ Tax</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -433,7 +435,7 @@ export default function PriceCalculator() {
                               <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">${fmt(unitPrice)}</td>
                               <td className="text-right px-4 py-3 font-mono text-[var(--text-highlight)]">${fmt(totalTotal)}</td>
                               <td className={`text-right px-4 py-3 font-mono ${profit >= 0 ? "text-green-400" : "text-red-400"}`}>{profit >= 0 ? "+" : ""}${fmt(profit)}</td>
-                              {result.includeTaxRefund && <td className={`text-right px-6 py-3 font-mono ${profitTax >= 0 ? "text-emerald-400" : "text-red-400"}`}>{profitTax >= 0 ? "+" : ""}${fmt(profitTax)}</td>}
+                              {result.includeTaxRefund && <td className={`text-right px-3 md:px-6 py-3 font-mono ${profitTax >= 0 ? "text-emerald-400" : "text-red-400"}`}>{profitTax >= 0 ? "+" : ""}${fmt(profitTax)}</td>}
                             </tr>
                           );
                         })}
@@ -449,7 +451,7 @@ export default function PriceCalculator() {
                               <td className="text-right px-4 py-3 font-mono font-semibold text-[var(--text-ghost)]">--</td>
                               <td className="text-right px-4 py-3 font-mono font-bold text-[var(--text-primary)]">${fmt(ft)}</td>
                               <td className={`text-right px-4 py-3 font-mono font-bold ${fp >= 0 ? "text-green-400" : "text-red-400"}`}>{fp >= 0 ? "+" : ""}${fmt(fp)}</td>
-                              {result.includeTaxRefund && <td className={`text-right px-6 py-3 font-mono font-bold ${fpt >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fpt >= 0 ? "+" : ""}${fmt(fpt)}</td>}
+                              {result.includeTaxRefund && <td className={`text-right px-3 md:px-6 py-3 font-mono font-bold ${fpt >= 0 ? "text-emerald-400" : "text-red-400"}`}>{fpt >= 0 ? "+" : ""}${fmt(fpt)}</td>}
                             </tr>
                           );
                         })()}
@@ -484,9 +486,9 @@ export default function PriceCalculator() {
 
 function KV({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
-    <div className={`flex items-center justify-between px-6 py-2.5 ${last ? "" : "border-b border-[var(--border-subtle)]"}`}>
-      <span className="text-[12px] text-[var(--text-dim)]">{label}</span>
-      <span className="text-[13px] font-mono text-[var(--text-highlight)]">{value}</span>
+    <div className={`flex items-center justify-between px-4 md:px-6 py-2.5 ${last ? "" : "border-b border-[var(--border-subtle)]"}`}>
+      <span className="text-[11px] md:text-[12px] text-[var(--text-dim)] shrink-0">{label}</span>
+      <span className="text-[12px] md:text-[13px] font-mono text-[var(--text-highlight)] text-right">{value}</span>
     </div>
   );
 }
@@ -497,11 +499,11 @@ function ChannelTable({ item, result }: { item: ItemResult; result: CalcResult }
       <table className="w-full text-[12px]">
         <thead>
           <tr className="bg-[var(--bg-surface-subtle)]">
-            <th className="text-left px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
-            <th className="text-right px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Unit</th>
-            <th className="text-right px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Total</th>
-            <th className="text-right px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Profit</th>
-            {result.includeTaxRefund && <th className="text-right px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+Tax</th>}
+            <th className="text-left px-3 md:px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Channel</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Unit</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Total</th>
+            <th className="text-right px-2 md:px-4 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Profit</th>
+            {result.includeTaxRefund && <th className="text-right px-3 md:px-6 py-2 text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">+Tax</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-subtle)]">
