@@ -96,6 +96,19 @@ export default function PriceCalculator() {
   const [includeTaxRefund, setIncludeTaxRefund] = useState(true);
   const [result, setResult] = useState<CalcResult | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  async function fetchLiveRate() {
+    setFetchingRate(true);
+    try {
+      const res = await fetch("https://open.er-api.com/v6/latest/USD");
+      const data = await res.json();
+      if (data?.result === "success" && data.rates?.CNY) {
+        setExchangeRate(Math.round(data.rates.CNY * 100) / 100);
+      }
+    } catch { /* silently fail */ }
+    setFetchingRate(false);
+  }
 
   function addProduct() { setProducts(p => [...p, { id: uid(), name: "", costCny: 0, qty: 1 }]); }
   function removeProduct(id: string) { setProducts(p => p.length <= 1 ? p : p.filter(x => x.id !== id)); }
@@ -224,7 +237,7 @@ export default function PriceCalculator() {
                   <label className={labelCls}>USD/CNY Rate</label>
                   <div className="flex items-center gap-2">
                     <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={`${inputCls} flex-1`} />
-                    <button onClick={() => setExchangeRate(7.24)} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0 flex items-center gap-2"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>Live Rate</button>
+                    <button onClick={fetchLiveRate} disabled={fetchingRate} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0 flex items-center gap-2 disabled:opacity-50"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>{fetchingRate ? "Fetching..." : "Live Rate"}</button>
                     <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-red-500/30 text-red-400 hover:bg-red-500/10"}`}>FX Risk</button>
                   </div>
                 </div>
