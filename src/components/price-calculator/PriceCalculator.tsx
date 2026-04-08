@@ -224,8 +224,8 @@ export default function PriceCalculator() {
                   <label className={labelCls}>USD/CNY Rate</label>
                   <div className="flex items-center gap-2">
                     <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={`${inputCls} flex-1`} />
-                    <button onClick={() => setExchangeRate(7.24)} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0">Live Rate</button>
-                    <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-purple-500/50 text-purple-400 bg-purple-500/10" : "border-purple-500/30 text-purple-400 hover:bg-purple-500/10"}`}>FX Risk</button>
+                    <button onClick={() => setExchangeRate(7.24)} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0 flex items-center gap-2"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>Live Rate</button>
+                    <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-red-500/30 text-red-400 hover:bg-red-500/10"}`}>FX Risk</button>
                   </div>
                 </div>
                 {showFxManager && (
