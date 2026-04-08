@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Calculator, ArrowLeft, Plus, Trash2, RefreshCw, ChevronDown, ChevronUp,
   TrendingUp, DollarSign, Globe, Users, Package, Percent, ShieldCheck,
-  Zap, Tag, Copy, FileText, Printer, Share2, Info, Activity, Layers,
+  Zap, Tag, Copy, FileText, Printer, Share2, Info, Activity, Layers, Settings,
 } from "lucide-react";
+import { fetchPricingConfig, type PricingConfig } from "@/lib/pricing-config";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 
@@ -97,6 +98,9 @@ export default function PriceCalculator() {
   const [result, setResult] = useState<CalcResult | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [fetchingRate, setFetchingRate] = useState(false);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null);
+
+  useEffect(() => { fetchPricingConfig().then(setPricingConfig); }, []);
 
   async function fetchLiveRate() {
     setFetchingRate(true);
@@ -125,11 +129,17 @@ export default function PriceCalculator() {
   }
 
   function generate() {
-    const country = COUNTRIES.find(c => c.code === countryCode)!;
+    const cats = pricingConfig?.categories ?? CATEGORIES;
+    const cntrs = pricingConfig?.countries ?? COUNTRIES;
+    const custs = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
+    const taxRate = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
+    const country = cntrs.find(c => c.code === countryCode) ?? cntrs[0];
+    const autoDetect = (cost: number) => { for (const c of cats) { if (cost >= c.min && cost < c.max) return c; } return cats[cats.length - 1]; };
     const discFrac = discountPct / 100;
+    const allRows = [{ id: "base", name: "Base Price" }, ...custs.map(c => ({ id: c.id, name: c.name }))];
     const itemResults: ItemResult[] = products.map(prod => {
       const costUsd = prod.costCny / exchangeRate;
-      const cat = categoryId === "auto" ? autoDetectCategory(prod.costCny) : CATEGORIES.find(c => c.id === categoryId)!;
+      const cat = categoryId === "auto" ? autoDetect(prod.costCny) : cats.find(c => c.id === categoryId)!;
       let marginUsd: number, marginPctVal: number;
       if (overrideActive) {
         if (overrideMode === "amount") { marginUsd = overrideValue; marginPctVal = costUsd > 0 ? marginUsd / costUsd : 0; }
@@ -141,19 +151,30 @@ export default function PriceCalculator() {
       const countryAdjusted = initialBase * (1 + country.adjustmentPct);
       const finalBase = countryAdjusted * (1 - discFrac);
       const channelPrices: Record<string, number> = { base: finalBase };
-      for (const rule of CUSTOMER_RULES) channelPrices[rule.id] = channelPrices[rule.rel] * (1 + rule.markupPct);
-      const taxRefundPerUnit = costUsd * TAX_REFUND_DEFAULT;
+      for (const rule of custs) channelPrices[rule.id] = channelPrices[rule.rel] * (1 + rule.markupPct);
+      const taxRefundPerUnit = costUsd * taxRate;
       const channelProfits: Record<string, number> = {};
       const channelProfitsWithTax: Record<string, number> = {};
-      for (const row of ROW_ORDER) { channelProfits[row.id] = channelPrices[row.id] - costUsd; channelProfitsWithTax[row.id] = channelPrices[row.id] - costUsd + taxRefundPerUnit; }
+      for (const row of allRows) { channelProfits[row.id] = channelPrices[row.id] - costUsd; channelProfitsWithTax[row.id] = channelPrices[row.id] - costUsd + taxRefundPerUnit; }
       return { name: prod.name || "Unnamed Product", qty: prod.qty, costCny: prod.costCny, costUsd, categoryName: cat.name, marginPct: marginPctVal, marginUsd, initialBase, countryAdjusted, finalBase, taxRefundPerUnit, channelPrices, channelProfits, channelProfitsWithTax };
     });
     const totalCostCny = products.reduce((s, p) => s + p.costCny * p.qty, 0);
-    setResult({ items: itemResults, totalCostCny, totalCostUsd: totalCostCny / exchangeRate, exchangeRate, totalItems: products.length, totalQty: products.reduce((s, p) => s + p.qty, 0), categoryName: categoryId === "auto" ? autoDetectCategory(products[0]?.costCny ?? 0).name : CATEGORIES.find(c => c.id === categoryId)!.name, countryName: country.name, countryAdjPct: country.adjustmentPct, customerType, discountPct, overrideActive, overrideMode, overrideValue, fxRisk, includeTaxRefund });
+    const autoDetectName = categoryId === "auto" ? autoDetect(products[0]?.costCny ?? 0).name : cats.find(c => c.id === categoryId)!.name;
+    setResult({ items: itemResults, totalCostCny, totalCostUsd: totalCostCny / exchangeRate, exchangeRate, totalItems: products.length, totalQty: products.reduce((s, p) => s + p.qty, 0), categoryName: autoDetectName, countryName: country.name, countryAdjPct: country.adjustmentPct, customerType, discountPct, overrideActive, overrideMode, overrideValue, fxRisk, includeTaxRefund });
     setExpandedItems(new Set());
   }
 
-  const selectedCountry = COUNTRIES.find(c => c.code === countryCode)!;
+  /* ── Derived from config ── */
+  const cfgCountries = pricingConfig?.countries ?? COUNTRIES;
+  const cfgCategories = pricingConfig?.categories ?? CATEGORIES;
+  const cfgCustomers = pricingConfig ? pricingConfig.customers.filter(c => c.visible) : CUSTOMER_RULES;
+  const cfgTaxRefund = pricingConfig ? pricingConfig.defaultTaxRefund / 100 : TAX_REFUND_DEFAULT;
+  const cfgMaxDiscount = pricingConfig?.maxDiscount ?? 10;
+  const cfgUI = pricingConfig?.ui ?? { showOverride: true, showFxRisk: true, showTaxRefund: true };
+  const selectedCountry = cfgCountries.find(c => c.code === countryCode) ?? cfgCountries[0];
+
+  /* ── Row order for results table ── */
+  const rowOrder = [{ id: "base", name: "Base Price" }, ...cfgCustomers.map(c => ({ id: c.id, name: c.name }))];
 
   /* ── Exact ProductForm input/select/label classes ── */
   const inputCls = "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all";
@@ -174,6 +195,9 @@ export default function PriceCalculator() {
             <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
+            <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+              <Settings className="h-3.5 w-3.5" /> <span className="hidden md:inline">Settings</span>
+            </Link>
             <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
             </button>
@@ -238,7 +262,7 @@ export default function PriceCalculator() {
                   <div className="flex items-center gap-2">
                     <input type="number" min={0.01} step="0.01" value={exchangeRate || ""} onChange={e => setExchangeRate(parseFloat(e.target.value) || 0)} className={`${inputCls} flex-1`} />
                     <button onClick={fetchLiveRate} disabled={fetchingRate} className="h-10 px-3 md:px-4 rounded-xl border border-green-500/30 text-green-400 text-[11px] md:text-[12px] font-medium hover:bg-green-500/10 transition-all whitespace-nowrap shrink-0 flex items-center gap-2 disabled:opacity-50"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>{fetchingRate ? "Fetching..." : "Live Rate"}</button>
-                    <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-red-500/30 text-red-400 hover:bg-red-500/10"}`}>FX Risk</button>
+                    {cfgUI.showFxRisk && <button onClick={() => setShowFxManager(!showFxManager)} className={`h-10 px-3 md:px-4 rounded-xl border text-[11px] md:text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${showFxManager ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-red-500/30 text-red-400 hover:bg-red-500/10"}`}>FX Risk</button>}
                   </div>
                 </div>
                 {showFxManager && (
@@ -266,13 +290,13 @@ export default function PriceCalculator() {
                   <label className={labelCls}>Product Category</label>
                   <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={selectCls}>
                     <option value="auto">Auto-Detect (Smart Margin)</option>
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.marginPct * 100).toFixed(0)}%)</option>)}
+                    {cfgCategories.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.marginPct * 100).toFixed(0)}%)</option>)}
                   </select>
                 </div>
                 <div>
                   <label className={labelCls}>Target Country</label>
                   <select value={countryCode} onChange={e => setCountryCode(e.target.value)} className={selectCls}>
-                    {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>)}
+                    {cfgCountries.map(c => <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>)}
                   </select>
                   <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-blue-500/[0.06] border border-blue-500/15">
                     <Info className="h-3.5 w-3.5 text-blue-400 shrink-0" />
@@ -282,7 +306,7 @@ export default function PriceCalculator() {
                 <div>
                   <label className={labelCls}>Target Customer Type</label>
                   <select value={customerType} onChange={e => setCustomerType(e.target.value)} className={selectCls}>
-                    {CUSTOMER_RULES.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    {cfgCustomers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -296,24 +320,28 @@ export default function PriceCalculator() {
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
                 {/* Override */}
-                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                  <input type="checkbox" checked={overrideActive} onChange={() => setOverrideActive(!overrideActive)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-blue-600 cursor-pointer" />
-                  <span className="text-[13px] font-medium">Override Default Profit Margin</span>
-                </label>
-                {overrideActive && (
-                  <div className="grid grid-cols-2 gap-3 pl-7">
-                    <div>
-                      <label className={labelCls}>Override Type</label>
-                      <select value={overrideMode} onChange={e => setOverrideMode(e.target.value as OverrideMode)} className={selectCls}>
-                        <option value="percentage">By Percentage</option>
-                        <option value="amount">By Amount USD</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Value</label>
-                      <input type="number" min={0} step={overrideMode === "percentage" ? "0.1" : "0.01"} value={overrideValue || ""} onChange={e => setOverrideValue(parseFloat(e.target.value) || 0)} placeholder={overrideMode === "percentage" ? "e.g. 12" : "e.g. 150"} className={inputCls} />
-                    </div>
-                  </div>
+                {cfgUI.showOverride && (
+                  <>
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={overrideActive} onChange={() => setOverrideActive(!overrideActive)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-blue-600 cursor-pointer" />
+                      <span className="text-[13px] font-medium">Override Default Profit Margin</span>
+                    </label>
+                    {overrideActive && (
+                      <div className="grid grid-cols-2 gap-3 pl-7">
+                        <div>
+                          <label className={labelCls}>Override Type</label>
+                          <select value={overrideMode} onChange={e => setOverrideMode(e.target.value as OverrideMode)} className={selectCls}>
+                            <option value="percentage">By Percentage</option>
+                            <option value="amount">By Amount USD</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Value</label>
+                          <input type="number" min={0} step={overrideMode === "percentage" ? "0.1" : "0.01"} value={overrideValue || ""} onChange={e => setOverrideValue(parseFloat(e.target.value) || 0)} placeholder={overrideMode === "percentage" ? "e.g. 12" : "e.g. 150"} className={inputCls} />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
                 {/* Discount */}
                 <div className="space-y-2 pt-1">
@@ -321,15 +349,17 @@ export default function PriceCalculator() {
                     <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><Tag className="h-3.5 w-3.5 text-orange-400" /> Manual Discount</label>
                     <span className="text-[13px] font-mono font-semibold text-blue-400 tabular-nums">{discountPct}%</span>
                   </div>
-                  <input type="range" min={0} max={10} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-blue-500" style={{ background: `linear-gradient(to right, #3b82f6 ${discountPct * 10}%, rgba(255,255,255,0.06) ${discountPct * 10}%)` }} />
-                  <div className="flex justify-between text-[9px] text-[var(--text-ghost)]"><span>0%</span><span>5%</span><span>10%</span></div>
+                  <input type="range" min={0} max={cfgMaxDiscount} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-blue-500" style={{ background: `linear-gradient(to right, #3b82f6 ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%, rgba(255,255,255,0.06) ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%)` }} />
+                  <div className="flex justify-between text-[9px] text-[var(--text-ghost)]"><span>0%</span><span>{Math.floor(cfgMaxDiscount / 2)}%</span><span>{cfgMaxDiscount}%</span></div>
                 </div>
                 {/* Tax Refund */}
-                <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
-                  <input type="checkbox" checked={includeTaxRefund} onChange={() => setIncludeTaxRefund(!includeTaxRefund)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-emerald-600 cursor-pointer" />
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                  <span className="text-[13px] font-medium">Include Tax Refund ({(TAX_REFUND_DEFAULT * 100).toFixed(0)}%)</span>
-                </label>
+                {cfgUI.showTaxRefund && (
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+                    <input type="checkbox" checked={includeTaxRefund} onChange={() => setIncludeTaxRefund(!includeTaxRefund)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-emerald-600 cursor-pointer" />
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="text-[13px] font-medium">Include Tax Refund ({(cfgTaxRefund * 100).toFixed(0)}%)</span>
+                  </label>
+                )}
               </div>
             </div>
 
@@ -361,7 +391,7 @@ export default function PriceCalculator() {
                         <Globe className="h-3 w-3" /> {result.countryName}
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-[10px] font-medium text-pink-300">
-                        <Users className="h-3 w-3" /> {CUSTOMER_RULES.find(r => r.id === result.customerType)?.name}
+                        <Users className="h-3 w-3" /> {cfgCustomers.find(r => r.id === result.customerType)?.name}
                       </span>
                     </div>
                   </div>
@@ -410,7 +440,7 @@ export default function PriceCalculator() {
                           <KV label="Initial Base" value={`$${fmt(item.initialBase)}`} />
                           <KV label="After Country" value={`$${fmt(item.countryAdjusted)}`} />
                           <KV label="Final Base" value={`$${fmt(item.finalBase)}`} last />
-                          <ChannelTable item={item} result={result} />
+                          <ChannelTable item={item} result={result} rows={rowOrder} />
                         </div>
                       )}
                     </div>
@@ -435,7 +465,7 @@ export default function PriceCalculator() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border-subtle)]">
-                        {ROW_ORDER.map(row => {
+                        {rowOrder.map(row => {
                           let totalTotal = 0, totalProfit = 0, totalProfitTax = 0;
                           for (const item of result.items) { totalTotal += item.channelPrices[row.id] * item.qty; totalProfit += item.channelProfits[row.id]; totalProfitTax += item.channelProfitsWithTax[row.id]; }
                           const unitPrice = result.items.length === 1 ? result.items[0].channelPrices[row.id] : result.items.reduce((s, i) => s + i.channelPrices[row.id], 0);
@@ -476,7 +506,7 @@ export default function PriceCalculator() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {[
-                    { icon: Copy, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${CUSTOMER_RULES.find(r => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
+                    { icon: Copy, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${cfgCustomers.find(r => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
                     { icon: FileText, label: "Export PDF", fn: () => {} },
                     { icon: Printer, label: "Print", fn: () => window.print() },
                     { icon: Share2, label: "Share", fn: () => {} },
@@ -506,7 +536,7 @@ function KV({ label, value, last }: { label: string; value: string; last?: boole
   );
 }
 
-function ChannelTable({ item, result }: { item: ItemResult; result: CalcResult }) {
+function ChannelTable({ item, result, rows }: { item: ItemResult; result: CalcResult; rows: { id: string; name: string }[] }) {
   return (
     <div className="overflow-x-auto border-t border-[var(--border-subtle)]">
       <table className="w-full text-[12px]">
@@ -520,7 +550,7 @@ function ChannelTable({ item, result }: { item: ItemResult; result: CalcResult }
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border-subtle)]">
-          {ROW_ORDER.map(row => {
+          {rows.map(row => {
             const up = item.channelPrices[row.id], pr = item.channelProfits[row.id], pt = item.channelProfitsWithTax[row.id];
             const isTarget = row.id === result.customerType;
             return (
