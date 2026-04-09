@@ -14,6 +14,7 @@ interface Props {
   subcategories: SubcategoryRow[];
   divisionLogos?: Record<string, string>;
   categoryLogos?: Record<string, string>;
+  subcategoryLogos?: Record<string, string>;
   onClickCreateDivision?: () => void;
   onClickCreateCategory?: () => void;
   onClickCreateSubcategory?: () => void;
@@ -29,7 +30,7 @@ function getStep(data: Pick<ProductFormState, "division_slug" | "category_slug" 
 
 export default function ClassificationSection({
   data, onChange, divisions, categories, subcategories,
-  divisionLogos, categoryLogos,
+  divisionLogos, categoryLogos, subcategoryLogos,
   onClickCreateDivision, onClickCreateCategory, onClickCreateSubcategory,
 }: Props) {
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === data.division_slug)?.id, [divisions, data.division_slug]);
@@ -187,16 +188,23 @@ export default function ClassificationSection({
             <p className="text-[12px] text-[var(--text-ghost)] italic py-6 text-center">No subcategories in this category</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {filteredSubs.map((sub) => (
-                <button
-                  key={sub.id}
-                  onClick={() => onChange({ subcategory_slug: sub.slug })}
-                  className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
-                >
-                  <Tag className="h-8 w-8 text-[var(--text-ghost)]" />
-                  <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{sub.name}</span>
-                </button>
-              ))}
+              {filteredSubs.map((sub) => {
+                const logo = subcategoryLogos?.[sub.slug];
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => onChange({ subcategory_slug: sub.slug })}
+                    className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                  >
+                    {logo ? (
+                      <Image src={logo} alt={sub.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
+                    ) : (
+                      <Tag className="h-8 w-8 text-[var(--text-ghost)]" />
+                    )}
+                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{sub.name}</span>
+                  </button>
+                );
+              })}
               {onClickCreateSubcategory && (
                 <button
                   onClick={onClickCreateSubcategory}

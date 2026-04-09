@@ -5,6 +5,7 @@ import TaxonomyAdmin from "@/components/admin/TaxonomyAdmin";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
   createSubcategory, updateSubcategory, deleteSubcategory,
+  fetchSubcategoryLogos, uploadSubcategoryLogo, deleteSubcategoryLogo,
 } from "@/lib/products-admin";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 
@@ -12,15 +13,17 @@ function SubcategoriesContent() {
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [divs, cats, subs] = await Promise.all([
-      fetchDivisions(), fetchCategories(), fetchSubcategories(),
+    const [divs, cats, subs, logoMap] = await Promise.all([
+      fetchDivisions(), fetchCategories(), fetchSubcategories(), fetchSubcategoryLogos(),
     ]);
     setDivisions(divs);
     setCategories(cats);
     setSubcategories(subs);
+    setLogos(logoMap);
     setLoading(false);
   }, []);
 
@@ -44,7 +47,8 @@ function SubcategoriesContent() {
     id: s.id, name: s.name, slug: s.slug,
     description: s.description, order: s.order,
     parent_id: s.category_id, created_at: s.created_at,
-  })), [subcategories]);
+    logoUrl: logos[s.slug] || null,
+  })), [subcategories, logos]);
 
   return (
     <TaxonomyAdmin
@@ -72,6 +76,8 @@ function SubcategoriesContent() {
       }}
       onDelete={deleteSubcategory}
       onReorder={async (id, newOrder) => updateSubcategory(id, { order: newOrder })}
+      onUploadLogo={uploadSubcategoryLogo}
+      onDeleteLogo={deleteSubcategoryLogo}
     />
   );
 }

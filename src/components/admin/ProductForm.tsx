@@ -21,7 +21,7 @@ import {
   setRelatedProducts,
   fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
-  fetchDivisionLogos, fetchCategoryLogos,
+  fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos,
 } from "@/lib/products-admin";
 import { fetchAttributeConfig } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
@@ -94,6 +94,7 @@ export default function ProductForm({ productId }: Props) {
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
+  const [subcategoryLogos, setSubcategoryLogos] = useState<Record<string, string>>({});
   const [allTags, setAllTags] = useState<string[]>([]);
   const [attrSuggestions, setAttrSuggestions] = useState<{ voltage: string[]; plug_types: { name: string; image?: string | null }[]; colors: string[]; watt: string[]; levels: string[] }>({ voltage: [], plug_types: [], colors: [], watt: [], levels: [] });
 
@@ -124,11 +125,11 @@ export default function ProductForm({ productId }: Props) {
   useEffect(() => {
     (async () => {
       // Fetch lookup data + attribute config in parallel
-      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos] = await Promise.all([
+      const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
         fetchSupplierNames(), fetchUniqueBrands(), fetchBrandLogos(),
         fetchAttributeConfig(),
-        fetchDivisionLogos(), fetchCategoryLogos(),
+        fetchDivisionLogos(), fetchCategoryLogos(), fetchSubcategoryLogos(),
       ]);
       setDivisions(divs);
       setCategories(cats);
@@ -140,6 +141,7 @@ export default function ProductForm({ productId }: Props) {
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
       setCategoryLogos(catLogos);
+      setSubcategoryLogos(subLogos);
       setAttrSuggestions({
         voltage: attrCfg.voltage,
         plug_types: attrCfg.plug_types,
@@ -732,6 +734,7 @@ export default function ProductForm({ productId }: Props) {
               subcategories={subcategories}
               divisionLogos={divisionLogos}
               categoryLogos={categoryLogos}
+              subcategoryLogos={subcategoryLogos}
               onClickCreateDivision={() => setShowDivisionModal(true)}
               onClickCreateCategory={() => setShowCategoryModal(true)}
               onClickCreateSubcategory={() => setShowSubcategoryModal(true)}

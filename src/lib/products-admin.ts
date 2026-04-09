@@ -398,10 +398,13 @@ async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean
 
 export const fetchDivisionLogos = () => fetchTaxonomyLogos("divisions");
 export const fetchCategoryLogos = () => fetchTaxonomyLogos("categories");
+export const fetchSubcategoryLogos = () => fetchTaxonomyLogos("subcategories");
 export const uploadDivisionLogo = (slug: string, file: File) => uploadTaxonomyLogo("divisions", slug, file);
 export const uploadCategoryLogo = (slug: string, file: File) => uploadTaxonomyLogo("categories", slug, file);
+export const uploadSubcategoryLogo = (slug: string, file: File) => uploadTaxonomyLogo("subcategories", slug, file);
 export const deleteDivisionLogo = (slug: string) => deleteTaxonomyLogo("divisions", slug);
 export const deleteCategoryLogo = (slug: string) => deleteTaxonomyLogo("categories", slug);
+export const deleteSubcategoryLogo = (slug: string) => deleteTaxonomyLogo("subcategories", slug);
 
 // ── Brand logos (stored in media/brands/ folder) ──
 
