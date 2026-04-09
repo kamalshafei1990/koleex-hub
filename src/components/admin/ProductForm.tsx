@@ -514,8 +514,8 @@ export default function ProductForm({ productId }: Props) {
   };
 
   // ── Section nav for quick jump ──
-  // Check if this product belongs to the sewing machines division
-  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug);
+  // Check if this product belongs to a sewing machine category
+  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
 
   const sections = [
     { id: "classification", label: "Classification", icon: <FolderTree className="h-3.5 w-3.5" /> },

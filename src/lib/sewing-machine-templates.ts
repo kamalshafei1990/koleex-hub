@@ -941,47 +941,118 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
  * Multiple subcategory slugs can map to the same template.
  */
 const SUBCATEGORY_TO_TEMPLATE: Record<string, string> = {
-  // Direct matches
+  // Direct matches from actual DB subcategories
+  "lockstitch-machines": "single-needle-lockstitch",
   "single-needle-lockstitch": "single-needle-lockstitch",
   "lockstitch": "single-needle-lockstitch",
+  "household-lockstitch-machines": "single-needle-lockstitch",
+
+  "double-needle-machines": "double-needle-lockstitch",
   "double-needle-lockstitch": "double-needle-lockstitch",
   "twin-needle-lockstitch": "double-needle-lockstitch",
+  "multi-needle-machines": "double-needle-lockstitch",
+
+  "overlock-machines": "overlock",
   "overlock": "overlock",
   "serger": "overlock",
   "overlock-serger": "overlock",
+  "household-overlock-machines": "overlock",
+
+  "interlock-machines": "flatlock-interlock",
   "flatlock": "flatlock-interlock",
   "interlock": "flatlock-interlock",
   "flatlock-interlock": "flatlock-interlock",
   "flat-lock": "flatlock-interlock",
+
+  "hemming-machines": "coverstitch",
   "coverstitch": "coverstitch",
   "cover-stitch": "coverstitch",
   "cover-hem": "coverstitch",
+
+  "buttonhole-machines": "button-hole",
   "button-hole": "button-hole",
   "buttonhole": "button-hole",
   "button-holer": "button-hole",
+
+  "button-attaching-machines": "button-attach",
   "button-attach": "button-attach",
   "button-sewing": "button-attach",
   "button-sew": "button-attach",
+
+  "bartacking-machines": "bartacking",
   "bartacking": "bartacking",
   "bartack": "bartacking",
   "bar-tack": "bartacking",
+
   "feed-of-the-arm": "feed-of-the-arm",
   "feed-off-the-arm": "feed-of-the-arm",
   "cylinder-arm": "feed-of-the-arm",
   "cylinder-bed": "feed-of-the-arm",
+
+  // Pattern / Special / Heavy duty — map to single needle as closest
+  "pattern-sewing-machines": "single-needle-lockstitch",
+  "special-machines": "single-needle-lockstitch",
+  "heavy-duty-machines": "single-needle-lockstitch",
+  "chainstitch-machines": "flatlock-interlock",
+
+  // Automatic sewing systems
+  "pocket-setter-machines": "bartacking",
+  "pocket-welting-machines": "bartacking",
+  "placket-sewing-units": "single-needle-lockstitch",
+  "side-seam-units": "single-needle-lockstitch",
+  "collar-machines": "single-needle-lockstitch",
+  "sleeve-setting-machines": "single-needle-lockstitch",
+
+  // Leather & footwear
+  "shoe-sewing-machines": "single-needle-lockstitch",
+  "bag-sewing-machines": "single-needle-lockstitch",
+  "leather-sewing-machines": "single-needle-lockstitch",
+  "edge-binding-machines": "coverstitch",
+  "tape-attaching-machines": "coverstitch",
 };
 
-/** Check if a subcategory belongs to the sewing machines division */
-export function isSewingMachineSubcategory(subcategorySlug: string, divisionSlug: string): boolean {
-  // Check if the division is "sewing-machines" or similar
+/**
+ * Category slugs that should show sewing machine specs.
+ * Matches the actual Supabase category slugs under "Garment Machinery".
+ */
+const SEWING_CATEGORY_SLUGS = new Set([
+  "industrial-sewing-machines",
+  "automatic-sewing-systems",
+  "domestic-sewing-machines",
+  "leather-footwear-machinery",
+]);
+
+/**
+ * Check if a product should show sewing machine specs.
+ * Works by checking division + category slug combination.
+ */
+export function isSewingMachineSubcategory(
+  subcategorySlug: string,
+  divisionSlug: string,
+  categorySlug?: string,
+): boolean {
+  // Division must be "garment-machinery" (or similar sewing-focused divisions)
   const sewingDivisionSlugs = [
+    "garment-machinery",
     "sewing-machines",
     "sewing-machine",
     "sewing",
     "industrial-sewing-machines",
     "industrial-sewing",
   ];
-  return sewingDivisionSlugs.includes(divisionSlug);
+
+  if (!sewingDivisionSlugs.includes(divisionSlug)) return false;
+
+  // If category is provided, check if it's a sewing-related category
+  if (categorySlug) {
+    return SEWING_CATEGORY_SLUGS.has(categorySlug);
+  }
+
+  // If no category provided, check subcategory against known mappings
+  if (subcategorySlug && SUBCATEGORY_TO_TEMPLATE[subcategorySlug]) return true;
+
+  // Default: if division matches, show sewing specs
+  return true;
 }
 
 /** Get the template for a given subcategory slug. Returns null if no template found. */
