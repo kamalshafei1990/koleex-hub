@@ -17,6 +17,7 @@ import {
   fetchBrandLogos, uploadBrandLogo, deleteBrandLogo,
   fetchDivisionLogos, uploadDivisionLogo, deleteDivisionLogo,
   fetchCategoryLogos, uploadCategoryLogo, deleteCategoryLogo,
+  fetchSubcategoryLogos, uploadSubcategoryLogo, deleteSubcategoryLogo,
 } from "@/lib/products-admin";
 import {
   fetchAttributeConfig, saveAttributeConfig, fetchAttributeUsage,
@@ -437,6 +438,7 @@ export default function ProductSettingsPage() {
   // Taxonomy logos
   const [divLogos, setDivLogos] = useState<Record<string, string>>({});
   const [catLogos, setCatLogos] = useState<Record<string, string>>({});
+  const [subLogos, setSubLogos] = useState<Record<string, string>>({});
 
   // Classification data
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
@@ -457,15 +459,15 @@ export default function ProductSettingsPage() {
   // ── Load ──
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [divs, cats, subs, cc, sc, pc, cfg, usg, logos, dLogos, cLogos] = await Promise.all([
+    const [divs, cats, subs, cc, sc, pc, cfg, usg, logos, dLogos, cLogos, sLogos] = await Promise.all([
       fetchDivisions(), fetchCategories(), fetchSubcategories(),
       fetchCategoryCounts(), fetchSubcategoryCounts(), fetchProductCountsByClassification(),
       fetchAttributeConfig(), fetchAttributeUsage(), fetchBrandLogos(),
-      fetchDivisionLogos(), fetchCategoryLogos(),
+      fetchDivisionLogos(), fetchCategoryLogos(), fetchSubcategoryLogos(),
     ]);
     setDivisions(divs); setCategories(cats); setSubcategories(subs);
     setCatCounts(cc); setSubCounts(sc); setProdCounts(pc);
-    setBrandLogos(logos); setDivLogos(dLogos); setCatLogos(cLogos);
+    setBrandLogos(logos); setDivLogos(dLogos); setCatLogos(cLogos); setSubLogos(sLogos);
     const merged = mergeConfigWithUsage(cfg, usg);
     setConfig(merged); setUsage(usg);
     if (JSON.stringify(merged) !== JSON.stringify(cfg)) await saveAttributeConfig(merged);
@@ -704,6 +706,7 @@ export default function ProductSettingsPage() {
                 </div>
                 <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden">
                   {selectedCat ? <ClassPanel title={`Subcategories`} items={filteredSubcategories.map(s => ({ id: s.id, name: s.name, slug: s.slug, description: s.description }))} selectedId={null} onSelect={() => {}} childCounts={{}} productCounts={prodCounts.bySubcategory}
+                    logoMap={subLogos}
                     onAdd={() => setClassModal({ open: true, type: "subcategory", editItem: null })}
                     onEdit={(item) => setClassModal({ open: true, type: "subcategory", editItem: item })}
                     onDelete={(item) => { setDeleteModal({ open: true, title: `Delete "${item.name}"`, message: "Delete this subcategory?", onConfirm: async () => { setDeleting(true); await handleClassDelete("subcategory", item.id); setDeleting(false); setDeleteModal(m => ({ ...m, open: false })); } }); }}
@@ -758,9 +761,9 @@ export default function ProductSettingsPage() {
       <ClassificationModal open={classModal.open} onClose={() => { setClassModal(m => ({ ...m, open: false })); loadAll(); }} type={classModal.type} editItem={classModal.editItem}
         parentName={classModal.type === "category" ? selectedDivision?.name : classModal.type === "subcategory" ? selectedCategory?.name : undefined}
         onSave={handleClassSave}
-        editLogoUrl={classModal.editItem ? (classModal.type === "division" ? divLogos[classModal.editItem.slug] : classModal.type === "category" ? catLogos[classModal.editItem.slug] : null) : null}
-        onUploadLogo={classModal.type === "division" ? uploadDivisionLogo : classModal.type === "category" ? uploadCategoryLogo : undefined}
-        onDeleteLogo={classModal.type === "division" ? deleteDivisionLogo : classModal.type === "category" ? deleteCategoryLogo : undefined}
+        editLogoUrl={classModal.editItem ? (classModal.type === "division" ? divLogos[classModal.editItem.slug] : classModal.type === "category" ? catLogos[classModal.editItem.slug] : classModal.type === "subcategory" ? subLogos[classModal.editItem.slug] : null) : null}
+        onUploadLogo={classModal.type === "division" ? uploadDivisionLogo : classModal.type === "category" ? uploadCategoryLogo : classModal.type === "subcategory" ? uploadSubcategoryLogo : undefined}
+        onDeleteLogo={classModal.type === "division" ? deleteDivisionLogo : classModal.type === "category" ? deleteCategoryLogo : classModal.type === "subcategory" ? deleteSubcategoryLogo : undefined}
       />
 
       <DeleteModal open={deleteModal.open} onClose={() => setDeleteModal(m => ({ ...m, open: false }))} title={deleteModal.title} message={deleteModal.message} warning={deleteModal.warning}
