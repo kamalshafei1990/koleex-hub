@@ -282,6 +282,7 @@ export interface ProductModelRow {
   sku: string;
   tagline: string | null;
   supplier: string | null;
+  reference_model: string | null;
   cost_price: number | null;
   global_price: number | null;
   supports_head_only: boolean | null;

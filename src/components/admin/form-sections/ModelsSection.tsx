@@ -81,6 +81,10 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSup
               <input type="text" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={inp} />
             </div>
           </div>
+          <div>
+            <label className={lbl}>Reference Model (Supplier Model)</label>
+            <input type="text" value={model.reference_model} onChange={(e) => onUpdate({ reference_model: e.target.value })} placeholder="e.g. supplier's model number or name" className={inp} />
+          </div>
 
           <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
           <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Pricing</p>

@@ -35,6 +35,7 @@ export interface ModelFormState {
   slug: string;
   tagline: string;
   supplier: string;
+  reference_model: string;
   cost_price: string;
   global_price: string;
   supports_head_only: boolean | null;
@@ -128,6 +129,7 @@ export function createEmptyModel(): ModelFormState {
     slug: "",
     tagline: "",
     supplier: "",
+    reference_model: "",
     cost_price: "",
     global_price: "",
     supports_head_only: null,
