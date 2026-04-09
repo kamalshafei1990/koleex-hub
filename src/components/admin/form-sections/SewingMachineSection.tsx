@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronDown, ChevronUp, Settings2, Cpu, Zap, Info, Check } from "lucide-react";
 import type { TemplateField, SewingMachineTemplate } from "@/lib/sewing-machine-templates";
 import {
@@ -285,6 +285,13 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug }
   );
 
   const activeTemplateSlug = data.template_slug || detectedTemplate?.slug || "";
+
+  // Auto-persist detected template to parent state so it gets saved
+  useEffect(() => {
+    if (!data.template_slug && detectedTemplate?.slug) {
+      onChange({ ...data, template_slug: detectedTemplate.slug });
+    }
+  }, [detectedTemplate?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get the active template definition
   const activeTemplate = useMemo(() => {
