@@ -347,6 +347,18 @@ export interface RelatedProductRow {
   order: number;
 }
 
+export interface SewingMachineSpecsRow {
+  id: string;
+  product_id: string;
+  template_slug: string;
+  common_specs: Record<string, unknown>;
+  template_specs: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SewingMachineSpecsInsert = Omit<SewingMachineSpecsRow, "id" | "created_at" | "updated_at">;
+
 /* ── Insert types ── */
 
 export type ProductInsert = Omit<ProductRow, "id" | "created_at" | "updated_at">;
@@ -425,6 +437,11 @@ export interface Database {
         Row: RelatedProductRow;
         Insert: RelatedProductRow;
         Update: Partial<RelatedProductRow>;
+      };
+      product_sewing_specs: {
+        Row: SewingMachineSpecsRow;
+        Insert: SewingMachineSpecsInsert;
+        Update: Partial<SewingMachineSpecsInsert>;
       };
     };
   };

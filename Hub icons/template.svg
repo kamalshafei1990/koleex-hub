@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="a" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <style>
+      .b {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 8px;
+      }
+
+      .b, .c {
+        stroke: #fff;
+      }
+
+      .c {
+        fill: #fff;
+        stroke-miterlimit: 10;
+      }
+    </style>
+  </defs>
+  <polyline class="b" points="456.3 476.7 193 531.1 570 620.1 886.3 502.7 690.4 468.1"/>
+  <polyline class="b" points="564.2 476.2 779.3 511.5 779.3 535.3 538.1 489.5"/>
+  <polyline class="b" points="498.6 481.7 455.2 474.1 454.5 454.7 497.2 462.3"/>
+  <polyline class="b" points="779.3 513.2 796.5 503.9 794.6 530.3 781.3 535.8"/>
+  <polyline class="b" points="497.4 462.8 500.1 498 519.7 501.5 518.1 451.6 497.8 449.2 497.4 462.8"/>
+  <polyline class="b" points="537.6 479.5 669.4 457.3 669.2 470.5 701.3 466.7 701.9 420.2 518.1 454"/>
+  <polyline class="b" points="496.2 444.3 655 418.6 702.3 418.2"/>
+  <polyline class="b" points="519.7 501.5 537.2 495.6 538 479.5"/>
+  <line class="b" x1="513.7" y1="503" x2="514.8" y2="521.2"/>
+  <line class="b" x1="638.9" y1="464.4" x2="668.3" y2="469.7"/>
+  <line class="b" x1="792.3" y1="503.2" x2="592" y2="470.7"/>
+  <polyline class="b" points="454.5 454.7 472.3 448.6 496.8 452.1"/>
+  <polyline class="b" points="727.4 561.9 724.7 635.2 757.1 619 760.9 550.9"/>
+  <line class="b" x1="652.9" y1="618.5" x2="724.7" y2="635.2"/>
+  <line class="b" x1="757.1" y1="619" x2="570" y2="713.4"/>
+  <polyline class="b" points="415.2 585.1 418.4 667 570 712.9 570 620.1"/>
+  <polyline class="b" points="326.9 564 329.1 605 347.4 610.8 346.3 568"/>
+  <polyline class="b" points="368.3 574.1 368.6 603.6 347.4 610.8"/>
+  <line class="b" x1="351.4" y1="610.8" x2="353.2" y2="648.9"/>
+  <line class="b" x1="377" y1="656" x2="330.5" y2="642.8"/>
+  <polyline class="b" points="416.1 608.1 570.8 651.7 725.3 589.4"/>
+  <line class="b" x1="488.9" y1="449.1" x2="495.3" y2="447.6"/>
+  <polygon class="b" points="469.3 365.8 467.7 408.4 472 421 496.5 424.6 503.9 410.8 506.6 367.6 469.3 365.8"/>
+  <polyline class="c" points="508.7 365.3 516 372.5 514.1 415.4 499.3 426.3"/>
+  <polygon class="c" points="489.4 422.9 492.2 437.9 493.8 449.6 502.5 441.2 500.5 424.3 489.4 422.9"/>
+</svg>

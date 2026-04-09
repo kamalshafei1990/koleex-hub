@@ -7,7 +7,7 @@ import {
   ArrowLeft, Save, Loader2, Camera, ImageIcon, FolderTree,
   FileText, Wrench, Sliders, Boxes, Image, DollarSign,
   Languages, Link2, Zap, Shield, Star, Eye, Package,
-  Upload, Plus, ChevronDown,
+  Upload, Plus, ChevronDown, Settings2,
 } from "lucide-react";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
@@ -22,6 +22,7 @@ import {
   fetchSupplierNames, fetchUniqueBrands,
   fetchBrandLogos, uploadBrandLogo,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos,
+  fetchSewingSpecsByProductId, upsertSewingSpecs,
 } from "@/lib/products-admin";
 import { fetchAttributeConfig } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
@@ -48,6 +49,9 @@ import MediaSection from "./form-sections/MediaSection";
 import TranslationsSection from "./form-sections/TranslationsSection";
 import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
+import SewingMachineSection from "./form-sections/SewingMachineSection";
+import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
+import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
 
 /* ── Section wrapper with icon + title (collapsible) ── */
 function Section({ icon, title, children, id, defaultOpen = true, badge }: {
@@ -106,6 +110,13 @@ export default function ProductForm({ productId }: Props) {
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
 
+  // Sewing machine specs
+  const [sewingSpecs, setSewingSpecs] = useState<SewingSpecsFormState>({
+    template_slug: "",
+    common_specs: {},
+    template_specs: {},
+  });
+
   // UI state
   const [slugEdited, setSlugEdited] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -152,12 +163,13 @@ export default function ProductForm({ productId }: Props) {
 
       if (isEdit && productId) {
         // Fetch product + related data in parallel (perf fix)
-        const [p, dbModels, dbMedia, dbTranslations, dbRelated] = await Promise.all([
+        const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs] = await Promise.all([
           fetchProductById(productId),
           fetchModelsByProductId(productId),
           fetchMediaByProductId(productId),
           fetchTranslationsByProductId(productId),
           fetchRelatedProducts(productId),
+          fetchSewingSpecsByProductId(productId),
         ]);
         if (!p) { setError("Product not found"); setLoading(false); return; }
 
@@ -259,6 +271,15 @@ export default function ProductForm({ productId }: Props) {
           order: r.order,
         }));
         setRelated(mappedRelated);
+
+        // Restore sewing machine specs if available
+        if (dbSewingSpecs) {
+          setSewingSpecs({
+            template_slug: dbSewingSpecs.template_slug,
+            common_specs: (dbSewingSpecs.common_specs as Record<string, unknown>) || {},
+            template_specs: (dbSewingSpecs.template_specs as Record<string, unknown>) || {},
+          });
+        }
       }
 
       setLoading(false);
@@ -471,6 +492,16 @@ export default function ProductForm({ productId }: Props) {
 
       await setRelatedProducts(pid, related.map(r => r.related_id));
 
+      // Save sewing machine specs if template is selected
+      if (sewingSpecs.template_slug) {
+        await upsertSewingSpecs({
+          product_id: pid,
+          template_slug: sewingSpecs.template_slug,
+          common_specs: sewingSpecs.common_specs,
+          template_specs: sewingSpecs.template_specs,
+        });
+      }
+
       setSuccess("Product saved successfully!");
       if (!isEdit) {
         setTimeout(() => router.push(`/products/${pid}/edit`), 800);
@@ -483,11 +514,15 @@ export default function ProductForm({ productId }: Props) {
   };
 
   // ── Section nav for quick jump ──
+  // Check if this product belongs to the sewing machines division
+  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug);
+
   const sections = [
     { id: "classification", label: "Classification", icon: <FolderTree className="h-3.5 w-3.5" /> },
     { id: "basic", label: "Basic", icon: <FileText className="h-3.5 w-3.5" /> },
     { id: "description", label: "Description", icon: <FileText className="h-3.5 w-3.5" /> },
     { id: "specs", label: "Specs", icon: <Wrench className="h-3.5 w-3.5" /> },
+    ...(isSewing ? [{ id: "sewing", label: "Sewing Specs", icon: <Settings2 className="h-3.5 w-3.5" /> }] : []),
     { id: "config", label: "Config", icon: <Sliders className="h-3.5 w-3.5" /> },
     { id: "technical", label: "Technical", icon: <Zap className="h-3.5 w-3.5" /> },
     { id: "models", label: "Models", icon: <Boxes className="h-3.5 w-3.5" /> },
@@ -797,6 +832,17 @@ export default function ProductForm({ productId }: Props) {
           <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications">
             <SpecsSection data={product} onChange={updateProduct_} />
           </Section>
+
+          {/* 4b. Sewing Machine Specs (only for sewing machine division) */}
+          {isSewing && (
+            <Section id="sewing" icon={<Settings2 className="h-4 w-4" />} title="Sewing Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
+              <SewingMachineSection
+                data={sewingSpecs}
+                onChange={setSewingSpecs}
+                subcategorySlug={product.subcategory_slug}
+              />
+            </Section>
+          )}
 
           {/* 5. Configuration */}
           <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration">

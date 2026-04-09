@@ -9,6 +9,7 @@ import type {
   ProductRow, ProductModelRow, ProductMediaRow,
   ProductTranslationRow, ModelTranslationRow,
   ProductMarketPriceRow, RelatedProductRow,
+  SewingMachineSpecsRow,
 } from "@/types/supabase";
 
 const BUCKET = "media";
@@ -540,6 +541,45 @@ export async function deleteBrandLogo(brandSlug: string): Promise<boolean> {
   if (logoFile) {
     const { error } = await supabase.storage.from(BUCKET).remove([`brands/${logoFile.name}`]);
     if (error) { console.error("[BrandLogo] Delete:", error.message); return false; }
+  }
+  return true;
+}
+
+// ── Sewing Machine Specs ──
+
+export async function fetchSewingSpecsByProductId(productId: string): Promise<SewingMachineSpecsRow | null> {
+  const { data } = await supabase
+    .from("product_sewing_specs")
+    .select("*")
+    .eq("product_id", productId)
+    .single();
+  return data as SewingMachineSpecsRow | null;
+}
+
+export async function upsertSewingSpecs(specs: {
+  product_id: string;
+  template_slug: string;
+  common_specs: Record<string, unknown>;
+  template_specs: Record<string, unknown>;
+}): Promise<boolean> {
+  const { error } = await supabase
+    .from("product_sewing_specs")
+    .upsert(specs, { onConflict: "product_id" });
+  if (error) {
+    console.error("[SewingSpecs] Upsert error:", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteSewingSpecs(productId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("product_sewing_specs")
+    .delete()
+    .eq("product_id", productId);
+  if (error) {
+    console.error("[SewingSpecs] Delete error:", error.message);
+    return false;
   }
   return true;
 }

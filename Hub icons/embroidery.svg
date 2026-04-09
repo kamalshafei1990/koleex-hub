@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="a" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <style>
+      .b, .c {
+        fill: none;
+        stroke-width: 8px;
+      }
+
+      .b, .c, .d {
+        stroke: #fff;
+      }
+
+      .b, .d {
+        stroke-miterlimit: 10;
+      }
+
+      .c {
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .d {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <g>
+    <rect class="c" x="399.1" y="478.2" width="279.5" height="21.7"/>
+    <g>
+      <polyline class="c" points="467.2 501.5 467.2 523.1 420.8 523.1 430.9 502.2"/>
+      <path class="c" d="M419.3,524.7l14.5,32.5h33.5v-32.5"/>
+      <polyline class="c" points="434.7 562.6 434.7 806.5 464 806.5 467.2 559.5 617.4 559.5"/>
+    </g>
+    <g>
+      <polyline class="c" points="613.6 501.5 613.6 523.1 660 523.1 649.9 502.2"/>
+      <path class="c" d="M661.5,524.7l-14.5,32.5c-7.2,0-33.5,0-33.5,0v-32.5"/>
+      <polyline class="c" points="646.1 562.6 646.1 806.5 616.8 806.5 613.6 559.5"/>
+    </g>
+    <line class="c" x1="466.5" y1="645.4" x2="610.5" y2="645.4"/>
+    <line class="c" x1="466.5" y1="693.4" x2="612.8" y2="693.4"/>
+    <path class="c" d="M538.9,452.4h0c-29,0-52.5-10.8-52.5-39.8v-25.7h104.9v25.7c0,29-23.5,39.8-52.5,39.8Z"/>
+    <g>
+      <line class="c" x1="499.2" y1="443.6" x2="499.2" y2="475.1"/>
+      <line class="c" x1="578.5" y1="443.1" x2="578.5" y2="473.6"/>
+    </g>
+    <polyline class="c" points="485.5 402.2 468.5 402.2 468.5 425.9 487 425.9"/>
+    <polyline class="c" points="582 386.1 577.6 302.5 500.1 302.5 496.3 385.3"/>
+    <polygon class="c" points="608.1 337.4 611.6 431.4 680.1 430.8 671.7 337 608.1 337.4"/>
+    <line class="c" x1="593.3" y1="401.7" x2="608.1" y2="401.7"/>
+    <line class="c" x1="591.6" y1="426.8" x2="607" y2="426.8"/>
+    <polygon class="c" points="625.4 286.8 452.3 286.8 456.8 272.8 620.9 272.8 625.4 286.8"/>
+    <line class="c" x1="538.9" y1="287.5" x2="538.9" y2="301"/>
+    <path class="c" d="M619.7,287.5s-40.3.8-42.2,15"/>
+    <path class="c" d="M455.9,287.5s40.3.8,42.2,15"/>
+    <polygon class="b" points="624.5 352.2 626.4 416.5 663.6 415.7 658.7 352.2 624.5 352.2"/>
+  </g>
+  <g>
+    <circle class="d" cx="515.6" cy="322.2" r="4.2"/>
+    <circle class="d" cx="539" cy="322.2" r="4.2"/>
+    <circle class="d" cx="562.4" cy="322.2" r="4.2"/>
+    <circle class="d" cx="527.3" cy="322.2" r="4.2"/>
+    <circle class="d" cx="550.7" cy="322.2" r="4.2"/>
+  </g>
+  <g>
+    <circle class="d" cx="515.6" cy="337.7" r="4.2"/>
+    <circle class="d" cx="539" cy="337.7" r="4.2"/>
+    <circle class="d" cx="562.4" cy="337.7" r="4.2"/>
+    <circle class="d" cx="527.3" cy="337.7" r="4.2"/>
+    <circle class="d" cx="550.7" cy="337.7" r="4.2"/>
+  </g>
+  <g>
+    <circle class="d" cx="515.4" cy="352.7" r="4.2"/>
+    <circle class="d" cx="538.9" cy="352.7" r="4.2"/>
+    <circle class="d" cx="562.3" cy="352.7" r="4.2"/>
+    <circle class="d" cx="527.2" cy="352.7" r="4.2"/>
+    <circle class="d" cx="550.6" cy="352.7" r="4.2"/>
+  </g>
+  <g>
+    <circle class="d" cx="515.4" cy="368.1" r="4.2"/>
+    <circle class="d" cx="538.9" cy="368.1" r="4.2"/>
+    <circle class="d" cx="562.3" cy="368.1" r="4.2"/>
+    <circle class="d" cx="527.2" cy="368.1" r="4.2"/>
+    <circle class="d" cx="550.6" cy="368.1" r="4.2"/>
+  </g>
+</svg>
