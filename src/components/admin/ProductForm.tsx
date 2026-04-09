@@ -485,9 +485,11 @@ export default function ProductForm({ productId }: Props) {
   // ── Section nav for quick jump ──
   const sections = [
     { id: "classification", label: "Classification", icon: <FolderTree className="h-3.5 w-3.5" /> },
+    { id: "basic", label: "Basic", icon: <FileText className="h-3.5 w-3.5" /> },
     { id: "description", label: "Description", icon: <FileText className="h-3.5 w-3.5" /> },
     { id: "specs", label: "Specs", icon: <Wrench className="h-3.5 w-3.5" /> },
     { id: "config", label: "Config", icon: <Sliders className="h-3.5 w-3.5" /> },
+    { id: "technical", label: "Technical", icon: <Zap className="h-3.5 w-3.5" /> },
     { id: "models", label: "Models", icon: <Boxes className="h-3.5 w-3.5" /> },
     { id: "media", label: "Media", icon: <Image className="h-3.5 w-3.5" /> },
     { id: "prices", label: "Prices", icon: <DollarSign className="h-3.5 w-3.5" /> },
@@ -599,7 +601,7 @@ export default function ProductForm({ productId }: Props) {
             </div>
 
             {/* Right: Product Identity */}
-            <div className="flex-1 flex flex-col justify-center gap-5">
+            <div className="flex-1 flex flex-col justify-center gap-4">
               {/* Product Name — prominent */}
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">Product Name *</label>
@@ -654,68 +656,61 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               </div>
 
-              {/* Brand + Level */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Supplier Model + Cost Price + Global Price */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
-                  </label>
-                  <SelectWithCreate
-                    value={product.brand}
-                    options={brands.map(b => {
-                      const slug = b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                      return { value: b, label: b, icon: brandLogos[slug] || null };
-                    })}
-                    onChange={(val) => updateProduct_({ brand: val })}
-                    onClickCreate={() => setShowBrandModal(true)}
-                    placeholder="Select brand..."
-                    createLabel="Create Brand"
+                  <label className={lbl}>Supplier Model</label>
+                  <input
+                    type="text"
+                    value={models[0]?.reference_model || ""}
+                    onChange={(e) => {
+                      if (models.length === 0) ensureFirstModel();
+                      updateFirstModel({ reference_model: e.target.value });
+                    }}
+                    placeholder="e.g. AB-1234X"
+                    className={inp}
                   />
                 </div>
                 <div>
                   <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><Shield className="h-3 w-3" /> Level</span>
+                    <span className="inline-flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Cost Price (USD)</span>
                   </label>
-                  <select
-                    value={product.level}
-                    onChange={(e) => updateProduct_({ level: e.target.value })}
+                  <input
+                    type="text"
+                    value={models[0]?.cost_price || ""}
+                    onChange={(e) => {
+                      if (models.length === 0) ensureFirstModel();
+                      updateFirstModel({ cost_price: e.target.value });
+                    }}
+                    placeholder="0.00"
                     className={inp}
-                  >
-                    <option value="">Select level...</option>
-                    {attrSuggestions.levels.length > 0
-                      ? attrSuggestions.levels.map(l => (
-                          <option key={l} value={l.toLowerCase()}>{l}</option>
-                        ))
-                      : <>
-                          <option value="entry">Entry</option>
-                          <option value="mid">Mid</option>
-                          <option value="premium">Premium</option>
-                          <option value="enterprise">Enterprise</option>
-                        </>
-                    }
-                  </select>
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>
+                    <span className="inline-flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Global Price (USD)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={models[0]?.global_price || ""}
+                    onChange={(e) => {
+                      if (models.length === 0) ensureFirstModel();
+                      updateFirstModel({ global_price: e.target.value });
+                    }}
+                    placeholder="0.00"
+                    className={inp}
+                  />
                 </div>
               </div>
 
-              {/* Slug + Tags */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={lbl}>Slug (URL path)</label>
-                  <input
-                    type="text"
-                    value={product.slug}
-                    onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
-                    className={`${inp} font-mono text-[var(--text-muted)]`}
-                  />
-                </div>
-                <div>
-                  <label className={lbl}>Tags</label>
-                  <TagsInput
-                    tags={product.tags}
-                    onChange={(tags) => updateProduct_({ tags })}
-                    suggestions={allTags}
-                  />
-                </div>
+              {/* Tags */}
+              <div>
+                <label className={lbl}>Tags</label>
+                <TagsInput
+                  tags={product.tags}
+                  onChange={(tags) => updateProduct_({ tags })}
+                  suggestions={allTags}
+                />
               </div>
             </div>
           </div>
@@ -741,35 +736,79 @@ export default function ProductForm({ productId }: Props) {
             />
           </Section>
 
-          {/* 2. Description */}
-          <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
-            <DescriptionSection data={product} onChange={updateProduct_} />
-          </Section>
-
-          {/* 3. Specs + Technical combined */}
-          <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications & Technical">
-            <div className="space-y-6">
+          {/* 2. Basic Information */}
+          <Section id="basic" icon={<FileText className="h-4 w-4" />} title="Basic Information">
+            <div className="space-y-5">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
-                  <Wrench className="h-3 w-3" /> Key Specifications
-                </p>
-                <SpecsSection data={product} onChange={updateProduct_} />
+                <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Slug (URL Path)</label>
+                <input
+                  type="text"
+                  value={product.slug}
+                  onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
+                  className={`${inp} font-mono text-[var(--text-muted)]`}
+                />
               </div>
-              <div className="border-t border-[var(--border-subtle)] pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] mb-3 flex items-center gap-2">
-                  <Zap className="h-3 w-3" /> Electrical & Technical
-                </p>
-                <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Brand</label>
+                  <SelectWithCreate
+                    value={product.brand}
+                    options={brands.map(b => {
+                      const slug = b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                      return { value: b, label: b, icon: brandLogos[slug] || null };
+                    })}
+                    onChange={(val) => updateProduct_({ brand: val })}
+                    onClickCreate={() => setShowBrandModal(true)}
+                    placeholder="Select brand..."
+                    createLabel="Create Brand"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Level</label>
+                  <select
+                    value={product.level}
+                    onChange={(e) => updateProduct_({ level: e.target.value })}
+                    className={inp}
+                  >
+                    <option value="">Select level...</option>
+                    {attrSuggestions.levels.length > 0
+                      ? attrSuggestions.levels.map(l => (
+                          <option key={l} value={l.toLowerCase()}>{l}</option>
+                        ))
+                      : <>
+                          <option value="entry">Entry</option>
+                          <option value="mid">Mid</option>
+                          <option value="premium">Premium</option>
+                          <option value="enterprise">Enterprise</option>
+                        </>
+                    }
+                  </select>
+                </div>
               </div>
             </div>
           </Section>
 
-          {/* 4. Configuration */}
-          <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration & Visibility">
+          {/* 3. Description */}
+          <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
+            <DescriptionSection data={product} onChange={updateProduct_} />
+          </Section>
+
+          {/* 4. Specifications */}
+          <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications">
+            <SpecsSection data={product} onChange={updateProduct_} />
+          </Section>
+
+          {/* 5. Configuration */}
+          <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration">
             <ConfigSection data={product} onChange={updateProduct_} />
           </Section>
 
-          {/* 5. Models */}
+          {/* 6. Technical Details */}
+          <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details">
+            <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
+          </Section>
+
+          {/* 7. Models & Variants */}
           <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
             <ModelsSection
               models={models}
@@ -779,7 +818,7 @@ export default function ProductForm({ productId }: Props) {
             />
           </Section>
 
-          {/* 6. Media */}
+          {/* 8. Media */}
           <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
             <MediaSection
               media={media.filter(m => m.type !== "main_image")}
@@ -791,17 +830,17 @@ export default function ProductForm({ productId }: Props) {
             />
           </Section>
 
-          {/* 7. Market Prices */}
-          <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
-            <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
-          </Section>
-
-          {/* 8. Translations */}
+          {/* 9. Translations */}
           <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
             <TranslationsSection translations={translations} onChange={setTranslations} />
           </Section>
 
-          {/* 9. Related Products */}
+          {/* 10. Market Prices */}
+          <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
+            <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
+          </Section>
+
+          {/* 11. Related Products */}
           <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
             <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
           </Section>
