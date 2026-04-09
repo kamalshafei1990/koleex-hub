@@ -321,6 +321,19 @@ export const landedCostT: Translations = {
   "hint.CIF":               { en: "Cost, Insurance & Freight — Export + freight + insurance included", zh: "到岸价 — 出口+运费+保险已含", ar: "التكلفة والتأمين والشحن — التصدير + الشحن + التأمين مشمولة" },
 
   /* ═══════════════════════════════════════════════════════════════════════════
+     LOADING TYPE HINTS
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "hint.LCL":             { en: "Less than Container Load — Shared container, charged per CBM", zh: "拼箱 — 共享集装箱，按立方米计费", ar: "أقل من حمولة حاوية — حاوية مشتركة، محاسبة بالمتر المكعب" },
+  "hint.FCL 20GP":        { en: "Full Container 20ft — ~33 CBM capacity", zh: "整箱20尺 — 约33立方米容量", ar: "حاوية كاملة 20 قدم — سعة ~33 متر مكعب" },
+  "hint.FCL 40GP":        { en: "Full Container 40ft — ~67 CBM capacity", zh: "整箱40尺 — 约67立方米容量", ar: "حاوية كاملة 40 قدم — سعة ~67 متر مكعب" },
+  "hint.FCL 40HQ":        { en: "Full Container 40ft High Cube — ~76 CBM capacity", zh: "整箱40尺高柜 — 约76立方米容量", ar: "حاوية كاملة 40 قدم عالية — سعة ~76 متر مكعب" },
+  "hint.Air":             { en: "Air freight — Charged by volumetric or actual weight", zh: "空运 — 按体积重量或实际重量计费", ar: "شحن جوي — محاسبة بالوزن الحجمي أو الفعلي" },
+  "hint.Courier":         { en: "Express courier — DHL, FedEx, UPS etc.", zh: "快递 — DHL、FedEx、UPS等", ar: "بريد سريع — DHL، FedEx، UPS إلخ" },
+
+  /* ── Untitled Simulation ── */
+  "untitledSimulation":   { en: "Untitled Simulation",   zh: "未命名模拟",          ar: "محاكاة بدون عنوان" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
      LIST PAGE
      ═══════════════════════════════════════════════════════════════════════════ */
   "list.title":             { en: "Landed Cost Simulator",        zh: "到岸成本模拟器",               ar: "محاكي تكلفة الوصول" },

@@ -31,21 +31,7 @@ import {
 
 function fmt(n: number, d = 2) { return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
-const PRICE_BASIS_HINTS: Record<string, string> = {
-  EXW: "Ex Works — All costs from factory to warehouse apply",
-  FOB: "Free On Board — Export costs included in price, skip export block",
-  CFR: "Cost & Freight — Export + freight included, only surcharges apply",
-  CIF: "Cost, Insurance & Freight — Export + freight + insurance included",
-};
-
-const LOADING_HINTS: Record<string, string> = {
-  LCL: "Less than Container Load — Shared container, charged per CBM",
-  "FCL 20GP": "Full Container 20ft — ~33 CBM capacity",
-  "FCL 40GP": "Full Container 40ft — ~67 CBM capacity",
-  "FCL 40HQ": "Full Container 40ft High Cube — ~76 CBM capacity",
-  Air: "Air freight — Charged by volumetric or actual weight",
-  Courier: "Express courier — DHL, FedEx, UPS etc.",
-};
+/* Price basis & loading hints are now served by t("hint.EXW") etc. from translations */
 
 /* ═══════════════════ TAB NAVIGATION ═══════════════════ */
 
@@ -253,7 +239,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   // Core state
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState("Untitled Simulation");
+  const [name, setName] = useState("");
   const [status, setStatus] = useState("draft");
   const [customerName, setCustomerName] = useState("");
   const [customerCompany, setCustomerCompany] = useState("");
@@ -485,7 +471,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   const handleSave = useCallback(async (newStatus?: string) => {
     setSaving(true);
     const payload: Partial<SimulationRow> = {
-      name, status: newStatus || status,
+      name: name || t("untitledSimulation"), status: newStatus || status,
       customer_name: customerName, customer_company: customerCompany,
       customer_country: customerCountry, customer_city: customerCity,
       warehouse_destination: warehouseDest,
@@ -511,7 +497,7 @@ export default function SimulationForm({ id }: { id?: string }) {
       await updateSimulation(id!, payload);
     }
     setSaving(false);
-  }, [name, status, customerName, customerCompany, customerCountry, customerCity, warehouseDest, productId, productName, modelId, modelName, skuVal, hsCode, brandVal, originCountry, quantity, unitPrice, currency, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial, results, notes, isNew, id, router]);
+  }, [name, status, customerName, customerCompany, customerCountry, customerCity, warehouseDest, productId, productName, modelId, modelName, skuVal, hsCode, brandVal, originCountry, quantity, unitPrice, currency, priceBasis, productInfo, exportCosts, shippingCosts, importCosts, inlandDelivery, financial, results, notes, isNew, id, router, t]);
 
   // Updaters
   const ux = (fn: React.Dispatch<React.SetStateAction<ExportCosts>>) => (key: keyof ExportCosts, v: number) => fn(prev => ({ ...prev, [key]: v }));
@@ -555,7 +541,7 @@ export default function SimulationForm({ id }: { id?: string }) {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("simulationName")} />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("untitledSimulation")} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
@@ -696,7 +682,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Field label={t("packingType")} fieldState={fs("packingType")} badgeLabels={bl}><input type="text" value={productInfo.packingType} onChange={e => { setProductInfo(p => ({ ...p, packingType: e.target.value })); markManual("packingType"); }} className={`${inputCls} ${fs("packingType") && productInfo.packingType ? FIELD_INPUT_STYLES[fs("packingType")!] : ""}`} placeholder={t("ph.packingType")} /></Field>
                   <NumField label={t("numCartons")} value={productInfo.numCartons} onChange={v => setProductInfo(p => ({ ...p, numCartons: v }))} />
-                  <Field label={t("loadingType")} hint={LOADING_HINTS[productInfo.loadingType]}>
+                  <Field label={t("loadingType")} hint={t(`hint.${productInfo.loadingType}`)}>
                     <select value={productInfo.loadingType} onChange={e => setProductInfo(p => ({ ...p, loadingType: e.target.value }))} className={selectCls}>
                       {["LCL","FCL 20GP","FCL 40GP","FCL 40HQ","Air","Courier"].map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
