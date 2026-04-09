@@ -49,17 +49,18 @@ type TabKey = typeof TABS[number]["key"];
 
 /* ═══════════════════ SECTION COMPONENT ═══════════════════ */
 
-function Section({ id, icon: Icon, title, description, subtotal, currency, badge, children, defaultOpen = true, sectionRef }: {
-  id?: string; icon: React.ElementType; title: string; description?: string; subtotal?: number; currency?: string; badge?: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; sectionRef?: React.RefObject<HTMLDivElement | null>;
+function Section({ id, icon: Icon, title, description, subtotal, currency, badge, children, defaultOpen = true, forceOpen }: {
+  id?: string; icon: React.ElementType; title: string; description?: string; subtotal?: number; currency?: string; badge?: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; forceOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   return (
-    <div id={id} ref={sectionRef} className={`bg-[var(--bg-secondary)] rounded-2xl border overflow-hidden transition-all duration-200 ${open ? "border-[var(--border-subtle)] shadow-[0_2px_16px_rgba(0,0,0,0.12)]" : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]/30"} scroll-mt-28`}>
+    <div id={id} className={`bg-[var(--bg-secondary)] rounded-2xl border overflow-hidden transition-all duration-200 ${open ? "border-[var(--border-subtle)] shadow-[0_2px_16px_rgba(0,0,0,0.12)]" : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]/30"} scroll-mt-28`}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-6 py-4 hover:bg-[var(--bg-surface-subtle)]/50 transition-colors cursor-pointer">
         <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
           <Icon className="h-4 w-4" />
         </div>
-        <div className="flex-1 text-left min-w-0">
+        <div className="flex-1 text-start min-w-0">
           <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">{title}</span>
           {description && !open && <p className="text-[11px] text-[var(--text-ghost)] mt-0.5 truncate">{description}</p>}
         </div>
@@ -135,7 +136,7 @@ function Field({ label, hint, fieldState, warn, children, span = 1, badgeLabels 
 }) {
   const badge = fieldState ? FIELD_BADGES[fieldState] : null;
   return (
-    <div className={span === 2 ? "col-span-2" : span === 3 ? "col-span-3" : ""}>
+    <div className={span === 2 ? "md:col-span-2" : span === 3 ? "md:col-span-3" : ""}>
       <label className={labelCls}>
         {label}
         {badge && (
@@ -277,11 +278,12 @@ export default function SimulationForm({ id }: { id?: string }) {
 
   // Tab navigation
   const [activeTab, setActiveTab] = useState<TabKey>("customer");
+  const [openedSections, setOpenedSections] = useState<Set<TabKey>>(new Set());
   const sectionRefs = useRef<Record<TabKey, HTMLDivElement | null>>({
     customer: null, product: null, export: null, shipping: null, import: null, inland: null, financial: null,
   });
 
-  // Scrollspy
+  // Scrollspy — observe marker divs that are always in the DOM
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -302,7 +304,11 @@ export default function SimulationForm({ id }: { id?: string }) {
 
   function scrollToSection(key: TabKey) {
     setActiveTab(key);
-    sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Force the target section open, then scroll to its marker
+    setOpenedSections(prev => new Set(prev).add(key));
+    requestAnimationFrame(() => {
+      sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   // Load data
@@ -535,7 +541,7 @@ export default function SimulationForm({ id }: { id?: string }) {
 
       {/* ── Header ── */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/landed-cost" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeft className={`h-4 w-4 ${isRtl ? "rotate-180" : ""}`} />
           </Link>
@@ -543,26 +549,26 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("untitledSimulation")} />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
             <button onClick={() => handleSave()} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? t("saving") : t("save")}
             </button>
             {status === "draft" && (
-              <button onClick={() => handleSave("completed")} disabled={saving} className="hidden md:flex h-10 px-4 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50">
+              <button onClick={() => handleSave("completed")} disabled={saving} className="flex h-10 px-4 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50">
                 <CheckCircle2 className="h-4 w-4" /> {t("finalize")}
               </button>
             )}
           </div>
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-11">{t("subtitle")}</p>
+        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">{t("subtitle")}</p>
       </div>
 
       {/* ── Tab Navigation Bar (sticky) ── */}
       <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2 pr-8">
             {TABS.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -603,14 +609,14 @@ export default function SimulationForm({ id }: { id?: string }) {
           <div className="space-y-5">
 
             {/* ──────── Customer & Destination ──────── */}
+            <div ref={el => { sectionRefs.current.customer = el; }} data-tab="customer" className="scroll-mt-24" />
             <Section
               id="section-customer"
-              sectionRef={{ current: sectionRefs.current.customer } as React.RefObject<HTMLDivElement | null>}
               icon={Users}
               title={t("sec.customer")}
               description={t("sec.customerDesc")}
+              forceOpen={openedSections.has("customer")}
             >
-              <div ref={el => { sectionRefs.current.customer = el; }} data-tab="customer" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label={t("customerName")} warn={!customerName && !customerCompany ? t("required") : undefined}><input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} className={inputCls} placeholder={t("ph.contactName")} /></Field>
                 <Field label={t("customerCompany")}><input type="text" value={customerCompany} onChange={e => setCustomerCompany(e.target.value)} className={inputCls} placeholder={t("ph.companyName")} /></Field>
@@ -621,6 +627,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Product & Pricing ──────── */}
+            <div ref={el => { sectionRefs.current.product = el; }} data-tab="product" className="scroll-mt-24" />
             <Section
               id="section-product"
               icon={Package}
@@ -628,8 +635,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               description={t("sec.productDesc")}
               subtotal={productTotal}
               currency={currency}
+              forceOpen={openedSections.has("product")}
             >
-              <div ref={el => { sectionRefs.current.product = el; }} data-tab="product" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label={t("product")}>
                   <select value={productId} onChange={e => onProductSelect(e.target.value)} className={selectCls}>
@@ -699,6 +706,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Export Side Costs ──────── */}
+            <div ref={el => { sectionRefs.current.export = el; }} data-tab="export" className="scroll-mt-24" />
             <Section
               id="section-export"
               icon={Building2}
@@ -707,11 +715,11 @@ export default function SimulationForm({ id }: { id?: string }) {
               subtotal={results.exportTotal}
               currency={currency}
               defaultOpen={false}
+              forceOpen={openedSections.has("export")}
               badge={priceBasis !== "EXW" ? (
                 <span className="px-2 py-0.5 rounded-md bg-blue-500/[0.08] text-[9px] font-semibold text-blue-400 uppercase tracking-wider">{t("includedIn")} {priceBasis}</span>
               ) : undefined}
             >
-              <div ref={el => { sectionRefs.current.export = el; }} data-tab="export" />
               {priceBasis !== "EXW" && (
                 <Callout>{t("priceBasis")} <strong>{priceBasis}</strong> — {t("exportIncludedMsg")}</Callout>
               )}
@@ -750,6 +758,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Shipping & Freight ──────── */}
+            <div ref={el => { sectionRefs.current.shipping = el; }} data-tab="shipping" className="scroll-mt-24" />
             <Section
               id="section-shipping"
               icon={Ship}
@@ -758,8 +767,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               subtotal={results.shippingTotal}
               currency={currency}
               defaultOpen={false}
+              forceOpen={openedSections.has("shipping")}
             >
-              <div ref={el => { sectionRefs.current.shipping = el; }} data-tab="shipping" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label={t("shippingMode")}><select value={shippingCosts.shippingMode} onChange={e => updateShipping("shippingMode", e.target.value)} className={selectCls}>{["Sea","Air","Courier","Land"].map(m => <option key={m} value={m}>{m}</option>)}</select></Field>
                 <Field label={t("portOfLoading")}><input type="text" value={shippingCosts.portOfLoading} onChange={e => updateShipping("portOfLoading", e.target.value)} className={inputCls} placeholder={t("ph.shanghai")} /></Field>
@@ -797,6 +806,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Import Side Costs ──────── */}
+            <div ref={el => { sectionRefs.current.import = el; }} data-tab="import" className="scroll-mt-24" />
             <Section
               id="section-import"
               icon={Anchor}
@@ -805,8 +815,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               subtotal={results.importTotal}
               currency={currency}
               defaultOpen={false}
+              forceOpen={openedSections.has("import")}
             >
-              <div ref={el => { sectionRefs.current.import = el; }} data-tab="import" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <NumField label={t("customsDutyPct")} value={importCosts.customsDutyPct} onChange={v => { updateImport("customsDutyPct", v); markManual("dutyPct"); }} suffix="%" hint={t("dutyHint")} fieldState={fs("dutyPct")} badgeLabels={bl} />
                 <NumField label={t("importVatPct")} value={importCosts.importVatPct} onChange={v => { updateImport("importVatPct", v); markManual("vatPct"); }} suffix="%" hint={t("vatHint")} fieldState={fs("vatPct")} badgeLabels={bl} />
@@ -851,6 +861,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Inland Delivery ──────── */}
+            <div ref={el => { sectionRefs.current.inland = el; }} data-tab="inland" className="scroll-mt-24" />
             <Section
               id="section-inland"
               icon={Truck}
@@ -859,8 +870,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               subtotal={results.inlandTotal}
               currency={currency}
               defaultOpen={false}
+              forceOpen={openedSections.has("inland")}
             >
-              <div ref={el => { sectionRefs.current.inland = el; }} data-tab="inland" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Field label={t("finalDeliveryCity")}><input type="text" value={inlandDelivery.finalDeliveryCity} onChange={e => updateInland("finalDeliveryCity", e.target.value)} className={inputCls} /></Field>
                 <Field label={t("finalWarehouseAddress")} span={2}><input type="text" value={inlandDelivery.finalWarehouseAddress} onChange={e => updateInland("finalWarehouseAddress", e.target.value)} className={inputCls} /></Field>
@@ -889,6 +900,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── Financial & Commercial ──────── */}
+            <div ref={el => { sectionRefs.current.financial = el; }} data-tab="financial" className="scroll-mt-24" />
             <Section
               id="section-financial"
               icon={CircleDollarSign}
@@ -897,8 +909,8 @@ export default function SimulationForm({ id }: { id?: string }) {
               subtotal={results.financialTotal}
               currency={currency}
               defaultOpen={false}
+              forceOpen={openedSections.has("financial")}
             >
-              <div ref={el => { sectionRefs.current.financial = el; }} data-tab="financial" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <NumField label={t("exchangeRate")} value={financial.exchangeRate} onChange={v => updateFinancial("exchangeRate", v)} hint={t("exchangeRateHint")} />
                 <Field label={t("paymentTerm")} hint={t("paymentTermHint")}><select value={financial.paymentTerm} onChange={e => updateFinancial("paymentTerm", e.target.value)} className={selectCls}>{["TT","LC","DP","OA"].map(pt => <option key={pt} value={pt}>{pt}</option>)}</select></Field>
