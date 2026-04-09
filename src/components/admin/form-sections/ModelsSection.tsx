@@ -52,9 +52,15 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSup
               <input type="text" value={model.slug} onChange={(e) => onUpdate({ slug: e.target.value })} className={`${inp} font-mono text-[var(--text-subtle)]`} />
             </div>
           </div>
-          <div>
-            <label className={lbl}>Tagline</label>
-            <input type="text" value={model.tagline} onChange={(e) => onUpdate({ tagline: e.target.value })} placeholder="e.g. 5 kg payload, desktop-class" className={inp} />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Tagline</label>
+              <input type="text" value={model.tagline} onChange={(e) => onUpdate({ tagline: e.target.value })} placeholder="e.g. 5 kg payload, desktop-class" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Reference Model (Supplier Model)</label>
+              <input type="text" value={model.reference_model} onChange={(e) => onUpdate({ reference_model: e.target.value })} placeholder="e.g. supplier's model number or name" className={inp} />
+            </div>
           </div>
 
           <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
@@ -80,10 +86,6 @@ function ModelCard({ model, idx, onUpdate, onRemove, suppliers, onClickCreateSup
               <label className={lbl}>Cost Price (USD)</label>
               <input type="text" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={inp} />
             </div>
-          </div>
-          <div>
-            <label className={lbl}>Reference Model (Supplier Model)</label>
-            <input type="text" value={model.reference_model} onChange={(e) => onUpdate({ reference_model: e.target.value })} placeholder="e.g. supplier's model number or name" className={inp} />
           </div>
 
           <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
