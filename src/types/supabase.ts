@@ -270,6 +270,11 @@ export interface ProductRow {
   warranty: string | null;
   visible: boolean;
   featured: boolean;
+  status: string | null;
+  family: string | null;
+  country_of_origin: string | null;
+  moq: number | null;
+  lead_time: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -296,6 +301,10 @@ export interface ProductModelRow {
   extra_accessories: string | null;
   order: number;
   visible: boolean;
+  status: string | null;
+  moq: number | null;
+  lead_time: string | null;
+  barcode: string | null;
   created_at: string;
   updated_at: string;
 }

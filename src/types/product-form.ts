@@ -5,6 +5,9 @@
 
 import type { ProductMediaType } from "./supabase";
 
+export type ProductStatus = "draft" | "active" | "archived";
+export type ModelStatus = "active" | "discontinued";
+
 export interface ProductFormState {
   division_slug: string;
   category_slug: string;
@@ -13,6 +16,7 @@ export interface ProductFormState {
   slug: string;
   brand: string;
   level: string;
+  family: string;
   tags: string[];
   description: string;
   specs: Record<string, string>;
@@ -26,6 +30,10 @@ export interface ProductFormState {
   colors: string[];
   visible: boolean;
   featured: boolean;
+  status: ProductStatus;
+  country_of_origin: string;
+  moq: string;
+  lead_time: string;
 }
 
 export interface ModelFormState {
@@ -49,6 +57,10 @@ export interface ModelFormState {
   extra_accessories: string;
   order: number;
   visible: boolean;
+  status: ModelStatus;
+  moq: string;
+  lead_time: string;
+  barcode: string;
 }
 
 export interface MediaFormState {
@@ -107,6 +119,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   slug: "",
   brand: "",
   level: "",
+  family: "",
   tags: [],
   description: "",
   specs: {},
@@ -120,6 +133,10 @@ export const EMPTY_PRODUCT: ProductFormState = {
   colors: [],
   visible: true,
   featured: false,
+  status: "draft",
+  country_of_origin: "",
+  moq: "",
+  lead_time: "",
 };
 
 export function createEmptyModel(): ModelFormState {
@@ -143,6 +160,10 @@ export function createEmptyModel(): ModelFormState {
     extra_accessories: "",
     order: 0,
     visible: true,
+    status: "active",
+    moq: "",
+    lead_time: "",
+    barcode: "",
   };
 }
 

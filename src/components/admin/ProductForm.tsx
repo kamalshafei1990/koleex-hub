@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Camera, ImageIcon, FolderTree,
   FileText, Wrench, Sliders, Boxes, Image, DollarSign,
-  Languages, Link2, Zap, Shield, Star, Eye, Package,
-  Upload, Plus, ChevronDown, Settings2,
+  Languages, Link2, Zap, Settings2, ChevronDown, ChevronRight,
+  Check, Package, Plus, AlertTriangle, Globe, Eye, Star,
+  ArrowRight, CircleDot, Hash,
 } from "lucide-react";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
@@ -39,7 +40,6 @@ import CreateCategoryModal from "./form-sections/CreateCategoryModal";
 import CreateSubcategoryModal from "./form-sections/CreateSubcategoryModal";
 import CreateSupplierModal from "./form-sections/CreateSupplierModal";
 import CreateBrandModal from "./form-sections/CreateBrandModal";
-import BasicInfoSection from "./form-sections/BasicInfoSection";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import SpecsSection from "./form-sections/SpecsSection";
 import ConfigSection from "./form-sections/ConfigSection";
@@ -53,7 +53,9 @@ import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
 import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
 
-/* ── Section wrapper with icon + title (collapsible) ── */
+/* ═══════════════════════════════════════════════════════════════════
+   SECTION WRAPPER — collapsible card with icon + title
+   ═══════════════════════════════════════════════════════════════════ */
 function Section({ icon, title, children, id, defaultOpen = true, badge }: {
   icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean; badge?: string;
 }) {
@@ -81,6 +83,115 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   WIZARD STEPS DEFINITION
+   ═══════════════════════════════════════════════════════════════════ */
+interface WizardStep {
+  id: string;
+  label: string;
+  shortLabel: string;
+  icon: React.ReactNode;
+  conditional?: boolean;
+}
+
+function getSteps(isSewing: boolean): WizardStep[] {
+  const steps: WizardStep[] = [
+    { id: "identity", label: "Identity & Classification", shortLabel: "Identity", icon: <Camera className="h-4 w-4" /> },
+    { id: "details", label: "Product Information", shortLabel: "Details", icon: <FileText className="h-4 w-4" /> },
+  ];
+  if (isSewing) {
+    steps.push({ id: "sewing", label: "Sewing Machine Specs", shortLabel: "Sewing", icon: <Settings2 className="h-4 w-4" />, conditional: true });
+  }
+  steps.push(
+    { id: "commercial", label: "Models & Pricing", shortLabel: "Models", icon: <Boxes className="h-4 w-4" /> },
+    { id: "media", label: "Media & Files", shortLabel: "Media", icon: <Image className="h-4 w-4" /> },
+    { id: "finalize", label: "Review & Publish", shortLabel: "Finalize", icon: <Check className="h-4 w-4" /> },
+  );
+  return steps;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP NAVIGATION BAR
+   ═══════════════════════════════════════════════════════════════════ */
+function StepNav({ steps, currentStep, onStepChange, completedSteps }: {
+  steps: WizardStep[]; currentStep: number; onStepChange: (i: number) => void; completedSteps: Set<number>;
+}) {
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6">
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+        {steps.map((step, i) => {
+          const isActive = i === currentStep;
+          const isCompleted = completedSteps.has(i);
+          const isPast = i < currentStep;
+          return (
+            <button
+              key={step.id}
+              onClick={() => onStepChange(i)}
+              className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
+                isActive
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg"
+                  : isPast || isCompleted
+                  ? "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
+                  : "text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)]"
+              }`}
+            >
+              <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                isActive ? "bg-white/20" : isCompleted ? "bg-emerald-500/20 text-emerald-400" : "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
+              }`}>
+                {isCompleted && !isActive ? <Check className="h-3 w-3" /> : i + 1}
+              </div>
+              <span className="hidden md:inline">{step.shortLabel}</span>
+              {i < steps.length - 1 && (
+                <ChevronRight className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOGGLE COMPONENT
+   ═══════════════════════════════════════════════════════════════════ */
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer group">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500/60" : "bg-[var(--bg-surface)]"}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[var(--bg-inverted)] shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
+      </button>
+      <span className="text-[13px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)]/80 transition-colors">{label}</span>
+    </label>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATUS BADGE
+   ═══════════════════════════════════════════════════════════════════ */
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+    active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+    archived: "text-red-400 bg-red-400/10 border-red-400/20",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${colors[status] || colors.draft}`}>
+      <CircleDot className="h-2.5 w-2.5" />
+      {status || "draft"}
+    </span>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PRODUCT FORM (WIZARD)
+   ═══════════════════════════════════════════════════════════════════ */
 interface Props {
   productId?: string;
 }
@@ -89,7 +200,7 @@ export default function ProductForm({ productId }: Props) {
   const router = useRouter();
   const isEdit = !!productId;
 
-  // Lookup data
+  /* ── Lookup data ── */
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
@@ -102,7 +213,7 @@ export default function ProductForm({ productId }: Props) {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [attrSuggestions, setAttrSuggestions] = useState<{ voltage: string[]; plug_types: { name: string; image?: string | null }[]; colors: string[]; watt: string[]; levels: string[] }>({ voltage: [], plug_types: [], colors: [], watt: [], levels: [] });
 
-  // Form state
+  /* ── Form state ── */
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
   const [models, setModels] = useState<ModelFormState[]>([]);
   const [media, setMedia] = useState<MediaFormState[]>([]);
@@ -110,32 +221,41 @@ export default function ProductForm({ productId }: Props) {
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
 
-  // Sewing machine specs
+  /* ── Sewing machine specs ── */
   const [sewingSpecs, setSewingSpecs] = useState<SewingSpecsFormState>({
     template_slug: "",
     common_specs: {},
     template_specs: {},
   });
 
-  // UI state
+  /* ── Wizard state ── */
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+
+  /* ── UI state ── */
   const [slugEdited, setSlugEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Track original IDs for diff in edit mode
+  /* ── Track original IDs for diff in edit mode ── */
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
   const [originalTranslationIds, setOriginalTranslationIds] = useState<string[]>([]);
 
-  // Main image ref for hero
+  /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
 
-  // Load data
+  /* ── Derived: is this a sewing machine product? ── */
+  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
+
+  /* ── Wizard steps ── */
+  const steps = useMemo(() => getSteps(isSewing), [isSewing]);
+
+  /* ── Load data ── */
   useEffect(() => {
     (async () => {
-      // Fetch lookup data + attribute config in parallel
       const [divs, cats, subs, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos] = await Promise.all([
         fetchDivisions(), fetchCategories(), fetchSubcategories(),
         fetchSupplierNames(), fetchUniqueBrands(), fetchBrandLogos(),
@@ -147,7 +267,6 @@ export default function ProductForm({ productId }: Props) {
       setSubcategories(subs);
       setSuppliers(supplierList);
       setBrands(brandList);
-      // Use attribute config for tags (faster than scanning products)
       setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
@@ -162,7 +281,6 @@ export default function ProductForm({ productId }: Props) {
       });
 
       if (isEdit && productId) {
-        // Fetch product + related data in parallel (perf fix)
         const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs] = await Promise.all([
           fetchProductById(productId),
           fetchModelsByProductId(productId),
@@ -173,7 +291,6 @@ export default function ProductForm({ productId }: Props) {
         ]);
         if (!p) { setError("Product not found"); setLoading(false); return; }
 
-        // Fetch prices (needs model IDs from above)
         const modelIds = dbModels.map(m => m.id);
         const dbPrices = await fetchMarketPricesByModelIds(modelIds);
 
@@ -185,6 +302,7 @@ export default function ProductForm({ productId }: Props) {
           slug: p.slug,
           brand: p.brand || "",
           level: p.level || "",
+          family: p.family || "",
           tags: p.tags || [],
           description: p.description || "",
           specs: (p.specs as Record<string, string>) || {},
@@ -198,6 +316,10 @@ export default function ProductForm({ productId }: Props) {
           colors: p.colors || [],
           visible: p.visible,
           featured: p.featured,
+          status: (p.status as ProductFormState["status"]) || "draft",
+          country_of_origin: p.country_of_origin || "",
+          moq: p.moq?.toString() || "",
+          lead_time: p.lead_time || "",
         });
         setSlugEdited(true);
 
@@ -222,6 +344,10 @@ export default function ProductForm({ productId }: Props) {
           extra_accessories: m.extra_accessories || "",
           order: m.order,
           visible: m.visible,
+          status: (m.status as ModelFormState["status"]) || "active",
+          moq: m.moq?.toString() || "",
+          lead_time: m.lead_time || "",
+          barcode: m.barcode || "",
         }));
         setModels(mappedModels);
         setOriginalModelIds(modelIds);
@@ -272,7 +398,6 @@ export default function ProductForm({ productId }: Props) {
         }));
         setRelated(mappedRelated);
 
-        // Restore sewing machine specs if available
         if (dbSewingSpecs) {
           setSewingSpecs({
             template_slug: dbSewingSpecs.template_slug,
@@ -296,7 +421,6 @@ export default function ProductForm({ productId }: Props) {
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
-  // Track which supplier field triggered the modal: "hero" or a model _tempId
   const [supplierTarget, setSupplierTarget] = useState<"hero" | string>("hero");
 
   /* ── Hero: main image helpers ── */
@@ -308,7 +432,6 @@ export default function ProductForm({ productId }: Props) {
   const handleMainImage = (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
-    // Remove existing main_image entries
     const filtered = media.filter(m => m.type !== "main_image");
     const newItem: MediaFormState = {
       _tempId: crypto.randomUUID(),
@@ -323,35 +446,62 @@ export default function ProductForm({ productId }: Props) {
     setMedia([...filtered, newItem]);
   };
 
-  /* ── Hero: model helpers ── */
+  /* ── Auto-create first model ── */
   const ensureFirstModel = useCallback(() => {
     if (models.length === 0) {
       setModels([{ ...createEmptyModel(), order: 0 }]);
     }
   }, [models.length]);
 
-  // Auto-create first model on mount
   useEffect(() => {
     if (!loading && models.length === 0) ensureFirstModel();
   }, [loading, ensureFirstModel]);
 
-  const updateFirstModel = useCallback((updates: Partial<ModelFormState>) => {
-    setModels(prev => {
-      if (prev.length === 0) return prev;
-      return [{ ...prev[0], ...updates }, ...prev.slice(1)];
-    });
-  }, []);
+  /* ── Step navigation ── */
+  const goToStep = (idx: number) => {
+    // Mark current step as completed when moving forward
+    if (idx > currentStep) {
+      setCompletedSteps(prev => new Set([...prev, currentStep]));
+    }
+    setCurrentStep(Math.max(0, Math.min(idx, steps.length - 1)));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  // ── SAVE ──
+  const nextStep = () => goToStep(currentStep + 1);
+  const prevStep = () => goToStep(currentStep - 1);
+
+  /* ── Validation per step ── */
+  const validateCurrentStep = (): string | null => {
+    const stepId = steps[currentStep]?.id;
+    if (stepId === "identity") {
+      if (!product.product_name.trim()) return "Product name is required";
+      if (!product.division_slug || !product.category_slug || !product.subcategory_slug) return "Complete the classification before proceeding";
+    }
+    return null;
+  };
+
+  const handleNext = () => {
+    const err = validateCurrentStep();
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError("");
+    nextStep();
+  };
+
+  /* ═══════════════════════════════════════════════
+     SAVE
+     ═══════════════════════════════════════════════ */
   const save = async () => {
     if (!product.product_name) {
       setError("Product name is required");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setCurrentStep(0);
       return;
     }
     if (!product.division_slug || !product.category_slug || !product.subcategory_slug) {
       setError("Classification is required");
-      setTimeout(() => document.getElementById("classification")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      setCurrentStep(0);
       return;
     }
 
@@ -360,7 +510,7 @@ export default function ProductForm({ productId }: Props) {
     setSuccess("");
 
     try {
-      const productData = {
+      const productData: Record<string, unknown> = {
         product_name: product.product_name,
         slug: product.slug,
         division_slug: product.division_slug,
@@ -369,6 +519,7 @@ export default function ProductForm({ productId }: Props) {
         brand: product.brand || null,
         tags: product.tags,
         level: product.level || null,
+        family: product.family || null,
         description: product.description || null,
         specs: product.specs,
         hs_code: product.hs_code || null,
@@ -381,6 +532,10 @@ export default function ProductForm({ productId }: Props) {
         warranty: product.warranty || null,
         visible: product.visible,
         featured: product.featured,
+        status: product.status,
+        country_of_origin: product.country_of_origin || null,
+        moq: product.moq ? parseInt(product.moq) : null,
+        lead_time: product.lead_time || null,
       };
 
       let pid: string;
@@ -398,7 +553,7 @@ export default function ProductForm({ productId }: Props) {
 
       for (const m of models) {
         const num = (v: string) => v ? parseFloat(v) : null;
-        const modelData = {
+        const modelData: Record<string, unknown> = {
           product_id: pid,
           model_name: m.model_name,
           slug: m.slug,
@@ -418,6 +573,10 @@ export default function ProductForm({ productId }: Props) {
           extra_accessories: m.extra_accessories || null,
           order: m.order,
           visible: m.visible,
+          status: m.status,
+          moq: m.moq ? parseInt(m.moq) : null,
+          lead_time: m.lead_time || null,
+          barcode: m.barcode || null,
         };
 
         if (m.id) {
@@ -492,7 +651,6 @@ export default function ProductForm({ productId }: Props) {
 
       await setRelatedProducts(pid, related.map(r => r.related_id));
 
-      // Save sewing machine specs if template is selected
       if (sewingSpecs.template_slug) {
         await upsertSewingSpecs({
           product_id: pid,
@@ -513,24 +671,14 @@ export default function ProductForm({ productId }: Props) {
     }
   };
 
-  // ── Section nav for quick jump ──
-  // Check if this product belongs to a sewing machine category
-  const isSewing = isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
+  /* ── Shared CSS ── */
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
+  const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
-  const sections = [
-    { id: "classification", label: "Classification", icon: <FolderTree className="h-3.5 w-3.5" /> },
-    { id: "basic", label: "Basic", icon: <FileText className="h-3.5 w-3.5" /> },
-    { id: "description", label: "Description", icon: <FileText className="h-3.5 w-3.5" /> },
-    { id: "specs", label: "Specs", icon: <Wrench className="h-3.5 w-3.5" /> },
-    ...(isSewing ? [{ id: "sewing", label: "Sewing Specs", icon: <Settings2 className="h-3.5 w-3.5" /> }] : []),
-    { id: "config", label: "Config", icon: <Sliders className="h-3.5 w-3.5" /> },
-    { id: "technical", label: "Technical", icon: <Zap className="h-3.5 w-3.5" /> },
-    { id: "models", label: "Models", icon: <Boxes className="h-3.5 w-3.5" /> },
-    { id: "media", label: "Media", icon: <Image className="h-3.5 w-3.5" /> },
-    { id: "prices", label: "Prices", icon: <DollarSign className="h-3.5 w-3.5" /> },
-    { id: "translations", label: "Translations", icon: <Languages className="h-3.5 w-3.5" /> },
-    { id: "related", label: "Related", icon: <Link2 className="h-3.5 w-3.5" /> },
-  ];
+  /* ── Classification summary for breadcrumb ── */
+  const divisionName = divisions.find(d => d.slug === product.division_slug)?.name;
+  const categoryName = categories.find(c => c.slug === product.category_slug)?.name;
+  const subcategoryName = subcategories.find(s => s.slug === product.subcategory_slug)?.name;
 
   if (loading) {
     return (
@@ -540,17 +688,23 @@ export default function ProductForm({ productId }: Props) {
     );
   }
 
-  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
-  const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
-
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* ═══ STICKY TOP BAR ═══ */}
       <div className="sticky top-14 z-40 bg-[var(--bg-secondary)]/90 backdrop-blur-xl border-b border-[var(--border-subtle)]">
         <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-14 flex items-center justify-between">
-          <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
+            </Link>
+            {product.product_name && (
+              <div className="hidden md:flex items-center gap-2">
+                <span className="text-[var(--text-ghost)]">/</span>
+                <span className="text-[13px] text-[var(--text-muted)] font-medium truncate max-w-[200px]">{product.product_name}</span>
+                <StatusBadge status={product.status} />
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={save}
@@ -569,272 +723,306 @@ export default function ProductForm({ productId }: Props) {
         {/* Messages */}
         {error && (
           <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
-            <span className="shrink-0">&#9888;</span> {error}
+            <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
+            <button onClick={() => setError("")} className="ml-auto text-red-400/50 hover:text-red-400">×</button>
           </div>
         )}
         {success && (
           <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
-            <span className="shrink-0">&#10003;</span> {success}
+            <Check className="h-4 w-4 shrink-0" /> {success}
           </div>
         )}
 
-        {/* ═══ SECTION NAV (quick jump) ═══ */}
-        <div className="mb-6">
-          <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-            {sections.map(s => (
-              <button
-                key={s.id}
-                onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                className="shrink-0 h-8 px-3.5 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-all"
-              >
-                {s.icon}
-                <span className="hidden sm:inline">{s.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ═══ STEP NAVIGATION ═══ */}
+        <StepNav
+          steps={steps}
+          currentStep={currentStep}
+          onStepChange={goToStep}
+          completedSteps={completedSteps}
+        />
 
-        {/* ═══ HERO SECTION ═══ */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-8 mb-6 shadow-[0_1px_8px_rgba(0,0,0,0.1)]">
-          <div className="flex flex-col md:flex-row gap-6 md:gap-10">
-
-            {/* Left: Main Product Image */}
-            <div className="md:w-[280px] lg:w-[320px] shrink-0">
-              <input
-                ref={mainImageRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleMainImage(e.target.files)}
-              />
-              <div
-                onClick={() => mainImageRef.current?.click()}
-                className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
-              >
-                {mainImageSrc ? (
-                  <>
-                    <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-5" />
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                      <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
-                        <Camera className="h-4 w-4" />
-                        Change Photo
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 1: IDENTITY & CLASSIFICATION
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "identity" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Hero Card */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-8 shadow-[0_1px_8px_rgba(0,0,0,0.1)]">
+              <div className="flex flex-col md:flex-row gap-6 md:gap-10">
+                {/* Left: Main Product Image */}
+                <div className="md:w-[280px] lg:w-[320px] shrink-0">
+                  <input
+                    ref={mainImageRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleMainImage(e.target.files)}
+                  />
+                  <div
+                    onClick={() => mainImageRef.current?.click()}
+                    className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
+                  >
+                    {mainImageSrc ? (
+                      <>
+                        <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-5" />
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                          <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
+                            <Camera className="h-4 w-4" />
+                            Change Photo
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 group-hover:scale-105 transition-transform duration-300">
+                        <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
+                          <ImageIcon className="h-7 w-7 text-[var(--text-ghost)]" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[13px] font-medium text-[var(--text-dim)]">Upload Product Photo</p>
+                          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag & drop</p>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Product Identity */}
+                <div className="flex-1 flex flex-col justify-center gap-4">
+                  {/* Product Name — prominent */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">Product Name *</label>
+                    <input
+                      type="text"
+                      value={product.product_name}
+                      onChange={(e) => {
+                        const updates: Partial<ProductFormState> = { product_name: e.target.value };
+                        if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                        updateProduct_(updates);
+                      }}
+                      placeholder="e.g. KX CoBot Pro"
+                      className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+                    />
+                  </div>
+
+                  <div className="border-t border-[var(--border-subtle)]" />
+
+                  {/* Brand + Family + Status */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={lbl}>
+                        <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
+                      </label>
+                      <SelectWithCreate
+                        value={product.brand}
+                        options={brands.map(b => {
+                          const slug = b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                          return { value: b, label: b, icon: brandLogos[slug] || null };
+                        })}
+                        onChange={(val) => updateProduct_({ brand: val })}
+                        onClickCreate={() => setShowBrandModal(true)}
+                        placeholder="Select brand..."
+                        createLabel="Create Brand"
+                      />
                     </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 group-hover:scale-105 transition-transform duration-300">
-                    <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
-                      <ImageIcon className="h-7 w-7 text-[var(--text-ghost)]" />
+                    <div>
+                      <label className={lbl}>
+                        <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Product Family / Series</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={product.family}
+                        onChange={(e) => updateProduct_({ family: e.target.value })}
+                        placeholder="e.g. CoBot Series, Pro Line"
+                        className={inp}
+                      />
                     </div>
-                    <div className="text-center">
-                      <p className="text-[13px] font-medium text-[var(--text-dim)]">Upload Product Photo</p>
-                      <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag & drop</p>
+                    <div>
+                      <label className={lbl}>
+                        <span className="inline-flex items-center gap-1.5"><CircleDot className="h-3 w-3" /> Product Status</span>
+                      </label>
+                      <select
+                        value={product.status}
+                        onChange={(e) => updateProduct_({ status: e.target.value as ProductFormState["status"] })}
+                        className={inp}
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="active">Active</option>
+                        <option value="archived">Archived</option>
+                      </select>
                     </div>
                   </div>
-                )}
+
+                  {/* Tags */}
+                  <div>
+                    <label className={lbl}>Tags</label>
+                    <TagsInput
+                      tags={product.tags}
+                      onChange={(tags) => updateProduct_({ tags })}
+                      suggestions={allTags}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Right: Product Identity */}
-            <div className="flex-1 flex flex-col justify-center gap-4">
-              {/* Product Name — prominent */}
-              <div>
-                <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">Product Name *</label>
-                <input
-                  type="text"
-                  value={product.product_name}
-                  onChange={(e) => {
-                    const updates: Partial<ProductFormState> = { product_name: e.target.value };
-                    if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                    updateProduct_(updates);
-                  }}
-                  placeholder="e.g. KX CoBot Pro"
-                  className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
-                />
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-[var(--border-subtle)]" />
-
-              {/* Model + Supplier */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><Boxes className="h-3 w-3" /> Product Model</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={models[0]?.model_name || ""}
-                    onChange={(e) => {
-                      if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ model_name: e.target.value, slug: (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") });
-                    }}
-                    placeholder="e.g. KX-500A"
-                    className={inp}
-                  />
-                </div>
-                <div>
-                  <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Supplier</span>
-                  </label>
-                  <SelectWithCreate
-                    value={models[0]?.supplier || ""}
-                    options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
-                    onChange={(val) => {
-                      if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ supplier: val });
-                    }}
-                    onClickCreate={() => { setSupplierTarget("hero"); setShowSupplierModal(true); }}
-                    placeholder="Select supplier..."
-                    createLabel="Create Supplier"
-                  />
-                </div>
-              </div>
-
-              {/* Supplier Model + Cost Price + Global Price */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={lbl}>Supplier Model</label>
-                  <input
-                    type="text"
-                    value={models[0]?.reference_model || ""}
-                    onChange={(e) => {
-                      if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ reference_model: e.target.value });
-                    }}
-                    placeholder="e.g. AB-1234X"
-                    className={inp}
-                  />
-                </div>
-                <div>
-                  <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Cost Price (USD)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={models[0]?.cost_price || ""}
-                    onChange={(e) => {
-                      if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ cost_price: e.target.value });
-                    }}
-                    placeholder="0.00"
-                    className={inp}
-                  />
-                </div>
-                <div>
-                  <label className={lbl}>
-                    <span className="inline-flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Global Price (USD)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={models[0]?.global_price || ""}
-                    onChange={(e) => {
-                      if (models.length === 0) ensureFirstModel();
-                      updateFirstModel({ global_price: e.target.value });
-                    }}
-                    placeholder="0.00"
-                    className={inp}
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className={lbl}>Tags</label>
-                <TagsInput
-                  tags={product.tags}
-                  onChange={(tags) => updateProduct_({ tags })}
-                  suggestions={allTags}
-                />
-              </div>
-            </div>
+            {/* Classification */}
+            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
+              <ClassificationSection
+                data={product}
+                onChange={updateProduct_}
+                divisions={divisions}
+                categories={categories}
+                subcategories={subcategories}
+                divisionLogos={divisionLogos}
+                categoryLogos={categoryLogos}
+                subcategoryLogos={subcategoryLogos}
+                onClickCreateDivision={() => setShowDivisionModal(true)}
+                onClickCreateCategory={() => setShowCategoryModal(true)}
+                onClickCreateSubcategory={() => setShowSubcategoryModal(true)}
+              />
+            </Section>
           </div>
-        </div>
+        )}
 
-        {/* ═══ ALL SECTIONS ═══ */}
-        <div className="space-y-5">
-
-          {/* 1. Classification */}
-          <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
-            <ClassificationSection
-              data={product}
-              onChange={updateProduct_}
-              divisions={divisions}
-              categories={categories}
-              subcategories={subcategories}
-              divisionLogos={divisionLogos}
-              categoryLogos={categoryLogos}
-              subcategoryLogos={subcategoryLogos}
-              onClickCreateDivision={() => setShowDivisionModal(true)}
-              onClickCreateCategory={() => setShowCategoryModal(true)}
-              onClickCreateSubcategory={() => setShowSubcategoryModal(true)}
-            />
-          </Section>
-
-          {/* 2. Basic Information */}
-          <Section id="basic" icon={<FileText className="h-4 w-4" />} title="Basic Information">
-            <div className="space-y-5">
-              <div>
-                <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Slug (URL Path)</label>
-                <input
-                  type="text"
-                  value={product.slug}
-                  onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
-                  className={`${inp} font-mono text-[var(--text-muted)]`}
-                />
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 2: PRODUCT INFORMATION
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "details" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Classification summary breadcrumb */}
+            {divisionName && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
+                <FolderTree className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
+                <span>{divisionName}</span>
+                {categoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
+                {subcategoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            )}
+
+            {/* Basic Information */}
+            <Section id="basic" icon={<FileText className="h-4 w-4" />} title="Basic Information">
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Slug (URL Path)</label>
+                    <input
+                      type="text"
+                      value={product.slug}
+                      onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
+                      className={`${inp} font-mono text-[var(--text-muted)]`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Level</label>
+                    <select
+                      value={product.level}
+                      onChange={(e) => updateProduct_({ level: e.target.value })}
+                      className={inp}
+                    >
+                      <option value="">Select level...</option>
+                      {attrSuggestions.levels.length > 0
+                        ? attrSuggestions.levels.map(l => (
+                            <option key={l} value={l.toLowerCase()}>{l}</option>
+                          ))
+                        : <>
+                            <option value="entry">Entry</option>
+                            <option value="mid">Mid</option>
+                            <option value="premium">Premium</option>
+                            <option value="enterprise">Enterprise</option>
+                          </>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                {/* New fields row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Country of Origin</label>
+                    <input
+                      type="text"
+                      value={product.country_of_origin}
+                      onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
+                      placeholder="e.g. China, Japan, Taiwan"
+                      className={inp}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">MOQ (Min. Order Qty)</label>
+                    <input
+                      type="number"
+                      value={product.moq}
+                      onChange={(e) => updateProduct_({ moq: e.target.value })}
+                      placeholder="e.g. 10"
+                      className={inp}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Lead Time</label>
+                    <input
+                      type="text"
+                      value={product.lead_time}
+                      onChange={(e) => updateProduct_({ lead_time: e.target.value })}
+                      placeholder="e.g. 7-14 days"
+                      className={inp}
+                    />
+                  </div>
+                </div>
+
+                {/* Visibility toggles */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  <div className="space-y-3">
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)]">Visibility</label>
+                    <Toggle checked={product.visible} onChange={(v) => updateProduct_({ visible: v })} label="Visible on website" />
+                    <Toggle checked={product.featured} onChange={(v) => updateProduct_({ featured: v })} label="Featured product" />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="block text-[12px] font-medium text-[var(--text-subtle)]">Purchase Options</label>
+                    <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
+                    <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Brand</label>
-                  <SelectWithCreate
-                    value={product.brand}
-                    options={brands.map(b => {
-                      const slug = b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                      return { value: b, label: b, icon: brandLogos[slug] || null };
-                    })}
-                    onChange={(val) => updateProduct_({ brand: val })}
-                    onClickCreate={() => setShowBrandModal(true)}
-                    placeholder="Select brand..."
-                    createLabel="Create Brand"
+                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Warranty</label>
+                  <input
+                    type="text"
+                    value={product.warranty}
+                    onChange={(e) => updateProduct_({ warranty: e.target.value })}
+                    placeholder="e.g. 2 years parts & labor"
+                    className={inp}
                   />
                 </div>
-                <div>
-                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Level</label>
-                  <select
-                    value={product.level}
-                    onChange={(e) => updateProduct_({ level: e.target.value })}
-                    className={inp}
-                  >
-                    <option value="">Select level...</option>
-                    {attrSuggestions.levels.length > 0
-                      ? attrSuggestions.levels.map(l => (
-                          <option key={l} value={l.toLowerCase()}>{l}</option>
-                        ))
-                      : <>
-                          <option value="entry">Entry</option>
-                          <option value="mid">Mid</option>
-                          <option value="premium">Premium</option>
-                          <option value="enterprise">Enterprise</option>
-                        </>
-                    }
-                  </select>
-                </div>
               </div>
-            </div>
-          </Section>
+            </Section>
 
-          {/* 3. Description */}
-          <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
-            <DescriptionSection data={product} onChange={updateProduct_} />
-          </Section>
+            {/* Description */}
+            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
+              <DescriptionSection data={product} onChange={updateProduct_} />
+            </Section>
 
-          {/* 4. Specifications */}
-          <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Specifications">
-            <SpecsSection data={product} onChange={updateProduct_} />
-          </Section>
+            {/* Generic Specifications (key-value) */}
+            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Additional Specifications" badge="key/value">
+              <SpecsSection data={product} onChange={updateProduct_} />
+            </Section>
+          </div>
+        )}
 
-          {/* 4b. Sewing Machine Specs (only for sewing machine division) */}
-          {isSewing && (
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 3: SEWING MACHINE SPECS (conditional)
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "sewing" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Classification summary */}
+            {divisionName && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
+                <FolderTree className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
+                <span>{divisionName}</span>
+                {categoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
+                {subcategoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+              </div>
+            )}
+
             <Section id="sewing" icon={<Settings2 className="h-4 w-4" />} title="Sewing Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
               <SewingMachineSection
                 data={sewingSpecs}
@@ -842,62 +1030,121 @@ export default function ProductForm({ productId }: Props) {
                 subcategorySlug={product.subcategory_slug}
               />
             </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 4: MODELS & PRICING
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "commercial" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Models & Variants — the commercial source of truth */}
+            <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants" badge={`${models.length} model${models.length !== 1 ? "s" : ""}`}>
+              <ModelsSection
+                models={models}
+                onChange={setModels}
+                suppliers={suppliers}
+                onClickCreateSupplier={(tempId) => { setSupplierTarget(tempId); setShowSupplierModal(true); }}
+              />
+            </Section>
+
+            {/* Technical Details */}
+            <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details">
+              <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
+            </Section>
+
+            {/* Market Prices */}
+            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
+              <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 5: MEDIA & FILES
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "media" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
+              <MediaSection
+                media={media.filter(m => m.type !== "main_image")}
+                excludeTypes={["main_image"]}
+                onChange={(filtered) => {
+                  const mainImages = media.filter(m => m.type === "main_image");
+                  setMedia([...mainImages, ...filtered]);
+                }}
+              />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 6: REVIEW & PUBLISH
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "finalize" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Summary Card */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6">
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-4">Product Summary</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <SummaryItem label="Product" value={product.product_name || "—"} />
+                <SummaryItem label="Brand" value={product.brand || "—"} />
+                <SummaryItem label="Classification" value={subcategoryName || "—"} />
+                <SummaryItem label="Status" value={<StatusBadge status={product.status} />} />
+                <SummaryItem label="Models" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} />
+                <SummaryItem label="Media Files" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} />
+                <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} />
+                <SummaryItem label="Template" value={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : "—"} />
+              </div>
+            </div>
+
+            {/* Translations */}
+            <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+              <TranslationsSection translations={translations} onChange={setTranslations} />
+            </Section>
+
+            {/* Related Products */}
+            <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+              <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
+        <div className="flex items-center justify-between mt-8 mb-4">
+          <button
+            onClick={prevStep}
+            disabled={currentStep === 0}
+            className="h-10 px-5 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" /> Previous
+          </button>
+
+          <div className="text-[11px] text-[var(--text-ghost)]">
+            Step {currentStep + 1} of {steps.length}
+          </div>
+
+          {currentStep < steps.length - 1 ? (
+            <button
+              onClick={handleNext}
+              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg"
+            >
+              Next <ArrowRight className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={save}
+              disabled={saving}
+              className="h-10 px-6 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? "Saving..." : "Save & Publish"}
+            </button>
           )}
-
-          {/* 5. Configuration */}
-          <Section id="config" icon={<Sliders className="h-4 w-4" />} title="Configuration">
-            <ConfigSection data={product} onChange={updateProduct_} />
-          </Section>
-
-          {/* 6. Technical Details */}
-          <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details">
-            <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
-          </Section>
-
-          {/* 7. Models & Variants */}
-          <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants">
-            <ModelsSection
-              models={models}
-              onChange={setModels}
-              suppliers={suppliers}
-              onClickCreateSupplier={(tempId) => { setSupplierTarget(tempId); setShowSupplierModal(true); }}
-            />
-          </Section>
-
-          {/* 8. Media */}
-          <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
-            <MediaSection
-              media={media.filter(m => m.type !== "main_image")}
-              excludeTypes={["main_image"]}
-              onChange={(filtered) => {
-                const mainImages = media.filter(m => m.type === "main_image");
-                setMedia([...mainImages, ...filtered]);
-              }}
-            />
-          </Section>
-
-          {/* 9. Translations */}
-          <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
-            <TranslationsSection translations={translations} onChange={setTranslations} />
-          </Section>
-
-          {/* 10. Market Prices */}
-          <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
-            <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
-          </Section>
-
-          {/* 11. Related Products */}
-          <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
-            <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
-          </Section>
         </div>
 
-        {/* spacer for sticky bar */}
-        <div className="h-8" />
+        <div className="h-12" />
       </div>
-
-      {/* Bottom spacer */}
-      <div className="h-12" />
 
       {/* ═══ CREATE MODALS ═══ */}
       <CreateDivisionModal
@@ -940,11 +1187,7 @@ export default function ProductForm({ productId }: Props) {
         onClose={() => setShowSupplierModal(false)}
         onCreated={(supplier) => {
           setSuppliers(prev => [...prev, { ...supplier, logo: supplier.logo || null }].sort((a, b) => a.name.localeCompare(b.name)));
-          // Auto-select the new supplier on the target field
-          if (supplierTarget === "hero") {
-            if (models.length === 0) ensureFirstModel();
-            updateFirstModel({ supplier: supplier.name });
-          } else {
+          if (supplierTarget !== "hero") {
             setModels(prev => prev.map(m => m._tempId === supplierTarget ? { ...m, supplier: supplier.name } : m));
           }
         }}
@@ -967,7 +1210,21 @@ export default function ProductForm({ productId }: Props) {
   );
 }
 
-/* ── Tags Input with Suggestions Dropdown ── */
+/* ═══════════════════════════════════════════════════════════════════
+   SUMMARY ITEM — for review step
+   ═══════════════════════════════════════════════════════════════════ */
+function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-[var(--bg-surface-subtle)] rounded-xl px-4 py-3 border border-[var(--border-subtle)]">
+      <div className="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{value}</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAGS INPUT — with suggestions dropdown
+   ═══════════════════════════════════════════════════════════════════ */
 function TagsInput({ tags, onChange, suggestions = [] }: { tags: string[]; onChange: (t: string[]) => void; suggestions?: string[] }) {
   const [input, setInput] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);

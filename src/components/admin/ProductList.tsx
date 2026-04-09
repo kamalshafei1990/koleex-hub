@@ -32,6 +32,7 @@ export default function ProductList() {
   const [filterSupplier, setFilterSupplier] = useState("");
   const [filterVisible, setFilterVisible] = useState("");
   const [filterFeatured, setFilterFeatured] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -84,16 +85,17 @@ export default function ProductList() {
       if (filterVisible === "hidden" && p.visible) return false;
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
+      if (filterStatus && (p.status || "draft") !== filterStatus) return false;
       if (search && !p.product_name.toLowerCase().includes(search.toLowerCase()) && !p.slug.includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, search, productSuppliers]);
+  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers]);
 
-  const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured].filter(Boolean).length;
+  const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
 
   const clearAllFilters = () => {
     setFilterDiv(""); setFilterCat(""); setFilterSub(""); setFilterBrand("");
-    setFilterLevel(""); setFilterSupplier(""); setFilterVisible(""); setFilterFeatured("");
+    setFilterLevel(""); setFilterSupplier(""); setFilterVisible(""); setFilterFeatured(""); setFilterStatus("");
     setSearch("");
   };
 
@@ -261,6 +263,15 @@ export default function ProductList() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Status</label>
+                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass + " w-full"}>
+                    <option value="">All</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Featured</label>
                   <select value={filterFeatured} onChange={(e) => setFilterFeatured(e.target.value)} className={selectClass + " w-full"}>
                     <option value="">All</option>
@@ -410,6 +421,19 @@ export default function ProductList() {
 
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      {(() => {
+                        const st = (p.status || "draft");
+                        const stColors: Record<string, string> = {
+                          draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+                          active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+                          archived: "text-red-400 bg-red-400/10 border-red-400/20",
+                        };
+                        return (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${stColors[st] || stColors.draft}`}>
+                            {st}
+                          </span>
+                        );
+                      })()}
                       {p.brand && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
                           <Tag className="h-2.5 w-2.5" /> {p.brand}
@@ -527,17 +551,21 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Visibility (desktop only) */}
+                    {/* Status (desktop only) */}
                     <div className="hidden md:flex items-center justify-center">
-                      {p.visible ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-medium">
-                          <Eye className="h-2.5 w-2.5" /> Live
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] text-[10px] font-medium">
-                          <EyeOff className="h-2.5 w-2.5" /> Draft
-                        </span>
-                      )}
+                      {(() => {
+                        const st = (p.status || "draft");
+                        const stColors: Record<string, string> = {
+                          draft: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+                          active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+                          archived: "text-red-400 bg-red-400/10 border-red-400/20",
+                        };
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${stColors[st] || stColors.draft}`}>
+                            {st}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Actions */}
