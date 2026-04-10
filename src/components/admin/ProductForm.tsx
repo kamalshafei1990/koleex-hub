@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Camera, ImageIcon, FolderTree,
-  FileText, Wrench, Sliders, Boxes, Image, DollarSign,
+  FileText, Wrench, Boxes, Image, DollarSign,
   Languages, Link2, Zap, Settings2, ChevronDown, ChevronRight,
-  Check, Package, Plus, AlertTriangle, Globe, Eye, Star,
-  ArrowRight, CircleDot, Hash,
+  Check, Package, AlertTriangle, Star,
+  ArrowRight, CircleDot, Factory, Tag, Sparkles,
 } from "lucide-react";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
@@ -51,7 +51,9 @@ import MarketPricesSection from "./form-sections/MarketPricesSection";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
+import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
 import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
+import { slugify } from "@/types/product-form";
 
 /* ═══════════════════════════════════════════════════════════════════
    SECTION WRAPPER — collapsible card with icon + title
@@ -96,16 +98,18 @@ interface WizardStep {
 
 function getSteps(isSewing: boolean): WizardStep[] {
   const steps: WizardStep[] = [
-    { id: "identity", label: "Identity & Classification", shortLabel: "Identity", icon: <Camera className="h-4 w-4" /> },
-    { id: "details", label: "Product Information", shortLabel: "Details", icon: <FileText className="h-4 w-4" /> },
+    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <Sparkles className="h-4 w-4" /> },
+    { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTree className="h-4 w-4" /> },
   ];
   if (isSewing) {
-    steps.push({ id: "sewing", label: "Sewing Machine Specs", shortLabel: "Sewing", icon: <Settings2 className="h-4 w-4" />, conditional: true });
+    steps.push({ id: "sewing", label: "Sewing Machine Specs", shortLabel: "Specs", icon: <Settings2 className="h-4 w-4" />, conditional: true });
   }
   steps.push(
-    { id: "commercial", label: "Models & Pricing", shortLabel: "Models", icon: <Boxes className="h-4 w-4" /> },
+    { id: "description", label: "Description", shortLabel: "Description", icon: <FileText className="h-4 w-4" /> },
+    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <Zap className="h-4 w-4" /> },
+    { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <Boxes className="h-4 w-4" /> },
     { id: "media", label: "Media & Files", shortLabel: "Media", icon: <Image className="h-4 w-4" /> },
-    { id: "finalize", label: "Review & Publish", shortLabel: "Finalize", icon: <Check className="h-4 w-4" /> },
+    { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <Check className="h-4 w-4" /> },
   );
   return steps;
 }
@@ -457,6 +461,19 @@ export default function ProductForm({ productId }: Props) {
     if (!loading && models.length === 0) ensureFirstModel();
   }, [loading, ensureFirstModel]);
 
+  /* ── Primary model helpers (shown in Hero) ── */
+  const primaryModel = models[0];
+  const updatePrimaryModel = useCallback((updates: Partial<ModelFormState>) => {
+    setModels(prev => {
+      if (prev.length === 0) {
+        return [{ ...createEmptyModel(), ...updates, order: 0 }];
+      }
+      const next = [...prev];
+      next[0] = { ...next[0], ...updates };
+      return next;
+    });
+  }, []);
+
   /* ── Step navigation ── */
   const goToStep = (idx: number) => {
     // Mark current step as completed when moving forward
@@ -742,15 +759,22 @@ export default function ProductForm({ productId }: Props) {
         />
 
         {/* ═══════════════════════════════════════════════════════════
-           STEP 1: IDENTITY & CLASSIFICATION
+           STEP 1: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "identity" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Hero Card */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-8 shadow-[0_1px_8px_rgba(0,0,0,0.1)]">
-              <div className="flex flex-col md:flex-row gap-6 md:gap-10">
-                {/* Left: Main Product Image */}
-                <div className="md:w-[280px] lg:w-[320px] shrink-0">
+            {/* ═══ HERO CARD ═══ */}
+            <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-surface-subtle)]/40 rounded-3xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
+                {/* Left: Main Product Image (2/5 width) */}
+                <div className="lg:col-span-2 p-6 md:p-8 lg:border-r lg:border-[var(--border-subtle)] flex flex-col">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                      <Camera className="h-3 w-3 text-[var(--text-ghost)]" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Main Product Photo</span>
+                  </div>
+
                   <input
                     ref={mainImageRef}
                     type="file"
@@ -760,11 +784,12 @@ export default function ProductForm({ productId }: Props) {
                   />
                   <div
                     onClick={() => mainImageRef.current?.click()}
-                    className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
+                    className="relative w-full aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)] flex-1"
                   >
                     {mainImageSrc ? (
                       <>
-                        <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-5" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-6" />
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                           <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
                             <Camera className="h-4 w-4" />
@@ -774,40 +799,67 @@ export default function ProductForm({ productId }: Props) {
                       </>
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 group-hover:scale-105 transition-transform duration-300">
-                        <div className="h-16 w-16 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
-                          <ImageIcon className="h-7 w-7 text-[var(--text-ghost)]" />
+                        <div className="h-20 w-20 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
+                          <ImageIcon className="h-9 w-9 text-[var(--text-ghost)]" />
                         </div>
                         <div className="text-center">
-                          <p className="text-[13px] font-medium text-[var(--text-dim)]">Upload Product Photo</p>
-                          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag & drop</p>
+                          <p className="text-[14px] font-semibold text-[var(--text-dim)]">Upload Product Photo</p>
+                          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Click to browse or drag &amp; drop</p>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Right: Product Identity */}
-                <div className="flex-1 flex flex-col justify-center gap-4">
-                  {/* Product Name — prominent */}
+                {/* Right: Product Identity (3/5 width) */}
+                <div className="lg:col-span-3 p-6 md:p-8 flex flex-col justify-center gap-5">
+                  {/* Top row: Status pill + brand logo */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <StatusBadge status={product.status} />
+                    {product.brand && (
+                      <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
+                        <Star className="h-3 w-3" /> {product.brand}
+                      </span>
+                    )}
+                    {product.family && (
+                      <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
+                        <Package className="h-3 w-3" /> {product.family}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Product Name — XL prominent */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">Product Name *</label>
+                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">Product Name *</label>
                     <input
                       type="text"
                       value={product.product_name}
                       onChange={(e) => {
                         const updates: Partial<ProductFormState> = { product_name: e.target.value };
-                        if (!slugEdited) updates.slug = (e.target.value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                        if (!slugEdited) updates.slug = slugify(e.target.value);
                         updateProduct_(updates);
                       }}
-                      placeholder="e.g. KX CoBot Pro"
-                      className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-lg md:text-xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+                      placeholder="e.g. KX Lockstitch Industrial 9500"
+                      className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
                     />
                   </div>
 
-                  <div className="border-t border-[var(--border-subtle)]" />
+                  {/* Primary Model Name */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+                      <span className="inline-flex items-center gap-1.5"><Tag className="h-3 w-3" /> Primary Model</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={primaryModel?.model_name || ""}
+                      onChange={(e) => updatePrimaryModel({ model_name: e.target.value, slug: slugify(e.target.value) })}
+                      placeholder="e.g. KX-9500-D"
+                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+                    />
+                  </div>
 
                   {/* Brand + Family + Status */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
@@ -826,19 +878,19 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Product Family / Series</span>
+                        <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Family / Series</span>
                       </label>
                       <input
                         type="text"
                         value={product.family}
                         onChange={(e) => updateProduct_({ family: e.target.value })}
-                        placeholder="e.g. CoBot Series, Pro Line"
+                        placeholder="e.g. Pro Line"
                         className={inp}
                       />
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><CircleDot className="h-3 w-3" /> Product Status</span>
+                        <span className="inline-flex items-center gap-1.5"><CircleDot className="h-3 w-3" /> Status</span>
                       </label>
                       <select
                         value={product.status}
@@ -851,22 +903,105 @@ export default function ProductForm({ productId }: Props) {
                       </select>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Tags */}
+              {/* ═══ PRIMARY MODEL COMMERCIAL STRIP ═══ */}
+              <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                    <DollarSign className="h-3 w-3 text-[var(--text-ghost)]" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Primary Commercial · Supplier &amp; Pricing</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
-                    <label className={lbl}>Tags</label>
-                    <TagsInput
-                      tags={product.tags}
-                      onChange={(tags) => updateProduct_({ tags })}
-                      suggestions={allTags}
+                    <label className={lbl}>
+                      <span className="inline-flex items-center gap-1.5"><Factory className="h-3 w-3" /> Supplier</span>
+                    </label>
+                    <SelectWithCreate
+                      value={primaryModel?.supplier || ""}
+                      options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
+                      onChange={(val) => updatePrimaryModel({ supplier: val })}
+                      onClickCreate={() => { setSupplierTarget("hero"); setShowSupplierModal(true); }}
+                      placeholder="Select supplier..."
+                      createLabel="Create Supplier"
                     />
                   </div>
+                  <div>
+                    <label className={lbl}>Supplier Model</label>
+                    <input
+                      type="text"
+                      value={primaryModel?.reference_model || ""}
+                      onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
+                      placeholder="Factory model code"
+                      className={inp}
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Cost Price (USD)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={primaryModel?.cost_price || ""}
+                        onChange={(e) => updatePrimaryModel({ cost_price: e.target.value })}
+                        placeholder="0.00"
+                        className={`${inp} pl-8`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Global Selling Price (USD)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={primaryModel?.global_price || ""}
+                        onChange={(e) => updatePrimaryModel({ global_price: e.target.value })}
+                        placeholder="0.00"
+                        className={`${inp} pl-8`}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Auto-generated codes for the primary model */}
+                {primaryModel?.model_name && (
+                  <div className="mt-5 pt-5 border-t border-[var(--border-subtle)]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Auto-Generated Codes</span>
+                    </div>
+                    <BarcodeQRDisplay
+                      value={primaryModel.barcode || primaryModel.slug || primaryModel.model_name}
+                      label={primaryModel.model_name}
+                      qrPayload={JSON.stringify({ sku: primaryModel.slug, name: primaryModel.model_name, ref: primaryModel.reference_model })}
+                      compact
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Classification */}
-            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification">
+            {/* Tags */}
+            <Section id="tags" icon={<Tag className="h-4 w-4" />} title="Tags & Keywords">
+              <TagsInput
+                tags={product.tags}
+                onChange={(tags) => updateProduct_({ tags })}
+                suggestions={allTags}
+              />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP 2: CLASSIFICATION
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "classify" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification" badge="Division · Category · Subcategory">
               <ClassificationSection
                 data={product}
                 onChange={updateProduct_}
@@ -885,11 +1020,10 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-           STEP 2: PRODUCT INFORMATION
+           STEP 3 (maybe): DESCRIPTION (rich text)
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "details" && (
+        {steps[currentStep]?.id === "description" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Classification summary breadcrumb */}
             {divisionName && (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
                 <FolderTree className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
@@ -899,110 +1033,12 @@ export default function ProductForm({ productId }: Props) {
               </div>
             )}
 
-            {/* Basic Information */}
-            <Section id="basic" icon={<FileText className="h-4 w-4" />} title="Basic Information">
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Slug (URL Path)</label>
-                    <input
-                      type="text"
-                      value={product.slug}
-                      onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
-                      className={`${inp} font-mono text-[var(--text-muted)]`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Level</label>
-                    <select
-                      value={product.level}
-                      onChange={(e) => updateProduct_({ level: e.target.value })}
-                      className={inp}
-                    >
-                      <option value="">Select level...</option>
-                      {attrSuggestions.levels.length > 0
-                        ? attrSuggestions.levels.map(l => (
-                            <option key={l} value={l.toLowerCase()}>{l}</option>
-                          ))
-                        : <>
-                            <option value="entry">Entry</option>
-                            <option value="mid">Mid</option>
-                            <option value="premium">Premium</option>
-                            <option value="enterprise">Enterprise</option>
-                          </>
-                      }
-                    </select>
-                  </div>
-                </div>
-
-                {/* New fields row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Country of Origin</label>
-                    <input
-                      type="text"
-                      value={product.country_of_origin}
-                      onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
-                      placeholder="e.g. China, Japan, Taiwan"
-                      className={inp}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">MOQ (Min. Order Qty)</label>
-                    <input
-                      type="number"
-                      value={product.moq}
-                      onChange={(e) => updateProduct_({ moq: e.target.value })}
-                      placeholder="e.g. 10"
-                      className={inp}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Lead Time</label>
-                    <input
-                      type="text"
-                      value={product.lead_time}
-                      onChange={(e) => updateProduct_({ lead_time: e.target.value })}
-                      placeholder="e.g. 7-14 days"
-                      className={inp}
-                    />
-                  </div>
-                </div>
-
-                {/* Visibility toggles */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  <div className="space-y-3">
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)]">Visibility</label>
-                    <Toggle checked={product.visible} onChange={(v) => updateProduct_({ visible: v })} label="Visible on website" />
-                    <Toggle checked={product.featured} onChange={(v) => updateProduct_({ featured: v })} label="Featured product" />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-[12px] font-medium text-[var(--text-subtle)]">Purchase Options</label>
-                    <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
-                    <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Warranty</label>
-                  <input
-                    type="text"
-                    value={product.warranty}
-                    onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                    placeholder="e.g. 2 years parts & labor"
-                    className={inp}
-                  />
-                </div>
-              </div>
-            </Section>
-
-            {/* Description */}
-            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Description">
+            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Product Description" badge="Rich text">
               <DescriptionSection data={product} onChange={updateProduct_} />
             </Section>
 
-            {/* Generic Specifications (key-value) */}
-            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Additional Specifications" badge="key/value">
+            {/* Additional text specs (key/value) */}
+            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Additional Specifications" badge="Key/value" defaultOpen={false}>
               <SpecsSection data={product} onChange={updateProduct_} />
             </Section>
           </div>
@@ -1034,27 +1070,152 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-           STEP 4: MODELS & PRICING
+           STEP N: TECHNICAL DETAILS
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "technical" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details" badge="Electrical · Physical">
+              <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
+            </Section>
+
+            {/* Configuration */}
+            <Section id="config" icon={<Settings2 className="h-4 w-4" />} title="Configuration & Options">
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="block text-[11px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Website Visibility</label>
+                    <Toggle checked={product.visible} onChange={(v) => updateProduct_({ visible: v })} label="Visible on public catalog" />
+                    <Toggle checked={product.featured} onChange={(v) => updateProduct_({ featured: v })} label="Featured on homepage" />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="block text-[11px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Purchase Options</label>
+                    <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
+                    <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lbl}>Warranty</label>
+                    <input
+                      type="text"
+                      value={product.warranty}
+                      onChange={(e) => updateProduct_({ warranty: e.target.value })}
+                      placeholder="e.g. 2 years parts &amp; labor"
+                      className={inp}
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Level</label>
+                    <select
+                      value={product.level}
+                      onChange={(e) => updateProduct_({ level: e.target.value })}
+                      className={inp}
+                    >
+                      <option value="">Select level...</option>
+                      {attrSuggestions.levels.length > 0
+                        ? attrSuggestions.levels.map(l => (
+                            <option key={l} value={l.toLowerCase()}>{l}</option>
+                          ))
+                        : <>
+                            <option value="entry">Entry</option>
+                            <option value="mid">Mid</option>
+                            <option value="premium">Premium</option>
+                            <option value="enterprise">Enterprise</option>
+                          </>
+                      }
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            {/* Advanced / Internal — collapsed by default */}
+            <Section id="advanced" icon={<Wrench className="h-4 w-4" />} title="Advanced · Internal Only" badge="MOQ · Lead Time · Slug" defaultOpen={false}>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lbl}>Slug (URL Path)</label>
+                    <input
+                      type="text"
+                      value={product.slug}
+                      onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
+                      className={`${inp} font-mono text-[var(--text-muted)]`}
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Country of Origin</label>
+                    <input
+                      type="text"
+                      value={product.country_of_origin}
+                      onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
+                      placeholder="e.g. China, Japan"
+                      className={inp}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lbl}>Default MOQ (Product-level)</label>
+                    <input
+                      type="number"
+                      value={product.moq}
+                      onChange={(e) => updateProduct_({ moq: e.target.value })}
+                      placeholder="e.g. 10"
+                      className={inp}
+                    />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Can be overridden per model</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>Default Lead Time</label>
+                    <input
+                      type="text"
+                      value={product.lead_time}
+                      onChange={(e) => updateProduct_({ lead_time: e.target.value })}
+                      placeholder="e.g. 7-14 days"
+                      className={inp}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP N: MODELS & VARIANTS
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "commercial" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Models & Variants — the commercial source of truth */}
-            <Section id="models" icon={<Boxes className="h-4 w-4" />} title="Models & Variants" badge={`${models.length} model${models.length !== 1 ? "s" : ""}`}>
+            {/* Primary model summary reminder */}
+            {primaryModel && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <Star className="h-4 w-4 text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Primary Model: {primaryModel.model_name || "(unnamed)"}</div>
+                  <div className="text-[10px] text-[var(--text-ghost)]">Identity &amp; pricing entered in the Hero. Add additional variants below when needed.</div>
+                </div>
+              </div>
+            )}
+
+            <Section
+              id="models"
+              icon={<Boxes className="h-4 w-4" />}
+              title="Models &amp; Variants"
+              badge={`${models.length} model${models.length !== 1 ? "s" : ""}`}
+            >
               <ModelsSection
                 models={models}
                 onChange={setModels}
                 suppliers={suppliers}
                 onClickCreateSupplier={(tempId) => { setSupplierTarget(tempId); setShowSupplierModal(true); }}
+                hidePrimary={false}
               />
             </Section>
 
-            {/* Technical Details */}
-            <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details">
-              <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
-            </Section>
-
             {/* Market Prices */}
-            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" defaultOpen={false}>
+            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" badge="Per country" defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
             </Section>
           </div>

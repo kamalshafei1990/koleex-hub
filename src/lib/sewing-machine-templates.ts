@@ -1312,11 +1312,12 @@ export function getTemplateForSubcategory(subcategorySlug: string): SewingMachin
 }
 
 /** Get all available template options (for a dropdown or template picker) */
-export function getAllTemplates(): { slug: string; name: string; icon: string }[] {
+export function getAllTemplates(): { slug: string; name: string; icon: string; description: string }[] {
   return SEWING_MACHINE_TEMPLATES.map(t => ({
     slug: t.slug,
     name: t.name,
     icon: t.icon,
+    description: t.description,
   }));
 }
 

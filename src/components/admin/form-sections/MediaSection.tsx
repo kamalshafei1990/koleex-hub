@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef } from "react";
-import { Plus, Trash2, Upload, Image as ImageIcon, Film, FileText, Box } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Plus, Trash2, Upload, Image as ImageIcon, Film, FileText, Box, Tag, Layers,
+} from "lucide-react";
 import type { MediaFormState } from "@/types/product-form";
 import type { ProductMediaType } from "@/types/supabase";
 
@@ -11,80 +13,146 @@ interface Props {
   excludeTypes?: ProductMediaType[];
 }
 
-const MEDIA_TYPES: { type: ProductMediaType; label: string; icon: React.ReactNode; multiple: boolean; accept: string }[] = [
-  { type: "main_image", label: "Main Image", icon: <ImageIcon className="h-4 w-4" />, multiple: false, accept: "image/*" },
-  { type: "gallery", label: "Gallery", icon: <ImageIcon className="h-4 w-4" />, multiple: true, accept: "image/*" },
-  { type: "packing_photo", label: "Packing Photos", icon: <ImageIcon className="h-4 w-4" />, multiple: true, accept: "image/*" },
-  { type: "label", label: "Labels & Logos", icon: <ImageIcon className="h-4 w-4" />, multiple: true, accept: "image/*" },
-  { type: "manual", label: "Manual / Datasheet", icon: <FileText className="h-4 w-4" />, multiple: true, accept: ".pdf,.doc,.docx" },
-  { type: "ar_3d", label: "AR / 3D View", icon: <Box className="h-4 w-4" />, multiple: true, accept: ".glb,.gltf,.usdz" },
-  { type: "video", label: "Videos", icon: <Film className="h-4 w-4" />, multiple: true, accept: "video/*" },
+interface MediaTypeDef {
+  type: ProductMediaType;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  accentColor: string;
+  multiple: boolean;
+  accept: string;
+}
+
+const MEDIA_TYPES: MediaTypeDef[] = [
+  { type: "main_image", label: "Main Image", description: "Primary product photo used in hero and lists", icon: <ImageIcon className="h-4 w-4" />, accentColor: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400", multiple: false, accept: "image/*" },
+  { type: "gallery", label: "Gallery", description: "Additional product photos, angles and details", icon: <Layers className="h-4 w-4" />, accentColor: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400", multiple: true, accept: "image/*" },
+  { type: "packing_photo", label: "Packing Photos", description: "Show crate, box, and packaging dimensions", icon: <Box className="h-4 w-4" />, accentColor: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400", multiple: true, accept: "image/*" },
+  { type: "label", label: "Labels & Logos", description: "Brand labels, origin stickers, certifications", icon: <Tag className="h-4 w-4" />, accentColor: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400", multiple: true, accept: "image/*" },
+  { type: "manual", label: "Manual / Datasheet", description: "PDF manuals, datasheets, spec sheets", icon: <FileText className="h-4 w-4" />, accentColor: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300", multiple: true, accept: ".pdf,.doc,.docx" },
+  { type: "ar_3d", label: "AR / 3D View", description: "GLB, GLTF, USDZ files for AR preview", icon: <Box className="h-4 w-4" />, accentColor: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400", multiple: true, accept: ".glb,.gltf,.usdz" },
+  { type: "video", label: "Videos", description: "Product demo and operation videos", icon: <Film className="h-4 w-4" />, accentColor: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400", multiple: true, accept: "video/*" },
 ];
 
-function MediaSlot({ type, label, icon, multiple, accept, items, onAdd, onRemove }: {
-  type: ProductMediaType; label: string; icon: React.ReactNode;
-  multiple: boolean; accept: string;
+function MediaSlot({
+  label, description, icon, accentColor, multiple, accept, items, onAdd, onRemove,
+}: Omit<MediaTypeDef, "type"> & {
   items: MediaFormState[];
   onAdd: (files: FileList) => void;
   onRemove: (tempId: string) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) onAdd(e.dataTransfer.files);
+  };
 
   return (
-    <div className="bg-[var(--bg-surface-subtle)] rounded-xl border border-white/[0.06] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-[var(--text-subtle)]">
-          {icon}
-          <span className="text-[12px] font-medium">{label}</span>
-          <span className="text-[10px] text-[var(--text-ghost)]">({items.length})</span>
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`h-9 w-9 rounded-xl bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentColor}`}>
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{label}</h4>
+              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-center">
+                {items.length}
+              </span>
+            </div>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 truncate">{description}</p>
+          </div>
         </div>
         {(multiple || items.length === 0) && (
           <button
             onClick={() => ref.current?.click()}
-            className="h-7 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-subtle)] hover:text-[var(--text-primary)]/80 flex items-center gap-1 transition-colors"
+            className="h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-colors shrink-0"
           >
             <Upload className="h-3 w-3" /> Upload
           </button>
         )}
-        <input ref={ref} type="file" accept={accept} multiple={multiple} className="hidden" onChange={(e) => e.target.files && onAdd(e.target.files)} />
+        <input
+          ref={ref}
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          className="hidden"
+          onChange={(e) => e.target.files && onAdd(e.target.files)}
+        />
       </div>
-      {items.length === 0 ? (
-        <div
-          className="border border-dashed border-white/[0.06] rounded-lg py-6 text-center cursor-pointer hover:border-white/[0.12] transition-colors"
-          onClick={() => ref.current?.click()}
-        >
-          <Plus className="h-5 w-5 text-[var(--text-whisper)] mx-auto mb-1" />
-          <p className="text-[11px] text-[var(--text-ghost)]">Click to upload</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {items.map(item => (
-            <div key={item._tempId} className="relative group rounded-lg overflow-hidden bg-[var(--bg-surface-subtle)] border border-white/[0.06]">
-              {item._file ? (
-                item._file.type.startsWith("image/") ? (
-                  <img src={URL.createObjectURL(item._file)} alt="" className="w-full h-24 object-cover" />
-                ) : (
-                  <div className="w-full h-24 flex items-center justify-center text-[11px] text-[var(--text-dim)]">{item._file.name}</div>
-                )
-              ) : item.url ? (
-                item.type === "video" ? (
-                  <div className="w-full h-24 flex items-center justify-center text-[11px] text-[var(--text-dim)]"><Film className="h-5 w-5" /></div>
-                ) : item.type === "manual" || item.type === "ar_3d" ? (
-                  <div className="w-full h-24 flex items-center justify-center text-[11px] text-[var(--text-dim)]">{item.url.split("/").pop()}</div>
-                ) : (
-                  <img src={item.url} alt={item.alt_text} className="w-full h-24 object-cover" />
-                )
-              ) : null}
-              <button
-                onClick={() => onRemove(item._tempId)}
-                className="absolute top-1 right-1 h-6 w-6 rounded-md bg-[var(--bg-overlay)] text-[var(--text-subtle)] hover:text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+
+      {/* Body */}
+      <div className="p-4">
+        {items.length === 0 ? (
+          <div
+            onClick={() => ref.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`border border-dashed rounded-xl py-8 text-center cursor-pointer transition-all ${
+              dragOver
+                ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]/60"
+                : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30"
+            }`}
+          >
+            <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-2 flex items-center justify-center">
+              <Plus className="h-4 w-4 text-[var(--text-ghost)]" />
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-[11px] font-medium text-[var(--text-dim)]">
+              Click to upload{multiple ? " or drag files" : ""}
+            </p>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
+              {accept.replace(/[.,]/g, " ").trim()}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {items.map((item) => {
+              const isImage = item._file?.type.startsWith("image/") || (!item._file && (item.type === "gallery" || item.type === "main_image" || item.type === "packing_photo" || item.type === "label"));
+              const src = item._file ? URL.createObjectURL(item._file) : item.url;
+              return (
+                <div key={item._tempId} className="relative group rounded-xl overflow-hidden bg-[var(--bg-primary)] border border-[var(--border-subtle)] aspect-square shadow-[0_1px_4px_rgba(0,0,0,0.15)]">
+                  {isImage && src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={src} alt={item.alt_text} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-ghost)] p-2">
+                      {item.type === "video" ? <Film className="h-8 w-8 mb-1" /> : item.type === "manual" ? <FileText className="h-8 w-8 mb-1" /> : <Box className="h-8 w-8 mb-1" />}
+                      <span className="text-[9px] truncate max-w-full text-center">{item._file?.name || (item.url ? item.url.split("/").pop() : "File")}</span>
+                    </div>
+                  )}
+
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => onRemove(item._tempId)}
+                      className="h-8 w-8 rounded-lg bg-red-500/90 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                      title="Remove"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Add more tile */}
+            {multiple && (
+              <button
+                onClick={() => ref.current?.click()}
+                className="aspect-square rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30 transition-all"
+              >
+                <Plus className="h-5 w-5" />
+                <span className="text-[10px] font-medium">Add more</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -97,7 +165,7 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
       url: "",
       file_path: null,
       alt_text: "",
-      order: media.filter(m => m.type === type).length + i,
+      order: media.filter((m) => m.type === type).length + i,
       model_id: null,
       _file: f,
     }));
@@ -105,17 +173,16 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
   };
 
   const removeItem = (tempId: string) => {
-    onChange(media.filter(m => m._tempId !== tempId));
+    onChange(media.filter((m) => m._tempId !== tempId));
   };
 
   return (
     <div className="space-y-4">
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)]">Product Media</label>
-      {MEDIA_TYPES.filter(mt => !excludeTypes.includes(mt.type)).map(mt => (
+      {MEDIA_TYPES.filter((mt) => !excludeTypes.includes(mt.type)).map((mt) => (
         <MediaSlot
           key={mt.type}
           {...mt}
-          items={media.filter(m => m.type === mt.type)}
+          items={media.filter((m) => m.type === mt.type)}
           onAdd={(files) => addFiles(mt.type, files)}
           onRemove={removeItem}
         />

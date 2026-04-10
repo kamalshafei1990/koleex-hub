@@ -1,19 +1,42 @@
 "use client";
 
-import { Plus, Trash2, ChevronDown, ChevronUp, Copy, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Plus, Trash2, ChevronDown, ChevronUp, Copy, ArrowUp, ArrowDown,
+  Package, DollarSign, Scale, ScanLine, Warehouse, Tag,
+} from "lucide-react";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
 import SelectWithCreate from "./SelectWithCreate";
+import BarcodeQRDisplay from "./BarcodeQRDisplay";
 
 interface Props {
   models: ModelFormState[];
   onChange: (models: ModelFormState[]) => void;
   suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: (modelTempId: string) => void;
+  hidePrimary?: boolean;  // when true, skip the first model (it's shown in Hero)
 }
 
-function ModelCard({ model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown, suppliers, onClickCreateSupplier }: {
+/* ── Visual grouped panel ── */
+function Panel({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-[var(--bg-primary)]/40 rounded-xl border border-[var(--border-subtle)]/70 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)]">
+          {icon}
+        </div>
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">{title}</h4>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ModelCard({
+  model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
+  suppliers, onClickCreateSupplier, defaultOpen = true,
+}: {
   model: ModelFormState; idx: number; total: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
   onRemove: () => void;
@@ -22,172 +45,279 @@ function ModelCard({ model, idx, total, onUpdate, onRemove, onDuplicate, onMoveU
   onMoveDown: () => void;
   suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: () => void;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
 
-  const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
-  const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
+  const inp = "w-full h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
+  const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1.5";
+
+  const isActive = model.status === "active";
+  const barcodeValue = model.barcode || model.slug || model.model_name;
+  const qrPayload = JSON.stringify({
+    sku: model.slug || barcodeValue,
+    name: model.model_name,
+    ref: model.reference_model || null,
+  });
 
   return (
-    <div className="bg-[var(--bg-surface-subtle)] rounded-xl border border-white/[0.06] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 cursor-pointer" onClick={() => setOpen(!open)}>
-        <div className="flex items-center gap-3">
-          <span className="h-6 w-6 rounded-md bg-[var(--bg-surface)] flex items-center justify-center text-[11px] font-bold text-[var(--text-dim)]">{idx + 1}</span>
-          <span className="text-[14px] font-medium text-[var(--text-highlight)]">{model.model_name || "Untitled Model"}</span>
-          {model.id && <span className="text-[10px] font-mono text-[var(--text-ghost)]">SKU: {model.slug}</span>}
-          <span className={`inline-block h-2 w-2 rounded-full ${model.status === "discontinued" ? "bg-amber-400" : "bg-green-400"}`} title={model.status === "discontinued" ? "Discontinued" : "Active"} />
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)]">
+      {/* Header */}
+      <div
+        className={`flex items-center justify-between px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--bg-surface-subtle)]/40 ${
+          open ? "border-b border-[var(--border-subtle)]" : ""
+        }`}
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[12px] font-bold text-[var(--text-muted)]">
+            {idx + 1}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
+                {model.model_name || "Untitled Model"}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 h-5 px-2 rounded-full border text-[9px] font-bold uppercase tracking-wider ${
+                  isActive
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                }`}
+                title={isActive ? "Active" : "Discontinued"}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-amber-400"}`} />
+                {isActive ? "Active" : "Discontinued"}
+              </span>
+            </div>
+            {model.slug && (
+              <div className="text-[10px] font-mono text-[var(--text-ghost)] mt-0.5 truncate">SKU: {model.slug}</div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button onClick={(e) => { e.stopPropagation(); onMoveUp(); }} disabled={idx === 0} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+            disabled={idx === 0}
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Move up"
+          >
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onMoveDown(); }} disabled={idx === total - 1} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+            disabled={idx === total - 1}
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Move down"
+          >
             <ArrowDown className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDuplicate(); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-blue-400/70 transition-colors" title="Duplicate Model">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+            title="Duplicate"
+          >
             <Copy className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Delete"
+          >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-          {open ? <ChevronUp className="h-4 w-4 text-[var(--text-ghost)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-ghost)]" />}
+          {open ? <ChevronUp className="h-4 w-4 text-[var(--text-ghost)] ml-1" /> : <ChevronDown className="h-4 w-4 text-[var(--text-ghost)] ml-1" />}
         </div>
       </div>
+
       {open && (
-        <div className="px-4 pb-4 space-y-4 border-t border-white/[0.04] pt-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
+        <div className="p-5 space-y-4">
+          {/* Identity row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
               <label className={lbl}>Model Name *</label>
-              <input type="text" value={model.model_name} onChange={(e) => onUpdate({ model_name: e.target.value, slug: slugify(e.target.value) })} placeholder="e.g. KX CoBot 5" className={inp} />
+              <input
+                type="text"
+                value={model.model_name}
+                onChange={(e) => onUpdate({ model_name: e.target.value, slug: slugify(e.target.value) })}
+                placeholder="e.g. KX-9500-D"
+                className={inp}
+              />
             </div>
             <div>
-              <label className={lbl}>Slug</label>
-              <input type="text" value={model.slug} onChange={(e) => onUpdate({ slug: e.target.value })} className={`${inp} font-mono text-[var(--text-subtle)]`} />
+              <label className={lbl}>Slug / SKU</label>
+              <input
+                type="text"
+                value={model.slug}
+                onChange={(e) => onUpdate({ slug: e.target.value })}
+                className={`${inp} font-mono text-[var(--text-muted)]`}
+              />
             </div>
             <div>
-              <label className={lbl}>Model Status</label>
-              <select value={model.status} onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })} className={inp}>
+              <label className={lbl}>Status</label>
+              <select
+                value={model.status}
+                onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
+                className={inp}
+              >
                 <option value="active">Active</option>
                 <option value="discontinued">Discontinued</option>
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Tagline</label>
-              <input type="text" value={model.tagline} onChange={(e) => onUpdate({ tagline: e.target.value })} placeholder="e.g. 5 kg payload, desktop-class" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Reference Model (Supplier Model)</label>
-              <input type="text" value={model.reference_model} onChange={(e) => onUpdate({ reference_model: e.target.value })} placeholder="e.g. supplier's model number or name" className={inp} />
-            </div>
+
+          <div>
+            <label className={lbl}>Tagline</label>
+            <input
+              type="text"
+              value={model.tagline}
+              onChange={(e) => onUpdate({ tagline: e.target.value })}
+              placeholder="Short sub-title shown under the model name"
+              className={inp}
+            />
           </div>
 
-          <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Commercial (hidden from website)</p>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={lbl}>Supplier</label>
-              {suppliers ? (
-                <SelectWithCreate
-                  value={model.supplier}
-                  options={suppliers.map(s => ({ value: s.name, label: s.name, icon: s.logo }))}
-                  onChange={(val) => onUpdate({ supplier: val })}
-                  onClickCreate={onClickCreateSupplier}
-                  placeholder="Select supplier..."
-                  createLabel="Create Supplier"
-                  className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-inverted)]/[0.05]"
+          {/* Supplier + Pricing panel */}
+          <Panel icon={<DollarSign className="h-3.5 w-3.5" />} title="Supplier & Pricing">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={lbl}>Supplier</label>
+                {suppliers ? (
+                  <SelectWithCreate
+                    value={model.supplier}
+                    options={suppliers.map((s) => ({ value: s.name, label: s.name, icon: s.logo }))}
+                    onChange={(val) => onUpdate({ supplier: val })}
+                    onClickCreate={onClickCreateSupplier}
+                    placeholder="Select supplier..."
+                    createLabel="Create Supplier"
+                    className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-surface-subtle)]/70"
+                  />
+                ) : (
+                  <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+                )}
+              </div>
+              <div>
+                <label className={lbl}>Supplier Reference Model</label>
+                <input
+                  type="text"
+                  value={model.reference_model}
+                  onChange={(e) => onUpdate({ reference_model: e.target.value })}
+                  placeholder="e.g. Factory model code"
+                  className={inp}
                 />
-              ) : (
-                <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
-              )}
+              </div>
+              <div>
+                <label className={lbl}>Cost Price (USD)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                  <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={lbl}>Cost Price (USD)</label>
-              <input type="text" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={inp} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div>
+                <label className={lbl}>Global Selling Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                  <input type="number" step="0.01" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Head-Only Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                  <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Complete Set Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                  <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={lbl}>Barcode</label>
-              <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder="e.g. 123456789" className={inp} />
-            </div>
-          </div>
+          </Panel>
 
-          <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Fulfillment</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>MOQ (Minimum Order Qty)</label>
-              <input type="number" value={model.moq} onChange={(e) => onUpdate({ moq: e.target.value })} placeholder="e.g. 10" className={inp} />
+          {/* Packaging & Logistics panel */}
+          <Panel icon={<Package className="h-3.5 w-3.5" />} title="Packaging & Logistics">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={lbl}>Weight (kg)</label>
+                <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>CBM (m³)</label>
+                <input type="number" step="0.0001" value={model.cbm} onChange={(e) => onUpdate({ cbm: e.target.value })} placeholder="0.0000" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Packing Type</label>
+                <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder="e.g. Wooden crate" className={inp} />
+              </div>
             </div>
-            <div>
-              <label className={lbl}>Lead Time</label>
-              <input type="text" value={model.lead_time} onChange={(e) => onUpdate({ lead_time: e.target.value })} placeholder="e.g. 7-14 days" className={inp} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className={lbl}>Box Includes</label>
+                <input type="text" value={model.box_include} onChange={(e) => onUpdate({ box_include: e.target.value })} placeholder="e.g. Main unit, cable, manual" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Extra Accessories</label>
+                <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder="e.g. Spare parts kit" className={inp} />
+              </div>
             </div>
-          </div>
+          </Panel>
 
-          <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Pricing</p>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={lbl}>Global Price (USD)</label>
-              <input type="text" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={inp} />
+          {/* Advanced (MOQ / Lead Time / Barcode override) */}
+          <details className="group">
+            <summary className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-subtle)]/50 transition-colors list-none">
+              <Warehouse className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Advanced · Fulfillment & Codes</span>
+              <ChevronDown className="h-3.5 w-3.5 text-[var(--text-ghost)] ml-auto transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="pt-3 px-1 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={lbl}>MOQ (Min Order Qty)</label>
+                  <input type="number" value={model.moq} onChange={(e) => onUpdate({ moq: e.target.value })} placeholder="e.g. 10" className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>Lead Time</label>
+                  <input type="text" value={model.lead_time} onChange={(e) => onUpdate({ lead_time: e.target.value })} placeholder="e.g. 7-14 days" className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>Barcode Override</label>
+                  <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder="Leave empty = auto from SKU" className={`${inp} font-mono`} />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={lbl}>Head-Only Price</label>
-              <input type="text" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Complete Set Price</label>
-              <input type="text" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={inp} />
-            </div>
-          </div>
+          </details>
 
-          <div className="h-px bg-[var(--bg-surface-subtle)] my-2" />
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Packaging & Logistics</p>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={lbl}>Weight (kg)</label>
-              <input type="text" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.00" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>CBM</label>
-              <input type="text" value={model.cbm} onChange={(e) => onUpdate({ cbm: e.target.value })} placeholder="0.0000" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Packing Type</label>
-              <input type="text" value={model.packing_type} onChange={(e) => onUpdate({ packing_type: e.target.value })} placeholder="e.g. Wooden crate" className={inp} />
-            </div>
-          </div>
-          <div>
-            <label className={lbl}>Box Includes</label>
-            <input type="text" value={model.box_include} onChange={(e) => onUpdate({ box_include: e.target.value })} placeholder="e.g. Main unit, power cable, manual" className={inp} />
-          </div>
-          <div>
-            <label className={lbl}>Extra Accessories</label>
-            <input type="text" value={model.extra_accessories} onChange={(e) => onUpdate({ extra_accessories: e.target.value })} placeholder="e.g. Spare parts kit" className={inp} />
-          </div>
+          {/* Auto-generated codes panel */}
+          <Panel icon={<ScanLine className="h-3.5 w-3.5" />} title="Auto-Generated Codes">
+            <BarcodeQRDisplay value={barcodeValue} label={model.model_name} qrPayload={qrPayload} />
+          </Panel>
         </div>
       )}
     </div>
   );
 }
 
-export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier }: Props) {
+export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false }: Props) {
   const addModel = () => {
     onChange([...models, { ...createEmptyModel(), order: models.length }]);
   };
 
   const updateModel = (tempId: string, updates: Partial<ModelFormState>) => {
-    onChange(models.map(m => m._tempId === tempId ? { ...m, ...updates } : m));
+    onChange(models.map((m) => (m._tempId === tempId ? { ...m, ...updates } : m)));
   };
 
   const removeModel = (tempId: string) => {
     if (!confirm("Remove this model?")) return;
-    onChange(models.filter(m => m._tempId !== tempId));
+    onChange(models.filter((m) => m._tempId !== tempId));
   };
 
   const duplicateModel = (tempId: string) => {
-    const source = models.find(m => m._tempId === tempId);
+    const source = models.find((m) => m._tempId === tempId);
     if (!source) return;
     const copy: ModelFormState = {
       ...source,
@@ -214,39 +344,65 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
     onChange(next.map((m, i) => ({ ...m, order: i })));
   };
 
+  // When Hero owns the primary model, the Models section only shows additional variants.
+  const visibleModels = hidePrimary ? models.slice(1) : models;
+  const startIndex = hidePrimary ? 1 : 0;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <label className="text-[12px] font-medium text-[var(--text-subtle)]">Product Models / Variants</label>
-          <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">SKU is auto-generated on save</p>
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-[var(--text-muted)]" />
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
+              {hidePrimary ? "Additional Model Variants" : "Product Models / Variants"}
+            </h3>
+          </div>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
+            {hidePrimary
+              ? "Primary model is entered in the Hero. Add extra variants only when needed."
+              : "SKU is auto-generated on save. Barcode & QR codes are generated automatically."}
+          </p>
         </div>
         <button
           onClick={addModel}
-          className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]/80 flex items-center gap-1.5 transition-colors"
+          className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-sm"
         >
           <Plus className="h-3.5 w-3.5" /> Add Model
         </button>
       </div>
-      {models.length === 0 ? (
-        <p className="text-[13px] text-[var(--text-ghost)] py-8 text-center border border-dashed border-white/[0.06] rounded-xl">No models yet. Add your first model variant.</p>
+
+      {visibleModels.length === 0 ? (
+        <div className="py-12 text-center border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
+          <Scale className="h-8 w-8 text-[var(--text-ghost)] mx-auto mb-2" />
+          <p className="text-[13px] text-[var(--text-dim)] font-medium">
+            {hidePrimary ? "No additional variants" : "No models yet"}
+          </p>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-1">
+            {hidePrimary ? "Add a variant when this product has multiple versions" : "Add your first model variant"}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {models.map((m, i) => (
-            <ModelCard
-              key={m._tempId}
-              model={m}
-              idx={i}
-              total={models.length}
-              onUpdate={(u) => updateModel(m._tempId, u)}
-              onRemove={() => removeModel(m._tempId)}
-              onDuplicate={() => duplicateModel(m._tempId)}
-              onMoveUp={() => moveUp(i)}
-              onMoveDown={() => moveDown(i)}
-              suppliers={suppliers}
-              onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
-            />
-          ))}
+        <div className="space-y-4">
+          {visibleModels.map((m, i) => {
+            const trueIdx = startIndex + i;
+            return (
+              <ModelCard
+                key={m._tempId}
+                model={m}
+                idx={trueIdx}
+                total={models.length}
+                onUpdate={(u) => updateModel(m._tempId, u)}
+                onRemove={() => removeModel(m._tempId)}
+                onDuplicate={() => duplicateModel(m._tempId)}
+                onMoveUp={() => moveUp(trueIdx)}
+                onMoveDown={() => moveDown(trueIdx)}
+                suppliers={suppliers}
+                onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
+                defaultOpen={i === 0}
+              />
+            );
+          })}
         </div>
       )}
     </div>

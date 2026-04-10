@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { ChevronDown, ChevronUp, Settings2, Cpu, Zap, Info, Check } from "lucide-react";
-import type { TemplateField, SewingMachineTemplate } from "@/lib/sewing-machine-templates";
+import { useMemo, useEffect } from "react";
+import {
+  Settings2, Zap, Info, Check,
+  Gauge, Scissors, Wrench, Ruler, Shirt, Workflow, Cog, Layers,
+} from "lucide-react";
+import type { TemplateField } from "@/lib/sewing-machine-templates";
 import {
   COMMON_SEWING_FIELDS,
   SEWING_MACHINE_TEMPLATES,
@@ -10,6 +13,28 @@ import {
   groupFields,
   getAllTemplates,
 } from "@/lib/sewing-machine-templates";
+
+/* ── Icons and colors for each group ── */
+const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
+  Performance: { icon: <Gauge className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
+  "Needle & Thread": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Mechanical: { icon: <Wrench className="h-3.5 w-3.5" />, color: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400" },
+  Physical: { icon: <Ruler className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
+  Application: { icon: <Shirt className="h-3.5 w-3.5" />, color: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400" },
+  Automation: { icon: <Workflow className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
+  Stitch: { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Capacity: { icon: <Gauge className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
+  Configuration: { icon: <Cog className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
+  "Needle Setup": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  "Thread Configuration": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Feed: { icon: <Workflow className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
+  Cutting: { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400" },
+  "Needle Configuration": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+};
+
+function getGroupMeta(name: string) {
+  return GROUP_META[name] || { icon: <Layers className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" };
+}
 
 /* ── Types ── */
 export interface SewingSpecsFormState {
@@ -24,13 +49,16 @@ interface Props {
   subcategorySlug: string;
 }
 
-/* ── Group Header ── */
+/* ── Group Header with icon chip ── */
 function GroupHeader({ label }: { label: string }) {
+  const { icon, color } = getGroupMeta(label);
   return (
-    <div className="flex items-center gap-2 pt-4 pb-1.5 first:pt-0">
-      <div className="h-px flex-1 bg-white/[0.04]" />
-      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-ghost)] px-1">{label}</span>
-      <div className="h-px flex-1 bg-white/[0.04]" />
+    <div className="flex items-center gap-3 pt-5 pb-2 first:pt-1">
+      <div className={`h-8 w-8 rounded-xl bg-gradient-to-br border flex items-center justify-center shrink-0 ${color}`}>
+        {icon}
+      </div>
+      <span className="text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--text-primary)]">{label}</span>
+      <div className="h-px flex-1 bg-[var(--border-subtle)]" />
     </div>
   );
 }
@@ -190,7 +218,7 @@ function FieldRenderer({
   }
 }
 
-/* ── Field Group Renderer ── */
+/* ── Field Group Renderer (visual panel) ── */
 function FieldGroup({
   groupLabel,
   fields,
@@ -205,7 +233,7 @@ function FieldGroup({
   return (
     <div>
       <GroupHeader label={groupLabel} />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3 mt-2">
+      <div className="rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-subtle)]/60 p-4 mt-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">
         {fields.map((field) => (
           <FieldRenderer
             key={field.key}
@@ -219,7 +247,7 @@ function FieldGroup({
   );
 }
 
-/* ── Template Picker ── */
+/* ── Template Picker — visual machine type cards ── */
 function TemplatePicker({
   selected,
   onSelect,
@@ -231,10 +259,13 @@ function TemplatePicker({
 
   return (
     <div>
-      <label className="block text-[11px] font-medium text-[var(--text-faint)] mb-2">
-        Machine Type Template
-      </label>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Sewing Machine Type</h3>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">Choose the template that matches this machine. Fields adjust automatically.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {templates.map((t) => {
           const isSelected = selected === t.slug;
           return (
@@ -242,26 +273,27 @@ function TemplatePicker({
               key={t.slug}
               type="button"
               onClick={() => onSelect(t.slug)}
-              className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer
+              className={`group relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all cursor-pointer text-left
                 ${
                   isSelected
-                    ? "border-blue-500 bg-blue-500/10 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.03] hover:border-[var(--border-focus)] hover:bg-[var(--bg-inverted)]/[0.06]"
+                    ? "border-blue-500 bg-gradient-to-br from-blue-500/15 to-blue-600/5 shadow-[0_4px_16px_rgba(59,130,246,0.2)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/80 hover:-translate-y-0.5"
                 }`}
             >
               {isSelected && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                  <Check className="h-2.5 w-2.5 text-white" />
+                <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
+                  <Check className="h-3 w-3 text-white" />
                 </div>
               )}
-              <span className="text-2xl">{t.icon}</span>
+              <span className="text-3xl mt-1 mb-1">{t.icon}</span>
               <span
-                className={`text-[10px] font-bold text-center leading-tight ${
-                  isSelected ? "text-blue-400" : "text-[var(--text-dim)]"
+                className={`text-[11px] font-bold text-center leading-tight ${
+                  isSelected ? "text-blue-400" : "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
                 }`}
               >
                 {t.name}
               </span>
+              <span className="text-[9px] text-[var(--text-ghost)] text-center line-clamp-2 leading-snug">{t.description}</span>
             </button>
           );
         })}
@@ -275,9 +307,6 @@ function TemplatePicker({
    ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function SewingMachineSection({ data, onChange, subcategorySlug }: Props) {
-  const [commonOpen, setCommonOpen] = useState(true);
-  const [templateOpen, setTemplateOpen] = useState(true);
-
   // Auto-detect template from subcategory, but allow manual override
   const detectedTemplate = useMemo(
     () => getTemplateForSubcategory(subcategorySlug),
@@ -342,111 +371,77 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug }
   ).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Template Picker */}
       <TemplatePicker selected={activeTemplateSlug} onSelect={handleTemplateChange} />
 
       {activeTemplateSlug && (
         <>
           {/* ── Common Fields Section ── */}
-          <div className="bg-[var(--bg-surface-subtle)]/50 rounded-xl border border-white/[0.06] overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setCommonOpen(!commonOpen)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors cursor-pointer"
-            >
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/20 flex items-center justify-center">
-                <Settings2 className="h-3.5 w-3.5 text-emerald-400" />
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center">
+                <Settings2 className="h-4 w-4 text-emerald-400" />
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-                  Common Sewing Machine Specs
-                </h3>
-                <p className="text-[10px] text-[var(--text-ghost)]">
-                  Shared across all machine types
-                </p>
+              <div className="flex-1">
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Common Sewing Specs</h3>
+                <p className="text-[11px] text-[var(--text-ghost)]">Performance · Needle &amp; Thread · Mechanical · Physical · Application · Automation</p>
               </div>
-              {filledCommon > 0 && (
-                <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                  {filledCommon} / {COMMON_SEWING_FIELDS.length}
-                </span>
-              )}
-              {commonOpen ? (
-                <ChevronUp className="h-4 w-4 text-[var(--text-ghost)]" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-[var(--text-ghost)]" />
-              )}
-            </button>
-            {commonOpen && (
-              <div className="px-4 pb-4 pt-1 border-t border-white/[0.04] space-y-1">
-                {commonGroups.map((g) => (
-                  <FieldGroup
-                    key={g.group}
-                    groupLabel={g.group}
-                    fields={g.fields}
-                    values={data.common_specs}
-                    onChange={handleCommonChange}
-                  />
-                ))}
-              </div>
-            )}
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                {filledCommon} / {COMMON_SEWING_FIELDS.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {commonGroups.map((g) => (
+                <FieldGroup
+                  key={g.group}
+                  groupLabel={g.group}
+                  fields={g.fields}
+                  values={data.common_specs}
+                  onChange={handleCommonChange}
+                />
+              ))}
+            </div>
           </div>
 
           {/* ── Template-Specific Fields Section ── */}
           {activeTemplate && templateGroups.length > 0 && (
-            <div className="bg-[var(--bg-surface-subtle)]/50 rounded-xl border border-white/[0.06] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setTemplateOpen(!templateOpen)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors cursor-pointer"
-              >
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/20 flex items-center justify-center">
-                  <Cpu className="h-3.5 w-3.5 text-blue-400" />
+            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-2xl">
+                  {activeTemplate.icon}
                 </div>
-                <div className="flex-1 text-left">
-                  <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-                    {activeTemplate.icon} {activeTemplate.name} Specs
-                  </h3>
-                  <p className="text-[10px] text-[var(--text-ghost)]">
-                    {activeTemplate.description}
-                  </p>
+                <div className="flex-1">
+                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{activeTemplate.name} Specs</h3>
+                  <p className="text-[11px] text-[var(--text-ghost)]">{activeTemplate.description}</p>
                 </div>
-                {filledTemplate > 0 && (
-                  <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
-                    {filledTemplate} / {activeTemplate.fields.length}
-                  </span>
-                )}
-                {templateOpen ? (
-                  <ChevronUp className="h-4 w-4 text-[var(--text-ghost)]" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-[var(--text-ghost)]" />
-                )}
-              </button>
-              {templateOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-white/[0.04] space-y-1">
-                  {templateGroups.map((g) => (
-                    <FieldGroup
-                      key={g.group}
-                      groupLabel={g.group}
-                      fields={g.fields}
-                      values={data.template_specs}
-                      onChange={handleTemplateSpecChange}
-                    />
-                  ))}
-                </div>
-              )}
+                <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                  {filledTemplate} / {activeTemplate.fields.length}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {templateGroups.map((g) => (
+                  <FieldGroup
+                    key={g.group}
+                    groupLabel={g.group}
+                    fields={g.fields}
+                    values={data.template_specs}
+                    onChange={handleTemplateSpecChange}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </>
       )}
 
       {!activeTemplateSlug && (
-        <div className="text-center py-8 border border-dashed border-white/[0.06] rounded-xl">
-          <Zap className="h-10 w-10 text-[var(--text-ghost)] mx-auto mb-3" />
+        <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
+          <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-3 flex items-center justify-center">
+            <Zap className="h-6 w-6 text-[var(--text-ghost)]" />
+          </div>
           <p className="text-[13px] text-[var(--text-dim)] font-medium">Select a machine type above</p>
-          <p className="text-[11px] text-[var(--text-ghost)] mt-1">
-            Template-specific fields will appear based on your selection
-          </p>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Template-specific fields will appear based on your selection</p>
         </div>
       )}
     </div>
