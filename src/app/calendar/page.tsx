@@ -1,15 +1,15 @@
 "use client";
 
-import AdminAuth from "@/components/admin/AdminAuth";
+import AuthGate from "@/components/admin/AuthGate";
 import CalendarApp from "@/components/admin/calendar/CalendarApp";
 
 export default function CalendarPage() {
   return (
-    <AdminAuth
+    <AuthGate
       title="Calendar"
       subtitle="Self-contained scheduling for Koleex accounts"
     >
       <CalendarApp />
-    </AdminAuth>
+    </AuthGate>
   );
 }

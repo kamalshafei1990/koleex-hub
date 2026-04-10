@@ -1,15 +1,15 @@
 "use client";
 
-import AdminAuth from "@/components/admin/AdminAuth";
+import AuthGate from "@/components/admin/AuthGate";
 import AccountsList from "@/components/admin/accounts/AccountsList";
 
 export default function AccountsPage() {
   return (
-    <AdminAuth
+    <AuthGate
       title="Accounts Manager"
       subtitle="Super Admin access only"
     >
       <AccountsList />
-    </AdminAuth>
+    </AuthGate>
   );
 }

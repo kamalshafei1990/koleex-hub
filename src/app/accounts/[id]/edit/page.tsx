@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import AdminAuth from "@/components/admin/AdminAuth";
+import AuthGate from "@/components/admin/AuthGate";
 import AccountForm from "@/components/admin/accounts/AccountForm";
 import { fetchAccountById } from "@/lib/accounts-admin";
 import type { AccountRow } from "@/types/supabase";
@@ -27,7 +27,7 @@ export default function EditAccountPage() {
   }, [id]);
 
   return (
-    <AdminAuth
+    <AuthGate
       title="Accounts Manager"
       subtitle="Super Admin access only"
     >
@@ -47,6 +47,6 @@ export default function EditAccountPage() {
           <p className="text-[var(--text-dim)]">Account not found.</p>
         </div>
       )}
-    </AdminAuth>
+    </AuthGate>
   );
 }

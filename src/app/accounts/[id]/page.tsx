@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import AdminAuth from "@/components/admin/AdminAuth";
+import AuthGate from "@/components/admin/AuthGate";
 import AccountDetail from "@/components/admin/accounts/AccountDetail";
 
 export default function AccountDetailPage() {
@@ -9,7 +9,7 @@ export default function AccountDetailPage() {
   const id = params?.id;
 
   return (
-    <AdminAuth
+    <AuthGate
       title="Accounts Manager"
       subtitle="Super Admin access only"
     >
@@ -20,6 +20,6 @@ export default function AccountDetailPage() {
           <p className="text-[var(--text-dim)]">No account selected.</p>
         </div>
       )}
-    </AdminAuth>
+    </AuthGate>
   );
 }
