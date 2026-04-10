@@ -335,19 +335,29 @@ export default function UserMenu({ dk }: { dk: boolean }) {
               <>
                 <button
                   type="button"
-                  disabled
-                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium cursor-default ${
-                    dk ? "text-white/40" : "text-black/40"
+                  disabled={!account}
+                  onClick={() => {
+                    if (!account) return;
+                    setOpen(false);
+                    router.push(`/accounts/${account.id}`);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                    account
+                      ? dk
+                        ? "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                        : "text-black/80 hover:text-black hover:bg-black/[0.04]"
+                      : dk
+                        ? "text-white/40 cursor-default"
+                        : "text-black/40 cursor-default"
                   }`}
-                  title="Profile page coming soon"
+                  title={
+                    account
+                      ? "Open your account profile"
+                      : "Profile unavailable — no linked account"
+                  }
                 >
                   <UserIcon className="h-4 w-4" />
                   Profile
-                  <span className={`ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                    dk ? "bg-white/[0.06] text-white/40" : "bg-black/[0.04] text-black/40"
-                  }`}>
-                    Soon
-                  </span>
                 </button>
                 <button
                   type="button"
