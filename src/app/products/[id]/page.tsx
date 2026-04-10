@@ -287,28 +287,39 @@ function describeApplication(tag: string): AppInfo {
 }
 
 function Section({
-  id, eyebrow, title, children, className = "",
+  id, eyebrow, title, subtitle, children, className = "", align = "left",
 }: {
   id?: string;
   eyebrow?: string;
   title?: string;
+  subtitle?: string;
   children: React.ReactNode;
   className?: string;
+  align?: "left" | "center";
 }) {
+  const headerAlign = align === "center" ? "text-center mx-auto max-w-3xl" : "";
   return (
-    <section id={id} className={`py-16 md:py-24 ${className}`}>
-      <div className="max-w-6xl mx-auto px-6">
-        {(eyebrow || title) && (
-          <div className="mb-10 md:mb-14">
+    <section id={id} className={`py-20 md:py-32 ${className}`}>
+      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+        {(eyebrow || title || subtitle) && (
+          <div className={`mb-12 md:mb-16 ${headerAlign}`}>
             {eyebrow && (
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)] mb-3">
-                {eyebrow}
-              </p>
+              <div className="inline-flex items-center gap-3 mb-4">
+                <span className="h-px w-8 bg-white/30" />
+                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60">
+                  {eyebrow}
+                </p>
+              </div>
             )}
             {title && (
-              <h2 className="text-[32px] md:text-[48px] font-semibold tracking-tight text-[var(--text-primary)] leading-[1.05]">
+              <h2 className="text-[34px] md:text-[52px] lg:text-[60px] font-semibold tracking-[-0.02em] text-white leading-[1.02]">
                 {title}
               </h2>
+            )}
+            {subtitle && (
+              <p className="mt-5 text-[16px] md:text-[18px] text-white/60 leading-relaxed max-w-2xl">
+                {subtitle}
+              </p>
             )}
           </div>
         )}
@@ -557,104 +568,141 @@ export default function ProductViewPage() {
       </div>
 
       {/* ══════════════════════════════════════
-          1. HERO
+          1. HERO — premium layout
+          Image dominates left (7/12 ≈ 58%), content right (5/12)
+          Subtle radial glow behind the product for depth.
           ══════════════════════════════════════ */}
-      <section className="relative pt-16 md:pt-24 pb-10 md:pb-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] via-transparent to-transparent pointer-events-none" />
-        <div className="max-w-6xl mx-auto px-6 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            {/* Left: headline */}
-            <div className="lg:col-span-6">
+      <section className="relative pt-14 md:pt-20 pb-16 md:pb-24 overflow-hidden">
+        {/* Ambient background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-[15%] -translate-y-1/2 h-[60vw] w-[60vw] max-h-[900px] max-w-[900px] rounded-full bg-white/[0.025] blur-[120px]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0A0A0A]" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+            {/* LEFT: dominant product image (7/12 on desktop) */}
+            <div className="lg:col-span-7 order-2 lg:order-1">
+              <div className="relative">
+                {/* Subtle radial behind the product */}
+                <div className="absolute inset-0 rounded-[40px] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.08),transparent_70%)] pointer-events-none" />
+                <div className="relative aspect-[5/4] md:aspect-[4/3] lg:aspect-[5/4] rounded-[32px] overflow-hidden bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent border border-white/10">
+                  {mainImage ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={mainImage}
+                      alt={product.product_name}
+                      className="absolute inset-0 w-full h-full object-contain p-10 md:p-16 lg:p-20 drop-shadow-[0_25px_50px_rgba(0,0,0,0.5)]"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-white/20">
+                      <ImageIcon className="h-20 w-20" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Floating badges over the image (desktop only) */}
+                <div className="hidden lg:flex absolute top-6 left-6 flex-col gap-2">
+                  {product.featured && (
+                    <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-amber-400/15 border border-amber-400/40 backdrop-blur-md text-amber-300 text-[10px] font-bold uppercase tracking-[0.15em]">
+                      <Sparkles className="h-3 w-3" /> Featured
+                    </span>
+                  )}
+                  {product.level && (
+                    <span className="inline-flex items-center h-7 px-3 rounded-full bg-white/[0.08] border border-white/15 backdrop-blur-md text-[10px] font-bold uppercase tracking-[0.15em] text-white/90">
+                      {product.level} tier
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: headline content (5/12 on desktop) */}
+            <div className="lg:col-span-5 order-1 lg:order-2">
+              {/* Brand eyebrow */}
               {product.brand && (
-                <div className="inline-flex items-center gap-2 mb-5">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)]">
+                <div className="inline-flex items-center gap-3 mb-6">
+                  <span className="h-px w-8 bg-white/30" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60">
                     {product.brand}
                   </span>
                 </div>
               )}
-              <h1 className="text-[40px] md:text-[64px] lg:text-[72px] font-semibold leading-[1.02] tracking-[-0.02em] text-white">
+
+              {/* Product name — large, confident */}
+              <h1 className="text-[42px] md:text-[56px] lg:text-[60px] xl:text-[68px] font-semibold leading-[0.98] tracking-[-0.025em] text-white">
                 {product.product_name}
               </h1>
+
+              {/* Model identifier — subtle but visible */}
+              {primaryModel?.model_name && primaryModel.model_name !== product.product_name && (
+                <p className="mt-4 text-[13px] md:text-[14px] font-mono uppercase tracking-[0.12em] text-white/50">
+                  Model · {primaryModel.model_name}
+                </p>
+              )}
+
+              {/* Tagline */}
               {primaryModel?.tagline && (
-                <p className="mt-5 text-[18px] md:text-[22px] text-[var(--text-dim)] leading-relaxed max-w-xl">
+                <p className="mt-5 text-[17px] md:text-[19px] text-white/75 leading-[1.55] font-light">
                   {primaryModel.tagline}
                 </p>
               )}
 
-              {/* Hero highlight bullets (derived from real specs) */}
+              {/* 3-4 highlight bullets — refined with icons */}
               {heroHighlights.length > 0 && (
-                <ul className="mt-7 space-y-2.5 max-w-xl">
-                  {heroHighlights.map((h, i) => (
-                    <li key={i} className="flex items-start gap-3 text-[14px] md:text-[15px] text-white/85">
-                      <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-white/70 shrink-0" />
-                      <span>{h}</span>
+                <ul className="mt-8 space-y-3">
+                  {heroHighlights.slice(0, 4).map((h, i) => (
+                    <li key={i} className="flex items-start gap-3 text-[14px] md:text-[15px] text-white/90">
+                      <span className="mt-[5px] h-4 w-4 rounded-full border border-white/25 bg-white/[0.04] flex items-center justify-center shrink-0">
+                        <Check className="h-2.5 w-2.5 text-white/80" strokeWidth={3} />
+                      </span>
+                      <span className="leading-snug">{h}</span>
                     </li>
                   ))}
                 </ul>
               )}
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                {product.featured && (
-                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider">
-                    <Sparkles className="h-3 w-3" /> Featured
-                  </span>
-                )}
-                {product.level && (
-                  <span className="inline-flex items-center h-7 px-3 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-wider text-white/80">
-                    {product.level} tier
-                  </span>
-                )}
-                {product.warranty && (
-                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/80">
-                    <ShieldCheck className="h-3 w-3" /> {product.warranty}
-                  </span>
-                )}
-                {product.country_of_origin && (
-                  <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/5 border border-white/10 text-[11px] text-white/80">
-                    <Globe className="h-3 w-3" /> {product.country_of_origin}
-                  </span>
-                )}
-              </div>
-
-              {/* CTAs */}
-              <div className="mt-10 flex flex-wrap items-center gap-3">
+              {/* Price + CTAs */}
+              <div className="mt-10 pt-8 border-t border-white/10">
                 {priceFrom !== null && (
-                  <div className="mr-2">
-                    <p className="text-[11px] uppercase tracking-wider text-[var(--text-ghost)]">From</p>
-                    <p className="text-[28px] font-semibold text-white">{fmtMoney(priceFrom)}</p>
+                  <div className="mb-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45 mb-1">Starting at</p>
+                    <p className="text-[32px] md:text-[36px] font-semibold text-white leading-none tracking-tight">{fmtMoney(priceFrom)}</p>
                   </div>
                 )}
-                <a
-                  href="#models"
-                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-white text-black text-[14px] font-semibold hover:opacity-90 transition"
-                >
-                  Explore models <ChevronRight className="h-4 w-4" />
-                </a>
-                <a
-                  href="#specs"
-                  className="inline-flex items-center gap-2 h-11 px-6 rounded-full border border-white/15 text-white text-[14px] font-medium hover:bg-white/5 transition"
-                >
-                  Full specifications
-                </a>
+                <div className="flex flex-wrap items-center gap-3">
+                  <a
+                    href="#models"
+                    className="inline-flex items-center gap-2 h-12 px-7 rounded-full bg-white text-black text-[14px] font-semibold hover:bg-white/90 hover:scale-[1.02] transition-all"
+                  >
+                    Explore models <ChevronRight className="h-4 w-4" />
+                  </a>
+                  <a
+                    href="#specs"
+                    className="inline-flex items-center gap-2 h-12 px-7 rounded-full border border-white/20 text-white text-[14px] font-medium hover:bg-white/5 hover:border-white/30 transition"
+                  >
+                    Specifications
+                  </a>
+                </div>
               </div>
-            </div>
 
-            {/* Right: main image */}
-            <div className="lg:col-span-6">
-              <div className="relative aspect-square md:aspect-[4/5] rounded-3xl overflow-hidden bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/10">
-                {mainImage ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={mainImage}
-                    alt={product.product_name}
-                    className="absolute inset-0 w-full h-full object-contain p-8 md:p-16"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-white/20">
-                    <ImageIcon className="h-16 w-16" />
-                  </div>
-                )}
-              </div>
+              {/* Meta ribbon — warranty / origin */}
+              {(product.warranty || product.country_of_origin) && (
+                <div className="mt-8 flex flex-wrap items-center gap-5 text-[12px] text-white/55">
+                  {product.warranty && (
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>{product.warranty} warranty</span>
+                    </div>
+                  )}
+                  {product.country_of_origin && (
+                    <div className="flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5" />
+                      <span>Made in {product.country_of_origin}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -662,31 +710,37 @@ export default function ProductViewPage() {
 
       {/* ══════════════════════════════════════
           2. IMAGE GALLERY
+          Large main image + thumbnail strip. Zoom-on-hover on desktop.
           ══════════════════════════════════════ */}
       {galleryImages.length > 1 && (
         <Section eyebrow="Gallery" title="Every angle." className="bg-white/[0.015]">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_120px] gap-6">
-            <div className="relative aspect-[4/3] md:aspect-[16/10] rounded-3xl overflow-hidden bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_140px] gap-6">
+            <div className="group relative aspect-[4/3] md:aspect-[16/10] rounded-[28px] overflow-hidden bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent border border-white/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
+                key={galleryImages[activeImageIdx]?.id}
                 src={galleryImages[activeImageIdx]?.url}
                 alt={galleryImages[activeImageIdx]?.alt_text || product.product_name}
-                className="absolute inset-0 w-full h-full object-contain p-10"
+                className="absolute inset-0 w-full h-full object-contain p-10 md:p-14 transition-transform duration-[800ms] ease-out group-hover:scale-[1.08] animate-in fade-in duration-500"
               />
+              {/* Image counter */}
+              <div className="absolute bottom-5 right-5 inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-[11px] font-medium text-white/90">
+                {activeImageIdx + 1} / {galleryImages.length}
+              </div>
             </div>
-            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-y-auto lg:max-h-[460px]">
+            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-y-auto lg:max-h-[520px] pb-2 lg:pb-0 lg:pr-2">
               {galleryImages.map((img, idx) => (
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`relative shrink-0 h-24 w-24 lg:h-[100px] lg:w-full rounded-xl overflow-hidden border-2 transition-all ${
+                  className={`relative shrink-0 h-24 w-24 lg:h-[120px] lg:w-full rounded-2xl overflow-hidden border-2 transition-all duration-300 ${
                     idx === activeImageIdx
-                      ? "border-white shadow-lg"
-                      : "border-white/10 hover:border-white/30"
+                      ? "border-white shadow-[0_8px_30px_rgba(255,255,255,0.15)] scale-[1.02]"
+                      : "border-white/10 hover:border-white/40 opacity-70 hover:opacity-100"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="w-full h-full object-contain p-2 bg-white/[0.02]" />
+                  <img src={img.url} alt="" className="w-full h-full object-contain p-3 bg-white/[0.02]" />
                 </button>
               ))}
             </div>
@@ -698,10 +752,15 @@ export default function ProductViewPage() {
           3. PRODUCT DESCRIPTION (prose)
           ══════════════════════════════════════ */}
       {product.description && (
-        <section className="py-16 md:py-24">
-          <div className="max-w-3xl mx-auto px-6">
+        <section className="py-20 md:py-32">
+          <div className="max-w-3xl mx-auto px-6 text-center">
+            <div className="inline-flex items-center gap-3 mb-6">
+              <span className="h-px w-8 bg-white/30" />
+              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60">About</p>
+              <span className="h-px w-8 bg-white/30" />
+            </div>
             <div
-              className="prose prose-invert max-w-none text-center text-[18px] md:text-[22px] text-[var(--text-muted)] leading-[1.6] font-light [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_p]:mb-5"
+              className="prose prose-invert max-w-none text-[20px] md:text-[24px] text-white/80 leading-[1.55] font-light tracking-[-0.005em] [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_p]:mb-6"
               dangerouslySetInnerHTML={{ __html: product.description }}
             />
           </div>
@@ -814,49 +873,77 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          4. TECHNICAL SPECS (grouped)
+          6. TECHNICAL SPECS — each group as its own card
           ══════════════════════════════════════ */}
       {(commonSpecsRendered.length > 0 || templateSpecsRendered.length > 0 || genericSpecsRendered.length > 0) && (
         <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white/[0.015]">
           {activeTemplate && (
-            <div className="mb-8 inline-flex items-center gap-2 px-4 h-9 rounded-full border border-white/10 bg-white/[0.03] text-[12px] text-white/80">
-              <span>{activeTemplate.icon}</span>
+            <div className="mb-10 inline-flex items-center gap-2.5 px-5 h-10 rounded-full border border-white/10 bg-white/[0.04] backdrop-blur-sm text-[12px] text-white/85">
+              <span className="text-base">{activeTemplate.icon}</span>
               <span className="font-semibold">{activeTemplate.name}</span>
             </div>
           )}
-          <div className="space-y-10">
-            {[...commonSpecsRendered, ...templateSpecsRendered].map((g) => (
-              <div key={g.group}>
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)] mb-4 flex items-center gap-2">
-                  {g.group === "Performance" && <Zap className="h-3 w-3" />}
-                  {g.group === "Mechanical" && <Factory className="h-3 w-3" />}
-                  {g.group === "Electrical" && <Zap className="h-3 w-3" />}
-                  {(g.group === "Physical" || g.group === "Physical / Installation") && <Ruler className="h-3 w-3" />}
-                  {g.group}
-                </h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                  {g.rows.map(({ field, value }) => (
-                    <div
-                      key={field.key}
-                      className="flex justify-between gap-4 py-3 border-b border-white/5"
-                    >
-                      <dt className="text-[13px] text-[var(--text-dim)]">{field.label}</dt>
-                      <dd className="text-[13px] text-white text-right font-medium">{value}</dd>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[...commonSpecsRendered, ...templateSpecsRendered].map((g) => {
+              const GroupIcon =
+                g.group === "Performance" ? Gauge :
+                g.group === "Mechanical" ? Factory :
+                g.group === "Electrical" ? Zap :
+                (g.group === "Physical" || g.group === "Physical / Installation") ? Ruler :
+                g.group === "Needle & Thread" ? Target :
+                Wrench;
+              return (
+                <div
+                  key={g.group}
+                  className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent p-7 md:p-8 hover:border-white/20 transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/10">
+                    <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                      <GroupIcon className="h-4 w-4 text-white/85" />
                     </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 mb-0.5">
+                        Group
+                      </p>
+                      <h3 className="text-[17px] font-semibold text-white leading-none">
+                        {g.group}
+                      </h3>
+                    </div>
+                  </div>
+                  <dl className="space-y-0">
+                    {g.rows.map(({ field, value }, idx) => (
+                      <div
+                        key={field.key}
+                        className={`flex justify-between items-center gap-4 py-3 ${idx < g.rows.length - 1 ? "border-b border-white/[0.06]" : ""}`}
+                      >
+                        <dt className="text-[13px] text-white/55">{field.label}</dt>
+                        <dd className="text-[13px] text-white text-right font-medium">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              );
+            })}
 
             {genericSpecsRendered.length > 0 && (
-              <div>
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)] mb-4">
-                  Additional
-                </h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-                  {genericSpecsRendered.map(({ key, value }) => (
-                    <div key={key} className="flex justify-between gap-4 py-3 border-b border-white/5">
-                      <dt className="text-[13px] text-[var(--text-dim)] capitalize">{key.replace(/_/g, " ")}</dt>
+              <div className="rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent p-7 md:p-8 md:col-span-2 hover:border-white/20 transition-all">
+                <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/10">
+                  <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                    <Wrench className="h-4 w-4 text-white/85" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 mb-0.5">
+                      Group
+                    </p>
+                    <h3 className="text-[17px] font-semibold text-white leading-none">
+                      Additional
+                    </h3>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
+                  {genericSpecsRendered.map(({ key, value }, idx) => (
+                    <div key={key} className={`flex justify-between items-center gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-white/[0.06]" : ""}`}>
+                      <dt className="text-[13px] text-white/55 capitalize">{key.replace(/_/g, " ")}</dt>
                       <dd className="text-[13px] text-white text-right font-medium">{value}</dd>
                     </div>
                   ))}
@@ -868,55 +955,110 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          7. MODELS / VARIANTS
+          7. MODELS / VARIANTS — premium product cards
+          Each card: image · Best Choice badge (first) · name · tagline
+          · key specs preview (3-4 lines) · price · SKU · expand
           ══════════════════════════════════════ */}
       {models.length > 0 && (
-        <Section id="models" eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`} title="Choose your model." className="bg-white/[0.015]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <Section
+          id="models"
+          eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`}
+          title="Choose your model."
+          className="bg-white/[0.015]"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {models
               .filter(m => m.visible !== false)
-              .map(m => {
+              .map((m, idx) => {
                 const modelPhoto = media.find(md => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"));
                 const price = m.global_price ?? m.head_only_price ?? m.complete_set_price ?? null;
                 const isExpanded = !!expandedModels[m.id];
+                const isBestChoice = idx === 0 && models.filter(mm => mm.visible !== false).length > 1;
                 const hasDetails = Boolean(
                   m.weight || m.cbm || m.packing_type || m.box_include || m.extra_accessories || m.barcode || m.reference_model
                 );
+
+                // Pull top 3-4 key specs from common_specs for inline preview
+                const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
+                const keySpecs: { label: string; value: string }[] = [];
+                if (cs.max_sewing_speed) keySpecs.push({ label: "Max speed", value: `${cs.max_sewing_speed} spm` });
+                if (cs.motor_type) keySpecs.push({ label: "Motor", value: String(cs.motor_type).replace(/-/g, " ") });
+                if (cs.stitch_length_max) keySpecs.push({ label: "Stitch", value: `${cs.stitch_length_min ? cs.stitch_length_min + "–" : "up to "}${cs.stitch_length_max} mm` });
+                if (cs.needle_system && keySpecs.length < 4) keySpecs.push({ label: "Needle", value: String(cs.needle_system) });
+                if (keySpecs.length < 3 && cs.lubrication_system) keySpecs.push({ label: "Lubrication", value: String(cs.lubrication_system).replace(/-/g, " ") });
+
                 return (
-                  <div key={m.id} className="group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/25 transition-all flex flex-col">
-                    <div className="aspect-[4/3] bg-white/[0.02] relative">
+                  <div
+                    key={m.id}
+                    className={`group relative rounded-[32px] overflow-hidden border transition-all flex flex-col ${
+                      isBestChoice
+                        ? "border-white/25 bg-gradient-to-br from-white/[0.08] via-white/[0.04] to-white/[0.01] shadow-[0_20px_60px_-20px_rgba(255,255,255,0.1)]"
+                        : "border-white/10 bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/25"
+                    }`}
+                  >
+                    {/* Best Choice ribbon */}
+                    {isBestChoice && (
+                      <div className="absolute top-5 left-5 z-10 inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white text-black text-[10px] font-bold uppercase tracking-[0.15em]">
+                        <Sparkles className="h-3 w-3" /> Best Choice
+                      </div>
+                    )}
+
+                    {/* Image area */}
+                    <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-b from-white/[0.03] to-transparent">
                       {modelPhoto || mainImage ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={modelPhoto?.url || mainImage!}
                           alt={m.model_name}
-                          className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.03] transition-transform duration-500"
+                          className="absolute inset-0 w-full h-full object-contain p-8 group-hover:scale-[1.06] transition-transform duration-700 ease-out"
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-white/20">
-                          <ImageIcon className="h-10 w-10" />
+                          <ImageIcon className="h-12 w-12" />
                         </div>
                       )}
                     </div>
-                    <div className="p-5 flex flex-col flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-[17px] font-semibold text-white truncate">{m.model_name}</h3>
+
+                    {/* Content */}
+                    <div className="p-6 flex flex-col flex-1 border-t border-white/5">
+                      {/* Name + price row */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-[20px] font-semibold text-white tracking-tight truncate leading-tight">
+                            {m.model_name}
+                          </h3>
                           {m.tagline && (
-                            <p className="text-[12px] text-[var(--text-dim)] mt-1 line-clamp-2">{m.tagline}</p>
+                            <p className="text-[13px] text-white/55 mt-1.5 line-clamp-2 leading-relaxed">
+                              {m.tagline}
+                            </p>
                           )}
                         </div>
                         {price !== null && (
                           <div className="text-right shrink-0">
-                            <p className="text-[10px] text-[var(--text-ghost)] uppercase tracking-wider">From</p>
-                            <p className="text-[15px] font-semibold text-white">{fmtMoney(price)}</p>
+                            <p className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-bold">From</p>
+                            <p className="text-[20px] font-semibold text-white tracking-tight leading-none mt-0.5">
+                              {fmtMoney(price)}
+                            </p>
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-1.5">
+                      {/* Key spec preview — 3-4 lines */}
+                      {keySpecs.length > 0 && (
+                        <dl className="mt-5 space-y-2">
+                          {keySpecs.slice(0, 4).map(s => (
+                            <div key={s.label} className="flex items-baseline justify-between gap-3 text-[12px]">
+                              <dt className="text-white/45 capitalize">{s.label}</dt>
+                              <dd className="text-white/90 font-medium text-right capitalize">{s.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+
+                      {/* Config badges */}
+                      <div className="mt-5 flex flex-wrap gap-1.5">
                         {m.sku && (
-                          <span className="text-[10px] px-2 h-5 inline-flex items-center rounded border border-white/10 bg-white/[0.03] text-white/60 font-mono">
+                          <span className="text-[10px] px-2 h-5 inline-flex items-center rounded border border-white/10 bg-white/[0.03] text-white/60 font-mono tracking-tight">
                             {m.sku}
                           </span>
                         )}
@@ -932,24 +1074,25 @@ export default function ProductViewPage() {
                         )}
                       </div>
 
+                      {/* Commercial info */}
                       {(m.moq || m.lead_time || m.supplier) && (
-                        <dl className="mt-4 pt-4 border-t border-white/5 text-[11px] space-y-1">
+                        <dl className="mt-5 pt-5 border-t border-white/5 text-[11px] space-y-1.5">
                           {m.supplier && (
                             <div className="flex justify-between">
-                              <dt className="text-[var(--text-ghost)]">Supplier</dt>
-                              <dd className="text-white/80 truncate ml-2">{m.supplier}</dd>
+                              <dt className="text-white/40">Supplier</dt>
+                              <dd className="text-white/75 truncate ml-2">{m.supplier}</dd>
                             </div>
                           )}
                           {m.moq && (
                             <div className="flex justify-between">
-                              <dt className="text-[var(--text-ghost)]">MOQ</dt>
-                              <dd className="text-white/80">{m.moq}</dd>
+                              <dt className="text-white/40">MOQ</dt>
+                              <dd className="text-white/75">{m.moq}</dd>
                             </div>
                           )}
                           {m.lead_time && (
                             <div className="flex justify-between">
-                              <dt className="text-[var(--text-ghost)]">Lead time</dt>
-                              <dd className="text-white/80">{m.lead_time}</dd>
+                              <dt className="text-white/40">Lead time</dt>
+                              <dd className="text-white/75">{m.lead_time}</dd>
                             </div>
                           )}
                         </dl>
@@ -960,54 +1103,54 @@ export default function ProductViewPage() {
                         <>
                           <div
                             className={`grid transition-all duration-300 ease-out ${
-                              isExpanded ? "grid-rows-[1fr] opacity-100 mt-4" : "grid-rows-[0fr] opacity-0"
+                              isExpanded ? "grid-rows-[1fr] opacity-100 mt-5" : "grid-rows-[0fr] opacity-0"
                             }`}
                           >
                             <div className="overflow-hidden">
-                              <div className="pt-4 border-t border-white/5">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-ghost)] mb-2 flex items-center gap-1.5">
+                              <div className="pt-5 border-t border-white/5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45 mb-3 flex items-center gap-1.5">
                                   <Package className="h-3 w-3" /> Packaging
                                 </p>
-                                <dl className="text-[11px] space-y-1">
+                                <dl className="text-[11px] space-y-1.5">
                                   {m.weight && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[var(--text-ghost)]">Weight</dt>
+                                      <dt className="text-white/40">Weight</dt>
                                       <dd className="text-white/80">{m.weight} kg</dd>
                                     </div>
                                   )}
                                   {m.cbm && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[var(--text-ghost)]">Volume</dt>
+                                      <dt className="text-white/40">Volume</dt>
                                       <dd className="text-white/80">{m.cbm} m³</dd>
                                     </div>
                                   )}
                                   {m.packing_type && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[var(--text-ghost)]">Packing</dt>
+                                      <dt className="text-white/40">Packing</dt>
                                       <dd className="text-white/80 truncate ml-2">{m.packing_type}</dd>
                                     </div>
                                   )}
                                   {m.box_include && (
                                     <div className="pt-1">
-                                      <dt className="text-[var(--text-ghost)] mb-0.5">Box includes</dt>
+                                      <dt className="text-white/40 mb-0.5">Box includes</dt>
                                       <dd className="text-white/80 leading-snug">{m.box_include}</dd>
                                     </div>
                                   )}
                                   {m.extra_accessories && (
                                     <div className="pt-1">
-                                      <dt className="text-[var(--text-ghost)] mb-0.5">Accessories</dt>
+                                      <dt className="text-white/40 mb-0.5">Accessories</dt>
                                       <dd className="text-white/80 leading-snug">{m.extra_accessories}</dd>
                                     </div>
                                   )}
                                   {m.reference_model && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[var(--text-ghost)]">Reference</dt>
+                                      <dt className="text-white/40">Reference</dt>
                                       <dd className="text-white/80 font-mono">{m.reference_model}</dd>
                                     </div>
                                   )}
                                   {m.barcode && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[var(--text-ghost)]">Barcode</dt>
+                                      <dt className="text-white/40">Barcode</dt>
                                       <dd className="text-white/80 font-mono">{m.barcode}</dd>
                                     </div>
                                   )}
@@ -1019,7 +1162,7 @@ export default function ProductViewPage() {
                           <button
                             type="button"
                             onClick={() => toggleModel(m.id)}
-                            className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/70 hover:text-white transition self-start"
+                            className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70 hover:text-white transition self-start"
                           >
                             {isExpanded ? "Hide details" : "Show details"}
                             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
@@ -1080,48 +1223,54 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          7. MEDIA / DOWNLOADS
+          9. MEDIA / DOWNLOADS — premium resource cards
           ══════════════════════════════════════ */}
       {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-        <Section eyebrow="Downloads" title="Resources.">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Section eyebrow="Resources" title="Dig deeper.">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {videos.map(v => (
               <a key={v.id} href={v.url} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-4 p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition">
-                <div className="h-11 w-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <Play className="h-4 w-4 text-white" />
+                 className="group flex items-start gap-5 p-7 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent hover:border-white/25 hover:from-white/[0.06] transition-all">
+                <div className="h-14 w-14 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center shrink-0 group-hover:bg-white/[0.1] transition">
+                  <Play className="h-5 w-5 text-white" fill="currentColor" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-white truncate">{v.alt_text || "Product video"}</p>
-                  <p className="text-[11px] text-[var(--text-dim)]">Video</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45 mb-1.5">Video</p>
+                  <p className="text-[15px] font-semibold text-white leading-tight">{v.alt_text || "Product video"}</p>
+                  <p className="text-[12px] text-white/55 mt-2 flex items-center gap-1">
+                    Watch now <ExternalLink className="h-3 w-3" />
+                  </p>
                 </div>
-                <ExternalLink className="h-4 w-4 text-[var(--text-ghost)]" />
               </a>
             ))}
             {manuals.map(m => (
               <a key={m.id} href={m.url} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-4 p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition">
-                <div className="h-11 w-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <FileText className="h-4 w-4 text-white" />
+                 className="group flex items-start gap-5 p-7 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent hover:border-white/25 hover:from-white/[0.06] transition-all">
+                <div className="h-14 w-14 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center shrink-0 group-hover:bg-white/[0.1] transition">
+                  <FileText className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-white truncate">{m.alt_text || "Technical manual"}</p>
-                  <p className="text-[11px] text-[var(--text-dim)]">PDF manual</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45 mb-1.5">PDF manual</p>
+                  <p className="text-[15px] font-semibold text-white leading-tight">{m.alt_text || "Technical manual"}</p>
+                  <p className="text-[12px] text-white/55 mt-2 flex items-center gap-1">
+                    Download <Download className="h-3 w-3" />
+                  </p>
                 </div>
-                <Download className="h-4 w-4 text-[var(--text-ghost)]" />
               </a>
             ))}
             {otherDocs.map(d => (
               <a key={d.id} href={d.url} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-4 p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition">
-                <div className="h-11 w-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <ImageIcon className="h-4 w-4 text-white" />
+                 className="group flex items-start gap-5 p-7 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.02] to-transparent hover:border-white/25 hover:from-white/[0.06] transition-all">
+                <div className="h-14 w-14 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center shrink-0 group-hover:bg-white/[0.1] transition">
+                  <ImageIcon className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-white truncate capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
-                  <p className="text-[11px] text-[var(--text-dim)] capitalize">{d.type.replace(/_/g, " ")}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45 mb-1.5 capitalize">{d.type.replace(/_/g, " ")}</p>
+                  <p className="text-[15px] font-semibold text-white leading-tight capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
+                  <p className="text-[12px] text-white/55 mt-2 flex items-center gap-1">
+                    View <ExternalLink className="h-3 w-3" />
+                  </p>
                 </div>
-                <ExternalLink className="h-4 w-4 text-[var(--text-ghost)]" />
               </a>
             ))}
           </div>
@@ -1129,7 +1278,7 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          8. RELATED PRODUCTS
+          10. RELATED PRODUCTS — clean cards
           ══════════════════════════════════════ */}
       {related.length > 0 && (
         <Section eyebrow="You might also like" title="Related machines." className="bg-white/[0.015]">
@@ -1142,24 +1291,27 @@ export default function ProductViewPage() {
                 <Link
                   key={r.related_id}
                   href={`/products/${rp.slug || rp.id}`}
-                  className="group rounded-2xl overflow-hidden border border-white/10 bg-white/[0.02] hover:border-white/25 transition-all"
+                  className="group rounded-[24px] overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent hover:border-white/30 hover:from-white/[0.08] transition-all"
                 >
-                  <div className="aspect-[4/3] bg-white/[0.02] relative">
+                  <div className="aspect-[4/3] bg-gradient-to-b from-white/[0.03] to-transparent relative overflow-hidden">
                     {img ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={img} alt={rp.product_name}
-                           className="absolute inset-0 w-full h-full object-contain p-5 group-hover:scale-105 transition-transform duration-500" />
+                           className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.08] transition-transform duration-700 ease-out" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-white/20">
-                        <ImageIcon className="h-8 w-8" />
+                        <ImageIcon className="h-10 w-10" />
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <p className="text-[13px] font-semibold text-white truncate">{rp.product_name}</p>
+                  <div className="p-5 border-t border-white/5">
                     {rp.brand && (
-                      <p className="text-[11px] text-[var(--text-dim)] mt-0.5">{rp.brand}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40 mb-1.5">{rp.brand}</p>
                     )}
+                    <p className="text-[15px] font-semibold text-white leading-tight line-clamp-2">{rp.product_name}</p>
+                    <p className="mt-3 inline-flex items-center gap-1 text-[11px] text-white/55 group-hover:text-white transition">
+                      Learn more <ChevronRight className="h-3 w-3" />
+                    </p>
                   </div>
                 </Link>
               );
@@ -1169,34 +1321,57 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          9. FOOTER CTA
+          11. FINAL CTA — big closing statement
           ══════════════════════════════════════ */}
-      <section className="py-20 md:py-28">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-[32px] md:text-[44px] font-semibold tracking-tight text-white leading-[1.05]">
-            Ready to talk about {product.product_name}?
+      <section className="relative py-24 md:py-36 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[60vw] w-[60vw] max-h-[700px] max-w-[700px] rounded-full bg-white/[0.03] blur-[140px]" />
+        </div>
+        <div className="max-w-4xl mx-auto px-6 text-center relative">
+          <div className="inline-flex items-center gap-3 mb-6">
+            <span className="h-px w-8 bg-white/30" />
+            <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/60">Let&apos;s talk</p>
+            <span className="h-px w-8 bg-white/30" />
+          </div>
+          <h2 className="text-[38px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.02em] text-white leading-[1.02]">
+            Ready to elevate<br />your production line?
           </h2>
-          <p className="mt-4 text-[15px] text-[var(--text-dim)]">
-            Our product specialists will help you select the right configuration for your production line.
+          <p className="mt-6 text-[17px] md:text-[19px] text-white/60 leading-relaxed max-w-xl mx-auto font-light">
+            Our specialists will help you select the right {product.product_name} configuration for your factory.
           </p>
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
             <Link
               href="/contacts"
-              className="inline-flex items-center gap-2 h-11 px-6 rounded-full bg-white text-black text-[14px] font-semibold hover:opacity-90 transition"
+              className="inline-flex items-center gap-2 h-12 px-8 rounded-full bg-white text-black text-[14px] font-semibold hover:bg-white/90 hover:scale-[1.02] transition-all"
             >
-              Contact sales
+              Contact sales <ChevronRight className="h-4 w-4" />
             </Link>
-            <Link
-              href={`/products/${product.id}/edit`}
-              className="inline-flex items-center gap-2 h-11 px-6 rounded-full border border-white/15 text-white text-[14px] font-medium hover:bg-white/5 transition"
+            <a
+              href="#models"
+              className="inline-flex items-center gap-2 h-12 px-8 rounded-full border border-white/20 text-white text-[14px] font-medium hover:bg-white/5 hover:border-white/30 transition"
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit product
-            </Link>
+              Review models
+            </a>
           </div>
-          <div className="mt-10 flex items-center justify-center gap-2 text-[11px] text-[var(--text-ghost)]">
-            <Boxes className="h-3 w-3" />
-            <span>{models.length} model{models.length === 1 ? "" : "s"}</span>
-            {product.hs_code && <><span>·</span><span className="font-mono">HS {product.hs_code}</span></>}
+          <div className="mt-12 flex items-center justify-center gap-4 text-[11px] text-white/40">
+            <span className="inline-flex items-center gap-1.5">
+              <Boxes className="h-3 w-3" />
+              {models.length} model{models.length === 1 ? "" : "s"}
+            </span>
+            {product.hs_code && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="font-mono">HS {product.hs_code}</span>
+              </>
+            )}
+            {product.warranty && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck className="h-3 w-3" /> {product.warranty}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </section>
