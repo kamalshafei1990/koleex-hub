@@ -34,7 +34,7 @@ const ACCOUNTS = "accounts";
 const COMPANIES = "companies";
 const ROLES = "roles";
 const PEOPLE = "people";
-const EMPLOYEES = "employees";
+const EMPLOYEES = "koleex_employees"; // renamed to avoid collision with legacy `employees` table
 const ACCESS_PRESETS = "access_presets";
 
 /* ============================================================================

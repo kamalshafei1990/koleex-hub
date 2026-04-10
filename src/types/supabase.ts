@@ -383,20 +383,21 @@ export type ProductMarketPriceInsert = Omit<ProductMarketPriceRow, "id" | "creat
    This is the refactored identity layer. It separates five concerns into
    five tables (see supabase/migrations/refactor_accounts_to_identity_system.sql):
 
-     1. people          — Person / contact records (identity + address).
-     2. companies       — Organisations. customer_level lives here as the
-                          single source of truth for pricing logic.
-     3. employees       — Internal HR records linking people ↔ accounts.
-     4. accounts        — Login identity only: username, login email,
-                          password, user_type, status, role, links to
-                          person + company. No more profile data here.
-     5. access_presets  — Role → default permission bundle (placeholder for
-                          the future permissions system with overrides).
+     1. people            — Person / contact records (identity + address).
+     2. companies         — Organisations. customer_level lives here as the
+                            single source of truth for pricing logic.
+     3. koleex_employees  — Internal HR records linking people ↔ accounts.
+     4. accounts          — Login identity only: username, login email,
+                            password, user_type, status, role, links to
+                            person + company. No more profile data here.
+     5. access_presets    — Role → default permission bundle (placeholder for
+                            the future permissions system with overrides).
 
-   Naming note: we use `people` (not `contacts`) because a legacy `contacts`
-   table already exists for the /customers, /suppliers, /contacts pages as
-   a flat business directory. The new `people` table is the identity-layer
-   person record.
+   Naming note: we use `people` (not `contacts`) and `koleex_employees` (not
+   `employees`) because legacy tables with those names already exist. The
+   legacy `contacts` table powers /customers, /suppliers, /contacts as a
+   flat business directory, and a legacy `employees` table exists too. The
+   new `people` + `koleex_employees` tables are identity-layer records.
    --------------------------------------------------------------------------- */
 
 export type UserType = "internal" | "customer";
@@ -648,7 +649,7 @@ export interface Database {
         Insert: AccountInsert;
         Update: AccountUpdate;
       };
-      employees: {
+      koleex_employees: {
         Row: EmployeeRow;
         Insert: EmployeeInsert;
         Update: EmployeeUpdate;

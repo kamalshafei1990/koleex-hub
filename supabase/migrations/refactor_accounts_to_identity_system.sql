@@ -4,21 +4,23 @@
 -- Separates the v1 accounts table (which mixed profile + login + permission
 -- data) into properly scoped entities:
 --
---   people           — Person / contact records (identity + address).
---   companies        — Organisation records. Customer level lives here as the
---                      single source of truth for pricing logic.
---   employees        — Internal HR records, linked to both a person and an
---                      account.
---   accounts         — Login identity ONLY: username, login email, password,
---                      user type, status, role, linked person, linked company.
---   access_presets   — Default permission bundles keyed to roles. Placeholder
---                      for the future custom-overrides permission layer.
+--   people            — Person / contact records (identity + address).
+--   companies         — Organisation records. Customer level lives here as the
+--                       single source of truth for pricing logic.
+--   koleex_employees  — Internal HR records, linked to both a person and an
+--                       account.
+--   accounts          — Login identity ONLY: username, login email, password,
+--                       user type, status, role, linked person, linked company.
+--   access_presets    — Default permission bundles keyed to roles. Placeholder
+--                       for the future custom-overrides permission layer.
 --
--- Naming note: we use `people` (not `contacts`) because there is already a
--- legacy `contacts` table used by the /customers, /suppliers, and /contacts
--- pages as a flat business directory. The new `people` table is the
--- identity-layer person record. Migration of the legacy `contacts` table is
--- a separate project.
+-- Naming note: we use `people` (not `contacts`) and `koleex_employees` (not
+-- `employees`) because legacy tables with those names already exist in the
+-- database. The legacy `contacts` table powers /customers, /suppliers, and
+-- /contacts as a flat business directory, and a legacy `employees` table
+-- exists too. The new `people` + `koleex_employees` tables are the
+-- identity-layer records used by Accounts Manager v2. Migration of the
+-- legacy tables is a separate project.
 --
 -- This migration is idempotent and can be applied as either:
 --   a) a fresh install (v1 never applied) — creates everything from scratch.
@@ -212,10 +214,14 @@ CREATE TRIGGER trg_accounts_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
--- 5. Employees  (new — internal HR record, links person ↔ account)
+-- 5. Koleex Employees  (new — internal HR record, links person ↔ account)
+--
+-- Named `koleex_employees` to avoid collision with the legacy `employees`
+-- table that already exists in this database. This table is the identity
+-- layer HR record (person + login + HR data) used by Accounts Manager v2.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS employees (
+CREATE TABLE IF NOT EXISTS koleex_employees (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Links
@@ -228,7 +234,7 @@ CREATE TABLE IF NOT EXISTS employees (
   position           TEXT,
   hire_date          DATE,
   employment_status  TEXT DEFAULT 'active' CHECK (employment_status IN ('active', 'on_leave', 'terminated', 'inactive')),
-  manager_id         UUID REFERENCES employees(id) ON DELETE SET NULL,
+  manager_id         UUID REFERENCES koleex_employees(id) ON DELETE SET NULL,
 
   -- Work contact
   work_email         TEXT,
@@ -239,13 +245,13 @@ CREATE TABLE IF NOT EXISTS employees (
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_employees_person_id ON employees(person_id);
-CREATE INDEX IF NOT EXISTS idx_employees_account_id ON employees(account_id);
-CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
+CREATE INDEX IF NOT EXISTS idx_koleex_employees_person_id ON koleex_employees(person_id);
+CREATE INDEX IF NOT EXISTS idx_koleex_employees_account_id ON koleex_employees(account_id);
+CREATE INDEX IF NOT EXISTS idx_koleex_employees_department ON koleex_employees(department);
 
-DROP TRIGGER IF EXISTS trg_employees_updated_at ON employees;
-CREATE TRIGGER trg_employees_updated_at
-  BEFORE UPDATE ON employees
+DROP TRIGGER IF EXISTS trg_koleex_employees_updated_at ON koleex_employees;
+CREATE TRIGGER trg_koleex_employees_updated_at
+  BEFORE UPDATE ON koleex_employees
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
