@@ -121,6 +121,31 @@ export async function fetchProductById(id: string): Promise<ProductRow | null> {
   return data as ProductRow | null;
 }
 
+/**
+ * Fetch a product by slug first, falling back to UUID lookup.
+ * Lets routes accept either "/products/my-machine" or "/products/<uuid>".
+ */
+export async function fetchProductByIdOrSlug(handle: string): Promise<ProductRow | null> {
+  if (!handle) return null;
+  // Try slug match first (cheaper + more common public URL form)
+  const { data: bySlug } = await supabase
+    .from("products")
+    .select("*")
+    .eq("slug", handle)
+    .maybeSingle();
+  if (bySlug) return bySlug as ProductRow;
+
+  // UUID fallback — only hit this branch if the handle looks like a UUID
+  const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
+  if (!uuidLike) return null;
+  const { data: byId } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", handle)
+    .maybeSingle();
+  return (byId as ProductRow) || null;
+}
+
 export async function createProduct(product: Record<string, unknown>): Promise<ProductRow | null> {
   const { data, error } = await supabase.from("products").insert(product).select().single();
   if (error) { console.error("[Products] Create error:", error.message); return null; }

@@ -47,6 +47,12 @@ interface Props {
   data: SewingSpecsFormState;
   onChange: (data: SewingSpecsFormState) => void;
   subcategorySlug: string;
+  /**
+   * "full" (default) renders template picker + specs fields
+   * "template" renders only the machine type picker card grid
+   * "specs" renders only the dynamic spec fields (assumes a template is already chosen)
+   */
+  mode?: "full" | "template" | "specs";
 }
 
 /* ── Group Header with icon chip ── */
@@ -306,7 +312,7 @@ function TemplatePicker({
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export default function SewingMachineSection({ data, onChange, subcategorySlug }: Props) {
+export default function SewingMachineSection({ data, onChange, subcategorySlug, mode = "full" }: Props) {
   // Auto-detect template from subcategory, but allow manual override
   const detectedTemplate = useMemo(
     () => getTemplateForSubcategory(subcategorySlug),
@@ -372,10 +378,32 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug }
 
   return (
     <div className="space-y-6">
-      {/* Template Picker */}
-      <TemplatePicker selected={activeTemplateSlug} onSelect={handleTemplateChange} />
+      {/* Template Picker — shown in "full" and "template" modes */}
+      {(mode === "full" || mode === "template") && (
+        <TemplatePicker selected={activeTemplateSlug} onSelect={handleTemplateChange} />
+      )}
 
-      {activeTemplateSlug && (
+      {mode === "template" && !activeTemplateSlug && (
+        <div className="text-center py-8 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
+          <p className="text-[12px] text-[var(--text-dim)]">Pick a machine type to unlock its spec fields in the next step.</p>
+        </div>
+      )}
+
+      {mode === "template" && activeTemplateSlug && activeTemplate && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center text-xl">
+            {activeTemplate.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold text-[var(--text-primary)]">{activeTemplate.name}</div>
+            <div className="text-[11px] text-[var(--text-ghost)] truncate">{activeTemplate.description}</div>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Selected</span>
+        </div>
+      )}
+
+      {/* Specs fields — shown in "full" and "specs" modes */}
+      {(mode === "full" || mode === "specs") && activeTemplateSlug && (
         <>
           {/* ── Common Fields Section ── */}
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
@@ -435,13 +463,23 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug }
         </>
       )}
 
-      {!activeTemplateSlug && (
+      {mode === "full" && !activeTemplateSlug && (
         <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
           <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-3 flex items-center justify-center">
             <Zap className="h-6 w-6 text-[var(--text-ghost)]" />
           </div>
           <p className="text-[13px] text-[var(--text-dim)] font-medium">Select a machine type above</p>
           <p className="text-[11px] text-[var(--text-ghost)] mt-1">Template-specific fields will appear based on your selection</p>
+        </div>
+      )}
+
+      {mode === "specs" && !activeTemplateSlug && (
+        <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
+          <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-3 flex items-center justify-center">
+            <Zap className="h-6 w-6 text-[var(--text-ghost)]" />
+          </div>
+          <p className="text-[13px] text-[var(--text-dim)] font-medium">Pick a machine type first</p>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-1">Go back to the Machine Type step to select a template before filling specs.</p>
         </div>
       )}
     </div>

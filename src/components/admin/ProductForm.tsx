@@ -8,7 +8,7 @@ import {
   FileText, Wrench, Boxes, Image, DollarSign,
   Languages, Link2, Zap, Settings2, ChevronDown, ChevronRight,
   Check, Package, AlertTriangle, Star,
-  ArrowRight, CircleDot, Factory, Tag, Sparkles,
+  ArrowRight, CircleDot, Factory, Tag, Sparkles, Lock,
 } from "lucide-react";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
@@ -52,8 +52,7 @@ import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
 import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
-import LivePreviewPanel from "./form-sections/LivePreviewPanel";
-import { isSewingMachineSubcategory, SEWING_MACHINE_TEMPLATES } from "@/lib/sewing-machine-templates";
+import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
 import { slugify } from "@/types/product-form";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -99,16 +98,21 @@ interface WizardStep {
 
 function getSteps(isSewing: boolean): WizardStep[] {
   const steps: WizardStep[] = [
-    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <Sparkles className="h-4 w-4" /> },
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTree className="h-4 w-4" /> },
   ];
   if (isSewing) {
-    steps.push({ id: "sewing", label: "Sewing Machine Specs", shortLabel: "Specs", icon: <Settings2 className="h-4 w-4" />, conditional: true });
+    steps.push({ id: "machine-type", label: "Machine Type", shortLabel: "Machine Type", icon: <Factory className="h-4 w-4" />, conditional: true });
   }
   steps.push(
+    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <Sparkles className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <FileText className="h-4 w-4" /> },
-    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <Zap className="h-4 w-4" /> },
+  );
+  if (isSewing) {
+    steps.push({ id: "sewing-specs", label: "Machine Specs", shortLabel: "Specs", icon: <Settings2 className="h-4 w-4" />, conditional: true });
+  }
+  steps.push(
     { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <Boxes className="h-4 w-4" /> },
+    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <Zap className="h-4 w-4" /> },
     { id: "media", label: "Media & Files", shortLabel: "Media", icon: <Image className="h-4 w-4" /> },
     { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <Check className="h-4 w-4" /> },
   );
@@ -118,8 +122,12 @@ function getSteps(isSewing: boolean): WizardStep[] {
 /* ═══════════════════════════════════════════════════════════════════
    STEP NAVIGATION BAR
    ═══════════════════════════════════════════════════════════════════ */
-function StepNav({ steps, currentStep, onStepChange, completedSteps }: {
-  steps: WizardStep[]; currentStep: number; onStepChange: (i: number) => void; completedSteps: Set<number>;
+function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps }: {
+  steps: WizardStep[];
+  currentStep: number;
+  onStepChange: (i: number) => void;
+  completedSteps: Set<number>;
+  lockedSteps?: Set<number>;
 }) {
   return (
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6">
@@ -128,12 +136,17 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps }: {
           const isActive = i === currentStep;
           const isCompleted = completedSteps.has(i);
           const isPast = i < currentStep;
+          const isLocked = !!lockedSteps?.has(i);
           return (
             <button
               key={step.id}
-              onClick={() => onStepChange(i)}
+              onClick={() => { if (!isLocked) onStepChange(i); }}
+              disabled={isLocked}
+              title={isLocked ? "Complete classification first" : step.label}
               className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
-                isActive
+                isLocked
+                  ? "text-[var(--text-ghost)]/60 cursor-not-allowed"
+                  : isActive
                   ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg"
                   : isPast || isCompleted
                   ? "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
@@ -141,9 +154,12 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps }: {
               }`}
             >
               <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                isActive ? "bg-white/20" : isCompleted ? "bg-emerald-500/20 text-emerald-400" : "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
+                isLocked ? "bg-[var(--bg-surface)]/60 text-[var(--text-ghost)]/50" :
+                isActive ? "bg-white/20" :
+                isCompleted ? "bg-emerald-500/20 text-emerald-400" :
+                "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
               }`}>
-                {isCompleted && !isActive ? <Check className="h-3 w-3" /> : i + 1}
+                {isLocked ? <Lock className="h-3 w-3" /> : (isCompleted && !isActive ? <Check className="h-3 w-3" /> : i + 1)}
               </div>
               <span className="hidden md:inline">{step.shortLabel}</span>
               {i < steps.length - 1 && (
@@ -475,13 +491,42 @@ export default function ProductForm({ productId }: Props) {
     });
   }, []);
 
+  /* ── Classification-gated lock ── */
+  const classificationComplete =
+    !!product.division_slug && !!product.category_slug && !!product.subcategory_slug;
+
+  /* Sewing flow unlocks the "Specs" step only after a template is selected */
+  const machineTypeComplete = !isSewing || !!sewingSpecs.template_slug;
+
+  const lockedSteps = useMemo(() => {
+    const set = new Set<number>();
+    steps.forEach((s, i) => {
+      // Everything after classify is locked until classification is complete
+      if (s.id !== "classify" && !classificationComplete) set.add(i);
+      // The "sewing-specs" step also requires a machine-type selection
+      if (s.id === "sewing-specs" && !machineTypeComplete) set.add(i);
+    });
+    return set;
+  }, [steps, classificationComplete, machineTypeComplete]);
+
   /* ── Step navigation ── */
   const goToStep = (idx: number) => {
+    const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
+    if (lockedSteps.has(safeIdx)) {
+      const target = steps[safeIdx];
+      if (target?.id === "sewing-specs") {
+        setError("Select a machine type before entering specs");
+      } else {
+        setError("Complete the classification first to unlock this step");
+      }
+      return;
+    }
     // Mark current step as completed when moving forward
-    if (idx > currentStep) {
+    if (safeIdx > currentStep) {
       setCompletedSteps(prev => new Set([...prev, currentStep]));
     }
-    setCurrentStep(Math.max(0, Math.min(idx, steps.length - 1)));
+    setError("");
+    setCurrentStep(safeIdx);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -491,9 +536,16 @@ export default function ProductForm({ productId }: Props) {
   /* ── Validation per step ── */
   const validateCurrentStep = (): string | null => {
     const stepId = steps[currentStep]?.id;
+    if (stepId === "classify") {
+      if (!product.division_slug || !product.category_slug || !product.subcategory_slug)
+        return "Pick division, category and subcategory before continuing";
+    }
+    if (stepId === "machine-type") {
+      if (isSewing && !sewingSpecs.template_slug)
+        return "Select a machine type to continue";
+    }
     if (stepId === "identity") {
       if (!product.product_name.trim()) return "Product name is required";
-      if (!product.division_slug || !product.category_slug || !product.subcategory_slug) return "Complete the classification before proceeding";
     }
     return null;
   };
@@ -757,10 +809,11 @@ export default function ProductForm({ productId }: Props) {
           currentStep={currentStep}
           onStepChange={goToStep}
           completedSteps={completedSteps}
+          lockedSteps={lockedSteps}
         />
 
         {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
-        {divisionName && steps[currentStep]?.id !== "identity" && steps[currentStep]?.id !== "classification" && (
+        {divisionName && steps[currentStep]?.id !== "classify" && (
           <div className="flex items-center gap-2 text-[11px] text-[var(--text-ghost)] mb-4 px-1">
             <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">Classification:</span>
             <span>{divisionName}</span>
@@ -769,12 +822,8 @@ export default function ProductForm({ productId }: Props) {
           </div>
         )}
 
-        {/* ═══ MAIN CONTENT + STICKY LIVE PREVIEW RAIL ═══ */}
-        <div className="flex gap-6 items-start">
-          <div className="flex-1 min-w-0">
-
         {/* ═══════════════════════════════════════════════════════════
-           STEP 1: HERO (identity + primary model)
+           STEP: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "identity" && (
           <div className="space-y-5 animate-in fade-in duration-300">
@@ -907,15 +956,27 @@ export default function ProductForm({ productId }: Props) {
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><CircleDot className="h-3 w-3" /> Status</span>
                       </label>
-                      <select
-                        value={product.status}
-                        onChange={(e) => updateProduct_({ status: e.target.value as ProductFormState["status"] })}
-                        className={inp}
-                      >
-                        <option value="draft">Draft</option>
-                        <option value="active">Active</option>
-                        <option value="archived">Archived</option>
-                      </select>
+                      <div className="flex gap-1.5 h-11">
+                        {([
+                          { v: "draft", label: "Draft", cls: "text-amber-400 bg-amber-400/10 border-amber-400/40" },
+                          { v: "active", label: "Active", cls: "text-emerald-400 bg-emerald-400/10 border-emerald-400/40" },
+                          { v: "archived", label: "Archived", cls: "text-red-400 bg-red-400/10 border-red-400/40" },
+                        ] as const).map(s => {
+                          const active = product.status === s.v;
+                          return (
+                            <button
+                              key={s.v}
+                              type="button"
+                              onClick={() => updateProduct_({ status: s.v as ProductFormState["status"] })}
+                              className={`flex-1 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all ${
+                                active ? s.cls : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1060,25 +1121,38 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-           STEP 3: SEWING MACHINE SPECS (conditional)
+           STEP: MACHINE TYPE (conditional — right after classification)
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "sewing" && (
+        {steps[currentStep]?.id === "machine-type" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Classification summary */}
-            {divisionName && (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
-                <FolderTree className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
-                <span>{divisionName}</span>
-                {categoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
-                {subcategoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+            <Section id="machine-type" icon={<Factory className="h-4 w-4" />} title="Machine Type" badge="Template">
+              <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+                <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
+                  Choose the machine type that best describes this product. The spec fields, defaults, and
+                  visual structure in later steps are driven by this choice — pick carefully.
+                </p>
               </div>
-            )}
-
-            <Section id="sewing" icon={<Settings2 className="h-4 w-4" />} title="Sewing Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
               <SewingMachineSection
                 data={sewingSpecs}
                 onChange={setSewingSpecs}
                 subcategorySlug={product.subcategory_slug}
+                mode="template"
+              />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           STEP: SEWING MACHINE SPECS (conditional — after description)
+           ═══════════════════════════════════════════════════════════ */}
+        {steps[currentStep]?.id === "sewing-specs" && (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            <Section id="sewing" icon={<Settings2 className="h-4 w-4" />} title="Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
+              <SewingMachineSection
+                data={sewingSpecs}
+                onChange={setSewingSpecs}
+                subcategorySlug={product.subcategory_slug}
+                mode="specs"
               />
             </Section>
           </div>
@@ -1121,24 +1195,33 @@ export default function ProductForm({ productId }: Props) {
                   </div>
                   <div>
                     <label className={lbl}>Level</label>
-                    <select
-                      value={product.level}
-                      onChange={(e) => updateProduct_({ level: e.target.value })}
-                      className={inp}
-                    >
-                      <option value="">Select level...</option>
-                      {attrSuggestions.levels.length > 0
-                        ? attrSuggestions.levels.map(l => (
-                            <option key={l} value={l.toLowerCase()}>{l}</option>
-                          ))
-                        : <>
-                            <option value="entry">Entry</option>
-                            <option value="mid">Mid</option>
-                            <option value="premium">Premium</option>
-                            <option value="enterprise">Enterprise</option>
-                          </>
-                      }
-                    </select>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(attrSuggestions.levels.length > 0
+                        ? attrSuggestions.levels.map(l => ({ value: l.toLowerCase(), label: l }))
+                        : [
+                            { value: "entry", label: "Entry" },
+                            { value: "mid", label: "Mid" },
+                            { value: "premium", label: "Premium" },
+                            { value: "enterprise", label: "Enterprise" },
+                          ]
+                      ).map(({ value, label }) => {
+                        const active = product.level === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => updateProduct_({ level: active ? "" : value })}
+                            className={`px-3 h-9 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all ${
+                              active
+                                ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]"
+                                : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1317,27 +1400,6 @@ export default function ProductForm({ productId }: Props) {
               {saving ? "Saving..." : "Save & Publish"}
             </button>
           )}
-        </div>
-
-          </div>
-
-          {/* ═══ STICKY LIVE PREVIEW RAIL ═══ */}
-          <LivePreviewPanel
-            product={product}
-            primaryModel={primaryModel}
-            mainImageSrc={mainImageSrc}
-            mediaCount={media.length}
-            modelCount={models.length}
-            sewingTemplateName={
-              sewingSpecs.template_slug
-                ? SEWING_MACHINE_TEMPLATES.find(t => t.slug === sewingSpecs.template_slug)?.name || null
-                : null
-            }
-            sewingCommonSpecs={sewingSpecs.common_specs}
-            divisionName={divisionName}
-            categoryName={categoryName}
-            subcategoryName={subcategoryName}
-          />
         </div>
 
         <div className="h-12" />

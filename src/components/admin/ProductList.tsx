@@ -345,7 +345,7 @@ export default function ProductList() {
               return (
                 <Link
                   key={p.id}
-                  href={`/products/${p.id}/edit`}
+                  href={`/products/${p.slug || p.id}`}
                   className="group bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden hover:border-[var(--border-focus)] hover:shadow-xl transition-all duration-200"
                 >
                   {/* Image */}
@@ -391,15 +391,18 @@ export default function ProductList() {
 
                     {/* Actions (show on hover) */}
                     <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      <Link
+                        href={`/products/${p.id}/edit`}
+                        onClick={(e) => e.stopPropagation()}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                        title="Edit product"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      </Link>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                        title="Delete product"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -478,7 +481,7 @@ export default function ProductList() {
                 return (
                   <Link
                     key={p.id}
-                    href={`/products/${p.id}/edit`}
+                    href={`/products/${p.slug || p.id}`}
                     className="group flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
                   >
                     {/* Thumbnail */}
@@ -578,15 +581,18 @@ export default function ProductList() {
                           <EyeOff className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                         )}
                       </div>
-                      <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      <Link
+                        href={`/products/${p.id}/edit`}
+                        onClick={(e) => e.stopPropagation()}
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+                        title="Edit product"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      </Link>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
+                        title="Delete product"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
