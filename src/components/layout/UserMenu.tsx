@@ -22,7 +22,7 @@
    Theme aware: uses the same dk/light branches as MainHeader.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LogIn, LogOut, Shield, User as UserIcon } from "lucide-react";
 import {
@@ -31,6 +31,7 @@ import {
   onAuthStateChange,
   signOut as supabaseSignOut,
 } from "@/lib/auth-client";
+import { useCurrentAccount } from "@/lib/identity";
 
 const LEGACY_SESSION_KEY = "koleex-admin";
 
@@ -81,6 +82,24 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       : { mode: "legacy", signedIn: false },
   );
   const menuRef = useRef<HTMLDivElement>(null);
+
+  /* Load the richer "current account" row so we can show the real person
+     name, avatar, role, and user type — not just the stub initials. This
+     resolves in both auth modes (see src/lib/identity.ts). */
+  const { account } = useCurrentAccount();
+
+  const profile = useMemo(() => {
+    if (!account) return null;
+    const avatar = account.avatar_url || account.person?.avatar_url || null;
+    const fullName = account.person?.full_name || account.username;
+    const subtitle = [
+      account.user_type,
+      account.role?.name,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return { avatar, fullName, subtitle };
+  }, [account]);
 
   /* Load initial identity + keep it in sync. */
   useEffect(() => {
@@ -180,8 +199,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
   }, [identity, router]);
 
   const avatarLabel = initialsFor(identity);
-  const displayName = displayNameFor(identity);
-  const subLine = subLineFor(identity);
+  const displayName = profile?.fullName ?? displayNameFor(identity);
+  const subLine = profile?.subtitle ?? subLineFor(identity);
+  const avatarUrl = profile?.avatar ?? null;
   const signedIn = identity.signedIn;
 
   return (
@@ -192,11 +212,46 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         aria-label="Account menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full text-[10px] md:text-[11px] font-semibold transition-all ${
-          dk ? "bg-white text-black hover:opacity-90" : "bg-black text-white hover:opacity-90"
-        } ${open ? "ring-2 ring-offset-2 ring-offset-transparent ring-white/20" : ""}`}
+        className={`group flex items-center gap-2 rounded-full transition-all ${
+          open ? "ring-2 ring-offset-2 ring-offset-transparent ring-white/20" : ""
+        }`}
       >
-        {avatarLabel}
+        <span
+          className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden text-[10px] md:text-[11px] font-semibold transition-all ${
+            dk
+              ? "bg-white text-black group-hover:opacity-90"
+              : "bg-black text-white group-hover:opacity-90"
+          }`}
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            avatarLabel
+          )}
+        </span>
+        {profile && (
+          <span className="hidden md:flex flex-col items-start leading-tight pe-1">
+            <span
+              className={`text-[12px] font-semibold max-w-[140px] truncate ${
+                dk ? "text-white" : "text-black"
+              }`}
+            >
+              {profile.fullName}
+            </span>
+            <span
+              className={`text-[10px] capitalize max-w-[140px] truncate ${
+                dk ? "text-white/50" : "text-black/50"
+              }`}
+            >
+              {profile.subtitle}
+            </span>
+          </span>
+        )}
       </button>
 
       {open && (
@@ -212,17 +267,26 @@ export default function UserMenu({ dk }: { dk: boolean }) {
           <div className={`px-4 py-3.5 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>
             <div className="flex items-center gap-3">
               <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full text-[12px] font-semibold shrink-0 ${
+                className={`flex items-center justify-center w-10 h-10 rounded-full overflow-hidden text-[12px] font-semibold shrink-0 ${
                   dk ? "bg-white text-black" : "bg-black text-white"
                 }`}
               >
-                {avatarLabel}
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  avatarLabel
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className={`text-[13px] font-semibold truncate ${dk ? "text-white" : "text-black"}`}>
                   {displayName}
                 </div>
-                <div className={`text-[11px] truncate ${dk ? "text-white/50" : "text-black/50"}`}>
+                <div className={`text-[11px] truncate capitalize ${dk ? "text-white/50" : "text-black/50"}`}>
                   {subLine}
                 </div>
               </div>

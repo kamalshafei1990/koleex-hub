@@ -543,6 +543,9 @@ export interface AccountRow {
   person_id: string | null;
   company_id: string | null;
 
+  // Profile
+  avatar_url: string | null;
+
   // Admin-only
   internal_notes: string | null;
 

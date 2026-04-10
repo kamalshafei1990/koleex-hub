@@ -198,6 +198,30 @@ export async function deleteAccount(id: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Set (or clear) the avatar on an account.
+ *
+ * `avatarUrl` is expected to be either a data URL produced by the client-side
+ * resizer in AccountDetail (see `fileToResizedDataUrl`) or `null` to remove
+ * the current avatar. We deliberately don't validate the string here so the
+ * same helper can later accept public Storage object URLs if we migrate off
+ * data URLs.
+ */
+export async function updateAccountAvatar(
+  id: string,
+  avatarUrl: string | null,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from(ACCOUNTS)
+    .update({ avatar_url: avatarUrl })
+    .eq("id", id);
+  if (error) {
+    console.error("[Accounts] Update avatar:", error.message);
+    return false;
+  }
+  return true;
+}
+
 export async function isUsernameAvailable(
   username: string,
   excludeId?: string,

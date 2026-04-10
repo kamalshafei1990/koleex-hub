@@ -28,7 +28,7 @@
      - Notes          — admin-only internal notes
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -48,6 +48,9 @@ import {
   Lock,
   FileText,
   Briefcase,
+  Camera,
+  Loader2,
+  Trash2,
 } from "lucide-react";
 import {
   fetchAccountWithLinks,
@@ -55,7 +58,9 @@ import {
   resetAccountPassword,
   setForcePasswordChange,
   generateTemporaryPassword,
+  updateAccountAvatar,
 } from "@/lib/accounts-admin";
+import { notifyIdentityChanged } from "@/lib/identity";
 import type {
   AccountWithLinks,
   AccountStatus,
@@ -111,6 +116,9 @@ export default function AccountDetail({ accountId }: Props) {
   const [working, setWorking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -192,6 +200,87 @@ export default function AccountDetail({ accountId }: Props) {
   function copyNewPw() {
     if (!newTempPw) return;
     navigator.clipboard?.writeText(newTempPw).catch(() => {});
+  }
+
+  /* ---- Avatar upload ---------------------------------------------------- */
+
+  /**
+   * Load a File into an HTMLImageElement, center-crop to a square, scale to
+   * 256×256, and return a JPEG data URL at ~0.85 quality. Keeps payloads well
+   * under 30 KB so we can store the result directly in `accounts.avatar_url`
+   * as TEXT without needing a Storage bucket.
+   */
+  function resizeImageToDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read file."));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("Could not decode image."));
+        img.onload = () => {
+          const size = 256;
+          const canvas = document.createElement("canvas");
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Canvas not available."));
+            return;
+          }
+          /* center-crop to square then scale */
+          const sourceSide = Math.min(img.naturalWidth, img.naturalHeight);
+          const sx = (img.naturalWidth - sourceSide) / 2;
+          const sy = (img.naturalHeight - sourceSide) / 2;
+          ctx.drawImage(img, sx, sy, sourceSide, sourceSide, 0, 0, size, size);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleAvatarChange(file: File) {
+    if (!data) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image is too large (max 8 MB before resize).");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      const ok = await updateAccountAvatar(data.id, dataUrl);
+      if (!ok) {
+        setError("Could not save the new avatar.");
+        return;
+      }
+      setData({ ...data, avatar_url: dataUrl });
+      setToast("Profile picture updated.");
+      notifyIdentityChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not process image.");
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!data) return;
+    setUploadingAvatar(true);
+    const ok = await updateAccountAvatar(data.id, null);
+    setUploadingAvatar(false);
+    if (!ok) {
+      setError("Could not remove the avatar.");
+      return;
+    }
+    setData({ ...data, avatar_url: null });
+    setToast("Profile picture removed.");
+    notifyIdentityChanged();
   }
 
   /** Called by child tabs to patch the loaded account in memory. */
@@ -353,16 +442,60 @@ export default function AccountDetail({ accountId }: Props) {
         {/* ── Identity banner ── */}
         <section className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6 mb-4">
           <div className="flex items-start gap-5 flex-wrap">
-            <div className="h-20 w-20 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden shrink-0">
-              {person?.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={person.avatar_url}
-                  alt={displayName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <UserCircle2 className="h-10 w-10 text-[var(--text-dim)]" />
+            <div className="flex flex-col items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="group relative h-20 w-20 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden hover:border-[var(--border-focus)] transition-colors disabled:opacity-60"
+                title={
+                  data.avatar_url || person?.avatar_url
+                    ? "Change profile picture"
+                    : "Upload profile picture"
+                }
+              >
+                {data.avatar_url || person?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={data.avatar_url || person?.avatar_url || ""}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <UserCircle2 className="h-10 w-10 text-[var(--text-dim)]" />
+                )}
+                <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {uploadingAvatar ? (
+                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white" />
+                  )}
+                </span>
+                {uploadingAvatar && (
+                  <span className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  </span>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleAvatarChange(f);
+                }}
+              />
+              {data.avatar_url && (
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  disabled={uploadingAvatar}
+                  className="text-[11px] text-[var(--text-dim)] hover:text-red-300 flex items-center gap-1 disabled:opacity-60"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
+                </button>
               )}
             </div>
             <div className="flex-1 min-w-0">

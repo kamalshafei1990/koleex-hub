@@ -256,6 +256,7 @@ export default function AccountForm({ mode, account }: Props) {
         two_factor_enabled: false,
         last_login_at: null,
         created_by: null,
+        avatar_url: null,
         temporary_password: form.temporary_password.trim(),
       });
       setSaving(false);
