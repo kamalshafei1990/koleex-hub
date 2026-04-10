@@ -1,21 +1,36 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   AccountsList — Table view of all accounts with search, filters, and
-   per-row actions. Links to /accounts/[id] for detail.
+   AccountsList v2 — Identity system table view.
+
+   Columns:
+     Avatar · Full Name · Username · Login Email · User Type · Company ·
+     Role · Status · Country · Customer Level · Created · Actions
+
+   Search:   name, username, email, company
+   Filters:  user type, role, company, status, country, customer level
+   Actions:  View, Edit, Disable/Activate, Reset Password, Force Password Reset
+
+   Full name, country, and customer level are resolved by joining in-memory
+   against the parallel-fetched people + companies tables. Account rows
+   themselves only hold login identity now.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Search, Filter, X, Users, UserCircle2, Shield, Mail, Phone,
-  ChevronRight, Building2,
+  Plus, Search, Filter, X, Users, UserCircle2, Shield, Mail, Building2,
+  MoreHorizontal, Eye, Pencil, KeyRound, PowerOff, Power, RefreshCcw,
+  CheckCircle2, AlertCircle, Copy, Flag,
 } from "lucide-react";
 import {
-  fetchAccounts, fetchCompanies, fetchRoles,
+  fetchAccounts, fetchCompanies, fetchRoles, fetchPeople,
+  setAccountStatus, resetAccountPassword, setForcePasswordChange,
+  generateTemporaryPassword,
 } from "@/lib/accounts-admin";
 import type {
-  AccountRow, CompanyRow, RoleRow, AccountStatus, UserType, CustomerLevel,
+  AccountRow, CompanyRow, RoleRow, PersonRow,
+  AccountStatus, UserType, CustomerLevel,
 } from "@/types/supabase";
 
 const selectClass =
@@ -39,6 +54,7 @@ export default function AccountsList() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
+  const [people, setPeople] = useState<PersonRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -46,19 +62,34 @@ export default function AccountsList() {
   const [filterStatus, setFilterStatus] = useState<"" | AccountStatus>("");
   const [filterCompany, setFilterCompany] = useState<string>("");
   const [filterRole, setFilterRole] = useState<string>("");
+  const [filterCountry, setFilterCountry] = useState<string>("");
+  const [filterLevel, setFilterLevel] = useState<"" | CustomerLevel>("");
   const [showFilters, setShowFilters] = useState(false);
+
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [newTempPw, setNewTempPw] = useState<{ id: string; pw: string } | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [a, c, r] = await Promise.all([
-        fetchAccounts(), fetchCompanies(), fetchRoles(),
+      const [a, c, r, p] = await Promise.all([
+        fetchAccounts(), fetchCompanies(), fetchRoles(), fetchPeople(),
       ]);
       setAccounts(a);
       setCompanies(c);
       setRoles(r);
+      setPeople(p);
       setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const companyMap = useMemo(
     () => Object.fromEntries(companies.map((c) => [c.id, c])),
@@ -68,42 +99,135 @@ export default function AccountsList() {
     () => Object.fromEntries(roles.map((r) => [r.id, r])),
     [roles],
   );
+  const personMap = useMemo(
+    () => Object.fromEntries(people.map((p) => [p.id, p])),
+    [people],
+  );
+
+  /* Build a derived row bag so search + filter logic is a single pass. */
+  const enriched = useMemo(
+    () =>
+      accounts.map((a) => {
+        const person = a.person_id ? personMap[a.person_id] : null;
+        const company = a.company_id ? companyMap[a.company_id] : null;
+        const role = a.role_id ? roleMap[a.role_id] : null;
+        const fullName = person?.full_name || a.username;
+        const country = company?.country || person?.country || null;
+        const customerLevel: CustomerLevel | null = company?.customer_level || null;
+        return { account: a, person, company, role, fullName, country, customerLevel };
+      }),
+    [accounts, personMap, companyMap, roleMap],
+  );
+
+  /* Country options derived from companies + people so filter dropdown
+     only shows countries that actually exist in the data. */
+  const countryOptions = useMemo(() => {
+    const set = new Set<string>();
+    companies.forEach((c) => c.country && set.add(c.country));
+    people.forEach((p) => p.country && set.add(p.country));
+    return Array.from(set).sort();
+  }, [companies, people]);
 
   const activeFilters =
     (filterType ? 1 : 0) +
     (filterStatus ? 1 : 0) +
     (filterCompany ? 1 : 0) +
-    (filterRole ? 1 : 0);
+    (filterRole ? 1 : 0) +
+    (filterCountry ? 1 : 0) +
+    (filterLevel ? 1 : 0);
 
   const filtered = useMemo(() => {
-    return accounts.filter((a) => {
+    return enriched.filter((row) => {
+      const { account: a, company, fullName, country, customerLevel } = row;
       if (filterType && a.user_type !== filterType) return false;
       if (filterStatus && a.status !== filterStatus) return false;
       if (filterCompany && a.company_id !== filterCompany) return false;
       if (filterRole && a.role_id !== filterRole) return false;
+      if (filterCountry && country !== filterCountry) return false;
+      if (filterLevel && customerLevel !== filterLevel) return false;
       if (search) {
         const q = search.toLowerCase();
         const hit =
-          a.full_name.toLowerCase().includes(q) ||
+          fullName.toLowerCase().includes(q) ||
           a.username.toLowerCase().includes(q) ||
-          a.email.toLowerCase().includes(q) ||
-          (a.phone || "").toLowerCase().includes(q);
+          a.login_email.toLowerCase().includes(q) ||
+          (company?.name || "").toLowerCase().includes(q);
         if (!hit) return false;
       }
       return true;
     });
-  }, [accounts, search, filterType, filterStatus, filterCompany, filterRole]);
+  }, [enriched, search, filterType, filterStatus, filterCompany, filterRole, filterCountry, filterLevel]);
 
   function clearFilters() {
     setFilterType("");
     setFilterStatus("");
     setFilterCompany("");
     setFilterRole("");
+    setFilterCountry("");
+    setFilterLevel("");
+  }
+
+  /* ── Row actions ── */
+
+  async function actionToggleStatus(a: AccountRow) {
+    const next: AccountStatus = a.status === "active" ? "inactive" : "active";
+    setWorking(true);
+    const ok = await setAccountStatus(a.id, next);
+    setWorking(false);
+    setOpenMenu(null);
+    if (ok) {
+      setAccounts((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: next } : x)));
+      setToast(next === "active" ? "Account activated." : "Account deactivated.");
+    } else {
+      setError("Could not update account status.");
+    }
+  }
+
+  async function actionResetPassword(a: AccountRow) {
+    const pw = generateTemporaryPassword();
+    setWorking(true);
+    const ok = await resetAccountPassword(a.id, pw);
+    setWorking(false);
+    setOpenMenu(null);
+    if (ok) {
+      setNewTempPw({ id: a.id, pw });
+      setAccounts((prev) =>
+        prev.map((x) => (x.id === a.id ? { ...x, force_password_change: true } : x)),
+      );
+      setToast("Temporary password reset. Copy it and share securely.");
+    } else {
+      setError("Could not reset the password.");
+    }
+  }
+
+  async function actionToggleForce(a: AccountRow) {
+    const next = !a.force_password_change;
+    setWorking(true);
+    const ok = await setForcePasswordChange(a.id, next);
+    setWorking(false);
+    setOpenMenu(null);
+    if (ok) {
+      setAccounts((prev) =>
+        prev.map((x) => (x.id === a.id ? { ...x, force_password_change: next } : x)),
+      );
+      setToast(
+        next
+          ? "Force password change on next login."
+          : "Force password change cleared.",
+      );
+    } else {
+      setError("Could not update the flag.");
+    }
+  }
+
+  function copyTempPw() {
+    if (!newTempPw) return;
+    navigator.clipboard?.writeText(newTempPw.pw).catch(() => {});
   }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8">
@@ -127,6 +251,49 @@ export default function AccountsList() {
           </div>
         </div>
 
+        {/* Toasts */}
+        {toast && (
+          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{toast}</span>
+          </div>
+        )}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+        {newTempPw && (
+          <div className="mb-4 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface)] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
+                New Temporary Password
+              </p>
+              <p className="text-[14px] font-mono text-[var(--text-primary)] mt-1">
+                {newTempPw.pw}
+              </p>
+              <p className="text-[11px] text-[var(--text-dim)] mt-1">
+                Copy this and share securely. The user will be forced to change it on next login.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={copyTempPw}
+                className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
+              >
+                <Copy className="h-3.5 w-3.5" /> Copy
+              </button>
+              <button
+                onClick={() => setNewTempPw(null)}
+                className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Search + Filters */}
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
@@ -136,7 +303,7 @@ export default function AccountsList() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, username, email, phone…"
+                placeholder="Search by name, username, email, or company…"
                 className="w-full h-10 pl-10 pr-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
               />
             </div>
@@ -167,10 +334,10 @@ export default function AccountsList() {
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Type
+                  User Type
                 </label>
                 <select
                   value={filterType}
@@ -184,18 +351,19 @@ export default function AccountsList() {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Status
+                  Role
                 </label>
                 <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as "" | AccountStatus)}
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
                   className={selectClass + " w-full"}
                 >
                   <option value="">All</option>
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -217,19 +385,51 @@ export default function AccountsList() {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Role
+                  Status
                 </label>
                 <select
-                  value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as "" | AccountStatus)}
                   className={selectClass + " w-full"}
                 >
                   <option value="">All</option>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
+                  Country
+                </label>
+                <select
+                  value={filterCountry}
+                  onChange={(e) => setFilterCountry(e.target.value)}
+                  className={selectClass + " w-full"}
+                >
+                  <option value="">All</option>
+                  {countryOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
                     </option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
+                  Customer Level
+                </label>
+                <select
+                  value={filterLevel}
+                  onChange={(e) => setFilterLevel(e.target.value as "" | CustomerLevel)}
+                  className={selectClass + " w-full"}
+                >
+                  <option value="">All</option>
+                  <option value="silver">Silver</option>
+                  <option value="gold">Gold</option>
+                  <option value="platinum">Platinum</option>
+                  <option value="diamond">Diamond</option>
                 </select>
               </div>
             </div>
@@ -243,7 +443,7 @@ export default function AccountsList() {
           </p>
         )}
 
-        {/* List */}
+        {/* Table */}
         {loading ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
             {[...Array(6)].map((_, i) => (
@@ -279,91 +479,312 @@ export default function AccountsList() {
             )}
           </div>
         ) : (
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
-            {filtered.map((a) => {
-              const company = a.company_id ? companyMap[a.company_id] : null;
-              const role = a.role_id ? roleMap[a.role_id] : null;
-              return (
-                <Link
-                  key={a.id}
-                  href={`/accounts/${a.id}`}
-                  className="flex items-center gap-4 p-4 hover:bg-[var(--bg-surface-subtle)] transition-colors group"
-                >
-                  {/* Avatar */}
-                  <div className="h-11 w-11 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-                    {a.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={a.avatar_url}
-                        alt={a.full_name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <UserCircle2 className="h-6 w-6 text-[var(--text-dim)]" />
-                    )}
-                  </div>
-
-                  {/* Identity */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
-                        {a.full_name}
-                      </span>
-                      <span className="text-[11px] text-[var(--text-dim)]">
-                        @{a.username}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            {/* Desktop table */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-left text-[12px]">
+                <thead className="bg-[var(--bg-surface-subtle)]/50">
+                  <tr className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
+                    <th className="px-4 py-3 w-[280px]">Name</th>
+                    <th className="px-3 py-3 w-[140px]">Username</th>
+                    <th className="px-3 py-3">Login Email</th>
+                    <th className="px-3 py-3 w-[90px]">Type</th>
+                    <th className="px-3 py-3">Company</th>
+                    <th className="px-3 py-3">Role</th>
+                    <th className="px-3 py-3 w-[90px]">Status</th>
+                    <th className="px-3 py-3 w-[100px]">Country</th>
+                    <th className="px-3 py-3 w-[100px]">Level</th>
+                    <th className="px-3 py-3 w-[100px]">Created</th>
+                    <th className="px-3 py-3 w-[60px] text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {filtered.map((row) => {
+                    const { account: a, person, company, role, fullName, country, customerLevel } = row;
+                    return (
+                      <tr
+                        key={a.id}
+                        className="hover:bg-[var(--bg-surface-subtle)]/60 transition-colors group"
                       >
-                        {a.status}
-                      </span>
-                      {a.customer_level && (
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[a.customer_level]}`}
-                        >
-                          {a.customer_level}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-[var(--text-dim)] mt-1 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {a.email}
-                      </span>
-                      {a.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> {a.phone}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                        <td className="px-4 py-3">
+                          <Link href={`/accounts/${a.id}`} className="flex items-center gap-3 min-w-0">
+                            <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
+                              {person?.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={person.avatar_url}
+                                  alt={fullName}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <UserCircle2 className="h-5 w-5 text-[var(--text-dim)]" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+                                {fullName}
+                              </div>
+                              {person?.job_title && (
+                                <div className="text-[11px] text-[var(--text-dim)] truncate">
+                                  {person.job_title}
+                                </div>
+                              )}
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-3 py-3 font-mono text-[12px] text-[var(--text-muted)]">
+                          @{a.username}
+                        </td>
+                        <td className="px-3 py-3 text-[var(--text-muted)]">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <Mail className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                            <span className="truncate">{a.login_email}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                            {a.user_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-[var(--text-muted)]">
+                          {company ? (
+                            <span className="flex items-center gap-1.5 truncate">
+                              <Building2 className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                              <span className="truncate">{company.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-ghost)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-[var(--text-muted)]">
+                          {role ? (
+                            <span className="flex items-center gap-1.5 truncate">
+                              <Shield className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                              <span className="truncate">{role.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-ghost)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
+                          >
+                            {a.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-[var(--text-muted)]">
+                          {country || <span className="text-[var(--text-ghost)]">—</span>}
+                        </td>
+                        <td className="px-3 py-3">
+                          {customerLevel ? (
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
+                            >
+                              {customerLevel}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-ghost)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-[var(--text-dim)] text-[11px]">
+                          {new Date(a.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-3 py-3 text-right relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenu((m) => (m === a.id ? null : a.id));
+                            }}
+                            disabled={working}
+                            className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center ml-auto disabled:opacity-60"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                          {openMenu === a.id && (
+                            <RowMenu
+                              account={a}
+                              onClose={() => setOpenMenu(null)}
+                              onToggleStatus={() => actionToggleStatus(a)}
+                              onResetPassword={() => actionResetPassword(a)}
+                              onToggleForce={() => actionToggleForce(a)}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                  {/* Company / role */}
-                  <div className="hidden md:flex flex-col items-end text-[11px] text-[var(--text-dim)] min-w-[160px]">
-                    {company && (
-                      <span className="flex items-center gap-1 text-[var(--text-muted)]">
-                        <Building2 className="h-3 w-3" />
-                        {company.name}
-                      </span>
+            {/* Mobile / tablet card list */}
+            <div className="lg:hidden divide-y divide-[var(--border-subtle)]">
+              {filtered.map((row) => {
+                const { account: a, person, company, role, fullName, country, customerLevel } = row;
+                return (
+                  <div key={a.id} className="p-4 relative">
+                    <Link href={`/accounts/${a.id}`} className="flex items-start gap-3">
+                      <div className="h-11 w-11 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
+                        {person?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={person.avatar_url}
+                            alt={fullName}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <UserCircle2 className="h-6 w-6 text-[var(--text-dim)]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pr-10">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
+                            {fullName}
+                          </span>
+                          <span className="text-[11px] font-mono text-[var(--text-dim)]">
+                            @{a.username}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-[var(--text-dim)] mt-1 flex-wrap">
+                          <span className="flex items-center gap-1 truncate max-w-full">
+                            <Mail className="h-3 w-3" />
+                            {a.login_email}
+                          </span>
+                          {company && (
+                            <span className="flex items-center gap-1 truncate max-w-full">
+                              <Building2 className="h-3 w-3" />
+                              {company.name}
+                            </span>
+                          )}
+                          {role && (
+                            <span className="flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              {role.name}
+                            </span>
+                          )}
+                          {country && (
+                            <span className="flex items-center gap-1">
+                              <Flag className="h-3 w-3" />
+                              {country}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
+                          >
+                            {a.status}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border border-[var(--border-subtle)] text-[var(--text-muted)]">
+                            {a.user_type}
+                          </span>
+                          {customerLevel && (
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
+                            >
+                              {customerLevel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => setOpenMenu((m) => (m === a.id ? null : a.id))}
+                      disabled={working}
+                      className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center disabled:opacity-60"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    {openMenu === a.id && (
+                      <RowMenu
+                        account={a}
+                        onClose={() => setOpenMenu(null)}
+                        onToggleStatus={() => actionToggleStatus(a)}
+                        onResetPassword={() => actionResetPassword(a)}
+                        onToggleForce={() => actionToggleForce(a)}
+                      />
                     )}
-                    {role && (
-                      <span className="flex items-center gap-1 mt-0.5">
-                        <Shield className="h-3 w-3" />
-                        {role.name}
-                      </span>
-                    )}
-                    <span className="uppercase tracking-wider mt-0.5 opacity-60">
-                      {a.user_type}
-                    </span>
                   </div>
-
-                  <ChevronRight className="h-4 w-4 text-[var(--text-ghost)] group-hover:text-[var(--text-primary)] transition-colors shrink-0" />
-                </Link>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Row menu popover ── */
+
+function RowMenu({
+  account,
+  onClose,
+  onToggleStatus,
+  onResetPassword,
+  onToggleForce,
+}: {
+  account: AccountRow;
+  onClose: () => void;
+  onToggleStatus: () => void;
+  onResetPassword: () => void;
+  onToggleForce: () => void;
+}) {
+  const isActive = account.status === "active";
+  return (
+    <>
+      {/* Click-away backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+      />
+      <div className="absolute right-4 top-12 z-50 w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+        <MenuItem icon={<Eye className="h-4 w-4" />} label="View" href={`/accounts/${account.id}`} />
+        <MenuItem icon={<Pencil className="h-4 w-4" />} label="Edit" href={`/accounts/${account.id}/edit`} />
+        <div className="h-px bg-[var(--border-subtle)]" />
+        <MenuItem
+          icon={isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+          label={isActive ? "Deactivate" : "Activate"}
+          onClick={onToggleStatus}
+        />
+        <MenuItem
+          icon={<KeyRound className="h-4 w-4" />}
+          label="Reset Password"
+          onClick={onResetPassword}
+        />
+        <MenuItem
+          icon={<RefreshCcw className="h-4 w-4" />}
+          label={account.force_password_change ? "Clear Force Reset" : "Force Password Reset"}
+          onClick={onToggleForce}
+        />
+      </div>
+    </>
+  );
+}
+
+function MenuItem({
+  icon, label, href, onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  href?: string;
+  onClick?: () => void;
+}) {
+  const base =
+    "w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors text-left";
+  if (href) {
+    return (
+      <Link href={href} className={base}>
+        {icon}
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={base}>
+      {icon}
+      {label}
+    </button>
   );
 }

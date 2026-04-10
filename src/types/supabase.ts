@@ -378,9 +378,25 @@ export type ModelTranslationInsert = Omit<ModelTranslationRow, "id" | "created_a
 export type ProductMarketPriceInsert = Omit<ProductMarketPriceRow, "id" | "created_at">;
 
 /* ---------------------------------------------------------------------------
-   Accounts Manager — Internal + customer user accounts, companies, roles.
-   Maps to the `accounts`, `companies`, `roles` tables created in
-   supabase/migrations/create_accounts_system.sql.
+   Accounts Manager v2 — Identity System
+
+   This is the refactored identity layer. It separates five concerns into
+   five tables (see supabase/migrations/refactor_accounts_to_identity_system.sql):
+
+     1. people          — Person / contact records (identity + address).
+     2. companies       — Organisations. customer_level lives here as the
+                          single source of truth for pricing logic.
+     3. employees       — Internal HR records linking people ↔ accounts.
+     4. accounts        — Login identity only: username, login email,
+                          password, user_type, status, role, links to
+                          person + company. No more profile data here.
+     5. access_presets  — Role → default permission bundle (placeholder for
+                          the future permissions system with overrides).
+
+   Naming note: we use `people` (not `contacts`) because a legacy `contacts`
+   table already exists for the /customers, /suppliers, /contacts pages as
+   a flat business directory. The new `people` table is the identity-layer
+   person record.
    --------------------------------------------------------------------------- */
 
 export type UserType = "internal" | "customer";
@@ -388,13 +404,17 @@ export type AccountStatus = "active" | "inactive" | "suspended" | "pending";
 export type CustomerLevel = "silver" | "gold" | "platinum" | "diamond";
 export type CompanyType = "koleex" | "customer" | "supplier" | "partner";
 export type RoleScope = "internal" | "customer" | "all";
+export type EmploymentStatus = "active" | "on_leave" | "terminated" | "inactive";
 
+/* ── Companies (source of truth for customer level + pricing) ── */
 export interface CompanyRow {
   id: string;
   name: string;
   type: CompanyType;
   country: string | null;
   currency: string | null;
+  customer_level: CustomerLevel | null;
+  tax_id: string | null;
   website: string | null;
   logo_url: string | null;
   notes: string | null;
@@ -403,7 +423,9 @@ export interface CompanyRow {
 }
 
 export type CompanyInsert = Omit<CompanyRow, "id" | "created_at" | "updated_at">;
+export type CompanyUpdate = Partial<CompanyInsert>;
 
+/* ── Roles ── */
 export interface RoleRow {
   id: string;
   slug: string;
@@ -416,34 +438,80 @@ export interface RoleRow {
 
 export type RoleInsert = Omit<RoleRow, "id" | "created_at">;
 
+/* ── People (person records — identity + address) ── */
+export interface PersonRow {
+  id: string;
+  full_name: string;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  job_title: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  avatar_url: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postal_code: string | null;
+  company_id: string | null;
+  language: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export type PersonInsert = Omit<PersonRow, "id" | "created_at" | "updated_at">;
+export type PersonUpdate = Partial<PersonInsert>;
+
+/* ── Employees (internal HR record, links person ↔ account) ── */
+export interface EmployeeRow {
+  id: string;
+  person_id: string | null;
+  account_id: string | null;
+  employee_number: string | null;
+  department: string | null;
+  position: string | null;
+  hire_date: string | null;
+  employment_status: EmploymentStatus;
+  manager_id: string | null;
+  work_email: string | null;
+  work_phone: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EmployeeInsert = Omit<EmployeeRow, "id" | "created_at" | "updated_at">;
+export type EmployeeUpdate = Partial<EmployeeInsert>;
+
+/* ── Accounts (login identity only) ── */
 export interface AccountRow {
   id: string;
   auth_user_id: string | null;
-  full_name: string;
+
+  // Login identity
   username: string;
-  email: string;
-  phone: string | null;
-  avatar_url: string | null;
-  user_type: UserType;
-  company_id: string | null;
-  role_id: string | null;
-  status: AccountStatus;
-  country: string | null;
-  currency: string | null;
-  customer_level: CustomerLevel | null;
-
-  can_access_products: boolean;
-  can_create_quotations: boolean;
-  can_view_pricing: boolean;
-  can_place_orders: boolean;
-
+  login_email: string;
   password_hash: string | null;
   force_password_change: boolean;
   two_factor_enabled: boolean;
   last_login_at: string | null;
 
+  // Type / status / role
+  user_type: UserType;
+  status: AccountStatus;
+  role_id: string | null;
+
+  // Linked records
+  person_id: string | null;
+  company_id: string | null;
+
+  // Admin-only
   internal_notes: string | null;
-  account_notes: string | null;
 
   created_at: string;
   updated_at: string;
@@ -452,6 +520,38 @@ export interface AccountRow {
 
 export type AccountInsert = Omit<AccountRow, "id" | "created_at" | "updated_at">;
 export type AccountUpdate = Partial<AccountInsert>;
+
+/* ── Access Presets (role → default permission bundle) ── */
+export interface AccessPresetRow {
+  id: string;
+  role_id: string;
+  preset_name: string;
+  description: string | null;
+  can_access_products: boolean;
+  can_view_pricing: boolean;
+  can_create_quotations: boolean;
+  can_place_orders: boolean;
+  can_manage_accounts: boolean;
+  can_manage_products: boolean;
+  can_access_finance: boolean;
+  can_access_hr: boolean;
+  can_access_marketing: boolean;
+  scope_notes: string | null;
+  created_at: string;
+}
+
+export type AccessPresetInsert = Omit<AccessPresetRow, "id" | "created_at">;
+export type AccessPresetUpdate = Partial<AccessPresetInsert>;
+
+/* Convenience: an account with its linked person / company / role / preset
+   already joined in memory (built client-side after parallel fetches). */
+export interface AccountWithLinks extends AccountRow {
+  person: PersonRow | null;
+  company: CompanyRow | null;
+  role: RoleRow | null;
+  preset: AccessPresetRow | null;
+  employee: EmployeeRow | null;
+}
 
 /* ── Database schema type for createClient<Database> ── */
 
@@ -531,17 +631,32 @@ export interface Database {
       companies: {
         Row: CompanyRow;
         Insert: CompanyInsert;
-        Update: Partial<CompanyInsert>;
+        Update: CompanyUpdate;
       };
       roles: {
         Row: RoleRow;
         Insert: RoleInsert;
         Update: Partial<RoleInsert>;
       };
+      people: {
+        Row: PersonRow;
+        Insert: PersonInsert;
+        Update: PersonUpdate;
+      };
       accounts: {
         Row: AccountRow;
         Insert: AccountInsert;
         Update: AccountUpdate;
+      };
+      employees: {
+        Row: EmployeeRow;
+        Insert: EmployeeInsert;
+        Update: EmployeeUpdate;
+      };
+      access_presets: {
+        Row: AccessPresetRow;
+        Insert: AccessPresetInsert;
+        Update: AccessPresetUpdate;
       };
     };
   };
