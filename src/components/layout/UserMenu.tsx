@@ -152,9 +152,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       const next = encodeURIComponent(pathname || "/");
       router.push(`/login?next=${next}`);
     } else {
-      /* Legacy: AdminAuth renders its own password form on protected
-         routes. Navigating to / triggers that gate if not authed. */
-      router.push("/");
+      /* Legacy: the home page isn't gated, so we route to a gated page
+         that forces AdminAuth to render its password form. /accounts is
+         the obvious landing spot for an admin session. */
+      router.push("/accounts");
     }
   }, [identity, pathname, router]);
 
