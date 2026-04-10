@@ -26,7 +26,8 @@ import Link from "next/link";
 import {
   ArrowLeft, Pencil, Check, Download, Play, Tag, Boxes, Globe, Zap,
   Ruler, Layers, Factory, Sparkles, ShieldCheck, Image as ImageIcon,
-  ChevronRight, FileText, ExternalLink,
+  ChevronRight, FileText, ExternalLink, Gauge, Cpu, Droplets, Target,
+  Volume2, Wrench, Activity, Award, Scissors, ChevronDown, Package,
 } from "lucide-react";
 
 import {
@@ -71,6 +72,218 @@ function fmtMoney(amount: number | null, currency = "USD"): string {
   } catch {
     return `${currency} ${amount}`;
   }
+}
+
+type KeyFeature = {
+  icon: React.ReactNode;
+  title: string;
+  value?: string;
+  description: string;
+};
+
+/**
+ * Pull 4-6 marketing-worthy features out of the common specs + product row.
+ * Chooses whichever real data is present so the section is always meaningful.
+ */
+function deriveKeyFeatures(
+  product: ProductRow,
+  sewingSpecs: SewingMachineSpecsRow | null,
+): KeyFeature[] {
+  const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
+  const features: KeyFeature[] = [];
+
+  // 1. Max sewing speed
+  if (cs.max_sewing_speed) {
+    features.push({
+      icon: <Gauge className="h-5 w-5" />,
+      title: "High Speed",
+      value: `${cs.max_sewing_speed} spm`,
+      description: "Built for high-volume production runs.",
+    });
+  }
+
+  // 2. Motor type
+  const motor = cs.motor_type as string | undefined;
+  if (motor) {
+    const labels: Record<string, { title: string; desc: string }> = {
+      servo: { title: "Direct Drive Servo", desc: "Energy-efficient, instant response." },
+      clutch: { title: "Clutch Motor", desc: "Proven industrial reliability." },
+      "built-in": { title: "Built-in Motor", desc: "Integrated, vibration-reduced drive." },
+      stepper: { title: "Stepper Motor", desc: "Precise incremental positioning." },
+    };
+    const m = labels[motor] || { title: "Advanced Motor", desc: "Precision drive system." };
+    features.push({ icon: <Cpu className="h-5 w-5" />, title: m.title, description: m.desc });
+  }
+
+  // 3. Lubrication
+  const lube = cs.lubrication_system as string | undefined;
+  if (lube) {
+    const labels: Record<string, { title: string; desc: string }> = {
+      automatic: { title: "Auto Lubrication", desc: "Fully sealed, low maintenance." },
+      "semi-automatic": { title: "Semi-Auto Lubrication", desc: "Reliable with minimal checks." },
+      manual: { title: "Manual Lubrication", desc: "Operator-controlled oiling." },
+      "dry-head": { title: "Dry Head", desc: "Oil-free — ideal for clean garments." },
+    };
+    const l = labels[lube] || { title: "Smart Lubrication", desc: "Engineered for durability." };
+    features.push({ icon: <Droplets className="h-5 w-5" />, title: l.title, description: l.desc });
+  }
+
+  // 4. Needle system
+  if (cs.needle_system) {
+    features.push({
+      icon: <Target className="h-5 w-5" />,
+      title: "Precision Needle",
+      value: String(cs.needle_system),
+      description: "Industrial-grade needle system.",
+    });
+  }
+
+  // 5. Stitch range
+  if (cs.stitch_length_max) {
+    const min = cs.stitch_length_min ? `${cs.stitch_length_min}–` : "Up to ";
+    features.push({
+      icon: <Ruler className="h-5 w-5" />,
+      title: "Wide Stitch Range",
+      value: `${min}${cs.stitch_length_max} mm`,
+      description: "Versatile across fabric thicknesses.",
+    });
+  }
+
+  // 6. Presser foot lift
+  if (features.length < 6 && cs.presser_foot_lift) {
+    features.push({
+      icon: <Activity className="h-5 w-5" />,
+      title: "Generous Clearance",
+      value: `${cs.presser_foot_lift} mm lift`,
+      description: "Handles thick and layered materials.",
+    });
+  }
+
+  // 7. Noise level (from template_specs if present)
+  const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
+  if (features.length < 6 && ts.noise_level) {
+    features.push({
+      icon: <Volume2 className="h-5 w-5" />,
+      title: "Low Noise",
+      value: `${ts.noise_level} dB`,
+      description: "Quieter workstation environment.",
+    });
+  }
+
+  // Fallbacks — always show at least 4
+  if (features.length < 4 && product.warranty) {
+    features.push({
+      icon: <ShieldCheck className="h-5 w-5" />,
+      title: "Manufacturer Warranty",
+      value: product.warranty,
+      description: "Backed by Koleex support.",
+    });
+  }
+  if (features.length < 4 && product.country_of_origin) {
+    features.push({
+      icon: <Award className="h-5 w-5" />,
+      title: "Quality Sourcing",
+      value: product.country_of_origin,
+      description: "Curated manufacturing origin.",
+    });
+  }
+  if (features.length < 4 && (product.voltage?.length || 0) > 0) {
+    features.push({
+      icon: <Zap className="h-5 w-5" />,
+      title: "Global Voltage",
+      value: (product.voltage || []).join(" / "),
+      description: "Ready for international deployment.",
+    });
+  }
+  if (features.length < 4) {
+    features.push({
+      icon: <Wrench className="h-5 w-5" />,
+      title: "Built to Serve",
+      description: "Engineered for industrial sewing lines.",
+    });
+  }
+
+  return features.slice(0, 6);
+}
+
+/**
+ * Build 2–4 short bullet highlights for the hero, derived from whichever
+ * specs are filled in. Kept as short imperative phrases.
+ */
+function deriveHeroHighlights(
+  product: ProductRow,
+  sewingSpecs: SewingMachineSpecsRow | null,
+): string[] {
+  const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
+  const out: string[] = [];
+  if (cs.max_sewing_speed) out.push(`Up to ${cs.max_sewing_speed} stitches per minute`);
+  if (cs.motor_type === "servo") out.push("Direct drive servo motor");
+  else if (cs.motor_type) out.push(`${String(cs.motor_type).replace(/-/g, " ")} motor`);
+  if (cs.lubrication_system === "automatic") out.push("Automatic sealed lubrication");
+  else if (cs.lubrication_system === "dry-head") out.push("Dry head — oil-free operation");
+  if (cs.stitch_length_max) out.push(`Stitch length up to ${cs.stitch_length_max} mm`);
+  if (out.length < 2 && product.warranty) out.push(`${product.warranty} warranty`);
+  if (out.length < 2 && product.country_of_origin) out.push(`Manufactured in ${product.country_of_origin}`);
+  return out.slice(0, 4);
+}
+
+/**
+ * Map an application/tag to an icon + category label + short description.
+ * Falls back to a generic Layers/garment treatment.
+ */
+type AppInfo = {
+  kind: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  description: string;
+};
+function describeApplication(tag: string): AppInfo {
+  const t = tag.toLowerCase().trim();
+
+  // Fabric types
+  if (/denim|jean/.test(t))
+    return { kind: "Heavy fabric", icon: Layers, description: "Engineered for dense denim and jeanswear production." };
+  if (/leather/.test(t))
+    return { kind: "Heavy material", icon: ShieldCheck, description: "Handles thick hides and multi-layer leather work." };
+  if (/canvas|tarp/.test(t))
+    return { kind: "Heavy fabric", icon: Layers, description: "Ideal for canvas, tarpaulin and technical textiles." };
+  if (/knit|jersey/.test(t))
+    return { kind: "Stretch fabric", icon: Activity, description: "Smooth handling of knit and jersey materials." };
+  if (/silk|satin|chiffon/.test(t))
+    return { kind: "Fine fabric", icon: Sparkles, description: "Precision feed for delicate and luxury fabrics." };
+
+  // Garment types
+  if (/shirt|blouse/.test(t))
+    return { kind: "Garment", icon: Scissors, description: "Clean seams for shirting and light tailoring." };
+  if (/trouser|pant|jean/.test(t))
+    return { kind: "Garment", icon: Scissors, description: "Production-grade stitching for bottoms and jeans." };
+  if (/jacket|coat|outerwear/.test(t))
+    return { kind: "Outerwear", icon: ShieldCheck, description: "Reliable seams across heavy-layered garments." };
+  if (/dress|skirt/.test(t))
+    return { kind: "Garment", icon: Sparkles, description: "Elegant finish for dresses, skirts and womenswear." };
+  if (/underwear|lingerie|intimate/.test(t))
+    return { kind: "Intimates", icon: Sparkles, description: "Gentle feed for fine intimate apparel." };
+  if (/sport|active|athletic/.test(t))
+    return { kind: "Activewear", icon: Activity, description: "Built for performance and athletic garments." };
+  if (/workwear|uniform/.test(t))
+    return { kind: "Workwear", icon: Factory, description: "Durable construction for uniforms and workwear." };
+
+  // Accessories / home
+  if (/bag|backpack|luggage/.test(t))
+    return { kind: "Accessory", icon: Package, description: "Tough stitching for bags, backpacks and luggage." };
+  if (/shoe|footwear/.test(t))
+    return { kind: "Footwear", icon: Target, description: "Specialised seams for footwear and uppers." };
+  if (/home|upholstery|curtain|cushion/.test(t))
+    return { kind: "Home textile", icon: Layers, description: "Consistent finish for upholstery and home goods." };
+  if (/automotive|car|seat/.test(t))
+    return { kind: "Technical", icon: Wrench, description: "Heavy-duty seams for automotive interiors." };
+  if (/medical|ppe|mask/.test(t))
+    return { kind: "Technical", icon: ShieldCheck, description: "Precise assembly for medical and PPE goods." };
+  if (/embroidery|decor/.test(t))
+    return { kind: "Decoration", icon: Sparkles, description: "Decorative stitching and embellishment work." };
+  if (/quilt/.test(t))
+    return { kind: "Multi-layer", icon: Layers, description: "Controlled feed across thick quilted layers." };
+
+  return { kind: "Application", icon: Layers, description: "Optimised for industrial garment production." };
 }
 
 function Section({
@@ -128,6 +341,9 @@ export default function ProductViewPage() {
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
 
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
+  const toggleModel = (id: string) =>
+    setExpandedModels(prev => ({ ...prev, [id]: !prev[id] }));
 
   /* ── Load ── */
   useEffect(() => {
@@ -264,6 +480,16 @@ export default function ProductViewPage() {
       .map(([k, v]) => ({ key: k, value: String(v) }));
   }, [product]);
 
+  const keyFeatures = useMemo<KeyFeature[]>(
+    () => (product ? deriveKeyFeatures(product, sewingSpecs) : []),
+    [product, sewingSpecs],
+  );
+
+  const heroHighlights = useMemo<string[]>(
+    () => (product ? deriveHeroHighlights(product, sewingSpecs) : []),
+    [product, sewingSpecs],
+  );
+
   /* ── Loading / not found ── */
   if (loading) {
     return (
@@ -353,6 +579,18 @@ export default function ProductViewPage() {
                 <p className="mt-5 text-[18px] md:text-[22px] text-[var(--text-dim)] leading-relaxed max-w-xl">
                   {primaryModel.tagline}
                 </p>
+              )}
+
+              {/* Hero highlight bullets (derived from real specs) */}
+              {heroHighlights.length > 0 && (
+                <ul className="mt-7 space-y-2.5 max-w-xl">
+                  {heroHighlights.map((h, i) => (
+                    <li key={i} className="flex items-start gap-3 text-[14px] md:text-[15px] text-white/85">
+                      <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-white/70 shrink-0" />
+                      <span>{h}</span>
+                    </li>
+                  ))}
+                </ul>
               )}
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -457,61 +695,118 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          3. KEY FEATURES / DESCRIPTION
+          3. PRODUCT DESCRIPTION (prose)
           ══════════════════════════════════════ */}
-      {(product.description || tags.length > 0) && (
-        <Section eyebrow="Overview" title="Built for precision.">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            {product.description && (
-              <div className="lg:col-span-7">
-                <div
-                  className="prose prose-invert max-w-none text-[16px] md:text-[17px] text-[var(--text-muted)] leading-[1.75] [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white"
-                  dangerouslySetInnerHTML={{ __html: product.description }}
-                />
+      {product.description && (
+        <section className="py-16 md:py-24">
+          <div className="max-w-3xl mx-auto px-6">
+            <div
+              className="prose prose-invert max-w-none text-center text-[18px] md:text-[22px] text-[var(--text-muted)] leading-[1.6] font-light [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_p]:mb-5"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════
+          4. KEY FEATURES (icon grid)
+          ══════════════════════════════════════ */}
+      {keyFeatures.length > 0 && (
+        <Section eyebrow="Key features" title="Engineered to perform." className="bg-white/[0.015]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {keyFeatures.map((f, i) => (
+              <div
+                key={i}
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-7 md:p-8 hover:border-white/25 transition-all"
+              >
+                <div className="h-11 w-11 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/90 mb-6 group-hover:bg-white/[0.1] transition">
+                  {f.icon}
+                </div>
+                <h3 className="text-[20px] md:text-[22px] font-semibold text-white tracking-tight leading-tight">
+                  {f.title}
+                </h3>
+                {f.value && (
+                  <p className="mt-1.5 text-[13px] font-medium text-[var(--text-dim)]">{f.value}</p>
+                )}
+                <p className="mt-3 text-[14px] text-[var(--text-dim)] leading-relaxed">
+                  {f.description}
+                </p>
               </div>
-            )}
-            <div className="lg:col-span-5 space-y-4">
-              {tags.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)] mb-3">
-                    Built for
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map(t => (
-                      <span key={t} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-white/10 bg-white/[0.03] text-[12px] text-white/80">
-                        <Tag className="h-3 w-3 text-white/40" />
-                        {t}
-                      </span>
-                    ))}
-                  </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ══════════════════════════════════════
+          5. SEWING MACHINE OVERVIEW
+          Three labeled blocks: Machine Type · Main Function · Application
+          ══════════════════════════════════════ */}
+      {(activeTemplate || subcategoryName || tags.length > 0) && (
+        <Section eyebrow="Machine overview" title="Designed for your line.">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Machine Type */}
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 flex flex-col min-h-[240px]">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                  <Factory className="h-4 w-4 text-white/80" />
                 </div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)]">
+                  Machine Type
+                </p>
+              </div>
+              <h3 className="text-[24px] md:text-[26px] font-semibold text-white leading-tight tracking-tight">
+                {activeTemplate?.icon ? `${activeTemplate.icon} ` : ""}
+                {activeTemplate?.name || subcategoryName || "Industrial Sewing Machine"}
+              </h3>
+              {categoryName && (
+                <p className="mt-auto pt-4 text-[12px] text-[var(--text-dim)]">
+                  {categoryName}
+                </p>
               )}
-              {(product.voltage?.length > 0 || product.watt || product.plug_types?.length > 0) && (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)] mb-3 flex items-center gap-1.5">
-                    <Zap className="h-3 w-3" /> Electrical
-                  </p>
-                  <dl className="text-[13px] space-y-1.5">
-                    {product.voltage?.length > 0 && (
-                      <div className="flex justify-between">
-                        <dt className="text-[var(--text-dim)]">Voltage</dt>
-                        <dd className="text-white">{product.voltage.join(" / ")}</dd>
-                      </div>
-                    )}
-                    {product.watt && (
-                      <div className="flex justify-between">
-                        <dt className="text-[var(--text-dim)]">Power</dt>
-                        <dd className="text-white">{product.watt} W</dd>
-                      </div>
-                    )}
-                    {product.plug_types?.length > 0 && (
-                      <div className="flex justify-between">
-                        <dt className="text-[var(--text-dim)]">Plug</dt>
-                        <dd className="text-white">{product.plug_types.join(", ")}</dd>
-                      </div>
-                    )}
-                  </dl>
+            </div>
+
+            {/* Main Function */}
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 flex flex-col min-h-[240px]">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                  <Scissors className="h-4 w-4 text-white/80" />
                 </div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)]">
+                  Main Function
+                </p>
+              </div>
+              <p className="text-[17px] md:text-[18px] text-white/90 leading-[1.5] font-light">
+                {activeTemplate?.description ||
+                  primaryModel?.tagline ||
+                  `${product.product_name} delivers industrial-grade performance for professional sewing lines.`}
+              </p>
+            </div>
+
+            {/* Application */}
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 flex flex-col min-h-[240px]">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                  <Layers className="h-4 w-4 text-white/80" />
+                </div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-ghost)]">
+                  Application
+                </p>
+              </div>
+              {tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {tags.slice(0, 8).map(t => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center h-7 px-3 rounded-full border border-white/10 bg-white/[0.04] text-[12px] text-white/85 capitalize"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[15px] text-[var(--text-dim)]">
+                  General-purpose industrial sewing across garment production lines.
+                </p>
               )}
             </div>
           </div>
@@ -573,18 +868,22 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          5. MODELS
+          7. MODELS / VARIANTS
           ══════════════════════════════════════ */}
       {models.length > 0 && (
-        <Section id="models" eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`} title="Choose your model.">
+        <Section id="models" eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`} title="Choose your model." className="bg-white/[0.015]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {models
               .filter(m => m.visible !== false)
               .map(m => {
                 const modelPhoto = media.find(md => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"));
                 const price = m.global_price ?? m.head_only_price ?? m.complete_set_price ?? null;
+                const isExpanded = !!expandedModels[m.id];
+                const hasDetails = Boolean(
+                  m.weight || m.cbm || m.packing_type || m.box_include || m.extra_accessories || m.barcode || m.reference_model
+                );
                 return (
-                  <div key={m.id} className="group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/25 transition-all">
+                  <div key={m.id} className="group relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.04] to-white/[0.01] hover:border-white/25 transition-all flex flex-col">
                     <div className="aspect-[4/3] bg-white/[0.02] relative">
                       {modelPhoto || mainImage ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -599,7 +898,7 @@ export default function ProductViewPage() {
                         </div>
                       )}
                     </div>
-                    <div className="p-5">
+                    <div className="p-5 flex flex-col flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <h3 className="text-[17px] font-semibold text-white truncate">{m.model_name}</h3>
@@ -638,7 +937,7 @@ export default function ProductViewPage() {
                           {m.supplier && (
                             <div className="flex justify-between">
                               <dt className="text-[var(--text-ghost)]">Supplier</dt>
-                              <dd className="text-white/80">{m.supplier}</dd>
+                              <dd className="text-white/80 truncate ml-2">{m.supplier}</dd>
                             </div>
                           )}
                           {m.moq && (
@@ -655,6 +954,78 @@ export default function ProductViewPage() {
                           )}
                         </dl>
                       )}
+
+                      {/* Expand details */}
+                      {hasDetails && (
+                        <>
+                          <div
+                            className={`grid transition-all duration-300 ease-out ${
+                              isExpanded ? "grid-rows-[1fr] opacity-100 mt-4" : "grid-rows-[0fr] opacity-0"
+                            }`}
+                          >
+                            <div className="overflow-hidden">
+                              <div className="pt-4 border-t border-white/5">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-ghost)] mb-2 flex items-center gap-1.5">
+                                  <Package className="h-3 w-3" /> Packaging
+                                </p>
+                                <dl className="text-[11px] space-y-1">
+                                  {m.weight && (
+                                    <div className="flex justify-between">
+                                      <dt className="text-[var(--text-ghost)]">Weight</dt>
+                                      <dd className="text-white/80">{m.weight} kg</dd>
+                                    </div>
+                                  )}
+                                  {m.cbm && (
+                                    <div className="flex justify-between">
+                                      <dt className="text-[var(--text-ghost)]">Volume</dt>
+                                      <dd className="text-white/80">{m.cbm} m³</dd>
+                                    </div>
+                                  )}
+                                  {m.packing_type && (
+                                    <div className="flex justify-between">
+                                      <dt className="text-[var(--text-ghost)]">Packing</dt>
+                                      <dd className="text-white/80 truncate ml-2">{m.packing_type}</dd>
+                                    </div>
+                                  )}
+                                  {m.box_include && (
+                                    <div className="pt-1">
+                                      <dt className="text-[var(--text-ghost)] mb-0.5">Box includes</dt>
+                                      <dd className="text-white/80 leading-snug">{m.box_include}</dd>
+                                    </div>
+                                  )}
+                                  {m.extra_accessories && (
+                                    <div className="pt-1">
+                                      <dt className="text-[var(--text-ghost)] mb-0.5">Accessories</dt>
+                                      <dd className="text-white/80 leading-snug">{m.extra_accessories}</dd>
+                                    </div>
+                                  )}
+                                  {m.reference_model && (
+                                    <div className="flex justify-between">
+                                      <dt className="text-[var(--text-ghost)]">Reference</dt>
+                                      <dd className="text-white/80 font-mono">{m.reference_model}</dd>
+                                    </div>
+                                  )}
+                                  {m.barcode && (
+                                    <div className="flex justify-between">
+                                      <dt className="text-[var(--text-ghost)]">Barcode</dt>
+                                      <dd className="text-white/80 font-mono">{m.barcode}</dd>
+                                    </div>
+                                  )}
+                                </dl>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleModel(m.id)}
+                            className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/70 hover:text-white transition self-start"
+                          >
+                            {isExpanded ? "Hide details" : "Show details"}
+                            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -664,17 +1035,46 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          6. APPLICATIONS (tags as big chips)
+          8. APPLICATIONS (image-style cards)
+          Use cases / Garment types / Fabric types.
           ══════════════════════════════════════ */}
       {tags.length > 0 && (
-        <Section eyebrow="Applications" title="Where it performs." className="bg-white/[0.015]">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {tags.map(t => (
-              <div key={t} className="aspect-[4/3] rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-6 flex flex-col justify-between hover:border-white/25 transition-all">
-                <Layers className="h-5 w-5 text-white/40" />
-                <p className="text-[17px] font-semibold text-white capitalize">{t}</p>
-              </div>
-            ))}
+        <Section eyebrow="Applications" title="Where it performs.">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {tags.map(t => {
+              const info = describeApplication(t);
+              const Icon = info.icon;
+              return (
+                <div
+                  key={t}
+                  className="group relative aspect-[4/5] rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent hover:border-white/30 transition-all duration-300"
+                >
+                  {/* Subtle radial highlight */}
+                  <div className="absolute -top-20 -right-20 h-48 w-48 rounded-full bg-white/[0.04] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                  <div className="relative h-full flex flex-col p-6">
+                    {/* Large icon as visual anchor */}
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="h-20 w-20 rounded-3xl bg-white/[0.04] border border-white/10 flex items-center justify-center group-hover:bg-white/[0.08] group-hover:scale-105 transition-all duration-300">
+                        <Icon className="h-9 w-9 text-white/85" strokeWidth={1.4} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-ghost)] mb-1.5">
+                        {info.kind}
+                      </p>
+                      <h3 className="text-[18px] md:text-[20px] font-semibold text-white capitalize leading-tight">
+                        {t}
+                      </h3>
+                      <p className="mt-2 text-[12px] text-[var(--text-dim)] leading-relaxed line-clamp-2">
+                        {info.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Section>
       )}

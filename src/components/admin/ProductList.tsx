@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Plus, Search, Trash2, Pencil, Eye, EyeOff, Package, Filter, X,
   Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List, Settings,
@@ -13,6 +14,7 @@ import {
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 
 export default function ProductList() {
+  const router = useRouter();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -391,14 +393,18 @@ export default function ProductList() {
 
                     {/* Actions (show on hover) */}
                     <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Link
-                        href={`/products/${p.id}/edit`}
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/products/${p.id}/edit`);
+                        }}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </Link>
+                      </button>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
@@ -581,14 +587,18 @@ export default function ProductList() {
                           <EyeOff className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                         )}
                       </div>
-                      <Link
-                        href={`/products/${p.id}/edit`}
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/products/${p.id}/edit`);
+                        }}
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </Link>
+                      </button>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
