@@ -607,6 +607,71 @@ export interface AccountWithLinks extends AccountRow {
   overrides: AccountPermissionOverrideRow[];
 }
 
+/* ── Security infrastructure (Project C: Security tab) ── */
+
+export interface ApiKeyRow {
+  id: string;
+  account_id: string;
+  name: string;
+  key_prefix: string;
+  key_hash: string;
+  scopes: string[];
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+export type ApiKeyInsert = Omit<ApiKeyRow, "id" | "created_at">;
+export type ApiKeyUpdate = Partial<ApiKeyInsert>;
+
+export type DeviceType = "desktop" | "mobile" | "tablet" | "other";
+
+export interface AccountSessionRow {
+  id: string;
+  account_id: string;
+  session_token_hash: string;
+  device_name: string | null;
+  device_type: DeviceType | null;
+  os: string | null;
+  browser: string | null;
+  ip_address: string | null;
+  last_active_at: string;
+  expires_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+export type AccountSessionInsert = Omit<
+  AccountSessionRow,
+  "id" | "created_at" | "last_active_at"
+> & { last_active_at?: string };
+export type AccountSessionUpdate = Partial<AccountSessionInsert>;
+
+export type LoginEventType =
+  | "login_success"
+  | "login_failed"
+  | "logout"
+  | "password_reset"
+  | "force_reset_enabled"
+  | "force_reset_cleared"
+  | "two_factor_enabled"
+  | "two_factor_disabled"
+  | "api_key_created"
+  | "api_key_revoked"
+  | "session_revoked"
+  | "passkey_enrolled"
+  | "passkey_revoked";
+
+export interface LoginHistoryRow {
+  id: string;
+  account_id: string;
+  event_type: LoginEventType;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+export type LoginHistoryInsert = Omit<LoginHistoryRow, "id" | "created_at">;
+
 /* ── Calendar events (Project B: self-contained calendar app) ── */
 
 export type CalendarEventType =
@@ -752,6 +817,21 @@ export interface Database {
         Row: CalendarEventRow;
         Insert: CalendarEventInsert;
         Update: CalendarEventUpdate;
+      };
+      account_api_keys: {
+        Row: ApiKeyRow;
+        Insert: ApiKeyInsert;
+        Update: ApiKeyUpdate;
+      };
+      account_sessions: {
+        Row: AccountSessionRow;
+        Insert: AccountSessionInsert;
+        Update: AccountSessionUpdate;
+      };
+      account_login_history: {
+        Row: LoginHistoryRow;
+        Insert: LoginHistoryInsert;
+        Update: Partial<LoginHistoryInsert>;
       };
     };
   };

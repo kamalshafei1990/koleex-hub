@@ -32,6 +32,7 @@ import type {
   AccountPreferences,
 } from "@/types/supabase";
 import type { AccessLevel } from "@/lib/access-control";
+import { logEvent } from "./account-security";
 
 const ACCOUNTS = "accounts";
 const COMPANIES = "companies";
@@ -139,7 +140,13 @@ export async function setAccountStatus(
   id: string,
   status: AccountStatus,
 ): Promise<boolean> {
-  return updateAccount(id, { status });
+  const ok = await updateAccount(id, { status });
+  if (ok) {
+    // Mirror status changes into the audit log so the Security tab can show
+    // "account suspended / archived / activated" alongside login events.
+    void logEvent(id, "logout", { reason: "status_change", status });
+  }
+  return ok;
 }
 
 export async function resetAccountPassword(
@@ -157,6 +164,7 @@ export async function resetAccountPassword(
     console.error("[Accounts] Reset password:", error.message);
     return false;
   }
+  void logEvent(id, "password_reset", { source: "admin" });
   return true;
 }
 
@@ -173,6 +181,11 @@ export async function setForcePasswordChange(
     console.error("[Accounts] Set force password change:", error.message);
     return false;
   }
+  void logEvent(
+    id,
+    force ? "force_reset_enabled" : "force_reset_cleared",
+    {},
+  );
   return true;
 }
 

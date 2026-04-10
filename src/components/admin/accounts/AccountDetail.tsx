@@ -72,6 +72,7 @@ import AccessRightsTab from "./tabs/AccessRightsTab";
 import PreferencesTab from "./tabs/PreferencesTab";
 import CalendarTab from "./tabs/CalendarTab";
 import PrivateTab from "./tabs/PrivateTab";
+import SecurityTab from "./tabs/SecurityTab";
 import NotesTab from "./tabs/NotesTab";
 
 const levelColors: Record<CustomerLevel, string> = {
@@ -87,6 +88,7 @@ type TabKey =
   | "preferences"
   | "calendar"
   | "private"
+  | "security"
   | "notes";
 
 interface TabDef {
@@ -132,6 +134,7 @@ export default function AccountDetail({ accountId }: Props) {
       { key: "preferences", label: "Preferences", icon: Settings2 },
       { key: "calendar", label: "Calendar", icon: CalendarIcon },
       { key: "private", label: "Private", icon: Lock, hidden: !isInternal },
+      { key: "security", label: "Security", icon: KeyRound },
       { key: "notes", label: "Notes", icon: FileText },
     ];
   }, [data?.user_type]);
@@ -459,6 +462,7 @@ export default function AccountDetail({ accountId }: Props) {
           {activeTab === "private" && (
             <PrivateTab account={data} onChanged={handleEmployeeChanged} />
           )}
+          {activeTab === "security" && <SecurityTab account={data} />}
           {activeTab === "notes" && (
             <NotesTab account={data} onChanged={handleNotesChanged} />
           )}
