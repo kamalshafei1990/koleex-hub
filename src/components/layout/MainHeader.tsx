@@ -7,6 +7,7 @@ import { Sun, Moon, Home, Bell, ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { useRef } from "react";
+import UserMenu from "./UserMenu";
 
 /* ── Koleex Logo ── */
 function KoleexLogo({ className }: { className?: string }) {
@@ -226,14 +227,8 @@ export default function MainHeader() {
           <span className="absolute top-1 end-1 md:top-1.5 md:end-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
         </button>
 
-        {/* User avatar */}
-        <div
-          className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full text-[10px] md:text-[11px] font-semibold ${
-            dk ? "bg-white text-black" : "bg-black text-white"
-          }`}
-        >
-          KS
-        </div>
+        {/* User menu (avatar → identity + sign in/out) */}
+        <UserMenu dk={dk} />
       </div>
     </header>
   );
