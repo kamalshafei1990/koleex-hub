@@ -607,6 +607,37 @@ export interface AccountWithLinks extends AccountRow {
   overrides: AccountPermissionOverrideRow[];
 }
 
+/* ── Calendar events (Project B: self-contained calendar app) ── */
+
+export type CalendarEventType =
+  | "meeting"
+  | "task"
+  | "reminder"
+  | "event"
+  | "holiday"
+  | "out_of_office";
+
+export interface CalendarEventRow {
+  id: string;
+  account_id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_at: string;   // ISO UTC timestamp
+  end_at: string;     // ISO UTC timestamp
+  all_day: boolean;
+  event_type: CalendarEventType;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CalendarEventInsert = Omit<
+  CalendarEventRow,
+  "id" | "created_at" | "updated_at"
+>;
+export type CalendarEventUpdate = Partial<CalendarEventInsert>;
+
 /* ── Database schema type for createClient<Database> ── */
 
 export interface Database {
@@ -716,6 +747,11 @@ export interface Database {
         Row: AccountPermissionOverrideRow;
         Insert: AccountPermissionOverrideInsert;
         Update: AccountPermissionOverrideUpdate;
+      };
+      koleex_calendar_events: {
+        Row: CalendarEventRow;
+        Insert: CalendarEventInsert;
+        Update: CalendarEventUpdate;
       };
     };
   };
