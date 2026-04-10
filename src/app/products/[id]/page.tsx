@@ -304,17 +304,17 @@ function Section({
         {(eyebrow || title || subtitle) && (
           <div className={`mb-12 md:mb-16 ${headerAlign}`}>
             {eyebrow && (
-              <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] mb-3 tracking-[-0.005em]">
+              <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-3 tracking-[-0.005em]">
                 {eyebrow}
               </p>
             )}
             {title && (
-              <h2 className="text-[32px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.015em] text-[#1D1D1F] leading-[1.08]">
+              <h2 className="text-[32px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.015em] text-[#1D1D1F] dark:text-white leading-[1.08]">
                 {title}
               </h2>
             )}
             {subtitle && (
-              <p className="mt-5 text-[17px] md:text-[19px] text-[#6E6E73] leading-[1.5] max-w-[680px] mx-auto font-normal">
+              <p className="mt-5 text-[17px] md:text-[19px] text-[#6E6E73] dark:text-white/60 leading-[1.5] max-w-[680px] mx-auto font-normal">
                 {subtitle}
               </p>
             )}
@@ -501,9 +501,9 @@ export default function ProductViewPage() {
   /* ── Loading / not found ── */
   if (loading) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center bg-white">
-        <div className="flex items-center gap-3 text-[#6E6E73] text-[13px]">
-          <div className="h-4 w-4 rounded-full border-2 border-[#D2D2D7] border-t-[#06C] animate-spin" />
+      <div className="min-h-[80vh] flex items-center justify-center bg-white dark:bg-[#0A0A0A]">
+        <div className="flex items-center gap-3 text-[#6E6E73] dark:text-white/40 text-[13px]">
+          <div className="h-4 w-4 rounded-full border-2 border-[#D2D2D7] dark:border-white/20 border-t-[#06C] dark:border-t-[#2997FF] animate-spin" />
           Loading product…
         </div>
       </div>
@@ -512,17 +512,17 @@ export default function ProductViewPage() {
 
   if (notFound || !product) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white">
-        <div className="h-16 w-16 rounded-2xl bg-[#F5F5F7] flex items-center justify-center">
-          <ImageIcon className="h-7 w-7 text-[#86868B]" />
+      <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white dark:bg-[#0A0A0A]">
+        <div className="h-16 w-16 rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.04] flex items-center justify-center">
+          <ImageIcon className="h-7 w-7 text-[#86868B] dark:text-white/30" />
         </div>
-        <h1 className="text-[22px] font-semibold text-[#1D1D1F]">Product not found</h1>
-        <p className="text-[14px] text-[#6E6E73]">
-          We could not find a product matching <span className="font-mono text-[#1D1D1F]">{handle}</span>.
+        <h1 className="text-[22px] font-semibold text-[#1D1D1F] dark:text-white">Product not found</h1>
+        <p className="text-[14px] text-[#6E6E73] dark:text-white/60">
+          We could not find a product matching <span className="font-mono text-[#1D1D1F] dark:text-white">{handle}</span>.
         </p>
         <Link
           href="/products"
-          className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] transition"
+          className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition"
         >
           <ArrowLeft className="h-4 w-4" /> Back to products
         </Link>
@@ -537,7 +537,7 @@ export default function ProductViewPage() {
   /* ════════════════════════════════════════════ */
   return (
     <div
-      className="min-h-screen bg-white text-[#1D1D1F] antialiased"
+      className="min-h-screen bg-white text-[#1D1D1F] dark:bg-[#0A0A0A] dark:text-white antialiased"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -545,25 +545,25 @@ export default function ProductViewPage() {
       }}
     >
       {/* ── Apple-style sub-nav: slim, translucent, centered breadcrumb ── */}
-      <div className="sticky top-14 z-20 bg-white/80 backdrop-blur-xl border-b border-[#D2D2D7]/60">
+      <div className="sticky top-14 z-20 bg-white/80 backdrop-blur-xl border-b border-[#D2D2D7]/60 dark:bg-[#0A0A0A]/80 dark:border-white/10">
         <div className="max-w-[1024px] mx-auto px-6 h-11 flex items-center justify-between">
           <Link
             href="/products"
-            className="inline-flex items-center gap-1.5 text-[12px] text-[#6E6E73] hover:text-[#1D1D1F] transition"
+            className="inline-flex items-center gap-1.5 text-[12px] text-[#6E6E73] hover:text-[#1D1D1F] dark:text-white/60 dark:hover:text-white transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> All products
           </Link>
           <div className="flex items-center gap-3">
             {divisionName && (
-              <div className="hidden md:flex items-center gap-1.5 text-[12px] text-[#6E6E73]">
+              <div className="hidden md:flex items-center gap-1.5 text-[12px] text-[#6E6E73] dark:text-white/60">
                 <span>{divisionName}</span>
-                {categoryName && <><span className="text-[#D2D2D7]">/</span><span>{categoryName}</span></>}
-                {subcategoryName && <><span className="text-[#D2D2D7]">/</span><span className="text-[#1D1D1F] font-medium">{subcategoryName}</span></>}
+                {categoryName && <><span className="text-[#D2D2D7] dark:text-white/20">/</span><span>{categoryName}</span></>}
+                {subcategoryName && <><span className="text-[#D2D2D7] dark:text-white/20">/</span><span className="text-[#1D1D1F] dark:text-white font-medium">{subcategoryName}</span></>}
               </div>
             )}
             <Link
               href={`/products/${product.id}/edit`}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] transition"
+              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] dark:border-white/15 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:text-white transition"
             >
               <Pencil className="h-3 w-3" /> Edit
             </Link>
@@ -574,28 +574,28 @@ export default function ProductViewPage() {
       {/* ══════════════════════════════════════
           1. HERO — Apple.com style: centered headline + dominant image below
           ══════════════════════════════════════ */}
-      <section className="relative pt-16 md:pt-24 pb-0 bg-white">
+      <section className="relative pt-16 md:pt-24 pb-0 bg-white dark:bg-[#0A0A0A]">
         <div className="max-w-[980px] mx-auto px-6 text-center">
-          {/* "New" eyebrow (Apple-blue) */}
+          {/* "New" eyebrow (Apple-blue — works in both themes) */}
           {product.featured && (
-            <p className="text-[18px] md:text-[21px] font-normal text-[#06C] mb-2 tracking-[-0.005em]">
+            <p className="text-[18px] md:text-[21px] font-normal text-[#06C] dark:text-[#2997FF] mb-2 tracking-[-0.005em]">
               New
             </p>
           )}
           {!product.featured && product.brand && (
-            <p className="text-[14px] md:text-[17px] font-normal text-[#6E6E73] mb-2 tracking-[-0.005em]">
+            <p className="text-[14px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-2 tracking-[-0.005em]">
               {product.brand}
             </p>
           )}
 
           {/* Headline — Apple Hero Title */}
-          <h1 className="text-[40px] md:text-[64px] lg:text-[80px] font-semibold text-[#1D1D1F] leading-[1.05] tracking-[-0.015em]">
+          <h1 className="text-[40px] md:text-[64px] lg:text-[80px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.05] tracking-[-0.015em]">
             {product.product_name}
           </h1>
 
           {/* Tagline */}
           {primaryModel?.tagline && (
-            <p className="mt-4 md:mt-5 text-[21px] md:text-[28px] lg:text-[32px] font-normal text-[#1D1D1F] leading-[1.15] tracking-[-0.005em] max-w-[760px] mx-auto">
+            <p className="mt-4 md:mt-5 text-[21px] md:text-[28px] lg:text-[32px] font-normal text-[#1D1D1F] dark:text-white leading-[1.15] tracking-[-0.005em] max-w-[760px] mx-auto">
               {primaryModel.tagline}
             </p>
           )}
@@ -603,19 +603,19 @@ export default function ProductViewPage() {
           {/* Price + primary CTAs — Apple style inline */}
           <div className="mt-6 md:mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[17px] md:text-[19px] font-normal">
             {priceFrom !== null && (
-              <span className="text-[#1D1D1F]">
+              <span className="text-[#1D1D1F] dark:text-white">
                 From <span className="font-medium">{fmtMoney(priceFrom)}</span>
               </span>
             )}
             <a
               href="#models"
-              className="inline-flex items-center h-[36px] md:h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-normal hover:bg-[#0077ED] transition-colors"
+              className="inline-flex items-center h-[36px] md:h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
             >
               Buy
             </a>
             <a
               href="#specs"
-              className="inline-flex items-center gap-1 text-[#06C] hover:underline text-[14px] md:text-[17px]"
+              className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
             >
               Learn more <ChevronRight className="h-3.5 w-3.5 mt-0.5" />
             </a>
@@ -631,15 +631,15 @@ export default function ProductViewPage() {
                 className="w-full max-w-[900px] mx-auto aspect-[4/3] object-contain"
               />
             ) : (
-              <div className="w-full max-w-[900px] mx-auto aspect-[4/3] flex items-center justify-center bg-[#F5F5F7] rounded-[22px]">
-                <ImageIcon className="h-20 w-20 text-[#86868B]" />
+              <div className="w-full max-w-[900px] mx-auto aspect-[4/3] flex items-center justify-center bg-[#F5F5F7] dark:bg-white/[0.03] rounded-[22px]">
+                <ImageIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
               </div>
             )}
           </div>
 
           {/* Small meta line under image */}
           {(product.warranty || product.country_of_origin) && (
-            <p className="mt-6 text-[12px] text-[#86868B]">
+            <p className="mt-6 text-[12px] text-[#86868B] dark:text-white/40">
               {product.warranty && <>{product.warranty} warranty</>}
               {product.warranty && product.country_of_origin && <span className="mx-2">·</span>}
               {product.country_of_origin && <>Made in {product.country_of_origin}</>}
@@ -653,9 +653,9 @@ export default function ProductViewPage() {
           Large main image + clean thumbnail strip.
           ══════════════════════════════════════ */}
       {galleryImages.length > 1 && (
-        <Section eyebrow="Gallery" title="Every angle." className="bg-[#F5F5F7]">
+        <Section eyebrow="Gallery" title="Every angle." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_120px] gap-6">
-            <div className="group relative aspect-[4/3] md:aspect-[16/10] rounded-[22px] overflow-hidden bg-white">
+            <div className="group relative aspect-[4/3] md:aspect-[16/10] rounded-[22px] overflow-hidden bg-white dark:bg-white/[0.03]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={galleryImages[activeImageIdx]?.id}
@@ -664,7 +664,7 @@ export default function ProductViewPage() {
                 className="absolute inset-0 w-full h-full object-contain p-10 md:p-14 transition-transform duration-[800ms] ease-out group-hover:scale-[1.04] animate-in fade-in duration-500"
               />
               {/* Image counter */}
-              <div className="absolute bottom-5 right-5 inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/90 backdrop-blur-md text-[11px] font-medium text-[#1D1D1F] shadow-sm">
+              <div className="absolute bottom-5 right-5 inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/90 backdrop-blur-md text-[11px] font-medium text-[#1D1D1F] shadow-sm dark:bg-black/50 dark:text-white/90 dark:shadow-none">
                 {activeImageIdx + 1} / {galleryImages.length}
               </div>
             </div>
@@ -673,10 +673,10 @@ export default function ProductViewPage() {
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`relative shrink-0 h-20 w-20 lg:h-[100px] lg:w-full rounded-2xl overflow-hidden bg-white transition-all duration-300 ${
+                  className={`relative shrink-0 h-20 w-20 lg:h-[100px] lg:w-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] transition-all duration-300 ${
                     idx === activeImageIdx
-                      ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7]"
-                      : "opacity-70 hover:opacity-100 ring-1 ring-[#D2D2D7]"
+                      ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7] dark:ring-[#2997FF] dark:ring-offset-[#0A0A0A]"
+                      : "opacity-70 hover:opacity-100 ring-1 ring-[#D2D2D7] dark:ring-white/10"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -692,13 +692,13 @@ export default function ProductViewPage() {
           3. PRODUCT DESCRIPTION — Apple light prose
           ══════════════════════════════════════ */}
       {product.description && (
-        <section className="py-20 md:py-28 bg-white">
+        <section className="py-20 md:py-28 bg-white dark:bg-[#0A0A0A]">
           <div className="max-w-[740px] mx-auto px-6 text-center">
-            <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] mb-4 tracking-[-0.005em]">
+            <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-4 tracking-[-0.005em]">
               About
             </p>
             <div
-              className="max-w-none text-[19px] md:text-[24px] text-[#1D1D1F] leading-[1.45] font-normal tracking-[-0.005em] [&_h1]:text-[#1D1D1F] [&_h1]:font-semibold [&_h2]:text-[#1D1D1F] [&_h2]:font-semibold [&_h3]:text-[#1D1D1F] [&_h3]:font-semibold [&_strong]:text-[#1D1D1F] [&_strong]:font-semibold [&_p]:mb-5 [&_a]:text-[#06C] [&_a]:no-underline hover:[&_a]:underline"
+              className="max-w-none text-[19px] md:text-[24px] text-[#1D1D1F] dark:text-white/80 leading-[1.45] font-normal tracking-[-0.005em] [&_h1]:text-[#1D1D1F] dark:[&_h1]:text-white [&_h1]:font-semibold [&_h2]:text-[#1D1D1F] dark:[&_h2]:text-white [&_h2]:font-semibold [&_h3]:text-[#1D1D1F] dark:[&_h3]:text-white [&_h3]:font-semibold [&_strong]:text-[#1D1D1F] dark:[&_strong]:text-white [&_strong]:font-semibold [&_p]:mb-5 [&_a]:text-[#06C] dark:[&_a]:text-[#2997FF] [&_a]:no-underline hover:[&_a]:underline"
               dangerouslySetInnerHTML={{ __html: product.description }}
             />
           </div>
@@ -709,23 +709,23 @@ export default function ProductViewPage() {
           4. KEY FEATURES — Apple clean card grid
           ══════════════════════════════════════ */}
       {keyFeatures.length > 0 && (
-        <Section eyebrow="Key features" title="Engineered to perform." className="bg-white">
+        <Section eyebrow="Key features" title="Engineered to perform." className="bg-white dark:bg-[#0A0A0A]">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {keyFeatures.map((f, i) => (
               <div
                 key={i}
-                className="group relative overflow-hidden rounded-[22px] bg-[#F5F5F7] p-8 md:p-9 transition-all duration-300 hover:scale-[1.01]"
+                className="group relative overflow-hidden rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 p-8 md:p-9 transition-all duration-300 hover:scale-[1.01]"
               >
-                <div className="h-11 w-11 rounded-full bg-white flex items-center justify-center text-[#06C] mb-6 shadow-sm">
+                <div className="h-11 w-11 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center text-[#06C] dark:text-[#2997FF] mb-6 shadow-sm dark:shadow-none">
                   {f.icon}
                 </div>
-                <h3 className="text-[20px] md:text-[22px] font-semibold text-[#1D1D1F] tracking-[-0.015em] leading-[1.2]">
+                <h3 className="text-[20px] md:text-[22px] font-semibold text-[#1D1D1F] dark:text-white tracking-[-0.015em] leading-[1.2]">
                   {f.title}
                 </h3>
                 {f.value && (
-                  <p className="mt-1.5 text-[15px] font-medium text-[#06C]">{f.value}</p>
+                  <p className="mt-1.5 text-[15px] font-medium text-[#06C] dark:text-[#2997FF]">{f.value}</p>
                 )}
-                <p className="mt-3 text-[15px] text-[#6E6E73] leading-[1.5]">
+                <p className="mt-3 text-[15px] text-[#6E6E73] dark:text-white/60 leading-[1.5]">
                   {f.description}
                 </p>
               </div>
@@ -738,40 +738,40 @@ export default function ProductViewPage() {
           5. SEWING MACHINE OVERVIEW — Apple clean blocks
           ══════════════════════════════════════ */}
       {(activeTemplate || subcategoryName || tags.length > 0) && (
-        <Section eyebrow="Machine overview" title="Designed for your line." className="bg-[#F5F5F7]">
+        <Section eyebrow="Machine overview" title="Designed for your line." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Machine Type */}
-            <div className="rounded-[22px] bg-white p-8 flex flex-col min-h-[240px]">
+            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center">
-                  <Factory className="h-4 w-4 text-[#06C]" />
+                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
+                  <Factory className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
-                <p className="text-[13px] font-medium text-[#6E6E73]">
+                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Machine Type
                 </p>
               </div>
-              <h3 className="text-[22px] md:text-[24px] font-semibold text-[#1D1D1F] leading-[1.2] tracking-[-0.015em]">
+              <h3 className="text-[22px] md:text-[24px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] tracking-[-0.015em]">
                 {activeTemplate?.icon ? `${activeTemplate.icon} ` : ""}
                 {activeTemplate?.name || subcategoryName || "Industrial Sewing Machine"}
               </h3>
               {categoryName && (
-                <p className="mt-auto pt-4 text-[13px] text-[#86868B]">
+                <p className="mt-auto pt-4 text-[13px] text-[#86868B] dark:text-white/40">
                   {categoryName}
                 </p>
               )}
             </div>
 
             {/* Main Function */}
-            <div className="rounded-[22px] bg-white p-8 flex flex-col min-h-[240px]">
+            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center">
-                  <Scissors className="h-4 w-4 text-[#06C]" />
+                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
+                  <Scissors className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
-                <p className="text-[13px] font-medium text-[#6E6E73]">
+                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Main Function
                 </p>
               </div>
-              <p className="text-[17px] md:text-[18px] text-[#1D1D1F] leading-[1.45] font-normal">
+              <p className="text-[17px] md:text-[18px] text-[#1D1D1F] dark:text-white/85 leading-[1.45] font-normal">
                 {activeTemplate?.description ||
                   primaryModel?.tagline ||
                   `${product.product_name} delivers industrial-grade performance for professional sewing lines.`}
@@ -779,12 +779,12 @@ export default function ProductViewPage() {
             </div>
 
             {/* Application */}
-            <div className="rounded-[22px] bg-white p-8 flex flex-col min-h-[240px]">
+            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center">
-                  <Layers className="h-4 w-4 text-[#06C]" />
+                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
+                  <Layers className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
-                <p className="text-[13px] font-medium text-[#6E6E73]">
+                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Application
                 </p>
               </div>
@@ -793,14 +793,14 @@ export default function ProductViewPage() {
                   {tags.slice(0, 8).map(t => (
                     <span
                       key={t}
-                      className="inline-flex items-center h-7 px-3 rounded-full bg-[#F5F5F7] text-[12px] text-[#1D1D1F] capitalize"
+                      className="inline-flex items-center h-7 px-3 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[12px] text-[#1D1D1F] dark:text-white/85 capitalize"
                     >
                       {t}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-[15px] text-[#6E6E73]">
+                <p className="text-[15px] text-[#6E6E73] dark:text-white/60">
                   General-purpose industrial sewing across garment production lines.
                 </p>
               )}
@@ -813,10 +813,10 @@ export default function ProductViewPage() {
           6. TECHNICAL SPECS — Apple clean rows style
           ══════════════════════════════════════ */}
       {(commonSpecsRendered.length > 0 || templateSpecsRendered.length > 0 || genericSpecsRendered.length > 0) && (
-        <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white">
+        <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white dark:bg-[#0A0A0A]">
           {activeTemplate && (
             <div className="mb-12 flex justify-center">
-              <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] text-[13px] text-[#1D1D1F]">
+              <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[13px] text-[#1D1D1F] dark:text-white/85">
                 <span className="text-base">{activeTemplate.icon}</span>
                 <span className="font-medium">{activeTemplate.name}</span>
               </div>
@@ -834,13 +834,13 @@ export default function ProductViewPage() {
               return (
                 <div
                   key={g.group}
-                  className="rounded-[22px] bg-[#F5F5F7] p-8"
+                  className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8"
                 >
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center shadow-sm">
-                      <GroupIcon className="h-4 w-4 text-[#06C]" />
+                    <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
+                      <GroupIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                     </div>
-                    <h3 className="text-[17px] font-semibold text-[#1D1D1F] leading-none tracking-[-0.01em]">
+                    <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
                       {g.group}
                     </h3>
                   </div>
@@ -848,10 +848,10 @@ export default function ProductViewPage() {
                     {g.rows.map(({ field, value }, idx) => (
                       <div
                         key={field.key}
-                        className={`flex justify-between items-baseline gap-4 py-3 ${idx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/60" : ""}`}
+                        className={`flex justify-between items-baseline gap-4 py-3 ${idx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}
                       >
-                        <dt className="text-[13px] text-[#6E6E73]">{field.label}</dt>
-                        <dd className="text-[13px] text-[#1D1D1F] text-right font-medium">{value}</dd>
+                        <dt className="text-[13px] text-[#6E6E73] dark:text-white/55">{field.label}</dt>
+                        <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
                       </div>
                     ))}
                   </dl>
@@ -860,20 +860,20 @@ export default function ProductViewPage() {
             })}
 
             {genericSpecsRendered.length > 0 && (
-              <div className="rounded-[22px] bg-[#F5F5F7] p-8 md:col-span-2">
+              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 md:col-span-2">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="h-9 w-9 rounded-full bg-white flex items-center justify-center shadow-sm">
-                    <Wrench className="h-4 w-4 text-[#06C]" />
+                  <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
+                    <Wrench className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                   </div>
-                  <h3 className="text-[17px] font-semibold text-[#1D1D1F] leading-none tracking-[-0.01em]">
+                  <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
                     Additional
                   </h3>
                 </div>
                 <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
                   {genericSpecsRendered.map(({ key, value }, idx) => (
-                    <div key={key} className={`flex justify-between items-baseline gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-[#D2D2D7]/60" : ""}`}>
-                      <dt className="text-[13px] text-[#6E6E73] capitalize">{key.replace(/_/g, " ")}</dt>
-                      <dd className="text-[13px] text-[#1D1D1F] text-right font-medium">{value}</dd>
+                    <div key={key} className={`flex justify-between items-baseline gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}>
+                      <dt className="text-[13px] text-[#6E6E73] dark:text-white/55 capitalize">{key.replace(/_/g, " ")}</dt>
+                      <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -892,7 +892,7 @@ export default function ProductViewPage() {
           eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`}
           title="Choose your model."
           subtitle="Which is right for you?"
-          className="bg-[#F5F5F7]"
+          className="bg-[#F5F5F7] dark:bg-white/[0.015]"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {models
@@ -918,21 +918,21 @@ export default function ProductViewPage() {
                 return (
                   <div
                     key={m.id}
-                    className={`group relative rounded-[22px] overflow-hidden flex flex-col bg-white transition-all duration-300 ${
+                    className={`group relative rounded-[22px] overflow-hidden flex flex-col bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 ${
                       isBestChoice
-                        ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7]"
+                        ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7] dark:ring-[#2997FF] dark:ring-offset-[#0A0A0A]"
                         : ""
                     }`}
                   >
                     {/* Best Choice ribbon — Apple-style top bar */}
                     {isBestChoice && (
-                      <div className="absolute top-0 left-0 right-0 z-10 h-7 bg-[#06C] flex items-center justify-center gap-1.5 text-[11px] font-medium text-white tracking-[-0.005em]">
+                      <div className="absolute top-0 left-0 right-0 z-10 h-7 bg-[#06C] dark:bg-[#2997FF] flex items-center justify-center gap-1.5 text-[11px] font-medium text-white tracking-[-0.005em]">
                         <Sparkles className="h-3 w-3" /> Best Choice
                       </div>
                     )}
 
                     {/* Image area */}
-                    <div className={`aspect-[4/3] relative overflow-hidden bg-white ${isBestChoice ? "pt-7" : ""}`}>
+                    <div className={`aspect-[4/3] relative overflow-hidden bg-white dark:bg-white/[0.02] ${isBestChoice ? "pt-7" : ""}`}>
                       {modelPhoto || mainImage ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -941,7 +941,7 @@ export default function ProductViewPage() {
                           className="absolute inset-0 w-full h-full object-contain p-8 group-hover:scale-[1.04] transition-transform duration-700 ease-out"
                         />
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7]">
+                        <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
                           <ImageIcon className="h-12 w-12" />
                         </div>
                       )}
@@ -950,29 +950,29 @@ export default function ProductViewPage() {
                     {/* Content */}
                     <div className="p-7 flex flex-col flex-1">
                       {/* Name */}
-                      <h3 className="text-[22px] font-semibold text-[#1D1D1F] tracking-[-0.015em] leading-[1.15]">
+                      <h3 className="text-[22px] font-semibold text-[#1D1D1F] dark:text-white tracking-[-0.015em] leading-[1.15]">
                         {m.model_name}
                       </h3>
                       {m.tagline && (
-                        <p className="text-[14px] text-[#6E6E73] mt-2 line-clamp-2 leading-[1.4]">
+                        <p className="text-[14px] text-[#6E6E73] dark:text-white/55 mt-2 line-clamp-2 leading-[1.4]">
                           {m.tagline}
                         </p>
                       )}
 
                       {/* Price */}
                       {price !== null && (
-                        <p className="mt-4 text-[17px] text-[#1D1D1F]">
+                        <p className="mt-4 text-[17px] text-[#1D1D1F] dark:text-white">
                           From <span className="font-medium">{fmtMoney(price)}</span>
                         </p>
                       )}
 
                       {/* Key spec preview — 3-4 lines */}
                       {keySpecs.length > 0 && (
-                        <dl className="mt-6 pt-6 border-t border-[#D2D2D7]/60 space-y-2.5">
+                        <dl className="mt-6 pt-6 border-t border-[#D2D2D7]/60 dark:border-white/[0.08] space-y-2.5">
                           {keySpecs.slice(0, 4).map(s => (
                             <div key={s.label} className="flex items-baseline justify-between gap-3 text-[13px]">
-                              <dt className="text-[#6E6E73] capitalize">{s.label}</dt>
-                              <dd className="text-[#1D1D1F] font-medium text-right capitalize">{s.value}</dd>
+                              <dt className="text-[#6E6E73] dark:text-white/45 capitalize">{s.label}</dt>
+                              <dd className="text-[#1D1D1F] dark:text-white/90 font-medium text-right capitalize">{s.value}</dd>
                             </div>
                           ))}
                         </dl>
@@ -981,41 +981,41 @@ export default function ProductViewPage() {
                       {/* Config badges */}
                       <div className="mt-5 flex flex-wrap gap-1.5">
                         {m.sku && (
-                          <span className="text-[11px] px-2 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] text-[#6E6E73] font-mono tracking-tight">
+                          <span className="text-[11px] px-2 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#6E6E73] dark:text-white/60 font-mono tracking-tight">
                             {m.sku}
                           </span>
                         )}
                         {m.supports_head_only && (
-                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
-                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C]" /> Head only
+                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
+                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Head only
                           </span>
                         )}
                         {m.supports_complete_set && (
-                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
-                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C]" /> Complete set
+                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
+                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Complete set
                           </span>
                         )}
                       </div>
 
                       {/* Commercial info */}
                       {(m.moq || m.lead_time || m.supplier) && (
-                        <dl className="mt-5 pt-5 border-t border-[#D2D2D7]/60 text-[12px] space-y-1.5">
+                        <dl className="mt-5 pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08] text-[12px] space-y-1.5">
                           {m.supplier && (
                             <div className="flex justify-between">
-                              <dt className="text-[#86868B]">Supplier</dt>
-                              <dd className="text-[#1D1D1F] truncate ml-2">{m.supplier}</dd>
+                              <dt className="text-[#86868B] dark:text-white/40">Supplier</dt>
+                              <dd className="text-[#1D1D1F] dark:text-white/75 truncate ml-2">{m.supplier}</dd>
                             </div>
                           )}
                           {m.moq && (
                             <div className="flex justify-between">
-                              <dt className="text-[#86868B]">MOQ</dt>
-                              <dd className="text-[#1D1D1F]">{m.moq}</dd>
+                              <dt className="text-[#86868B] dark:text-white/40">MOQ</dt>
+                              <dd className="text-[#1D1D1F] dark:text-white/75">{m.moq}</dd>
                             </div>
                           )}
                           {m.lead_time && (
                             <div className="flex justify-between">
-                              <dt className="text-[#86868B]">Lead time</dt>
-                              <dd className="text-[#1D1D1F]">{m.lead_time}</dd>
+                              <dt className="text-[#86868B] dark:text-white/40">Lead time</dt>
+                              <dd className="text-[#1D1D1F] dark:text-white/75">{m.lead_time}</dd>
                             </div>
                           )}
                         </dl>
@@ -1030,51 +1030,51 @@ export default function ProductViewPage() {
                             }`}
                           >
                             <div className="overflow-hidden">
-                              <div className="pt-5 border-t border-[#D2D2D7]/60">
-                                <p className="text-[12px] font-medium text-[#6E6E73] mb-3 flex items-center gap-1.5">
+                              <div className="pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08]">
+                                <p className="text-[12px] font-medium text-[#6E6E73] dark:text-white/50 mb-3 flex items-center gap-1.5">
                                   <Package className="h-3 w-3" /> Packaging
                                 </p>
                                 <dl className="text-[12px] space-y-1.5">
                                   {m.weight && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[#86868B]">Weight</dt>
-                                      <dd className="text-[#1D1D1F]">{m.weight} kg</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40">Weight</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80">{m.weight} kg</dd>
                                     </div>
                                   )}
                                   {m.cbm && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[#86868B]">Volume</dt>
-                                      <dd className="text-[#1D1D1F]">{m.cbm} m³</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40">Volume</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80">{m.cbm} m³</dd>
                                     </div>
                                   )}
                                   {m.packing_type && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[#86868B]">Packing</dt>
-                                      <dd className="text-[#1D1D1F] truncate ml-2">{m.packing_type}</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40">Packing</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80 truncate ml-2">{m.packing_type}</dd>
                                     </div>
                                   )}
                                   {m.box_include && (
                                     <div className="pt-1">
-                                      <dt className="text-[#86868B] mb-0.5">Box includes</dt>
-                                      <dd className="text-[#1D1D1F] leading-snug">{m.box_include}</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40 mb-0.5">Box includes</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80 leading-snug">{m.box_include}</dd>
                                     </div>
                                   )}
                                   {m.extra_accessories && (
                                     <div className="pt-1">
-                                      <dt className="text-[#86868B] mb-0.5">Accessories</dt>
-                                      <dd className="text-[#1D1D1F] leading-snug">{m.extra_accessories}</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40 mb-0.5">Accessories</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80 leading-snug">{m.extra_accessories}</dd>
                                     </div>
                                   )}
                                   {m.reference_model && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[#86868B]">Reference</dt>
-                                      <dd className="text-[#1D1D1F] font-mono">{m.reference_model}</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40">Reference</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80 font-mono">{m.reference_model}</dd>
                                     </div>
                                   )}
                                   {m.barcode && (
                                     <div className="flex justify-between">
-                                      <dt className="text-[#86868B]">Barcode</dt>
-                                      <dd className="text-[#1D1D1F] font-mono">{m.barcode}</dd>
+                                      <dt className="text-[#86868B] dark:text-white/40">Barcode</dt>
+                                      <dd className="text-[#1D1D1F] dark:text-white/80 font-mono">{m.barcode}</dd>
                                     </div>
                                   )}
                                 </dl>
@@ -1085,7 +1085,7 @@ export default function ProductViewPage() {
                           <button
                             type="button"
                             onClick={() => toggleModel(m.id)}
-                            className="mt-5 inline-flex items-center gap-1 text-[13px] font-normal text-[#06C] hover:underline self-start"
+                            className="mt-5 inline-flex items-center gap-1 text-[13px] font-normal text-[#06C] dark:text-[#2997FF] hover:underline self-start"
                           >
                             {isExpanded ? "Hide details" : "Show details"}
                             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
@@ -1097,7 +1097,7 @@ export default function ProductViewPage() {
                       <div className="mt-auto pt-7">
                         <Link
                           href="/contacts"
-                          className="w-full inline-flex items-center justify-center h-[38px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] transition-colors"
+                          className="w-full inline-flex items-center justify-center h-[38px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
                         >
                           Buy
                         </Link>
@@ -1114,7 +1114,7 @@ export default function ProductViewPage() {
           8. APPLICATIONS — Apple clean tile cards
           ══════════════════════════════════════ */}
       {tags.length > 0 && (
-        <Section eyebrow="Applications" title="Where it performs." className="bg-white">
+        <Section eyebrow="Applications" title="Where it performs." className="bg-white dark:bg-[#0A0A0A]">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {tags.map(t => {
               const info = describeApplication(t);
@@ -1122,24 +1122,24 @@ export default function ProductViewPage() {
               return (
                 <div
                   key={t}
-                  className="group relative aspect-[4/5] rounded-[22px] overflow-hidden bg-[#F5F5F7] transition-all duration-300 hover:scale-[1.02]"
+                  className="group relative aspect-[4/5] rounded-[22px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.02]"
                 >
                   <div className="relative h-full flex flex-col p-7">
                     {/* Large icon as visual anchor */}
                     <div className="flex-1 flex items-center justify-center">
-                      <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-300">
-                        <Icon className="h-9 w-9 text-[#06C]" strokeWidth={1.4} />
+                      <div className="h-20 w-20 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none group-hover:scale-105 transition-transform duration-300">
+                        <Icon className="h-9 w-9 text-[#06C] dark:text-[#2997FF]" strokeWidth={1.4} />
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-[12px] font-medium text-[#86868B] mb-1">
+                      <p className="text-[12px] font-medium text-[#86868B] dark:text-white/40 mb-1">
                         {info.kind}
                       </p>
-                      <h3 className="text-[18px] md:text-[20px] font-semibold text-[#1D1D1F] capitalize leading-[1.2] tracking-[-0.015em]">
+                      <h3 className="text-[18px] md:text-[20px] font-semibold text-[#1D1D1F] dark:text-white capitalize leading-[1.2] tracking-[-0.015em]">
                         {t}
                       </h3>
-                      <p className="mt-2 text-[13px] text-[#6E6E73] leading-[1.45] line-clamp-2">
+                      <p className="mt-2 text-[13px] text-[#6E6E73] dark:text-white/60 leading-[1.45] line-clamp-2">
                         {info.description}
                       </p>
                     </div>
@@ -1155,18 +1155,18 @@ export default function ProductViewPage() {
           9. MEDIA / DOWNLOADS — Apple clean resource cards
           ══════════════════════════════════════ */}
       {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-        <Section eyebrow="Resources" title="Dig deeper." className="bg-[#F5F5F7]">
+        <Section eyebrow="Resources" title="Dig deeper." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {videos.map(v => (
               <a key={v.id} href={v.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0">
-                  <Play className="h-4 w-4 text-[#06C]" fill="currentColor" />
+                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
+                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                  <Play className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" fill="currentColor" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] mb-1">Video</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] leading-[1.25] tracking-[-0.01em]">{v.alt_text || "Product video"}</p>
-                  <p className="text-[13px] text-[#06C] mt-2 inline-flex items-center gap-1 group-hover:underline">
+                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">Video</p>
+                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{v.alt_text || "Product video"}</p>
+                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
                     Watch now <ExternalLink className="h-3 w-3" />
                   </p>
                 </div>
@@ -1174,14 +1174,14 @@ export default function ProductViewPage() {
             ))}
             {manuals.map(m => (
               <a key={m.id} href={m.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0">
-                  <FileText className="h-4 w-4 text-[#06C]" />
+                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
+                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                  <FileText className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] mb-1">PDF manual</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] leading-[1.25] tracking-[-0.01em]">{m.alt_text || "Technical manual"}</p>
-                  <p className="text-[13px] text-[#06C] mt-2 inline-flex items-center gap-1 group-hover:underline">
+                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">PDF manual</p>
+                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{m.alt_text || "Technical manual"}</p>
+                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
                     Download <Download className="h-3 w-3" />
                   </p>
                 </div>
@@ -1189,14 +1189,14 @@ export default function ProductViewPage() {
             ))}
             {otherDocs.map(d => (
               <a key={d.id} href={d.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0">
-                  <ImageIcon className="h-4 w-4 text-[#06C]" />
+                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
+                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
+                  <ImageIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] mb-1 capitalize">{d.type.replace(/_/g, " ")}</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] leading-[1.25] tracking-[-0.01em] capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
-                  <p className="text-[13px] text-[#06C] mt-2 inline-flex items-center gap-1 group-hover:underline">
+                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1 capitalize">{d.type.replace(/_/g, " ")}</p>
+                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em] capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
+                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
                     View <ExternalLink className="h-3 w-3" />
                   </p>
                 </div>
@@ -1210,7 +1210,7 @@ export default function ProductViewPage() {
           10. RELATED PRODUCTS — Apple clean shopping cards
           ══════════════════════════════════════ */}
       {related.length > 0 && (
-        <Section eyebrow="You might also like" title="Related machines." className="bg-white">
+        <Section eyebrow="You might also like" title="Related machines." className="bg-white dark:bg-[#0A0A0A]">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {related.map(r => {
               const rp = relatedDetails[r.related_id];
@@ -1220,25 +1220,25 @@ export default function ProductViewPage() {
                 <Link
                   key={r.related_id}
                   href={`/products/${rp.slug || rp.id}`}
-                  className="group rounded-[22px] overflow-hidden bg-[#F5F5F7] transition-all duration-300 hover:scale-[1.02]"
+                  className="group rounded-[22px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.02]"
                 >
-                  <div className="aspect-[4/3] bg-white relative overflow-hidden">
+                  <div className="aspect-[4/3] bg-white dark:bg-white/[0.02] relative overflow-hidden">
                     {img ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={img} alt={rp.product_name}
                            className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.05] transition-transform duration-700 ease-out" />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7]">
+                      <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
                         <ImageIcon className="h-10 w-10" />
                       </div>
                     )}
                   </div>
                   <div className="p-5">
                     {rp.brand && (
-                      <p className="text-[12px] font-medium text-[#86868B] mb-1">{rp.brand}</p>
+                      <p className="text-[12px] font-medium text-[#86868B] dark:text-white/40 mb-1">{rp.brand}</p>
                     )}
-                    <p className="text-[16px] font-semibold text-[#1D1D1F] leading-[1.2] line-clamp-2 tracking-[-0.01em]">{rp.product_name}</p>
-                    <p className="mt-3 inline-flex items-center gap-1 text-[13px] text-[#06C] group-hover:underline">
+                    <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] line-clamp-2 tracking-[-0.01em]">{rp.product_name}</p>
+                    <p className="mt-3 inline-flex items-center gap-1 text-[13px] text-[#06C] dark:text-[#2997FF] group-hover:underline">
                       Learn more <ChevronRight className="h-3 w-3" />
                     </p>
                   </div>
@@ -1252,45 +1252,45 @@ export default function ProductViewPage() {
       {/* ══════════════════════════════════════
           11. FINAL CTA — Apple closing statement
           ══════════════════════════════════════ */}
-      <section className="relative py-24 md:py-32 bg-[#F5F5F7]">
+      <section className="relative py-24 md:py-32 bg-[#F5F5F7] dark:bg-white/[0.015]">
         <div className="max-w-[980px] mx-auto px-6 text-center">
-          <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] mb-3 tracking-[-0.005em]">
+          <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-3 tracking-[-0.005em]">
             Let&apos;s talk
           </p>
-          <h2 className="text-[36px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.015em] text-[#1D1D1F] leading-[1.08]">
+          <h2 className="text-[36px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.015em] text-[#1D1D1F] dark:text-white leading-[1.08]">
             Ready to elevate<br />your production line?
           </h2>
-          <p className="mt-5 text-[19px] md:text-[21px] text-[#6E6E73] leading-[1.45] max-w-[640px] mx-auto font-normal">
+          <p className="mt-5 text-[19px] md:text-[21px] text-[#6E6E73] dark:text-white/60 leading-[1.45] max-w-[640px] mx-auto font-normal">
             Our specialists will help you select the right {product.product_name} configuration for your factory.
           </p>
           <div className="mt-9 flex items-center justify-center gap-4 flex-wrap">
             <Link
               href="/contacts"
-              className="inline-flex items-center gap-1 h-[44px] px-[22px] rounded-full bg-[#06C] text-white text-[17px] font-normal hover:bg-[#0077ED] transition-colors"
+              className="inline-flex items-center gap-1 h-[44px] px-[22px] rounded-full bg-[#06C] text-white text-[17px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
             >
               Contact sales <ChevronRight className="h-4 w-4 mt-0.5" />
             </Link>
             <a
               href="#models"
-              className="inline-flex items-center gap-1 text-[#06C] text-[17px] font-normal hover:underline"
+              className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] text-[17px] font-normal hover:underline"
             >
               Review models <ChevronRight className="h-4 w-4 mt-0.5" />
             </a>
           </div>
-          <div className="mt-12 flex items-center justify-center gap-4 text-[12px] text-[#86868B]">
+          <div className="mt-12 flex items-center justify-center gap-4 text-[12px] text-[#86868B] dark:text-white/40">
             <span className="inline-flex items-center gap-1.5">
               <Boxes className="h-3 w-3" />
               {models.length} model{models.length === 1 ? "" : "s"}
             </span>
             {product.hs_code && (
               <>
-                <span className="h-1 w-1 rounded-full bg-[#D2D2D7]" />
+                <span className="h-1 w-1 rounded-full bg-[#D2D2D7] dark:bg-white/20" />
                 <span className="font-mono">HS {product.hs_code}</span>
               </>
             )}
             {product.warranty && (
               <>
-                <span className="h-1 w-1 rounded-full bg-[#D2D2D7]" />
+                <span className="h-1 w-1 rounded-full bg-[#D2D2D7] dark:bg-white/20" />
                 <span className="inline-flex items-center gap-1.5">
                   <ShieldCheck className="h-3 w-3" /> {product.warranty}
                 </span>

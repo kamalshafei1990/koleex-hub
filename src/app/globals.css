@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 dark variant — keyed off our data-theme attribute ── */
+@custom-variant dark (&:where([data-theme="dark"] *, [data-theme="dark"]));
+
 /* ── Theme-aware design tokens ── */
 :root,
 [data-theme="dark"] {
