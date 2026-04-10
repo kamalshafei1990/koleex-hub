@@ -377,6 +377,82 @@ export type ProductTranslationInsert = Omit<ProductTranslationRow, "id" | "creat
 export type ModelTranslationInsert = Omit<ModelTranslationRow, "id" | "created_at">;
 export type ProductMarketPriceInsert = Omit<ProductMarketPriceRow, "id" | "created_at">;
 
+/* ---------------------------------------------------------------------------
+   Accounts Manager — Internal + customer user accounts, companies, roles.
+   Maps to the `accounts`, `companies`, `roles` tables created in
+   supabase/migrations/create_accounts_system.sql.
+   --------------------------------------------------------------------------- */
+
+export type UserType = "internal" | "customer";
+export type AccountStatus = "active" | "inactive" | "suspended" | "pending";
+export type CustomerLevel = "silver" | "gold" | "platinum" | "diamond";
+export type CompanyType = "koleex" | "customer" | "supplier" | "partner";
+export type RoleScope = "internal" | "customer" | "all";
+
+export interface CompanyRow {
+  id: string;
+  name: string;
+  type: CompanyType;
+  country: string | null;
+  currency: string | null;
+  website: string | null;
+  logo_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompanyInsert = Omit<CompanyRow, "id" | "created_at" | "updated_at">;
+
+export interface RoleRow {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  scope: RoleScope;
+  display_order: number;
+  created_at: string;
+}
+
+export type RoleInsert = Omit<RoleRow, "id" | "created_at">;
+
+export interface AccountRow {
+  id: string;
+  auth_user_id: string | null;
+  full_name: string;
+  username: string;
+  email: string;
+  phone: string | null;
+  avatar_url: string | null;
+  user_type: UserType;
+  company_id: string | null;
+  role_id: string | null;
+  status: AccountStatus;
+  country: string | null;
+  currency: string | null;
+  customer_level: CustomerLevel | null;
+
+  can_access_products: boolean;
+  can_create_quotations: boolean;
+  can_view_pricing: boolean;
+  can_place_orders: boolean;
+
+  password_hash: string | null;
+  force_password_change: boolean;
+  two_factor_enabled: boolean;
+  last_login_at: string | null;
+
+  internal_notes: string | null;
+  account_notes: string | null;
+
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export type AccountInsert = Omit<AccountRow, "id" | "created_at" | "updated_at">;
+export type AccountUpdate = Partial<AccountInsert>;
+
 /* ── Database schema type for createClient<Database> ── */
 
 export interface Database {
@@ -451,6 +527,21 @@ export interface Database {
         Row: SewingMachineSpecsRow;
         Insert: SewingMachineSpecsInsert;
         Update: Partial<SewingMachineSpecsInsert>;
+      };
+      companies: {
+        Row: CompanyRow;
+        Insert: CompanyInsert;
+        Update: Partial<CompanyInsert>;
+      };
+      roles: {
+        Row: RoleRow;
+        Insert: RoleInsert;
+        Update: Partial<RoleInsert>;
+      };
+      accounts: {
+        Row: AccountRow;
+        Insert: AccountInsert;
+        Update: AccountUpdate;
       };
     };
   };

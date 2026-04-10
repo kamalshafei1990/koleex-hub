@@ -78,6 +78,7 @@ const apps: AppItem[] = [
   { id: "planning", name: "Planning", icon: <Kanban size={iconSize} />, category: "planning", route: "/planning" },
   { id: "projects", name: "Projects", icon: <FolderKanban size={iconSize} />, category: "planning", route: "/projects" },
   { id: "knowledge", name: "Knowledge", icon: <BookOpen size={iconSize} />, category: "knowledge", route: "/knowledge" },
+  { id: "accounts", name: "Accounts Manager", icon: <Users size={iconSize} />, category: "system", route: "/accounts", active: true },
   { id: "database", name: "Database", icon: <Database size={iconSize} />, category: "system", route: "/database" },
   { id: "ai", name: "AI", icon: <Sparkles size={iconSize} />, category: "system", route: "/ai" },
   { id: "settings", name: "Settings", icon: <Settings size={iconSize} />, category: "system", route: "/settings" },
