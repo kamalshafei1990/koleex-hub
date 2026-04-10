@@ -379,11 +379,16 @@ export default function AccountForm({ mode, account }: Props) {
                   value={form.status}
                   onChange={(e) => set("status", e.target.value as AccountStatus)}
                 >
+                  <option value="invited">Invited</option>
                   <option value="pending">Pending</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                   <option value="suspended">Suspended</option>
                 </select>
+                <p className="text-[11px] text-[var(--text-dim)] mt-1.5">
+                  Use <span className="text-[var(--text-muted)] font-medium">Invited</span> when
+                  the account has been created but the user hasn&rsquo;t set a password yet.
+                </p>
               </div>
             </div>
 

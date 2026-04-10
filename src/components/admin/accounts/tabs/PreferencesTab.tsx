@@ -1,0 +1,198 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   PreferencesTab — general user preferences (language, theme, email signature,
+   notifications). Stored in accounts.preferences jsonb.
+
+   The tab reads from the merged AccountPreferences bag (stored + defaults),
+   and only persists the keys the user actually interacts with.
+   --------------------------------------------------------------------------- */
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Settings2,
+  Languages,
+  Palette,
+  Mail,
+  Bell,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
+import type {
+  AccountWithLinks,
+  AccountPreferences,
+} from "@/types/supabase";
+import { withDefaults } from "@/lib/access-control";
+import { updateAccountPreferences } from "@/lib/accounts-admin";
+import {
+  tabCardClass,
+  tabSectionTitle,
+  selectClass,
+  textareaClass,
+  labelClass,
+  Toggle,
+  TabActionBar,
+} from "./shared";
+
+interface Props {
+  account: AccountWithLinks;
+  onChanged?: (prefs: AccountPreferences) => void;
+}
+
+export default function PreferencesTab({ account, onChanged }: Props) {
+  const initial = useMemo(() => withDefaults(account.preferences), [account.preferences]);
+
+  const [prefs, setPrefs] = useState<AccountPreferences>(initial);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setPrefs(initial), [initial]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const dirty = JSON.stringify(prefs) !== JSON.stringify(initial);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    // Persist the full merged bag — simpler than diffing and the jsonb
+    // payload is small.
+    const ok = await updateAccountPreferences(account.id, prefs);
+    setSaving(false);
+    if (!ok) {
+      setError("Could not save preferences.");
+      return;
+    }
+    setToast("Preferences saved.");
+    onChanged?.(prefs);
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className={tabCardClass}>
+        <h2 className={tabSectionTitle}>
+          <Settings2 className="h-3.5 w-3.5" />
+          General
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>
+              <Languages className="h-3 w-3 inline mr-1" /> Language
+            </label>
+            <select
+              className={selectClass}
+              value={prefs.language ?? "en"}
+              onChange={(e) =>
+                setPrefs({ ...prefs, language: e.target.value as "en" | "ar" })
+              }
+            >
+              <option value="en">English</option>
+              <option value="ar">العربية (Arabic)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              <Palette className="h-3 w-3 inline mr-1" /> Theme
+            </label>
+            <select
+              className={selectClass}
+              value={prefs.theme ?? "system"}
+              onChange={(e) =>
+                setPrefs({
+                  ...prefs,
+                  theme: e.target.value as "light" | "dark" | "system",
+                })
+              }
+            >
+              <option value="system">Match System</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section className={tabCardClass}>
+        <h2 className={tabSectionTitle}>
+          <Mail className="h-3.5 w-3.5" />
+          Email Signature
+        </h2>
+        <textarea
+          className={textareaClass}
+          rows={6}
+          value={prefs.email_signature ?? ""}
+          onChange={(e) => setPrefs({ ...prefs, email_signature: e.target.value })}
+          placeholder={`Jane Cooper\nSales Manager · Koleex International Group\njane@koleex.com · +971 50 000 0000`}
+        />
+        <p className="text-[11px] text-[var(--text-dim)] mt-2">
+          Appended to outgoing emails from the Koleex Hub.
+        </p>
+      </section>
+
+      <section className={tabCardClass}>
+        <h2 className={tabSectionTitle}>
+          <Bell className="h-3.5 w-3.5" />
+          Notifications
+        </h2>
+        <div className="space-y-4">
+          <Toggle
+            label="Email notifications"
+            description="Send activity and mentions to the login email."
+            checked={prefs.notifications?.email ?? true}
+            onChange={(v) =>
+              setPrefs({
+                ...prefs,
+                notifications: {
+                  email: v,
+                  in_app: prefs.notifications?.in_app ?? true,
+                },
+              })
+            }
+          />
+          <Toggle
+            label="In-app notifications"
+            description="Show a bell indicator inside the hub."
+            checked={prefs.notifications?.in_app ?? true}
+            onChange={(v) =>
+              setPrefs({
+                ...prefs,
+                notifications: {
+                  email: prefs.notifications?.email ?? true,
+                  in_app: v,
+                },
+              })
+            }
+          />
+        </div>
+      </section>
+
+      {toast && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
+          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{toast}</span>
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <section className={tabCardClass}>
+        <TabActionBar
+          dirty={dirty}
+          saving={saving}
+          onSave={save}
+          onReset={() => setPrefs(initial)}
+        />
+      </section>
+    </div>
+  );
+}

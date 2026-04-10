@@ -25,10 +25,13 @@ import type {
   AccountRow, AccountInsert, AccountUpdate, AccountStatus, AccountWithLinks,
   CompanyRow, CompanyInsert,
   PersonRow, PersonInsert,
-  EmployeeRow, EmployeeInsert,
+  EmployeeRow, EmployeeInsert, EmployeeUpdate,
   RoleRow,
   AccessPresetRow,
+  AccountPermissionOverrideRow, AccountPermissionOverrideInsert,
+  AccountPreferences,
 } from "@/types/supabase";
+import type { AccessLevel } from "@/lib/access-control";
 
 const ACCOUNTS = "accounts";
 const COMPANIES = "companies";
@@ -36,6 +39,7 @@ const ROLES = "roles";
 const PEOPLE = "people";
 const EMPLOYEES = "koleex_employees"; // renamed to avoid collision with legacy `employees` table
 const ACCESS_PRESETS = "access_presets";
+const PERMISSION_OVERRIDES = "account_permission_overrides";
 
 /* ============================================================================
    Accounts
@@ -68,8 +72,8 @@ export async function fetchAccountById(id: string): Promise<AccountRow | null> {
 
 /**
  * Fetch an account plus every linked record (person, company, role, preset,
- * employee) in one shot. Uses parallel queries rather than a joined select so
- * we can keep the untyped Supabase client simple.
+ * employee, permission overrides) in one shot. Uses parallel queries rather
+ * than a joined select so we can keep the untyped Supabase client simple.
  */
 export async function fetchAccountWithLinks(
   id: string,
@@ -77,30 +81,33 @@ export async function fetchAccountWithLinks(
   const account = await fetchAccountById(id);
   if (!account) return null;
 
-  const [person, company, role, employee] = await Promise.all([
+  const [person, company, role, employee, overrides] = await Promise.all([
     account.person_id ? fetchPersonById(account.person_id) : Promise.resolve(null),
     account.company_id ? fetchCompanyById(account.company_id) : Promise.resolve(null),
     account.role_id ? fetchRoleById(account.role_id) : Promise.resolve(null),
     fetchEmployeeByAccountId(account.id),
+    fetchPermissionOverrides(account.id),
   ]);
 
   const preset = account.role_id
     ? await fetchAccessPresetByRoleId(account.role_id)
     : null;
 
-  return { ...account, person, company, role, preset, employee };
+  return { ...account, person, company, role, preset, employee, overrides };
 }
 
 export async function createAccount(
-  input: Omit<AccountInsert, "password_hash" | "force_password_change"> & {
+  input: Omit<AccountInsert, "password_hash" | "force_password_change" | "preferences"> & {
     temporary_password?: string;
+    preferences?: AccountPreferences;
   },
 ): Promise<AccountRow | null> {
-  const { temporary_password, ...rest } = input;
+  const { temporary_password, preferences, ...rest } = input;
   const payload: Record<string, unknown> = {
     ...rest,
     password_hash: temporary_password ? hashTempPassword(temporary_password) : null,
     force_password_change: true,
+    preferences: preferences ?? {},
   };
 
   const { data, error } = await supabase
@@ -335,6 +342,73 @@ export async function createEmployee(
   return data as EmployeeRow;
 }
 
+/**
+ * Update a Koleex employee record. Used by the Private HR tab on the account
+ * detail page to persist private address, emergency contact, nationality,
+ * visa data, etc.
+ */
+export async function updateEmployee(
+  id: string,
+  updates: EmployeeUpdate,
+): Promise<boolean> {
+  const { error } = await supabase.from(EMPLOYEES).update(updates).eq("id", id);
+  if (error) {
+    console.error("[Employees] Update:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Upsert a Koleex employee by account_id. Creates a new HR record if one
+ * doesn't exist yet, otherwise updates in place. Used by the Private HR tab
+ * when an internal account has no linked employee record.
+ */
+export async function upsertEmployeeByAccountId(
+  accountId: string,
+  personId: string | null,
+  updates: EmployeeUpdate,
+): Promise<EmployeeRow | null> {
+  const existing = await fetchEmployeeByAccountId(accountId);
+  if (existing) {
+    const ok = await updateEmployee(existing.id, updates);
+    if (!ok) return null;
+    return { ...existing, ...updates } as EmployeeRow;
+  }
+  // Create a minimal HR record.
+  const created = await createEmployee({
+    account_id: accountId,
+    person_id: personId,
+    employee_number: null,
+    department: null,
+    position: null,
+    hire_date: null,
+    employment_status: "active",
+    manager_id: null,
+    work_email: null,
+    work_phone: null,
+    notes: null,
+    private_address_line1: null,
+    private_address_line2: null,
+    private_city: null,
+    private_state: null,
+    private_country: null,
+    private_postal_code: null,
+    emergency_contact_name: null,
+    emergency_contact_phone: null,
+    emergency_contact_relationship: null,
+    birth_date: null,
+    marital_status: null,
+    nationality: null,
+    identification_id: null,
+    passport_number: null,
+    visa_number: null,
+    visa_expiry_date: null,
+    ...updates,
+  } as EmployeeInsert);
+  return created;
+}
+
 /* ============================================================================
    Roles & Access Presets
    ============================================================================ */
@@ -380,6 +454,130 @@ export async function fetchAccessPresetByRoleId(
     .maybeSingle();
   if (error) return null;
   return (data as AccessPresetRow) || null;
+}
+
+/* ============================================================================
+   Account Preferences (jsonb)
+
+   Preferences are stored as a jsonb column on accounts. We never write the
+   full defaults bag back into the DB — only the keys the user actually set.
+   The UI merges stored values with DEFAULT_PREFERENCES for display.
+   ============================================================================ */
+
+export async function updateAccountPreferences(
+  id: string,
+  preferences: AccountPreferences,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from(ACCOUNTS)
+    .update({ preferences })
+    .eq("id", id);
+  if (error) {
+    console.error("[Accounts] Update preferences:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/* ============================================================================
+   Per-account Permission Overrides
+
+   The `account_permission_overrides` table stores sparse overrides that layer
+   on top of the role's access_preset. Absence of a row for a given module
+   means "use the preset default".
+   ============================================================================ */
+
+export async function fetchPermissionOverrides(
+  accountId: string,
+): Promise<AccountPermissionOverrideRow[]> {
+  const { data, error } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .select("*")
+    .eq("account_id", accountId);
+  if (error) {
+    console.error("[PermissionOverrides] Fetch:", error.message);
+    return [];
+  }
+  return (data as AccountPermissionOverrideRow[]) || [];
+}
+
+/**
+ * Upsert a single permission override. Creates a row if one doesn't exist
+ * for (account_id, module_key), otherwise updates the access_level.
+ */
+export async function upsertPermissionOverride(
+  accountId: string,
+  moduleKey: string,
+  accessLevel: AccessLevel,
+): Promise<boolean> {
+  const payload: AccountPermissionOverrideInsert = {
+    account_id: accountId,
+    module_key: moduleKey,
+    access_level: accessLevel,
+  };
+  const { error } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .upsert(payload, { onConflict: "account_id,module_key" });
+  if (error) {
+    console.error("[PermissionOverrides] Upsert:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Delete an override row — used when a user resets a module back to its
+ * preset default ("no override").
+ */
+export async function deletePermissionOverride(
+  accountId: string,
+  moduleKey: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .delete()
+    .eq("account_id", accountId)
+    .eq("module_key", moduleKey);
+  if (error) {
+    console.error("[PermissionOverrides] Delete:", error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Replace the full set of overrides for an account with a new set. Deletes
+ * rows that no longer exist and upserts the rest. Used by the Access Rights
+ * tab when saving the whole grid at once.
+ */
+export async function replacePermissionOverrides(
+  accountId: string,
+  nextOverrides: { module_key: string; access_level: AccessLevel }[],
+): Promise<boolean> {
+  // Delete every existing row for this account first (simple and correct).
+  const { error: delErr } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .delete()
+    .eq("account_id", accountId);
+  if (delErr) {
+    console.error("[PermissionOverrides] Replace/delete:", delErr.message);
+    return false;
+  }
+  if (nextOverrides.length === 0) return true;
+
+  const payload: AccountPermissionOverrideInsert[] = nextOverrides.map((o) => ({
+    account_id: accountId,
+    module_key: o.module_key,
+    access_level: o.access_level,
+  }));
+  const { error: insErr } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .insert(payload);
+  if (insErr) {
+    console.error("[PermissionOverrides] Replace/insert:", insErr.message);
+    return false;
+  }
+  return true;
 }
 
 /* ============================================================================

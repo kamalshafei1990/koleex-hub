@@ -37,6 +37,7 @@ const selectClass =
   "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors";
 
 const statusColors: Record<AccountStatus, string> = {
+  invited:   "bg-sky-500/15 text-sky-300 border-sky-500/25",
   active:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   pending:   "bg-amber-500/15 text-amber-400 border-amber-500/25",
   inactive:  "bg-zinc-500/15 text-zinc-300 border-zinc-500/25",
@@ -393,6 +394,7 @@ export default function AccountsList() {
                   className={selectClass + " w-full"}
                 >
                   <option value="">All</option>
+                  <option value="invited">Invited</option>
                   <option value="active">Active</option>
                   <option value="pending">Pending</option>
                   <option value="inactive">Inactive</option>

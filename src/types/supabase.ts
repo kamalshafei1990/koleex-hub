@@ -401,11 +401,24 @@ export type ProductMarketPriceInsert = Omit<ProductMarketPriceRow, "id" | "creat
    --------------------------------------------------------------------------- */
 
 export type UserType = "internal" | "customer";
-export type AccountStatus = "active" | "inactive" | "suspended" | "pending";
+export type AccountStatus =
+  | "invited"
+  | "active"
+  | "inactive"
+  | "suspended"
+  | "pending";
 export type CustomerLevel = "silver" | "gold" | "platinum" | "diamond";
 export type CompanyType = "koleex" | "customer" | "supplier" | "partner";
 export type RoleScope = "internal" | "customer" | "all";
 export type EmploymentStatus = "active" | "on_leave" | "terminated" | "inactive";
+
+/* Re-export the AccountPreferences type from the access-control catalog so
+   supabase types and UI types stay in sync. */
+export type {
+  AccountPreferences,
+  AccessLevel,
+} from "@/lib/access-control";
+import type { AccountPreferences as _AccountPreferences } from "@/lib/access-control";
 
 /* ── Companies (source of truth for customer level + pricing) ── */
 export interface CompanyRow {
@@ -482,6 +495,25 @@ export interface EmployeeRow {
   work_email: string | null;
   work_phone: string | null;
   notes: string | null;
+
+  // Private HR fields (added in accounts v2 phase 1)
+  private_address_line1: string | null;
+  private_address_line2: string | null;
+  private_city: string | null;
+  private_state: string | null;
+  private_country: string | null;
+  private_postal_code: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
+  birth_date: string | null;
+  marital_status: string | null;
+  nationality: string | null;
+  identification_id: string | null;
+  passport_number: string | null;
+  visa_number: string | null;
+  visa_expiry_date: string | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -514,6 +546,9 @@ export interface AccountRow {
   // Admin-only
   internal_notes: string | null;
 
+  // Preferences bag (language, theme, signature, notifications, calendar)
+  preferences: _AccountPreferences;
+
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -544,6 +579,23 @@ export interface AccessPresetRow {
 export type AccessPresetInsert = Omit<AccessPresetRow, "id" | "created_at">;
 export type AccessPresetUpdate = Partial<AccessPresetInsert>;
 
+/* ── Per-account permission overrides (layers on top of role preset) ── */
+export interface AccountPermissionOverrideRow {
+  id: string;
+  account_id: string;
+  module_key: string;
+  access_level: "none" | "user" | "manager" | "admin";
+  created_at: string;
+  updated_at: string;
+}
+
+export type AccountPermissionOverrideInsert = Omit<
+  AccountPermissionOverrideRow,
+  "id" | "created_at" | "updated_at"
+>;
+export type AccountPermissionOverrideUpdate =
+  Partial<AccountPermissionOverrideInsert>;
+
 /* Convenience: an account with its linked person / company / role / preset
    already joined in memory (built client-side after parallel fetches). */
 export interface AccountWithLinks extends AccountRow {
@@ -552,6 +604,7 @@ export interface AccountWithLinks extends AccountRow {
   role: RoleRow | null;
   preset: AccessPresetRow | null;
   employee: EmployeeRow | null;
+  overrides: AccountPermissionOverrideRow[];
 }
 
 /* ── Database schema type for createClient<Database> ── */
@@ -658,6 +711,11 @@ export interface Database {
         Row: AccessPresetRow;
         Insert: AccessPresetInsert;
         Update: AccessPresetUpdate;
+      };
+      account_permission_overrides: {
+        Row: AccountPermissionOverrideRow;
+        Insert: AccountPermissionOverrideInsert;
+        Update: AccountPermissionOverrideUpdate;
       };
     };
   };
