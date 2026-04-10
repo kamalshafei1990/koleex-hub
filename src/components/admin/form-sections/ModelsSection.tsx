@@ -2,7 +2,7 @@
 
 import {
   Plus, Trash2, ChevronDown, ChevronUp, Copy, ArrowUp, ArrowDown,
-  Package, DollarSign, Scale, ScanLine, Warehouse, Tag,
+  Package, DollarSign, Scale, ScanLine, Warehouse, Tag, Crown,
 } from "lucide-react";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
@@ -35,7 +35,7 @@ function Panel({ icon, title, children }: { icon: React.ReactNode; title: string
 
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
-  suppliers, onClickCreateSupplier, defaultOpen = true,
+  suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false,
 }: {
   model: ModelFormState; idx: number; total: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -46,6 +46,7 @@ function ModelCard({
   suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: () => void;
   defaultOpen?: boolean;
+  isPrimary?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -61,7 +62,9 @@ function ModelCard({
   });
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)]">
+    <div className={`bg-[var(--bg-secondary)] rounded-2xl border overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)] ${
+      isPrimary ? "border-amber-500/40 ring-1 ring-amber-500/20" : "border-[var(--border-subtle)]"
+    }`}>
       {/* Header */}
       <div
         className={`flex items-center justify-between px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--bg-surface-subtle)]/40 ${
@@ -70,14 +73,23 @@ function ModelCard({
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[12px] font-bold text-[var(--text-muted)]">
-            {idx + 1}
+          <div className={`h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center text-[12px] font-bold ${
+            isPrimary
+              ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-amber-500/40 text-amber-300"
+              : "bg-gradient-to-br from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-muted)]"
+          }`}>
+            {isPrimary ? <Crown className="h-4 w-4" /> : idx + 1}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
                 {model.model_name || "Untitled Model"}
               </span>
+              {isPrimary && (
+                <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/15 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                  <Crown className="h-2.5 w-2.5" /> Primary
+                </span>
+              )}
               <span
                 className={`inline-flex items-center gap-1 h-5 px-2 rounded-full border text-[9px] font-bold uppercase tracking-wider ${
                   isActive
@@ -392,6 +404,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
                 model={m}
                 idx={trueIdx}
                 total={models.length}
+                isPrimary={!hidePrimary && trueIdx === 0}
                 onUpdate={(u) => updateModel(m._tempId, u)}
                 onRemove={() => removeModel(m._tempId)}
                 onDuplicate={() => duplicateModel(m._tempId)}

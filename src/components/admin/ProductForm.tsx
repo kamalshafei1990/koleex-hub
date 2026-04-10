@@ -52,7 +52,8 @@ import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
 import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
-import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
+import LivePreviewPanel from "./form-sections/LivePreviewPanel";
+import { isSewingMachineSubcategory, SEWING_MACHINE_TEMPLATES } from "@/lib/sewing-machine-templates";
 import { slugify } from "@/types/product-form";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -758,6 +759,20 @@ export default function ProductForm({ productId }: Props) {
           completedSteps={completedSteps}
         />
 
+        {/* ═══ GLOBAL CLASSIFICATION BREADCRUMB (shown once classification is set, across all steps) ═══ */}
+        {divisionName && steps[currentStep]?.id !== "identity" && steps[currentStep]?.id !== "classification" && (
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-ghost)] mb-4 px-1">
+            <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">Classification:</span>
+            <span>{divisionName}</span>
+            {categoryName && <><ChevronRight className="h-3 w-3" /><span>{categoryName}</span></>}
+            {subcategoryName && <><ChevronRight className="h-3 w-3" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+          </div>
+        )}
+
+        {/* ═══ MAIN CONTENT + STICKY LIVE PREVIEW RAIL ═══ */}
+        <div className="flex gap-6 items-start">
+          <div className="flex-1 min-w-0">
+
         {/* ═══════════════════════════════════════════════════════════
            STEP 1: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
@@ -1302,6 +1317,27 @@ export default function ProductForm({ productId }: Props) {
               {saving ? "Saving..." : "Save & Publish"}
             </button>
           )}
+        </div>
+
+          </div>
+
+          {/* ═══ STICKY LIVE PREVIEW RAIL ═══ */}
+          <LivePreviewPanel
+            product={product}
+            primaryModel={primaryModel}
+            mainImageSrc={mainImageSrc}
+            mediaCount={media.length}
+            modelCount={models.length}
+            sewingTemplateName={
+              sewingSpecs.template_slug
+                ? SEWING_MACHINE_TEMPLATES.find(t => t.slug === sewingSpecs.template_slug)?.name || null
+                : null
+            }
+            sewingCommonSpecs={sewingSpecs.common_specs}
+            divisionName={divisionName}
+            categoryName={categoryName}
+            subcategoryName={subcategoryName}
+          />
         </div>
 
         <div className="h-12" />
