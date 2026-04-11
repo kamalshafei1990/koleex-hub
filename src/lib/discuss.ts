@@ -1037,6 +1037,14 @@ export async function uploadDiscussAttachment(
  *  We return a composite unsubscriber rather than the raw channel
  *  object because most callers only need "stop listening" — they
  *  never care about the underlying Supabase channel handle. */
+/** Unique-per-call topic suffix for realtime channels. We can't reuse
+ *  topic names across subscribers because supabase-js de-dupes channels
+ *  by topic and `.on("postgres_changes", …)` after `.subscribe()`
+ *  throws. A short random id keeps each subscription fully isolated. */
+function uniqueChannelSuffix(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function subscribeToChannel(
   channelId: string,
   handlers: {
@@ -1051,14 +1059,23 @@ export function subscribeToChannel(
      losing the caller's handlers. The Supabase JS realtime client
      will re-join on network blips, but it does NOT recreate a channel
      after a server-side error — which Safari triggers surprisingly
-     often when the tab comes back from a long sleep. */
+     often when the tab comes back from a long sleep.
+
+     IMPORTANT: every connect() invocation must use a UNIQUE topic.
+     `supabase.channel(topic)` returns the existing channel if one
+     with that topic is still in `client.channels`, and `removeChannel`
+     is async — so React strict-mode double-mounts (or two simultaneous
+     subscribers) handed back the same already-`subscribe()`-d channel,
+     and `.on("postgres_changes", …)` after subscribe throws. Suffixing
+     each call with a fresh random id sidesteps the cache entirely. */
   let currentChannel: ReturnType<typeof supabase.channel> | null = null;
   let reconnectTimer: number | null = null;
   let closed = false;
 
   const connect = () => {
     if (closed) return;
-    const ch = supabase.channel(`discuss:${channelId}`, {
+    const topic = `discuss:${channelId}:${uniqueChannelSuffix()}`;
+    const ch = supabase.channel(topic, {
       config: { broadcast: { self: false } },
     });
     ch.on(
@@ -1193,8 +1210,13 @@ export function subscribeToMyChannels(
 
   const connect = () => {
     if (closed) return;
+    /* See the long comment in subscribeToChannel: each subscriber needs
+       its own topic so DiscussBell + DiscussApp (which both call this)
+       and React strict-mode double-mounts don't collide on the cached
+       already-subscribed channel. */
+    const topic = `discuss:my-channels:${uniqueChannelSuffix()}`;
     const ch = supabase
-      .channel("discuss:my-channels")
+      .channel(topic)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "discuss_messages" },
