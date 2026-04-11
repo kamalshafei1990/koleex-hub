@@ -21,58 +21,42 @@
 
 let audioCtx: AudioContext | null = null;
 let unlockListenersAttached = false;
+let pendingPlayUntilUnlock = false;
 
-function getCtx(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  if (audioCtx) return audioCtx;
-  const Ctor =
+type CtorType = typeof AudioContext | undefined;
+
+function getCtor(): CtorType {
+  if (typeof window === "undefined") return undefined;
+  return (
     window.AudioContext ||
     (window as unknown as { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext;
+      .webkitAudioContext
+  );
+}
+
+function ensureCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (audioCtx) return audioCtx;
+  const Ctor = getCtor();
   if (!Ctor) return null;
   try {
     audioCtx = new Ctor();
   } catch {
     return null;
   }
+  /* Newly-created AudioContexts are usually "suspended" until a user
+     gesture; resume() inside a gesture promotes them to "running". We
+     try here optimistically — if we're not currently in a gesture the
+     promise just rejects silently. */
+  if (audioCtx.state === "suspended") {
+    void audioCtx.resume().catch(() => {});
+  }
   return audioCtx;
 }
 
-function attachUnlockListeners() {
-  if (unlockListenersAttached) return;
-  if (typeof window === "undefined") return;
-  unlockListenersAttached = true;
-  const unlock = () => {
-    const ctx = getCtx();
-    if (ctx && ctx.state === "suspended") {
-      void ctx.resume().catch(() => {});
-    }
-  };
-  window.addEventListener("click", unlock, { passive: true });
-  window.addEventListener("touchstart", unlock, { passive: true });
-  window.addEventListener("keydown", unlock);
-}
-
-/** Call once on app mount so the AudioContext is ready as soon as the
- *  user clicks anywhere. Safe to call multiple times — the listeners
- *  are only attached on the first call. */
-export function primeNotificationSound() {
-  attachUnlockListeners();
-}
-
-/** Play the two-note notification chime. Safe to call from any
- *  callback; if the audio context isn't unlocked yet (no prior user
- *  gesture) the call is a silent no-op. */
-export function playNotificationSound() {
-  const ctx = getCtx();
-  if (!ctx) return;
-  attachUnlockListeners();
-  if (ctx.state === "suspended") {
-    /* No user gesture yet → can't play. Try to resume in case we're in
-       a click handler; if not, this just no-ops. */
-    void ctx.resume().catch(() => {});
-    if (ctx.state === "suspended") return;
-  }
+function actuallyPlay() {
+  const ctx = audioCtx;
+  if (!ctx || ctx.state !== "running") return false;
   try {
     const now = ctx.currentTime;
     const tones: Array<{ freq: number; start: number; dur: number }> = [
@@ -93,7 +77,83 @@ export function playNotificationSound() {
       osc.start(t0);
       osc.stop(t1 + 0.02);
     }
+    return true;
   } catch {
-    /* ignore — audio is non-critical */
+    return false;
   }
+}
+
+function attachUnlockListeners() {
+  if (unlockListenersAttached) return;
+  if (typeof window === "undefined") return;
+  unlockListenersAttached = true;
+  const unlock = () => {
+    const ctx = ensureCtx();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(() => {
+        if (pendingPlayUntilUnlock) {
+          pendingPlayUntilUnlock = false;
+          actuallyPlay();
+        }
+      });
+    } else if (pendingPlayUntilUnlock) {
+      pendingPlayUntilUnlock = false;
+      actuallyPlay();
+    }
+  };
+  window.addEventListener("click", unlock, { passive: true });
+  window.addEventListener("touchstart", unlock, { passive: true });
+  window.addEventListener("keydown", unlock);
+}
+
+/** Call once on app mount so the AudioContext is ready as soon as the
+ *  user clicks anywhere. Safe to call multiple times — the listeners
+ *  are only attached on the first call. */
+export function primeNotificationSound() {
+  attachUnlockListeners();
+  /* Best-effort: try to create the context now. On most browsers it
+     starts suspended and the unlock listeners will resume it on the
+     first click. */
+  ensureCtx();
+}
+
+/** Play the two-note notification chime. Safe to call from any
+ *  callback. If the audio context can't play yet (no prior user
+ *  gesture) we set a flag and the next click/keydown/touchstart will
+ *  fire a single chime — better than swallowing it silently. */
+export function playNotificationSound() {
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) {
+    if (typeof console !== "undefined") {
+      console.warn("[notificationSound] no AudioContext support");
+    }
+    return;
+  }
+  if (ctx.state === "running") {
+    actuallyPlay();
+    if (typeof console !== "undefined") {
+      console.log("[notificationSound] played");
+    }
+    return;
+  }
+  /* Suspended → try to resume; if it works inside this turn, play
+     immediately. Otherwise queue a one-shot play for the next user
+     gesture. */
+  void ctx.resume().then(() => {
+    if (ctx.state === "running") {
+      actuallyPlay();
+      if (typeof console !== "undefined") {
+        console.log("[notificationSound] played after resume");
+      }
+    } else {
+      pendingPlayUntilUnlock = true;
+      if (typeof console !== "undefined") {
+        console.log(
+          "[notificationSound] suspended — will play on next click",
+        );
+      }
+    }
+  });
 }

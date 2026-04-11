@@ -91,17 +91,12 @@ export default function DiscussBell({ dk }: Props) {
         if (!myId) return;
         if (msg.author_account_id === myId) return;
         setUnread((n) => n + 1);
-        /* Play the chime everywhere except on the Discuss page itself —
-           when the user is actively chatting the visible UI update is
-           enough, and a sound on every keystroke would be obnoxious. */
-        if (typeof window !== "undefined") {
-          const onDiscuss =
-            window.location.pathname === "/discuss" ||
-            window.location.pathname.startsWith("/discuss/");
-          if (!onDiscuss) {
-            playNotificationSound();
-          }
-        }
+        /* Play the chime for every inbound message from someone else,
+           regardless of which page we're on. The first version skipped
+           it on /discuss, but that meant the user heard nothing when
+           testing — and a brief two-note ping is fine even when a chat
+           is open. */
+        playNotificationSound();
       },
       onChannelChange: () => {
         void recount();

@@ -1468,7 +1468,20 @@ export default function DiscussApp() {
      ═══════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+    /* Lock the chat surface to viewport-height-minus-MainHeader so the
+       composer at the bottom always stays pinned and only the message
+       list scrolls. We can't rely on the body flex chain here because
+       layout.tsx uses `min-h-full` on body (so ordinary pages scroll
+       naturally) — that lets the message list grow and push the
+       composer below the fold. `100dvh` is the dynamic viewport
+       height, which on mobile Safari shrinks/expands with the URL bar
+       and the on-screen keyboard, so the composer follows the visible
+       area instead of getting hidden under the keyboard. 3.5rem = 56px
+       = `h-14` on MainHeader. */
+    <div
+      className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden"
+      style={{ height: "calc(100dvh - 3.5rem)" }}
+    >
       {/* ═══ Top bar ═══
           On mobile the bar shrinks to a WeChat-style "[back] [chat
           name]" header once the user opens a chat (mobileView !==
