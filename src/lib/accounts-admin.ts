@@ -72,6 +72,83 @@ export async function fetchAccountById(id: string): Promise<AccountRow | null> {
 }
 
 /**
+ * Lightweight version of fetchAccountWithLinks tuned for the MainHeader /
+ * UserMenu. Only fetches the fields the header renders (avatar, name, type,
+ * role name) and pulls person + role via embedded resources so it's a SINGLE
+ * round trip instead of the 6+ that fetchAccountWithLinks makes.
+ *
+ * Returns an AccountWithLinks-shaped object so callers that reuse the same
+ * type don't need to branch — the unused join fields are simply null/[].
+ */
+export async function fetchAccountForHeader(
+  id: string,
+): Promise<AccountWithLinks | null> {
+  const { data, error } = await supabase
+    .from(ACCOUNTS)
+    .select(
+      `
+        id,
+        username,
+        user_type,
+        avatar_url,
+        person_id,
+        company_id,
+        role_id,
+        person:people(id, full_name, avatar_url),
+        role:roles(id, name)
+      `,
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Accounts] Fetch header:", error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  // Supabase's embedded-resource syntax can return either an object or an
+  // array depending on FK cardinality — normalise both to a single row.
+  const row = data as Record<string, unknown>;
+  const personRaw = row.person;
+  const roleRaw = row.role;
+  const person = Array.isArray(personRaw)
+    ? (personRaw[0] as PersonRow | undefined) ?? null
+    : ((personRaw as PersonRow | null) ?? null);
+  const role = Array.isArray(roleRaw)
+    ? (roleRaw[0] as RoleRow | undefined) ?? null
+    : ((roleRaw as RoleRow | null) ?? null);
+
+  return {
+    id: row.id as string,
+    auth_user_id: null,
+    username: row.username as string,
+    login_email: "",
+    password_hash: null,
+    force_password_change: false,
+    two_factor_enabled: false,
+    last_login_at: null,
+    user_type: row.user_type as AccountRow["user_type"],
+    status: "active" as AccountRow["status"],
+    role_id: (row.role_id as string | null) ?? null,
+    person_id: (row.person_id as string | null) ?? null,
+    company_id: (row.company_id as string | null) ?? null,
+    avatar_url: (row.avatar_url as string | null) ?? null,
+    internal_notes: null,
+    preferences: {},
+    created_at: "",
+    updated_at: "",
+    created_by: null,
+    person,
+    company: null,
+    role,
+    preset: null,
+    employee: null,
+    overrides: [],
+  };
+}
+
+/**
  * Fetch an account plus every linked record (person, company, role, preset,
  * employee, permission overrides) in one shot. Uses parallel queries rather
  * than a joined select so we can keep the untyped Supabase client simple.
