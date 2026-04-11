@@ -217,10 +217,10 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         }`}
       >
         <span
-          className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden text-[10px] md:text-[11px] font-semibold transition-all ${
+          className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-full overflow-hidden text-[10px] md:text-[12px] font-semibold transition-all ring-1 ${
             dk
-              ? "bg-white text-black group-hover:opacity-90"
-              : "bg-black text-white group-hover:opacity-90"
+              ? "bg-white text-black ring-white/20 group-hover:ring-white/40"
+              : "bg-black text-white ring-black/15 group-hover:ring-black/30"
           }`}
         >
           {avatarUrl ? (
@@ -237,7 +237,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
         {profile && (
           <span className="hidden md:flex flex-col items-start leading-tight pe-1">
             <span
-              className={`text-[12px] font-semibold max-w-[140px] truncate ${
+              className={`text-[12px] font-semibold max-w-[140px] truncate tracking-tight ${
                 dk ? "text-white" : "text-black"
               }`}
             >
@@ -245,7 +245,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
             </span>
             <span
               className={`text-[10px] capitalize max-w-[140px] truncate ${
-                dk ? "text-white/50" : "text-black/50"
+                dk ? "text-white/45" : "text-black/45"
               }`}
             >
               {profile.subtitle}

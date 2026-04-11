@@ -38,6 +38,9 @@ const routeKeys: Record<string, string> = {
   "/website": "app.website",
   "/catalogs": "app.catalogs",
   "/todo": "app.todo",
+  "/calendar": "app.calendar",
+  "/accounts": "app.accounts",
+  "/brands": "app.brands",
   "/categories": "cat.system",
   "/subcategories": "cat.system",
   "/divisions": "cat.system",
@@ -106,36 +109,52 @@ export default function MainHeader() {
           : "border-black/[0.08] bg-white/95"
       }`}
     >
-      {/* Left: Logo + App Name */}
-      <div className="flex items-center gap-2 md:gap-3 min-w-0">
+      {/* Left: Home + Logo + Breadcrumb */}
+      <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
         {!isHome && (
           <Link
             href="/"
-            className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg shrink-0 transition-colors ${
-              dk ? "text-white/60 hover:text-white hover:bg-white/[0.06]" : "text-black/60 hover:text-black hover:bg-black/[0.06]"
+            aria-label="Home"
+            className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border shrink-0 transition-all ${
+              dk
+                ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+                : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
             }`}
           >
-            <Home size={16} className="md:w-[18px] md:h-[18px]" />
+            <Home size={16} className="md:w-4 md:h-4" />
           </Link>
         )}
-        <Link href="/" className={`shrink-0 ${dk ? "text-white" : "text-black"}`}>
-          <KoleexLogo className="w-auto h-4 md:h-5" />
+        <Link
+          href="/"
+          aria-label="Koleex Hub"
+          className={`shrink-0 flex items-center ${dk ? "text-white" : "text-black"}`}
+        >
+          <KoleexLogo className="w-auto h-4 md:h-[18px]" />
         </Link>
         {appName && (
           <>
-            <span className={`text-sm hidden md:inline ${dk ? "text-white/20" : "text-black/20"}`}>/</span>
-            <span className={`text-sm font-medium hidden md:inline truncate ${dk ? "text-white/70" : "text-black/70"}`}>
+            <span
+              aria-hidden
+              className={`hidden md:inline-block w-px h-4 ${
+                dk ? "bg-white/[0.14]" : "bg-black/[0.14]"
+              }`}
+            />
+            <span
+              className={`text-[13px] font-semibold hidden md:inline truncate max-w-[260px] tracking-tight ${
+                dk ? "text-white/80" : "text-black/80"
+              }`}
+            >
               {appName}
             </span>
           </>
         )}
       </div>
 
-      {/* Right: Language + Theme + Avatar */}
-      <div className="flex items-center gap-1 md:gap-2 shrink-0">
+      {/* Right: Language + Theme + Notifications + Account */}
+      <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
         {/* Language — desktop pill bar */}
         <div
-          className={`hidden md:flex items-center h-8 rounded-lg border p-0.5 transition-colors ${
+          className={`hidden md:flex items-center h-9 rounded-lg border p-1 transition-colors ${
             dk
               ? "border-white/[0.08] bg-white/[0.03]"
               : "border-black/[0.08] bg-black/[0.03]"
@@ -145,14 +164,14 @@ export default function MainHeader() {
             <button
               key={l.code}
               onClick={() => setLang(l.code)}
-              className={`relative h-7 w-[60px] rounded-md text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
+              className={`relative h-7 w-[54px] rounded-md text-[11px] font-semibold tracking-wide transition-all duration-200 text-center ${
                 lang === l.code
                   ? dk
                     ? "bg-white/[0.12] text-white shadow-sm"
                     : "bg-black/[0.10] text-black shadow-sm"
                   : dk
-                    ? "text-white/30 hover:text-white/60"
-                    : "text-black/30 hover:text-black/60"
+                    ? "text-white/45 hover:text-white/75"
+                    : "text-black/45 hover:text-black/75"
               }`}
             >
               {l.label}
@@ -202,13 +221,22 @@ export default function MainHeader() {
           )}
         </div>
 
+        {/* Divider between locale and tools (desktop only) */}
+        <div
+          aria-hidden
+          className={`hidden md:block w-px h-5 mx-0.5 ${
+            dk ? "bg-white/[0.08]" : "bg-black/[0.08]"
+          }`}
+        />
+
         {/* Theme toggle */}
         <button
           onClick={() => setTheme(dk ? "light" : "dark")}
+          aria-label={dk ? "Switch to light theme" : "Switch to dark theme"}
           className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
             dk
-              ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white"
-              : "border-black/[0.08] bg-black/[0.04] text-black/60 hover:text-black"
+              ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+              : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
           }`}
         >
           {dk ? <Sun size={15} className="md:w-4 md:h-4" /> : <Moon size={15} className="md:w-4 md:h-4" />}
@@ -216,16 +244,20 @@ export default function MainHeader() {
 
         {/* Notification bell */}
         <button
+          aria-label="Notifications"
           className={`relative flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
             dk
-              ? "border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white"
-              : "border-black/[0.08] bg-black/[0.04] text-black/60 hover:text-black"
+              ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+              : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
           }`}
         >
           <Bell size={15} className="md:w-4 md:h-4" />
-          {/* Notification dot */}
-          <span className="absolute top-1 end-1 md:top-1.5 md:end-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
+          {/* Unread dot */}
+          <span className="absolute top-1 end-1 md:top-1.5 md:end-1.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-[var(--bg-primary)]" />
         </button>
+
+        {/* Subtle spacer before account */}
+        <div className="hidden md:block w-1" />
 
         {/* User menu (avatar → identity + sign in/out) */}
         <UserMenu dk={dk} />

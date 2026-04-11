@@ -68,4 +68,6 @@ export const hubT: Translations = {
   "app.database":        { en: "Database",         zh: "数据库",            ar: "قاعدة البيانات" },
   "app.ai":              { en: "AI",               zh: "AI",               ar: "الذكاء الاصطناعي" },
   "app.settings":        { en: "Settings",         zh: "设置",              ar: "الإعدادات" },
+  "app.accounts":        { en: "Accounts",         zh: "账户管理",          ar: "الحسابات" },
+  "app.brands":          { en: "Brands",           zh: "品牌",              ar: "العلامات التجارية" },
 };
