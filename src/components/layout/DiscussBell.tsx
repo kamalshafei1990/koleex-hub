@@ -28,6 +28,10 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { useCurrentAccount } from "@/lib/identity";
 import { fetchMyChannels, subscribeToMyChannels } from "@/lib/discuss";
+import {
+  playNotificationSound,
+  primeNotificationSound,
+} from "@/lib/notificationSound";
 
 interface Props {
   dk: boolean;
@@ -69,6 +73,13 @@ export default function DiscussBell({ dk }: Props) {
     void recount();
   }, [accountId, recount]);
 
+  /* Prime the notification-sound AudioContext on mount so the first
+     user click anywhere unlocks it. After that, playNotificationSound()
+     called from a realtime callback works without further gestures. */
+  useEffect(() => {
+    primeNotificationSound();
+  }, []);
+
   /* Subscribe once the account is known. Inbound messages that aren't
      from us bump the badge. Channel list changes trigger a silent
      refetch. */
@@ -80,6 +91,17 @@ export default function DiscussBell({ dk }: Props) {
         if (!myId) return;
         if (msg.author_account_id === myId) return;
         setUnread((n) => n + 1);
+        /* Play the chime everywhere except on the Discuss page itself —
+           when the user is actively chatting the visible UI update is
+           enough, and a sound on every keystroke would be obnoxious. */
+        if (typeof window !== "undefined") {
+          const onDiscuss =
+            window.location.pathname === "/discuss" ||
+            window.location.pathname.startsWith("/discuss/");
+          if (!onDiscuss) {
+            playNotificationSound();
+          }
+        }
       },
       onChannelChange: () => {
         void recount();
