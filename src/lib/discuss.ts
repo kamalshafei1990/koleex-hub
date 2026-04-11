@@ -1125,14 +1125,11 @@ export function subscribeToChannel(
         },
       )
       .subscribe((status) => {
-        /* Debug: surface the current realtime status so we can see in
-           the console why a specific channel is (or isn't) streaming.
-           No-op in production other than a single log line. */
-        if (
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT" ||
-          status === "CLOSED"
-        ) {
+        /* Reconnect only on the *abnormal* statuses. CLOSED is the
+           normal status emitted during teardown (we called
+           removeChannel) and during HMR / strict-mode double-mounts —
+           reconnecting on it produces an infinite reconnect loop. */
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           if (typeof console !== "undefined") {
             console.warn(
               `[Discuss] channel ${channelId} realtime ${status}, reconnecting…`,
@@ -1235,11 +1232,9 @@ export function subscribeToMyChannels(
         () => onChannel?.(),
       )
       .subscribe((status) => {
-        if (
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT" ||
-          status === "CLOSED"
-        ) {
+        /* Same caveat as subscribeToChannel: never reconnect on CLOSED,
+           that's the normal teardown status and would loop forever. */
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           if (typeof console !== "undefined") {
             console.warn(
               `[Discuss] my-channels realtime ${status}, reconnecting…`,
