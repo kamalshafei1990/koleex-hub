@@ -1869,6 +1869,60 @@ export async function searchContactsForChat(
   return toLinkedContacts(data);
 }
 
+/** Accounts that can receive messages — used by the DM + @mention picker.
+ *  Returns only internal users (not customers / suppliers). Lives in
+ *  `@/lib/discuss` so Discuss has no dependency on any parked mail
+ *  modules. */
+export async function fetchMessageableAccounts(): Promise<
+  Array<{
+    id: string;
+    username: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    role_name: string | null;
+  }>
+> {
+  const { data, error } = await supabase
+    .from("accounts")
+    .select(
+      `
+      id,
+      username,
+      avatar_url,
+      person:people ( full_name, avatar_url ),
+      role:roles ( name )
+      `,
+    )
+    .eq("user_type", "internal")
+    .eq("status", "active")
+    .order("username");
+  if (error) {
+    console.error("[Discuss] Fetch recipients:", error.message);
+    return [];
+  }
+  type Row = {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    person:
+      | { full_name: string; avatar_url: string | null }
+      | Array<{ full_name: string; avatar_url: string | null }>
+      | null;
+    role: { name: string } | Array<{ name: string }> | null;
+  };
+  return (data as unknown as Row[]).map((row) => {
+    const person = Array.isArray(row.person) ? row.person[0] ?? null : row.person;
+    const role = Array.isArray(row.role) ? row.role[0] ?? null : row.role;
+    return {
+      id: row.id,
+      username: row.username,
+      full_name: person?.full_name ?? null,
+      avatar_url: row.avatar_url ?? person?.avatar_url ?? null,
+      role_name: role?.name ?? null,
+    };
+  });
+}
+
 function toLinkedContacts(data: unknown): DiscussLinkedContact[] {
   return ((data ?? []) as Array<{
     id: string;

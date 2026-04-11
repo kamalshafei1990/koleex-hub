@@ -101,6 +101,7 @@ import {
   unpinMessage,
   uploadDiscussAttachment,
   uploadDiscussVoice,
+  fetchMessageableAccounts,
 } from "@/lib/discuss";
 import { renderDiscussMarkdown } from "./markdown";
 import { useDiscussNotifications } from "./useDiscussNotifications";
@@ -111,7 +112,6 @@ import {
 } from "./CustomerChatModal";
 import { ThreadPane } from "./ThreadPane";
 import { SearchPanel } from "./SearchPanel";
-import { fetchMessageableAccounts } from "@/lib/inbox";
 import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
