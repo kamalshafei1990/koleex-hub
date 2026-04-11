@@ -406,21 +406,68 @@ export default function DiscussApp() {
   const threadScrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
+  /* ── Latest-value refs ────────────────────────────────────────────
+     The realtime subscribe effect used to list `channels`, `members`,
+     `notifApi`, `t`, `accountUsername`, `accountDisplayName` in its
+     dep array. Every one of those changes all the time during normal
+     use (a new message bumps `channels`, a pref change bumps
+     `notifApi`, etc.), which meant the effect kept tearing down the
+     Supabase Realtime channel and recreating it. In practice that
+     window-of-instability was big enough to drop incoming messages —
+     the "I have to refresh to see new messages" symptom.
+
+     The fix: stash the latest values in refs, read them from inside
+     the subscription handlers, and leave the effect depending only
+     on the two things that actually imply "teardown + resubscribe":
+     `selectedChannelId` and `accountId`. */
+  const channelsRef = useRef<DiscussChannelWithState[]>(channels);
+  const membersRef = useRef(members);
+  const notifApiRef = useRef(notifApi);
+  const accountRef = useRef(account);
+  const selectedChannelIdRef = useRef<string | null>(selectedChannelId);
+  const tRef = useRef(t);
+
+  useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+  useEffect(() => {
+    notifApiRef.current = notifApi;
+  }, [notifApi]);
+  useEffect(() => {
+    accountRef.current = account;
+  }, [account]);
+  useEffect(() => {
+    selectedChannelIdRef.current = selectedChannelId;
+  }, [selectedChannelId]);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+
   /* ═══════════════════════════════════════════════════════════════════════
      DATA LOADING
      ═══════════════════════════════════════════════════════════════════════ */
 
-  const loadChannels = useCallback(async () => {
-    if (!accountId) {
-      setChannels([]);
+  const loadChannels = useCallback(
+    async (silent = false) => {
+      if (!accountId) {
+        setChannels([]);
+        setLoadingChannels(false);
+        return;
+      }
+      /* Only show the sidebar spinner on the very first load. Every
+         subsequent refresh (optimistic refreshes after send, realtime
+         repairs, etc.) runs silently in the background so the sidebar
+         doesn't flash every time something happens. */
+      if (!silent) setLoadingChannels(true);
+      const rows = await fetchMyChannels(accountId);
+      setChannels(rows);
       setLoadingChannels(false);
-      return;
-    }
-    setLoadingChannels(true);
-    const rows = await fetchMyChannels(accountId);
-    setChannels(rows);
-    setLoadingChannels(false);
-  }, [accountId]);
+    },
+    [accountId],
+  );
 
   const loadMessages = useCallback(
     async (channelId: string) => {
@@ -455,21 +502,63 @@ export default function DiscussApp() {
     void fetchMessageableAccounts().then(setRecipients);
   }, []);
 
-  /* Keep sidebar in sync in real-time. Any insert in discuss_messages or
-     discuss_channels triggers a lightweight re-fetch. We debounce via a
-     micro-timer so a burst of inserts doesn't thrash the DB. */
+  /* Keep sidebar in sync in real-time. Previously we refetched the
+     entire `fetchMyChannels` (which costs 6 DB round-trips) on every
+     single message insert anywhere in the workspace. That caused the
+     sidebar to "flash" constantly and was the main reason the app
+     felt slow. Now:
+       · onMessageInsert → patch the affected channel row in place
+         (bump last_message_at, increment unread, move to top). Zero
+         DB round-trips. Instant.
+       · onChannelChange → a new channel or archive. Refetch silently
+         in the background so the sidebar doesn't flash. */
   useEffect(() => {
     if (!accountId) return;
     let pending = false;
-    const schedule = () => {
+    const scheduleChannelRefresh = () => {
       if (pending) return;
       pending = true;
       window.setTimeout(() => {
         pending = false;
-        void loadChannels();
-      }, 400);
+        void loadChannels(true);
+      }, 800);
     };
-    return subscribeToMyChannels(schedule);
+    return subscribeToMyChannels({
+      onMessageInsert: (msg) => {
+        const isSelected = selectedChannelIdRef.current === msg.channel_id;
+        const isMine = msg.author_account_id === accountId;
+        setChannels((prev) => {
+          const idx = prev.findIndex((c) => c.id === msg.channel_id);
+          if (idx === -1) {
+            /* Message in a channel we're not (yet) a member of, or the
+               channel list hasn't loaded yet. Kick a silent refetch so
+               the new channel appears without flashing. */
+            scheduleChannelRefresh();
+            return prev;
+          }
+          const existing = prev[idx];
+          const next: DiscussChannelWithState = {
+            ...existing,
+            last_message_at: msg.created_at,
+            last_message: {
+              id: msg.id,
+              body: msg.body,
+              kind: msg.kind,
+              author_username:
+                existing.last_message?.author_username ?? null,
+              created_at: msg.created_at,
+            },
+            unread_count:
+              isSelected || isMine
+                ? existing.unread_count
+                : existing.unread_count + 1,
+          };
+          const rest = prev.filter((_, i) => i !== idx);
+          return [next, ...rest];
+        });
+      },
+      onChannelChange: scheduleChannelRefresh,
+    });
   }, [accountId, loadChannels]);
 
   /* Load messages + members when a channel is selected, and subscribe to
@@ -483,25 +572,31 @@ export default function DiscussApp() {
 
     const unsubChannel = subscribeToChannel(selectedChannelId, {
       onMessageInsert: async (row) => {
-        /* Need author info joined in — we re-fetch the single row. In the
-           common case where the insert came from ourselves, the optimistic
-           send path already added the message, so the dedupe below prevents
-           duplicate rendering. */
+        /* Read the latest state from refs so we don't have to list
+           `channels`, `members`, `account*` in the effect deps (which
+           would cause the subscription to tear down on every change
+           and drop incoming messages). */
+        const curMembers = membersRef.current;
+        const curAccount = accountRef.current;
+        const curChannels = channelsRef.current;
+        const curNotifApi = notifApiRef.current;
+        const curT = tRef.current;
+        const curUsername = curAccount?.username ?? "me";
+        const curDisplayName =
+          curAccount?.person?.full_name || curAccount?.username || "Me";
+
         setMessages((prev) => {
           if (prev.some((m) => m.id === row.id)) return prev;
-          /* Find author from the cached recipients / members list so we can
-             show it immediately without a round-trip. If it's us, use the
-             current account data. */
           const selfMatch = row.author_account_id === accountId;
-          const member = members.find(
+          const member = curMembers.find(
             (m) => m.author.id === row.author_account_id,
           );
           const author: DiscussAuthor | null = selfMatch
             ? {
                 id: accountId,
-                username: accountUsername,
-                avatar_url: account?.avatar_url ?? null,
-                full_name: accountDisplayName,
+                username: curUsername,
+                avatar_url: curAccount?.avatar_url ?? null,
+                full_name: curDisplayName,
               }
             : member?.author ?? null;
           return [
@@ -519,7 +614,7 @@ export default function DiscussApp() {
            focused. For muted / DND / "mentions-only" channels the
            notify() helper will short-circuit internally. */
         if (row.author_account_id !== accountId) {
-          const selfChannel = channels.find(
+          const selfChannel = curChannels.find(
             (c) => c.id === selectedChannelId,
           );
           const body = row.body ?? "";
@@ -528,11 +623,11 @@ export default function DiscussApp() {
                 (m) => m.account_id === accountId,
               )
             : false;
-          notifApi.notify(
+          curNotifApi.notify(
             {
               title: selfChannel?.name
                 ? `#${selfChannel.name}`
-                : t("notif.newMessage", "New message"),
+                : curT("notif.newMessage", "New message"),
               body: body.slice(0, 140),
               channelId: selectedChannelId,
             },
@@ -630,21 +725,12 @@ export default function DiscussApp() {
     return () => {
       unsubChannel();
     };
-    /* We intentionally omit `members` from the deps — it's read only inside
-       the message-insert handler as a best-effort lookup, and re-subscribing
-       on every members mutation would cause flicker. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedChannelId,
-    accountId,
-    loadMessages,
-    loadMembers,
-    accountUsername,
-    accountDisplayName,
-    channels,
-    notifApi,
-    t,
-  ]);
+    /* Critical: only depend on the two things that actually mean
+       "teardown + resubscribe". Everything else (channels, members,
+       notifApi, t, account*) is read via refs above. If we re-added
+       any of those here the subscription would flap constantly and
+       drop realtime messages. */
+  }, [selectedChannelId, accountId, loadMessages, loadMembers]);
 
   /* Presence + typing. Fresh channel each time the selection changes. */
   useEffect(() => {
@@ -701,7 +787,9 @@ export default function DiscussApp() {
   }, [messages.length]);
 
   /* Mark the selected channel read whenever we render its latest message.
-     Debounced so a burst of realtime inserts only triggers one write. */
+     Debounced so a burst of realtime inserts only triggers one write.
+     Also dispatches `discuss:unread-changed` so the global bell in
+     MainHeader drops its badge count immediately. */
   useEffect(() => {
     if (!selectedChannelId || !accountId || messages.length === 0) return;
     const id = window.setTimeout(() => {
@@ -711,6 +799,9 @@ export default function DiscussApp() {
             c.id === selectedChannelId ? { ...c, unread_count: 0 } : c,
           ),
         );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("discuss:unread-changed"));
+        }
       });
     }, 600);
     return () => window.clearTimeout(id);
@@ -806,7 +897,7 @@ export default function DiscussApp() {
       const id = await findOrCreateDirectChannel(accountId, otherId);
       if (!id) return;
       setNewDmOpen(false);
-      await loadChannels();
+      await loadChannels(true);
       handleSelectChannel(id);
     },
     [accountId, loadChannels, handleSelectChannel],
@@ -841,7 +932,7 @@ export default function DiscussApp() {
         return;
       }
       setNewChannelOpen(false);
-      await loadChannels();
+      await loadChannels(true);
       handleSelectChannel(row.id);
     },
     [accountId, loadChannels, handleSelectChannel, showToast, t],
@@ -950,9 +1041,10 @@ export default function DiscussApp() {
         ),
       );
       void clearDraft(accountId, selectedChannelId);
-      /* Force the sidebar to reflect the new last_message_at — also
-         gives us a clean unread reset since we sent the message. */
-      void loadChannels();
+      /* Silent refresh so the sidebar reflects the new last_message_at
+         — the realtime handler will also patch it in place, this is
+         just a safety net. No spinner. */
+      void loadChannels(true);
     } else {
       /* Restore the body so the user can retry without re-typing. */
       setComposerBody(trimmed);
@@ -1248,7 +1340,7 @@ export default function DiscussApp() {
         metadata: { voice: uploaded },
       });
       setVoiceOpen(false);
-      void loadChannels();
+      void loadChannels(true);
     },
     [accountId, selectedChannelId, showToast, t, loadChannels],
   );
@@ -1260,16 +1352,20 @@ export default function DiscussApp() {
   const handleCustomerCreated = useCallback(
     async (channelId: string) => {
       setCustomerChatOpen(false);
-      await loadChannels();
+      await loadChannels(true);
       handleSelectChannel(channelId);
     },
     [loadChannels, handleSelectChannel],
   );
 
-  /* Fetch the linked contact when a customer channel is selected. */
+  /* Fetch the linked contact when a customer channel is selected.
+     Reads `channels` through the ref so we don't re-fire every time
+     the sidebar patches in a new last-message. */
   useEffect(() => {
     if (!selectedChannelId) return;
-    const channel = channels.find((c) => c.id === selectedChannelId);
+    const channel = channelsRef.current.find(
+      (c) => c.id === selectedChannelId,
+    );
     if (!channel || channel.kind !== "customer") return;
     if (linkedContacts[selectedChannelId] !== undefined) return;
     void fetchLinkedContact(selectedChannelId).then((contact) => {
@@ -1278,7 +1374,7 @@ export default function DiscussApp() {
         [selectedChannelId]: contact,
       }));
     });
-  }, [selectedChannelId, channels, linkedContacts]);
+  }, [selectedChannelId, linkedContacts]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      EARLY RETURNS / LOADING STATES
@@ -1317,11 +1413,17 @@ export default function DiscussApp() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
-      {/* ═══ Top bar ═══ */}
+      {/* ═══ Top bar ═══
+          On mobile the bar shrinks to a WeChat-style "[back] [chat
+          name]" header once the user opens a chat (mobileView !==
+          "list"). In list mode it still shows "Discuss". On desktop
+          we always show the full bar.                               */}
       <header className="shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <Link
           href="/"
-          className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          className={`h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
+            mobileView === "list" ? "flex" : "hidden md:flex"
+          }`}
           aria-label={t("back")}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -1330,13 +1432,17 @@ export default function DiscussApp() {
           <button
             type="button"
             onClick={() => setMobileView("list")}
-            className="md:hidden h-8 px-2 flex items-center gap-1 rounded-lg text-[12px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+            className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+            aria-label={t("mobile.list")}
           >
-            <ArrowLeft className="h-4 w-4" />
-            {t("mobile.list")}
+            <ArrowLeft className="h-5 w-5" />
           </button>
         )}
-        <div className="flex items-center gap-2 min-w-0">
+        <div
+          className={`items-center gap-2 min-w-0 ${
+            mobileView === "list" ? "flex" : "hidden md:flex"
+          }`}
+        >
           <MessageSquare className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
           <h1 className="text-[15px] md:text-[16px] font-semibold tracking-tight truncate">
             {t("title")}
@@ -1347,6 +1453,31 @@ export default function DiscussApp() {
             </span>
           )}
         </div>
+        {/* Mobile-only channel title when inside a chat. */}
+        {mobileView !== "list" && selectedChannel && (
+          <div className="md:hidden flex-1 min-w-0 flex items-center gap-2">
+            {selectedChannel.kind === "direct" ? (
+              <Avatar
+                name={displayNameFor(selectedChannel)}
+                url={selectedChannel.other?.avatar_url}
+                size={30}
+              />
+            ) : (
+              <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                {selectedChannel.kind === "channel" ? (
+                  <Hash className="h-4 w-4 text-[var(--text-muted)]" />
+                ) : (
+                  <Users className="h-4 w-4 text-[var(--text-muted)]" />
+                )}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-[14px] font-semibold truncate">
+                {displayNameFor(selectedChannel)}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex-1" />
         {/* Global search */}
         <button
@@ -2666,7 +2797,14 @@ function Composer({
     (body.trim().length > 0 || attachments.length > 0 || products.length > 0);
 
   return (
-    <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+    <div
+      className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3"
+      style={{
+        /* Respect the iPhone home-indicator so the composer sits above
+           the rounded bottom edge instead of being partially hidden. */
+        paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+      }}
+    >
       {/* Reply-to banner */}
       {replyTarget && (
         <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/8 border border-blue-500/25">

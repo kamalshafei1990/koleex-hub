@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Home, Bell, ChevronDown } from "lucide-react";
+import { Sun, Moon, Home, ChevronDown } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { useRef } from "react";
 import UserMenu from "./UserMenu";
+import DiscussBell from "./DiscussBell";
 import KoleexLogo from "./KoleexLogo";
 
 /* ── Route → Translation key mapping ── */
@@ -229,19 +230,8 @@ export default function MainHeader() {
           {dk ? <Sun size={15} className="md:w-4 md:h-4" /> : <Moon size={15} className="md:w-4 md:h-4" />}
         </button>
 
-        {/* Notification bell */}
-        <button
-          aria-label="Notifications"
-          className={`relative flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border transition-all ${
-            dk
-              ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
-              : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
-          }`}
-        >
-          <Bell size={15} className="md:w-4 md:h-4" />
-          {/* Unread dot */}
-          <span className="absolute top-1 end-1 md:top-1.5 md:end-1.5 w-1.5 h-1.5 rounded-full bg-red-500 ring-2 ring-[var(--bg-primary)]" />
-        </button>
+        {/* Notification bell — shows live Discuss unread count. */}
+        <DiscussBell dk={dk} />
 
         {/* Subtle spacer before account */}
         <div className="hidden md:block w-1" />

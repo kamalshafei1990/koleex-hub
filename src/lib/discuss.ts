@@ -1104,24 +1104,55 @@ export function subscribeToChannel(
   };
 }
 
-/** Subscribe to the "my channels" view — gets a ping whenever any
- *  channel the user is in has a new message (for sidebar unread badge
- *  updates) or whenever a new channel is created/removed. Cheap
- *  wrapper around a top-level postgres_changes subscription. */
+/** Subscribe to the "my channels" view — the sidebar wants a ping
+ *  whenever any channel the user is in gets a new message (so we can
+ *  bump `last_message_at`, increment the unread badge, and re-sort
+ *  without a full refetch) and whenever a channel row is created or
+ *  archived (so a new #channel or new DM appears instantly).
+ *
+ *  The handlers are intentionally split so callers can patch state
+ *  in place for the hot path (`onMessageInsert`) and only trigger a
+ *  full `loadChannels()` for the rare case where the channel list
+ *  itself changed (`onChannelChange`). This removes the old pattern
+ *  of refetching the entire sidebar on every message in the
+ *  workspace — which was the main reason Discuss felt "refreshy". */
 export function subscribeToMyChannels(
-  onAnyMessage: () => void,
+  handlers:
+    | (() => void)
+    | {
+        onMessageInsert?: (msg: DiscussMessageRow) => void;
+        onChannelChange?: () => void;
+      },
 ): () => void {
+  /* Backwards-compat: an old caller passed a single callback — run it
+     for both events so nothing silently breaks. */
+  const onMessage =
+    typeof handlers === "function"
+      ? (_msg: DiscussMessageRow) => (handlers as () => void)()
+      : handlers.onMessageInsert;
+  const onChannel =
+    typeof handlers === "function"
+      ? (handlers as () => void)
+      : handlers.onChannelChange;
+
   const realtimeChannel = supabase
     .channel("discuss:my-channels")
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "discuss_messages" },
-      () => onAnyMessage(),
+      (payload) => {
+        onMessage?.(payload.new as DiscussMessageRow);
+      },
     )
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "discuss_channels" },
-      () => onAnyMessage(),
+      () => onChannel?.(),
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "discuss_channels" },
+      () => onChannel?.(),
     )
     .subscribe();
 

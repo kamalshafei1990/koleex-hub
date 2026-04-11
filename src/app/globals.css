@@ -111,4 +111,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  /* Avoid overscroll bounce-scroll on iOS leaking past the fixed
+     chat layout (WeChat-style). */
+  overscroll-behavior-y: contain;
+}
+
+/* ── iOS zoom guard ──
+   iOS Safari auto-zooms on any input/textarea/select with font-size
+   smaller than 16px. We force all form controls below the md
+   breakpoint to 16px. At md+ (≥768px, desktop) we release the rule
+   so existing compact UIs don't get oversized text. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe-area helpers so fixed chat composers don't sit under the
+   home-indicator on iPhone. */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top);
 }

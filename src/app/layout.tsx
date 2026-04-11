@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import RootShell from "@/components/layout/RootShell";
@@ -20,6 +20,20 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
+};
+
+/* Lock the viewport on mobile so iOS Safari doesn't auto-zoom into
+   text inputs (which happens whenever an <input>/<textarea> has a
+   font-size smaller than 16px). `maximumScale: 1` + `userScalable:
+   false` are the belt-and-suspenders approach; the inputs themselves
+   also get `font-size: 16px` via globals.css. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#0A0A0A",
 };
 
 export default function RootLayout({
