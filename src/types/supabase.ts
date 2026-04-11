@@ -706,6 +706,440 @@ export type CalendarEventInsert = Omit<
 >;
 export type CalendarEventUpdate = Partial<CalendarEventInsert>;
 
+/* ── Membership requests ("Be a Koleex Member" form) ── */
+
+export type MembershipRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "archived";
+
+export interface MembershipRequestRow {
+  id: string;
+  full_name: string;
+  email: string;
+  company: string | null;
+  message: string | null;
+  status: MembershipRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  source: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export type MembershipRequestInsert = Omit<
+  MembershipRequestRow,
+  | "id"
+  | "created_at"
+  | "status"
+  | "reviewed_by"
+  | "reviewed_at"
+  | "source"
+  | "metadata"
+> & {
+  status?: MembershipRequestStatus;
+  source?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type MembershipRequestUpdate = Partial<MembershipRequestInsert> & {
+  status?: MembershipRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+};
+
+/* ── Inbox messages (unified notifications + direct messages) ── */
+
+export type InboxMessageCategory =
+  | "message"
+  | "system"
+  | "membership_request"
+  | "alert"
+  | "external_email";
+
+/** Direction an inbox message flowed:
+ *   internal — in-app Koleex message (original default)
+ *   inbound  — received from an external sender via IMAP
+ *   outbound — sent to an external recipient via SMTP
+ *
+ *  Exists so the UI can render a "Gmail" / "External" badge and the
+ *  sync service can filter cleanly between real email and Koleex DMs. */
+export type InboxMessageDirection = "internal" | "inbound" | "outbound";
+
+export interface InboxMessageRow {
+  id: string;
+  recipient_account_id: string;
+  sender_account_id: string | null;
+  category: InboxMessageCategory;
+  subject: string;
+  body: string | null;
+  link: string | null;
+  metadata: Record<string, unknown>;
+  read_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+
+  /* ── External-email fields (all NULL for internal Koleex messages) ── */
+  mail_connection_id: string | null;
+  direction: InboxMessageDirection;
+  external_from: string | null;
+  external_from_name: string | null;
+  external_to: string[] | null;
+  external_cc: string[] | null;
+  external_message_id: string | null;
+  external_in_reply_to: string | null;
+  external_references: string[] | null;
+  mail_thread_id: string | null;
+  imap_uid: number | null;
+  body_html: string | null;
+}
+
+export type InboxMessageInsert = Omit<
+  InboxMessageRow,
+  | "id"
+  | "created_at"
+  | "read_at"
+  | "archived_at"
+  | "metadata"
+  | "mail_connection_id"
+  | "direction"
+  | "external_from"
+  | "external_from_name"
+  | "external_to"
+  | "external_cc"
+  | "external_message_id"
+  | "external_in_reply_to"
+  | "external_references"
+  | "mail_thread_id"
+  | "imap_uid"
+  | "body_html"
+> & {
+  metadata?: Record<string, unknown>;
+  mail_connection_id?: string | null;
+  direction?: InboxMessageDirection;
+  external_from?: string | null;
+  external_from_name?: string | null;
+  external_to?: string[] | null;
+  external_cc?: string[] | null;
+  external_message_id?: string | null;
+  external_in_reply_to?: string | null;
+  external_references?: string[] | null;
+  mail_thread_id?: string | null;
+  imap_uid?: number | null;
+  body_html?: string | null;
+};
+
+export type InboxMessageUpdate = Partial<InboxMessageInsert> & {
+  read_at?: string | null;
+  archived_at?: string | null;
+};
+
+/* ── Mail connection (IMAP/SMTP) ────────────────────────────────────── */
+
+export type MailProvider = "zoho" | "gmail" | "outlook" | "yahoo" | "custom";
+export type MailConnectionStatus = "active" | "disabled" | "error";
+
+/** One connected external mailbox per account. The `password_encrypted`
+ *  field is deliberately excluded from the default `Row` shape — it's
+ *  server-only and never sent to the browser. The sync service reads
+ *  it through a privileged server helper that explicitly selects it. */
+export interface MailConnectionRow {
+  id: string;
+  account_id: string;
+  display_name: string;
+  email_address: string;
+  provider: MailProvider;
+
+  imap_host: string;
+  imap_port: number;
+  imap_secure: boolean;
+  imap_username: string;
+
+  smtp_host: string;
+  smtp_port: number;
+  smtp_secure: boolean;
+  smtp_username: string;
+
+  last_uid: number | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  status: MailConnectionStatus;
+
+  created_at: string;
+  updated_at: string;
+}
+
+/** Shape used only by the server-side IMAP/SMTP helpers. Adds the
+ *  encrypted password blob that the rest of the app must never see. */
+export interface MailConnectionWithSecret extends MailConnectionRow {
+  password_encrypted: string;
+}
+
+export type MailConnectionInsert = Omit<
+  MailConnectionRow,
+  "id" | "created_at" | "updated_at" | "last_uid" | "last_sync_at" | "last_error" | "status"
+> & {
+  password_encrypted: string;
+  status?: MailConnectionStatus;
+};
+
+export type MailConnectionUpdate = Partial<
+  Omit<MailConnectionInsert, "account_id">
+> & {
+  last_uid?: number | null;
+  last_sync_at?: string | null;
+  last_error?: string | null;
+  status?: MailConnectionStatus;
+};
+
+/** Joined view used by the bell dropdown + inbox list — includes the
+ *  sender's display info so we don't have to round-trip for each row. */
+export interface InboxMessageWithSender extends InboxMessageRow {
+  sender: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    full_name: string | null;
+  } | null;
+}
+
+/* ── Discuss (chat system) ───────────────────────────────────────────
+   Mirrors supabase/migrations/create_discuss_chat_system.sql. Every
+   table there has a matching Row / Insert / Update trio here, plus a
+   few "joined" view types for the common read patterns (sidebar list,
+   message with author, etc.). Kept colocated with the Inbox types
+   because chat evolved as the real-time counterpart to the static
+   inbox — both read from accounts/people for user info. */
+
+export type DiscussChannelKind = "direct" | "group" | "channel";
+
+export interface DiscussChannelRow {
+  id: string;
+  kind: DiscussChannelKind;
+  name: string | null;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  last_message_at: string;
+}
+
+export type DiscussChannelInsert = Omit<
+  DiscussChannelRow,
+  "id" | "created_at" | "updated_at" | "archived_at" | "last_message_at"
+> & {
+  id?: string;
+  last_message_at?: string;
+};
+
+export type DiscussChannelUpdate = Partial<
+  Omit<DiscussChannelRow, "id" | "created_at">
+>;
+
+export type DiscussMemberRole = "admin" | "member" | "guest";
+export type DiscussNotificationPref = "all" | "mentions" | "none";
+
+export interface DiscussMemberRow {
+  id: string;
+  channel_id: string;
+  account_id: string;
+  role: DiscussMemberRole;
+  last_read_at: string;
+  notification_pref: DiscussNotificationPref;
+  muted: boolean;
+  joined_at: string;
+  left_at: string | null;
+}
+
+export type DiscussMemberInsert = Omit<
+  DiscussMemberRow,
+  "id" | "joined_at" | "last_read_at" | "left_at"
+> & {
+  last_read_at?: string;
+  notification_pref?: DiscussNotificationPref;
+  muted?: boolean;
+};
+
+export type DiscussMemberUpdate = Partial<
+  Omit<DiscussMemberRow, "id" | "channel_id" | "account_id">
+>;
+
+export type DiscussMessageKind = "text" | "image" | "file" | "voice" | "system";
+
+/** Structured attachment record stored in `discuss_messages.metadata.attachments`.
+ *  Mirrors InboxAttachment shape so we can share picker UI components. */
+export interface DiscussAttachment {
+  name: string;
+  url: string;
+  file_path: string;
+  size: number;
+  type: string;
+}
+
+/** Product reference stored in `discuss_messages.metadata.products`.
+ *  Same shape as InboxProductRef — keeps rendering components reusable. */
+export interface DiscussProductRef {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+}
+
+/** Mention record stored in `discuss_messages.metadata.mentions`.
+ *  `offset` + `length` let us highlight the mention span inside the
+ *  rendered body without re-parsing markdown on every render. */
+export interface DiscussMention {
+  account_id: string;
+  username: string;
+  offset: number;
+  length: number;
+}
+
+/** Voice-note payload stored in `discuss_messages.metadata.voice`.
+ *  `waveform` is a downsampled amplitude array (usually 48–64 bars)
+ *  rendered as a mini visualizer next to the play button. */
+export interface DiscussVoiceMeta {
+  url: string;
+  duration_ms: number;
+  waveform: number[];
+}
+
+/** Unfurled OpenGraph preview stored in `discuss_messages.metadata.link_preview`. */
+export interface DiscussLinkPreview {
+  url: string;
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  site_name: string | null;
+}
+
+/** Strongly-typed view over the JSONB `metadata` column. All fields are
+ *  optional because any given message will only carry the subset
+ *  relevant to its kind — a text message never has `voice`, an image
+ *  message might not have `products`, etc. */
+export interface DiscussMessageMetadata {
+  attachments?: DiscussAttachment[];
+  products?: DiscussProductRef[];
+  mentions?: DiscussMention[];
+  voice?: DiscussVoiceMeta;
+  link_preview?: DiscussLinkPreview;
+  [key: string]: unknown;
+}
+
+export interface DiscussMessageRow {
+  id: string;
+  channel_id: string;
+  author_account_id: string | null;
+  reply_to_message_id: string | null;
+  kind: DiscussMessageKind;
+  body: string | null;
+  body_html: string | null;
+  metadata: DiscussMessageMetadata;
+  edited_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}
+
+export type DiscussMessageInsert = Omit<
+  DiscussMessageRow,
+  "id" | "created_at" | "edited_at" | "deleted_at" | "body_html"
+> & {
+  body_html?: string | null;
+  metadata?: DiscussMessageMetadata;
+};
+
+export type DiscussMessageUpdate = Partial<
+  Omit<DiscussMessageRow, "id" | "channel_id" | "created_at">
+>;
+
+export interface DiscussReactionRow {
+  id: string;
+  message_id: string;
+  account_id: string;
+  emoji: string;
+  created_at: string;
+}
+
+export type DiscussReactionInsert = Omit<DiscussReactionRow, "id" | "created_at">;
+
+export interface DiscussPinnedRow {
+  id: string;
+  channel_id: string;
+  message_id: string;
+  pinned_by: string | null;
+  pinned_at: string;
+}
+
+export type DiscussPinnedInsert = Omit<DiscussPinnedRow, "id" | "pinned_at">;
+
+export interface DiscussStarredRow {
+  id: string;
+  account_id: string;
+  message_id: string;
+  starred_at: string;
+}
+
+export type DiscussStarredInsert = Omit<DiscussStarredRow, "id" | "starred_at">;
+
+export interface DiscussDraftRow {
+  id: string;
+  account_id: string;
+  channel_id: string;
+  body: string;
+  metadata: DiscussMessageMetadata;
+  updated_at: string;
+}
+
+export type DiscussDraftInsert = Omit<DiscussDraftRow, "id" | "updated_at">;
+export type DiscussDraftUpdate = Partial<Omit<DiscussDraftRow, "id" | "account_id" | "channel_id">>;
+
+/* ── Joined / denormalized view types ───────────────────────────── */
+
+/** Short author block attached to a message for render. Matches the
+ *  InboxMessageWithSender.sender shape so the same avatar helpers work. */
+export interface DiscussAuthor {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  full_name: string | null;
+}
+
+export interface DiscussMessageWithAuthor extends DiscussMessageRow {
+  author: DiscussAuthor | null;
+  /** Aggregated reactions, grouped by emoji, populated by the data
+   *  layer when fetching a message. The UI never groups raw rows. */
+  reactions: Array<{
+    emoji: string;
+    count: number;
+    account_ids: string[];
+    reacted_by_me: boolean;
+  }>;
+}
+
+/** Sidebar channel row — enriched with the current user's read state,
+ *  the other member (for DMs), and a snippet of the last message so
+ *  the list looks like Slack/WhatsApp right out of the box. */
+export interface DiscussChannelWithState extends DiscussChannelRow {
+  unread_count: number;
+  last_read_at: string | null;
+  muted: boolean;
+  /** For direct channels, the OTHER account (not the current user).
+   *  Null for group/channel kinds. */
+  other: DiscussAuthor | null;
+  /** Short preview of the most recent message. */
+  last_message: {
+    id: string;
+    body: string | null;
+    kind: DiscussMessageKind;
+    author_username: string | null;
+    created_at: string;
+  } | null;
+}
+
 /* ── Database schema type for createClient<Database> ── */
 
 export interface Database {
@@ -835,6 +1269,56 @@ export interface Database {
         Row: LoginHistoryRow;
         Insert: LoginHistoryInsert;
         Update: Partial<LoginHistoryInsert>;
+      };
+      membership_requests: {
+        Row: MembershipRequestRow;
+        Insert: MembershipRequestInsert;
+        Update: MembershipRequestUpdate;
+      };
+      inbox_messages: {
+        Row: InboxMessageRow;
+        Insert: InboxMessageInsert;
+        Update: InboxMessageUpdate;
+      };
+      mail_connections: {
+        Row: MailConnectionRow;
+        Insert: MailConnectionInsert;
+        Update: MailConnectionUpdate;
+      };
+      discuss_channels: {
+        Row: DiscussChannelRow;
+        Insert: DiscussChannelInsert;
+        Update: DiscussChannelUpdate;
+      };
+      discuss_members: {
+        Row: DiscussMemberRow;
+        Insert: DiscussMemberInsert;
+        Update: DiscussMemberUpdate;
+      };
+      discuss_messages: {
+        Row: DiscussMessageRow;
+        Insert: DiscussMessageInsert;
+        Update: DiscussMessageUpdate;
+      };
+      discuss_reactions: {
+        Row: DiscussReactionRow;
+        Insert: DiscussReactionInsert;
+        Update: Partial<DiscussReactionInsert>;
+      };
+      discuss_pinned: {
+        Row: DiscussPinnedRow;
+        Insert: DiscussPinnedInsert;
+        Update: Partial<DiscussPinnedInsert>;
+      };
+      discuss_starred: {
+        Row: DiscussStarredRow;
+        Insert: DiscussStarredInsert;
+        Update: Partial<DiscussStarredInsert>;
+      };
+      discuss_drafts: {
+        Row: DiscussDraftRow;
+        Insert: DiscussDraftInsert;
+        Update: DiscussDraftUpdate;
       };
     };
   };

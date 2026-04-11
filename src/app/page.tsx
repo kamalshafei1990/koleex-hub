@@ -8,7 +8,7 @@ import {
   Users, Truck, Contact, Globe, CreditCard, Briefcase, UserSearch,
   Star, Clock, CalendarCheck, MessageSquare, Calendar, CheckSquare,
   Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Library, Database,
-  Sparkles, Menu, Search, PanelTop,
+  Sparkles, Menu, Search, PanelTop, Inbox,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
@@ -68,7 +68,8 @@ const apps: AppItem[] = [
   { id: "appraisals", name: "Appraisals", icon: <Star size={iconSize} />, category: "people", route: "/appraisals" },
   { id: "appointments", name: "Appointments", icon: <Clock size={iconSize} />, category: "people", route: "/appointments" },
   { id: "attendance", name: "Attendance", icon: <CalendarCheck size={iconSize} />, category: "people", route: "/attendance" },
-  { id: "discuss", name: "Discuss", icon: <MessageSquare size={iconSize} />, category: "communication", route: "/discuss" },
+  { id: "inbox", name: "Inbox", icon: <Inbox size={iconSize} />, category: "communication", route: "/inbox", active: true },
+  { id: "discuss", name: "Discuss", icon: <MessageSquare size={iconSize} />, category: "communication", route: "/discuss", active: true },
   { id: "calendar", name: "Calendar", icon: <Calendar size={iconSize} />, category: "communication", route: "/calendar", active: true },
   { id: "todo", name: "To-do", icon: <CheckSquare size={iconSize} />, category: "communication", route: "/todo", active: true },
   { id: "website", name: "Website", icon: <PanelTop size={iconSize} />, category: "marketing", route: "/website", active: true },
