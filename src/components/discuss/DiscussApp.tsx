@@ -745,17 +745,18 @@ export default function DiscussApp() {
        drop realtime messages. */
   }, [selectedChannelId, accountId, loadMessages, loadMembers]);
 
-  /* Safety net: even with a healthy realtime stream, the WebSocket can
+  /* Safety net: even with a healthy realtime stream the WebSocket can
      stall on flaky networks, be closed by Safari's aggressive sleep
      policy, or miss events due to Supabase queue hiccups. To guarantee
      the user never has to hit "reload" to see new messages we:
        · refetch the open channel silently on window focus / tab
          visibility change (cheap, single round-trip)
-       · poll the open channel every 15s while it's visible (also
-         silent; short-circuits when nothing changed)
+       · poll the open channel every 5s while it's visible (still
+         silent; the silent loadMessages short-circuits React re-renders
+         when nothing changed, so the cost is just one SELECT)
      Both run in addition to realtime — so when realtime is working
-     (99% of the time) there's nothing to do except compare and keep
-     the existing state reference. */
+     there's nothing to do except compare and keep the existing state
+     reference. When realtime is asleep, worst-case delivery is 5s. */
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
     if (typeof window === "undefined") return;
@@ -777,7 +778,7 @@ export default function DiscussApp() {
 
     const pollId = window.setInterval(() => {
       if (document.visibilityState === "visible") refresh();
-    }, 15000);
+    }, 5000);
 
     return () => {
       cancelled = true;

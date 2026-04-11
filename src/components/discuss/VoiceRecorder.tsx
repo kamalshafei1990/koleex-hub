@@ -121,17 +121,39 @@ export default function VoiceRecorder({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      /* Prefer audio/webm (Chrome/Firefox/Edge) — fall back to audio/mp4
-         for older Safari. MediaRecorder will pick the first supported
-         option automatically if we don't specify. */
-      const mr = new MediaRecorder(stream);
+      /* Pick the first container/codec this browser is willing to
+         record in. Chrome & Firefox → webm/opus, Safari → mp4/aac.
+         `isTypeSupported` is a static method but some very old Safari
+         builds expose it as undefined — the try/catch guards for that. */
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "audio/aac",
+      ];
+      let preferred: string | undefined;
+      try {
+        preferred = candidates.find(
+          (c) =>
+            typeof MediaRecorder !== "undefined" &&
+            typeof MediaRecorder.isTypeSupported === "function" &&
+            MediaRecorder.isTypeSupported(c),
+        );
+      } catch {
+        preferred = undefined;
+      }
+      const mr = preferred
+        ? new MediaRecorder(stream, { mimeType: preferred })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       mr.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       mr.onstop = async () => {
         const blob = new Blob(chunksRef.current, {
-          type: mr.mimeType || "audio/webm",
+          type: mr.mimeType || preferred || "audio/webm",
         });
         blobRef.current = blob;
         const url = URL.createObjectURL(blob);

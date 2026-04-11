@@ -1046,12 +1046,22 @@ export function subscribeToChannel(
     onReactionDelete?: (rx: DiscussReactionRow) => void;
   },
 ): () => void {
-  const realtimeChannel = supabase.channel(`discuss:${channelId}`, {
-    config: { broadcast: { self: false } },
-  });
+  /* We wrap channel creation in a helper so we can tear it down and
+     re-create it from scratch on CHANNEL_ERROR / TIMED_OUT without
+     losing the caller's handlers. The Supabase JS realtime client
+     will re-join on network blips, but it does NOT recreate a channel
+     after a server-side error — which Safari triggers surprisingly
+     often when the tab comes back from a long sleep. */
+  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+  let reconnectTimer: number | null = null;
+  let closed = false;
 
-  realtimeChannel
-    .on(
+  const connect = () => {
+    if (closed) return;
+    const ch = supabase.channel(`discuss:${channelId}`, {
+      config: { broadcast: { self: false } },
+    });
+    ch.on(
       "postgres_changes",
       {
         event: "INSERT",
@@ -1063,44 +1073,86 @@ export function subscribeToChannel(
         handlers.onMessageInsert?.(payload.new as DiscussMessageRow);
       },
     )
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "discuss_messages",
-        filter: `channel_id=eq.${channelId}`,
-      },
-      (payload) => {
-        handlers.onMessageUpdate?.(payload.new as DiscussMessageRow);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "discuss_reactions",
-      },
-      (payload) => {
-        handlers.onReactionInsert?.(payload.new as DiscussReactionRow);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "discuss_reactions",
-      },
-      (payload) => {
-        handlers.onReactionDelete?.(payload.old as DiscussReactionRow);
-      },
-    )
-    .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "discuss_messages",
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          handlers.onMessageUpdate?.(payload.new as DiscussMessageRow);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "discuss_reactions",
+        },
+        (payload) => {
+          handlers.onReactionInsert?.(payload.new as DiscussReactionRow);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "discuss_reactions",
+        },
+        (payload) => {
+          handlers.onReactionDelete?.(payload.old as DiscussReactionRow);
+        },
+      )
+      .subscribe((status) => {
+        /* Debug: surface the current realtime status so we can see in
+           the console why a specific channel is (or isn't) streaming.
+           No-op in production other than a single log line. */
+        if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          if (typeof console !== "undefined") {
+            console.warn(
+              `[Discuss] channel ${channelId} realtime ${status}, reconnecting…`,
+            );
+          }
+          if (!closed && reconnectTimer == null) {
+            reconnectTimer = window.setTimeout(() => {
+              reconnectTimer = null;
+              try {
+                if (currentChannel) supabase.removeChannel(currentChannel);
+              } catch {
+                /* ignore */
+              }
+              connect();
+            }, 1500);
+          }
+        }
+      });
+    currentChannel = ch;
+  };
+
+  connect();
 
   return () => {
-    supabase.removeChannel(realtimeChannel);
+    closed = true;
+    if (reconnectTimer != null) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (currentChannel) {
+      try {
+        supabase.removeChannel(currentChannel);
+      } catch {
+        /* ignore */
+      }
+      currentChannel = null;
+    }
   };
 }
 
@@ -1135,29 +1187,74 @@ export function subscribeToMyChannels(
       ? (handlers as () => void)
       : handlers.onChannelChange;
 
-  const realtimeChannel = supabase
-    .channel("discuss:my-channels")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "discuss_messages" },
-      (payload) => {
-        onMessage?.(payload.new as DiscussMessageRow);
-      },
-    )
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "discuss_channels" },
-      () => onChannel?.(),
-    )
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "discuss_channels" },
-      () => onChannel?.(),
-    )
-    .subscribe();
+  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+  let reconnectTimer: number | null = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    const ch = supabase
+      .channel("discuss:my-channels")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "discuss_messages" },
+        (payload) => {
+          onMessage?.(payload.new as DiscussMessageRow);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "discuss_channels" },
+        () => onChannel?.(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "discuss_channels" },
+        () => onChannel?.(),
+      )
+      .subscribe((status) => {
+        if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          if (typeof console !== "undefined") {
+            console.warn(
+              `[Discuss] my-channels realtime ${status}, reconnecting…`,
+            );
+          }
+          if (!closed && reconnectTimer == null) {
+            reconnectTimer = window.setTimeout(() => {
+              reconnectTimer = null;
+              try {
+                if (currentChannel) supabase.removeChannel(currentChannel);
+              } catch {
+                /* ignore */
+              }
+              connect();
+            }, 1500);
+          }
+        }
+      });
+    currentChannel = ch;
+  };
+
+  connect();
 
   return () => {
-    supabase.removeChannel(realtimeChannel);
+    closed = true;
+    if (reconnectTimer != null) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (currentChannel) {
+      try {
+        supabase.removeChannel(currentChannel);
+      } catch {
+        /* ignore */
+      }
+      currentChannel = null;
+    }
   };
 }
 
@@ -1755,27 +1852,58 @@ export async function setChannelMuted(
    Phase D — Voice notes
    ═══════════════════════════════════════════════════════════════════════ */
 
+/** Map a recorder's `Blob.type` to a file extension. MediaRecorder
+ *  hands us different containers depending on the browser:
+ *    · Chrome/Firefox/Edge → audio/webm (sometimes with ";codecs=opus")
+ *    · Safari desktop & iOS → audio/mp4 (sometimes with ";codecs=mp4a")
+ *    · Older Safari → audio/aac
+ *  We force the extension to match the real container so getPublicUrl
+ *  plays back correctly (some CDNs/browsers key their audio decoder on
+ *  the URL extension instead of the Content-Type header). */
+function pickVoiceExtension(mime: string | undefined): string {
+  const m = (mime ?? "").toLowerCase();
+  if (m.includes("webm")) return "webm";
+  if (m.includes("ogg")) return "ogg";
+  if (m.includes("mp4") || m.includes("aac") || m.includes("x-m4a"))
+    return "m4a";
+  if (m.includes("mpeg") || m.includes("mp3")) return "mp3";
+  if (m.includes("wav")) return "wav";
+  return "webm";
+}
+
 /** Upload a recorded voice blob to Storage and return the structured
  *  metadata ready to embed in `discuss_messages.metadata.voice`.
  *  Waveform is computed client-side in the recorder (see
- *  VoiceRecorder.tsx) and passed through verbatim. */
+ *  VoiceRecorder.tsx) and passed through verbatim.
+ *
+ *  We pass the blob's real MIME type through to Storage and pick an
+ *  extension that matches — iOS Safari records audio/mp4 but the old
+ *  hard-coded "audio/webm + .webm" pair meant the receiver got a file
+ *  that wouldn't decode (Chrome would refuse a .webm that's actually
+ *  MP4). Now the URL suffix and the stored Content-Type always agree. */
 export async function uploadDiscussVoice(input: {
   blob: Blob;
   durationMs: number;
   waveform: number[];
 }): Promise<DiscussVoiceMeta | null> {
+  const mime =
+    input.blob.type && input.blob.type.length > 0 ? input.blob.type : "audio/webm";
+  const ext = pickVoiceExtension(mime);
   const filePath = `discuss-voice/${Date.now()}_${Math.random()
     .toString(36)
-    .slice(2, 10)}.webm`;
+    .slice(2, 10)}.${ext}`;
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(filePath, input.blob, {
       cacheControl: "3600",
       upsert: false,
-      contentType: "audio/webm",
+      contentType: mime,
     });
   if (error) {
-    console.error("[Discuss] Voice upload:", error.message);
+    console.error("[Discuss] Voice upload:", error.message, {
+      mime,
+      size: input.blob.size,
+    });
     return null;
   }
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
