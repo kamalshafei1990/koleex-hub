@@ -31,9 +31,11 @@ import {
   onAuthStateChange,
   signOut as supabaseSignOut,
 } from "@/lib/auth-client";
-import { useCurrentAccount } from "@/lib/identity";
-
-const LEGACY_SESSION_KEY = "koleex-admin";
+import { setCurrentAccountId, useCurrentAccount } from "@/lib/identity";
+import {
+  LEGACY_SESSION_KEY,
+  LEGACY_SESSION_USER_KEY,
+} from "@/components/admin/AdminAuth";
 
 type Identity =
   | { mode: "supabase"; signedIn: true; email: string; username?: string }
@@ -123,7 +125,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       } else {
         const signedIn =
           typeof window !== "undefined" &&
-          sessionStorage.getItem(LEGACY_SESSION_KEY) === "true";
+          window.localStorage.getItem(LEGACY_SESSION_KEY) === "true";
         setIdentity({ mode: "legacy", signedIn });
       }
     }
@@ -141,16 +143,21 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       };
     }
 
-    /* Legacy: sessionStorage doesn't emit storage events across tabs for
-       sessionStorage, but it does sync on the same tab via page navigation.
-       We refresh on focus to cover the "just logged in on another tab" path. */
+    /* Legacy: localStorage syncs across tabs via the "storage" event. We
+       also refresh on focus to cover the "just logged in on another tab"
+       case where the listener might not have fired yet. */
     function onFocus() {
       void refresh();
     }
+    function onStorage(e: StorageEvent) {
+      if (e.key === LEGACY_SESSION_KEY) void refresh();
+    }
     window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -171,10 +178,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       const next = encodeURIComponent(pathname || "/");
       router.push(`/login?next=${next}`);
     } else {
-      /* Legacy: the home page isn't gated, so we route to a gated page
-         that forces AdminAuth to render its password form. /accounts is
-         the obvious landing spot for an admin session. */
-      router.push("/accounts");
+      /* Legacy: the root is now gated by AdminAuth, so a plain reload
+         brings up the username + password form. */
+      window.location.href = "/";
     }
   }, [identity, pathname, router]);
 
@@ -186,15 +192,18 @@ export default function UserMenu({ dk }: { dk: boolean }) {
       router.replace("/login");
       return;
     }
-    /* Legacy — clear the client-side session flag and bounce home so
-       AdminAuth re-renders the password gate. */
+    /* Legacy — clear the client-side session flags, drop the stored
+       "current account id" (so the next sign-in doesn't inherit the old
+       identity), and bounce home so AdminAuth re-renders the login form. */
     try {
-      sessionStorage.removeItem(LEGACY_SESSION_KEY);
+      window.localStorage.removeItem(LEGACY_SESSION_KEY);
+      window.localStorage.removeItem(LEGACY_SESSION_USER_KEY);
     } catch {
       /* ignore */
     }
+    setCurrentAccountId(null);
     setIdentity({ mode: "legacy", signedIn: false });
-    /* Hard reload so the AuthGate re-mounts and shows the password form. */
+    /* Hard reload so the AuthGate re-mounts and shows the login form. */
     window.location.href = "/";
   }, [identity, router]);
 

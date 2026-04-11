@@ -712,6 +712,56 @@ function hashTempPassword(plain: string): string {
   return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
 }
 
+/**
+ * Look up an account row by username. Used by the legacy login form so we
+ * can validate username+password against the accounts table without going
+ * through Supabase Auth. Case-insensitive match — usernames are always
+ * lowercased on insert, but we ilike-match defensively.
+ */
+export async function fetchAccountByUsername(
+  username: string,
+): Promise<AccountRow | null> {
+  const trimmed = username.trim();
+  if (!trimmed) return null;
+  const { data, error } = await supabase
+    .from(ACCOUNTS)
+    .select("*")
+    .ilike("username", trimmed)
+    .maybeSingle();
+  if (error) {
+    console.error("[Accounts] Lookup by username:", error.message);
+    return null;
+  }
+  return (data as AccountRow) || null;
+}
+
+/**
+ * Legacy login: verify a username + plaintext password against the accounts
+ * table using the same `tmp$<base64>` tag format that createAccount /
+ * resetAccountPassword write. Returns the matched account on success, or
+ * null on any failure (no row, wrong password, suspended, etc).
+ *
+ * SECURITY NOTE: This is not cryptographically secure — the "hash" is just
+ * base64. It's a bridge until we flip on Supabase Auth. We still short-
+ * circuit on suspended / archived accounts so disabled people can't sign in.
+ */
+export async function verifyAccountLogin(
+  username: string,
+  password: string,
+): Promise<
+  | { ok: true; account: AccountRow }
+  | { ok: false; reason: "not_found" | "wrong_password" | "disabled" }
+> {
+  const account = await fetchAccountByUsername(username);
+  if (!account) return { ok: false, reason: "not_found" };
+  if (account.status !== "active") return { ok: false, reason: "disabled" };
+  const expected = hashTempPassword(password);
+  if (!account.password_hash || account.password_hash !== expected) {
+    return { ok: false, reason: "wrong_password" };
+  }
+  return { ok: true, account };
+}
+
 /** Generate a short, human-readable temporary password. */
 export function generateTemporaryPassword(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
