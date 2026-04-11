@@ -110,6 +110,13 @@ export async function createChannel(input: {
 
   if (channelErr) {
     console.error("[Discuss] Create channel:", channelErr.message);
+    if (isMissingTable(channelErr.message)) {
+      console.error(
+        "[Discuss] `discuss_channels` is missing from Supabase. Apply " +
+          "supabase/migrations/create_discuss_chat_system.sql (and " +
+          "extend_discuss_phase_bcde.sql) in Supabase Studio → SQL Editor.",
+      );
+    }
     return null;
   }
 

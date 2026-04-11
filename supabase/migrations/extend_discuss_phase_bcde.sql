@@ -24,6 +24,8 @@ ALTER TABLE IF EXISTS discuss_channels
   DROP CONSTRAINT IF EXISTS discuss_channels_kind_check;
 
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   -- Some Supabase-generated constraints pick up a shorter auto-name.
   -- Best-effort cleanup: scan for any constraint starting with the

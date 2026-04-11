@@ -148,6 +148,7 @@ export const discussT: Translations = {
   "new.channel.private":    { en: "Private",               zh: "私密",                 ar: "خاصة" },
   "new.channel.privateDesc":{ en: "Only invited members can join", zh: "只有被邀请的成员可以加入", ar: "يمكن فقط للأعضاء المدعوين الانضمام" },
   "new.channel.create":     { en: "Create Channel",        zh: "创建频道",              ar: "إنشاء القناة" },
+  "new.channel.failed":     { en: "Couldn't create the channel. Check the browser console for details.", zh: "无法创建频道。详情请查看浏览器控制台。", ar: "تعذر إنشاء القناة. تحقق من وحدة تحكم المتصفح للحصول على التفاصيل." },
   "new.dm.title":           { en: "New Direct Message",    zh: "新建私信",              ar: "رسالة مباشرة جديدة" },
   "new.dm.to":              { en: "To",                    zh: "收件人",               ar: "إلى" },
   "new.dm.toPh":            { en: "Type a name…",          zh: "输入姓名...",           ar: "اكتب اسماً..." },

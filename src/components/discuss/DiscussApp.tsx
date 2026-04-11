@@ -787,6 +787,11 @@ export default function DiscussApp() {
      HANDLERS
      ═══════════════════════════════════════════════════════════════════════ */
 
+  const showToast = useCallback((text: string) => {
+    setToastMessage(text);
+    window.setTimeout(() => setToastMessage(null), 2000);
+  }, []);
+
   const handleSelectChannel = useCallback((channelId: string) => {
     setSelectedChannelId(channelId);
     setMobileView("thread");
@@ -822,13 +827,24 @@ export default function DiscussApp() {
         createdBy: accountId,
         memberIds: input.memberIds,
       });
-      setNewChannelOpen(false);
-      if (row) {
-        await loadChannels();
-        handleSelectChannel(row.id);
+      if (!row) {
+        /* Keep the modal open so the user doesn't think "nothing
+           happened", and surface a toast explaining the most common
+           cause: the Discuss migration hasn't been applied to
+           Supabase yet. Check the console for the precise DB error. */
+        showToast(
+          t(
+            "new.channel.failed",
+            "Couldn't create the channel. Check your Supabase Discuss migration.",
+          ),
+        );
+        return;
       }
+      setNewChannelOpen(false);
+      await loadChannels();
+      handleSelectChannel(row.id);
     },
-    [accountId, loadChannels, handleSelectChannel],
+    [accountId, loadChannels, handleSelectChannel, showToast, t],
   );
 
   const handleFilePick = useCallback(
@@ -1018,11 +1034,6 @@ export default function DiscussApp() {
      PHASE B — MESSAGE ACTIONS
      Optimistic where safe, refetch where the server is source of truth.
      ═══════════════════════════════════════════════════════════════════════ */
-
-  const showToast = useCallback((text: string) => {
-    setToastMessage(text);
-    window.setTimeout(() => setToastMessage(null), 2000);
-  }, []);
 
   const handleToggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
