@@ -470,15 +470,28 @@ export default function DiscussApp() {
   );
 
   const loadMessages = useCallback(
-    async (channelId: string) => {
+    async (channelId: string, silent = false) => {
       if (!accountId) return;
-      setLoadingMessages(true);
+      if (!silent) setLoadingMessages(true);
       const rows = await fetchChannelMessages(channelId, {
         currentAccountId: accountId,
         limit: 120,
       });
-      setMessages(rows);
-      setLoadingMessages(false);
+      setMessages((prev) => {
+        /* Silent refreshes should never blow away in-flight optimistic
+           state: only replace if the server returned a *newer* set than
+           what we already have. Concretely, we diff by message count and
+           the latest id — if either changed, swap in the server rows,
+           otherwise keep the existing array reference so React doesn't
+           re-render unnecessarily. */
+        if (!silent) return rows;
+        if (rows.length !== prev.length) return rows;
+        const lastNew = rows[rows.length - 1]?.id;
+        const lastOld = prev[prev.length - 1]?.id;
+        if (lastNew !== lastOld) return rows;
+        return prev;
+      });
+      if (!silent) setLoadingMessages(false);
     },
     [accountId],
   );
@@ -731,6 +744,48 @@ export default function DiscussApp() {
        any of those here the subscription would flap constantly and
        drop realtime messages. */
   }, [selectedChannelId, accountId, loadMessages, loadMembers]);
+
+  /* Safety net: even with a healthy realtime stream, the WebSocket can
+     stall on flaky networks, be closed by Safari's aggressive sleep
+     policy, or miss events due to Supabase queue hiccups. To guarantee
+     the user never has to hit "reload" to see new messages we:
+       · refetch the open channel silently on window focus / tab
+         visibility change (cheap, single round-trip)
+       · poll the open channel every 15s while it's visible (also
+         silent; short-circuits when nothing changed)
+     Both run in addition to realtime — so when realtime is working
+     (99% of the time) there's nothing to do except compare and keep
+     the existing state reference. */
+  useEffect(() => {
+    if (!selectedChannelId || !accountId) return;
+    if (typeof window === "undefined") return;
+
+    let cancelled = false;
+    const refresh = () => {
+      if (cancelled) return;
+      if (document.visibilityState === "hidden") return;
+      void loadMessages(selectedChannelId, true);
+      void loadChannels(true);
+    };
+
+    const onFocus = () => refresh();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(pollId);
+    };
+  }, [selectedChannelId, accountId, loadMessages, loadChannels]);
 
   /* Presence + typing. Fresh channel each time the selection changes. */
   useEffect(() => {
