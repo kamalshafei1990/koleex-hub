@@ -253,4 +253,103 @@ export const discussT: Translations = {
   "btn.add":                { en: "Add",                   zh: "添加",                 ar: "إضافة" },
   "btn.send":               { en: "Send",                  zh: "发送",                 ar: "إرسال" },
   "btn.done":               { en: "Done",                  zh: "完成",                 ar: "تم" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE B — THREADS / REPLIES
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "thread.pane.title":       { en: "Thread",                  zh: "话题",                 ar: "سلسلة المحادثة" },
+  "thread.replyCount.one":   { en: "1 reply",                 zh: "1 条回复",              ar: "رد واحد" },
+  "thread.replyCount.many":  { en: "{count} replies",         zh: "{count} 条回复",        ar: "{count} ردود" },
+  "thread.lastReply":        { en: "Last reply {time}",       zh: "最新回复 {time}",       ar: "آخر رد {time}" },
+  "thread.reply.placeholder":{ en: "Reply in thread…",        zh: "在话题中回复...",        ar: "رد في السلسلة..." },
+  "thread.viewThread":       { en: "View thread",             zh: "查看话题",              ar: "عرض السلسلة" },
+  "reply.replyingTo":        { en: "Replying to {name}",      zh: "回复 {name}",           ar: "الرد على {name}" },
+  "reply.cancel":            { en: "Cancel reply",            zh: "取消回复",              ar: "إلغاء الرد" },
+  "reply.deletedParent":     { en: "Original message deleted", zh: "原始消息已删除",         ar: "تم حذف الرسالة الأصلية" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE B — INLINE EDIT / REACTIONS / LINK COPY
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "edit.saveHint":           { en: "Enter to save · Esc to cancel", zh: "Enter 保存 · Esc 取消", ar: "Enter للحفظ · Esc للإلغاء" },
+  "edit.save":               { en: "Save changes",            zh: "保存更改",              ar: "حفظ التغييرات" },
+  "reactions.pick":          { en: "Pick a reaction",         zh: "选择反应",              ar: "اختر تفاعلاً" },
+  "reactions.you":           { en: "You",                     zh: "你",                   ar: "أنت" },
+  "reactions.andOthers":     { en: "and {count} others",      zh: "和其他 {count} 人",     ar: "و {count} آخرين" },
+  "link.copied":             { en: "Link copied",             zh: "链接已复制",            ar: "تم نسخ الرابط" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE C — SEARCH PANEL
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "search.panel.title":      { en: "Search Discuss",          zh: "搜索讨论",              ar: "ابحث في المحادثات" },
+  "search.panel.hint":       { en: "Type at least 2 characters", zh: "至少输入 2 个字符",   ar: "اكتب حرفين على الأقل" },
+  "search.panel.everywhere": { en: "Everywhere",              zh: "所有位置",              ar: "في كل مكان" },
+  "search.panel.thisChannel":{ en: "This channel only",       zh: "仅此频道",              ar: "هذه القناة فقط" },
+  "search.panel.loading":    { en: "Searching…",              zh: "搜索中...",             ar: "جارٍ البحث..." },
+  "search.panel.empty":      { en: "No messages match",       zh: "没有匹配的消息",         ar: "لا توجد رسائل مطابقة" },
+  "search.panel.jump":       { en: "Jump to message",         zh: "跳转到消息",            ar: "الانتقال إلى الرسالة" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE C — PINNED / STARRED / DRAFTS VIEWS
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "pinned.panel.title":      { en: "Pinned messages",         zh: "置顶消息",              ar: "الرسائل المثبّتة" },
+  "pinned.panel.empty":      { en: "No pinned messages yet",  zh: "暂无置顶消息",          ar: "لا توجد رسائل مثبّتة بعد" },
+  "pinned.panel.hint":       { en: "Pin important messages so everyone can find them", zh: "置顶重要消息，方便每个人查找", ar: "ثبّت الرسائل المهمة ليجدها الجميع" },
+  "starred.view.title":      { en: "Saved for later",         zh: "稍后保存",              ar: "محفوظ لاحقاً" },
+  "starred.view.empty":      { en: "You haven't saved anything yet", zh: "您还没有保存任何内容", ar: "لم تحفظ شيئاً بعد" },
+  "starred.view.hint":       { en: "Star a message to save it to this list", zh: "为消息添加星标以保存到此列表", ar: "ميّز رسالة لحفظها هنا" },
+  "drafts.view.title":       { en: "Drafts",                  zh: "草稿",                 ar: "المسودات" },
+  "drafts.view.empty":       { en: "No drafts",               zh: "没有草稿",              ar: "لا توجد مسودات" },
+  "drafts.view.resume":      { en: "Resume",                  zh: "继续",                 ar: "استئناف" },
+  "drafts.view.discard":     { en: "Discard draft",           zh: "丢弃草稿",              ar: "تجاهل المسودة" },
+  "drafts.badge":            { en: "Draft",                   zh: "草稿",                 ar: "مسودة" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE C — READ RECEIPTS / LAST-READ
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "receipts.sent":           { en: "Sent",                    zh: "已发送",               ar: "أُرسلت" },
+  "receipts.read":           { en: "Read",                    zh: "已读",                 ar: "مقروءة" },
+  "receipts.readBy":         { en: "Read by {count}",         zh: "{count} 人已读",        ar: "قرأها {count}" },
+  "unreadDivider.label":     { en: "New messages",            zh: "新消息",               ar: "رسائل جديدة" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE D — NOTIFICATIONS / DND / MUTE
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "notif.desktop.enable":    { en: "Enable desktop notifications", zh: "启用桌面通知",      ar: "تفعيل إشعارات سطح المكتب" },
+  "notif.desktop.enabled":   { en: "Desktop notifications on", zh: "桌面通知已开启",        ar: "إشعارات سطح المكتب مفعّلة" },
+  "notif.desktop.denied":    { en: "Blocked by browser. Enable in site settings.", zh: "被浏览器阻止。请在站点设置中启用。", ar: "محظور بواسطة المتصفح. فعّله من إعدادات الموقع." },
+  "notif.sound.on":          { en: "Sound on",                zh: "声音开",               ar: "الصوت يعمل" },
+  "notif.sound.off":         { en: "Sound off",               zh: "声音关",               ar: "الصوت مغلق" },
+  "notif.dnd.on":            { en: "Do Not Disturb",          zh: "免打扰",               ar: "عدم الإزعاج" },
+  "notif.dnd.off":           { en: "DND off",                 zh: "关闭免打扰",            ar: "إيقاف عدم الإزعاج" },
+  "notif.dnd.until":         { en: "Until {time}",            zh: "直到 {time}",          ar: "حتى {time}" },
+  "notif.newMessage":        { en: "New message in {channel}", zh: "{channel} 中有新消息", ar: "رسالة جديدة في {channel}" },
+  "notif.muted":             { en: "Muted",                   zh: "已静音",               ar: "تم الكتم" },
+  "notif.unmuted":           { en: "Notifications on",        zh: "通知开启",              ar: "الإشعارات مفعّلة" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE D — VOICE RECORDER
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "voice.start":             { en: "Start recording",         zh: "开始录音",              ar: "بدء التسجيل" },
+  "voice.stop":              { en: "Stop recording",          zh: "停止录音",              ar: "إيقاف التسجيل" },
+  "voice.cancel":            { en: "Cancel",                  zh: "取消",                 ar: "إلغاء" },
+  "voice.send":              { en: "Send voice",              zh: "发送语音",              ar: "إرسال الصوت" },
+  "voice.preview":           { en: "Preview",                 zh: "预览",                 ar: "معاينة" },
+  "voice.permissionDenied":  { en: "Microphone permission denied", zh: "麦克风权限被拒绝",   ar: "تم رفض إذن الميكروفون" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PHASE E — CUSTOMER CHAT
+     ═══════════════════════════════════════════════════════════════════════════ */
+  "customer.newChat":        { en: "Start customer chat",     zh: "开始客户聊天",          ar: "بدء محادثة عميل" },
+  "customer.newChat.title":  { en: "Start a customer conversation", zh: "开始与客户对话",    ar: "ابدأ محادثة مع عميل" },
+  "customer.newChat.hint":   { en: "Pick a CRM contact — the chat becomes linked to their record.", zh: "选择一个 CRM 联系人 — 聊天将与他们的记录关联。", ar: "اختر جهة اتصال CRM — ستكون المحادثة مرتبطة بسجلها." },
+  "customer.newChat.search": { en: "Search contacts…",        zh: "搜索联系人...",          ar: "ابحث عن جهات الاتصال..." },
+  "customer.newChat.noResults": { en: "No matching contacts", zh: "没有匹配的联系人",       ar: "لا توجد جهات اتصال مطابقة" },
+  "customer.newChat.create": { en: "Start chat",              zh: "开始聊天",              ar: "ابدأ المحادثة" },
+  "customer.contactCard":    { en: "Customer contact",        zh: "客户联系人",            ar: "جهة اتصال العميل" },
+  "customer.viewInCRM":      { en: "View in CRM",             zh: "在 CRM 中查看",         ar: "عرض في CRM" },
+  "customer.linked":         { en: "Linked contact",          zh: "关联联系人",            ar: "جهة اتصال مرتبطة" },
+  "customer.company":        { en: "Company",                 zh: "公司",                 ar: "الشركة" },
+  "customer.email":          { en: "Email",                   zh: "邮箱",                 ar: "البريد الإلكتروني" },
+  "customer.phone":          { en: "Phone",                   zh: "电话",                 ar: "الهاتف" },
+  "customer.type":           { en: "Type",                    zh: "类型",                 ar: "النوع" },
 };

@@ -38,48 +38,79 @@ import Link from "next/link";
 import {
   ArrowLeft,
   AtSign,
+  BellOff,
+  Bell,
   Check,
   CheckCheck,
+  Copy,
+  CornerUpLeft,
+  Edit3,
   File as FileIcon,
   FileText,
   Hash,
   Image as ImageIcon,
   Info,
+  Link as LinkIcon,
   Loader2,
   Lock,
   MessageSquare,
   MessageSquarePlus,
   Mic,
   MoreHorizontal,
+  MoonStar,
   Package,
   Paperclip,
   Pin,
+  PinOff,
   Plus,
+  Reply,
   Search,
   Send,
   Smile,
   Star,
   Trash2,
+  UserPlus,
   Users,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import {
   addMembers,
   createChannel,
+  deleteDiscussMessage,
+  editDiscussMessage,
   fetchChannelMembers,
   fetchChannelMessages,
+  fetchLinkedContact,
   fetchMyChannels,
   findOrCreateDirectChannel,
   markChannelRead,
   openPresenceChannel,
+  pinMessage,
   saveDraft,
   fetchDraft,
   clearDraft,
   sendDiscussMessage,
+  setChannelMuted,
+  setNotificationPref,
   subscribeToChannel,
   subscribeToMyChannels,
+  toggleReaction,
+  toggleStar,
+  unpinMessage,
   uploadDiscussAttachment,
+  uploadDiscussVoice,
 } from "@/lib/discuss";
+import { renderDiscussMarkdown } from "./markdown";
+import { useDiscussNotifications } from "./useDiscussNotifications";
+import VoiceRecorder, { VoicePlaybackBubble } from "./VoiceRecorder";
+import {
+  CustomerChatModal,
+  CustomerContactCard,
+} from "./CustomerChatModal";
+import { ThreadPane } from "./ThreadPane";
+import { SearchPanel } from "./SearchPanel";
 import { fetchMessageableAccounts } from "@/lib/inbox";
 import { fetchProducts, fetchProductMainImages } from "@/lib/products-admin";
 import { useCurrentAccount } from "@/lib/identity";
@@ -89,12 +120,14 @@ import type {
   DiscussAttachment,
   DiscussChannelKind,
   DiscussChannelWithState,
+  DiscussLinkedContact,
   DiscussMemberRow,
   DiscussMention,
   DiscussMessageKind,
   DiscussMessageMetadata,
   DiscussMessageRow,
   DiscussMessageWithAuthor,
+  DiscussNotificationPref,
   DiscussProductRef,
   DiscussAuthor,
   ProductRow,
@@ -321,6 +354,40 @@ export default function DiscussApp() {
   const [newChannelOpen, setNewChannelOpen] = useState(false);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [customerChatOpen, setCustomerChatOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  /* ── Phase B: message-level state ─────────────────────────────── */
+  /** Message id currently being edited inline. Null when nothing is
+   *  being edited. Only the author of a message can edit it. */
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
+  /** Reply target for the composer — shows a reply-preview banner at
+   *  the top of the composer and attaches reply_to_message_id on send. */
+  const [replyTarget, setReplyTarget] = useState<DiscussMessageWithAuthor | null>(
+    null,
+  );
+  /** Parent message for the thread pane overlay. When non-null the
+   *  ThreadPane drawer replaces the details column. */
+  const [threadTarget, setThreadTarget] = useState<DiscussMessageWithAuthor | null>(
+    null,
+  );
+  /** Transient toast at the bottom of the thread — used for "Link
+   *  copied!", "Pinned", etc. Auto-clears after 2 seconds. */
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  /** Voice recorder panel toggle. Shown inline inside the composer
+   *  when the user clicks the mic button. */
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  /** Pinned-panel toggle inside the details pane. */
+  const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false);
+  /** Customer contact card cache keyed by channel id — avoids refetch
+   *  every time the details pane opens. */
+  const [linkedContacts, setLinkedContacts] = useState<
+    Record<string, DiscussLinkedContact | null>
+  >({});
+
+  /* ── Phase D: notifications ───────────────────────────────────── */
+  const notifApi = useDiscussNotifications();
 
   /* ── Product catalog cache (for product picker) ─────────────── */
   const [productCatalog, setProductCatalog] = useState<ProductRow[]>([]);
@@ -446,6 +513,39 @@ export default function DiscussApp() {
             },
           ];
         });
+
+        /* Phase D: raise a desktop notification + sound for inbound
+           messages in the currently-open channel when the tab isn't
+           focused. For muted / DND / "mentions-only" channels the
+           notify() helper will short-circuit internally. */
+        if (row.author_account_id !== accountId) {
+          const selfChannel = channels.find(
+            (c) => c.id === selectedChannelId,
+          );
+          const body = row.body ?? "";
+          const mentionedMe = Array.isArray(row.metadata?.mentions)
+            ? (row.metadata.mentions as DiscussMention[]).some(
+                (m) => m.account_id === accountId,
+              )
+            : false;
+          notifApi.notify(
+            {
+              title: selfChannel?.name
+                ? `#${selfChannel.name}`
+                : t("notif.newMessage", "New message"),
+              body: body.slice(0, 140),
+              channelId: selectedChannelId,
+            },
+            {
+              muted: selfChannel?.muted ?? false,
+              pref: (selfChannel?.notification_pref ?? "all") as
+                | "all"
+                | "mentions"
+                | "none",
+              mentionsMe: mentionedMe,
+            },
+          );
+        }
       },
       onMessageUpdate: (row) => {
         setMessages((prev) =>
@@ -454,6 +554,75 @@ export default function DiscussApp() {
               ? { ...m, body: row.body, edited_at: row.edited_at, deleted_at: row.deleted_at, metadata: row.metadata }
               : m,
           ),
+        );
+      },
+      onReactionInsert: (rx) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== rx.message_id) return m;
+            const existing = m.reactions.find((r) => r.emoji === rx.emoji);
+            if (existing) {
+              if (existing.account_ids.includes(rx.account_id)) return m;
+              return {
+                ...m,
+                reactions: m.reactions.map((r) =>
+                  r.emoji === rx.emoji
+                    ? {
+                        ...r,
+                        count: r.count + 1,
+                        account_ids: [...r.account_ids, rx.account_id],
+                        reacted_by_me:
+                          r.reacted_by_me || rx.account_id === accountId,
+                      }
+                    : r,
+                ),
+              };
+            }
+            return {
+              ...m,
+              reactions: [
+                ...m.reactions,
+                {
+                  emoji: rx.emoji,
+                  count: 1,
+                  account_ids: [rx.account_id],
+                  reacted_by_me: rx.account_id === accountId,
+                },
+              ],
+            };
+          }),
+        );
+      },
+      onReactionDelete: (rx) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== rx.message_id) return m;
+            const existing = m.reactions.find((r) => r.emoji === rx.emoji);
+            if (!existing) return m;
+            const nextCount = existing.count - 1;
+            if (nextCount <= 0) {
+              return {
+                ...m,
+                reactions: m.reactions.filter((r) => r.emoji !== rx.emoji),
+              };
+            }
+            return {
+              ...m,
+              reactions: m.reactions.map((r) =>
+                r.emoji === rx.emoji
+                  ? {
+                      ...r,
+                      count: nextCount,
+                      account_ids: r.account_ids.filter(
+                        (id) => id !== rx.account_id,
+                      ),
+                      reacted_by_me:
+                        r.reacted_by_me && rx.account_id !== accountId,
+                    }
+                  : r,
+              ),
+            };
+          }),
         );
       },
     });
@@ -472,6 +641,9 @@ export default function DiscussApp() {
     loadMembers,
     accountUsername,
     accountDisplayName,
+    channels,
+    notifApi,
+    t,
   ]);
 
   /* Presence + typing. Fresh channel each time the selection changes. */
@@ -702,11 +874,22 @@ export default function DiscussApp() {
        once the server round-trip finishes. Keeps the thread feeling
        instant even on slow connections. */
     const tempId = `temp_${Date.now()}`;
+    const replyToId = replyTarget?.id ?? null;
+    const replyPreview = replyTarget
+      ? {
+          id: replyTarget.id,
+          body: replyTarget.body,
+          author_username: replyTarget.author?.username ?? null,
+          author_full_name: replyTarget.author?.full_name ?? null,
+          kind: replyTarget.kind,
+          deleted_at: replyTarget.deleted_at,
+        }
+      : null;
     const optimistic: DiscussMessageWithAuthor = {
       id: tempId,
       channel_id: selectedChannelId,
       author_account_id: accountId,
-      reply_to_message_id: null,
+      reply_to_message_id: replyToId,
       kind,
       body: trimmed || null,
       body_html: null,
@@ -721,12 +904,14 @@ export default function DiscussApp() {
         full_name: accountDisplayName,
       },
       reactions: [],
+      reply_preview: replyPreview,
     };
     setMessages((prev) => [...prev, optimistic]);
     setComposerBody("");
     setComposerAttachments([]);
     setComposerProducts([]);
     setComposerMentions([]);
+    setReplyTarget(null);
 
     const saved = await sendDiscussMessage({
       channelId: selectedChannelId,
@@ -734,6 +919,7 @@ export default function DiscussApp() {
       body: trimmed,
       kind,
       metadata,
+      replyToMessageId: replyToId,
     });
 
     if (saved) {
@@ -769,6 +955,7 @@ export default function DiscussApp() {
     account?.avatar_url,
     accountDisplayName,
     loadChannels,
+    replyTarget,
   ]);
 
   const handleKeyDown = useCallback(
@@ -826,6 +1013,261 @@ export default function DiscussApp() {
     setEmojiPickerOpen(false);
     composerRef.current?.focus();
   }, []);
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     PHASE B — MESSAGE ACTIONS
+     Optimistic where safe, refetch where the server is source of truth.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const showToast = useCallback((text: string) => {
+    setToastMessage(text);
+    window.setTimeout(() => setToastMessage(null), 2000);
+  }, []);
+
+  const handleToggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!accountId) return;
+      /* Optimistic flip. Realtime callbacks may also fire, but our
+         dedupe keeps the list consistent. */
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const existing = m.reactions.find((r) => r.emoji === emoji);
+          if (existing) {
+            const nextCount = existing.count + (existing.reacted_by_me ? -1 : 1);
+            if (nextCount <= 0) {
+              return {
+                ...m,
+                reactions: m.reactions.filter((r) => r.emoji !== emoji),
+              };
+            }
+            return {
+              ...m,
+              reactions: m.reactions.map((r) =>
+                r.emoji === emoji
+                  ? {
+                      ...r,
+                      count: nextCount,
+                      reacted_by_me: !r.reacted_by_me,
+                      account_ids: r.reacted_by_me
+                        ? r.account_ids.filter((id) => id !== accountId)
+                        : [...r.account_ids, accountId],
+                    }
+                  : r,
+              ),
+            };
+          }
+          return {
+            ...m,
+            reactions: [
+              ...m.reactions,
+              {
+                emoji,
+                count: 1,
+                account_ids: [accountId],
+                reacted_by_me: true,
+              },
+            ],
+          };
+        }),
+      );
+      await toggleReaction(messageId, accountId, emoji);
+    },
+    [accountId],
+  );
+
+  const handleStartEdit = useCallback((msg: DiscussMessageWithAuthor) => {
+    setEditingMessageId(msg.id);
+    setEditingDraft(msg.body ?? "");
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditingDraft("");
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessageId) return;
+    const trimmed = editingDraft.trim();
+    if (!trimmed) {
+      handleCancelEdit();
+      return;
+    }
+    const ok = await editDiscussMessage(editingMessageId, trimmed);
+    if (ok) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === editingMessageId
+            ? { ...m, body: trimmed, edited_at: new Date().toISOString() }
+            : m,
+        ),
+      );
+      handleCancelEdit();
+    }
+  }, [editingMessageId, editingDraft, handleCancelEdit]);
+
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      if (!window.confirm(t("msg.deleteConfirm", "Delete this message?"))) return;
+      const ok = await deleteDiscussMessage(messageId);
+      if (ok) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, deleted_at: new Date().toISOString(), body: null }
+              : m,
+          ),
+        );
+      }
+    },
+    [t],
+  );
+
+  const handlePin = useCallback(
+    async (messageId: string) => {
+      if (!selectedChannelId || !accountId) return;
+      const ok = await pinMessage(selectedChannelId, messageId, accountId);
+      if (ok) showToast(t("msg.pinned", "Pinned to channel"));
+    },
+    [selectedChannelId, accountId, showToast, t],
+  );
+
+  const handleUnpin = useCallback(
+    async (messageId: string) => {
+      if (!selectedChannelId) return;
+      const ok = await unpinMessage(selectedChannelId, messageId);
+      if (ok) showToast(t("msg.unpinned", "Unpinned"));
+    },
+    [selectedChannelId, showToast, t],
+  );
+
+  const handleStar = useCallback(
+    async (messageId: string) => {
+      if (!accountId) return;
+      const isNow = await toggleStar(messageId, accountId);
+      showToast(
+        isNow
+          ? t("msg.starred", "Saved for later")
+          : t("msg.unstarred", "Removed from saved"),
+      );
+    },
+    [accountId, showToast, t],
+  );
+
+  const handleCopyLink = useCallback(
+    async (messageId: string) => {
+      if (!selectedChannelId) return;
+      const url = `${window.location.origin}/discuss/${selectedChannelId}#${messageId}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast(t("link.copied", "Link copied"));
+      } catch {
+        /* Some browsers block clipboard access without a gesture. */
+      }
+    },
+    [selectedChannelId, showToast, t],
+  );
+
+  const handleStartReply = useCallback(
+    (msg: DiscussMessageWithAuthor) => {
+      setReplyTarget(msg);
+      composerRef.current?.focus();
+    },
+    [],
+  );
+
+  const handleOpenThread = useCallback(
+    (msg: DiscussMessageWithAuthor) => {
+      setThreadTarget(msg);
+      setDetailsOpen(false);
+    },
+    [],
+  );
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     PHASE D — Mute / DND / Voice
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const handleToggleMute = useCallback(async () => {
+    if (!selectedChannelId || !accountId) return;
+    const ch = channels.find((c) => c.id === selectedChannelId);
+    if (!ch) return;
+    const next = !ch.muted;
+    setChannels((prev) =>
+      prev.map((c) => (c.id === selectedChannelId ? { ...c, muted: next } : c)),
+    );
+    await setChannelMuted(selectedChannelId, accountId, next);
+    showToast(
+      next
+        ? t("notif.muted", "Channel muted")
+        : t("notif.unmuted", "Channel unmuted"),
+    );
+  }, [selectedChannelId, accountId, channels, showToast, t]);
+
+  const handleSetNotificationPref = useCallback(
+    async (pref: DiscussNotificationPref) => {
+      if (!selectedChannelId || !accountId) return;
+      setChannels((prev) =>
+        prev.map((c) =>
+          c.id === selectedChannelId ? { ...c, notification_pref: pref } : c,
+        ),
+      );
+      await setNotificationPref(selectedChannelId, accountId, pref);
+    },
+    [selectedChannelId, accountId],
+  );
+
+  const handleSendVoice = useCallback(
+    async (input: { blob: Blob; durationMs: number; waveform: number[] }) => {
+      if (!accountId || !selectedChannelId) return;
+      const uploaded = await uploadDiscussVoice({
+        blob: input.blob,
+        durationMs: input.durationMs,
+        waveform: input.waveform,
+      });
+      if (!uploaded) {
+        showToast(t("voice.uploadFailed", "Voice upload failed"));
+        return;
+      }
+      await sendDiscussMessage({
+        channelId: selectedChannelId,
+        authorId: accountId,
+        body: "",
+        kind: "voice",
+        metadata: { voice: uploaded },
+      });
+      setVoiceOpen(false);
+      void loadChannels();
+    },
+    [accountId, selectedChannelId, showToast, t, loadChannels],
+  );
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     PHASE E — Customer chat
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  const handleCustomerCreated = useCallback(
+    async (channelId: string) => {
+      setCustomerChatOpen(false);
+      await loadChannels();
+      handleSelectChannel(channelId);
+    },
+    [loadChannels, handleSelectChannel],
+  );
+
+  /* Fetch the linked contact when a customer channel is selected. */
+  useEffect(() => {
+    if (!selectedChannelId) return;
+    const channel = channels.find((c) => c.id === selectedChannelId);
+    if (!channel || channel.kind !== "customer") return;
+    if (linkedContacts[selectedChannelId] !== undefined) return;
+    void fetchLinkedContact(selectedChannelId).then((contact) => {
+      setLinkedContacts((prev) => ({
+        ...prev,
+        [selectedChannelId]: contact,
+      }));
+    });
+  }, [selectedChannelId, channels, linkedContacts]);
 
   /* ═══════════════════════════════════════════════════════════════════════
      EARLY RETURNS / LOADING STATES
@@ -895,6 +1337,59 @@ export default function DiscussApp() {
           )}
         </div>
         <div className="flex-1" />
+        {/* Global search */}
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          title={t("header.search", "Search")}
+        >
+          <Search className="h-3.5 w-3.5" />
+        </button>
+        {/* DND toggle */}
+        <button
+          type="button"
+          onClick={() => notifApi.setDndEnabled(!notifApi.dndEnabled)}
+          className={`hidden md:flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+            notifApi.dndEnabled
+              ? "bg-red-500/15 text-red-300"
+              : "hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+          }`}
+          title={
+            notifApi.dndEnabled
+              ? t("notif.dnd.on", "Do Not Disturb on")
+              : t("notif.dnd.off", "Do Not Disturb off")
+          }
+        >
+          <MoonStar className="h-3.5 w-3.5" />
+        </button>
+        {/* Sound toggle */}
+        <button
+          type="button"
+          onClick={() => notifApi.setSoundEnabled(!notifApi.soundEnabled)}
+          className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          title={
+            notifApi.soundEnabled
+              ? t("notif.sound.on", "Sound on")
+              : t("notif.sound.off", "Sound off")
+          }
+        >
+          {notifApi.soundEnabled ? (
+            <Volume2 className="h-3.5 w-3.5" />
+          ) : (
+            <VolumeX className="h-3.5 w-3.5" />
+          )}
+        </button>
+        {/* Start customer chat */}
+        <button
+          type="button"
+          onClick={() => setCustomerChatOpen(true)}
+          className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5"
+          title={t("customer.newChat", "Start customer chat")}
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          {t("customer.newChat", "Customer chat")}
+        </button>
         <button
           type="button"
           onClick={() => setNewDmOpen(true)}
@@ -1088,6 +1583,26 @@ export default function DiscussApp() {
                 </div>
                 <button
                   type="button"
+                  onClick={() => void handleToggleMute()}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors ${
+                    selectedChannel.muted
+                      ? "text-red-300 hover:bg-red-500/10"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                  }`}
+                  title={
+                    selectedChannel.muted
+                      ? t("header.unmute", "Unmute")
+                      : t("header.mute", "Mute")
+                  }
+                >
+                  {selectedChannel.muted ? (
+                    <BellOff className="h-4 w-4" />
+                  ) : (
+                    <Bell className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setDetailsOpen((v) => !v);
                     setMobileView("details");
@@ -1117,10 +1632,28 @@ export default function DiscussApp() {
                   <MessageList
                     messages={messages}
                     currentAccountId={accountId}
+                    channelKind={selectedChannel.kind}
+                    channelLastRead={selectedChannel.last_read_at}
                     todayText={t("thread.today")}
                     yesterdayText={t("thread.yesterday")}
                     editedText={t("thread.edited")}
                     deletedText={t("thread.deleted")}
+                    unreadMarkerText={t("thread.new", "New messages")}
+                    editingMessageId={editingMessageId}
+                    editingDraft={editingDraft}
+                    onEditDraftChange={setEditingDraft}
+                    onStartEdit={handleStartEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onSaveEdit={handleSaveEdit}
+                    onDelete={handleDelete}
+                    onPin={handlePin}
+                    onUnpin={handleUnpin}
+                    onStar={handleStar}
+                    onCopyLink={handleCopyLink}
+                    onReply={handleStartReply}
+                    onOpenThread={handleOpenThread}
+                    onToggleReaction={handleToggleReaction}
+                    t={t}
                   />
                 )}
                 {typingUsers.length > 0 && (
@@ -1153,6 +1686,12 @@ export default function DiscussApp() {
                     prev.filter((_, idx) => idx !== i),
                   )
                 }
+                replyTarget={replyTarget}
+                onCancelReply={() => setReplyTarget(null)}
+                voiceOpen={voiceOpen}
+                onOpenVoice={() => setVoiceOpen(true)}
+                onCloseVoice={() => setVoiceOpen(false)}
+                onSendVoice={(v) => void handleSendVoice(v)}
                 uploading={uploading}
                 sending={sending}
                 onSend={handleSend}
@@ -1176,6 +1715,7 @@ export default function DiscussApp() {
                 hintText={t("composer.enterToSend")}
                 sendLabel={t("composer.send")}
                 composerRef={composerRef}
+                t={t}
               />
               <input
                 ref={fileInputRef}
@@ -1188,16 +1728,19 @@ export default function DiscussApp() {
           )}
         </section>
 
-        {/* ── Column 3: Details ────────────────────────────────────── */}
-        {detailsOpen && selectedChannel && (
+        {/* ── Column 3: Details (closed when Thread pane is open) ─── */}
+        {detailsOpen && selectedChannel && !threadTarget && (
           <aside
-            className={`shrink-0 md:w-[300px] md:border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
+            className={`shrink-0 md:w-[320px] md:border-s border-[var(--border-subtle)] bg-[var(--bg-secondary)] min-h-0 overflow-y-auto ${
               mobileView === "details" ? "flex flex-col w-full" : "hidden md:flex md:flex-col"
             }`}
           >
             <DetailsPane
               channel={selectedChannel}
               members={members}
+              linkedContact={linkedContacts[selectedChannel.id] ?? null}
+              notificationPref={selectedChannel.notification_pref}
+              onSetNotificationPref={handleSetNotificationPref}
               onClose={() => {
                 setDetailsOpen(false);
                 setMobileView("thread");
@@ -1206,7 +1749,56 @@ export default function DiscussApp() {
             />
           </aside>
         )}
+
+        {/* Thread pane (Phase B) — replaces the details column */}
+        {threadTarget && selectedChannel && accountId && (
+          <aside className="shrink-0 md:w-[360px] min-h-0 flex">
+            <ThreadPane
+              parent={threadTarget}
+              currentAccountId={accountId}
+              channelId={selectedChannel.id}
+              onClose={() => setThreadTarget(null)}
+              t={t}
+            />
+          </aside>
+        )}
       </div>
+
+      {/* Search panel (Phase C) — full overlay on the right column */}
+      {searchOpen && accountId && (
+        <div className="absolute top-14 bottom-0 end-0 w-full md:w-[420px] z-40">
+          <SearchPanel
+            currentAccountId={accountId}
+            onClose={() => setSearchOpen(false)}
+            onJump={(channelId, messageId) => {
+              handleSelectChannel(channelId);
+              /* Scroll to the message after the channel switches. */
+              window.setTimeout(() => {
+                const el = document.getElementById(`msg-${messageId}`);
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 500);
+            }}
+            t={t}
+          />
+        </div>
+      )}
+
+      {/* Customer chat modal (Phase E) */}
+      {customerChatOpen && accountId && (
+        <CustomerChatModal
+          currentAccountId={accountId}
+          onCreated={(id) => void handleCustomerCreated(id)}
+          onCancel={() => setCustomerChatOpen(false)}
+          t={t}
+        />
+      )}
+
+      {/* Toast (Phase B-C) */}
+      {toastMessage && (
+        <div className="fixed bottom-6 start-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium shadow-lg">
+          {toastMessage}
+        </div>
+      )}
 
       {/* ═══ Modals / pickers ═══ */}
       {newChannelOpen && (
@@ -1358,31 +1950,63 @@ function ChannelRow({
    MESSAGE LIST — day separators, grouped bubbles, attachments, products
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function MessageList({
-  messages,
-  currentAccountId,
-  todayText,
-  yesterdayText,
-  editedText,
-  deletedText,
-}: {
+type MessageListProps = {
   messages: DiscussMessageWithAuthor[];
   currentAccountId: string;
+  channelKind: DiscussChannelKind;
+  channelLastRead: string | null;
   todayText: string;
   yesterdayText: string;
   editedText: string;
   deletedText: string;
-}) {
+  unreadMarkerText: string;
+  editingMessageId: string | null;
+  editingDraft: string;
+  onEditDraftChange: (value: string) => void;
+  onStartEdit: (msg: DiscussMessageWithAuthor) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: (messageId: string) => void;
+  onPin: (messageId: string) => void;
+  onUnpin: (messageId: string) => void;
+  onStar: (messageId: string) => void;
+  onCopyLink: (messageId: string) => void;
+  onReply: (msg: DiscussMessageWithAuthor) => void;
+  onOpenThread: (msg: DiscussMessageWithAuthor) => void;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+  t: (key: string, fallback?: string) => string;
+};
+
+function MessageList(props: MessageListProps) {
+  const {
+    messages,
+    currentAccountId,
+    channelLastRead,
+    todayText,
+    yesterdayText,
+    editedText,
+    deletedText,
+    unreadMarkerText,
+  } = props;
+
   /* Pre-compute day groupings once per render. Messages already sorted
-     ASC by created_at from the data layer. */
+     ASC by created_at from the data layer. Also compute the last-read
+     boundary so we can drop a "New messages" divider before the first
+     unread message.  */
   const withSeparators = useMemo(() => {
     const out: Array<
       | { kind: "sep"; key: string; label: string }
+      | { kind: "unread"; key: string }
       | { kind: "msg"; key: string; msg: DiscussMessageWithAuthor; showAuthor: boolean }
     > = [];
     let lastDay = "";
     let lastAuthor = "";
     let lastTime = 0;
+    /* Determine the first message that's after the last_read_at so we
+       can insert a single unread marker. Skip if channel has never been
+       read (showing the marker at the top is noisy). */
+    const lastReadTs = channelLastRead ? Date.parse(channelLastRead) : 0;
+    let unreadInserted = false;
     for (const m of messages) {
       const d = new Date(m.created_at);
       const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -1393,6 +2017,19 @@ function MessageList({
           label: formatDaySeparator(m.created_at, todayText, yesterdayText),
         });
         lastDay = dayKey;
+        lastAuthor = "";
+        lastTime = 0;
+      }
+      /* Unread divider: insert before the first message authored by
+         someone else that's newer than last_read_at. */
+      if (
+        !unreadInserted &&
+        lastReadTs > 0 &&
+        m.author_account_id !== currentAccountId &&
+        d.getTime() > lastReadTs
+      ) {
+        out.push({ kind: "unread", key: `unread-${m.id}` });
+        unreadInserted = true;
         lastAuthor = "";
         lastTime = 0;
       }
@@ -1407,20 +2044,34 @@ function MessageList({
       lastTime = thisTime;
     }
     return out;
-  }, [messages, todayText, yesterdayText]);
+  }, [messages, todayText, yesterdayText, channelLastRead, currentAccountId]);
 
   return (
     <div className="flex flex-col gap-1">
-      {withSeparators.map((row) =>
-        row.kind === "sep" ? (
-          <div key={row.key} className="flex items-center my-3">
-            <div className="flex-1 h-px bg-[var(--border-subtle)]" />
-            <div className="px-3 text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-              {row.label}
+      {withSeparators.map((row) => {
+        if (row.kind === "sep") {
+          return (
+            <div key={row.key} className="flex items-center my-3">
+              <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+              <div className="px-3 text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                {row.label}
+              </div>
+              <div className="flex-1 h-px bg-[var(--border-subtle)]" />
             </div>
-            <div className="flex-1 h-px bg-[var(--border-subtle)]" />
-          </div>
-        ) : (
+          );
+        }
+        if (row.kind === "unread") {
+          return (
+            <div key={row.key} className="flex items-center my-2">
+              <div className="flex-1 h-px bg-red-500/40" />
+              <div className="px-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-red-400">
+                {unreadMarkerText}
+              </div>
+              <div className="flex-1 h-px bg-red-500/40" />
+            </div>
+          );
+        }
+        return (
           <MessageBubble
             key={row.key}
             msg={row.msg}
@@ -1428,12 +2079,52 @@ function MessageList({
             isSelf={row.msg.author_account_id === currentAccountId}
             editedText={editedText}
             deletedText={deletedText}
+            isEditing={props.editingMessageId === row.msg.id}
+            editingDraft={props.editingDraft}
+            onEditDraftChange={props.onEditDraftChange}
+            onStartEdit={props.onStartEdit}
+            onCancelEdit={props.onCancelEdit}
+            onSaveEdit={props.onSaveEdit}
+            onDelete={props.onDelete}
+            onPin={props.onPin}
+            onUnpin={props.onUnpin}
+            onStar={props.onStar}
+            onCopyLink={props.onCopyLink}
+            onReply={props.onReply}
+            onOpenThread={props.onOpenThread}
+            onToggleReaction={props.onToggleReaction}
+            t={props.t}
           />
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🙏"];
+
+type MessageBubbleProps = {
+  msg: DiscussMessageWithAuthor;
+  showAuthor: boolean;
+  isSelf: boolean;
+  editedText: string;
+  deletedText: string;
+  isEditing: boolean;
+  editingDraft: string;
+  onEditDraftChange: (value: string) => void;
+  onStartEdit: (msg: DiscussMessageWithAuthor) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: (messageId: string) => void;
+  onPin: (messageId: string) => void;
+  onUnpin: (messageId: string) => void;
+  onStar: (messageId: string) => void;
+  onCopyLink: (messageId: string) => void;
+  onReply: (msg: DiscussMessageWithAuthor) => void;
+  onOpenThread: (msg: DiscussMessageWithAuthor) => void;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+  t: (key: string, fallback?: string) => string;
+};
 
 function MessageBubble({
   msg,
@@ -1441,21 +2132,34 @@ function MessageBubble({
   isSelf,
   editedText,
   deletedText,
-}: {
-  msg: DiscussMessageWithAuthor;
-  showAuthor: boolean;
-  isSelf: boolean;
-  editedText: string;
-  deletedText: string;
-}) {
+  isEditing,
+  editingDraft,
+  onEditDraftChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+  onPin,
+  onUnpin,
+  onStar,
+  onCopyLink,
+  onReply,
+  onOpenThread,
+  onToggleReaction,
+  t,
+}: MessageBubbleProps) {
   const author = msg.author;
   const authorName = author?.full_name || author?.username || "Unknown";
   const time = formatFullTime(msg.created_at);
   const isDeleted = !!msg.deleted_at;
   const meta = msg.metadata ?? {};
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
 
   return (
-    <div className={`group flex gap-3 ${showAuthor ? "mt-2" : ""}`}>
+    <div
+      id={`msg-${msg.id}`}
+      className={`group relative flex gap-3 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] ${showAuthor ? "mt-2" : ""}`}
+    >
       {showAuthor ? (
         <Avatar
           name={authorName}
@@ -1486,16 +2190,74 @@ function MessageBubble({
           </div>
         )}
 
+        {/* Reply-to preview — shown before the body when this msg quotes another */}
+        {msg.reply_preview && !isDeleted && (
+          <ReplyPreviewPill preview={msg.reply_preview} t={t} />
+        )}
+
         {isDeleted ? (
           <div className="text-[12.5px] italic text-[var(--text-dim)]">
             {deletedText}
           </div>
+        ) : isEditing ? (
+          <div className="mt-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-focus)]">
+            <textarea
+              autoFocus
+              value={editingDraft}
+              onChange={(e) => onEditDraftChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  onCancelEdit();
+                }
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  onSaveEdit();
+                }
+              }}
+              rows={2}
+              className="w-full bg-transparent resize-none px-3 pt-2 pb-1 text-[13px] text-[var(--text-primary)] outline-none"
+            />
+            <div className="flex items-center justify-end gap-2 px-2 pb-2 text-[10px]">
+              <span className="text-[var(--text-dim)]">
+                {t("edit.saveHint", "Cmd+Enter to save · Esc to cancel")}
+              </span>
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="h-6 px-2 rounded-md text-[10.5px] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
+              >
+                {t("btn.cancel", "Cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={onSaveEdit}
+                className="h-6 px-2 rounded-md bg-blue-500 text-white text-[10.5px] font-semibold hover:bg-blue-600"
+              >
+                {t("edit.save", "Save")}
+              </button>
+            </div>
+          </div>
         ) : (
           <>
-            {msg.body && (
-              <div className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words">
-                {renderMessageBody(msg.body, meta.mentions ?? [])}
+            {msg.kind === "voice" && meta.voice ? (
+              <div className="mt-1">
+                <VoicePlaybackBubble
+                  url={meta.voice.url}
+                  durationMs={meta.voice.duration_ms}
+                  waveform={meta.voice.waveform ?? []}
+                />
               </div>
+            ) : (
+              msg.body && (
+                <div className="text-[13px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words">
+                  {renderDiscussMarkdown(
+                    msg.body,
+                    meta.mentions ?? [],
+                    `mb-${msg.id}`,
+                  )}
+                </div>
+              )
             )}
 
             {/* Attachments */}
@@ -1522,56 +2284,193 @@ function MessageBubble({
               </div>
             )}
 
-            {/* Reactions row */}
+            {/* Reactions row — clickable to toggle */}
             {msg.reactions && msg.reactions.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {msg.reactions.map((rx) => (
-                  <span
+                  <button
                     key={rx.emoji}
+                    type="button"
+                    onClick={() => onToggleReaction(msg.id, rx.emoji)}
                     className={`inline-flex items-center gap-1 h-6 px-1.5 rounded-full border text-[11px] tabular-nums transition-colors ${
                       rx.reacted_by_me
                         ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
-                        : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]"
+                        : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:bg-[var(--bg-primary)]"
                     }`}
                   >
                     <span>{rx.emoji}</span>
                     <span className="font-semibold">{rx.count}</span>
-                  </span>
+                  </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setReactionPickerOpen(true)}
+                  className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                >
+                  <Smile className="h-3 w-3" />
+                </button>
               </div>
+            )}
+
+            {/* Thread indicator chip */}
+            {msg.thread && msg.thread.reply_count > 0 && (
+              <button
+                type="button"
+                onClick={() => onOpenThread(msg)}
+                className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10.5px] font-semibold hover:bg-blue-500/15 transition-colors"
+              >
+                <MessageSquare className="h-3 w-3" />
+                {msg.thread.reply_count === 1
+                  ? t("thread.replyCount.one", "1 reply")
+                  : t("thread.replyCount.many", "{count} replies").replace(
+                      "{count}",
+                      String(msg.thread.reply_count),
+                    )}
+              </button>
             )}
           </>
         )}
       </div>
+
+      {/* Hover action bar */}
+      {!isDeleted && !isEditing && (
+        <div className="absolute -top-3 end-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <div className="flex items-center gap-0.5 p-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg">
+            {reactionPickerOpen ? (
+              <div
+                className="flex items-center"
+                onMouseLeave={() => setReactionPickerOpen(false)}
+              >
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      onToggleReaction(msg.id, emoji);
+                      setReactionPickerOpen(false);
+                    }}
+                    className="h-7 w-7 rounded-md text-[14px] hover:bg-[var(--bg-primary)] transition-colors"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                <HoverAction
+                  title={t("msg.react", "Add reaction")}
+                  onClick={() => setReactionPickerOpen(true)}
+                >
+                  <Smile className="h-3.5 w-3.5" />
+                </HoverAction>
+                <HoverAction
+                  title={t("msg.replyInThread", "Reply in thread")}
+                  onClick={() => onOpenThread(msg)}
+                >
+                  <Reply className="h-3.5 w-3.5" />
+                </HoverAction>
+                <HoverAction
+                  title={t("msg.reply", "Reply")}
+                  onClick={() => onReply(msg)}
+                >
+                  <CornerUpLeft className="h-3.5 w-3.5" />
+                </HoverAction>
+                <HoverAction
+                  title={t("msg.star", "Save for later")}
+                  onClick={() => onStar(msg.id)}
+                >
+                  <Star className="h-3.5 w-3.5" />
+                </HoverAction>
+                <HoverAction
+                  title={t("msg.pin", "Pin")}
+                  onClick={() => onPin(msg.id)}
+                >
+                  <Pin className="h-3.5 w-3.5" />
+                </HoverAction>
+                <HoverAction
+                  title={t("msg.copyLink", "Copy link")}
+                  onClick={() => onCopyLink(msg.id)}
+                >
+                  <LinkIcon className="h-3.5 w-3.5" />
+                </HoverAction>
+                {isSelf && (
+                  <>
+                    <HoverAction
+                      title={t("msg.edit", "Edit")}
+                      onClick={() => onStartEdit(msg)}
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </HoverAction>
+                    <HoverAction
+                      title={t("msg.delete", "Delete")}
+                      onClick={() => onDelete(msg.id)}
+                      danger
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </HoverAction>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/** Render a message body with inline @mentions highlighted. Mentions
- *  are pre-computed server-side as offset ranges so we don't need to
- *  re-parse the text. Falls back to plain text on any shape mismatch. */
-function renderMessageBody(body: string, mentions: DiscussMention[]) {
-  if (!mentions || mentions.length === 0) return body;
-  /* Sort by offset to build a safe token stream. */
-  const sorted = [...mentions].sort((a, b) => a.offset - b.offset);
-  const parts: React.ReactNode[] = [];
-  let cursor = 0;
-  for (const m of sorted) {
-    if (m.offset < cursor || m.offset > body.length) continue;
-    if (m.offset > cursor) parts.push(body.slice(cursor, m.offset));
-    const end = Math.min(m.offset + m.length, body.length);
-    parts.push(
-      <span
-        key={`m-${m.offset}`}
-        className="inline-flex items-center px-1 rounded bg-blue-500/15 text-blue-300 font-semibold"
-      >
-        @{m.username}
-      </span>,
-    );
-    cursor = end;
-  }
-  if (cursor < body.length) parts.push(body.slice(cursor));
-  return parts;
+function HoverAction({
+  title,
+  onClick,
+  children,
+  danger = false,
+}: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+        danger
+          ? "text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10"
+          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ReplyPreviewPill({
+  preview,
+  t,
+}: {
+  preview: NonNullable<DiscussMessageWithAuthor["reply_preview"]>;
+  t: (key: string, fallback?: string) => string;
+}) {
+  const author =
+    preview.author_full_name || preview.author_username || "Unknown";
+  const body = preview.deleted_at
+    ? t("reply.deletedParent", "Original message deleted")
+    : (preview.body ?? "").slice(0, 120);
+  return (
+    <div className="mb-1 flex items-stretch gap-2 max-w-[480px]">
+      <div className="w-[3px] rounded-full bg-blue-500/50 shrink-0" />
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold text-blue-300">
+          {t("reply.replyingTo", "Replying to")} {author}
+        </div>
+        <div className="text-[11px] text-[var(--text-dim)] truncate italic">
+          {body}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AttachmentChip({ attachment }: { attachment: DiscussAttachment }) {
@@ -1701,6 +2600,12 @@ function Composer({
   products,
   onRemoveAttachment,
   onRemoveProduct,
+  replyTarget,
+  onCancelReply,
+  voiceOpen,
+  onOpenVoice,
+  onCloseVoice,
+  onSendVoice,
   uploading,
   sending,
   onSend,
@@ -1712,6 +2617,7 @@ function Composer({
   hintText,
   sendLabel,
   composerRef,
+  t,
 }: {
   body: string;
   onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
@@ -1720,6 +2626,16 @@ function Composer({
   products: DiscussProductRef[];
   onRemoveAttachment: (index: number) => void;
   onRemoveProduct: (index: number) => void;
+  replyTarget: DiscussMessageWithAuthor | null;
+  onCancelReply: () => void;
+  voiceOpen: boolean;
+  onOpenVoice: () => void;
+  onCloseVoice: () => void;
+  onSendVoice: (input: {
+    blob: Blob;
+    durationMs: number;
+    waveform: number[];
+  }) => void;
   uploading: boolean;
   sending: boolean;
   onSend: () => void;
@@ -1731,6 +2647,7 @@ function Composer({
   hintText: string;
   sendLabel: string;
   composerRef: React.MutableRefObject<HTMLTextAreaElement | null>;
+  t: (key: string, fallback?: string) => string;
 }) {
   const canSend =
     !sending &&
@@ -1739,6 +2656,56 @@ function Composer({
 
   return (
     <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3">
+      {/* Reply-to banner */}
+      {replyTarget && (
+        <div className="mb-2 flex items-start gap-2 p-2 rounded-lg bg-blue-500/8 border border-blue-500/25">
+          <div className="w-[3px] self-stretch rounded-full bg-blue-500 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold text-blue-300">
+              {t("reply.replyingTo", "Replying to")}{" "}
+              {replyTarget.author?.full_name ||
+                replyTarget.author?.username ||
+                "Unknown"}
+            </div>
+            <div className="text-[11px] text-[var(--text-muted)] truncate">
+              {(replyTarget.body ?? "").slice(0, 140) || "(no text)"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="h-6 w-6 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
+            aria-label={t("reply.cancel", "Cancel reply")}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Voice recorder overlay */}
+      {voiceOpen && (
+        <div className="mb-2">
+          <VoiceRecorder
+            onSend={(input) => {
+              onSendVoice(input);
+            }}
+            onCancel={onCloseVoice}
+            labels={{
+              start: t("voice.start", "Start"),
+              stop: t("voice.stop", "Stop"),
+              cancel: t("voice.cancel", "Cancel"),
+              send: t("voice.send", "Send"),
+              preview: t("voice.preview", "Preview"),
+              permissionDenied: t(
+                "voice.permissionDenied",
+                "Microphone permission denied",
+              ),
+              recording: t("voice.recording", "Recording…"),
+            }}
+          />
+        </div>
+      )}
+
       {/* Attached chips */}
       {(attachments.length > 0 || products.length > 0) && (
         <div className="flex flex-wrap gap-2 mb-2">
@@ -1812,7 +2779,10 @@ function Composer({
           <ComposerIconButton title="Emoji" onClick={onOpenEmojiPicker}>
             <Smile className="h-4 w-4" />
           </ComposerIconButton>
-          <ComposerIconButton title="Voice" onClick={() => undefined} disabled>
+          <ComposerIconButton
+            title={t("voice.record", "Record voice")}
+            onClick={onOpenVoice}
+          >
             <Mic className="h-4 w-4" />
           </ComposerIconButton>
 
@@ -1878,14 +2848,21 @@ function ComposerIconButton({
 function DetailsPane({
   channel,
   members,
+  linkedContact,
+  notificationPref,
+  onSetNotificationPref,
   onClose,
   t,
 }: {
   channel: DiscussChannelWithState;
   members: Array<DiscussMemberRow & { author: DiscussAuthor }>;
+  linkedContact: DiscussLinkedContact | null;
+  notificationPref: DiscussNotificationPref;
+  onSetNotificationPref: (pref: DiscussNotificationPref) => void;
   onClose: () => void;
   t: (key: string, fallback?: string) => string;
 }) {
+  const isCustomer = channel.kind === "customer";
   return (
     <div className="flex flex-col min-h-0 h-full">
       <div className="shrink-0 h-14 px-4 flex items-center justify-between border-b border-[var(--border-subtle)]">
@@ -1914,6 +2891,8 @@ function DetailsPane({
             <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
               {channel.kind === "channel" ? (
                 <Hash className="h-6 w-6 text-[var(--text-muted)]" />
+              ) : isCustomer ? (
+                <MessageSquare className="h-6 w-6 text-[var(--text-muted)]" />
               ) : (
                 <Users className="h-6 w-6 text-[var(--text-muted)]" />
               )}
@@ -1934,8 +2913,43 @@ function DetailsPane({
           )}
         </div>
 
+        {/* Customer contact card — only for customer-chat channels with a
+            linked CRM contact. Phase E. */}
+        {isCustomer && linkedContact && (
+          <section>
+            <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
+              {t("details.customer", "Customer")}
+            </div>
+            <CustomerContactCard contact={linkedContact} t={t} />
+          </section>
+        )}
+
+        {/* Notification preferences — Phase D */}
+        <section>
+          <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
+            {t("details.notifications", "Notifications")}
+          </div>
+          <div className="flex flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+            <NotifPrefRow
+              label={t("details.notif.all", "Everything")}
+              active={notificationPref === "all"}
+              onClick={() => onSetNotificationPref("all")}
+            />
+            <NotifPrefRow
+              label={t("details.notif.mentions", "Mentions only")}
+              active={notificationPref === "mentions"}
+              onClick={() => onSetNotificationPref("mentions")}
+            />
+            <NotifPrefRow
+              label={t("details.notif.none", "Nothing")}
+              active={notificationPref === "none"}
+              onClick={() => onSetNotificationPref("none")}
+            />
+          </div>
+        </section>
+
         {/* Members section */}
-        {channel.kind !== "direct" && (
+        {channel.kind !== "direct" && !isCustomer && (
           <section>
             <div className="flex items-center justify-between mb-2">
               <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
@@ -1975,10 +2989,10 @@ function DetailsPane({
           </section>
         )}
 
-        {/* Quick-actions stub — detailed features ship in Phase B/C/D */}
+        {/* Quick-actions stub */}
         <section>
           <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-2">
-            {t("details.notifications")}
+            {t("details.more", "More")}
           </div>
           <div className="flex flex-col gap-1">
             <DetailsRow
@@ -2001,6 +3015,37 @@ function DetailsPane({
         </section>
       </div>
     </div>
+  );
+}
+
+function NotifPrefRow({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-9 px-3 flex items-center gap-2 text-[12px] font-medium transition-colors text-start ${
+        active
+          ? "bg-blue-500/10 text-blue-300"
+          : "text-[var(--text-muted)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]"
+      }`}
+    >
+      <span
+        className={`h-3.5 w-3.5 rounded-full border flex items-center justify-center ${
+          active ? "border-blue-400" : "border-[var(--border-subtle)]"
+        }`}
+      >
+        {active && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
+      </span>
+      <span className="flex-1">{label}</span>
+    </button>
   );
 }
 

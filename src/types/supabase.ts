@@ -912,7 +912,7 @@ export interface InboxMessageWithSender extends InboxMessageRow {
    because chat evolved as the real-time counterpart to the static
    inbox — both read from accounts/people for user info. */
 
-export type DiscussChannelKind = "direct" | "group" | "channel";
+export type DiscussChannelKind = "direct" | "group" | "channel" | "customer";
 
 export interface DiscussChannelRow {
   id: string;
@@ -926,6 +926,9 @@ export interface DiscussChannelRow {
   updated_at: string;
   archived_at: string | null;
   last_message_at: string;
+  /** For Phase E customer-chat channels only: FK to the CRM contact
+   *  this chat is bound to. NULL for every internal channel. */
+  linked_contact_id: string | null;
 }
 
 export type DiscussChannelInsert = Omit<
@@ -1108,6 +1111,20 @@ export interface DiscussAuthor {
   full_name: string | null;
 }
 
+/** Compact preview of a replied-to message, embedded inside a
+ *  DiscussMessageWithAuthor when `reply_to_message_id` is populated.
+ *  We denormalize the author username + a trimmed body snippet so
+ *  the bubble can render the "Replying to X" header without a second
+ *  round-trip fetch. */
+export interface DiscussReplyPreview {
+  id: string;
+  body: string | null;
+  author_username: string | null;
+  author_full_name: string | null;
+  kind: DiscussMessageKind;
+  deleted_at: string | null;
+}
+
 export interface DiscussMessageWithAuthor extends DiscussMessageRow {
   author: DiscussAuthor | null;
   /** Aggregated reactions, grouped by emoji, populated by the data
@@ -1118,6 +1135,30 @@ export interface DiscussMessageWithAuthor extends DiscussMessageRow {
     account_ids: string[];
     reacted_by_me: boolean;
   }>;
+  /** Populated when the message is a reply-with-quote. */
+  reply_preview?: DiscussReplyPreview | null;
+  /** Populated when the message has a thread of replies.
+   *  Lightweight — just the count and latest reply timestamp so the
+   *  "X replies" chip can render without loading the thread itself. */
+  thread?: {
+    reply_count: number;
+    last_reply_at: string | null;
+    participant_ids: string[];
+  } | null;
+}
+
+/** Lightweight CRM contact block attached to a customer-chat channel.
+ *  Populated in the sidebar + details pane so we can render the
+ *  customer's name, company, and avatar without a second query. */
+export interface DiscussLinkedContact {
+  id: string;
+  display_name: string;
+  full_name: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  contact_type: string | null;
 }
 
 /** Sidebar channel row — enriched with the current user's read state,
@@ -1127,9 +1168,13 @@ export interface DiscussChannelWithState extends DiscussChannelRow {
   unread_count: number;
   last_read_at: string | null;
   muted: boolean;
+  notification_pref: DiscussNotificationPref;
   /** For direct channels, the OTHER account (not the current user).
    *  Null for group/channel kinds. */
   other: DiscussAuthor | null;
+  /** For customer-chat channels, the linked CRM contact. NULL for
+   *  every internal channel. */
+  linked_contact: DiscussLinkedContact | null;
   /** Short preview of the most recent message. */
   last_message: {
     id: string;
@@ -1138,6 +1183,28 @@ export interface DiscussChannelWithState extends DiscussChannelRow {
     author_username: string | null;
     created_at: string;
   } | null;
+  /** True when the current user has a non-empty draft saved for
+   *  this channel — surfaced so the sidebar can show a draft badge
+   *  and the Drafts section can pull it straight from the sidebar
+   *  query without a second round-trip. */
+  has_draft?: boolean;
+}
+
+/** Row returned by the full-text search RPC — a message plus the
+ *  channel it lives in so the search panel can group results. */
+export interface DiscussSearchResult {
+  message_id: string;
+  channel_id: string;
+  channel_name: string | null;
+  channel_kind: DiscussChannelKind;
+  author_username: string | null;
+  author_full_name: string | null;
+  author_avatar_url: string | null;
+  body: string | null;
+  /** ts_headline()-highlighted snippet with <mark> tags. */
+  snippet: string;
+  created_at: string;
+  rank: number;
 }
 
 /* ── Database schema type for createClient<Database> ── */
