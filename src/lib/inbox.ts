@@ -198,6 +198,82 @@ export async function fetchInboxMessages(
   });
 }
 
+/* ── Realtime ────────────────────────────────────────────────────────
+   Live INSERT subscription on `inbox_messages` filtered to a single
+   recipient. Mirrors `subscribeToMyChannels()` in src/lib/discuss.ts:
+   each subscriber gets its own topic so React strict-mode double-mounts
+   and multiple consumers (NotificationBell + the /inbox page) don't
+   collide on the same channel. Requires `inbox_messages` to be in the
+   `supabase_realtime` publication — see the
+   `add_inbox_messages_to_realtime` migration. */
+export function subscribeToInboxMessages(
+  accountId: string,
+  onInsert: (msg: InboxMessageRow) => void,
+): () => void {
+  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+  let reconnectTimer: number | null = null;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    const suffix = `${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const topic = `inbox:${accountId}:${suffix}`;
+    const ch = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: INBOX,
+          filter: `recipient_account_id=eq.${accountId}`,
+        },
+        (payload) => {
+          onInsert(payload.new as InboxMessageRow);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          if (typeof console !== "undefined") {
+            console.warn(`[Inbox] realtime ${status}, reconnecting…`);
+          }
+          if (!closed && reconnectTimer == null) {
+            reconnectTimer = window.setTimeout(() => {
+              reconnectTimer = null;
+              try {
+                if (currentChannel) supabase.removeChannel(currentChannel);
+              } catch {
+                /* ignore */
+              }
+              connect();
+            }, 1500);
+          }
+        }
+      });
+    currentChannel = ch;
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer != null) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (currentChannel) {
+      try {
+        supabase.removeChannel(currentChannel);
+      } catch {
+        /* ignore */
+      }
+      currentChannel = null;
+    }
+  };
+}
+
 export async function fetchUnreadCount(accountId: string): Promise<number> {
   const { count, error } = await supabase
     .from(INBOX)

@@ -44,6 +44,7 @@ import {
   fetchUnreadCount,
   markAllRead,
   markMessageRead,
+  subscribeToInboxMessages,
 } from "@/lib/inbox";
 import {
   fetchMyChannels,
@@ -250,6 +251,28 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       cancelled = true;
       window.clearInterval(t);
     };
+  }, [accountId]);
+
+  /* ── Inbox: realtime subscription ───────────────────────────────────
+     Listens for INSERTs on inbox_messages filtered to my recipient_id,
+     so a new mail (or system notification, or an inserted external
+     email row) bumps the bell instantly without waiting on the 60s
+     poll. The poll is still useful as a reconciliation safety net. */
+  useEffect(() => {
+    if (!accountId) return;
+    return subscribeToInboxMessages(accountId, (msg) => {
+      /* If the row landed already-read (e.g. an admin marked it read on
+         insert), don't bump. Otherwise treat it like a fresh inbound. */
+      if (msg.read_at) return;
+      setInboxUnread((n) => n + 1);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        /* Prepend with an empty sender object — the next loadInbox()
+           round-trip will hydrate the avatar / username. */
+        return [{ ...msg, sender: null } as InboxMessageWithSender, ...prev];
+      });
+      playNotificationSound();
+    });
   }, [accountId]);
 
   const loadInbox = useCallback(async () => {
