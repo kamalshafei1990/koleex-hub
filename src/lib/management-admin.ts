@@ -325,6 +325,40 @@ export async function safeDeletePosition(
   return deletePosition(id);
 }
 
+/** Duplicate a position (copies title, level, description, JD — not assignments). */
+export async function duplicatePosition(
+  sourceId: string,
+): Promise<{ data: PositionRow | null; error: string | null }> {
+  const { data: src, error: fetchErr } = await supabaseAdmin
+    .from("koleex_positions")
+    .select("*")
+    .eq("id", sourceId)
+    .single();
+
+  if (fetchErr || !src) return { data: null, error: fetchErr?.message || "Position not found" };
+
+  const { data, error } = await supabaseAdmin
+    .from("koleex_positions")
+    .insert({
+      title: `${src.title} (Copy)`,
+      department_id: src.department_id,
+      reports_to_position_id: src.reports_to_position_id,
+      level: src.level,
+      description: src.description,
+      role_id: src.role_id,
+      responsibilities: src.responsibilities,
+      requirements: src.requirements,
+      is_active: true,
+      sort_order: (src.sort_order || 0) + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as PositionRow, error: null };
+}
+
 /** Move a position in the hierarchy (drag & drop). */
 export async function movePosition(
   positionId: string,
@@ -467,6 +501,45 @@ export async function deleteRole(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
+}
+
+/** Clone a role and copy its permissions. */
+export async function cloneRole(
+  sourceRoleId: string,
+): Promise<{ data: RoleRow | null; error: string | null }> {
+  const { data: src, error: fetchErr } = await supabaseAdmin
+    .from("koleex_roles")
+    .select("*")
+    .eq("id", sourceRoleId)
+    .single();
+
+  if (fetchErr || !src) return { data: null, error: fetchErr?.message || "Role not found" };
+
+  const { data: newRole, error: createErr } = await supabaseAdmin
+    .from("koleex_roles")
+    .insert({
+      name: `${src.name} (Copy)`,
+      description: src.description,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (createErr || !newRole) return { data: null, error: createErr?.message || "Failed to create role" };
+
+  // Copy permissions
+  const { data: perms } = await supabaseAdmin
+    .from("koleex_permissions")
+    .select("module_name, can_view, can_create, can_edit, can_delete")
+    .eq("role_id", sourceRoleId);
+
+  if (perms && perms.length > 0) {
+    await supabaseAdmin
+      .from("koleex_permissions")
+      .insert(perms.map((p: Record<string, unknown>) => ({ ...p, role_id: newRole.id })));
+  }
+
+  return { data: newRole as RoleRow, error: null };
 }
 
 /* ═══════════════════════════════════════════════════

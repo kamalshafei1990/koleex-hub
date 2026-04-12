@@ -25,16 +25,16 @@ import {
   Check, History, ChevronUp, ArrowRightLeft, FileText, AlertCircle,
   GripVertical, Image, Smile, Globe, BarChart3, Activity,
   ZoomIn, ZoomOut, RotateCcw, Mail, Phone, Clock,
-  TrendingUp, Layers, UserCheck, UserX,
+  TrendingUp, Layers, UserCheck, UserX, Copy, Undo2,
 } from "lucide-react";
 import { APP_REGISTRY } from "@/lib/navigation";
 import {
   fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
-  fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition,
+  fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition, duplicatePosition,
   fetchAssignments, createAssignment, updateAssignment, deleteAssignment,
   fetchContactsForLinking, createInlineContact,
   buildDepartmentTree, buildOrgChart, getDepartmentHead, detectCircularHierarchy,
-  fetchRoles, createRole, updateRole, deleteRole,
+  fetchRoles, createRole, updateRole, deleteRole, cloneRole,
   fetchPermissions, upsertPermissions,
   fetchPositionHistory, addPositionHistory,
   transferEmployee, fetchFullOrgData, fetchDeptStats,
@@ -909,7 +909,7 @@ function OrgChartCard({
       onDrop={onDrop}
       onClick={onClick}
       className={`w-[240px] rounded-xl border bg-[var(--bg-secondary)] p-3 cursor-pointer group relative select-none transition-all duration-200
-        ${isDragOver ? "ring-2 ring-blue-400 border-blue-400/50 scale-[1.02]" : "border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-black/10"}
+        ${isDragOver ? "ring-2 ring-blue-400 border-blue-400/50 scale-[1.02]" : "border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-black/5"}
         ${isDragging ? "opacity-40 scale-95" : ""}
       `}>
       {/* Drag handle */}
@@ -1147,7 +1147,7 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
 
   return (
     <div>
-      <div className="space-y-3">
+      <div className="space-y-3 overflow-x-auto">
         {PERMISSION_GROUPS.map((group) => {
           const collapsed = collapsedGroups.has(group.label);
           const stats = getGroupStats(group);
@@ -1157,7 +1157,7 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
           });
 
           return (
-            <div key={group.label} className="rounded-xl border border-[var(--border-faint)] overflow-hidden">
+            <div key={group.label} className="rounded-xl border border-[var(--border-faint)] overflow-hidden min-w-[420px]">
               {/* Group header */}
               <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-surface-subtle)]">
                 <button onClick={() => toggleGroupCollapse(group.label)}
@@ -1414,7 +1414,7 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}><Icon size={15} /></div>
         <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">{label}</span>
       </div>
-      <div className="text-[28px] font-bold text-[var(--text-primary)] leading-none">{value}</div>
+      <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{value}</div>
       {sub && <div className="text-[11px] text-[var(--text-dim)] mt-1">{sub}</div>}
     </div>
   );
@@ -1479,12 +1479,12 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
             <Layers size={14} className="text-[var(--text-dim)]" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Level Distribution</span>
           </div>
-          <div className="flex items-end gap-2 h-[120px] px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+          <div className="flex items-end justify-center gap-2 h-[120px] px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
             {analytics.levelDistribution.map((l) => {
               const maxCount = Math.max(...analytics.levelDistribution.map((x) => x.count), 1);
               const height = (l.count / maxCount) * 100;
               return (
-                <div key={l.level} className="flex-1 flex flex-col items-center gap-1">
+                <div key={l.level} className="flex-1 min-w-[40px] max-w-[80px] flex flex-col items-center gap-1">
                   <span className="text-[10px] font-semibold text-[var(--text-primary)]">{l.count}</span>
                   <div className={`w-full rounded-t-md ${LEVEL_DOT[l.level] || "bg-slate-400"} transition-all duration-500`}
                     style={{ height: `${Math.max(height, 8)}%`, opacity: 0.7 }} />
@@ -1554,6 +1554,7 @@ export default function ManagementPage() {
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [posSearch, setPosSearch] = useState("");
 
   /* ── Org Chart Zoom ── */
   const [orgChartZoom, setOrgChartZoom] = useState(1);
@@ -1584,7 +1585,8 @@ export default function ManagementPage() {
 
   /* ── Toast ── */
   const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
+  const [toastUndo, setToastUndo] = useState<(() => void) | null>(null);
+  useEffect(() => { if (toast) { const t = setTimeout(() => { setToast(null); setToastUndo(null); }, 4000); return () => clearTimeout(t); } }, [toast]);
 
   /* ── Initial load ── */
   useEffect(() => {
@@ -1651,6 +1653,19 @@ export default function ManagementPage() {
     return { totalPositions, assignedPositions, emptyPositions: totalPositions - assignedPositions, totalAssigned: assignments.length };
   }, [positions, assignments]);
 
+  const filteredPositions = useMemo(() => {
+    if (!posSearch.trim()) return positions;
+    const q = posSearch.toLowerCase();
+    return positions.filter((p) => {
+      if (p.title.toLowerCase().includes(q)) return true;
+      const posAssigns = assignmentsByPos.get(p.id) || [];
+      return posAssigns.some((a) => {
+        const ctc = contactMap.get(a.contact_id);
+        return ctc?.name.toLowerCase().includes(q) || ctc?.email?.toLowerCase().includes(q);
+      });
+    });
+  }, [positions, posSearch, assignmentsByPos, contactMap]);
+
   /* ── Org chart trees ── */
   const deptOrgChart = useMemo(
     () => buildOrgChart(positions, assignments, contacts, departments),
@@ -1664,7 +1679,7 @@ export default function ManagementPage() {
 
   /* ── Handlers ── */
   const handleSelectDept = (dept: DepartmentRow) => {
-    setSelectedDeptId(dept.id); setRightView("dept"); setMobileShowDetail(true);
+    setSelectedDeptId(dept.id); setRightView("dept"); setMobileShowDetail(true); setPosSearch("");
   };
 
   const reloadAll = async () => {
@@ -1714,6 +1729,23 @@ export default function ManagementPage() {
     if (ok) setToast("Deleted.");
   };
 
+  /* ── Duplicate position handler ── */
+  const handleDuplicatePosition = async (posId: string) => {
+    const res = await duplicatePosition(posId);
+    if (res.error || !res.data) { setToast(res.error || "Duplicate failed."); return; }
+    if (selectedDeptId) await loadDeptDetail(selectedDeptId);
+    const stats = await fetchDeptStats(); setDeptStats(stats);
+    setToast("Position duplicated.");
+  };
+
+  /* ── Clone role handler ── */
+  const handleCloneRole = async (roleId: string) => {
+    const res = await cloneRole(roleId);
+    if (res.error || !res.data) { setToast(res.error || "Clone failed."); return; }
+    await reloadRoles();
+    setToast("Role cloned with permissions.");
+  };
+
   /* ── Drag & drop handler ── */
   const handleOrgDrop = async (sourceId: string, targetId: string) => {
     const posArr = rightView === "fullchart" ? fullOrgPositions : positions;
@@ -1721,11 +1753,24 @@ export default function ManagementPage() {
       setToast("Cannot move — would create circular hierarchy.");
       return;
     }
+    // Remember old parent for undo
+    const sourcePos = posArr.find((p) => p.id === sourceId);
+    const oldParentId = sourcePos?.reports_to_position_id || null;
+
     const res = await movePosition(sourceId, targetId);
     if (!res.ok) { setToast(res.error || "Move failed."); return; }
-    setToast("Position moved.");
+
     if (rightView === "fullchart") await loadFullOrgChart();
     else if (selectedDeptId) await loadDeptDetail(selectedDeptId);
+
+    setToastUndo(() => async () => {
+      await movePosition(sourceId, oldParentId);
+      if (rightView === "fullchart") await loadFullOrgChart();
+      else if (selectedDeptId) await loadDeptDetail(selectedDeptId);
+      setToast("Move undone.");
+      setToastUndo(null);
+    });
+    setToast("Position moved.");
   };
 
   const toggleTreeNode = (id: string) => {
@@ -1885,6 +1930,9 @@ export default function ManagementPage() {
 
           {/* Bottom links */}
           <div className="px-3 py-2 border-t border-[var(--border-color)] space-y-1">
+            <div className="px-3 pt-1 pb-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Views</span>
+            </div>
             <button onClick={() => { setRightView("dashboard"); setSelectedDeptId(null); setMobileShowDetail(true); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "dashboard" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
@@ -1999,6 +2047,10 @@ export default function ManagementPage() {
                             {selectedRoleId === role.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                             Permissions
                           </button>
+                          <button onClick={() => handleCloneRole(role.id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title="Clone role">
+                            <Copy size={11} className="text-[var(--text-dim)]" />
+                          </button>
                           <button onClick={() => { setEditRole(role); setShowRoleModal(true); }}
                             className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all">
                             <Pencil size={11} className="text-[var(--text-dim)]" />
@@ -2022,12 +2074,8 @@ export default function ManagementPage() {
           </div>
         ) : !selectedDept ? (
           /* ── EMPTY STATE ── */
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mb-4">
-              <Building2 size={28} className="text-[var(--text-dim)]" />
-            </div>
-            <p className="text-[15px] font-semibold text-[var(--text-secondary)] mb-1">Select a department</p>
-            <p className="text-[12px] text-[var(--text-dim)]">Choose a department to manage positions and people.</p>
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState icon={Building2} title="Select a department" subtitle="Choose a department to manage positions and people." />
           </div>
         ) : (
           /* ── DEPARTMENT DETAIL ── */
@@ -2123,10 +2171,23 @@ export default function ManagementPage() {
                     </button>
                   </div>
 
+                  {/* Position search */}
+                  {positions.length > 3 && (
+                    <div className="relative">
+                      <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+                      <input type="text" value={posSearch} onChange={(e) => setPosSearch(e.target.value)}
+                        placeholder="Filter positions or people..."
+                        className="w-full h-8 ps-8 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-faint)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
+                      {posSearch && <button onClick={() => setPosSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={12} /></button>}
+                    </div>
+                  )}
+
                   {positions.length === 0 ? (
                     <EmptyState icon={Briefcase} title="No positions defined yet" subtitle="Create positions, then assign people to them." />
+                  ) : filteredPositions.length === 0 ? (
+                    <div className="text-center py-8 text-[12px] text-[var(--text-dim)]">No positions matching &ldquo;{posSearch}&rdquo;</div>
                   ) : (
-                    positions.map((pos) => {
+                    filteredPositions.map((pos) => {
                       const posAssignments = assignmentsByPos.get(pos.id) || [];
                       const roleName = pos.role_id ? roles.find((r) => r.id === pos.role_id)?.name : null;
 
@@ -2152,6 +2213,10 @@ export default function ManagementPage() {
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
                                 className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
                                 <UserPlus size={11} /> Assign
+                              </button>
+                              <button onClick={() => handleDuplicatePosition(pos.id)}
+                                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title="Duplicate position">
+                                <Copy size={11} className="text-[var(--text-dim)]" />
                               </button>
                               <button onClick={() => { setEditPos(pos); setShowPosModal(true); }}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]">
@@ -2223,8 +2288,16 @@ export default function ManagementPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)]">{toast}</div>
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)] flex items-center gap-2">
+            {toast}
+            {toastUndo && (
+              <button onClick={() => { toastUndo(); setToast(null); setToastUndo(null); }}
+                className="ml-1 flex items-center gap-1 text-[12px] font-semibold underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity">
+                <Undo2 size={11} /> Undo
+              </button>
+            )}
+          </div>
         </div>
       )}
 
