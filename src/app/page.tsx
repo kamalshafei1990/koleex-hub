@@ -39,9 +39,11 @@ function getGreetingKey(): string {
   return "greeting.evening";
 }
 
-/* ── Analog Clock ── */
-function AnalogClock({ size = 48, dk = true }: { size?: number; dk?: boolean }) {
+/* ── Clock Widget: Analog + Digital ── */
+function ClockWidget({ dk = true }: { dk?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [digitalTime, setDigitalTime] = useState("");
+  const size = 80; // analog clock size
 
   useEffect(() => {
     const cvs = canvasRef.current;
@@ -66,23 +68,23 @@ function AnalogClock({ size = 48, dk = true }: { size?: number; dk?: boolean }) 
 
       /* Face */
       ctx.beginPath();
-      ctx.arc(r, r, r - 1, 0, Math.PI * 2);
-      ctx.fillStyle = dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)";
+      ctx.arc(r, r, r - 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = dk ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)";
       ctx.fill();
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
 
       /* Hour ticks */
       for (let i = 0; i < 12; i++) {
         const angle = (i * Math.PI) / 6 - Math.PI / 2;
-        const outer = r - 3;
-        const inner = i % 3 === 0 ? r - 7 : r - 5;
+        const outer = r - 4;
+        const inner = i % 3 === 0 ? r - 10 : r - 7;
         ctx.beginPath();
         ctx.moveTo(r + Math.cos(angle) * inner, r + Math.sin(angle) * inner);
         ctx.lineTo(r + Math.cos(angle) * outer, r + Math.sin(angle) * outer);
-        ctx.strokeStyle = dk ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)";
-        ctx.lineWidth = i % 3 === 0 ? 1.5 : 0.8;
+        ctx.strokeStyle = dk ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.30)";
+        ctx.lineWidth = i % 3 === 0 ? 2 : 1;
         ctx.stroke();
       }
 
@@ -91,8 +93,8 @@ function AnalogClock({ size = 48, dk = true }: { size?: number; dk?: boolean }) 
       ctx.beginPath();
       ctx.moveTo(r, r);
       ctx.lineTo(r + Math.cos(hAngle) * (r * 0.45), r + Math.sin(hAngle) * (r * 0.45));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.75)";
+      ctx.lineWidth = 2.5;
       ctx.lineCap = "round";
       ctx.stroke();
 
@@ -100,35 +102,48 @@ function AnalogClock({ size = 48, dk = true }: { size?: number; dk?: boolean }) 
       const mAngle = ((m + s / 60) * Math.PI) / 30 - Math.PI / 2;
       ctx.beginPath();
       ctx.moveTo(r, r);
-      ctx.lineTo(r + Math.cos(mAngle) * (r * 0.65), r + Math.sin(mAngle) * (r * 0.65));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
-      ctx.lineWidth = 1.5;
+      ctx.lineTo(r + Math.cos(mAngle) * (r * 0.62), r + Math.sin(mAngle) * (r * 0.62));
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
+      ctx.lineWidth = 2;
       ctx.lineCap = "round";
       ctx.stroke();
 
-      /* Second hand */
+      /* Second hand — thin red line */
       const sAngle = (s * Math.PI) / 30 - Math.PI / 2;
       ctx.beginPath();
-      ctx.moveTo(r, r);
-      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.7), r + Math.sin(sAngle) * (r * 0.7));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)";
-      ctx.lineWidth = 0.8;
+      ctx.moveTo(r + Math.cos(sAngle + Math.PI) * (r * 0.15), r + Math.sin(sAngle + Math.PI) * (r * 0.15));
+      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.72), r + Math.sin(sAngle) * (r * 0.72));
+      ctx.strokeStyle = "rgba(239,68,68,0.7)";
+      ctx.lineWidth = 1;
       ctx.lineCap = "round";
       ctx.stroke();
 
       /* Center dot */
       ctx.beginPath();
-      ctx.arc(r, r, 2, 0, Math.PI * 2);
-      ctx.fillStyle = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
+      ctx.arc(r, r, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(239,68,68,0.8)";
       ctx.fill();
+
+      /* Digital time */
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      setDigitalTime(`${pad(now.getHours())}:${pad(m)}:${pad(s)}`);
     }
 
     draw();
     const interval = setInterval(draw, 1000);
     return () => clearInterval(interval);
-  }, [size, dk]);
+  }, [dk]);
 
-  return <canvas ref={canvasRef} style={{ width: size, height: size }} className="shrink-0" />;
+  return (
+    <div className="flex flex-col items-center gap-1.5 shrink-0">
+      <canvas ref={canvasRef} style={{ width: size, height: size }} />
+      <span className={`text-[13px] font-mono font-semibold tracking-wider tabular-nums ${
+        dk ? "text-white/40" : "text-black/40"
+      }`}>
+        {digitalTime}
+      </span>
+    </div>
+  );
 }
 
 export default function HomePage() {
@@ -305,7 +320,7 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        className={`relative flex flex-col items-center justify-center gap-2.5 p-4 min-h-[90px] border rounded-2xl transition-all duration-200 select-none ${
+        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square border rounded-2xl transition-all duration-200 select-none ${
           app.active
             ? isCurrentApp
               ? `cursor-pointer group ${
@@ -425,29 +440,15 @@ export default function HomePage() {
 
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 pt-1">
               <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
                 {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
               </h1>
-              <p className={`text-[13px] mt-1 hidden md:block ${dk ? "text-white/30" : "text-black/30"}`}>{t("applicationsDesc")}</p>
+              <p className={`text-[14px] mt-1.5 font-medium ${dk ? "text-white/40" : "text-black/40"}`}>{today}</p>
+              <p className={`text-[12px] mt-0.5 hidden md:block ${dk ? "text-white/25" : "text-black/25"}`}>{t("applicationsDesc")}</p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="hidden md:flex flex-col items-end gap-0.5">
-                <span className={`text-[14px] font-semibold ${dk ? "text-white/50" : "text-black/50"}`}>{today}</span>
-                <span className={`text-[10px] font-medium ${dk ? "text-white/20" : "text-black/20"}`}>
-                  {activeCount}/{totalCount} {t("apps")}
-                </span>
-              </div>
-              <AnalogClock size={48} dk={dk} />
-            </div>
-          </div>
-          {/* Mobile: date below greeting */}
-          <div className="flex items-center gap-2 mt-1.5 md:hidden">
-            <span className={`text-[12px] font-medium ${dk ? "text-white/35" : "text-black/35"}`}>{today}</span>
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${dk ? "text-white/20 bg-white/[0.04]" : "text-black/20 bg-black/[0.04]"}`}>
-              {activeCount}/{totalCount}
-            </span>
+            <ClockWidget dk={dk} />
           </div>
         </div>
 
