@@ -27,6 +27,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Mail, Phone, Clock,
   TrendingUp, Layers, UserCheck, UserX,
 } from "lucide-react";
+import { APP_REGISTRY } from "@/lib/navigation";
 import {
   fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
   fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition,
@@ -74,16 +75,27 @@ const LEVEL_DOT: Record<number, string> = {
   3: "bg-emerald-400", 4: "bg-cyan-400", 5: "bg-slate-400",
 };
 
-const PERMISSION_MODULES = [
-  "Products", "Inventory", "Purchase", "Landed Cost",
-  "Sales", "CRM", "Quotations", "Invoices",
-  "Customers", "Suppliers", "Contacts", "Markets",
-  "Finance", "Expenses",
-  "Management", "Employees",
-  "Discuss", "Calendar", "To-do",
-  "Website", "Catalogs",
-  "Settings", "Accounts",
+/** Permission module groups — maps to real apps from APP_REGISTRY */
+const PERMISSION_GROUPS: { label: string; modules: string[] }[] = [
+  { label: "Operations", modules: ["Products", "Inventory", "Purchase", "Landed Cost", "Catalogs", "Documents"] },
+  { label: "Commercial", modules: ["Sales", "CRM", "Quotations", "Invoices", "Customers", "Suppliers", "Contacts", "Markets"] },
+  { label: "Finance", modules: ["Finance", "Expenses"] },
+  { label: "People", modules: ["Management", "Employees", "Recruitment", "Appraisals", "Attendance"] },
+  { label: "Communication", modules: ["Discuss", "Calendar", "To-do", "Koleex Mail"] },
+  { label: "Marketing & Growth", modules: ["Website", "Marketing", "Events"] },
+  { label: "Planning & Knowledge", modules: ["Planning", "Projects", "Knowledge", "AI"] },
+  { label: "System", modules: ["Accounts", "Settings", "Brands", "Price Calculator", "Dashboard"] },
 ];
+
+const PERMISSION_MODULES = PERMISSION_GROUPS.flatMap((g) => g.modules);
+
+/** Lookup app icon by permission module name */
+const getAppIcon = (moduleName: string) => {
+  const app = APP_REGISTRY.find((a) =>
+    a.name === moduleName || a.name.toLowerCase() === moduleName.toLowerCase(),
+  );
+  return app?.icon || null;
+};
 
 /* ═══════════════════════════════════════════════════
    SHARED UI
@@ -1043,13 +1055,14 @@ function OrgChartBranch({
 }
 
 /* ═══════════════════════════════════════════════════
-   PERMISSIONS EDITOR
+   PERMISSIONS EDITOR — grouped by app category
    ═══════════════════════════════════════════════════ */
 function PermissionsEditor({ roleId }: { roleId: string }) {
   const [perms, setPerms] = useState<Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setLoading(true);
@@ -1064,6 +1077,40 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
   const toggle = (mod: string, field: "can_view" | "can_create" | "can_edit" | "can_delete") => {
     setPerms((prev) => ({ ...prev, [mod]: { ...prev[mod], [field]: !prev[mod][field] } }));
     setSaved(false);
+  };
+
+  const toggleFullAccess = (mod: string) => {
+    const p = perms[mod];
+    const allOn = p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
+    setPerms((prev) => ({
+      ...prev,
+      [mod]: { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_delete: !allOn },
+    }));
+    setSaved(false);
+  };
+
+  const toggleGroupAll = (group: typeof PERMISSION_GROUPS[0]) => {
+    const allOn = group.modules.every((m) => {
+      const p = perms[m];
+      return p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
+    });
+    setPerms((prev) => {
+      const next = { ...prev };
+      group.modules.forEach((m) => {
+        next[m] = { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_delete: !allOn };
+      });
+      return next;
+    });
+    setSaved(false);
+  };
+
+  const toggleGroupCollapse = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -1084,34 +1131,98 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     </button>
   );
 
+  const getGroupStats = (group: typeof PERMISSION_GROUPS[0]) => {
+    let total = 0;
+    let enabled = 0;
+    group.modules.forEach((m) => {
+      total += 4;
+      const p = perms[m];
+      if (p?.can_view) enabled++;
+      if (p?.can_create) enabled++;
+      if (p?.can_edit) enabled++;
+      if (p?.can_delete) enabled++;
+    });
+    return { total, enabled, pct: total > 0 ? Math.round((enabled / total) * 100) : 0 };
+  };
+
   return (
     <div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
-              <th className="text-start py-2 px-2 font-medium">Module</th>
-              <th className="text-center py-2 px-2 font-medium w-16">View</th>
-              <th className="text-center py-2 px-2 font-medium w-16">Create</th>
-              <th className="text-center py-2 px-2 font-medium w-16">Edit</th>
-              <th className="text-center py-2 px-2 font-medium w-16">Delete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PERMISSION_MODULES.map((mod) => (
-              <tr key={mod} className="border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface-subtle)] transition-colors">
-                <td className="py-2 px-2 text-[var(--text-secondary)] font-medium">{mod}</td>
-                <td className="py-2 px-2 text-center"><CheckCell checked={perms[mod]?.can_view} onChange={() => toggle(mod, "can_view")} /></td>
-                <td className="py-2 px-2 text-center"><CheckCell checked={perms[mod]?.can_create} onChange={() => toggle(mod, "can_create")} /></td>
-                <td className="py-2 px-2 text-center"><CheckCell checked={perms[mod]?.can_edit} onChange={() => toggle(mod, "can_edit")} /></td>
-                <td className="py-2 px-2 text-center"><CheckCell checked={perms[mod]?.can_delete} onChange={() => toggle(mod, "can_delete")} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        {PERMISSION_GROUPS.map((group) => {
+          const collapsed = collapsedGroups.has(group.label);
+          const stats = getGroupStats(group);
+          const allGroupOn = group.modules.every((m) => {
+            const p = perms[m];
+            return p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
+          });
+
+          return (
+            <div key={group.label} className="rounded-xl border border-[var(--border-faint)] overflow-hidden">
+              {/* Group header */}
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-surface-subtle)]">
+                <button onClick={() => toggleGroupCollapse(group.label)}
+                  className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface)]">
+                  {collapsed ? <ChevronRight size={12} className="text-[var(--text-dim)]" /> : <ChevronDown size={12} className="text-[var(--text-dim)]" />}
+                </button>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">{group.label}</span>
+                <span className="text-[10px] font-medium text-[var(--text-faint)] mr-2">{stats.pct}%</span>
+                <button onClick={() => toggleGroupAll(group)}
+                  className={`h-6 px-2 rounded-md text-[10px] font-semibold border transition-all ${
+                    allGroupOn
+                      ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
+                      : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-focus)]"
+                  }`}>
+                  {allGroupOn ? "Full" : "All"}
+                </button>
+              </div>
+
+              {/* Module rows */}
+              {!collapsed && (
+                <div>
+                  {/* Column headers */}
+                  <div className="flex items-center px-3 py-1.5 border-t border-[var(--border-faint)]">
+                    <div className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">App</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">View</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Add</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Edit</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Del</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">All</div>
+                  </div>
+                  {group.modules.map((mod) => {
+                    const AppIcon = getAppIcon(mod);
+                    const p = perms[mod];
+                    const isFullAccess = p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
+                    const hasAny = p?.can_view || p?.can_create || p?.can_edit || p?.can_delete;
+
+                    return (
+                      <div key={mod} className="flex items-center px-3 py-1.5 border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface-subtle)] transition-colors">
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          {AppIcon && <AppIcon size={13} className={`shrink-0 ${hasAny ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`} />}
+                          <span className={`text-[12px] font-medium truncate ${hasAny ? "text-[var(--text-secondary)]" : "text-[var(--text-faint)]"}`}>{mod}</span>
+                        </div>
+                        <div className="w-12 flex justify-center"><CheckCell checked={p?.can_view} onChange={() => toggle(mod, "can_view")} /></div>
+                        <div className="w-12 flex justify-center"><CheckCell checked={p?.can_create} onChange={() => toggle(mod, "can_create")} /></div>
+                        <div className="w-12 flex justify-center"><CheckCell checked={p?.can_edit} onChange={() => toggle(mod, "can_edit")} /></div>
+                        <div className="w-12 flex justify-center"><CheckCell checked={p?.can_delete} onChange={() => toggle(mod, "can_delete")} /></div>
+                        <div className="w-12 flex justify-center">
+                          <button onClick={() => toggleFullAccess(mod)}
+                            className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                              isFullAccess ? "bg-blue-500/15 border-blue-500/30 text-blue-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-transparent hover:border-[var(--border-focus)]"
+                            }`}>
+                            <Shield size={10} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="flex items-center justify-end gap-2 mt-4">
-        {saved && <span className="text-[12px] text-emerald-400 font-medium">Saved!</span>}
+        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><Check size={12} /> Saved!</span>}
         <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? "Saving..." : "Save Permissions"}</button>
       </div>
     </div>
