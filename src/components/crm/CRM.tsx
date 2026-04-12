@@ -86,6 +86,7 @@ import {
   updateStage,
   type ActivityFeedRow,
 } from "@/lib/crm";
+import { fetchContacts, type ContactRow } from "@/lib/contacts-admin";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { crmT } from "@/lib/translations/crm";
@@ -1452,6 +1453,247 @@ function ListView({
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   ContactComboboxField — shared autocomplete used by the Company and
+   Contact Name fields in the Opportunity modal. The user can either pick
+   a saved contact (which links the FK and auto-fills email/phone) or
+   keep typing to use the value as free text.
+
+   `filter` decides which side of the address book we search:
+     · "company" → contacts whose contact_type is company/supplier or whose
+       `company` column matches.
+     · "person"  → contacts that are individuals (not companies/suppliers).
+   ════════════════════════════════════════════════════════════════════════ */
+
+function ContactComboboxField({
+  label,
+  value,
+  onChange,
+  onPickContact,
+  contacts,
+  filter,
+  placeholder,
+  t,
+}: {
+  label: string;
+  value: string;
+  onChange: (s: string) => void;
+  onPickContact: (c: ContactRow | null) => void;
+  contacts: ContactRow[];
+  filter: "company" | "person";
+  placeholder?: string;
+  t: (key: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  const isOrg = (c: ContactRow) =>
+    c.entity_type === "company" ||
+    c.contact_type === "company" ||
+    c.contact_type === "supplier";
+
+  const matches = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    if (!q) return [] as ContactRow[];
+    return contacts
+      .filter((c) => {
+        if (filter === "company") {
+          // Match either company-type contacts by their display name OR
+          // any contact whose `company` column hits the query.
+          if (isOrg(c)) {
+            const hay = [c.display_name, c.company]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+            return hay.includes(q);
+          }
+          return (c.company || "").toLowerCase().includes(q);
+        }
+        // person filter — exclude orgs, search across name + email
+        if (isOrg(c)) return false;
+        const hay = [
+          c.display_name,
+          c.full_name,
+          c.first_name,
+          c.last_name,
+          c.email,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 6);
+  }, [value, contacts, filter]);
+
+  const trimmed = value.trim();
+  const exactMatch = matches.some((c) => {
+    const label =
+      filter === "company"
+        ? c.company || c.display_name || ""
+        : c.display_name || c.full_name || "";
+    return label.toLowerCase() === trimmed.toLowerCase();
+  });
+  const showAddNew = trimmed.length > 0 && !exactMatch;
+
+  type Item =
+    | { kind: "contact"; contact: ContactRow }
+    | { kind: "add"; text: string };
+
+  const items: Item[] = useMemo(() => {
+    const list: Item[] = matches.map((c) => ({ kind: "contact", contact: c }));
+    if (showAddNew) list.push({ kind: "add", text: trimmed });
+    return list;
+  }, [matches, showAddNew, trimmed]);
+
+  function pickItem(idx: number) {
+    const it = items[idx];
+    if (!it) return;
+    if (it.kind === "contact") {
+      onPickContact(it.contact);
+    } else {
+      // "Use as new" — keep the typed text, no FK link
+      onPickContact(null);
+    }
+    setOpen(false);
+  }
+
+  return (
+    <Field label={label}>
+      <div className="relative" ref={containerRef}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+            setHi(0);
+          }}
+          onFocus={() => {
+            if (value.trim().length > 0) setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (!open || items.length === 0) {
+              if (e.key === "Escape") setOpen(false);
+              return;
+            }
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setHi((h) => Math.min(h + 1, items.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHi((h) => Math.max(h - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              pickItem(hi);
+            } else if (e.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+          className={inputClass}
+          autoComplete="off"
+        />
+        {open && items.length > 0 && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-[300] max-h-64 overflow-y-auto rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl py-1">
+            {items.map((it, i) => {
+              const active = hi === i;
+              if (it.kind === "contact") {
+                const c = it.contact;
+                const primary =
+                  filter === "company"
+                    ? c.company || c.display_name || c.full_name || "—"
+                    : c.display_name || c.full_name || "—";
+                const secondary =
+                  filter === "company"
+                    ? c.display_name && c.company && c.display_name !== c.company
+                      ? c.display_name
+                      : null
+                    : c.email || c.company || null;
+                const initial = (primary[0] || "?").toUpperCase();
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickItem(i)}
+                    onMouseEnter={() => setHi(i)}
+                    className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors ${
+                      active ? "bg-[var(--bg-surface-hover)]" : ""
+                    }`}
+                  >
+                    <div className="h-7 w-7 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-dim)] shrink-0 overflow-hidden">
+                      {c.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={c.photo_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        initial
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
+                        {primary}
+                      </div>
+                      {secondary && (
+                        <div className="text-[10.5px] text-[var(--text-dim)] truncate">
+                          {secondary}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={`add-${i}`}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pickItem(i)}
+                  onMouseEnter={() => setHi(i)}
+                  className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors border-t border-[var(--border-subtle)] ${
+                    active ? "bg-[var(--bg-surface-hover)]" : ""
+                  }`}
+                >
+                  <div className="h-7 w-7 rounded-full bg-[var(--bg-inverted)]/[0.08] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] shrink-0">
+                    <Plus className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
+                      {t("form.useAsNew")}
+                    </div>
+                    <div className="text-[10.5px] text-[var(--text-dim)] truncate">
+                      &ldquo;{it.text}&rdquo;
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    Opportunity modal — create / edit / activities / mark-won-lost
    ════════════════════════════════════════════════════════════════════════ */
 
@@ -1483,8 +1725,25 @@ function OpportunityModal({
   const [contactName, setContactName] = useState(
     opportunity?.contact_name ?? "",
   );
+  const [contactId, setContactId] = useState<string | null>(
+    opportunity?.contact_id ?? null,
+  );
   const [email, setEmail] = useState(opportunity?.email ?? "");
   const [phone, setPhone] = useState(opportunity?.phone ?? "");
+
+  /* Saved contacts — loaded once when the modal opens, used to power the
+     Company / Contact Name autocomplete dropdowns. */
+  const [contactBook, setContactBook] = useState<ContactRow[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const rows = await fetchContacts();
+      if (!cancelled) setContactBook(rows);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [expectedRevenue, setExpectedRevenue] = useState(
     String(opportunity?.expected_revenue ?? 0),
   );
@@ -1560,7 +1819,7 @@ function OpportunityModal({
         .map((s) => s.trim())
         .filter(Boolean),
       color: opportunity?.color ?? 0,
-      contact_id: opportunity?.contact_id ?? null,
+      contact_id: contactId,
       owner_account_id: opportunity?.owner_account_id ?? accountId ?? null,
       lost_reason: opportunity?.lost_reason ?? null,
       won_at: opportunity?.won_at ?? null,
@@ -1729,23 +1988,60 @@ function OpportunityModal({
               </Field>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label={t("form.company")}>
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder={t("form.companyPh")}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label={t("form.contactName")}>
-                  <input
-                    type="text"
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
+                <ContactComboboxField
+                  label={t("form.company")}
+                  placeholder={t("form.companyPh")}
+                  value={companyName}
+                  contacts={contactBook}
+                  filter="company"
+                  onChange={(v) => {
+                    setCompanyName(v);
+                    // Typing manually breaks the FK link unless it
+                    // exactly matches the previously linked contact.
+                    setContactId((prev) => {
+                      if (!prev) return null;
+                      const linked = contactBook.find((c) => c.id === prev);
+                      const stillMatches =
+                        linked &&
+                        ((linked.company || linked.display_name || "")
+                          .toLowerCase() === v.toLowerCase());
+                      return stillMatches ? prev : null;
+                    });
+                  }}
+                  onPickContact={(c) => {
+                    if (!c) return;
+                    setCompanyName(c.company || c.display_name || "");
+                    setContactId(c.id);
+                  }}
+                  t={t}
+                />
+                <ContactComboboxField
+                  label={t("form.contactName")}
+                  value={contactName}
+                  contacts={contactBook}
+                  filter="person"
+                  onChange={(v) => {
+                    setContactName(v);
+                    setContactId((prev) => {
+                      if (!prev) return null;
+                      const linked = contactBook.find((c) => c.id === prev);
+                      const stillMatches =
+                        linked &&
+                        ((linked.display_name || linked.full_name || "")
+                          .toLowerCase() === v.toLowerCase());
+                      return stillMatches ? prev : null;
+                    });
+                  }}
+                  onPickContact={(c) => {
+                    if (!c) return;
+                    setContactName(c.display_name || c.full_name || "");
+                    setContactId(c.id);
+                    if (!companyName && c.company) setCompanyName(c.company);
+                    if (!email && c.email) setEmail(c.email);
+                    if (!phone && c.phone) setPhone(c.phone);
+                  }}
+                  t={t}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
