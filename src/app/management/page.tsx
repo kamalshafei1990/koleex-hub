@@ -184,8 +184,8 @@ function Spinner() {
 }
 
 /** Department icon renderer — system-style: uploaded images in rounded containers, emoji fallback */
-function DeptIcon({ dept, size = 24 }: { dept: DepartmentRow; size?: number }) {
-  const iconSize = Math.round(size * 0.55);
+function DeptIcon({ dept, size = 32 }: { dept: DepartmentRow; size?: number }) {
+  const iconSize = Math.round(size * 0.5);
   // Uploaded / URL image
   if (dept.icon_type === "image" && dept.icon_value) {
     return (
@@ -1888,7 +1888,7 @@ export default function ManagementPage() {
               {isExpanded ? <ChevronDown size={12} className="text-[var(--text-dim)]" /> : <ChevronRight size={12} className="text-[var(--text-dim)]" />}
             </button>
           ) : <div className="w-5 shrink-0" />}
-          <DeptIcon dept={node} size={20} />
+          <DeptIcon dept={node} size={28} />
           <div className="flex-1 min-w-0">
             <div className={`text-[13px] font-medium truncate ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{node.name}</div>
           </div>
@@ -2010,7 +2010,7 @@ export default function ManagementPage() {
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all group ${
                     selectedDeptId === dept.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
                   }`}>
-                  <DeptIcon dept={dept} size={20} />
+                  <DeptIcon dept={dept} size={28} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate text-[var(--text-secondary)]">{dept.name}</div>
                   </div>
@@ -2179,9 +2179,7 @@ export default function ManagementPage() {
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                    <DeptIcon dept={selectedDept} size={28} />
-                  </div>
+                  <DeptIcon dept={selectedDept} size={44} />
                   <div className="min-w-0">
                     <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{selectedDept.name}</h2>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
