@@ -498,7 +498,7 @@ export default function InboxPage() {
       <header className="shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <Link
           href="/"
-          className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+          className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
           aria-label="Back to Hub"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -516,9 +516,11 @@ export default function InboxPage() {
             Mailboxes
           </button>
         )}
-        <div className="flex items-center gap-2 min-w-0">
-          <Mail className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
-          <h1 className="text-[15px] md:text-[16px] font-semibold tracking-tight truncate">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <Mail className="h-4 w-4" />
+          </div>
+          <h1 className="text-[15px] md:text-[18px] font-bold tracking-tight truncate">
             Koleex Mail
           </h1>
         </div>

@@ -1491,7 +1491,7 @@ export default function DiscussApp() {
       <header className="shrink-0 h-14 flex items-center gap-2 px-3 md:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <Link
           href="/"
-          className={`h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
+          className={`h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ${
             mobileView === "list" ? "flex" : "hidden md:flex"
           }`}
           aria-label={t("back")}
@@ -1513,8 +1513,10 @@ export default function DiscussApp() {
             mobileView === "list" ? "flex" : "hidden md:flex"
           }`}
         >
-          <MessageSquare className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
-          <h1 className="text-[15px] md:text-[16px] font-semibold tracking-tight truncate">
+          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <MessageSquare className="h-4 w-4" />
+          </div>
+          <h1 className="text-[15px] md:text-[18px] font-bold tracking-tight truncate">
             {t("title")}
           </h1>
           {totalUnread > 0 && (

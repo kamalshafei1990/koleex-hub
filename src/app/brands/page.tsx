@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Search, Pencil, Trash2, ImageIcon, X,
-  Loader2, Package, RefreshCw,
+  Loader2, Package, RefreshCw, Tag,
 } from "lucide-react";
 import {
   fetchBrandsWithDetails, renameBrand, deleteBrand,
@@ -110,18 +110,18 @@ function BrandModal({
 
   if (!open) return null;
 
-  const inp = "w-full h-11 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all";
+  const inp = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-[#141414] rounded-2xl border border-white/[0.08] shadow-2xl">
+      <div className="relative w-full max-w-[480px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-          <h2 className="text-[16px] font-semibold text-white">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+          <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">
             {brand ? "Edit Brand" : "New Brand"}
           </h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors">
+          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -138,7 +138,7 @@ function BrandModal({
           <div className="flex gap-5 items-start">
             {/* Logo */}
             <div className="shrink-0">
-              <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">Logo</label>
+              <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Logo</label>
               <input
                 ref={fileRef}
                 type="file"
@@ -147,7 +147,7 @@ function BrandModal({
                 onChange={(e) => handleLogoSelect(e.target.files)}
               />
               {logoPreview && !removeLogo ? (
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.04]">
+                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                   <img src={logoPreview} alt="" className="w-full h-full object-contain p-2" />
                   <button
                     type="button"
@@ -161,17 +161,17 @@ function BrandModal({
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-blue-500/30 bg-white/[0.02] flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
+                  className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/30 bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
                 >
-                  <ImageIcon className="h-5 w-5 text-white/20 group-hover:text-white/40 transition-colors" />
-                  <span className="text-[9px] text-white/20 group-hover:text-white/40">Upload</span>
+                  <ImageIcon className="h-5 w-5 text-[var(--text-muted)] group-hover:text-[var(--text-dim)] transition-colors" />
+                  <span className="text-[9px] text-[var(--text-muted)] group-hover:text-[var(--text-dim)]">Upload</span>
                 </button>
               )}
             </div>
 
             {/* Name */}
             <div className="flex-1">
-              <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">Brand Name *</label>
+              <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Brand Name *</label>
               <input
                 type="text"
                 value={name}
@@ -181,7 +181,7 @@ function BrandModal({
                 className={inp}
                 autoFocus
               />
-              <p className="text-[10px] text-white/20 mt-1.5">
+              <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
                 {brand
                   ? "Renaming will update all products using this brand."
                   : "Brand will appear in dropdowns once assigned to a product."}
@@ -190,7 +190,7 @@ function BrandModal({
           </div>
 
           {brand && (
-            <div className="flex items-center gap-2 text-[11px] text-white/30">
+            <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
               <Package className="h-3 w-3" />
               <span>Used by {brand.productCount} product{brand.productCount !== 1 ? "s" : ""}</span>
             </div>
@@ -198,14 +198,14 @@ function BrandModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/[0.06]">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-white/40 hover:text-white hover:bg-white/[0.04] transition-colors">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="h-10 px-6 rounded-xl bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
+            className="h-10 px-6 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Saving..." : brand ? "Save Changes" : "Create Brand"}
@@ -231,21 +231,21 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[400px] bg-[#141414] rounded-2xl border border-white/[0.08] shadow-2xl">
+      <div className="relative w-full max-w-[400px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="px-6 py-5">
-          <h2 className="text-[16px] font-semibold text-white mb-2">Delete Brand</h2>
-          <p className="text-[13px] text-white/50 leading-relaxed">
-            Are you sure you want to delete <span className="text-white font-medium">{brand.name}</span>?
+          <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-2">Delete Brand</h2>
+          <p className="text-[13px] text-[var(--text-dim)] leading-relaxed">
+            Are you sure you want to delete <span className="text-[var(--text-primary)] font-medium">{brand.name}</span>?
           </p>
           {brand.productCount > 0 && (
             <div className="mt-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[12px] text-amber-400">
               This brand is used by {brand.productCount} product{brand.productCount !== 1 ? "s" : ""}. The brand field will be cleared on those products.
             </div>
           )}
-          <p className="text-[12px] text-white/30 mt-3">The brand logo will also be removed.</p>
+          <p className="text-[12px] text-[var(--text-muted)] mt-3">The brand logo will also be removed.</p>
         </div>
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/[0.06]">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-white/40 hover:text-white hover:bg-white/[0.04] transition-colors">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
+          <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
             Cancel
           </button>
           <button
@@ -316,51 +316,54 @@ export default function BrandsPage() {
   const totalProducts = brands.reduce((sum, b) => sum + b.productCount, 0);
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-[1100px] mx-auto px-6 py-8">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="max-w-[1500px] mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/40 hover:text-white transition-colors">
+          <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-[28px] font-bold tracking-tight">Brands</h1>
+          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <Tag className="h-4 w-4" />
+          </div>
+          <h1 className="text-xl md:text-[22px] font-bold tracking-tight">Brands</h1>
         </div>
-        <p className="text-[13px] text-white/40 mb-6 ml-11">
+        <p className="text-[13px] text-[var(--text-dim)] mb-6 ml-0 md:ml-11">
           Manage product brands and their logos. Brands are shared across products.
         </p>
 
         {/* Stats row */}
         <div className="flex gap-4 mb-6">
-          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-            <span className="text-[18px] font-bold text-white">{brands.length}</span>
-            <span className="text-[11px] text-white/40">Brands</span>
+          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            <span className="text-[18px] font-bold text-[var(--text-primary)]">{brands.length}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">Brands</span>
           </div>
-          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-            <Package className="h-3.5 w-3.5 text-white/30" />
-            <span className="text-[18px] font-bold text-white">{totalProducts}</span>
-            <span className="text-[11px] text-white/40">Products</span>
+          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            <Package className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <span className="text-[18px] font-bold text-[var(--text-primary)]">{totalProducts}</span>
+            <span className="text-[11px] text-[var(--text-dim)]">Products</span>
           </div>
         </div>
 
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search brands..."
-              className="w-full h-9 pl-9 pr-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white placeholder:text-white/30 outline-none focus:border-blue-500/50 transition-colors"
+              className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-blue-500/50 transition-colors"
             />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={load} className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/40 hover:text-white transition-colors">
+            <button onClick={load} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleCreate}
-              className="h-9 px-4 rounded-lg bg-white text-black text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors"
+              className="h-9 px-4 rounded-lg bg-[var(--text-primary)] text-[var(--bg-primary)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" /> New Brand
             </button>
@@ -370,11 +373,11 @@ export default function BrandsPage() {
         {/* Brands Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-white/[0.06] rounded-xl">
-            <p className="text-[13px] text-white/30">
+          <div className="text-center py-20 border border-dashed border-[var(--border-subtle)] rounded-xl">
+            <p className="text-[13px] text-[var(--text-muted)]">
               {search ? "No brands match your search." : "No brands yet. Create your first brand or add one from the product form."}
             </p>
           </div>
@@ -383,14 +386,14 @@ export default function BrandsPage() {
             {filtered.map((brand) => (
               <div
                 key={brand.name}
-                className="group relative flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.12] transition-all"
+                className="group relative flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all"
               >
                 {/* Logo */}
-                <div className="shrink-0 w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center overflow-hidden">
+                <div className="shrink-0 w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
                   {brand.logoUrl ? (
                     <img src={brand.logoUrl} alt={brand.name} className="w-full h-full object-contain p-1.5" />
                   ) : (
-                    <span className="text-[16px] font-bold text-white/20">
+                    <span className="text-[16px] font-bold text-[var(--text-muted)]">
                       {brand.name.charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -398,10 +401,10 @@ export default function BrandsPage() {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[14px] font-semibold text-white truncate">{brand.name}</h3>
+                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)] truncate">{brand.name}</h3>
                   <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-[11px] text-white/30 font-mono">{brand.slug}</span>
-                    <span className="text-[11px] text-white/30 flex items-center gap-1">
+                    <span className="text-[11px] text-[var(--text-muted)] font-mono">{brand.slug}</span>
+                    <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1">
                       <Package className="h-3 w-3" /> {brand.productCount}
                     </span>
                   </div>
@@ -411,13 +414,13 @@ export default function BrandsPage() {
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleEdit(brand)}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.06] transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(brand)}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -429,19 +432,19 @@ export default function BrandsPage() {
 
         {/* Navigation links */}
         <div className="mt-8 flex gap-3">
-          <Link href="/divisions" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
+          <Link href="/divisions" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
             Divisions
           </Link>
-          <Link href="/categories" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
+          <Link href="/categories" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
             Categories
           </Link>
-          <Link href="/subcategories" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
+          <Link href="/subcategories" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
             Subcategories
           </Link>
-          <Link href="/brands" className="h-9 px-4 rounded-lg bg-white/[0.06] border border-white/[0.10] text-[12px] text-white/70 flex items-center gap-1.5 transition-colors">
+          <Link href="/brands" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)] text-[12px] text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
             Brands
           </Link>
-          <Link href="/products" className="h-9 px-4 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/70 flex items-center gap-1.5 transition-colors">
+          <Link href="/products" className="h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
             Products
           </Link>
         </div>

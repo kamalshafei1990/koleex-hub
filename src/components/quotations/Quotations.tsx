@@ -10,7 +10,6 @@ import {
   Printer,
   FileText,
   Download,
-  Home,
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════
@@ -652,25 +651,20 @@ export default function Quotations() {
         <style>{PRINT_AND_DOC_STYLES}</style>
 
         {/* Top bar */}
-        <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[var(--text-primary)] transition mb-4"
-          >
-            <Home size={16} />
-            Back to Home
-          </Link>
-
+        <div className="max-w-[1500px] mx-auto px-4 pt-6 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 flex items-center justify-center">
-                <ClipboardList size={22} className="text-emerald-400" />
+            <div className="flex flex-wrap items-center gap-3 mb-1">
+              <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <ClipboardList className="h-4 w-4" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
                   Quotations
                 </h1>
-                <p className="text-sm text-gray-500">
+                <p className="text-[12px] text-[var(--text-dim)]">
                   {quotations.length} quotation
                   {quotations.length !== 1 ? "s" : ""}
                 </p>
@@ -687,7 +681,7 @@ export default function Quotations() {
         </div>
 
         {/* List */}
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-[1500px] mx-auto px-4 py-6">
           {sortedQuotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
               <FileText size={48} className="mb-4 opacity-40" />

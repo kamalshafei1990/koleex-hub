@@ -183,16 +183,16 @@ export default function PriceCalculator() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ── Page Header ── */}
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex-1 flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
-            <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">Price Calculator</h1>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">

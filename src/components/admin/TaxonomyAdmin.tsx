@@ -183,53 +183,51 @@ export default function TaxonomyAdmin({
   const inp = "w-full h-10 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[14px] text-white placeholder:text-white/25 outline-none focus:border-white/20";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 md:mb-8">
-          <div className="flex items-center gap-3">
-            <Link
-              href={backHref}
-              className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/40 hover:text-white/80 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="text-xl md:text-[24px] font-bold text-white flex items-center gap-2">
-                <FolderTree className="h-5 w-5 md:h-6 md:w-6 text-white/40" />
-                {title}
-              </h1>
-              <p className="text-[12px] md:text-[13px] text-white/30">{items.length} {title.toLowerCase()} total</p>
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <Link
+            href={backHref}
+            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              <FolderTree className="h-4 w-4" />
             </div>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{title}</h1>
           </div>
           <button
             onClick={openCreate}
-            className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-white text-black text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
+            className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add {singular}</span>
             <span className="sm:hidden">Add</span>
           </button>
         </div>
+        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">{items.length} {title.toLowerCase()} total</p>
 
         {/* Search + filter */}
-        <div className="bg-[#141414] rounded-xl border border-white/[0.06] p-4 mb-6">
+        <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={`Search ${title.toLowerCase()}...`}
-                className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[13px] text-white placeholder:text-white/25 outline-none focus:border-white/20"
+                className="w-full h-10 pl-10 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
               />
             </div>
             {parentLabel && parentOptions && (
               <select
                 value={filterParent}
                 onChange={(e) => setFilterParent(e.target.value)}
-                className="h-10 px-3 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[13px] text-white/70 outline-none focus:border-white/20 min-w-[180px]"
+                className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)] min-w-[180px]"
               >
                 <option value="">All {parentLabel}s</option>
                 {parentOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

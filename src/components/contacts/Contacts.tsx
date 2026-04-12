@@ -1744,12 +1744,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
-        <div className="flex items-center justify-between mb-3">
-          <Link href="/" className="flex items-center gap-2 text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors text-sm">
+        <div className="flex items-center gap-2.5 mb-3">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeft size={16} className="rtl:rotate-180" />
-            <span className="hidden sm:inline">{t("hub")}</span>
           </Link>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">
+          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <Users size={16} />
+          </div>
+          <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : filterType === "employee" ? t("tab.employees") : t("tab.customers")) : t("title")}
           </h1>
           <button
@@ -1760,7 +1762,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 setShowTypeChooser(true);
               }
             }}
-            className="w-8 h-8 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:bg-[var(--bg-inverted-hover)] flex items-center justify-center transition-colors"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0"
           >
             <Plus size={16} />
           </button>
