@@ -166,9 +166,20 @@ export default function HomePage() {
     [recentIds, favoriteIds],
   );
 
-  const isSearchOrFilter = search.trim() !== "" || activeCategory !== "all";
+  const isSearching = search.trim() !== "";
+  const isFiltered = activeCategory !== "all";
+  const isSearchOrFilter = isSearching || isFiltered;
   const primaryCats = ALL_APPS_CATEGORIES.filter((c) => PRIMARY_CATS.includes(c.id));
   const secondaryCats = ALL_APPS_CATEGORIES.filter((c) => !PRIMARY_CATS.includes(c.id));
+
+  /* Group apps by category for the "All" view */
+  const groupedApps = useMemo(() => {
+    if (isSearchOrFilter) return [];
+    return ALL_APPS_CATEGORIES.map((cat) => ({
+      ...cat,
+      apps: APP_REGISTRY.filter((a) => getAppCategory(a.id) === cat.id),
+    })).filter((g) => g.apps.length > 0);
+  }, [isSearchOrFilter]);
 
   const dateLocale = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : "en-US";
   const today = new Date().toLocaleDateString(dateLocale, {
@@ -202,7 +213,7 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        className={`relative flex flex-col items-center justify-center gap-2.5 p-4 md:p-5 min-h-[100px] md:min-h-[110px] border rounded-2xl transition-all duration-200 select-none ${
+        className={`relative flex flex-col items-center justify-center gap-3 p-5 md:p-6 min-h-[110px] md:min-h-[120px] border rounded-2xl transition-all duration-200 select-none ${
           app.active
             ? isCurrentApp
               ? `cursor-pointer group ${
@@ -455,11 +466,36 @@ export default function HomePage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
-          {filteredApps.map((app) => (
-            <AppCard key={app.id} app={app} showStar />
-          ))}
-        </div>
+        {isSearchOrFilter ? (
+          /* Flat grid when searching or filtering by category */
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+            {filteredApps.map((app) => (
+              <AppCard key={app.id} app={app} showStar />
+            ))}
+          </div>
+        ) : (
+          /* Grouped by category when showing all */
+          <div className="space-y-7">
+            {groupedApps.map((group) => (
+              <div key={group.id}>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                    {t(group.tKey, group.label)}
+                  </span>
+                  <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                  <span className={`text-[10px] font-medium ${dk ? "text-white/15" : "text-black/15"}`}>
+                    {group.apps.filter((a) => a.active).length}/{group.apps.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                  {group.apps.map((app) => (
+                    <AppCard key={app.id} app={app} showStar />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* AI FAB */}
