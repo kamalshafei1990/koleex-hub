@@ -49,6 +49,7 @@ export const hubT: Translations = {
   "app.markets":         { en: "Markets",          zh: "市场",              ar: "الأسواق" },
   "app.finance":         { en: "Finance",          zh: "财务",              ar: "المالية" },
   "app.expenses":        { en: "Expenses",         zh: "费用",              ar: "المصروفات" },
+  "app.management":      { en: "Management",       zh: "管理架构",           ar: "الهيكل الإداري" },
   "app.employees":       { en: "Employees",        zh: "员工",              ar: "الموظفين" },
   "app.recruitment":     { en: "Recruitment",      zh: "招聘",              ar: "التوظيف" },
   "app.appraisals":      { en: "Appraisals",       zh: "绩效评估",          ar: "التقييمات" },

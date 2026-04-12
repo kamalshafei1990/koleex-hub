@@ -17,7 +17,7 @@ import {
   Users, Truck, Contact, Globe, CreditCard, Briefcase, UserSearch,
   Star, Clock, CalendarCheck, MessageSquare, Calendar, CheckSquare,
   Megaphone, Monitor, Bell, Kanban, FolderKanban, BookOpen, Library, Database,
-  Sparkles, Settings, Shield, Inbox, PanelTop, Tag,
+  Sparkles, Settings, Shield, Inbox, PanelTop, Tag, Network,
   type LucideIcon,
 } from "lucide-react";
 
@@ -84,6 +84,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "expenses",         tKey: "app.expenses",         name: "Expenses",          icon: Briefcase,     route: "/expenses",         active: false },
 
   /* ── People ── */
+  { id: "management",       tKey: "app.management",       name: "Management",        icon: Network,       route: "/management",       active: true  },
   { id: "employees",        tKey: "app.employees",        name: "Employees",         icon: Users,         route: "/employees",        active: true  },
   { id: "recruitment",      tKey: "app.recruitment",      name: "Recruitment",       icon: UserSearch,    route: "/recruitment",      active: false },
   { id: "appraisals",       tKey: "app.appraisals",       name: "Appraisals",        icon: Star,          route: "/appraisals",       active: false },
@@ -153,7 +154,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.people",
     label: "People",
     icon: Users,
-    appIds: ["employees", "recruitment", "appraisals", "appointments", "attendance"],
+    appIds: ["management", "employees", "recruitment", "appraisals", "appointments", "attendance"],
   },
   {
     id: "communication",

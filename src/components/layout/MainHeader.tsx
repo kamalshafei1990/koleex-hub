@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Home, ChevronDown, Menu } from "lucide-react";
+import { Sun, Moon, ChevronDown, Menu } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import UserMenu from "./UserMenu";
@@ -16,6 +16,7 @@ const routeKeys: Record<string, string> = {
   "/contacts": "app.contacts",
   "/customers": "app.customers",
   "/suppliers": "app.suppliers",
+  "/management": "app.management",
   "/employees": "app.employees",
   "/products": "app.products",
   "/products/new": "app.products",
@@ -84,7 +85,7 @@ export default function MainHeader() {
 
   const dk = theme === "dark";
   const isHome = pathname === "/";
-  const { toggle, setMobileOpen, mobileOpen } = useSidebar();
+  const { mobileOpen, setMobileOpen } = useSidebar();
 
   /* Find current app name from route */
   const routeKey = !isHome
@@ -101,32 +102,23 @@ export default function MainHeader() {
   return (
     <header
       dir="ltr"
-      className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 backdrop-blur-xl border-b transition-colors duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
-          ? "border-white/[0.08] bg-black/80"
-          : "border-black/[0.08] bg-white/95"
+          ? "border-white/[0.08] bg-black"
+          : "border-black/[0.08] bg-white"
       }`}
     >
-      {/* Left: Sidebar toggle + Home + Logo + Breadcrumb */}
+      {/* Left: Hamburger (mobile) + Logo + Breadcrumb */}
       <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
-        {/* Sidebar toggle: hamburger on mobile, collapse/expand on desktop */}
+        {/* Mobile hamburger — opens sidebar drawer */}
         <button
-          onClick={() => {
-            /* Mobile: toggle drawer. Desktop: collapse/expand. */
-            if (window.innerWidth < 768) setMobileOpen(!mobileOpen);
-            else toggle();
-          }}
+          onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle navigation"
-          className={btnCls}
+          className={`md:hidden ${btnCls}`}
         >
-          <Menu size={16} className="md:w-4 md:h-4" />
+          <Menu size={16} />
         </button>
 
-        {!isHome && (
-          <Link href="/" aria-label="Home" className={btnCls}>
-            <Home size={16} className="md:w-4 md:h-4" />
-          </Link>
-        )}
         <Link
           href="/"
           aria-label="Koleex Hub"
