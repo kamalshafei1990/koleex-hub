@@ -811,10 +811,11 @@ export default function TodoPage() {
   const hasActiveFilters = labelFilter || deptFilter || assigneeFilter;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
+    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden"
+      style={{ height: "calc(100dvh - 3.5rem)" }}>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-14 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
+      {/* ── FIXED HEADER (never scrolls) ── */}
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
 
           {/* Title row */}
@@ -929,8 +930,9 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* ── CONTENT ── */}
-      <div className="flex-1 max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full">
+      {/* ── SCROLLABLE CONTENT ── */}
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full">
 
         {/* KPI Dashboard */}
         {!loading && todos.length > 0 && <div className="mb-5"><KpiDashboard todos={todos} /></div>}
@@ -1019,6 +1021,7 @@ export default function TodoPage() {
             )}
           </div>
         )}
+      </div>
       </div>
 
       {/* Modals */}
