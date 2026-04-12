@@ -22,6 +22,7 @@
        user can see activities + form side-by-side without a route
    --------------------------------------------------------------------------- */
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -380,35 +381,63 @@ export default function CRM() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4 pb-6">
-        {/* ─ Row 1: top nav (Odoo-style — CRM brand + plain text tabs) ─ */}
-        <div className="mb-3 flex items-center gap-5 overflow-x-auto -mx-1 px-1">
-          <span className="inline-flex items-center gap-1.5 text-[15px] font-bold text-[var(--text-primary)] shrink-0">
-            <span className="inline-block h-4 w-4 rounded-[5px] bg-gradient-to-br from-emerald-400 to-cyan-500" />
-            {t("title")}
-          </span>
-          {(
-            [
-              { id: "pipeline", label: t("nav.sales") },
-              { id: "reporting", label: t("nav.reporting") },
-              { id: "configuration", label: t("nav.configuration") },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setMainView(tab.id)}
-              className={`text-[13px] font-semibold transition-colors shrink-0 pb-0.5 border-b-2 ${
-                mainView === tab.id
-                  ? "text-[var(--text-primary)] border-[var(--accent-primary,#22d3a7)]"
-                  : "text-[var(--text-dim)] border-transparent hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* ── Page header — same pattern as Markets / Landed Cost ── */}
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <Link
+            href="/"
+            className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+              {t("title")}
+            </h1>
+          </div>
         </div>
+        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
+          {t("subtitle")}
+        </p>
+      </div>
 
+      {/* ── Sticky tab nav — Sales / Reporting / Configuration ── */}
+      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
+            {(
+              [
+                { id: "pipeline",      label: t("nav.sales"),         icon: LayoutGrid },
+                { id: "reporting",     label: t("nav.reporting"),     icon: ChartPie },
+                { id: "configuration", label: t("nav.configuration"), icon: Settings },
+              ] as const
+            ).map((tab) => {
+              const TabIcon = tab.icon;
+              const isActive = mainView === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMainView(tab.id)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-medium whitespace-nowrap transition-all shrink-0 ${
+                    isActive
+                      ? "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
+                  }`}
+                >
+                  <TabIcon className="h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4 pb-6">
         {/* ─ Reporting page ─ */}
         {mainView === "reporting" && (
           <ReportingPage
@@ -436,37 +465,33 @@ export default function CRM() {
         {mainView === "pipeline" && (
           <>
 
-        {/* ─ Action bar — Odoo-style: New | Generate Leads | Pipeline ⚙ ......
-              [search] ...... [view icons]                                ─ */}
+        {/* ─ Action bar — New | Generate Leads | search | filters | view icons ─ */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setEditingId("new")}
-            className="inline-flex items-center gap-1 h-9 px-3.5 rounded-lg bg-[var(--accent-primary,#22d3a7)] text-[#0a0a0a] text-[12.5px] font-bold hover:opacity-90 transition-all"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-all shadow-sm"
           >
+            <Plus className="h-3.5 w-3.5" />
             {t("new")}
           </button>
           <button
             type="button"
             onClick={() => setShowGenerateLeads(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-hover)] transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5" />
             {t("generateLeads")}
           </button>
-          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text-dim)] ml-1">
-            {t("nav.pipeline")}
-            <Settings className="h-3.5 w-3.5" />
-          </span>
 
-          {/* Search bar — chip + input + filter dropdown */}
-          <div className="flex items-center gap-1.5 flex-1 min-w-[240px] max-w-[480px] mx-auto h-9 px-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-            <Search className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+          {/* Search bar — Hub-style: bg-secondary, rounded-xl */}
+          <div className="flex items-center gap-2 flex-1 min-w-[240px] max-w-[520px] mx-auto h-9 px-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-white/5 transition-all">
+            <Search className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
             {myOnly && (
               <button
                 type="button"
                 onClick={() => setMyOnly(false)}
-                className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--accent-primary,#22d3a7)]/15 text-[var(--accent-primary,#22d3a7)] text-[11px] font-semibold shrink-0"
+                className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--bg-surface-active)] text-[var(--text-primary)] text-[11px] font-semibold shrink-0"
               >
                 <Filter className="h-2.5 w-2.5" />
                 {t("myPipeline")}
@@ -478,15 +503,15 @@ export default function CRM() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("search")}
-              className="flex-1 min-w-0 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none"
+              className="flex-1 min-w-0 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none"
             />
             <button
               type="button"
               onClick={() => setShowFilters((v) => !v)}
-              className={`p-1 rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors ${
+              className={`p-1 rounded-md transition-colors ${
                 showFilters || filterStageId || filterPriority
                   ? "text-[var(--text-primary)]"
-                  : ""
+                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               }`}
               title={t("filters")}
             >
@@ -500,15 +525,15 @@ export default function CRM() {
               type="button"
               onClick={() => setMyOnly(true)}
               disabled={!accountId}
-              className="hidden md:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50"
+              className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] disabled:opacity-50 transition-colors"
             >
               <UserIcon className="h-3.5 w-3.5" />
               {t("myPipeline")}
             </button>
           )}
 
-          {/* View switcher — 7 icon-only modes, mirrors Odoo CRM. */}
-          <div className="ml-auto inline-flex items-center h-9 rounded-lg border border-[var(--border-subtle)] overflow-hidden">
+          {/* View switcher — 7 icon modes (kept compact, Hub-styled) */}
+          <div className="ml-auto inline-flex items-center h-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
             {(
               [
                 { id: "pipeline", label: t("view.pipeline"), icon: LayoutGrid },
@@ -524,10 +549,10 @@ export default function CRM() {
                 key={m.id}
                 type="button"
                 onClick={() => setViewMode(m.id)}
-                className={`h-9 w-9 inline-flex items-center justify-center transition-colors shrink-0 border-l border-[var(--border-subtle)] first:border-l-0 ${
+                className={`h-9 w-9 inline-flex items-center justify-center transition-colors shrink-0 ${
                   viewMode === m.id
-                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+                    ? "bg-[var(--bg-inverted)]/[0.08] text-[var(--text-primary)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.04]"
                 }`}
                 title={m.label}
               >
@@ -1052,8 +1077,8 @@ function PipelineColumn({
             <div
               className={`h-full rounded-full transition-all ${
                 col.isWon
-                  ? "bg-emerald-500"
-                  : "bg-[var(--accent-primary,#22d3a7)]"
+                  ? "bg-emerald-400"
+                  : "bg-[var(--text-primary)]/60"
               }`}
               style={{ width: `${fillPct}%` }}
             />
