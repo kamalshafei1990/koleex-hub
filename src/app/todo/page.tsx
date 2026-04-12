@@ -814,7 +814,7 @@ export default function TodoPage() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
 
       {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
+      <div className="sticky top-14 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-subtle)]">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
 
           {/* Title row */}
