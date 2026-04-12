@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import {
   Building2,
   Check,
@@ -62,6 +63,7 @@ export function CustomerChatModal({
   onCancel,
   t,
 }: CustomerChatModalProps) {
+  useScrollLock();
   const [query, setQuery] = useState("");
   const [contacts, setContacts] = useState<DiscussLinkedContact[]>([]);
   const [selected, setSelected] = useState<DiscussLinkedContact | null>(null);

@@ -25,6 +25,7 @@
      · External customer chat, shared team inbox
    --------------------------------------------------------------------------- */
 
+import { useScrollLock } from "@/hooks/useScrollLock";
 import {
   useCallback,
   useEffect,
@@ -3301,6 +3302,7 @@ function ModalShell({
   children: React.ReactNode;
   width?: number;
 }) {
+  useScrollLock();
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
       <div

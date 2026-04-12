@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import {
   ArrowLeft, Plus, Search, X, Trash2, Edit3, Save, Phone, Mail,
   MapPin, Globe, Calendar, Users, Building2, User, Crown, ChevronDown,
@@ -3304,7 +3305,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Delete confirm */}
         {deleteConfirm === c.id && (
-          <div className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
+          <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4">
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full">
               <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t("delete.title")}</h3>
               <p className="text-sm text-[var(--text-subtle)] mb-6">
@@ -3319,7 +3320,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </button>
               </div>
             </div>
-          </div>
+          </ScrollLockOverlay>
         )}
       </div>
     );
@@ -4914,7 +4915,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      ═════════════════════════════════════════════════════════════════════════ */
 
   const renderTypeChooser = () => (
-    <div className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
+    <ScrollLockOverlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)] flex items-center justify-center p-4" onClick={() => { setShowTypeChooser(false); setTypeChooserStep(1); }}>
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
         {typeChooserStep === 1 ? (
           <>
@@ -4976,7 +4977,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </>
         )}
       </div>
-    </div>
+    </ScrollLockOverlay>
   );
 
   /* ═════════════════════════════════════════════════════════════════════════

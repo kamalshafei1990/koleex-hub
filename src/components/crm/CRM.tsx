@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import {
   useCallback,
   useEffect,
@@ -1714,6 +1715,7 @@ function OpportunityModal({
   onSaved,
   t,
 }: OpportunityModalProps) {
+  useScrollLock();
   const isNew = !opportunity;
   const wonStage = stages.find((s) => s.is_won);
 
@@ -3387,6 +3389,7 @@ function GenerateLeadsModal({
   }) => Promise<{ ok: true; created: number } | { ok: false; error: string }>;
   t: (key: string) => string;
 }) {
+  useScrollLock();
   const [count, setCount] = useState(5);
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
   const [source, setSource] = useState("Sample data");
@@ -3538,6 +3541,7 @@ function StageEditModal({
   onSaved: () => void;
   t: (key: string) => string;
 }) {
+  useScrollLock();
   const isNew = !stage;
   const [name, setName] = useState(stage?.name ?? "");
   const [sequence, setSequence] = useState(

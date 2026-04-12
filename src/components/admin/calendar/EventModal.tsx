@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { X, Trash2, Save, CalendarPlus } from "lucide-react";
 import type {
   CalendarEventRow,
@@ -64,6 +65,7 @@ export default function EventModal({
   onDelete,
   onError,
 }: Props) {
+  useScrollLock();
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);

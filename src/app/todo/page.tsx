@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import {
   ArrowLeft, Plus, Search, X, Loader2, CheckSquare, Square, Trash2,
   Pencil, Calendar, Flag, Tag, ChevronDown, Circle, CheckCircle2,
@@ -47,7 +48,7 @@ function DeleteModal({
 }: { open: boolean; deleting: boolean; onConfirm: () => void; onClose: () => void }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] p-6 space-y-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)]">Delete Task</h3>
         <p className="text-sm text-[var(--text-muted)]">This action cannot be undone.</p>
@@ -63,7 +64,7 @@ function DeleteModal({
           </button>
         </div>
       </div>
-    </div>
+    </ScrollLockOverlay>
   );
 }
 
@@ -143,7 +144,7 @@ function TaskModal({
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
@@ -241,7 +242,7 @@ function TaskModal({
           </button>
         </div>
       </div>
-    </div>
+    </ScrollLockOverlay>
   );
 }
 

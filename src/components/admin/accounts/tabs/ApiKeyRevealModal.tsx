@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { X, Copy, Check, AlertTriangle, KeyRound } from "lucide-react";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface Props {
   token: string;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
+  useScrollLock();
   const [copied, setCopied] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
