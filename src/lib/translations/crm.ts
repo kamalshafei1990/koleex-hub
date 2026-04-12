@@ -6,9 +6,11 @@ export const crmT: Translations = {
   "subtitle":      { en: "Pipeline of opportunities and deals", zh: "商机与交易管道", ar: "خط أنابيب الفرص والصفقات" },
 
   /* ── Top sub-nav ── */
+  "nav.sales":         { en: "Sales",          zh: "销售",         ar: "المبيعات" },
   "nav.pipeline":      { en: "Pipeline",       zh: "管道",         ar: "خط الأنابيب" },
   "nav.reporting":     { en: "Reporting",      zh: "报告",         ar: "التقارير" },
   "nav.configuration": { en: "Configuration",  zh: "配置",         ar: "الإعدادات" },
+  "new":               { en: "New",            zh: "新建",         ar: "جديد" },
 
   /* ── View switcher ── */
   "view.pipeline": { en: "Kanban",         zh: "看板",            ar: "كانبان" },

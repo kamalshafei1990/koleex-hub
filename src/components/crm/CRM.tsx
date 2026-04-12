@@ -34,7 +34,6 @@ import {
   Activity,
   Archive,
   ArrowLeft,
-  BarChart3,
   Calendar as CalendarIcon,
   ChartPie,
   Check,
@@ -82,7 +81,6 @@ import {
   markOpportunityLost,
   moveOpportunityToStage,
   reopenActivity,
-  summarizePipeline,
   updateOpportunity,
   updateStage,
   type ActivityFeedRow,
@@ -244,11 +242,6 @@ export default function CRM() {
     });
   }, [opps, myOnly, accountId, filterStageId, filterPriority, search]);
 
-  const summary = useMemo(
-    () => summarizePipeline(filteredOpps),
-    [filteredOpps],
-  );
-
   /* Group by stage for the kanban. We always render every stage, even
      empty ones, so columns don't disappear when filters narrow the
      dataset (matches Odoo behavior). */
@@ -387,67 +380,30 @@ export default function CRM() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-        {/* ─ Header strip ─ */}
-        <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
-          <div>
-            <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] tracking-tight">
-              {mainView === "reporting"
-                ? t("rep.title")
-                : mainView === "configuration"
-                  ? t("cfg.title")
-                  : t("title")}
-            </h1>
-            <p className="text-[12.5px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
-              {mainView === "reporting"
-                ? t("rep.subtitle")
-                : mainView === "configuration"
-                  ? t("cfg.subtitle")
-                  : t("subtitle")}
-            </p>
-          </div>
-          {mainView === "pipeline" && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowGenerateLeads(true)}
-                className="inline-flex items-center gap-1.5 h-10 px-3 md:px-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t("generateLeads")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingId("new")}
-                className="inline-flex items-center gap-2 h-10 px-4 md:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
-              >
-                <Plus className="h-4 w-4" />
-                {t("newOppLong")}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* ─ Top sub-nav (Pipeline / Reporting / Configuration) ─ */}
-        <div className="mb-5 flex items-center gap-1 overflow-x-auto -mx-1 px-1">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-4 pb-6">
+        {/* ─ Row 1: top nav (Odoo-style — CRM brand + plain text tabs) ─ */}
+        <div className="mb-3 flex items-center gap-5 overflow-x-auto -mx-1 px-1">
+          <span className="inline-flex items-center gap-1.5 text-[15px] font-bold text-[var(--text-primary)] shrink-0">
+            <span className="inline-block h-4 w-4 rounded-[5px] bg-gradient-to-br from-emerald-400 to-cyan-500" />
+            {t("title")}
+          </span>
           {(
             [
-              { id: "pipeline", label: t("nav.pipeline"), icon: LayoutGrid },
-              { id: "reporting", label: t("nav.reporting"), icon: BarChart3 },
-              { id: "configuration", label: t("nav.configuration"), icon: Settings },
+              { id: "pipeline", label: t("nav.sales") },
+              { id: "reporting", label: t("nav.reporting") },
+              { id: "configuration", label: t("nav.configuration") },
             ] as const
           ).map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setMainView(tab.id)}
-              className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-[12.5px] font-semibold transition-colors shrink-0 ${
+              className={`text-[13px] font-semibold transition-colors shrink-0 pb-0.5 border-b-2 ${
                 mainView === tab.id
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+                  ? "text-[var(--text-primary)] border-[var(--accent-primary,#22d3a7)]"
+                  : "text-[var(--text-dim)] border-transparent hover:text-[var(--text-primary)]"
               }`}
             >
-              <tab.icon className="h-3.5 w-3.5" />
               {tab.label}
             </button>
           ))}
@@ -480,58 +436,79 @@ export default function CRM() {
         {mainView === "pipeline" && (
           <>
 
-        {/* ─ Summary strip ─ */}
-        <SummaryStrip summary={summary} t={t} />
+        {/* ─ Action bar — Odoo-style: New | Generate Leads | Pipeline ⚙ ......
+              [search] ...... [view icons]                                ─ */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditingId("new")}
+            className="inline-flex items-center gap-1 h-9 px-3.5 rounded-lg bg-[var(--accent-primary,#22d3a7)] text-[#0a0a0a] text-[12.5px] font-bold hover:opacity-90 transition-all"
+          >
+            {t("new")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowGenerateLeads(true)}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {t("generateLeads")}
+          </button>
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--text-dim)] ml-1">
+            {t("nav.pipeline")}
+            <Settings className="h-3.5 w-3.5" />
+          </span>
 
-        {/* ─ Toolbar ─ */}
-        <div className="mt-5 mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[220px] max-w-[420px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-ghost)] pointer-events-none" />
+          {/* Search bar — chip + input + filter dropdown */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-[240px] max-w-[480px] mx-auto h-9 px-2.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+            <Search className="h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0" />
+            {myOnly && (
+              <button
+                type="button"
+                onClick={() => setMyOnly(false)}
+                className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--accent-primary,#22d3a7)]/15 text-[var(--accent-primary,#22d3a7)] text-[11px] font-semibold shrink-0"
+              >
+                <Filter className="h-2.5 w-2.5" />
+                {t("myPipeline")}
+                <X className="h-3 w-3 ml-0.5" />
+              </button>
+            )}
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("search")}
-              className="w-full h-10 pl-9 pr-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors"
+              className="flex-1 min-w-0 bg-transparent text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none"
             />
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              className={`p-1 rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors ${
+                showFilters || filterStageId || filterPriority
+                  ? "text-[var(--text-primary)]"
+                  : ""
+              }`}
+              title={t("filters")}
+            >
+              <Filter className="h-3.5 w-3.5" />
+            </button>
           </div>
 
-          {/* My pipeline toggle */}
-          <button
-            type="button"
-            onClick={() => setMyOnly((v) => !v)}
-            disabled={!accountId}
-            className={`inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border text-[12.5px] font-semibold transition-colors disabled:opacity-50 ${
-              myOnly
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                : "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
-            }`}
-          >
-            <UserIcon className="h-3.5 w-3.5" />
-            {myOnly ? t("myPipeline") : t("allPipeline")}
-          </button>
+          {/* My pipeline shortcut — only visible when not already filtering */}
+          {!myOnly && (
+            <button
+              type="button"
+              onClick={() => setMyOnly(true)}
+              disabled={!accountId}
+              className="hidden md:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            >
+              <UserIcon className="h-3.5 w-3.5" />
+              {t("myPipeline")}
+            </button>
+          )}
 
-          {/* Filter toggle */}
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className={`inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border text-[12.5px] font-semibold transition-colors ${
-              showFilters || filterStageId || filterPriority
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
-                : "bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
-            }`}
-          >
-            <Filter className="h-3.5 w-3.5" />
-            {t("filters")}
-            {(filterStageId || filterPriority) && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-white/20 text-[10px] font-bold">
-                {[filterStageId, filterPriority].filter(Boolean).length}
-              </span>
-            )}
-          </button>
-
-          {/* View switcher — 7 modes, mirrors Odoo CRM. */}
-          <div className="ml-auto inline-flex items-center h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-1 gap-0.5 overflow-x-auto max-w-full">
+          {/* View switcher — 7 icon-only modes, mirrors Odoo CRM. */}
+          <div className="ml-auto inline-flex items-center h-9 rounded-lg border border-[var(--border-subtle)] overflow-hidden">
             {(
               [
                 { id: "pipeline", label: t("view.pipeline"), icon: LayoutGrid },
@@ -547,15 +524,14 @@ export default function CRM() {
                 key={m.id}
                 type="button"
                 onClick={() => setViewMode(m.id)}
-                className={`h-8 px-2.5 rounded-lg text-[11.5px] font-semibold inline-flex items-center gap-1.5 transition-colors shrink-0 ${
+                className={`h-9 w-9 inline-flex items-center justify-center transition-colors shrink-0 border-l border-[var(--border-subtle)] first:border-l-0 ${
                   viewMode === m.id
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
                 }`}
                 title={m.label}
               >
                 <m.icon className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">{m.label}</span>
               </button>
             ))}
           </div>
@@ -713,98 +689,6 @@ export default function CRM() {
           t={t}
         />
       )}
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════
-   Summary strip
-   ════════════════════════════════════════════════════════════════════════ */
-
-function SummaryStrip({
-  summary,
-  t,
-}: {
-  summary: ReturnType<typeof summarizePipeline>;
-  t: (key: string) => string;
-}) {
-  const cards = [
-    {
-      label: t("summary.active"),
-      value: String(summary.totalActive),
-      icon: <TrendingUp className="h-4 w-4" />,
-      tone: "default" as const,
-    },
-    {
-      label: t("summary.weighted"),
-      value: formatCurrency(summary.weightedForecast),
-      icon: <Activity className="h-4 w-4" />,
-      tone: "default" as const,
-    },
-    {
-      label: t("summary.pipeline"),
-      value: formatCurrency(summary.totalRevenue),
-      icon: <LayoutGrid className="h-4 w-4" />,
-      tone: "default" as const,
-    },
-    {
-      label: t("summary.wonMonth"),
-      value: formatCurrency(summary.wonThisMonthValue),
-      sub: `${summary.wonThisMonthCount} deals`,
-      icon: <CheckCircle2 className="h-4 w-4" />,
-      tone: "won" as const,
-    },
-    {
-      label: t("summary.lostMonth"),
-      value: String(summary.lostThisMonthCount),
-      icon: <XCircle className="h-4 w-4" />,
-      tone: "lost" as const,
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className={`p-4 rounded-2xl border ${
-            c.tone === "won"
-              ? "bg-emerald-500/[0.06] border-emerald-500/20"
-              : c.tone === "lost"
-                ? "bg-red-500/[0.05] border-red-500/15"
-                : "bg-[var(--bg-secondary)] border-[var(--border-subtle)]"
-          }`}
-        >
-          <div
-            className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
-              c.tone === "won"
-                ? "text-emerald-500"
-                : c.tone === "lost"
-                  ? "text-red-500"
-                  : "text-[var(--text-dim)]"
-            }`}
-          >
-            {c.icon}
-            {c.label}
-          </div>
-          <div
-            className={`text-[20px] md:text-[22px] font-bold leading-tight ${
-              c.tone === "won"
-                ? "text-emerald-500"
-                : c.tone === "lost"
-                  ? "text-red-500"
-                  : "text-[var(--text-primary)]"
-            }`}
-          >
-            {c.value}
-          </div>
-          {c.sub && (
-            <div className="text-[10.5px] text-[var(--text-ghost)] mt-0.5">
-              {c.sub}
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
