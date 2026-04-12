@@ -5,19 +5,23 @@
    the Koleex Hub. Two tabs:
 
      · Sign In         → username + password against the `accounts` table
-     · Be a Member     → request-to-join form, same visual language as the
-                         admin AccountForm, so someone without an account can
-                         ask to be invited
+     · Be a Member     → request-to-join form. Collects enough context that
+                         a Super Admin can triage the request from their
+                         inbox without a follow-up email.
 
    Sign-in persistence lives in localStorage (`koleex-admin` + the username)
    so the session survives tabs, reloads, and browser restarts. The gate
    only re-prompts after an explicit Sign Out (handled by UserMenu which
    clears the same keys plus the current-account id).
 
-   The legacy password check uses the same `tmp$<base64>` tag format that
-   createAccount / resetAccountPassword write, via verifyAccountLogin. Not
-   cryptographically secure — it's a bridge until Supabase Auth is flipped
-   on; see verifyAccountLogin for the security note.
+   Membership requests POST to `membership_requests` via createMembershipRequest.
+   Extra fields (phone, relationship, country, city, job title, heard_from)
+   ride along inside the row's `metadata` JSONB blob so we can grow the
+   form without column migrations. A DB trigger fans out an inbox
+   notification to every active Super Admin on insert, and our trigger
+   update in supabase/migrations/update_trigger_merge_metadata.sql merges
+   the row metadata into the notification metadata so reviewers see every
+   field in the inbox detail pane.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
@@ -31,10 +35,17 @@ import {
   User as UserIcon,
   Building2,
   MessageSquare,
+  Phone,
+  MapPin,
+  Briefcase,
+  Globe,
+  Link2,
 } from "lucide-react";
 import { verifyAccountLogin } from "@/lib/accounts-admin";
+import { createMembershipRequest } from "@/lib/inbox";
 import { setCurrentAccountId } from "@/lib/identity";
 import KoleexLogo from "@/components/layout/KoleexLogo";
+import { COUNTRIES } from "@/types/product-form";
 
 /* localStorage keys. Using localStorage (not sessionStorage) so the session
    survives browser restarts — the user only has to sign in again after an
@@ -42,9 +53,11 @@ import KoleexLogo from "@/components/layout/KoleexLogo";
 export const LEGACY_SESSION_KEY = "koleex-admin";
 export const LEGACY_SESSION_USER_KEY = "koleex-admin-user";
 
-/* Stub storage for membership requests until we pick a backend (Supabase
-   table, webhook, email, etc.). Using localStorage means a visitor won't
-   accidentally submit twice and the UI can still render a success state. */
+/* Fallback storage for membership requests. The primary path is the
+   Supabase `membership_requests` table (which fires a trigger to notify
+   every Super Admin). If that insert fails — usually because the
+   migration hasn't been applied yet — we stash here so the visitor still
+   sees a success state and the admin can recover the request later. */
 const MEMBERSHIP_REQUEST_KEY = "koleex-membership-requests";
 
 interface Props {
@@ -55,10 +68,33 @@ interface Props {
 
 type Tab = "signin" | "join";
 
+/* Relationship-to-Koleex options. The value is what we store; the label
+   is what the visitor sees. Kept as a tuple so we can reuse it in the
+   detail pane later. */
+const RELATIONSHIPS: Array<{ value: string; label: string }> = [
+  { value: "new_prospect", label: "New to Koleex" },
+  { value: "existing_customer", label: "Existing Customer" },
+  { value: "supplier", label: "Supplier" },
+  { value: "partner", label: "Partner" },
+  { value: "other", label: "Other" },
+];
+
+const HEARD_FROM_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Select an option" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "google", label: "Google Search" },
+  { value: "referral", label: "Referral from a colleague" },
+  { value: "event", label: "Event / Conference" },
+  { value: "website", label: "Koleex website" },
+  { value: "other", label: "Other" },
+];
+
 /* ── Shared input / label styling. Hard-coded colors (not CSS variables) so
    the form renders correctly even before the app's theme CSS has loaded. ── */
 const inputBase =
   "w-full h-11 px-3.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-colors";
+const selectBase =
+  "w-full h-11 px-3 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white outline-none focus:border-white/30 transition-colors appearance-none cursor-pointer";
 const textareaBase =
   "w-full min-h-[86px] px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-white placeholder:text-white/30 outline-none focus:border-white/30 transition-colors resize-none";
 const labelBase =
@@ -79,7 +115,13 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   /* Membership request form state */
   const [joinName, setJoinName] = useState("");
   const [joinEmail, setJoinEmail] = useState("");
+  const [joinPhone, setJoinPhone] = useState("");
+  const [joinRelationship, setJoinRelationship] = useState<string>("new_prospect");
   const [joinCompany, setJoinCompany] = useState("");
+  const [joinJobTitle, setJoinJobTitle] = useState("");
+  const [joinCountry, setJoinCountry] = useState("");
+  const [joinCity, setJoinCity] = useState("");
+  const [joinHeardFrom, setJoinHeardFrom] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -131,6 +173,20 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setAuthed(true);
   }
 
+  function resetJoinForm() {
+    setJoinDone(false);
+    setJoinName("");
+    setJoinEmail("");
+    setJoinPhone("");
+    setJoinRelationship("new_prospect");
+    setJoinCompany("");
+    setJoinJobTitle("");
+    setJoinCountry("");
+    setJoinCity("");
+    setJoinHeardFrom("");
+    setJoinMessage("");
+  }
+
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     setJoinError(null);
@@ -146,28 +202,62 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
       return;
     }
 
+    /* Look up the human-readable country name so admins don't have to
+       decode country codes in the inbox. */
+    const countryRow = COUNTRIES.find((c) => c.code === joinCountry);
+
     setJoinBusy(true);
-    try {
-      /* Stash locally until we wire a real backend. The schema mirrors
-         what we'd save to a `membership_requests` table: name, email,
-         company, message, created_at. */
-      const raw = window.localStorage.getItem(MEMBERSHIP_REQUEST_KEY);
-      const existing = raw ? (JSON.parse(raw) as unknown[]) : [];
-      existing.push({
-        full_name: name,
-        email,
-        company: joinCompany.trim() || null,
-        message: joinMessage.trim() || null,
-        created_at: new Date().toISOString(),
-      });
-      window.localStorage.setItem(
-        MEMBERSHIP_REQUEST_KEY,
-        JSON.stringify(existing),
-      );
-    } catch {
-      /* Even if localStorage blows up, still show the success state —
-         the visitor filled out a form and we don't want them stuck. */
+
+    /* Primary path: insert into `membership_requests`. The DB trigger
+       fans out a notification to every active Super Admin. */
+    const result = await createMembershipRequest({
+      full_name: name,
+      email,
+      company: joinCompany.trim() || null,
+      message: joinMessage.trim() || null,
+      source: "login_gate",
+      extras: {
+        phone: joinPhone.trim() || null,
+        relationship: joinRelationship || null,
+        job_title: joinJobTitle.trim() || null,
+        country: joinCountry || null,
+        country_name: countryRow?.name ?? null,
+        city: joinCity.trim() || null,
+        heard_from: joinHeardFrom || null,
+      },
+    });
+
+    if (!result.ok) {
+      /* Fallback stash so the visitor isn't blocked before the
+         migration is applied. */
+      try {
+        const raw = window.localStorage.getItem(MEMBERSHIP_REQUEST_KEY);
+        const existing = raw ? (JSON.parse(raw) as unknown[]) : [];
+        existing.push({
+          full_name: name,
+          email,
+          phone: joinPhone.trim() || null,
+          relationship: joinRelationship || null,
+          company: joinCompany.trim() || null,
+          job_title: joinJobTitle.trim() || null,
+          country: joinCountry || null,
+          country_name: countryRow?.name ?? null,
+          city: joinCity.trim() || null,
+          heard_from: joinHeardFrom || null,
+          message: joinMessage.trim() || null,
+          created_at: new Date().toISOString(),
+          error: result.error,
+        });
+        window.localStorage.setItem(
+          MEMBERSHIP_REQUEST_KEY,
+          JSON.stringify(existing),
+        );
+      } catch {
+        /* Even if localStorage blows up, still show the success state —
+           the visitor filled out a form and we don't want them stuck. */
+      }
     }
+
     setJoinBusy(false);
     setJoinDone(true);
   }
@@ -182,9 +272,13 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   }
 
   if (!authed) {
+    /* When we're on the wider Join tab, use a roomier card so the
+       2-column field grids don't feel cramped. */
+    const isWide = tab === "join";
+
     return (
       <div
-        className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4 relative overflow-hidden"
+        className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4 py-10 relative overflow-hidden"
         style={{
           backgroundImage:
             "radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.05), transparent 60%)",
@@ -205,14 +299,21 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
           }}
         />
 
-        <div className="relative w-full max-w-md">
-          {/* Brand header */}
-          <div className="flex flex-col items-center mb-7">
-            <KoleexLogo className="h-6 w-auto text-white mb-5 drop-shadow-[0_0_24px_rgba(255,255,255,0.08)]" />
-            <h1 className="text-[22px] font-bold text-white tracking-tight leading-none">
-              {title}
-            </h1>
-            <p className="text-[13px] text-white/50 mt-1.5">{subtitle}</p>
+        <div
+          className={`relative w-full transition-[max-width] duration-300 ${
+            isWide ? "max-w-[560px]" : "max-w-md"
+          }`}
+        >
+          {/* Brand header — tight, centered, a single statement. */}
+          <div className="flex flex-col items-center mb-6">
+            <KoleexLogo className="h-[28px] w-auto text-white drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]" />
+            <div className="mt-3 flex items-center gap-2">
+              <span className="h-px w-6 bg-white/15" aria-hidden />
+              <span className="text-[10px] uppercase tracking-[0.24em] text-white/45 font-semibold">
+                Enterprise Operations
+              </span>
+              <span className="h-px w-6 bg-white/15" aria-hidden />
+            </div>
           </div>
 
           {/* Card */}
@@ -266,7 +367,26 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
             </div>
 
             {/* Card body */}
-            <div className="p-7">
+            <div className="px-6 py-6 md:px-7 md:py-7">
+              {/* Tab-contextual heading. Gives the form a human-readable
+                  title without the clunky outer "Koleex Hub" label. */}
+              <div className="mb-5">
+                <h2 className="text-[17px] font-bold text-white tracking-tight leading-none">
+                  {tab === "signin"
+                    ? "Welcome back"
+                    : joinDone
+                      ? "Request received"
+                      : "Join the Koleex network"}
+                </h2>
+                <p className="text-[12px] text-white/50 mt-1.5">
+                  {tab === "signin"
+                    ? "Sign in to your Koleex Hub account."
+                    : joinDone
+                      ? "A Super Admin will review your request shortly."
+                      : "Tell us a bit about you — we'll reach out with an invitation."}
+                </p>
+              </div>
+
               {tab === "signin" ? (
                 <SignInPanel
                   username={username}
@@ -284,34 +404,41 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                   onSubmit={handleSignIn}
                 />
               ) : joinDone ? (
-                <JoinSuccessPanel
-                  name={joinName}
-                  onReset={() => {
-                    setJoinDone(false);
-                    setJoinName("");
-                    setJoinEmail("");
-                    setJoinCompany("");
-                    setJoinMessage("");
-                  }}
-                />
+                <JoinSuccessPanel name={joinName} onReset={resetJoinForm} />
               ) : (
                 <JoinPanel
-                  name={joinName}
-                  email={joinEmail}
-                  company={joinCompany}
-                  message={joinMessage}
+                  state={{
+                    name: joinName,
+                    email: joinEmail,
+                    phone: joinPhone,
+                    relationship: joinRelationship,
+                    company: joinCompany,
+                    jobTitle: joinJobTitle,
+                    country: joinCountry,
+                    city: joinCity,
+                    heardFrom: joinHeardFrom,
+                    message: joinMessage,
+                  }}
                   busy={joinBusy}
                   error={joinError}
-                  onNameChange={(v) => {
-                    setJoinName(v);
-                    setJoinError(null);
+                  setters={{
+                    setName: (v) => {
+                      setJoinName(v);
+                      setJoinError(null);
+                    },
+                    setEmail: (v) => {
+                      setJoinEmail(v);
+                      setJoinError(null);
+                    },
+                    setPhone: setJoinPhone,
+                    setRelationship: setJoinRelationship,
+                    setCompany: setJoinCompany,
+                    setJobTitle: setJoinJobTitle,
+                    setCountry: setJoinCountry,
+                    setCity: setJoinCity,
+                    setHeardFrom: setJoinHeardFrom,
+                    setMessage: setJoinMessage,
                   }}
-                  onEmailChange={(v) => {
-                    setJoinEmail(v);
-                    setJoinError(null);
-                  }}
-                  onCompanyChange={setJoinCompany}
-                  onMessageChange={setJoinMessage}
                   onSubmit={handleJoin}
                 />
               )}
@@ -411,92 +538,224 @@ function SignInPanel({
 
 /* ── Join / Be a Koleex Member panel ──────────────────────────────────── */
 
-interface JoinPanelProps {
+interface JoinState {
   name: string;
   email: string;
+  phone: string;
+  relationship: string;
   company: string;
+  jobTitle: string;
+  country: string;
+  city: string;
+  heardFrom: string;
   message: string;
+}
+
+interface JoinSetters {
+  setName: (v: string) => void;
+  setEmail: (v: string) => void;
+  setPhone: (v: string) => void;
+  setRelationship: (v: string) => void;
+  setCompany: (v: string) => void;
+  setJobTitle: (v: string) => void;
+  setCountry: (v: string) => void;
+  setCity: (v: string) => void;
+  setHeardFrom: (v: string) => void;
+  setMessage: (v: string) => void;
+}
+
+interface JoinPanelProps {
+  state: JoinState;
+  setters: JoinSetters;
   busy: boolean;
   error: string | null;
-  onNameChange: (v: string) => void;
-  onEmailChange: (v: string) => void;
-  onCompanyChange: (v: string) => void;
-  onMessageChange: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
 function JoinPanel({
-  name,
-  email,
-  company,
-  message,
+  state,
+  setters,
   busy,
   error,
-  onNameChange,
-  onEmailChange,
-  onCompanyChange,
-  onMessageChange,
   onSubmit,
 }: JoinPanelProps) {
   return (
-    <form onSubmit={onSubmit} className="space-y-3.5">
-      <p className="text-[12px] text-white/55 leading-relaxed mb-1">
-        Tell us who you are and an admin will be in touch with an invitation.
-      </p>
-
+    <form onSubmit={onSubmit} className="space-y-4">
+      {/* Relationship — pill buttons. First thing the admin wants to
+          know, so we ask it first and use a visual control so visitors
+          don't miss it. */}
       <div>
-        <label className={labelBase}>Full Name</label>
+        <label className={labelBase}>Your relationship with Koleex</label>
+        <div className="flex flex-wrap gap-1.5">
+          {RELATIONSHIPS.map((r) => {
+            const active = state.relationship === r.value;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setters.setRelationship(r.value)}
+                className={`h-8 px-3 rounded-full text-[11px] font-semibold transition-all border ${
+                  active
+                    ? "bg-white text-black border-white"
+                    : "bg-white/[0.04] text-white/70 border-white/[0.1] hover:bg-white/[0.07] hover:text-white"
+                }`}
+                aria-pressed={active}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="h-px bg-white/[0.05]" aria-hidden />
+
+      {/* Name — always full width, required */}
+      <div>
+        <label className={labelBase}>Full Name *</label>
         <div className="relative">
           <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
           <input
             type="text"
             autoComplete="name"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
+            value={state.name}
+            onChange={(e) => setters.setName(e.target.value)}
             placeholder="Jane Cooper"
             className={`${inputBase} pl-9`}
           />
         </div>
       </div>
 
-      <div>
-        <label className={labelBase}>Work Email</label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            placeholder="jane@company.com"
-            className={`${inputBase} pl-9`}
-          />
+      {/* Email + Phone row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div>
+          <label className={labelBase}>Work Email *</label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <input
+              type="email"
+              autoComplete="email"
+              value={state.email}
+              onChange={(e) => setters.setEmail(e.target.value)}
+              placeholder="jane@company.com"
+              className={`${inputBase} pl-9`}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelBase}>Phone</label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <input
+              type="tel"
+              autoComplete="tel"
+              value={state.phone}
+              onChange={(e) => setters.setPhone(e.target.value)}
+              placeholder="+1 555 123 4567"
+              className={`${inputBase} pl-9`}
+            />
+          </div>
         </div>
       </div>
 
-      <div>
-        <label className={labelBase}>Company</label>
-        <div className="relative">
-          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-          <input
-            type="text"
-            autoComplete="organization"
-            value={company}
-            onChange={(e) => onCompanyChange(e.target.value)}
-            placeholder="Optional"
-            className={`${inputBase} pl-9`}
-          />
+      {/* Company + Job title row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div>
+          <label className={labelBase}>Company</label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <input
+              type="text"
+              autoComplete="organization"
+              value={state.company}
+              onChange={(e) => setters.setCompany(e.target.value)}
+              placeholder="Acme Inc."
+              className={`${inputBase} pl-9`}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelBase}>Job Title</label>
+          <div className="relative">
+            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <input
+              type="text"
+              autoComplete="organization-title"
+              value={state.jobTitle}
+              onChange={(e) => setters.setJobTitle(e.target.value)}
+              placeholder="Procurement Manager"
+              className={`${inputBase} pl-9`}
+            />
+          </div>
         </div>
       </div>
 
+      {/* Country + City row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div>
+          <label className={labelBase}>Country</label>
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <select
+              value={state.country}
+              onChange={(e) => setters.setCountry(e.target.value)}
+              className={`${selectBase} pl-9`}
+            >
+              <option value="" className="bg-[#121212]">
+                Select country
+              </option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code} className="bg-[#121212]">
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className={labelBase}>City</label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <input
+              type="text"
+              autoComplete="address-level2"
+              value={state.city}
+              onChange={(e) => setters.setCity(e.target.value)}
+              placeholder="Dubai"
+              className={`${inputBase} pl-9`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* How did you hear — native select keeps it compact */}
       <div>
-        <label className={labelBase}>Message</label>
+        <label className={labelBase}>How did you hear about us?</label>
+        <div className="relative">
+          <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+          <select
+            value={state.heardFrom}
+            onChange={(e) => setters.setHeardFrom(e.target.value)}
+            className={`${selectBase} pl-9`}
+          >
+            {HEARD_FROM_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-[#121212]">
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Purpose */}
+      <div>
+        <label className={labelBase}>Purpose of access</label>
         <div className="relative">
           <MessageSquare className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
           <textarea
-            value={message}
-            onChange={(e) => onMessageChange(e.target.value)}
-            placeholder="What would you like access to?"
+            value={state.message}
+            onChange={(e) => setters.setMessage(e.target.value)}
+            placeholder="Which parts of the Koleex Hub would you like access to, and why?"
             className={`${textareaBase} pl-9`}
           />
         </div>
@@ -511,7 +770,7 @@ function JoinPanel({
 
       <button
         type="submit"
-        disabled={busy || !name || !email}
+        disabled={busy || !state.name || !state.email}
         className="w-full h-11 rounded-xl bg-white text-black text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-60"
       >
         {busy ? (
@@ -524,6 +783,11 @@ function JoinPanel({
           </>
         )}
       </button>
+
+      <p className="text-[11px] text-white/35 text-center pt-1">
+        Fields marked * are required. Everything else helps us route your
+        request faster.
+      </p>
     </form>
   );
 }
@@ -545,9 +809,9 @@ function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
       <h3 className="text-[15px] font-semibold text-white">
         Thanks, {firstName}!
       </h3>
-      <p className="text-[12px] text-white/55 mt-1.5 leading-relaxed max-w-[280px]">
-        Your request has been received. A Koleex administrator will review it
-        and reach out with next steps shortly.
+      <p className="text-[12px] text-white/55 mt-1.5 leading-relaxed max-w-[320px]">
+        Your request has been received. A Koleex Super Admin will review it
+        and reach out shortly with next steps.
       </p>
       <button
         type="button"

@@ -54,6 +54,7 @@ export const hubT: Translations = {
   "app.appraisals":      { en: "Appraisals",       zh: "绩效评估",          ar: "التقييمات" },
   "app.appointments":    { en: "Appointments",     zh: "预约",              ar: "المواعيد" },
   "app.attendance":      { en: "Attendance",       zh: "考勤",              ar: "الحضور" },
+  "app.inbox":           { en: "Koleex Mail",      zh: "Koleex 邮件",        ar: "بريد Koleex" },
   "app.discuss":         { en: "Discuss",          zh: "讨论",              ar: "المناقشات" },
   "app.calendar":        { en: "Calendar",         zh: "日历",              ar: "التقويم" },
   "app.todo":            { en: "To-do",            zh: "待办事项",          ar: "المهام" },
