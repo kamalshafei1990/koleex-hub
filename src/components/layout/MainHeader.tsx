@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, Home, ChevronDown } from "lucide-react";
+import { Sun, Moon, Home, ChevronDown, Menu } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
-import { useRef } from "react";
 import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
 import KoleexLogo from "./KoleexLogo";
+import { useSidebar } from "./SidebarContext";
 
 /* ── Route → Translation key mapping ── */
 const routeKeys: Record<string, string> = {
@@ -29,6 +29,9 @@ const routeKeys: Record<string, string> = {
   "/calendar": "app.calendar",
   "/accounts": "app.accounts",
   "/brands": "app.brands",
+  "/crm": "app.crm",
+  "/discuss": "app.discuss",
+  "/inbox": "app.inbox",
   "/categories": "cat.system",
   "/subcategories": "cat.system",
   "/divisions": "cat.system",
@@ -81,12 +84,19 @@ export default function MainHeader() {
 
   const dk = theme === "dark";
   const isHome = pathname === "/";
+  const { toggle, setMobileOpen, mobileOpen } = useSidebar();
 
   /* Find current app name from route */
   const routeKey = !isHome
     ? routeKeys[pathname] || routeKeys[Object.keys(routeKeys).find(r => pathname.startsWith(r + "/")) || ""] || null
     : null;
   const appName = routeKey ? t(routeKey) : null;
+
+  const btnCls = `flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border shrink-0 transition-all ${
+    dk
+      ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
+      : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
+  }`;
 
   return (
     <header
@@ -97,18 +107,23 @@ export default function MainHeader() {
           : "border-black/[0.08] bg-white/95"
       }`}
     >
-      {/* Left: Home + Logo + Breadcrumb */}
+      {/* Left: Sidebar toggle + Home + Logo + Breadcrumb */}
       <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
+        {/* Sidebar toggle: hamburger on mobile, collapse/expand on desktop */}
+        <button
+          onClick={() => {
+            /* Mobile: toggle drawer. Desktop: collapse/expand. */
+            if (window.innerWidth < 768) setMobileOpen(!mobileOpen);
+            else toggle();
+          }}
+          aria-label="Toggle navigation"
+          className={btnCls}
+        >
+          <Menu size={16} className="md:w-4 md:h-4" />
+        </button>
+
         {!isHome && (
-          <Link
-            href="/"
-            aria-label="Home"
-            className={`flex items-center justify-center w-7 h-7 md:w-9 md:h-9 rounded-md md:rounded-lg border shrink-0 transition-all ${
-              dk
-                ? "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:bg-white/[0.06]"
-                : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
-            }`}
-          >
+          <Link href="/" aria-label="Home" className={btnCls}>
             <Home size={16} className="md:w-4 md:h-4" />
           </Link>
         )}
