@@ -39,6 +39,98 @@ function getGreetingKey(): string {
   return "greeting.evening";
 }
 
+/* ── Analog Clock ── */
+function AnalogClock({ size = 48, dk = true }: { size?: number; dk?: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const ctx = cvs.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = size * dpr;
+    cvs.height = size * dpr;
+    ctx.scale(dpr, dpr);
+
+    function draw() {
+      if (!ctx) return;
+      const r = size / 2;
+      const now = new Date();
+      const h = now.getHours() % 12;
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+
+      ctx.clearRect(0, 0, size, size);
+
+      /* Face */
+      ctx.beginPath();
+      ctx.arc(r, r, r - 1, 0, Math.PI * 2);
+      ctx.fillStyle = dk ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)";
+      ctx.fill();
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      /* Hour ticks */
+      for (let i = 0; i < 12; i++) {
+        const angle = (i * Math.PI) / 6 - Math.PI / 2;
+        const outer = r - 3;
+        const inner = i % 3 === 0 ? r - 7 : r - 5;
+        ctx.beginPath();
+        ctx.moveTo(r + Math.cos(angle) * inner, r + Math.sin(angle) * inner);
+        ctx.lineTo(r + Math.cos(angle) * outer, r + Math.sin(angle) * outer);
+        ctx.strokeStyle = dk ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)";
+        ctx.lineWidth = i % 3 === 0 ? 1.5 : 0.8;
+        ctx.stroke();
+      }
+
+      /* Hour hand */
+      const hAngle = ((h + m / 60) * Math.PI) / 6 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(r, r);
+      ctx.lineTo(r + Math.cos(hAngle) * (r * 0.45), r + Math.sin(hAngle) * (r * 0.45));
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      /* Minute hand */
+      const mAngle = ((m + s / 60) * Math.PI) / 30 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(r, r);
+      ctx.lineTo(r + Math.cos(mAngle) * (r * 0.65), r + Math.sin(mAngle) * (r * 0.65));
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      /* Second hand */
+      const sAngle = (s * Math.PI) / 30 - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(r, r);
+      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.7), r + Math.sin(sAngle) * (r * 0.7));
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)";
+      ctx.lineWidth = 0.8;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      /* Center dot */
+      ctx.beginPath();
+      ctx.arc(r, r, 2, 0, Math.PI * 2);
+      ctx.fillStyle = dk ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
+      ctx.fill();
+    }
+
+    draw();
+    const interval = setInterval(draw, 1000);
+    return () => clearInterval(interval);
+  }, [size, dk]);
+
+  return <canvas ref={canvasRef} style={{ width: size, height: size }} className="shrink-0" />;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
@@ -213,7 +305,7 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        className={`relative flex flex-col items-center justify-center gap-3 p-5 md:p-6 min-h-[110px] md:min-h-[120px] border rounded-2xl transition-all duration-200 select-none ${
+        className={`relative flex flex-col items-center justify-center gap-2.5 p-4 min-h-[90px] border rounded-2xl transition-all duration-200 select-none ${
           app.active
             ? isCurrentApp
               ? `cursor-pointer group ${
@@ -331,23 +423,31 @@ export default function HomePage() {
     <div className={`${dk ? "bg-black" : "bg-white"} min-h-screen transition-colors duration-300`}>
       <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px]">
 
-        {/* ── Header: Greeting + Date ── */}
+        {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 md:gap-3">
-            <div>
-              <h1 className={`text-[22px] md:text-[32px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
                 {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
               </h1>
-              <p className={`text-[13px] mt-0.5 ${dk ? "text-white/30" : "text-black/30"}`}>{t("applicationsDesc")}</p>
+              <p className={`text-[13px] mt-1 hidden md:block ${dk ? "text-white/30" : "text-black/30"}`}>{t("applicationsDesc")}</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span className={`text-[11px] font-medium ${dk ? "text-white/20" : "text-black/20"}`}>{today}</span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                dk ? "text-white/25 bg-white/[0.04]" : "text-black/25 bg-black/[0.04]"
-              }`}>
-                {activeCount}/{totalCount}
-              </span>
+              <div className="hidden md:flex flex-col items-end gap-0.5">
+                <span className={`text-[14px] font-semibold ${dk ? "text-white/50" : "text-black/50"}`}>{today}</span>
+                <span className={`text-[10px] font-medium ${dk ? "text-white/20" : "text-black/20"}`}>
+                  {activeCount}/{totalCount} {t("apps")}
+                </span>
+              </div>
+              <AnalogClock size={48} dk={dk} />
             </div>
+          </div>
+          {/* Mobile: date below greeting */}
+          <div className="flex items-center gap-2 mt-1.5 md:hidden">
+            <span className={`text-[12px] font-medium ${dk ? "text-white/35" : "text-black/35"}`}>{today}</span>
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${dk ? "text-white/20 bg-white/[0.04]" : "text-black/20 bg-black/[0.04]"}`}>
+              {activeCount}/{totalCount}
+            </span>
           </div>
         </div>
 
