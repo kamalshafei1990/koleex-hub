@@ -144,9 +144,17 @@ function ModalShell({ open, onClose, title, width, children, footer }: {
   open: boolean; onClose: () => void; title: string; width?: string;
   children: React.ReactNode; footer?: React.ReactNode;
 }) {
+  /* Lock background scroll when modal is open */
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onTouchMove={(e) => e.stopPropagation()}>
       <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" onClick={onClose} />
       <div className={`relative w-full ${width || "max-w-[520px]"} bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl flex flex-col max-h-[85vh]`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
@@ -155,7 +163,7 @@ function ModalShell({ open, onClose, title, width, children, footer }: {
             <X size={16} className="text-[var(--text-dim)]" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">{children}</div>
+        <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
         {footer && <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-color)] shrink-0">{footer}</div>}
       </div>
     </div>
@@ -614,7 +622,7 @@ function AssignmentModal({
           </button>
 
           {showPicker && (
-            <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-[320px] overflow-hidden flex flex-col">
+            <div className="md:absolute md:top-full md:left-0 md:right-0 mt-1 z-20 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-[280px] overflow-hidden flex flex-col">
               <div className="p-2 shrink-0">
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -623,7 +631,7 @@ function AssignmentModal({
                     className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[12px] outline-none" />
                 </div>
               </div>
-              <div className="px-1 overflow-y-auto flex-1">
+              <div className="px-1 overflow-y-auto overscroll-contain flex-1">
                 {filtered.length === 0 ? (
                   <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noContacts")}</div>
                 ) : filtered.map((c) => (
