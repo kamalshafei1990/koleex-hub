@@ -1504,6 +1504,8 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
     id: string;
     display_name: string;
     company: string | null;
+    country: string | null;
+    country_code: string | null;
   } | null;
   next_activity: CrmActivityRow | null;
   activities_overdue: number;
