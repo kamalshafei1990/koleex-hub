@@ -1387,6 +1387,125 @@ export interface Database {
         Insert: DiscussDraftInsert;
         Update: DiscussDraftUpdate;
       };
+      crm_stages: {
+        Row: CrmStageRow;
+        Insert: CrmStageInsert;
+        Update: CrmStageUpdate;
+      };
+      crm_opportunities: {
+        Row: CrmOpportunityRow;
+        Insert: CrmOpportunityInsert;
+        Update: CrmOpportunityUpdate;
+      };
+      crm_activities: {
+        Row: CrmActivityRow;
+        Insert: CrmActivityInsert;
+        Update: CrmActivityUpdate;
+      };
     };
   };
+}
+
+/* ─── CRM ─────────────────────────────────────────────────────────────── */
+
+/** A column in the CRM pipeline kanban. Sorted by `sequence`; `is_won`
+ *  flags the terminal won column; `fold` collapses the column. */
+export interface CrmStageRow {
+  id: string;
+  name: string;
+  sequence: number;
+  is_won: boolean;
+  fold: boolean;
+  created_at: string;
+}
+export type CrmStageInsert = Omit<CrmStageRow, "id" | "created_at"> & {
+  id?: string;
+};
+export type CrmStageUpdate = Partial<CrmStageInsert>;
+
+/** A single deal moving through the pipeline. Mirrors Odoo's
+ *  crm.lead model — both leads (unqualified) and opportunities live in
+ *  the same table, distinguished by stage. `contact_id` links to the
+ *  shared contacts book; `company_name` / `contact_name` are
+ *  denormalized so brand-new prospects can be created without first
+ *  going through the contacts app. */
+export interface CrmOpportunityRow {
+  id: string;
+  name: string;
+  description: string | null;
+  stage_id: string | null;
+
+  contact_id: string | null;
+  company_name: string | null;
+  contact_name: string | null;
+  email: string | null;
+  phone: string | null;
+
+  expected_revenue: number;
+  probability: number;
+  expected_close_date: string | null;
+
+  priority: number;
+  source: string | null;
+  tags: string[];
+  color: number;
+
+  owner_account_id: string | null;
+
+  lost_reason: string | null;
+  won_at: string | null;
+  lost_at: string | null;
+  archived_at: string | null;
+
+  created_at: string;
+  updated_at: string;
+}
+export type CrmOpportunityInsert = Omit<
+  CrmOpportunityRow,
+  "id" | "created_at" | "updated_at"
+> & {
+  id?: string;
+};
+export type CrmOpportunityUpdate = Partial<CrmOpportunityInsert>;
+
+/** Lightweight to-do attached to an opportunity. Type drives the icon
+ *  the CRM card renders next to the activity row. */
+export type CrmActivityType = "call" | "meeting" | "task" | "email" | "note";
+
+export interface CrmActivityRow {
+  id: string;
+  opportunity_id: string;
+  type: CrmActivityType;
+  title: string;
+  notes: string | null;
+  due_at: string | null;
+  done_at: string | null;
+  assignee_account_id: string | null;
+  created_by_account_id: string | null;
+  created_at: string;
+}
+export type CrmActivityInsert = Omit<CrmActivityRow, "id" | "created_at"> & {
+  id?: string;
+};
+export type CrmActivityUpdate = Partial<CrmActivityInsert>;
+
+/** Opportunity row enriched with the related stage / contact / owner /
+ *  next-activity data the UI needs to render a card without a second
+ *  round-trip. The data layer in `lib/crm.ts` builds this. */
+export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
+  stage: CrmStageRow | null;
+  owner: {
+    id: string;
+    username: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+  contact: {
+    id: string;
+    display_name: string;
+    company: string | null;
+  } | null;
+  next_activity: CrmActivityRow | null;
+  activities_overdue: number;
+  activities_pending: number;
 }
