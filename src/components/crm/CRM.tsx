@@ -972,44 +972,40 @@ function PipelineColumn({
     <div
       onDragOver={(e) => onDragOver(e, col.id)}
       onDrop={(e) => onDrop(e, col.id)}
-      className={`w-[280px] md:w-[300px] shrink-0 rounded-2xl border transition-colors ${
-        isHover
-          ? "bg-[var(--bg-secondary)] border-[var(--border-focus)]"
-          : "bg-[var(--bg-secondary)] border-[var(--border-subtle)]"
+      className={`w-[280px] md:w-[300px] shrink-0 transition-colors ${
+        isHover ? "bg-[var(--bg-secondary)]/40" : ""
       }`}
     >
-      {/* Column header */}
-      <div className="px-4 pt-4 pb-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className={`inline-block h-2 w-2 rounded-full ${
-                col.isWon ? "bg-emerald-500" : "bg-[var(--text-ghost)]"
-              }`}
-            />
-            <span className="text-[12.5px] font-bold text-[var(--text-primary)] truncate uppercase tracking-wide">
+      {/* Column header — Odoo style: stage name + add button + total,
+          then a thin progress bar underneath.                          */}
+      <div className="pb-2">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
               {col.name}
             </span>
-            <span className="text-[10.5px] font-semibold text-[var(--text-ghost)]">
-              {list.length}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] font-semibold text-[var(--text-dim)] tabular-nums">
-              {formatCurrency(total)}
-            </span>
+            {isStageColumn && (
+              <button
+                type="button"
+                onClick={() => setQuickOpen(true)}
+                className="p-0.5 rounded text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                title={t("quick.add")}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
             {isStageColumn && (
               <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((v) => !v)}
-                  className="p-1 rounded-md text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                  className="p-0.5 rounded text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
                   title="Stage actions"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
                 {menuOpen && col.stage && (
-                  <div className="absolute right-0 top-7 z-30 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg overflow-hidden">
+                  <div className="absolute left-0 top-6 z-30 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg overflow-hidden">
                     <button
                       type="button"
                       onClick={() => {
@@ -1050,19 +1046,26 @@ function PipelineColumn({
           </div>
         </div>
 
-        {/* Per-stage progress bar — width relative to the largest stage. */}
-        <div className="mt-2 h-1 rounded-full bg-[var(--bg-surface-subtle)] overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              col.isWon ? "bg-emerald-500" : "bg-[var(--accent-primary,#5b7cff)]"
-            }`}
-            style={{ width: `${fillPct}%` }}
-          />
+        {/* Thin progress bar with total revenue floated to the right. */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-[3px] rounded-full bg-[var(--bg-secondary)] overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                col.isWon
+                  ? "bg-emerald-500"
+                  : "bg-[var(--accent-primary,#22d3a7)]"
+              }`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+          <span className="text-[11px] font-semibold text-[var(--text-dim)] tabular-nums shrink-0">
+            {total > 0 ? formatCurrency(total) : list.length}
+          </span>
         </div>
       </div>
 
       {/* Cards */}
-      <div className="px-3 pb-2 space-y-2 min-h-[80px]">
+      <div className="space-y-2 min-h-[80px]">
         {list.length === 0 ? (
           <div className="text-[11px] text-[var(--text-ghost)] text-center py-6 italic">
             {t("empty.pipeline")}
@@ -1082,11 +1085,11 @@ function PipelineColumn({
         )}
       </div>
 
-      {/* Quick inline add at the bottom of the column */}
-      {isStageColumn && (
-        <div className="px-3 pb-3">
-          {quickOpen ? (
-            <div className="p-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-focus)] space-y-2">
+      {/* Quick inline add — only shows the form when opened (button moved
+          to the column header to match Odoo). */}
+      {isStageColumn && quickOpen && (
+        <div className="pt-2">
+          <div className="p-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-focus)] space-y-2">
               <input
                 type="text"
                 autoFocus
@@ -1142,16 +1145,7 @@ function PipelineColumn({
                   {t("quick.add.btn")}
                 </button>
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setQuickOpen(true)}
-              className="w-full h-8 rounded-xl border border-dashed border-[var(--border-subtle)] text-[11.5px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
-            >
-              {t("quick.add")}
-            </button>
-          )}
+          </div>
         </div>
       )}
     </div>
