@@ -2361,7 +2361,7 @@ function ActivitiesPanel({
   async function handleAdd() {
     if (!title.trim()) return;
     setBusy(true);
-    await createActivity({
+    const createdActivity = await createActivity({
       opportunity_id: opportunityId,
       type,
       title: title.trim(),
@@ -2371,6 +2371,23 @@ function ActivitiesPanel({
       assignee_account_id: accountId,
       created_by_account_id: accountId,
     });
+    // Bridge: CRM "task" activities also appear in the To-do app
+    if (type === "task" && createdActivity) {
+      try {
+        const { createTodo: createTodoTask } = await import("@/lib/todo-admin");
+        await createTodoTask({
+          title: title.trim(),
+          description: notes.trim() || null,
+          priority: "medium",
+          due_date: dueAt ? new Date(dueAt).toISOString() : null,
+          source: "crm",
+          source_id: createdActivity.id,
+          created_by_account_id: accountId,
+          assigned_by_account_id: accountId,
+          assignee_account_ids: accountId ? [accountId] : [],
+        });
+      } catch { /* todo table may not exist yet — ignore silently */ }
+    }
     setBusy(false);
     setTitle("");
     setNotes("");

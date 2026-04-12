@@ -133,6 +133,25 @@ export default function EventModal({
       onError?.(`Could not ${existingId ? "update" : "create"} the event.`);
       return;
     }
+
+    // Bridge: Calendar events with type "task" also appear in the To-do app
+    if (!existingId && form.event_type === "task") {
+      try {
+        const { createTodo } = await import("@/lib/todo-admin");
+        await createTodo({
+          title: form.title.trim(),
+          description: form.description?.trim() || null,
+          priority: "medium",
+          due_date: form.start_at,
+          source: "calendar",
+          source_id: saved.id,
+          created_by_account_id: form.account_id,
+          assigned_by_account_id: form.account_id,
+          assignee_account_ids: [form.account_id],
+        });
+      } catch { /* todo table may not exist yet — ignore silently */ }
+    }
+
     onSaved(saved);
   }
 

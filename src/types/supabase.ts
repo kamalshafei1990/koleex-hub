@@ -756,7 +756,8 @@ export type InboxMessageCategory =
   | "system"
   | "membership_request"
   | "alert"
-  | "external_email";
+  | "external_email"
+  | "task";
 
 /** Direction an inbox message flowed:
  *   internal — in-app Koleex message (original default)
@@ -1402,6 +1403,26 @@ export interface Database {
         Insert: CrmActivityInsert;
         Update: CrmActivityUpdate;
       };
+      koleex_todos: {
+        Row: TodoRow;
+        Insert: TodoInsert;
+        Update: TodoUpdate;
+      };
+      koleex_todo_assignees: {
+        Row: TodoAssigneeRow;
+        Insert: TodoAssigneeInsert;
+        Update: Partial<TodoAssigneeInsert>;
+      };
+      koleex_todo_notes: {
+        Row: TodoNoteRow;
+        Insert: TodoNoteInsert;
+        Update: Partial<TodoNoteInsert>;
+      };
+      koleex_todo_labels: {
+        Row: TodoLabelRow;
+        Insert: TodoLabelInsert;
+        Update: Partial<TodoLabelInsert>;
+      };
     };
   };
 }
@@ -1510,4 +1531,82 @@ export interface CrmOpportunityWithRelations extends CrmOpportunityRow {
   next_activity: CrmActivityRow | null;
   activities_overdue: number;
   activities_pending: number;
+}
+
+/* ─── To-do System ───────────────────────────────────────────────────── */
+
+export type TodoSource = "manual" | "crm" | "calendar";
+export type TodoPriority = "high" | "medium" | "low";
+
+export interface TodoRow {
+  id: string;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  priority: TodoPriority;
+  label: string | null;
+  due_date: string | null;
+  created_by_account_id: string | null;
+  assigned_by_account_id: string | null;
+  source: TodoSource;
+  source_id: string | null;
+  assigned_department: string | null;
+  assign_to_all: boolean;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;
+export type TodoUpdate = Partial<TodoInsert> & { completed_at?: string | null };
+
+export interface TodoAssigneeRow {
+  id: string;
+  todo_id: string;
+  account_id: string;
+  assigned_at: string;
+}
+export type TodoAssigneeInsert = Omit<TodoAssigneeRow, "id" | "assigned_at">;
+
+export interface TodoNoteRow {
+  id: string;
+  todo_id: string;
+  author_account_id: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+export type TodoNoteInsert = Omit<TodoNoteRow, "id" | "created_at" | "updated_at">;
+
+export interface TodoLabelRow {
+  id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+}
+export type TodoLabelInsert = Omit<TodoLabelRow, "id" | "created_at">;
+
+/** Assignee info resolved via accounts → people + koleex_employees */
+export interface TodoAssigneeInfo {
+  account_id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  department: string | null;
+  position: string | null;
+}
+
+/** Full todo with resolved relations for display */
+export interface TodoWithRelations extends TodoRow {
+  assignees: TodoAssigneeInfo[];
+  assigner: {
+    account_id: string;
+    username: string;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+  notes: (TodoNoteRow & {
+    author_username: string;
+    author_full_name: string | null;
+    author_avatar_url: string | null;
+  })[];
 }
