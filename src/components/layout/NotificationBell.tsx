@@ -106,6 +106,13 @@ function categoryStyle(
           ? "bg-red-500/15 text-red-300 border-red-500/30"
           : "bg-red-100 text-red-700 border-red-200",
       };
+    case "task":
+      return {
+        label: "Task",
+        className: dk
+          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          : "bg-emerald-100 text-emerald-700 border-emerald-200",
+      };
     default:
       return {
         label: "Message",

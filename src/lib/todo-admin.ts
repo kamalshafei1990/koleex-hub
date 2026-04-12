@@ -378,3 +378,43 @@ export async function fetchDepartments(): Promise<string[]> {
   const unique = [...new Set(data.map((d) => d.department).filter(Boolean) as string[])];
   return unique.sort();
 }
+
+/* ── Realtime subscription for live todo updates ── */
+
+export function subscribeToTodos(
+  onInsert: (row: TodoRow) => void,
+  onChange: (row: TodoRow) => void,
+  onDelete: (oldRow: { id: string }) => void,
+): () => void {
+  const topic = `todos-live-${Date.now()}`;
+
+  const channel = supabase
+    .channel(topic)
+    .on(
+      "postgres_changes" as never,
+      { event: "INSERT", schema: "public", table: "koleex_todos" },
+      (payload: { new: TodoRow }) => onInsert(payload.new),
+    )
+    .on(
+      "postgres_changes" as never,
+      { event: "UPDATE", schema: "public", table: "koleex_todos" },
+      (payload: { new: TodoRow }) => onChange(payload.new),
+    )
+    .on(
+      "postgres_changes" as never,
+      { event: "DELETE", schema: "public", table: "koleex_todos" },
+      (payload: { old: { id: string } }) => onDelete(payload.old),
+    )
+    .subscribe((status: string) => {
+      if (status === "CHANNEL_ERROR") {
+        setTimeout(() => {
+          channel.unsubscribe();
+          supabase.channel(topic).subscribe();
+        }, 3000);
+      }
+    });
+
+  return () => {
+    channel.unsubscribe();
+  };
+}

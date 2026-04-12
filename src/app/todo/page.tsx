@@ -15,6 +15,7 @@ import {
   addTodoNote, deleteTodoNote,
   fetchTodoLabels, createTodoLabel,
   fetchAssignableEmployees, fetchDepartments,
+  subscribeToTodos,
 } from "@/lib/todo-admin";
 import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority,
@@ -703,6 +704,17 @@ export default function TodoPage() {
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  /* ── Realtime: auto-refresh when any todo is created/updated/deleted ── */
+  useEffect(() => {
+    return subscribeToTodos(
+      () => { loadAll(); },   // INSERT  → full refresh to resolve relations
+      () => { loadAll(); },   // UPDATE  → full refresh
+      (old) => {              // DELETE  → optimistic remove + refresh
+        setTodos((prev) => prev.filter((t) => t.id !== old.id));
+      },
+    );
+  }, [loadAll]);
 
   const handleToggle = async (id: string) => {
     setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed, completed_at: !t.completed ? new Date().toISOString() : null } : t));
