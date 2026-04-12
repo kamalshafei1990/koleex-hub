@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Trash2, Pencil, Eye, EyeOff, Package, Filter, X,
-  Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List, Settings,
+  Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List, Settings, ArrowLeft,
 } from "lucide-react";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
@@ -120,34 +120,34 @@ export default function ProductList() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 md:mb-8">
-          <div>
-            <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-              <Package className="h-6 w-6 text-[var(--text-faint)]" />
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              <Package className="h-4 w-4" />
+            </div>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               Products
             </h1>
-            <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-1">{products.length} products in catalog</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/products/settings"
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-            >
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/products/settings" className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Control Panel</span>
             </Link>
-            <Link
-              href="/products/new"
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-            >
-              <Plus className="h-4 w-4" />
-              Add Product
+            <Link href="/products/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+              <Plus className="h-4 w-4" /> Add Product
             </Link>
           </div>
         </div>
+        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
+          {products.length} products in catalog
+        </p>
 
         {/* Search + Filters */}
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">

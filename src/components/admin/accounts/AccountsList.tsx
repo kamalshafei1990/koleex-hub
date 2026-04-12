@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Search, Filter, X, Users, UserCircle2, Shield, Mail, Building2,
+  ArrowLeft, Plus, Search, Filter, X, Users, UserCircle2, Shield, Mail, Building2,
   MoreHorizontal, Eye, Pencil, KeyRound, PowerOff, Power, RefreshCcw,
   CheckCircle2, AlertCircle, Copy, Flag,
 } from "lucide-react";
@@ -68,10 +68,49 @@ export default function AccountsList() {
   const [showFilters, setShowFilters] = useState(false);
 
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  /* Row action dropdown lives in a viewport-fixed portal so that the
+     parent table's `overflow-hidden` / `overflow-x-auto` boundaries
+     cannot clip it. We store the trigger button's viewport rect here
+     and render a single <RowMenu> at the component's root. */
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null);
   const [working, setWorking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newTempPw, setNewTempPw] = useState<{ id: string; pw: string } | null>(null);
+
+  /* Helper: capture the trigger button's viewport rect and toggle the
+     row menu. We position the dropdown's top edge a few px below the
+     button and anchor its right edge to the button's right edge. */
+  function toggleRowMenu(id: string, el: HTMLElement | null) {
+    if (openMenu === id) {
+      setOpenMenu(null);
+      setMenuAnchor(null);
+      return;
+    }
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      setMenuAnchor({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
+    setOpenMenu(id);
+  }
+
+  /* Close the row menu on scroll / resize so stale coords don't drift. */
+  useEffect(() => {
+    if (!openMenu) return;
+    function close() {
+      setOpenMenu(null);
+      setMenuAnchor(null);
+    }
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openMenu]);
 
   useEffect(() => {
     (async () => {
@@ -231,26 +270,27 @@ export default function AccountsList() {
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 md:mb-8">
-          <div>
-            <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] flex items-center gap-2.5">
-              <Users className="h-6 w-6 text-[var(--text-faint)]" />
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              <Users className="h-4 w-4" />
+            </div>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               Accounts
             </h1>
-            <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-1">
-              {accounts.length} accounts across Koleex and customer workspaces
-            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/accounts/new"
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-            >
-              <Plus className="h-4 w-4" />
-              New Account
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+              <Plus className="h-4 w-4" /> New Account
             </Link>
           </div>
         </div>
+        <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
+          {accounts.length} accounts across Koleex and customer workspaces
+        </p>
 
         {/* Toasts */}
         {toast && (
@@ -592,26 +632,19 @@ export default function AccountsList() {
                         <td className="px-3 py-3 text-[var(--text-dim)] text-[11px]">
                           {new Date(a.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-3 py-3 text-right relative">
+                        <td className="px-3 py-3 text-right">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenMenu((m) => (m === a.id ? null : a.id));
+                              toggleRowMenu(a.id, e.currentTarget);
                             }}
                             disabled={working}
+                            aria-haspopup="menu"
+                            aria-expanded={openMenu === a.id}
                             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center ml-auto disabled:opacity-60"
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
-                          {openMenu === a.id && (
-                            <RowMenu
-                              account={a}
-                              onClose={() => setOpenMenu(null)}
-                              onToggleStatus={() => actionToggleStatus(a)}
-                              onResetPassword={() => actionResetPassword(a)}
-                              onToggleForce={() => actionToggleForce(a)}
-                            />
-                          )}
                         </td>
                       </tr>
                     );
@@ -692,21 +725,17 @@ export default function AccountsList() {
                       </div>
                     </Link>
                     <button
-                      onClick={() => setOpenMenu((m) => (m === a.id ? null : a.id))}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleRowMenu(a.id, e.currentTarget);
+                      }}
                       disabled={working}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenu === a.id}
                       className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center disabled:opacity-60"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
-                    {openMenu === a.id && (
-                      <RowMenu
-                        account={a}
-                        onClose={() => setOpenMenu(null)}
-                        onToggleStatus={() => actionToggleStatus(a)}
-                        onResetPassword={() => actionResetPassword(a)}
-                        onToggleForce={() => actionToggleForce(a)}
-                      />
-                    )}
                   </div>
                 );
               })}
@@ -714,20 +743,46 @@ export default function AccountsList() {
           </div>
         )}
       </div>
+
+      {/* Single root-level action dropdown. Rendered in a viewport-fixed
+          layer so the parent table's overflow boundaries can't clip it. */}
+      {openMenu && menuAnchor && (() => {
+        const active = filtered.find((r) => r.account.id === openMenu)?.account;
+        if (!active) return null;
+        return (
+          <RowMenu
+            account={active}
+            anchor={menuAnchor}
+            onClose={() => {
+              setOpenMenu(null);
+              setMenuAnchor(null);
+            }}
+            onToggleStatus={() => actionToggleStatus(active)}
+            onResetPassword={() => actionResetPassword(active)}
+            onToggleForce={() => actionToggleForce(active)}
+          />
+        );
+      })()}
     </div>
   );
 }
 
-/* ── Row menu popover ── */
+/* ── Row menu popover ──
+   Rendered at the component root (not inside the table row) so it
+   escapes the table's `overflow-hidden` / `overflow-x-auto` clipping
+   boundaries. Positioned via `position: fixed` against coordinates
+   captured from the trigger button's `getBoundingClientRect()`. */
 
 function RowMenu({
   account,
+  anchor,
   onClose,
   onToggleStatus,
   onResetPassword,
   onToggleForce,
 }: {
   account: AccountRow;
+  anchor: { top: number; right: number };
   onClose: () => void;
   onToggleStatus: () => void;
   onResetPassword: () => void;
@@ -738,10 +793,14 @@ function RowMenu({
     <>
       {/* Click-away backdrop */}
       <div
-        className="fixed inset-0 z-40"
+        className="fixed inset-0 z-[60]"
         onClick={onClose}
       />
-      <div className="absolute right-4 top-12 z-50 w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-xl overflow-hidden">
+      <div
+        role="menu"
+        style={{ top: anchor.top, right: anchor.right }}
+        className="fixed z-[70] w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
+      >
         <MenuItem icon={<Eye className="h-4 w-4" />} label="View" href={`/accounts/${account.id}`} />
         <MenuItem icon={<Pencil className="h-4 w-4" />} label="Edit" href={`/accounts/${account.id}/edit`} />
         <div className="h-px bg-[var(--border-subtle)]" />

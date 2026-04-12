@@ -265,58 +265,61 @@ export default function CalendarApp() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="w-full px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="w-full">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <Link
               href="/"
-              className="h-9 w-9 shrink-0 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="min-w-0">
-              <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-[var(--text-dim)]" />
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <CalendarIcon className="h-4 w-4" />
+              </div>
+              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
                 Calendar
               </h1>
-              <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
-                {timezone} · self-contained scheduling
-              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Account picker */}
-            <div className="flex items-center gap-2">
-              <UserCircle2 className="h-4 w-4 text-[var(--text-dim)]" />
-              <select
-                value={activeAccountId || ""}
-                onChange={(e) => setActiveAccountId(e.target.value || null)}
-                className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
-                disabled={loadingAccounts}
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              {/* Account picker */}
+              <div className="flex items-center gap-2">
+                <UserCircle2 className="h-4 w-4 text-[var(--text-dim)]" />
+                <select
+                  value={activeAccountId || ""}
+                  onChange={(e) => setActiveAccountId(e.target.value || null)}
+                  className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
+                  disabled={loadingAccounts}
+                >
+                  {loadingAccounts && <option>Loading accounts…</option>}
+                  {!loadingAccounts && accounts.length === 0 && (
+                    <option value="">No accounts</option>
+                  )}
+                  {!loadingAccounts &&
+                    accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.username} · {a.user_type}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button
+                onClick={() => openNewEvent()}
+                disabled={!activeAccountId}
+                className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
-                {loadingAccounts && <option>Loading accounts…</option>}
-                {!loadingAccounts && accounts.length === 0 && (
-                  <option value="">No accounts</option>
-                )}
-                {!loadingAccounts &&
-                  accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.username} · {a.user_type}
-                    </option>
-                  ))}
-              </select>
+                <Plus className="h-4 w-4" /> New Event
+              </button>
             </div>
-            <button
-              onClick={() => openNewEvent()}
-              disabled={!activeAccountId}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" /> New Event
-            </button>
           </div>
+          <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
+            {timezone} · self-contained scheduling
+          </p>
         </div>
 
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
         {toast && (
           <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
@@ -430,6 +433,7 @@ export default function CalendarApp() {
           <LegendDot color="#A855F7" label="Event" />
           <LegendDot color="#EC4899" label="Holiday" />
           <LegendDot color="#EF4444" label="Out of Office" />
+        </div>
         </div>
       </div>
 

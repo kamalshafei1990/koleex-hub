@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Plus, Search, Calculator, Trash2, Copy, Filter, X,
   Loader2, MoreHorizontal, CheckCircle2, Clock, Globe,
-  Building2, Package, FileText, ArrowUpDown,
+  Building2, Package, FileText, ArrowUpDown, ArrowLeft,
 } from "lucide-react";
 import {
   fetchSimulations, deleteSimulation, duplicateSimulation,
@@ -79,27 +79,31 @@ export default function LandedCostListPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" dir={isRtl ? "rtl" : "ltr"}>
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
-              <Calculator className="h-5 w-5" />
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+              <Calculator className="h-4 w-4" />
             </div>
-            <div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight">{t("list.title")}</h1>
-              <p className="text-[12px] text-[var(--text-dim)]">
-                {simulations.length} {simulations.length !== 1 ? t("list.simulationsPlural") : t("list.simulations")}
-                {draftCount > 0 && <span className="ml-2 text-amber-400">{draftCount} {t("draft")}</span>}
-                {completedCount > 0 && <span className="ml-2 text-emerald-400">{completedCount} {t("completed")}</span>}
-              </p>
-            </div>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+              {t("list.title")}
+            </h1>
           </div>
-          <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+          <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
             <Plus className="h-4 w-4" /> {t("list.newSimulation")}
           </Link>
         </div>
+        <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
+          {simulations.length} {simulations.length !== 1 ? t("list.simulationsPlural") : t("list.simulations")}
+          {draftCount > 0 && <span className="ml-2 text-amber-400">· {draftCount} drafts</span>}
+          {completedCount > 0 && <span className="ml-2 text-emerald-400">· {completedCount} completed</span>}
+        </p>
+      </div>
+
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
 
         {/* ── Search & Filters ── */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 mb-5">
