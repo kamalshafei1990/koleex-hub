@@ -1,20 +1,21 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   management-admin — CRUD helpers for the Management app.
+   management-admin — CRUD + business logic for the Management module.
 
-   Relational data model:
-     koleex_departments  – hierarchical org units (parent_id for nesting)
-     koleex_positions    – job roles within departments, with reporting lines
-                           (reports_to_position_id for org chart hierarchy)
-     koleex_assignments  – people (from contacts) assigned to positions
-                           supports primary/secondary, date ranges
-     koleex_roles        – named roles that can be attached to positions
-     koleex_permissions  – per-module permission flags attached to roles
-     koleex_position_history – audit log of assignment changes
+   Tables:
+     koleex_departments  – org units (parent_id for nesting, icon system)
+     koleex_positions    – jobs within departments, reports_to hierarchy
+     koleex_assignments  – people (contacts) → positions
+     koleex_roles        – named roles attached to positions
+     koleex_permissions  – per-module permission flags on roles
+     koleex_position_history – audit log
 
-   People are NEVER isolated — they always reference existing contacts.
-   Department heads are determined by assignments, not manual fields.
+   Key invariants:
+     • No circular reporting chains (validated before every save)
+     • Deleting a department reassigns children + positions safely
+     • Deleting a position reassigns subordinates to parent
+     • People always reference existing contacts
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin } from "./supabase-admin";
@@ -28,7 +29,7 @@ export interface DepartmentRow {
   name: string;
   description: string | null;
   icon: string;
-  icon_type: string;
+  icon_type: string;       // 'emoji' | 'image' | 'icon'
   icon_value: string | null;
   parent_id: string | null;
   sort_order: number;
@@ -96,7 +97,6 @@ export interface PositionHistoryRow {
   created_at: string;
 }
 
-/** Contact reference for the people picker */
 export interface ContactRef {
   id: string;
   name: string;
@@ -105,15 +105,44 @@ export interface ContactRef {
   phone: string | null;
 }
 
-/** Org chart node (position + assigned person + children) */
 export interface OrgChartNode {
   position: PositionRow;
+  department: DepartmentRow | null;
   assignment: AssignmentRow | null;
   contact: ContactRef | null;
   children: OrgChartNode[];
 }
 
 export type DeptTreeNode = DepartmentRow & { children: DeptTreeNode[] };
+
+/* ═══════════════════════════════════════════════════
+   VALIDATION
+   ═══════════════════════════════════════════════════ */
+
+/** Returns true if setting `positionId` to report to `newReportsToId`
+    would create a circular chain. */
+export function detectCircularHierarchy(
+  positionId: string,
+  newReportsToId: string | null,
+  allPositions: PositionRow[],
+): boolean {
+  if (!newReportsToId) return false;
+  if (positionId === newReportsToId) return true;
+
+  const posMap = new Map(allPositions.map((p) => [p.id, p]));
+  const visited = new Set<string>();
+  let current: string | null = newReportsToId;
+
+  while (current) {
+    if (current === positionId) return true;
+    if (visited.has(current)) return false; // existing cycle elsewhere
+    visited.add(current);
+    const pos = posMap.get(current);
+    current = pos?.reports_to_position_id || null;
+  }
+
+  return false;
+}
 
 /* ═══════════════════════════════════════════════════
    DEPARTMENTS — CRUD
@@ -142,10 +171,7 @@ export async function createDepartment(
     .select()
     .single();
 
-  if (error) {
-    console.error("[Management] createDepartment:", error.message);
-    return { data: null, error: error.message };
-  }
+  if (error) return { data: null, error: error.message };
   return { data: data as DepartmentRow, error: null };
 }
 
@@ -158,10 +184,7 @@ export async function updateDepartment(
     .update({ ...obj, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] updateDepartment:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -173,11 +196,46 @@ export async function deleteDepartment(
     .delete()
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] deleteDepartment:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
+}
+
+/** Safe delete: reassigns child departments to parent, handles positions. */
+export async function safeDeleteDepartment(
+  id: string,
+  positionStrategy: "cascade" | "reassign",
+  reassignToDeptId?: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  // Get department's parent so we can reparent children
+  const { data: dept } = await supabaseAdmin
+    .from("koleex_departments")
+    .select("parent_id")
+    .eq("id", id)
+    .single();
+
+  // Reparent child departments to this dept's parent
+  await supabaseAdmin
+    .from("koleex_departments")
+    .update({ parent_id: dept?.parent_id || null, updated_at: new Date().toISOString() })
+    .eq("parent_id", id);
+
+  if (positionStrategy === "reassign" && reassignToDeptId) {
+    // Move positions to another department
+    await supabaseAdmin
+      .from("koleex_positions")
+      .update({ department_id: reassignToDeptId, updated_at: new Date().toISOString() })
+      .eq("department_id", id);
+    await supabaseAdmin
+      .from("koleex_assignments")
+      .update({ department_id: reassignToDeptId, updated_at: new Date().toISOString() })
+      .eq("department_id", id);
+  } else {
+    // Cascade delete: remove assignments then positions
+    await supabaseAdmin.from("koleex_assignments").delete().eq("department_id", id);
+    await supabaseAdmin.from("koleex_positions").delete().eq("department_id", id);
+  }
+
+  return deleteDepartment(id);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -194,9 +252,7 @@ export async function fetchPositions(
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });
 
-  if (departmentId) {
-    query = query.eq("department_id", departmentId);
-  }
+  if (departmentId) query = query.eq("department_id", departmentId);
 
   const { data, error } = await query;
   if (error) {
@@ -215,10 +271,7 @@ export async function createPosition(
     .select()
     .single();
 
-  if (error) {
-    console.error("[Management] createPosition:", error.message);
-    return { data: null, error: error.message };
-  }
+  if (error) return { data: null, error: error.message };
   return { data: data as PositionRow, error: null };
 }
 
@@ -231,10 +284,7 @@ export async function updatePosition(
     .update({ ...obj, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] updatePosition:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -246,10 +296,53 @@ export async function deletePosition(
     .delete()
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] deletePosition:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, error: null };
+}
+
+/** Safe delete: reassigns subordinates to this position's parent, removes assignments. */
+export async function safeDeletePosition(
+  id: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  const { data: pos } = await supabaseAdmin
+    .from("koleex_positions")
+    .select("reports_to_position_id")
+    .eq("id", id)
+    .single();
+
+  // Reassign direct reports to this position's parent
+  await supabaseAdmin
+    .from("koleex_positions")
+    .update({
+      reports_to_position_id: pos?.reports_to_position_id || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("reports_to_position_id", id);
+
+  // Remove assignments
+  await supabaseAdmin.from("koleex_assignments").delete().eq("position_id", id);
+
+  return deletePosition(id);
+}
+
+/** Move a position in the hierarchy (drag & drop). */
+export async function movePosition(
+  positionId: string,
+  newReportsToId: string | null,
+  newDepartmentId?: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  const updates: Record<string, unknown> = {
+    reports_to_position_id: newReportsToId,
+    updated_at: new Date().toISOString(),
+  };
+  if (newDepartmentId) updates.department_id = newDepartmentId;
+
+  const { error } = await supabaseAdmin
+    .from("koleex_positions")
+    .update(updates)
+    .eq("id", positionId);
+
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -267,9 +360,7 @@ export async function fetchAssignments(
     .order("is_primary", { ascending: false })
     .order("created_at", { ascending: true });
 
-  if (departmentId) {
-    query = query.eq("department_id", departmentId);
-  }
+  if (departmentId) query = query.eq("department_id", departmentId);
 
   const { data, error } = await query;
   if (error) {
@@ -288,10 +379,7 @@ export async function createAssignment(
     .select()
     .single();
 
-  if (error) {
-    console.error("[Management] createAssignment:", error.message);
-    return { data: null, error: error.message };
-  }
+  if (error) return { data: null, error: error.message };
   return { data: data as AssignmentRow, error: null };
 }
 
@@ -304,10 +392,7 @@ export async function updateAssignment(
     .update({ ...obj, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] updateAssignment:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -319,10 +404,7 @@ export async function deleteAssignment(
     .delete()
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] deleteAssignment:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -352,10 +434,7 @@ export async function createRole(
     .select()
     .single();
 
-  if (error) {
-    console.error("[Management] createRole:", error.message);
-    return { data: null, error: error.message };
-  }
+  if (error) return { data: null, error: error.message };
   return { data: data as RoleRow, error: null };
 }
 
@@ -368,25 +447,25 @@ export async function updateRole(
     .update({ ...obj, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] updateRole:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
 export async function deleteRole(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
+  // Unlink positions first
+  await supabaseAdmin
+    .from("koleex_positions")
+    .update({ role_id: null, updated_at: new Date().toISOString() })
+    .eq("role_id", id);
+
   const { error } = await supabaseAdmin
     .from("koleex_roles")
     .delete()
     .eq("id", id);
 
-  if (error) {
-    console.error("[Management] deleteRole:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -394,49 +473,27 @@ export async function deleteRole(
    PERMISSIONS
    ═══════════════════════════════════════════════════ */
 
-export async function fetchPermissions(
-  roleId: string,
-): Promise<PermissionRow[]> {
+export async function fetchPermissions(roleId: string): Promise<PermissionRow[]> {
   const { data, error } = await supabaseAdmin
     .from("koleex_permissions")
     .select("*")
     .eq("role_id", roleId)
     .order("module_name", { ascending: true });
 
-  if (error) {
-    console.error("[Management] fetchPermissions:", error.message);
-    return [];
-  }
+  if (error) return [];
   return (data as PermissionRow[]) || [];
 }
 
 export async function upsertPermissions(
   roleId: string,
-  perms: {
-    module_name: string;
-    can_view: boolean;
-    can_create: boolean;
-    can_edit: boolean;
-    can_delete: boolean;
-  }[],
+  perms: { module_name: string; can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }[],
 ): Promise<{ ok: boolean; error: string | null }> {
-  const rows = perms.map((p) => ({
-    role_id: roleId,
-    module_name: p.module_name,
-    can_view: p.can_view,
-    can_create: p.can_create,
-    can_edit: p.can_edit,
-    can_delete: p.can_delete,
-  }));
-
+  const rows = perms.map((p) => ({ role_id: roleId, ...p }));
   const { error } = await supabaseAdmin
     .from("koleex_permissions")
     .upsert(rows, { onConflict: "role_id,module_name" });
 
-  if (error) {
-    console.error("[Management] upsertPermissions:", error.message);
-    return { ok: false, error: error.message };
-  }
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -444,33 +501,22 @@ export async function upsertPermissions(
    POSITION HISTORY
    ═══════════════════════════════════════════════════ */
 
-export async function fetchPositionHistory(
-  positionId: string,
-): Promise<PositionHistoryRow[]> {
+export async function fetchPositionHistory(positionId: string): Promise<PositionHistoryRow[]> {
   const { data, error } = await supabaseAdmin
     .from("koleex_position_history")
     .select("*")
     .eq("position_id", positionId)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("[Management] fetchPositionHistory:", error.message);
-    return [];
-  }
+  if (error) return [];
   return (data as PositionHistoryRow[]) || [];
 }
 
 export async function addPositionHistory(
   obj: Partial<PositionHistoryRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
-  const { error } = await supabaseAdmin
-    .from("koleex_position_history")
-    .insert(obj);
-
-  if (error) {
-    console.error("[Management] addPositionHistory:", error.message);
-    return { ok: false, error: error.message };
-  }
+  const { error } = await supabaseAdmin.from("koleex_position_history").insert(obj);
+  if (error) return { ok: false, error: error.message };
   return { ok: true, error: null };
 }
 
@@ -483,76 +529,42 @@ export async function transferEmployee(
   newPositionId: string,
   newDepartmentId: string,
 ): Promise<{ ok: boolean; error: string | null }> {
-  // 1. Fetch the current assignment to know the old position/department
   const { data: current, error: fetchErr } = await supabaseAdmin
     .from("koleex_assignments")
     .select("*")
     .eq("id", assignmentId)
     .single();
 
-  if (fetchErr || !current) {
-    console.error("[Management] transferEmployee fetch:", fetchErr?.message);
-    return { ok: false, error: fetchErr?.message || "Assignment not found" };
-  }
+  if (fetchErr || !current) return { ok: false, error: fetchErr?.message || "Assignment not found" };
 
   const oldPositionId = current.position_id as string;
   const contactId = current.contact_id as string;
   const oldDepartmentId = current.department_id as string;
 
-  // 2. Update the assignment with new position and department
   const { error: updateErr } = await supabaseAdmin
     .from("koleex_assignments")
-    .update({
-      position_id: newPositionId,
-      department_id: newDepartmentId,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ position_id: newPositionId, department_id: newDepartmentId, updated_at: new Date().toISOString() })
     .eq("id", assignmentId);
 
-  if (updateErr) {
-    console.error("[Management] transferEmployee update:", updateErr.message);
-    return { ok: false, error: updateErr.message };
-  }
+  if (updateErr) return { ok: false, error: updateErr.message };
 
-  // 3. Add history entry for the old position (unassigned)
-  const { error: histOldErr } = await supabaseAdmin
-    .from("koleex_position_history")
-    .insert({
-      position_id: oldPositionId,
-      contact_id: contactId,
-      department_id: oldDepartmentId,
-      action: "transferred",
-      from_position_id: oldPositionId,
-      to_position_id: newPositionId,
-      notes: `Transferred out to new position`,
-    });
-
-  if (histOldErr) {
-    console.error("[Management] transferEmployee history (old):", histOldErr.message);
-  }
-
-  // 4. Add history entry for the new position (assigned)
-  const { error: histNewErr } = await supabaseAdmin
-    .from("koleex_position_history")
-    .insert({
-      position_id: newPositionId,
-      contact_id: contactId,
-      department_id: newDepartmentId,
-      action: "transferred",
-      from_position_id: oldPositionId,
-      to_position_id: newPositionId,
-      notes: `Transferred in from previous position`,
-    });
-
-  if (histNewErr) {
-    console.error("[Management] transferEmployee history (new):", histNewErr.message);
-  }
+  // Audit entries
+  await supabaseAdmin.from("koleex_position_history").insert({
+    position_id: oldPositionId, contact_id: contactId, department_id: oldDepartmentId,
+    action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
+    notes: "Transferred out",
+  });
+  await supabaseAdmin.from("koleex_position_history").insert({
+    position_id: newPositionId, contact_id: contactId, department_id: newDepartmentId,
+    action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
+    notes: "Transferred in",
+  });
 
   return { ok: true, error: null };
 }
 
 /* ═══════════════════════════════════════════════════
-   CONTACTS — for people picker (linked, not isolated)
+   CONTACTS — people picker + inline creation
    ═══════════════════════════════════════════════════ */
 
 export async function fetchContactsForLinking(): Promise<ContactRef[]> {
@@ -561,36 +573,79 @@ export async function fetchContactsForLinking(): Promise<ContactRef[]> {
     .select("id, first_name, last_name, display_name, email, photo_url, phone")
     .order("first_name", { ascending: true });
 
-  if (error) {
-    console.error("[Management] fetchContactsForLinking:", error.message);
-    return [];
-  }
+  if (error) return [];
 
-  return (data || []).map((c: any) => ({
-    id: c.id,
-    name:
-      c.display_name ||
-      [c.first_name, c.last_name].filter(Boolean).join(" ") ||
-      "Unnamed",
-    email: c.email || null,
-    avatar: c.photo_url || null,
-    phone: c.phone || null,
+  return (data || []).map((c: Record<string, unknown>) => ({
+    id: c.id as string,
+    name: (c.display_name as string) || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed",
+    email: (c.email as string) || null,
+    avatar: (c.photo_url as string) || null,
+    phone: (c.phone as string) || null,
   }));
+}
+
+export async function createInlineContact(input: {
+  first_name: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+}): Promise<{ data: ContactRef | null; error: string | null }> {
+  const display = [input.first_name, input.last_name].filter(Boolean).join(" ");
+
+  const { data, error } = await supabaseAdmin
+    .from("contacts")
+    .insert({
+      first_name: input.first_name,
+      last_name: input.last_name || null,
+      display_name: display,
+      email: input.email || null,
+      phone: input.phone || null,
+    })
+    .select("id, first_name, last_name, display_name, email, photo_url, phone")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+
+  return {
+    data: {
+      id: data.id,
+      name: data.display_name || display,
+      email: data.email,
+      avatar: data.photo_url || null,
+      phone: data.phone,
+    },
+    error: null,
+  };
+}
+
+/* ═══════════════════════════════════════════════════
+   FULL ORG DATA (cross-department)
+   ═══════════════════════════════════════════════════ */
+
+export async function fetchFullOrgData(): Promise<{
+  positions: PositionRow[];
+  assignments: AssignmentRow[];
+  contacts: ContactRef[];
+  departments: DepartmentRow[];
+}> {
+  const [positions, assignments, contacts, departments] = await Promise.all([
+    fetchPositions(),
+    fetchAssignments(),
+    fetchContactsForLinking(),
+    fetchDepartments(),
+  ]);
+  return { positions, assignments, contacts, departments };
 }
 
 /* ═══════════════════════════════════════════════════
    TREE BUILDERS
    ═══════════════════════════════════════════════════ */
 
-export function buildDepartmentTree(
-  departments: DepartmentRow[],
-): DeptTreeNode[] {
+export function buildDepartmentTree(departments: DepartmentRow[]): DeptTreeNode[] {
   const map = new Map<string, DeptTreeNode>();
   const roots: DeptTreeNode[] = [];
 
-  for (const dept of departments) {
-    map.set(dept.id, { ...dept, children: [] });
-  }
+  for (const dept of departments) map.set(dept.id, { ...dept, children: [] });
 
   for (const dept of departments) {
     const node = map.get(dept.id)!;
@@ -600,37 +655,34 @@ export function buildDepartmentTree(
       roots.push(node);
     }
   }
-
   return roots;
 }
 
-/** Build org chart tree from positions by reports_to_position_id */
+/** Build org chart tree. Works for department-scoped or full data. */
 export function buildOrgChart(
   positions: PositionRow[],
   assignments: AssignmentRow[],
   contacts: ContactRef[],
+  departments?: DepartmentRow[],
 ): OrgChartNode[] {
   const ctcMap = new Map(contacts.map((c) => [c.id, c]));
-  // Map position_id -> primary assignment
+  const deptMap = departments ? new Map(departments.map((d) => [d.id, d])) : null;
+
   const assignMap = new Map<string, AssignmentRow>();
   for (const a of assignments) {
-    // Prefer primary assignments
-    if (!assignMap.has(a.position_id) || a.is_primary) {
-      assignMap.set(a.position_id, a);
-    }
+    if (!assignMap.has(a.position_id) || a.is_primary) assignMap.set(a.position_id, a);
   }
 
   const nodeMap = new Map<string, OrgChartNode>();
   const roots: OrgChartNode[] = [];
 
-  // Create all nodes
   for (const pos of positions) {
     const asgn = assignMap.get(pos.id) || null;
     const ctc = asgn ? ctcMap.get(asgn.contact_id) || null : null;
-    nodeMap.set(pos.id, { position: pos, assignment: asgn, contact: ctc, children: [] });
+    const dept = deptMap?.get(pos.department_id) || null;
+    nodeMap.set(pos.id, { position: pos, department: dept, assignment: asgn, contact: ctc, children: [] });
   }
 
-  // Build tree
   for (const pos of positions) {
     const node = nodeMap.get(pos.id)!;
     if (pos.reports_to_position_id && nodeMap.has(pos.reports_to_position_id)) {
@@ -640,30 +692,41 @@ export function buildOrgChart(
     }
   }
 
+  // Sort children by level then title for consistent layout
+  const sortChildren = (nodes: OrgChartNode[]) => {
+    nodes.sort((a, b) => a.position.level - b.position.level || a.position.title.localeCompare(b.position.title));
+    nodes.forEach((n) => sortChildren(n.children));
+  };
+  roots.forEach((r) => sortChildren(r.children));
+  roots.sort((a, b) => a.position.level - b.position.level || a.position.title.localeCompare(b.position.title));
+
   return roots;
 }
 
-/** Get department head: the person assigned to the highest-level position
-    (lowest level number) with is_primary = true */
 export function getDepartmentHead(
   positions: PositionRow[],
   assignments: AssignmentRow[],
   contacts: ContactRef[],
 ): { name: string; title: string } | null {
-  if (positions.length === 0) return null;
-
-  // Sort by level ascending (0 = executive = head)
+  if (!positions.length) return null;
   const sorted = [...positions].sort((a, b) => a.level - b.level);
   const topPos = sorted[0];
-
-  const primaryAssign = assignments.find(
-    (a) => a.position_id === topPos.id && a.is_primary,
-  );
+  const primaryAssign = assignments.find((a) => a.position_id === topPos.id && a.is_primary);
   if (!primaryAssign) return null;
-
   const ctc = contacts.find((c) => c.id === primaryAssign.contact_id);
-  return {
-    name: ctc?.name || "Unknown",
-    title: topPos.title,
-  };
+  return { name: ctc?.name || "Unknown", title: topPos.title };
+}
+
+/** Quick stats per department. */
+export async function fetchDeptStats(): Promise<Record<string, { total: number; assigned: number }>> {
+  const [allPos, allAssign] = await Promise.all([fetchPositions(), fetchAssignments()]);
+  const assignedSet = new Set(allAssign.map((a) => a.position_id));
+  const stats: Record<string, { total: number; assigned: number }> = {};
+
+  for (const pos of allPos) {
+    if (!stats[pos.department_id]) stats[pos.department_id] = { total: 0, assigned: 0 };
+    stats[pos.department_id].total++;
+    if (assignedSet.has(pos.id)) stats[pos.department_id].assigned++;
+  }
+  return stats;
 }

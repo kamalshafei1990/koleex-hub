@@ -1,40 +1,40 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   Management — Central organizational engine for Koleex Hub.
+   Management — Organizational engine for Koleex Hub.
 
    Features:
-     • Department hierarchy (tree with parent_id nesting)
-     • Position management (CRUD + reports_to hierarchy + job descriptions)
-     • Employee assignment (link contacts → positions)
-     • Roles & Permissions (per-module access control)
-     • Real org chart (top-down tree with connector lines)
+     • Department hierarchy (tree sidebar)
+     • Position management + reports_to hierarchy
+     • Employee assignment (contact picker + inline create)
+     • Real org chart (tree with connectors, expand/collapse, drag-drop)
+     • Full company org chart (cross-department)
+     • Roles & Permissions (per-module access grid)
      • Position history / audit trail
-     • Employee transfer between positions
-     • Position analytics per department
-
-   Layout (matches Contacts / Employees pattern):
-     Left panel:  Department tree, search, "Roles" link
-     Right panel: Department details OR Roles management
+     • Employee transfer
+     • Circular hierarchy validation
+     • Safe delete with cascade / reassign
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Plus, Search, Pencil, Trash2, X, Loader2, ChevronRight, ChevronDown,
-  Users, UserPlus, Building2, User, ArrowLeft, ArrowRight,
+  Users, UserPlus, Building2, User, ArrowLeft,
   Briefcase, Network, LayoutList, GitBranchPlus, Shield,
   Check, History, ChevronUp, ArrowRightLeft, FileText, AlertCircle,
+  GripVertical, Image, Smile, Globe,
 } from "lucide-react";
 import {
-  fetchDepartments, createDepartment, updateDepartment, deleteDepartment,
-  fetchPositions, createPosition, updatePosition, deletePosition,
+  fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
+  fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition,
   fetchAssignments, createAssignment, updateAssignment, deleteAssignment,
-  fetchContactsForLinking, buildDepartmentTree, buildOrgChart, getDepartmentHead,
+  fetchContactsForLinking, createInlineContact,
+  buildDepartmentTree, buildOrgChart, getDepartmentHead, detectCircularHierarchy,
   fetchRoles, createRole, updateRole, deleteRole,
   fetchPermissions, upsertPermissions,
   fetchPositionHistory, addPositionHistory,
-  transferEmployee,
+  transferEmployee, fetchFullOrgData, fetchDeptStats,
   type DepartmentRow, type PositionRow, type AssignmentRow,
   type DeptTreeNode, type ContactRef, type OrgChartNode,
   type RoleRow, type PermissionRow, type PositionHistoryRow,
@@ -52,12 +52,8 @@ const DEPT_ICONS = [
 ];
 
 const LEVEL_LABELS: Record<number, string> = {
-  0: "Executive",
-  1: "Senior Management",
-  2: "Management",
-  3: "Senior",
-  4: "Mid-Level",
-  5: "Entry Level",
+  0: "Executive", 1: "Senior Management", 2: "Management",
+  3: "Senior", 4: "Mid-Level", 5: "Entry Level",
 };
 
 const LEVEL_COLORS: Record<number, string> = {
@@ -67,6 +63,11 @@ const LEVEL_COLORS: Record<number, string> = {
   3: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   4: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
   5: "bg-slate-500/15 text-slate-400 border-slate-500/20",
+};
+
+const LEVEL_DOT: Record<number, string> = {
+  0: "bg-amber-400", 1: "bg-violet-400", 2: "bg-blue-400",
+  3: "bg-emerald-400", 4: "bg-cyan-400", 5: "bg-slate-400",
 };
 
 const PERMISSION_MODULES = [
@@ -81,8 +82,15 @@ const PERMISSION_MODULES = [
 ];
 
 /* ═══════════════════════════════════════════════════
-   SHARED COMPONENTS
+   SHARED UI
    ═══════════════════════════════════════════════════ */
+
+const inputCls = "w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors";
+const textareaCls = "w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors resize-none";
+const selectCls = inputCls;
+const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-subtle)] hover:bg-[var(--bg-surface)] transition-colors";
+const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all";
+const dangerBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 transition-all";
 
 function ModalShell({ open, onClose, title, width, children, footer }: {
   open: boolean; onClose: () => void; title: string; width?: string;
@@ -110,23 +118,14 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">{children}</label>;
 }
 
-const inputCls = "w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors";
-const textareaCls = "w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[var(--border-focus)] text-[var(--text-primary)] text-[13px] outline-none transition-colors resize-none";
-const selectCls = inputCls;
-const cancelBtnCls = "h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-subtle)] hover:bg-[var(--bg-surface)] transition-colors";
-const primaryBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-30 transition-all";
-const dangerBtnCls = "h-10 px-5 rounded-xl text-[13px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 transition-all";
-
 function ErrorBanner({ message }: { message: string }) {
   if (!message) return null;
   return <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex items-center gap-2"><AlertCircle size={14} /> {message}</div>;
 }
 
 function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; size?: number }) {
-  if (src) {
-    return <img src={src} alt={name} className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />;
-  }
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  if (src) return <img src={src} alt={name} className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />;
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div className="rounded-full bg-[var(--bg-surface)] flex items-center justify-center shrink-0 text-[var(--text-dim)]" style={{ width: size, height: size }}>
       {size >= 28 ? <span className="font-semibold" style={{ fontSize: size * 0.38 }}>{initials || <User size={size * 0.45} />}</span> : <User size={size * 0.5} />}
@@ -134,8 +133,30 @@ function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; s
   );
 }
 
+function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-[var(--text-dim)]">
+      <Icon size={32} className="mb-3 opacity-40" />
+      <p className="text-[13px] font-medium mb-1">{title}</p>
+      {subtitle && <p className="text-[11px]">{subtitle}</p>}
+    </div>
+  );
+}
+
+function Spinner() {
+  return <div className="flex items-center justify-center py-16"><Loader2 size={20} className="text-[var(--text-dim)] animate-spin" /></div>;
+}
+
+/** Department icon renderer — supports emoji, image URL, fallback */
+function DeptIcon({ dept, size = 24 }: { dept: DepartmentRow; size?: number }) {
+  if (dept.icon_type === "image" && dept.icon_value) {
+    return <img src={dept.icon_value} alt="" className="rounded-lg object-cover" style={{ width: size, height: size }} />;
+  }
+  return <span style={{ fontSize: size * 0.85 }}>{dept.icon || "🏢"}</span>;
+}
+
 /* ═══════════════════════════════════════════════════
-   DEPARTMENT MODAL
+   DEPARTMENT MODAL (emoji picker + image URL)
    ═══════════════════════════════════════════════════ */
 function DepartmentModal({
   open, onClose, dept, departments, onSaved,
@@ -147,6 +168,8 @@ function DepartmentModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("🏢");
+  const [iconType, setIconType] = useState<"emoji" | "image">("emoji");
+  const [iconUrl, setIconUrl] = useState("");
   const [parentId, setParentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -157,6 +180,8 @@ function DepartmentModal({
       setName(dept?.name || "");
       setDescription(dept?.description || "");
       setIcon(dept?.icon || "🏢");
+      setIconType((dept?.icon_type as "emoji" | "image") || "emoji");
+      setIconUrl(dept?.icon_type === "image" ? dept?.icon_value || "" : "");
       setParentId(dept?.parent_id || null);
       setError(""); setShowIcons(false);
     }
@@ -167,12 +192,19 @@ function DepartmentModal({
   const handleSave = async () => {
     if (!name.trim()) { setError("Department name is required."); return; }
     setSaving(true); setError("");
-    const payload: any = { name: name.trim(), description: description.trim() || null, icon, parent_id: parentId || null };
+    const payload: Record<string, unknown> = {
+      name: name.trim(),
+      description: description.trim() || null,
+      icon: iconType === "emoji" ? icon : "🏢",
+      icon_type: iconType,
+      icon_value: iconType === "image" ? iconUrl.trim() || null : icon,
+      parent_id: parentId || null,
+    };
     if (dept) {
-      const res = await updateDepartment(dept.id, payload);
+      const res = await updateDepartment(dept.id, payload as Partial<DepartmentRow>);
       if (!res.ok) { setError(res.error || "Failed."); setSaving(false); return; }
     } else {
-      const res = await createDepartment(payload);
+      const res = await createDepartment(payload as Partial<DepartmentRow>);
       if (res.error) { setError(res.error); setSaving(false); return; }
     }
     setSaving(false); onSaved(); onClose();
@@ -184,26 +216,60 @@ function DepartmentModal({
       <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? "Saving..." : dept ? "Save Changes" : "Create Department"}</button></>
     }>
       <ErrorBanner message={error} />
-      {/* Icon + Name */}
-      <div className="flex items-start gap-3">
-        <div className="relative">
-          <button onClick={() => setShowIcons(!showIcons)}
-            className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-2xl hover:scale-105 transition-transform">{icon}</button>
-          {showIcons && (
-            <div className="absolute top-full left-0 mt-2 z-10 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl p-2 w-[240px] grid grid-cols-8 gap-1">
-              {DEPT_ICONS.map((e) => (
-                <button key={e} onClick={() => { setIcon(e); setShowIcons(false); }}
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center text-base hover:scale-110 transition-transform ${icon === e ? "bg-[var(--bg-surface-active)]" : ""}`}>{e}</button>
-              ))}
+
+      {/* Icon type toggle */}
+      <div>
+        <FieldLabel>Icon</FieldLabel>
+        <div className="flex gap-2 mb-2">
+          <button onClick={() => setIconType("emoji")}
+            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconType === "emoji" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
+            <Smile size={12} /> Emoji
+          </button>
+          <button onClick={() => setIconType("image")}
+            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconType === "image" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
+            <Image size={12} /> Image URL
+          </button>
+        </div>
+
+        {iconType === "emoji" ? (
+          <div className="flex items-start gap-3">
+            <div className="relative">
+              <button onClick={() => setShowIcons(!showIcons)}
+                className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-2xl hover:scale-105 transition-transform">{icon}</button>
+              {showIcons && (
+                <div className="absolute top-full left-0 mt-2 z-10 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl p-2 w-[240px] grid grid-cols-8 gap-1">
+                  {DEPT_ICONS.map((e) => (
+                    <button key={e} onClick={() => { setIcon(e); setShowIcons(false); }}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-base hover:scale-110 transition-transform ${icon === e ? "bg-[var(--bg-surface-active)]" : ""}`}>{e}</button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex-1">
-          <FieldLabel>Name *</FieldLabel>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-            placeholder="e.g. Engineering" autoFocus className={inputCls} />
-        </div>
+            <div className="flex-1">
+              <FieldLabel>Name *</FieldLabel>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Engineering" autoFocus className={inputCls} />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              {iconUrl ? (
+                <img src={iconUrl} alt="" className="w-12 h-12 rounded-xl object-cover border border-[var(--border-subtle)]" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]"><Image size={18} /></div>
+              )}
+              <div className="flex-1">
+                <input type="url" value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://example.com/icon.png" className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <FieldLabel>Name *</FieldLabel>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Engineering" className={inputCls} />
+            </div>
+          </div>
+        )}
       </div>
+
       <div>
         <FieldLabel>Description</FieldLabel>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description..." rows={2} className={textareaCls} />
@@ -220,7 +286,7 @@ function DepartmentModal({
 }
 
 /* ═══════════════════════════════════════════════════
-   POSITION MODAL (with job description)
+   POSITION MODAL (with circular hierarchy validation)
    ═══════════════════════════════════════════════════ */
 function PositionModal({
   open, onClose, position, departmentId, allPositions, roles, onSaved,
@@ -256,8 +322,17 @@ function PositionModal({
 
   const handleSave = async () => {
     if (!title.trim()) { setError("Position title is required."); return; }
+
+    // Circular hierarchy check
+    if (position && reportsTo) {
+      if (detectCircularHierarchy(position.id, reportsTo, allPositions)) {
+        setError("Cannot report to this position — it would create a circular hierarchy.");
+        return;
+      }
+    }
+
     setSaving(true); setError("");
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       title: title.trim(), description: description.trim() || null,
       level, department_id: departmentId,
       reports_to_position_id: reportsTo || null,
@@ -266,10 +341,10 @@ function PositionModal({
       requirements: requirements.trim() || null,
     };
     if (position) {
-      const res = await updatePosition(position.id, payload);
+      const res = await updatePosition(position.id, payload as Partial<PositionRow>);
       if (!res.ok) { setError(res.error || "Failed."); setSaving(false); return; }
     } else {
-      const res = await createPosition(payload);
+      const res = await createPosition(payload as Partial<PositionRow>);
       if (res.error) { setError(res.error); setSaving(false); return; }
     }
     setSaving(false); onSaved(); onClose();
@@ -318,7 +393,6 @@ function PositionModal({
         </select>
       </div>
 
-      {/* Job Description toggle */}
       <button onClick={() => setShowJD(!showJD)} className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors w-full">
         <FileText size={13} />
         <span>Job Description</span>
@@ -328,11 +402,11 @@ function PositionModal({
         <div className="space-y-4 pl-1 border-l-2 border-[var(--border-subtle)] ml-1">
           <div className="pl-3">
             <FieldLabel>Responsibilities</FieldLabel>
-            <textarea value={responsibilities} onChange={(e) => setResponsibilities(e.target.value)} placeholder="Key responsibilities for this role..." rows={3} className={textareaCls} />
+            <textarea value={responsibilities} onChange={(e) => setResponsibilities(e.target.value)} placeholder="Key responsibilities..." rows={3} className={textareaCls} />
           </div>
           <div className="pl-3">
             <FieldLabel>Requirements</FieldLabel>
-            <textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} placeholder="Skills, qualifications, experience..." rows={3} className={textareaCls} />
+            <textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} placeholder="Skills, qualifications..." rows={3} className={textareaCls} />
           </div>
         </div>
       )}
@@ -341,15 +415,16 @@ function PositionModal({
 }
 
 /* ═══════════════════════════════════════════════════
-   ASSIGNMENT MODAL (contact picker)
+   ASSIGNMENT MODAL (contact picker + inline create)
    ═══════════════════════════════════════════════════ */
 function AssignmentModal({
-  open, onClose, assignment, positionId, departmentId, contacts, onSaved,
+  open, onClose, assignment, positionId, departmentId, contacts, onSaved, onContactCreated,
 }: {
   open: boolean; onClose: () => void;
   assignment: AssignmentRow | null;
   positionId: string; departmentId: string;
   contacts: ContactRef[]; onSaved: () => void;
+  onContactCreated: (c: ContactRef) => void;
 }) {
   const [contactId, setContactId] = useState<string | null>(null);
   const [isPrimary, setIsPrimary] = useState(true);
@@ -358,6 +433,12 @@ function AssignmentModal({
   const [error, setError] = useState("");
   const [contactSearch, setContactSearch] = useState("");
   const [showPicker, setShowPicker] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newFirst, setNewFirst] = useState("");
+  const [newLast, setNewLast] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -365,6 +446,7 @@ function AssignmentModal({
       setIsPrimary(assignment?.is_primary ?? true);
       setStartDate(assignment?.start_date || "");
       setError(""); setContactSearch(""); setShowPicker(false);
+      setShowCreate(false); setNewFirst(""); setNewLast(""); setNewEmail(""); setNewPhone("");
     }
   }, [open, assignment]);
 
@@ -374,48 +456,66 @@ function AssignmentModal({
 
   const selectedContact = contactId ? contacts.find((c) => c.id === contactId) : null;
 
+  const handleCreateContact = async () => {
+    if (!newFirst.trim()) { setError("First name is required."); return; }
+    setCreating(true); setError("");
+    const res = await createInlineContact({
+      first_name: newFirst.trim(),
+      last_name: newLast.trim() || undefined,
+      email: newEmail.trim() || undefined,
+      phone: newPhone.trim() || undefined,
+    });
+    if (res.error || !res.data) { setError(res.error || "Failed to create contact."); setCreating(false); return; }
+    onContactCreated(res.data);
+    setContactId(res.data.id);
+    setShowCreate(false);
+    setShowPicker(false);
+    setCreating(false);
+  };
+
   const handleSave = async () => {
-    if (!contactId) { setError("Select a person from contacts."); return; }
+    if (!contactId) { setError("Select a person."); return; }
     setSaving(true); setError("");
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       contact_id: contactId, position_id: positionId,
       department_id: departmentId, is_primary: isPrimary,
       start_date: startDate || null,
     };
     if (assignment) {
-      const res = await updateAssignment(assignment.id, payload);
+      const res = await updateAssignment(assignment.id, payload as Partial<AssignmentRow>);
       if (!res.ok) { setError(res.error || "Failed."); setSaving(false); return; }
     } else {
-      const res = await createAssignment(payload);
+      const res = await createAssignment(payload as Partial<AssignmentRow>);
       if (res.error) { setError(res.error); setSaving(false); return; }
-      // Record history
       await addPositionHistory({ position_id: positionId, contact_id: contactId, department_id: departmentId, action: "assigned" });
     }
     setSaving(false); onSaved(); onClose();
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={assignment ? "Edit Assignment" : "Assign Employee"} width="max-w-[480px]" footer={
+    <ModalShell open={open} onClose={onClose} title={assignment ? "Edit Assignment" : "Assign Employee"} width="max-w-[500px]" footer={
       <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
       <button onClick={handleSave} disabled={saving || !contactId} className={primaryBtnCls}>{saving ? "Saving..." : assignment ? "Save Changes" : "Assign"}</button></>
     }>
       <ErrorBanner message={error} />
+
       {/* Contact picker */}
       <div>
-        <FieldLabel>Employee (from Contacts) *</FieldLabel>
+        <FieldLabel>Employee *</FieldLabel>
         <div className="relative">
-          <button onClick={() => setShowPicker(!showPicker)}
+          <button onClick={() => { setShowPicker(!showPicker); setShowCreate(false); }}
             className="w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-start flex items-center gap-2.5 transition-colors hover:border-[var(--border-focus)]">
             {selectedContact ? (
               <><Avatar src={selectedContact.avatar} name={selectedContact.name} size={22} />
               <span className="text-[var(--text-primary)] truncate">{selectedContact.name}</span>
               {selectedContact.email && <span className="text-[var(--text-dim)] text-[11px] truncate">({selectedContact.email})</span>}</>
             ) : (
-              <><User size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">Select an employee...</span></>
+              <><User size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">Select or create an employee...</span></>
             )}
           </button>
+
           {showPicker && (
-            <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-[260px] overflow-hidden flex flex-col">
+            <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-[320px] overflow-hidden flex flex-col">
               <div className="p-2 shrink-0">
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -424,7 +524,7 @@ function AssignmentModal({
                     className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[12px] outline-none" />
                 </div>
               </div>
-              <div className="px-1 pb-1 overflow-y-auto flex-1">
+              <div className="px-1 overflow-y-auto flex-1">
                 {filtered.length === 0 ? (
                   <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">No contacts found.</div>
                 ) : filtered.map((c) => (
@@ -438,10 +538,48 @@ function AssignmentModal({
                   </button>
                 ))}
               </div>
+              {/* Create new button */}
+              <div className="p-2 border-t border-[var(--border-color)] shrink-0">
+                <button onClick={() => { setShowCreate(true); setShowPicker(false); }}
+                  className="w-full h-9 rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 border border-dashed border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors">
+                  <UserPlus size={13} /> Create New Employee
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Inline create form */}
+      {showCreate && (
+        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[12px] font-semibold text-[var(--text-secondary)]">New Employee</span>
+            <button onClick={() => setShowCreate(false)} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>First Name *</FieldLabel>
+              <input type="text" value={newFirst} onChange={(e) => setNewFirst(e.target.value)} placeholder="John" autoFocus className={inputCls} />
+            </div>
+            <div>
+              <FieldLabel>Last Name</FieldLabel>
+              <input type="text" value={newLast} onChange={(e) => setNewLast(e.target.value)} placeholder="Doe" className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Email</FieldLabel>
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="john@example.com" className={inputCls} />
+          </div>
+          <div>
+            <FieldLabel>Phone</FieldLabel>
+            <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+1 234 567 890" className={inputCls} />
+          </div>
+          <button onClick={handleCreateContact} disabled={creating || !newFirst.trim()} className={primaryBtnCls + " w-full"}>
+            {creating ? "Creating..." : "Create & Select"}
+          </button>
+        </div>
+      )}
 
       {/* Primary toggle */}
       <div>
@@ -457,7 +595,6 @@ function AssignmentModal({
             }`}>Secondary</button>
         </div>
       </div>
-
       <div>
         <FieldLabel>Start Date</FieldLabel>
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
@@ -492,14 +629,13 @@ function TransferModal({
     if (!targetDeptId) { setDeptPositions([]); setTargetPosId(""); return; }
     (async () => {
       setLoadingPos(true);
-      const pos = await fetchPositions(targetDeptId);
-      setDeptPositions(pos);
+      setDeptPositions(await fetchPositions(targetDeptId));
       setLoadingPos(false);
     })();
   }, [targetDeptId]);
 
   const handleTransfer = async () => {
-    if (!assignment || !targetPosId || !targetDeptId) { setError("Select a target department and position."); return; }
+    if (!assignment || !targetPosId || !targetDeptId) { setError("Select target department and position."); return; }
     setSaving(true); setError("");
     const res = await transferEmployee(assignment.id, targetPosId, targetDeptId);
     if (!res.ok) { setError(res.error || "Transfer failed."); setSaving(false); return; }
@@ -530,9 +666,9 @@ function TransferModal({
         <div>
           <FieldLabel>Target Position</FieldLabel>
           {loadingPos ? (
-            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Loader2 size={14} className="animate-spin" /> Loading positions...</div>
+            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Loader2 size={14} className="animate-spin" /> Loading...</div>
           ) : deptPositions.length === 0 ? (
-            <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">No positions in this department.</div>
+            <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">No positions available.</div>
           ) : (
             <select value={targetPosId} onChange={(e) => setTargetPosId(e.target.value)} className={selectCls}>
               <option value="">Select position...</option>
@@ -548,11 +684,8 @@ function TransferModal({
 /* ═══════════════════════════════════════════════════
    ROLE MODAL
    ═══════════════════════════════════════════════════ */
-function RoleModal({
-  open, onClose, role, onSaved,
-}: {
-  open: boolean; onClose: () => void;
-  role: RoleRow | null; onSaved: () => void;
+function RoleModal({ open, onClose, role, onSaved }: {
+  open: boolean; onClose: () => void; role: RoleRow | null; onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -595,31 +728,75 @@ function RoleModal({
 }
 
 /* ═══════════════════════════════════════════════════
-   DELETE MODAL
+   DELETE MODAL (with safe delete options)
    ═══════════════════════════════════════════════════ */
-function DeleteModal({ open, title, message, onClose, onConfirm, deleting }: {
-  open: boolean; title: string; message: string;
-  onClose: () => void; onConfirm: () => void; deleting: boolean;
+function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }: {
+  open: boolean;
+  target: { type: "dept" | "pos" | "assign" | "role"; id: string; name: string } | null;
+  departments: DepartmentRow[];
+  onClose: () => void;
+  onConfirm: (strategy?: "cascade" | "reassign", reassignId?: string) => void;
+  deleting: boolean;
 }) {
-  if (!open) return null;
+  const [strategy, setStrategy] = useState<"cascade" | "reassign">("cascade");
+  const [reassignDeptId, setReassignDeptId] = useState("");
+
+  useEffect(() => { if (open) { setStrategy("cascade"); setReassignDeptId(""); } }, [open]);
+
+  if (!open || !target) return null;
+
+  const title = target.type === "dept" ? "Delete Department" : target.type === "pos" ? "Delete Position" : target.type === "role" ? "Delete Role" : "Remove Assignment";
+
   return (
-    <ModalShell open={open} onClose={onClose} title={title} width="max-w-[400px]" footer={
+    <ModalShell open={open} onClose={onClose} title={title} width="max-w-[440px]" footer={
       <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={onConfirm} disabled={deleting} className={dangerBtnCls}>{deleting ? "Deleting..." : "Delete"}</button></>
+      <button onClick={() => onConfirm(target.type === "dept" ? strategy : undefined, reassignDeptId || undefined)} disabled={deleting || (target.type === "dept" && strategy === "reassign" && !reassignDeptId)} className={dangerBtnCls}>
+        {deleting ? "Deleting..." : "Delete"}
+      </button></>
     }>
-      <p className="text-[13px] text-[var(--text-muted)]">{message}</p>
+      {target.type === "dept" ? (
+        <div className="space-y-3">
+          <p className="text-[13px] text-[var(--text-muted)]">Delete &ldquo;{target.name}&rdquo;? Choose what happens to its positions:</p>
+          <div className="space-y-2">
+            <button onClick={() => setStrategy("cascade")}
+              className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${strategy === "cascade" ? "border-red-500/30 bg-red-500/5" : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"}`}>
+              <div className="text-[13px] font-medium text-[var(--text-primary)]">Delete all positions</div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">All positions and assignments will be permanently removed.</div>
+            </button>
+            <button onClick={() => setStrategy("reassign")}
+              className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${strategy === "reassign" ? "border-blue-500/30 bg-blue-500/5" : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"}`}>
+              <div className="text-[13px] font-medium text-[var(--text-primary)]">Move positions to another department</div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">Positions and assignments will be transferred.</div>
+            </button>
+          </div>
+          {strategy === "reassign" && (
+            <div>
+              <FieldLabel>Move to</FieldLabel>
+              <select value={reassignDeptId} onChange={(e) => setReassignDeptId(e.target.value)} className={selectCls}>
+                <option value="">Select department...</option>
+                {departments.filter((d) => d.id !== target.id).map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-[13px] text-[var(--text-muted)]">
+          {target.type === "pos"
+            ? `Delete "${target.name}"? Subordinate positions will be reassigned to its parent. Assignments will be removed.`
+            : target.type === "role"
+              ? `Delete role "${target.name}"? Positions using this role will be unlinked.`
+              : `Remove "${target.name}" from this position?`}
+        </p>
+      )}
     </ModalShell>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   POSITION DETAIL DRAWER (history + JD)
+   POSITION DETAIL (history + JD)
    ═══════════════════════════════════════════════════ */
-function PositionDetailModal({
-  open, onClose, position, contacts,
-}: {
-  open: boolean; onClose: () => void;
-  position: PositionRow | null; contacts: ContactRef[];
+function PositionDetailModal({ open, onClose, position, contacts }: {
+  open: boolean; onClose: () => void; position: PositionRow | null; contacts: ContactRef[];
 }) {
   const [history, setHistory] = useState<PositionHistoryRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -631,48 +808,37 @@ function PositionDetailModal({
     }
   }, [open, position]);
 
-  const ctcMap = new Map(contacts.map(c => [c.id, c]));
+  const ctcMap = new Map(contacts.map((c) => [c.id, c]));
 
   return (
     <ModalShell open={open} onClose={onClose} title={position?.title || "Position Details"} width="max-w-[540px]">
       {position && (
         <div className="space-y-5">
-          {/* Level badge */}
           <div className="flex items-center gap-2">
             <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${LEVEL_COLORS[position.level] || LEVEL_COLORS[5]}`}>
               L{position.level} — {LEVEL_LABELS[position.level]}
             </span>
           </div>
-
           {position.description && (
-            <div>
-              <FieldLabel>Description</FieldLabel>
-              <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{position.description}</p>
-            </div>
+            <div><FieldLabel>Description</FieldLabel><p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{position.description}</p></div>
           )}
-
           {position.responsibilities && (
-            <div>
-              <FieldLabel>Responsibilities</FieldLabel>
+            <div><FieldLabel>Responsibilities</FieldLabel>
               <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-surface)] rounded-xl p-3.5 border border-[var(--border-subtle)]">{position.responsibilities}</div>
             </div>
           )}
-
           {position.requirements && (
-            <div>
-              <FieldLabel>Requirements</FieldLabel>
+            <div><FieldLabel>Requirements</FieldLabel>
               <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-surface)] rounded-xl p-3.5 border border-[var(--border-subtle)]">{position.requirements}</div>
             </div>
           )}
-
-          {/* History timeline */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <History size={13} className="text-[var(--text-dim)]" />
               <FieldLabel>Position History</FieldLabel>
             </div>
             {loading ? (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><Loader2 size={14} className="animate-spin" /> Loading history...</div>
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><Loader2 size={14} className="animate-spin" /> Loading...</div>
             ) : history.length === 0 ? (
               <div className="text-[12px] text-[var(--text-dim)] py-4 text-center">No history yet.</div>
             ) : (
@@ -684,7 +850,7 @@ function PositionDetailModal({
                       <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--border-strong)]" />
                       <div className="text-[12px] font-medium text-[var(--text-primary)]">{ctc?.name || "Unknown"}</div>
                       <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-2">
-                        <span className={`capitalize ${h.action === 'assigned' ? 'text-emerald-400' : h.action === 'transferred' ? 'text-blue-400' : 'text-red-400'}`}>{h.action}</span>
+                        <span className={`capitalize ${h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"}`}>{h.action}</span>
                         <span>·</span>
                         <span>{new Date(h.created_at).toLocaleDateString()}</span>
                       </div>
@@ -702,21 +868,42 @@ function PositionDetailModal({
 }
 
 /* ═══════════════════════════════════════════════════
-   ORG CHART — Real tree with connector lines
+   ORG CHART — Real tree with connectors, DnD, animation
    ═══════════════════════════════════════════════════ */
+
 function OrgChartCard({
-  node, hasChildren, expanded, onToggle, onAssign, onClick,
+  node, hasChildren, expanded, isDragOver, isDragging, showDept,
+  onToggle, onAssign, onClick, onDragStart, onDragOver, onDragLeave, onDrop,
 }: {
   node: OrgChartNode; hasChildren: boolean; expanded: boolean;
+  isDragOver: boolean; isDragging: boolean; showDept: boolean;
   onToggle: () => void; onAssign: (posId: string) => void;
   onClick: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
 }) {
   return (
-    <div onClick={onClick}
-      className="w-[210px] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3 hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-black/10 transition-all duration-200 cursor-pointer group relative">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={onClick}
+      className={`w-[240px] rounded-xl border bg-[var(--bg-secondary)] p-3 cursor-pointer group relative select-none transition-all duration-200
+        ${isDragOver ? "ring-2 ring-blue-400 border-blue-400/50 scale-[1.02]" : "border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:shadow-lg hover:shadow-black/10"}
+        ${isDragging ? "opacity-40 scale-95" : ""}
+      `}>
+      {/* Drag handle */}
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing">
+        <GripVertical size={12} className="text-[var(--text-dim)]" />
+      </div>
+
       {/* Person */}
       <div className="flex items-center gap-2.5 mb-2">
-        <Avatar src={node.contact?.avatar} name={node.contact?.name || "?"} size={32} />
+        <Avatar src={node.contact?.avatar} name={node.contact?.name || "?"} size={34} />
         <div className="min-w-0 flex-1">
           {node.contact ? (
             <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{node.contact.name}</div>
@@ -726,15 +913,23 @@ function OrgChartCard({
               <UserPlus size={10} /> Assign
             </button>
           )}
+          {node.contact?.email && <div className="text-[10px] text-[var(--text-dim)] truncate">{node.contact.email}</div>}
         </div>
       </div>
-      {/* Position */}
+
+      {/* Position title */}
       <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">{node.position.title}</div>
-      {/* Meta row */}
-      <div className="flex items-center gap-1.5 mt-2">
+
+      {/* Meta: level + department */}
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[node.position.level] || LEVEL_COLORS[5]}`}>
           L{node.position.level}
         </span>
+        {showDept && node.department && (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)] truncate max-w-[120px]">
+            {node.department.icon} {node.department.name}
+          </span>
+        )}
         {hasChildren && (
           <button onClick={(e) => { e.stopPropagation(); onToggle(); }}
             className="ml-auto w-5 h-5 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface)] transition-colors">
@@ -747,11 +942,17 @@ function OrgChartCard({
 }
 
 function OrgChartBranch({
-  node, onAssign, onClickNode,
+  node, showDept, dragSourceId, dragOverId, allPositions,
+  onAssign, onClickNode, setDragSourceId, setDragOverId, onDrop,
 }: {
-  node: OrgChartNode;
+  node: OrgChartNode; showDept: boolean;
+  dragSourceId: string | null; dragOverId: string | null;
+  allPositions: PositionRow[];
   onAssign: (posId: string) => void;
   onClickNode: (pos: PositionRow) => void;
+  setDragSourceId: (id: string | null) => void;
+  setDragOverId: (id: string | null) => void;
+  onDrop: (sourceId: string, targetId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
@@ -759,43 +960,86 @@ function OrgChartBranch({
   return (
     <div className="flex flex-col items-center">
       <OrgChartCard
-        node={node} hasChildren={hasChildren} expanded={expanded}
-        onToggle={() => setExpanded(!expanded)} onAssign={onAssign}
+        node={node}
+        hasChildren={hasChildren}
+        expanded={expanded}
+        isDragOver={dragOverId === node.position.id}
+        isDragging={dragSourceId === node.position.id}
+        showDept={showDept}
+        onToggle={() => setExpanded(!expanded)}
+        onAssign={onAssign}
         onClick={() => onClickNode(node.position)}
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", node.position.id);
+          e.dataTransfer.effectAllowed = "move";
+          setTimeout(() => setDragSourceId(node.position.id), 0);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (dragOverId !== node.position.id) setDragOverId(node.position.id);
+        }}
+        onDragLeave={() => { if (dragOverId === node.position.id) setDragOverId(null); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const sourceId = e.dataTransfer.getData("text/plain");
+          if (sourceId && sourceId !== node.position.id) {
+            onDrop(sourceId, node.position.id);
+          }
+          setDragSourceId(null);
+          setDragOverId(null);
+        }}
       />
 
-      {hasChildren && expanded && (
-        <>
-          {/* Vertical connector from parent */}
-          <div className="w-px h-6 bg-[var(--border-color)]" />
+      {/* Children with connectors + animation */}
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded && hasChildren ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0"}`}>
+        {hasChildren && (
+          <>
+            {/* Vertical connector from parent */}
+            <div className="flex justify-center">
+              <div className="w-px h-6 bg-[var(--border-color)]" />
+            </div>
 
-          {/* Children row */}
-          <div className="flex">
-            {node.children.map((child, i) => (
-              <div key={child.position.id} className="flex flex-col items-center relative px-3 min-w-0">
-                {/* Horizontal connector segment */}
-                {node.children.length > 1 && (
-                  <div className={`absolute top-0 h-px bg-[var(--border-color)] ${
-                    i === 0 ? "left-1/2 right-0" :
-                    i === node.children.length - 1 ? "left-0 right-1/2" :
-                    "left-0 right-0"
-                  }`} />
-                )}
-                {/* Vertical connector to child */}
-                <div className="w-px h-6 bg-[var(--border-color)]" />
-                {/* Recurse */}
-                <OrgChartBranch node={child} onAssign={onAssign} onClickNode={onClickNode} />
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+            {/* Children row */}
+            <div className="flex">
+              {node.children.map((child, i) => (
+                <div key={child.position.id} className="flex flex-col items-center relative px-3 min-w-0">
+                  {/* Horizontal connector segment */}
+                  {node.children.length > 1 && (
+                    <div className={`absolute top-0 h-px bg-[var(--border-color)] ${
+                      i === 0 ? "left-1/2 right-0" :
+                      i === node.children.length - 1 ? "left-0 right-1/2" :
+                      "left-0 right-0"
+                    }`} />
+                  )}
+                  {/* Vertical connector to child */}
+                  <div className="w-px h-6 bg-[var(--border-color)]" />
+                  {/* Recurse */}
+                  <OrgChartBranch
+                    node={child}
+                    showDept={showDept}
+                    dragSourceId={dragSourceId}
+                    dragOverId={dragOverId}
+                    allPositions={allPositions}
+                    onAssign={onAssign}
+                    onClickNode={onClickNode}
+                    setDragSourceId={setDragSourceId}
+                    setDragOverId={setDragOverId}
+                    onDrop={onDrop}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   PERMISSIONS EDITOR (table grid)
+   PERMISSIONS EDITOR
    ═══════════════════════════════════════════════════ */
 function PermissionsEditor({ roleId }: { roleId: string }) {
   const [perms, setPerms] = useState<Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>>({});
@@ -807,25 +1051,20 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     setLoading(true);
     fetchPermissions(roleId).then((rows) => {
       const map: typeof perms = {};
-      PERMISSION_MODULES.forEach(m => { map[m] = { can_view: false, can_create: false, can_edit: false, can_delete: false }; });
-      rows.forEach(r => { if (map[r.module_name]) map[r.module_name] = { can_view: r.can_view, can_create: r.can_create, can_edit: r.can_edit, can_delete: r.can_delete }; });
-      setPerms(map);
-      setLoading(false);
+      PERMISSION_MODULES.forEach((m) => { map[m] = { can_view: false, can_create: false, can_edit: false, can_delete: false }; });
+      rows.forEach((r) => { if (map[r.module_name]) map[r.module_name] = { can_view: r.can_view, can_create: r.can_create, can_edit: r.can_edit, can_delete: r.can_delete }; });
+      setPerms(map); setLoading(false);
     });
   }, [roleId]);
 
-  const toggle = (module: string, field: "can_view" | "can_create" | "can_edit" | "can_delete") => {
-    setPerms(prev => ({
-      ...prev,
-      [module]: { ...prev[module], [field]: !prev[module][field] },
-    }));
+  const toggle = (mod: string, field: "can_view" | "can_create" | "can_edit" | "can_delete") => {
+    setPerms((prev) => ({ ...prev, [mod]: { ...prev[mod], [field]: !prev[mod][field] } }));
     setSaved(false);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    const arr = Object.entries(perms).map(([module_name, p]) => ({ module_name, ...p }));
-    await upsertPermissions(roleId, arr);
+    await upsertPermissions(roleId, Object.entries(perms).map(([module_name, p]) => ({ module_name, ...p })));
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -869,9 +1108,7 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
       </div>
       <div className="flex items-center justify-end gap-2 mt-4">
         {saved && <span className="text-[12px] text-emerald-400 font-medium">Saved!</span>}
-        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>
-          {saving ? "Saving..." : "Save Permissions"}
-        </button>
+        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? "Saving..." : "Save Permissions"}</button>
       </div>
     </div>
   );
@@ -889,14 +1126,25 @@ export default function ManagementPage() {
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [deptStats, setDeptStats] = useState<Record<string, { total: number; assigned: number }>>({});
+
+  /* ── Full org chart data ── */
+  const [fullOrgPositions, setFullOrgPositions] = useState<PositionRow[]>([]);
+  const [fullOrgAssignments, setFullOrgAssignments] = useState<AssignmentRow[]>([]);
+  const [fullOrgContacts, setFullOrgContacts] = useState<ContactRef[]>([]);
+  const [fullOrgLoading, setFullOrgLoading] = useState(false);
 
   /* ── Selection ── */
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
-  const [rightView, setRightView] = useState<"dept" | "roles">("dept");
+  const [rightView, setRightView] = useState<"dept" | "roles" | "fullchart">("dept");
   const [search, setSearch] = useState("");
   const [expandedTree, setExpandedTree] = useState<Set<string>>(new Set());
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
+
+  /* ── Drag & Drop ── */
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   /* ── Modals ── */
   const [showDeptModal, setShowDeptModal] = useState(false);
@@ -926,10 +1174,10 @@ export default function ManagementPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [depts, ctcs, rls] = await Promise.all([fetchDepartments(), fetchContactsForLinking(), fetchRoles()]);
-      setDepartments(depts);
-      setContacts(ctcs);
-      setRoles(rls);
+      const [depts, ctcs, rls, stats] = await Promise.all([
+        fetchDepartments(), fetchContactsForLinking(), fetchRoles(), fetchDeptStats(),
+      ]);
+      setDepartments(depts); setContacts(ctcs); setRoles(rls); setDeptStats(stats);
       const pIds = new Set<string>();
       depts.forEach((d) => { if (d.parent_id) pIds.add(d.parent_id); });
       setExpandedTree(pIds);
@@ -937,118 +1185,149 @@ export default function ManagementPage() {
     })();
   }, []);
 
-  /* ── Load detail ── */
+  /* ── Load department detail ── */
   const loadDeptDetail = useCallback(async (deptId: string) => {
     setDetailLoading(true);
     const [pos, asgn] = await Promise.all([fetchPositions(deptId), fetchAssignments(deptId)]);
-    setPositions(pos);
-    setAssignments(asgn);
+    setPositions(pos); setAssignments(asgn);
     setDetailLoading(false);
   }, []);
 
   useEffect(() => {
-    if (selectedDeptId) loadDeptDetail(selectedDeptId);
-    else { setPositions([]); setAssignments([]); }
-  }, [selectedDeptId, loadDeptDetail]);
+    if (selectedDeptId && rightView === "dept") loadDeptDetail(selectedDeptId);
+    else if (rightView !== "fullchart") { setPositions([]); setAssignments([]); }
+  }, [selectedDeptId, rightView, loadDeptDetail]);
+
+  /* ── Load full org chart ── */
+  const loadFullOrgChart = useCallback(async () => {
+    setFullOrgLoading(true);
+    const data = await fetchFullOrgData();
+    setFullOrgPositions(data.positions);
+    setFullOrgAssignments(data.assignments);
+    setFullOrgContacts(data.contacts);
+    setDepartments(data.departments);
+    setFullOrgLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (rightView === "fullchart") loadFullOrgChart();
+  }, [rightView, loadFullOrgChart]);
 
   const selectedDept = departments.find((d) => d.id === selectedDeptId) || null;
   const tree = useMemo(() => buildDepartmentTree(departments), [departments]);
-
-  /* ── Per-dept position counts ── */
-  const [deptCounts, setDeptCounts] = useState<Record<string, number>>({});
-  useEffect(() => {
-    (async () => {
-      const allPos = await fetchPositions();
-      const counts: Record<string, number> = {};
-      allPos.forEach((p) => { counts[p.department_id] = (counts[p.department_id] || 0) + 1; });
-      setDeptCounts(counts);
-    })();
-  }, [departments, positions]);
-
   const contactMap = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
 
-  /* ── Filtered departments ── */
   const filteredDepts = useMemo(() => {
     if (!search.trim()) return null;
     const q = search.toLowerCase();
     return departments.filter((d) => d.name.toLowerCase().includes(q) || (d.description && d.description.toLowerCase().includes(q)));
   }, [departments, search]);
 
-  /* ── Grouped assignments by position ── */
   const assignmentsByPos = useMemo(() => {
     const map = new Map<string, AssignmentRow[]>();
     assignments.forEach((a) => { const arr = map.get(a.position_id) || []; arr.push(a); map.set(a.position_id, arr); });
     return map;
   }, [assignments]);
 
-  /* ── Analytics ── */
   const analytics = useMemo(() => {
     const totalPositions = positions.length;
-    const assignedPositions = new Set(assignments.map(a => a.position_id)).size;
-    const emptyPositions = totalPositions - assignedPositions;
-    const totalAssigned = assignments.length;
-    return { totalPositions, assignedPositions, emptyPositions, totalAssigned };
+    const assignedPositions = new Set(assignments.map((a) => a.position_id)).size;
+    return { totalPositions, assignedPositions, emptyPositions: totalPositions - assignedPositions, totalAssigned: assignments.length };
   }, [positions, assignments]);
+
+  /* ── Org chart trees ── */
+  const deptOrgChart = useMemo(
+    () => buildOrgChart(positions, assignments, contacts, departments),
+    [positions, assignments, contacts, departments],
+  );
+
+  const fullOrgChart = useMemo(
+    () => rightView === "fullchart" ? buildOrgChart(fullOrgPositions, fullOrgAssignments, fullOrgContacts, departments) : [],
+    [rightView, fullOrgPositions, fullOrgAssignments, fullOrgContacts, departments],
+  );
 
   /* ── Handlers ── */
   const handleSelectDept = (dept: DepartmentRow) => {
-    setSelectedDeptId(dept.id);
-    setRightView("dept");
-    setMobileShowDetail(true);
+    setSelectedDeptId(dept.id); setRightView("dept"); setMobileShowDetail(true);
   };
 
-  const reloadDepts = async () => {
-    const fresh = await fetchDepartments();
-    setDepartments(fresh);
+  const reloadAll = async () => {
+    const [depts, stats, ctcs] = await Promise.all([fetchDepartments(), fetchDeptStats(), fetchContactsForLinking()]);
+    setDepartments(depts); setDeptStats(stats); setContacts(ctcs);
     const pIds = new Set<string>();
-    fresh.forEach((d) => { if (d.parent_id) pIds.add(d.parent_id); });
+    depts.forEach((d) => { if (d.parent_id) pIds.add(d.parent_id); });
     setExpandedTree(pIds);
   };
 
-  const reloadRoles = async () => { const rls = await fetchRoles(); setRoles(rls); };
+  const reloadRoles = async () => { setRoles(await fetchRoles()); };
 
-  const handleDeptSaved = async () => { await reloadDepts(); setToast(editDept ? "Department updated." : "Department created."); };
-  const handlePosSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(editPos ? "Position updated." : "Position created."); };
+  const handleDeptSaved = async () => { await reloadAll(); setToast(editDept ? "Department updated." : "Department created."); };
+  const handlePosSaved = async () => {
+    if (selectedDeptId) await loadDeptDetail(selectedDeptId);
+    const stats = await fetchDeptStats(); setDeptStats(stats);
+    setToast(editPos ? "Position updated." : "Position created.");
+  };
   const handleAssignSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(editAssign ? "Assignment updated." : "Employee assigned."); };
   const handleRoleSaved = async () => { await reloadRoles(); setToast(editRole ? "Role updated." : "Role created."); };
   const handleTransferSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast("Employee transferred."); };
 
-  const handleDeleteConfirm = async () => {
+  const handleContactCreated = (c: ContactRef) => {
+    setContacts((prev) => [...prev, c]);
+  };
+
+  const handleDeleteConfirm = async (strategy?: "cascade" | "reassign", reassignId?: string) => {
     if (!deleteTarget) return;
     setDeleting(true);
     let ok = false;
     if (deleteTarget.type === "dept") {
-      ok = (await deleteDepartment(deleteTarget.id)).ok;
+      ok = (await safeDeleteDepartment(deleteTarget.id, strategy || "cascade", reassignId)).ok;
       if (ok && selectedDeptId === deleteTarget.id) { setSelectedDeptId(null); setMobileShowDetail(false); }
-      if (ok) await reloadDepts();
+      if (ok) await reloadAll();
     } else if (deleteTarget.type === "pos") {
-      ok = (await deletePosition(deleteTarget.id)).ok;
+      ok = (await safeDeletePosition(deleteTarget.id)).ok;
+      if (ok && selectedDeptId) await loadDeptDetail(selectedDeptId);
+      if (ok) { const stats = await fetchDeptStats(); setDeptStats(stats); }
     } else if (deleteTarget.type === "assign") {
       ok = (await deleteAssignment(deleteTarget.id)).ok;
+      if (ok && selectedDeptId) await loadDeptDetail(selectedDeptId);
     } else if (deleteTarget.type === "role") {
       ok = (await deleteRole(deleteTarget.id)).ok;
       if (ok) { await reloadRoles(); if (selectedRoleId === deleteTarget.id) setSelectedRoleId(null); }
     }
-    if (ok && selectedDeptId && (deleteTarget.type === "pos" || deleteTarget.type === "assign")) await loadDeptDetail(selectedDeptId);
     setDeleting(false); setShowDeleteModal(false); setDeleteTarget(null);
     if (ok) setToast("Deleted.");
+  };
+
+  /* ── Drag & drop handler ── */
+  const handleOrgDrop = async (sourceId: string, targetId: string) => {
+    const posArr = rightView === "fullchart" ? fullOrgPositions : positions;
+    if (detectCircularHierarchy(sourceId, targetId, posArr)) {
+      setToast("Cannot move — would create circular hierarchy.");
+      return;
+    }
+    const res = await movePosition(sourceId, targetId);
+    if (!res.ok) { setToast(res.error || "Move failed."); return; }
+    setToast("Position moved.");
+    if (rightView === "fullchart") await loadFullOrgChart();
+    else if (selectedDeptId) await loadDeptDetail(selectedDeptId);
   };
 
   const toggleTreeNode = (id: string) => {
     setExpandedTree((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   };
 
-  /* ── Tree node ── */
+  /* ── Tree node renderer ── */
   const renderTreeNode = (node: DeptTreeNode, depth = 0) => {
     const hasChildren = node.children.length > 0;
     const isExpanded = expandedTree.has(node.id);
     const isSelected = selectedDeptId === node.id && rightView === "dept";
-    const cnt = deptCounts[node.id] || 0;
+    const stat = deptStats[node.id];
 
     return (
       <div key={node.id}>
-        <button onClick={() => handleSelectDept(node)}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-start transition-all duration-150 group ${
+        <div role="button" tabIndex={0} onClick={() => handleSelectDept(node)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSelectDept(node); }}
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-start transition-all duration-150 group cursor-pointer ${
             isSelected ? "bg-[var(--bg-surface-active)] shadow-[inset_3px_0_0_var(--text-subtle)]" : "hover:bg-[var(--bg-surface)]"
           }`}
           style={{ paddingInlineStart: `${12 + depth * 20}px` }}>
@@ -1058,18 +1337,22 @@ export default function ManagementPage() {
               {isExpanded ? <ChevronDown size={12} className="text-[var(--text-dim)]" /> : <ChevronRight size={12} className="text-[var(--text-dim)]" />}
             </button>
           ) : <div className="w-5 shrink-0" />}
-          <span className="text-lg shrink-0">{node.icon}</span>
+          <DeptIcon dept={node} size={20} />
           <div className="flex-1 min-w-0">
             <div className={`text-[13px] font-medium truncate ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{node.name}</div>
           </div>
-          {cnt > 0 && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md shrink-0 bg-[var(--bg-surface)] text-[var(--text-faint)]">{cnt}</span>}
+          {stat && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md shrink-0 bg-[var(--bg-surface)] text-[var(--text-faint)]">
+              {stat.assigned}/{stat.total}
+            </span>
+          )}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button onClick={(e) => { e.stopPropagation(); setEditDept(node); setShowDeptModal(true); }}
               className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]"><Pencil size={11} className="text-[var(--text-dim)]" /></button>
             <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "dept", id: node.id, name: node.name }); setShowDeleteModal(true); }}
               className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]"><Trash2 size={11} className="text-red-400/60" /></button>
           </div>
-        </button>
+        </div>
         {hasChildren && isExpanded && <div className="mt-0.5">{node.children.map((c) => renderTreeNode(c, depth + 1))}</div>}
       </div>
     );
@@ -1080,8 +1363,32 @@ export default function ManagementPage() {
     return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><Loader2 size={24} className="text-[var(--text-dim)] animate-spin" /></div>;
   }
 
+  /* ── Render org chart helper ── */
+  const renderOrgChart = (chartNodes: OrgChartNode[], posArr: PositionRow[], showDept: boolean) => (
+    <div className="overflow-auto pb-8">
+      <div className="flex justify-center gap-6 pt-4 min-w-max">
+        {chartNodes.map((node) => (
+          <OrgChartBranch
+            key={node.position.id}
+            node={node}
+            showDept={showDept}
+            dragSourceId={dragSourceId}
+            dragOverId={dragOverId}
+            allPositions={posArr}
+            onAssign={(posId) => { setAssignPosId(posId); setEditAssign(null); setShowAssignModal(true); }}
+            onClickNode={(pos) => { setDetailPos(pos); setShowPosDetail(true); }}
+            setDragSourceId={setDragSourceId}
+            setDragOverId={setDragOverId}
+            onDrop={handleOrgDrop}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]">
+    <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden max-w-[100vw]"
+      onDragEnd={() => { setDragSourceId(null); setDragOverId(null); }}>
 
       {/* ═══════════ LEFT PANEL ═══════════ */}
       <div className={`${mobileShowDetail ? "hidden md:flex" : "flex"} flex-col w-full md:w-[340px] lg:w-[380px] md:border-e border-[var(--border-color)] shrink-0 h-full bg-[var(--bg-secondary)] min-w-0`}>
@@ -1102,7 +1409,6 @@ export default function ManagementPage() {
               </button>
             </div>
 
-            {/* Search */}
             <div className="relative">
               <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search departments..."
@@ -1118,18 +1424,14 @@ export default function ManagementPage() {
           {/* Department tree */}
           <div className="flex-1 overflow-y-auto will-change-scroll px-2.5 py-2 space-y-0.5">
             {departments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-[var(--text-dim)]">
-                <Building2 size={32} className="mb-3 opacity-40" />
-                <p className="text-[13px] font-medium mb-1">No departments yet</p>
-                <p className="text-[11px]">Create your first department to get started.</p>
-              </div>
+              <EmptyState icon={Building2} title="No departments yet" subtitle="Create your first department to get started." />
             ) : filteredDepts ? (
               filteredDepts.map((dept) => (
                 <button key={dept.id} onClick={() => handleSelectDept(dept)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all group ${
                     selectedDeptId === dept.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
                   }`}>
-                  <span className="text-lg">{dept.icon}</span>
+                  <DeptIcon dept={dept} size={20} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate text-[var(--text-secondary)]">{dept.name}</div>
                   </div>
@@ -1138,8 +1440,15 @@ export default function ManagementPage() {
             ) : tree.map((node) => renderTreeNode(node))}
           </div>
 
-          {/* Roles & Permissions link */}
-          <div className="px-3 py-3 border-t border-[var(--border-color)]">
+          {/* Bottom links */}
+          <div className="px-3 py-2 border-t border-[var(--border-color)] space-y-1">
+            <button onClick={() => { setRightView("fullchart"); setSelectedDeptId(null); setMobileShowDetail(true); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
+                rightView === "fullchart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+              }`}>
+              <Globe size={16} />
+              <span className="text-[13px] font-medium">Full Org Chart</span>
+            </button>
             <button onClick={() => { setRightView("roles"); setSelectedDeptId(null); setMobileShowDetail(true); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "roles" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
@@ -1154,8 +1463,32 @@ export default function ManagementPage() {
       {/* ═══════════ RIGHT PANEL ═══════════ */}
       <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
 
-        {/* ── ROLES VIEW ── */}
-        {rightView === "roles" ? (
+        {/* ── FULL ORG CHART VIEW ── */}
+        {rightView === "fullchart" ? (
+          <div className="flex flex-col h-full">
+            <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
+              <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
+                className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
+                <ArrowLeft size={14} className="rtl:rotate-180" /> Back
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                  <Globe size={18} className="text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Company Org Chart</h2>
+                  <p className="text-[12px] text-[var(--text-dim)]">Drag & drop to reorganize hierarchy</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {fullOrgLoading ? <Spinner /> : fullOrgChart.length === 0 ? (
+                <EmptyState icon={GitBranchPlus} title="No positions to visualize" subtitle="Create departments and positions first." />
+              ) : renderOrgChart(fullOrgChart, fullOrgPositions, true)}
+            </div>
+          </div>
+        ) : rightView === "roles" ? (
+          /* ── ROLES VIEW ── */
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
@@ -1181,11 +1514,7 @@ export default function ManagementPage() {
 
             <div className="flex-1 overflow-y-auto">
               {roles.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-dim)]">
-                  <Shield size={36} className="mb-3 opacity-30" />
-                  <p className="text-[14px] font-medium mb-1">No roles defined</p>
-                  <p className="text-[12px]">Create roles and assign module permissions.</p>
-                </div>
+                <EmptyState icon={Shield} title="No roles defined" subtitle="Create roles and assign module permissions." />
               ) : (
                 <div className="px-4 md:px-6 py-4 space-y-3">
                   {roles.map((role) => (
@@ -1218,9 +1547,7 @@ export default function ManagementPage() {
                       </div>
                       {selectedRoleId === role.id && (
                         <div className="px-4 pb-4 border-t border-[var(--border-color)]">
-                          <div className="pt-3">
-                            <PermissionsEditor roleId={role.id} />
-                          </div>
+                          <div className="pt-3"><PermissionsEditor roleId={role.id} /></div>
                         </div>
                       )}
                     </div>
@@ -1241,7 +1568,6 @@ export default function ManagementPage() {
         ) : (
           /* ── DEPARTMENT DETAIL ── */
           <>
-            {/* Header */}
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => setMobileShowDetail(false)}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
@@ -1249,7 +1575,9 @@ export default function ManagementPage() {
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-2xl shrink-0">{selectedDept.icon}</div>
+                  <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 overflow-hidden">
+                    <DeptIcon dept={selectedDept} size={28} />
+                  </div>
                   <div className="min-w-0">
                     <h2 className="text-[18px] font-bold text-[var(--text-primary)] truncate">{selectedDept.name}</h2>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -1291,7 +1619,6 @@ export default function ManagementPage() {
                     </div>
                   )}
                 </div>
-                {/* View toggle */}
                 <div className="flex items-center border border-[var(--border-subtle)] rounded-lg overflow-hidden shrink-0">
                   <button onClick={() => setViewMode("list")}
                     className={`h-7 px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors ${viewMode === "list" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}>
@@ -1305,12 +1632,10 @@ export default function ManagementPage() {
               </div>
             </div>
 
-            {/* Content */}
+            {/* Content area */}
             <div className="flex-1 overflow-y-auto">
-              {detailLoading ? (
-                <div className="flex items-center justify-center py-16"><Loader2 size={20} className="text-[var(--text-dim)] animate-spin" /></div>
-              ) : viewMode === "chart" ? (
-                /* ── ORG CHART VIEW ── */
+              {detailLoading ? <Spinner /> : viewMode === "chart" ? (
+                /* ── DEPT ORG CHART ── */
                 <div className="px-4 md:px-6 py-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Organizational Chart</h3>
@@ -1320,22 +1645,8 @@ export default function ManagementPage() {
                     </button>
                   </div>
                   {positions.length === 0 ? (
-                    <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-xl">
-                      <GitBranchPlus size={24} className="text-[var(--text-dim)] mx-auto mb-2" />
-                      <p className="text-[13px] text-[var(--text-dim)]">No positions to visualize.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto pb-8">
-                      <div className="flex justify-center gap-6 pt-4 min-w-max">
-                        {buildOrgChart(positions, assignments, contacts).map((node) => (
-                          <OrgChartBranch key={node.position.id} node={node}
-                            onAssign={(posId) => { setAssignPosId(posId); setEditAssign(null); setShowAssignModal(true); }}
-                            onClickNode={(pos) => { setDetailPos(pos); setShowPosDetail(true); }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    <EmptyState icon={GitBranchPlus} title="No positions to visualize" subtitle="Create positions to see the org chart." />
+                  ) : renderOrgChart(deptOrgChart, positions, false)}
                 </div>
               ) : (
                 /* ── LIST VIEW ── */
@@ -1349,19 +1660,14 @@ export default function ManagementPage() {
                   </div>
 
                   {positions.length === 0 ? (
-                    <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-xl">
-                      <Briefcase size={24} className="text-[var(--text-dim)] mx-auto mb-2" />
-                      <p className="text-[13px] text-[var(--text-dim)]">No positions defined yet.</p>
-                      <p className="text-[11px] text-[var(--text-dim)] mt-0.5">Create positions, then assign people to them.</p>
-                    </div>
+                    <EmptyState icon={Briefcase} title="No positions defined yet" subtitle="Create positions, then assign people to them." />
                   ) : (
                     positions.map((pos) => {
                       const posAssignments = assignmentsByPos.get(pos.id) || [];
-                      const roleName = pos.role_id ? roles.find(r => r.id === pos.role_id)?.name : null;
+                      const roleName = pos.role_id ? roles.find((r) => r.id === pos.role_id)?.name : null;
 
                       return (
                         <div key={pos.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all duration-200">
-                          {/* Position header */}
                           <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-faint)] group">
                             <div className="w-9 h-9 rounded-lg bg-violet-500/[0.10] border border-violet-500/15 flex items-center justify-center shrink-0">
                               <Briefcase size={15} className="text-violet-400" />
@@ -1394,7 +1700,6 @@ export default function ManagementPage() {
                             </div>
                           </div>
 
-                          {/* Assigned people */}
                           {posAssignments.length === 0 ? (
                             <div className="px-4 py-3">
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
@@ -1465,7 +1770,7 @@ export default function ManagementPage() {
             position={editPos} departmentId={selectedDeptId} allPositions={positions} roles={roles} onSaved={handlePosSaved} />
           <AssignmentModal open={showAssignModal} onClose={() => setShowAssignModal(false)}
             assignment={editAssign} positionId={assignPosId} departmentId={selectedDeptId}
-            contacts={contacts} onSaved={handleAssignSaved} />
+            contacts={contacts} onSaved={handleAssignSaved} onContactCreated={handleContactCreated} />
         </>
       )}
 
@@ -1478,17 +1783,7 @@ export default function ManagementPage() {
       <PositionDetailModal open={showPosDetail} onClose={() => setShowPosDetail(false)}
         position={detailPos} contacts={contacts} />
 
-      <DeleteModal open={showDeleteModal}
-        title={deleteTarget?.type === "dept" ? "Delete Department" : deleteTarget?.type === "pos" ? "Delete Position" : deleteTarget?.type === "role" ? "Delete Role" : "Remove Assignment"}
-        message={
-          deleteTarget?.type === "dept"
-            ? `Delete "${deleteTarget.name}"? All positions and assignments within will also be removed.`
-            : deleteTarget?.type === "pos"
-              ? `Delete position "${deleteTarget?.name}"? All assignments to this position will be removed.`
-              : deleteTarget?.type === "role"
-                ? `Delete role "${deleteTarget?.name}"? Positions using this role will be unlinked.`
-                : `Remove "${deleteTarget?.name}" from this position?`
-        }
+      <DeleteModal open={showDeleteModal} target={deleteTarget} departments={departments}
         onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
         onConfirm={handleDeleteConfirm} deleting={deleting} />
     </div>
