@@ -39,7 +39,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <Sidebar />
       {/* pt-14 = header height. Desktop: offset by sidebar width. */}
       <div
-        className="pt-14 flex-1 flex flex-col min-h-0 transition-all duration-300 ease-in-out"
+        className="pt-14 flex-1 flex flex-col min-h-0 h-[calc(100vh-0px)] overflow-hidden transition-all duration-300 ease-in-out"
         style={{
           /* @ts-ignore — inline style for responsive sidebar offset */
           paddingInlineStart: undefined,
@@ -53,7 +53,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             .shell-content-offset { padding-inline-start: ${desktopPad}px !important; }
           }
         `}</style>
-        <div className="shell-content-offset flex-1 flex flex-col min-h-0 transition-all duration-300 ease-in-out">
+        <div className="shell-content-offset flex-1 flex flex-col min-h-0 overflow-auto transition-all duration-300 ease-in-out">
           {children}
         </div>
       </div>
