@@ -8,7 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import { useRef } from "react";
 import UserMenu from "./UserMenu";
-import DiscussBell from "./DiscussBell";
+import NotificationBell from "./NotificationBell";
 import KoleexLogo from "./KoleexLogo";
 
 /* ── Route → Translation key mapping ── */
@@ -230,8 +230,9 @@ export default function MainHeader() {
           {dk ? <Sun size={15} className="md:w-4 md:h-4" /> : <Moon size={15} className="md:w-4 md:h-4" />}
         </button>
 
-        {/* Notification bell — shows live Discuss unread count. */}
-        <DiscussBell dk={dk} />
+        {/* Notification bell — system-wide notifications dropdown
+            covering Discuss messages and inbox alerts from every app. */}
+        <NotificationBell dk={dk} />
 
         {/* Subtle spacer before account */}
         <div className="hidden md:block w-1" />

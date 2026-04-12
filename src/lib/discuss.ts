@@ -1208,7 +1208,7 @@ export function subscribeToMyChannels(
   const connect = () => {
     if (closed) return;
     /* See the long comment in subscribeToChannel: each subscriber needs
-       its own topic so DiscussBell + DiscussApp (which both call this)
+       its own topic so NotificationBell + DiscussApp (which both call this)
        and React strict-mode double-mounts don't collide on the cached
        already-subscribed channel. */
     const topic = `discuss:my-channels:${uniqueChannelSuffix()}`;
