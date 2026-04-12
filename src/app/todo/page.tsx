@@ -681,6 +681,8 @@ export default function TodoPage() {
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; entry: TodoWithRelations | null }>({ open: false, entry: null });
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: TodoWithRelations | null }>({ open: false, task: null });
@@ -745,9 +747,35 @@ export default function TodoPage() {
   const filtered = useMemo(() => {
     let list = todos;
 
-    // Text search: title, description, label, assignee name/username, department
+    // Text search: title, description, label, assignee, department, date
     if (search) {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
+
+      /** Check if any date on the task matches the search query.
+       *  Supports: "2026-04-12", "Apr 12", "April", "12 Apr", "12/04" etc. */
+      const matchesDate = (iso: string | null) => {
+        if (!iso) return false;
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return false;
+        // ISO string match (2026-04-12)
+        if (iso.toLowerCase().includes(q)) return true;
+        // Formatted date strings for flexible matching
+        const formats = [
+          d.toLocaleDateString("en", { month: "short", day: "numeric" }),               // "Apr 12"
+          d.toLocaleDateString("en", { month: "long", day: "numeric" }),                 // "April 12"
+          d.toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" }), // "Apr 12, 2026"
+          d.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" }), // "April 12, 2026"
+          d.toLocaleDateString("en", { day: "numeric", month: "short" }),                 // "12 Apr"
+          d.toLocaleDateString("en", { month: "long" }),                                  // "April"
+          d.toLocaleDateString("en", { month: "short" }),                                 // "Apr"
+          d.toLocaleDateString("en", { weekday: "long" }),                                // "Saturday"
+          d.toLocaleDateString("en", { weekday: "short" }),                               // "Sat"
+          `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`, // "12/04"
+          `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`, // "04/12"
+        ];
+        return formats.some((f) => f.toLowerCase().includes(q));
+      };
+
       list = list.filter((t) =>
         t.title.toLowerCase().includes(q) ||
         t.description?.toLowerCase().includes(q) ||
@@ -759,7 +787,9 @@ export default function TodoPage() {
         t.priority.includes(q) ||
         (q === "done" && t.completed) ||
         (q === "active" && !t.completed) ||
-        (q === "overdue" && isOverdue(t.due_date)),
+        (q === "overdue" && isOverdue(t.due_date)) ||
+        matchesDate(t.due_date) ||
+        matchesDate(t.created_at),
       );
     }
 
@@ -775,8 +805,28 @@ export default function TodoPage() {
       t.assignees.some((a) => a.account_id === assigneeFilter),
     );
 
+    // Date range filter — matches against due_date OR created_at
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      list = list.filter((t) => {
+        const due = t.due_date ? new Date(t.due_date) : null;
+        const created = new Date(t.created_at);
+        return (due && due >= from) || created >= from;
+      });
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      list = list.filter((t) => {
+        const due = t.due_date ? new Date(t.due_date) : null;
+        const created = new Date(t.created_at);
+        return (due && due <= to) || created <= to;
+      });
+    }
+
     return list;
-  }, [todos, search, filter, priorityFilter, labelFilter, deptFilter, assigneeFilter]);
+  }, [todos, search, filter, priorityFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
 
   const stats = useMemo(() => ({
     total: todos.length,
@@ -808,7 +858,7 @@ export default function TodoPage() {
     return [...new Set(todos.map((t) => t.label).filter(Boolean) as string[])];
   }, [todos]);
 
-  const hasActiveFilters = labelFilter || deptFilter || assigneeFilter;
+  const hasActiveFilters = labelFilter || deptFilter || assigneeFilter || dateFrom || dateTo;
 
   return (
     <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -918,8 +968,25 @@ export default function TodoPage() {
                   {usedLabels.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
 
+                {/* Date range filter */}
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                    <Calendar size={12} className="text-[var(--text-dim)] shrink-0" />
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                      className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
+                      title="From date" />
+                  </div>
+                  <span className="text-[11px] text-[var(--text-dim)]">→</span>
+                  <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                    <Calendar size={12} className="text-[var(--text-dim)] shrink-0" />
+                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                      className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
+                      title="To date" />
+                  </div>
+                </div>
+
                 {hasActiveFilters && (
-                  <button onClick={() => { setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); }}
+                  <button onClick={() => { setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); setDateFrom(""); setDateTo(""); }}
                     className="h-8 px-3 rounded-lg text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
                     <X size={12} /> Clear Filters
                   </button>
