@@ -20,6 +20,34 @@
 
 import { supabaseAdmin } from "./supabase-admin";
 
+const BUCKET = "media";
+
+/* ═══════════════════════════════════════════════════
+   ICON UPLOAD
+   ═══════════════════════════════════════════════════ */
+
+/** Upload a department/management icon (PNG, JPG, SVG) to Supabase storage. */
+export async function uploadManagementIcon(
+  file: File,
+  prefix = "management",
+): Promise<{ url: string; error: string | null }> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const allowed = ["png", "jpg", "jpeg", "svg", "webp"];
+  if (!allowed.includes(ext)) return { url: "", error: `File type .${ext} not allowed. Use PNG, JPG, or SVG.` };
+  if (file.size > 2 * 1024 * 1024) return { url: "", error: "File too large (max 2 MB)." };
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+  const filePath = `${prefix}/${Date.now()}_${safeName}`;
+
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(filePath, file, { cacheControl: "3600", upsert: false });
+
+  if (error) return { url: "", error: error.message };
+  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(filePath);
+  return { url: data.publicUrl, error: null };
+}
+
 /* ═══════════════════════════════════════════════════
    TYPES
    ═══════════════════════════════════════════════════ */
@@ -908,6 +936,7 @@ export interface HeadcountAnalytics {
   maxOrgDepth: number;
   departmentBreakdown: {
     id: string; name: string; icon: string;
+    icon_type?: string; icon_value?: string;
     total: number; filled: number; vacant: number;
   }[];
   levelDistribution: { level: number; label: string; count: number }[];
@@ -954,7 +983,7 @@ export async function fetchHeadcountAnalytics(): Promise<HeadcountAnalytics> {
   const deptBreakdown = depts.map((d) => {
     const deptPos = positions.filter((p) => p.department_id === d.id);
     const filled = deptPos.filter((p) => assignedPosIds.has(p.id)).length;
-    return { id: d.id, name: d.name, icon: d.icon || "🏢", total: deptPos.length, filled, vacant: deptPos.length - filled };
+    return { id: d.id, name: d.name, icon: d.icon || "building2", icon_type: d.icon_type || "icon", icon_value: d.icon_value || "building2", total: deptPos.length, filled, vacant: deptPos.length - filled };
   }).sort((a, b) => b.total - a.total);
 
   // Level distribution

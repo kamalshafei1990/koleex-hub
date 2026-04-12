@@ -25,9 +25,17 @@ import {
   Check, History, ChevronUp, ArrowRightLeft, FileText, AlertCircle,
   GripVertical, Image, Smile, Globe, BarChart3, Activity,
   ZoomIn, ZoomOut, RotateCcw, Mail, Phone, Clock,
-  TrendingUp, Layers, UserCheck, UserX, Copy, Undo2,
+  TrendingUp, Layers, UserCheck, UserX, Copy, Undo2, Upload,
+  Building, Code, Wrench, Heart, Truck, BookOpen, Headphones,
+  Scale, Factory, Cpu, Palette, GraduationCap, Warehouse,
+  Stethoscope, Lock, Radio, ShoppingCart, Plane, FlaskConical,
+  Ruler, Target, Lightbulb, Package, Rocket, CreditCard,
+  Megaphone, Monitor, Landmark, PieChart, Settings, Handshake,
+  type LucideIcon,
 } from "lucide-react";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { managementT } from "@/lib/translations/management";
 import {
   fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
   fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition, duplicatePosition,
@@ -39,6 +47,7 @@ import {
   fetchPositionHistory, addPositionHistory,
   transferEmployee, fetchFullOrgData, fetchDeptStats,
   fetchEmployeeProfile, fetchRecentActivity, fetchHeadcountAnalytics,
+  uploadManagementIcon,
   type DepartmentRow, type PositionRow, type AssignmentRow,
   type DeptTreeNode, type ContactRef, type OrgChartNode,
   type RoleRow, type PermissionRow, type PositionHistoryRow,
@@ -49,12 +58,21 @@ import {
    CONSTANTS
    ═══════════════════════════════════════════════════ */
 
-const DEPT_ICONS = [
-  "🏢","🏗️","💼","📊","🎯","⚙️","🔧","💡",
-  "📦","🚀","🛡️","💰","📈","🎨","📱","🌍",
-  "🔬","⚖️","🏭","🧑‍💻","📋","🤝","📣","🎓",
-  "🏦","🩺","🔒","📡","🛒","✈️","🧪","📐",
-];
+/** Lucide icon map for department icon picker. Key = stored string, value = component. */
+const DEPT_ICON_MAP: Record<string, LucideIcon> = {
+  building2: Building2, building: Building, briefcase: Briefcase, users: Users,
+  shield: Shield, globe: Globe, "trending-up": TrendingUp, "bar-chart": BarChart3,
+  "credit-card": CreditCard, megaphone: Megaphone, code: Code, wrench: Wrench,
+  heart: Heart, truck: Truck, "book-open": BookOpen, headphones: Headphones,
+  scale: Scale, factory: Factory, cpu: Cpu, palette: Palette,
+  "graduation-cap": GraduationCap, warehouse: Warehouse, stethoscope: Stethoscope,
+  lock: Lock, radio: Radio, "shopping-cart": ShoppingCart, plane: Plane,
+  flask: FlaskConical, ruler: Ruler, target: Target, lightbulb: Lightbulb,
+  package: Package, rocket: Rocket, monitor: Monitor, landmark: Landmark,
+  "pie-chart": PieChart, settings: Settings, handshake: Handshake, network: Network,
+  mail: Mail, layers: Layers, "file-text": FileText, activity: Activity,
+};
+const DEPT_ICON_KEYS = Object.keys(DEPT_ICON_MAP);
 
 const LEVEL_LABELS: Record<number, string> = {
   0: "Executive", 1: "Senior Management", 2: "Management",
@@ -165,57 +183,83 @@ function Spinner() {
   return <div className="flex items-center justify-center py-16"><Loader2 size={20} className="text-[var(--text-dim)] animate-spin" /></div>;
 }
 
-/** Department icon renderer — supports emoji, image URL, fallback */
+/** Department icon renderer — system-style: uploaded images in rounded containers, emoji fallback */
 function DeptIcon({ dept, size = 24 }: { dept: DepartmentRow; size?: number }) {
+  const iconSize = Math.round(size * 0.55);
+  // Uploaded / URL image
   if (dept.icon_type === "image" && dept.icon_value) {
-    return <img src={dept.icon_value} alt="" className="rounded-lg object-cover" style={{ width: size, height: size }} />;
+    return (
+      <div className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center overflow-hidden shrink-0"
+        style={{ width: size, height: size }}>
+        <img src={dept.icon_value} alt="" className="w-full h-full object-cover" />
+      </div>
+    );
   }
-  return <span style={{ fontSize: size * 0.85 }}>{dept.icon || "🏢"}</span>;
+  // Lucide icon (stored as icon_type="icon", icon_value="building2" etc.)
+  const iconKey = dept.icon_type === "icon" && dept.icon_value ? dept.icon_value : "building2";
+  const IconComp = DEPT_ICON_MAP[iconKey] || Building2;
+  return (
+    <div className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0"
+      style={{ width: size, height: size }}>
+      <IconComp size={iconSize} className="text-[var(--text-muted)]" />
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════
    DEPARTMENT MODAL (emoji picker + image URL)
    ═══════════════════════════════════════════════════ */
 function DepartmentModal({
-  open, onClose, dept, departments, onSaved,
+  open, onClose, dept, departments, onSaved, t,
 }: {
   open: boolean; onClose: () => void;
   dept: DepartmentRow | null; departments: DepartmentRow[];
-  onSaved: () => void;
+  onSaved: () => void; t: (key: string) => string;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [icon, setIcon] = useState("🏢");
-  const [iconType, setIconType] = useState<"emoji" | "image">("emoji");
+  const [selectedIcon, setSelectedIcon] = useState("building2");
+  const [iconTab, setIconTab] = useState<"icon" | "upload">("icon");
   const [iconUrl, setIconUrl] = useState("");
   const [parentId, setParentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showIcons, setShowIcons] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setName(dept?.name || "");
       setDescription(dept?.description || "");
-      setIcon(dept?.icon || "🏢");
-      setIconType((dept?.icon_type as "emoji" | "image") || "emoji");
+      setSelectedIcon(dept?.icon_type === "icon" && dept?.icon_value ? dept.icon_value : "building2");
+      setIconTab(dept?.icon_type === "image" ? "upload" : "icon");
       setIconUrl(dept?.icon_type === "image" ? dept?.icon_value || "" : "");
       setParentId(dept?.parent_id || null);
-      setError(""); setShowIcons(false);
+      setError(""); setShowIcons(false); setUploading(false);
     }
   }, [open, dept]);
 
   const parentOptions = departments.filter((d) => d.id !== dept?.id);
 
+  const handleFileUpload = async (file: File) => {
+    setUploading(true); setError("");
+    const res = await uploadManagementIcon(file);
+    if (res.error) { setError(res.error); setUploading(false); return; }
+    setIconUrl(res.url);
+    setUploading(false);
+  };
+
   const handleSave = async () => {
-    if (!name.trim()) { setError("Department name is required."); return; }
+    if (!name.trim()) { setError(t("mgmt.deptNameReq")); return; }
     setSaving(true); setError("");
+    const isUpload = iconTab === "upload" && iconUrl.trim();
     const payload: Record<string, unknown> = {
       name: name.trim(),
       description: description.trim() || null,
-      icon: iconType === "emoji" ? icon : "🏢",
-      icon_type: iconType,
-      icon_value: iconType === "image" ? iconUrl.trim() || null : icon,
+      icon: selectedIcon,
+      icon_type: isUpload ? "image" : "icon",
+      icon_value: isUpload ? iconUrl.trim() : selectedIcon,
       parent_id: parentId || null,
     };
     if (dept) {
@@ -229,59 +273,81 @@ function DepartmentModal({
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={dept ? "Edit Department" : "New Department"} footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? "Saving..." : dept ? "Save Changes" : "Create Department"}</button></>
+    <ModalShell open={open} onClose={onClose} title={dept ? t("mgmt.editDept") : t("mgmt.newDept")} footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
+      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? t("mgmt.saving") : dept ? t("mgmt.saveChanges") : t("mgmt.createDept")}</button></>
     }>
       <ErrorBanner message={error} />
 
-      {/* Icon type toggle */}
+      {/* Icon type toggle — 2 tabs: Icon, Upload */}
       <div>
-        <FieldLabel>Icon</FieldLabel>
+        <FieldLabel>{t("mgmt.icon")}</FieldLabel>
         <div className="flex gap-2 mb-2">
-          <button onClick={() => setIconType("emoji")}
-            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconType === "emoji" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
-            <Smile size={12} /> Emoji
+          <button onClick={() => setIconTab("icon")}
+            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconTab === "icon" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
+            <Layers size={12} /> {t("mgmt.iconTab")}
           </button>
-          <button onClick={() => setIconType("image")}
-            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconType === "image" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
-            <Image size={12} /> Image URL
+          <button onClick={() => setIconTab("upload")}
+            className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconTab === "upload" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
+            <Upload size={12} /> {t("mgmt.upload")}
           </button>
         </div>
 
-        {iconType === "emoji" ? (
+        {iconTab === "icon" ? (
           <div className="flex items-start gap-3">
             <div className="relative">
               <button onClick={() => setShowIcons(!showIcons)}
-                className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-2xl hover:scale-105 transition-transform">{icon}</button>
+                className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center hover:scale-105 transition-transform">
+                {(() => { const IC = DEPT_ICON_MAP[selectedIcon] || Building2; return <IC size={20} className="text-[var(--text-muted)]" />; })()}
+              </button>
               {showIcons && (
-                <div className="absolute top-full left-0 mt-2 z-10 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl p-2 w-[240px] grid grid-cols-8 gap-1">
-                  {DEPT_ICONS.map((e) => (
-                    <button key={e} onClick={() => { setIcon(e); setShowIcons(false); }}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-base hover:scale-110 transition-transform ${icon === e ? "bg-[var(--bg-surface-active)]" : ""}`}>{e}</button>
-                  ))}
+                <div className="absolute top-full left-0 rtl:left-auto rtl:right-0 mt-2 z-10 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl p-2.5 w-[280px] grid grid-cols-7 gap-1">
+                  {DEPT_ICON_KEYS.map((key) => {
+                    const IC = DEPT_ICON_MAP[key];
+                    return (
+                      <button key={key} onClick={() => { setSelectedIcon(key); setShowIcons(false); }}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center hover:scale-110 transition-transform ${selectedIcon === key ? "bg-[var(--bg-surface-active)] ring-1 ring-[var(--border-focus)]" : "hover:bg-[var(--bg-surface)]"}`}>
+                        <IC size={16} className={selectedIcon === key ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"} />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
             <div className="flex-1">
-              <FieldLabel>Name *</FieldLabel>
+              <FieldLabel>{t("mgmt.name")} *</FieldLabel>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Engineering" autoFocus className={inputCls} />
             </div>
           </div>
         ) : (
           <div className="space-y-3">
+            <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.svg,.webp" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
             <div className="flex items-center gap-3">
               {iconUrl ? (
-                <img src={iconUrl} alt="" className="w-12 h-12 rounded-xl object-cover border border-[var(--border-subtle)]" />
+                <div className="w-12 h-12 rounded-xl border border-[var(--border-subtle)] overflow-hidden shrink-0">
+                  <img src={iconUrl} alt="" className="w-full h-full object-cover" />
+                </div>
               ) : (
-                <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]"><Image size={18} /></div>
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
+                  <Upload size={18} />
+                </div>
               )}
               <div className="flex-1">
-                <input type="url" value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://example.com/icon.png" className={inputCls} />
+                {uploading ? (
+                  <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
+                    <Loader2 size={14} className="animate-spin" /> {t("mgmt.uploading")}
+                  </div>
+                ) : (
+                  <button onClick={() => fileRef.current?.click()}
+                    className="h-9 px-4 rounded-lg text-[12px] font-medium border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all flex items-center gap-1.5">
+                    <Upload size={12} /> {iconUrl ? t("mgmt.changeFile") : t("mgmt.uploadFile")}
+                  </button>
+                )}
               </div>
             </div>
             <div>
-              <FieldLabel>Name *</FieldLabel>
+              <FieldLabel>{t("mgmt.name")} *</FieldLabel>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Engineering" className={inputCls} />
             </div>
           </div>
@@ -289,14 +355,14 @@ function DepartmentModal({
       </div>
 
       <div>
-        <FieldLabel>Description</FieldLabel>
+        <FieldLabel>{t("mgmt.description")}</FieldLabel>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description..." rows={2} className={textareaCls} />
       </div>
       <div>
-        <FieldLabel>Parent Department</FieldLabel>
+        <FieldLabel>{t("mgmt.parentDept")}</FieldLabel>
         <select value={parentId || ""} onChange={(e) => setParentId(e.target.value || null)} className={selectCls}>
-          <option value="">None (Top Level)</option>
-          {parentOptions.map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+          <option value="">{t("mgmt.noneTopLevel")}</option>
+          {parentOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
     </ModalShell>
@@ -307,12 +373,12 @@ function DepartmentModal({
    POSITION MODAL (with circular hierarchy validation)
    ═══════════════════════════════════════════════════ */
 function PositionModal({
-  open, onClose, position, departmentId, allPositions, roles, onSaved,
+  open, onClose, position, departmentId, allPositions, roles, onSaved, t,
 }: {
   open: boolean; onClose: () => void;
   position: PositionRow | null; departmentId: string;
   allPositions: PositionRow[]; roles: RoleRow[];
-  onSaved: () => void;
+  onSaved: () => void; t: (key: string) => string;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -339,12 +405,12 @@ function PositionModal({
   const reportsToOptions = allPositions.filter((p) => p.id !== position?.id);
 
   const handleSave = async () => {
-    if (!title.trim()) { setError("Position title is required."); return; }
+    if (!title.trim()) { setError(t("mgmt.posNameReq")); return; }
 
     // Circular hierarchy check
     if (position && reportsTo) {
       if (detectCircularHierarchy(position.id, reportsTo, allPositions)) {
-        setError("Cannot report to this position — it would create a circular hierarchy.");
+        setError(t("mgmt.circularError"));
         return;
       }
     }
@@ -369,22 +435,22 @@ function PositionModal({
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={position ? "Edit Position" : "New Position"} width="max-w-[560px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleSave} disabled={saving || !title.trim()} className={primaryBtnCls}>{saving ? "Saving..." : position ? "Save Changes" : "Create Position"}</button></>
+    <ModalShell open={open} onClose={onClose} title={position ? t("mgmt.editPos") : t("mgmt.newPos")} width="max-w-[560px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
+      <button onClick={handleSave} disabled={saving || !title.trim()} className={primaryBtnCls}>{saving ? t("mgmt.saving") : position ? t("mgmt.saveChanges") : t("mgmt.createPos")}</button></>
     }>
       <ErrorBanner message={error} />
       <div>
-        <FieldLabel>Title *</FieldLabel>
+        <FieldLabel>{t("mgmt.posTitle")} *</FieldLabel>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Senior Developer" autoFocus className={inputCls} />
       </div>
       <div>
-        <FieldLabel>Description</FieldLabel>
+        <FieldLabel>{t("mgmt.description")}</FieldLabel>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Role overview..." rows={2} className={textareaCls} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <FieldLabel>Level</FieldLabel>
+          <FieldLabel>{t("mgmt.level")}</FieldLabel>
           <div className="flex gap-1.5">
             {[0, 1, 2, 3, 4, 5].map((l) => (
               <button key={l} onClick={() => setLevel(l)}
@@ -393,37 +459,37 @@ function PositionModal({
                 }`}>{l}</button>
             ))}
           </div>
-          <p className="text-[11px] text-[var(--text-dim)] mt-1">{LEVEL_LABELS[level]}</p>
+          <p className="text-[11px] text-[var(--text-dim)] mt-1">{t(`mgmt.level.${level}`)}</p>
         </div>
         <div>
-          <FieldLabel>Role</FieldLabel>
+          <FieldLabel>{t("mgmt.role")}</FieldLabel>
           <select value={roleId || ""} onChange={(e) => setRoleId(e.target.value || null)} className={selectCls}>
-            <option value="">No Role</option>
+            <option value="">{t("mgmt.noRole")}</option>
             {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </select>
         </div>
       </div>
       <div>
-        <FieldLabel>Reports To</FieldLabel>
+        <FieldLabel>{t("mgmt.reportsTo")}</FieldLabel>
         <select value={reportsTo || ""} onChange={(e) => setReportsTo(e.target.value || null)} className={selectCls}>
-          <option value="">None (Top of hierarchy)</option>
+          <option value="">{t("mgmt.noneTopHierarchy")}</option>
           {reportsToOptions.map((p) => <option key={p.id} value={p.id}>{p.title} (L{p.level})</option>)}
         </select>
       </div>
 
       <button onClick={() => setShowJD(!showJD)} className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors w-full">
         <FileText size={13} />
-        <span>Job Description</span>
+        <span>{t("mgmt.jobDescription")}</span>
         {showJD ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
       </button>
       {showJD && (
         <div className="space-y-4 pl-1 border-l-2 border-[var(--border-subtle)] ml-1">
           <div className="pl-3">
-            <FieldLabel>Responsibilities</FieldLabel>
+            <FieldLabel>{t("mgmt.responsibilities")}</FieldLabel>
             <textarea value={responsibilities} onChange={(e) => setResponsibilities(e.target.value)} placeholder="Key responsibilities..." rows={3} className={textareaCls} />
           </div>
           <div className="pl-3">
-            <FieldLabel>Requirements</FieldLabel>
+            <FieldLabel>{t("mgmt.requirements")}</FieldLabel>
             <textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} placeholder="Skills, qualifications..." rows={3} className={textareaCls} />
           </div>
         </div>
@@ -436,13 +502,14 @@ function PositionModal({
    ASSIGNMENT MODAL (contact picker + inline create)
    ═══════════════════════════════════════════════════ */
 function AssignmentModal({
-  open, onClose, assignment, positionId, departmentId, contacts, onSaved, onContactCreated,
+  open, onClose, assignment, positionId, departmentId, contacts, onSaved, onContactCreated, t,
 }: {
   open: boolean; onClose: () => void;
   assignment: AssignmentRow | null;
   positionId: string; departmentId: string;
   contacts: ContactRef[]; onSaved: () => void;
   onContactCreated: (c: ContactRef) => void;
+  t: (key: string) => string;
 }) {
   const [contactId, setContactId] = useState<string | null>(null);
   const [isPrimary, setIsPrimary] = useState(true);
@@ -475,7 +542,7 @@ function AssignmentModal({
   const selectedContact = contactId ? contacts.find((c) => c.id === contactId) : null;
 
   const handleCreateContact = async () => {
-    if (!newFirst.trim()) { setError("First name is required."); return; }
+    if (!newFirst.trim()) { setError(t("mgmt.firstNameReq")); return; }
     setCreating(true); setError("");
     const res = await createInlineContact({
       first_name: newFirst.trim(),
@@ -492,7 +559,7 @@ function AssignmentModal({
   };
 
   const handleSave = async () => {
-    if (!contactId) { setError("Select a person."); return; }
+    if (!contactId) { setError(t("mgmt.selectPerson")); return; }
     setSaving(true); setError("");
     const payload: Record<string, unknown> = {
       contact_id: contactId, position_id: positionId,
@@ -511,15 +578,15 @@ function AssignmentModal({
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={assignment ? "Edit Assignment" : "Assign Employee"} width="max-w-[500px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleSave} disabled={saving || !contactId} className={primaryBtnCls}>{saving ? "Saving..." : assignment ? "Save Changes" : "Assign"}</button></>
+    <ModalShell open={open} onClose={onClose} title={assignment ? t("mgmt.editAssign") : t("mgmt.assignEmployee")} width="max-w-[500px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
+      <button onClick={handleSave} disabled={saving || !contactId} className={primaryBtnCls}>{saving ? t("mgmt.saving") : assignment ? t("mgmt.saveChanges") : t("mgmt.assign")}</button></>
     }>
       <ErrorBanner message={error} />
 
       {/* Contact picker */}
       <div>
-        <FieldLabel>Employee *</FieldLabel>
+        <FieldLabel>{t("mgmt.employee")} *</FieldLabel>
         <div className="relative">
           <button onClick={() => { setShowPicker(!showPicker); setShowCreate(false); }}
             className="w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-start flex items-center gap-2.5 transition-colors hover:border-[var(--border-focus)]">
@@ -528,7 +595,7 @@ function AssignmentModal({
               <span className="text-[var(--text-primary)] truncate">{selectedContact.name}</span>
               {selectedContact.email && <span className="text-[var(--text-dim)] text-[11px] truncate">({selectedContact.email})</span>}</>
             ) : (
-              <><User size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">Select or create an employee...</span></>
+              <><User size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">{t("mgmt.selectOrCreate")}</span></>
             )}
           </button>
 
@@ -538,13 +605,13 @@ function AssignmentModal({
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
                   <input type="text" value={contactSearch} onChange={(e) => setContactSearch(e.target.value)}
-                    placeholder="Search by name or email..." autoFocus
+                    placeholder={t("mgmt.searchNameEmail")} autoFocus
                     className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[12px] outline-none" />
                 </div>
               </div>
               <div className="px-1 overflow-y-auto flex-1">
                 {filtered.length === 0 ? (
-                  <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">No contacts found.</div>
+                  <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noContacts")}</div>
                 ) : filtered.map((c) => (
                   <button key={c.id} onClick={() => { setContactId(c.id); setShowPicker(false); setContactSearch(""); }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-start transition-colors hover:bg-[var(--bg-surface)] ${contactId === c.id ? "bg-[var(--bg-surface-active)]" : ""}`}>
@@ -560,7 +627,7 @@ function AssignmentModal({
               <div className="p-2 border-t border-[var(--border-color)] shrink-0">
                 <button onClick={() => { setShowCreate(true); setShowPicker(false); }}
                   className="w-full h-9 rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 border border-dashed border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors">
-                  <UserPlus size={13} /> Create New Employee
+                  <UserPlus size={13} /> {t("mgmt.createNewEmployee")}
                 </button>
               </div>
             </div>
@@ -572,49 +639,49 @@ function AssignmentModal({
       {showCreate && (
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[12px] font-semibold text-[var(--text-secondary)]">New Employee</span>
+            <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("mgmt.newEmployee")}</span>
             <button onClick={() => setShowCreate(false)} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X size={14} /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <FieldLabel>First Name *</FieldLabel>
+              <FieldLabel>{t("mgmt.firstName")} *</FieldLabel>
               <input type="text" value={newFirst} onChange={(e) => setNewFirst(e.target.value)} placeholder="John" autoFocus className={inputCls} />
             </div>
             <div>
-              <FieldLabel>Last Name</FieldLabel>
+              <FieldLabel>{t("mgmt.lastName")}</FieldLabel>
               <input type="text" value={newLast} onChange={(e) => setNewLast(e.target.value)} placeholder="Doe" className={inputCls} />
             </div>
           </div>
           <div>
-            <FieldLabel>Email</FieldLabel>
+            <FieldLabel>{t("mgmt.email")}</FieldLabel>
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="john@example.com" className={inputCls} />
           </div>
           <div>
-            <FieldLabel>Phone</FieldLabel>
+            <FieldLabel>{t("mgmt.phone")}</FieldLabel>
             <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+1 234 567 890" className={inputCls} />
           </div>
           <button onClick={handleCreateContact} disabled={creating || !newFirst.trim()} className={primaryBtnCls + " w-full"}>
-            {creating ? "Creating..." : "Create & Select"}
+            {creating ? t("mgmt.creating") : t("mgmt.createAndSelect")}
           </button>
         </div>
       )}
 
       {/* Primary toggle */}
       <div>
-        <FieldLabel>Assignment Type</FieldLabel>
+        <FieldLabel>{t("mgmt.assignType")}</FieldLabel>
         <div className="flex gap-2">
           <button onClick={() => setIsPrimary(true)}
             className={`flex-1 h-10 rounded-xl border text-[12px] font-semibold transition-all ${
               isPrimary ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
-            }`}>Primary</button>
+            }`}>{t("mgmt.primary")}</button>
           <button onClick={() => setIsPrimary(false)}
             className={`flex-1 h-10 rounded-xl border text-[12px] font-semibold transition-all ${
               !isPrimary ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
-            }`}>Secondary</button>
+            }`}>{t("mgmt.secondary")}</button>
         </div>
       </div>
       <div>
-        <FieldLabel>Start Date</FieldLabel>
+        <FieldLabel>{t("mgmt.startDate")}</FieldLabel>
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
       </div>
     </ModalShell>
@@ -625,12 +692,12 @@ function AssignmentModal({
    TRANSFER MODAL
    ═══════════════════════════════════════════════════ */
 function TransferModal({
-  open, onClose, assignment, contactName, departments, onSaved,
+  open, onClose, assignment, contactName, departments, onSaved, t,
 }: {
   open: boolean; onClose: () => void;
   assignment: AssignmentRow | null; contactName: string;
   departments: DepartmentRow[];
-  onSaved: () => void;
+  onSaved: () => void; t: (key: string) => string;
 }) {
   const [targetDeptId, setTargetDeptId] = useState("");
   const [targetPosId, setTargetPosId] = useState("");
@@ -653,7 +720,7 @@ function TransferModal({
   }, [targetDeptId]);
 
   const handleTransfer = async () => {
-    if (!assignment || !targetPosId || !targetDeptId) { setError("Select target department and position."); return; }
+    if (!assignment || !targetPosId || !targetDeptId) { setError(t("mgmt.selectTargetErr")); return; }
     setSaving(true); setError("");
     const res = await transferEmployee(assignment.id, targetPosId, targetDeptId);
     if (!res.ok) { setError(res.error || "Transfer failed."); setSaving(false); return; }
@@ -661,35 +728,35 @@ function TransferModal({
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title="Transfer Employee" width="max-w-[460px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleTransfer} disabled={saving || !targetPosId} className={primaryBtnCls}>{saving ? "Transferring..." : "Transfer"}</button></>
+    <ModalShell open={open} onClose={onClose} title={t("mgmt.transferEmployee")} width="max-w-[460px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
+      <button onClick={handleTransfer} disabled={saving || !targetPosId} className={primaryBtnCls}>{saving ? t("mgmt.transferring") : t("mgmt.transfer")}</button></>
     }>
       <ErrorBanner message={error} />
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
         <ArrowRightLeft size={16} className="text-[var(--text-dim)] shrink-0" />
         <div>
           <div className="text-[13px] font-medium text-[var(--text-primary)]">{contactName}</div>
-          <div className="text-[11px] text-[var(--text-dim)]">Moving to a new position</div>
+          <div className="text-[11px] text-[var(--text-dim)]">{t("mgmt.movingNewPos")}</div>
         </div>
       </div>
       <div>
-        <FieldLabel>Target Department</FieldLabel>
+        <FieldLabel>{t("mgmt.targetDept")}</FieldLabel>
         <select value={targetDeptId} onChange={(e) => setTargetDeptId(e.target.value)} className={selectCls}>
-          <option value="">Select department...</option>
+          <option value="">{t("mgmt.selectDept")}</option>
           {departments.map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
         </select>
       </div>
       {targetDeptId && (
         <div>
-          <FieldLabel>Target Position</FieldLabel>
+          <FieldLabel>{t("mgmt.targetPos")}</FieldLabel>
           {loadingPos ? (
-            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Loader2 size={14} className="animate-spin" /> Loading...</div>
+            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Loader2 size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
           ) : deptPositions.length === 0 ? (
-            <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">No positions available.</div>
+            <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noPosAvailable")}</div>
           ) : (
             <select value={targetPosId} onChange={(e) => setTargetPosId(e.target.value)} className={selectCls}>
-              <option value="">Select position...</option>
+              <option value="">{t("mgmt.selectPos")}</option>
               {deptPositions.map((p) => <option key={p.id} value={p.id}>{p.title} (L{p.level})</option>)}
             </select>
           )}
@@ -702,8 +769,8 @@ function TransferModal({
 /* ═══════════════════════════════════════════════════
    ROLE MODAL
    ═══════════════════════════════════════════════════ */
-function RoleModal({ open, onClose, role, onSaved }: {
-  open: boolean; onClose: () => void; role: RoleRow | null; onSaved: () => void;
+function RoleModal({ open, onClose, role, onSaved, t }: {
+  open: boolean; onClose: () => void; role: RoleRow | null; onSaved: () => void; t: (key: string) => string;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -715,7 +782,7 @@ function RoleModal({ open, onClose, role, onSaved }: {
   }, [open, role]);
 
   const handleSave = async () => {
-    if (!name.trim()) { setError("Role name is required."); return; }
+    if (!name.trim()) { setError(t("mgmt.roleNameReq")); return; }
     setSaving(true); setError("");
     if (role) {
       const res = await updateRole(role.id, { name: name.trim(), description: description.trim() || null });
@@ -728,18 +795,18 @@ function RoleModal({ open, onClose, role, onSaved }: {
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={role ? "Edit Role" : "New Role"} width="max-w-[420px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? "Saving..." : role ? "Save" : "Create Role"}</button></>
+    <ModalShell open={open} onClose={onClose} title={role ? t("mgmt.editRole") : t("mgmt.newRole")} width="max-w-[420px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
+      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? t("mgmt.saving") : role ? t("mgmt.save") : t("mgmt.createRole")}</button></>
     }>
       <ErrorBanner message={error} />
       <div>
-        <FieldLabel>Role Name *</FieldLabel>
+        <FieldLabel>{t("mgmt.roleName")} *</FieldLabel>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sales Manager" autoFocus className={inputCls} />
       </div>
       <div>
-        <FieldLabel>Description</FieldLabel>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this role does..." rows={2} className={textareaCls} />
+        <FieldLabel>{t("mgmt.description")}</FieldLabel>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("mgmt.roleDescPlaceholder")} rows={2} className={textareaCls} />
       </div>
     </ModalShell>
   );
@@ -748,13 +815,13 @@ function RoleModal({ open, onClose, role, onSaved }: {
 /* ═══════════════════════════════════════════════════
    DELETE MODAL (with safe delete options)
    ═══════════════════════════════════════════════════ */
-function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }: {
+function DeleteModal({ open, target, departments, onClose, onConfirm, deleting, t }: {
   open: boolean;
   target: { type: "dept" | "pos" | "assign" | "role"; id: string; name: string } | null;
   departments: DepartmentRow[];
   onClose: () => void;
   onConfirm: (strategy?: "cascade" | "reassign", reassignId?: string) => void;
-  deleting: boolean;
+  deleting: boolean; t: (key: string) => string;
 }) {
   const [strategy, setStrategy] = useState<"cascade" | "reassign">("cascade");
   const [reassignDeptId, setReassignDeptId] = useState("");
@@ -763,13 +830,13 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }
 
   if (!open || !target) return null;
 
-  const title = target.type === "dept" ? "Delete Department" : target.type === "pos" ? "Delete Position" : target.type === "role" ? "Delete Role" : "Remove Assignment";
+  const title = target.type === "dept" ? t("mgmt.deleteDept") : target.type === "pos" ? t("mgmt.deletePos") : target.type === "role" ? t("mgmt.deleteRole") : t("mgmt.removeAssign");
 
   return (
     <ModalShell open={open} onClose={onClose} title={title} width="max-w-[440px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
+      <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
       <button onClick={() => onConfirm(target.type === "dept" ? strategy : undefined, reassignDeptId || undefined)} disabled={deleting || (target.type === "dept" && strategy === "reassign" && !reassignDeptId)} className={dangerBtnCls}>
-        {deleting ? "Deleting..." : "Delete"}
+        {deleting ? t("mgmt.deleting") : t("mgmt.delete")}
       </button></>
     }>
       {target.type === "dept" ? (
@@ -778,18 +845,18 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }
           <div className="space-y-2">
             <button onClick={() => setStrategy("cascade")}
               className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${strategy === "cascade" ? "border-red-500/30 bg-red-500/5" : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"}`}>
-              <div className="text-[13px] font-medium text-[var(--text-primary)]">Delete all positions</div>
-              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">All positions and assignments will be permanently removed.</div>
+              <div className="text-[13px] font-medium text-[var(--text-primary)]">{t("mgmt.deleteAllPos")}</div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">{t("mgmt.deleteAllPosDesc")}</div>
             </button>
             <button onClick={() => setStrategy("reassign")}
               className={`w-full text-start px-4 py-3 rounded-xl border transition-all ${strategy === "reassign" ? "border-blue-500/30 bg-blue-500/5" : "border-[var(--border-subtle)] hover:bg-[var(--bg-surface)]"}`}>
-              <div className="text-[13px] font-medium text-[var(--text-primary)]">Move positions to another department</div>
-              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">Positions and assignments will be transferred.</div>
+              <div className="text-[13px] font-medium text-[var(--text-primary)]">{t("mgmt.moveToAnotherDept")}</div>
+              <div className="text-[11px] text-[var(--text-dim)] mt-0.5">{t("mgmt.moveToAnotherDesc")}</div>
             </button>
           </div>
           {strategy === "reassign" && (
             <div>
-              <FieldLabel>Move to</FieldLabel>
+              <FieldLabel>{t("mgmt.moveTo")}</FieldLabel>
               <select value={reassignDeptId} onChange={(e) => setReassignDeptId(e.target.value)} className={selectCls}>
                 <option value="">Select department...</option>
                 {departments.filter((d) => d.id !== target.id).map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
@@ -800,10 +867,10 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }
       ) : (
         <p className="text-[13px] text-[var(--text-muted)]">
           {target.type === "pos"
-            ? `Delete "${target.name}"? Subordinate positions will be reassigned to its parent. Assignments will be removed.`
+            ? `"${target.name}" — ${t("mgmt.confirmDeletePos")}`
             : target.type === "role"
-              ? `Delete role "${target.name}"? Positions using this role will be unlinked.`
-              : `Remove "${target.name}" from this position?`}
+              ? `"${target.name}" — ${t("mgmt.confirmDeleteRole")}`
+              : `"${target.name}" ${t("mgmt.confirmRemoveAssign")}`}
         </p>
       )}
     </ModalShell>
@@ -813,8 +880,9 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting }
 /* ═══════════════════════════════════════════════════
    POSITION DETAIL (history + JD)
    ═══════════════════════════════════════════════════ */
-function PositionDetailModal({ open, onClose, position, contacts }: {
+function PositionDetailModal({ open, onClose, position, contacts, t }: {
   open: boolean; onClose: () => void; position: PositionRow | null; contacts: ContactRef[];
+  t: (key: string) => string;
 }) {
   const [history, setHistory] = useState<PositionHistoryRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -829,36 +897,36 @@ function PositionDetailModal({ open, onClose, position, contacts }: {
   const ctcMap = new Map(contacts.map((c) => [c.id, c]));
 
   return (
-    <ModalShell open={open} onClose={onClose} title={position?.title || "Position Details"} width="max-w-[540px]">
+    <ModalShell open={open} onClose={onClose} title={position?.title || t("mgmt.posDetails")} width="max-w-[540px]">
       {position && (
         <div className="space-y-5">
           <div className="flex items-center gap-2">
             <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ${LEVEL_COLORS[position.level] || LEVEL_COLORS[5]}`}>
-              L{position.level} — {LEVEL_LABELS[position.level]}
+              L{position.level} — {t(`mgmt.level.${position.level}`)}
             </span>
           </div>
           {position.description && (
-            <div><FieldLabel>Description</FieldLabel><p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{position.description}</p></div>
+            <div><FieldLabel>{t("mgmt.description")}</FieldLabel><p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{position.description}</p></div>
           )}
           {position.responsibilities && (
-            <div><FieldLabel>Responsibilities</FieldLabel>
+            <div><FieldLabel>{t("mgmt.responsibilities")}</FieldLabel>
               <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-surface)] rounded-xl p-3.5 border border-[var(--border-subtle)]">{position.responsibilities}</div>
             </div>
           )}
           {position.requirements && (
-            <div><FieldLabel>Requirements</FieldLabel>
+            <div><FieldLabel>{t("mgmt.requirements")}</FieldLabel>
               <div className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-surface)] rounded-xl p-3.5 border border-[var(--border-subtle)]">{position.requirements}</div>
             </div>
           )}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <History size={13} className="text-[var(--text-dim)]" />
-              <FieldLabel>Position History</FieldLabel>
+              <FieldLabel>{t("mgmt.posHistory")}</FieldLabel>
             </div>
             {loading ? (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><Loader2 size={14} className="animate-spin" /> Loading...</div>
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><Loader2 size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
             ) : history.length === 0 ? (
-              <div className="text-[12px] text-[var(--text-dim)] py-4 text-center">No history yet.</div>
+              <div className="text-[12px] text-[var(--text-dim)] py-4 text-center">{t("mgmt.noHistory")}</div>
             ) : (
               <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-3">
                 {history.map((h) => {
@@ -1062,7 +1130,7 @@ function OrgChartBranch({
 /* ═══════════════════════════════════════════════════
    PERMISSIONS EDITOR — grouped by app category
    ═══════════════════════════════════════════════════ */
-function PermissionsEditor({ roleId }: { roleId: string }) {
+function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => string }) {
   const [perms, setPerms] = useState<Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1186,12 +1254,12 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                 <div>
                   {/* Column headers */}
                   <div className="flex items-center px-3 py-1.5 border-t border-[var(--border-faint)]">
-                    <div className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">App</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">View</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Add</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Edit</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Del</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">All</div>
+                    <div className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.app")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.view")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.add")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.edit")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.del")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("mgmt.all")}</div>
                   </div>
                   {group.modules.map((mod) => {
                     const AppIcon = getAppIcon(mod);
@@ -1227,8 +1295,8 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
         })}
       </div>
       <div className="flex items-center justify-end gap-2 mt-4">
-        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><Check size={12} /> Saved!</span>}
-        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? "Saving..." : "Save Permissions"}</button>
+        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><Check size={12} /> {t("mgmt.saved")}</span>}
+        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? t("mgmt.saving") : t("mgmt.savePerms")}</button>
       </div>
     </div>
   );
@@ -1237,9 +1305,10 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
 /* ═══════════════════════════════════════════════════
    EMPLOYEE PROFILE PANEL
    ═══════════════════════════════════════════════════ */
-function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: {
+function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t }: {
   contactId: string; contacts: ContactRef[];
   onClose: () => void; onOpenEmployee: (id: string) => void;
+  t: (key: string) => string;
 }) {
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1250,7 +1319,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
   }, [contactId]);
 
   if (loading) return <Spinner />;
-  if (!profile) return <EmptyState icon={User} title="Employee not found" />;
+  if (!profile) return <EmptyState icon={User} title={t("mgmt.employeeNotFound")} />;
 
   const { contact, assignments, reportingChain, directReports, history } = profile;
   const primary = assignments.find((a) => a.is_primary) || assignments[0];
@@ -1260,7 +1329,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
         <button onClick={onClose}
           className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-          <ArrowLeft size={14} className="rtl:rotate-180" /> Back
+          <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
         </button>
         <div className="flex items-center gap-4">
           <Avatar src={contact.avatar} name={contact.name} size={56} />
@@ -1293,7 +1362,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Briefcase size={14} className="text-[var(--text-dim)]" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Current Positions</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.currentPositions")}</span>
           </div>
           <div className="space-y-2">
             {assignments.map((a) => (
@@ -1305,11 +1374,11 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{a.position.title}</span>
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[a.position.level] || LEVEL_COLORS[5]}`}>L{a.position.level}</span>
-                    {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400/80">Primary</span>}
+                    {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400/80">{t("mgmt.primary")}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {a.department && <span className="text-[11px] text-[var(--text-dim)]">{a.department.icon} {a.department.name}</span>}
-                    {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">Since {a.start_date}</span></>}
+                    {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">{t("mgmt.since")} {a.start_date}</span></>}
                   </div>
                 </div>
               </div>
@@ -1322,7 +1391,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
           <div>
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp size={14} className="text-[var(--text-dim)]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Reports To</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.reportsTo")}</span>
             </div>
             <div className="relative pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
               {reportingChain.map((r, i) => (
@@ -1347,7 +1416,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Users size={14} className="text-[var(--text-dim)]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Direct Reports ({directReports.length})</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.directReports")} ({directReports.length})</span>
             </div>
             <div className="space-y-1.5">
               {directReports.map((r) => (
@@ -1370,10 +1439,10 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
         <div>
           <div className="flex items-center gap-2 mb-3">
             <History size={14} className="text-[var(--text-dim)]" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">History</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.history")}</span>
           </div>
           {history.length === 0 ? (
-            <div className="text-[12px] text-[var(--text-dim)] text-center py-4">No history recorded yet.</div>
+            <div className="text-[12px] text-[var(--text-dim)] text-center py-4">{t("mgmt.noHistoryYet")}</div>
           ) : (
             <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-3">
               {history.map((h) => (
@@ -1397,7 +1466,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
 /* ═══════════════════════════════════════════════════
    HEADCOUNT DASHBOARD
    ═══════════════════════════════════════════════════ */
-function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => void }) {
+function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) => void; t: (key: string) => string }) {
   const [analytics, setAnalytics] = useState<HeadcountAnalytics | null>(null);
   const [activity, setActivity] = useState<PositionHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1409,7 +1478,7 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
   }, []);
 
   if (loading) return <Spinner />;
-  if (!analytics) return <EmptyState icon={BarChart3} title="No data available" />;
+  if (!analytics) return <EmptyState icon={BarChart3} title={t("mgmt.noData")} />;
 
   const StatCard = ({ icon: Icon, label, value, sub, color, accent }: {
     icon: React.ElementType; label: string; value: string | number; sub?: string; color: string; accent: string;
@@ -1435,8 +1504,8 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
             <BarChart3 size={20} className="text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Headcount Dashboard</h2>
-            <p className="text-[12px] text-[var(--text-dim)]">Organization overview and workforce analytics</p>
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.headcountDash")}</h2>
+            <p className="text-[12px] text-[var(--text-dim)]">{t("mgmt.orgOverview")}</p>
           </div>
         </div>
       </div>
@@ -1444,25 +1513,31 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Users} label="Employees" value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" accent="bg-blue-400" />
-          <StatCard icon={Briefcase} label="Positions" value={analytics.totalPositions} sub={`${analytics.filledPositions} filled`} color="bg-violet-500/10 text-violet-400" accent="bg-violet-400" />
-          <StatCard icon={UserX} label="Vacant" value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% rate`} color="bg-amber-500/10 text-amber-400" accent="bg-amber-400" />
-          <StatCard icon={Layers} label="Org Depth" value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} avg reports`} color="bg-cyan-500/10 text-cyan-400" accent="bg-cyan-400" />
+          <StatCard icon={Users} label={t("mgmt.employees")} value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" accent="bg-blue-400" />
+          <StatCard icon={Briefcase} label={t("mgmt.positions")} value={analytics.totalPositions} sub={`${analytics.filledPositions} ${t("mgmt.filled")}`} color="bg-violet-500/10 text-violet-400" accent="bg-violet-400" />
+          <StatCard icon={UserX} label={t("mgmt.vacant")} value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% ${t("mgmt.rate")}`} color="bg-amber-500/10 text-amber-400" accent="bg-amber-400" />
+          <StatCard icon={Layers} label={t("mgmt.orgDepth")} value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} ${t("mgmt.avgReports")}`} color="bg-cyan-500/10 text-cyan-400" accent="bg-cyan-400" />
         </div>
 
         {/* Department Breakdown */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Building2 size={14} className="text-[var(--text-dim)]" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Department Breakdown</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.deptBreakdown")}</span>
           </div>
           <div className="space-y-2">
             {analytics.departmentBreakdown.map((dept) => (
               <div key={dept.id}
                 onClick={() => onDeptClick(dept.id)}
                 className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-strong)] hover:shadow-sm transition-all group">
-                <div className="w-9 h-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0">
-                  <span className="text-base">{dept.icon}</span>
+                <div className="w-9 h-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0 overflow-hidden">
+                  {dept.icon_type === "image" && dept.icon_value ? (
+                    <img src={dept.icon_value} alt="" className="w-full h-full object-cover" />
+                  ) : (() => {
+                    const key = dept.icon_type === "icon" && dept.icon_value ? dept.icon_value : "building2";
+                    const IC = DEPT_ICON_MAP[key] || Building2;
+                    return <IC size={16} className="text-[var(--text-muted)]" />;
+                  })()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
@@ -1489,7 +1564,7 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Layers size={14} className="text-[var(--text-dim)]" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Level Distribution</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.levelDist")}</span>
           </div>
           <div className="flex items-end justify-center gap-2 h-[120px] px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
             {analytics.levelDistribution.map((l) => {
@@ -1512,7 +1587,7 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Activity size={14} className="text-[var(--text-dim)]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Recent Activity</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.recentActivity")}</span>
             </div>
             <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-2.5">
               {activity.slice(0, 10).map((h) => (
@@ -1542,6 +1617,8 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
    MAIN PAGE
    ═══════════════════════════════════════════════════ */
 export default function ManagementPage() {
+  const { t, lang } = useTranslation(managementT);
+
   /* ── Data ── */
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [positions, setPositions] = useState<PositionRow[]>([]);
@@ -1704,15 +1781,15 @@ export default function ManagementPage() {
 
   const reloadRoles = async () => { setRoles(await fetchRoles()); };
 
-  const handleDeptSaved = async () => { await reloadAll(); setToast(editDept ? "Department updated." : "Department created."); };
+  const handleDeptSaved = async () => { await reloadAll(); setToast(editDept ? t("mgmt.toastDeptUpdated") : t("mgmt.toastDeptCreated")); };
   const handlePosSaved = async () => {
     if (selectedDeptId) await loadDeptDetail(selectedDeptId);
     const stats = await fetchDeptStats(); setDeptStats(stats);
-    setToast(editPos ? "Position updated." : "Position created.");
+    setToast(editPos ? t("mgmt.toastPosUpdated") : t("mgmt.toastPosCreated"));
   };
-  const handleAssignSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(editAssign ? "Assignment updated." : "Employee assigned."); };
-  const handleRoleSaved = async () => { await reloadRoles(); setToast(editRole ? "Role updated." : "Role created."); };
-  const handleTransferSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast("Employee transferred."); };
+  const handleAssignSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(editAssign ? t("mgmt.toastAssignUpdated") : t("mgmt.toastAssigned")); };
+  const handleRoleSaved = async () => { await reloadRoles(); setToast(editRole ? t("mgmt.toastRoleUpdated") : t("mgmt.toastRoleCreated")); };
+  const handleTransferSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(t("mgmt.toastTransferred")); };
 
   const handleContactCreated = (c: ContactRef) => {
     setContacts((prev) => [...prev, c]);
@@ -1738,31 +1815,31 @@ export default function ManagementPage() {
       if (ok) { await reloadRoles(); if (selectedRoleId === deleteTarget.id) setSelectedRoleId(null); }
     }
     setDeleting(false); setShowDeleteModal(false); setDeleteTarget(null);
-    if (ok) setToast("Deleted.");
+    if (ok) setToast(t("mgmt.toastDeleted"));
   };
 
   /* ── Duplicate position handler ── */
   const handleDuplicatePosition = async (posId: string) => {
     const res = await duplicatePosition(posId);
-    if (res.error || !res.data) { setToast(res.error || "Duplicate failed."); return; }
+    if (res.error || !res.data) { setToast(res.error || t("mgmt.toastDupFailed")); return; }
     if (selectedDeptId) await loadDeptDetail(selectedDeptId);
     const stats = await fetchDeptStats(); setDeptStats(stats);
-    setToast("Position duplicated.");
+    setToast(t("mgmt.toastDuplicated"));
   };
 
   /* ── Clone role handler ── */
   const handleCloneRole = async (roleId: string) => {
     const res = await cloneRole(roleId);
-    if (res.error || !res.data) { setToast(res.error || "Clone failed."); return; }
+    if (res.error || !res.data) { setToast(res.error || t("mgmt.toastCloneFailed")); return; }
     await reloadRoles();
-    setToast("Role cloned with permissions.");
+    setToast(t("mgmt.toastCloned"));
   };
 
   /* ── Drag & drop handler ── */
   const handleOrgDrop = async (sourceId: string, targetId: string) => {
     const posArr = rightView === "fullchart" ? fullOrgPositions : positions;
     if (detectCircularHierarchy(sourceId, targetId, posArr)) {
-      setToast("Cannot move — would create circular hierarchy.");
+      setToast(t("mgmt.toastCircular"));
       return;
     }
     // Remember old parent for undo
@@ -1770,7 +1847,7 @@ export default function ManagementPage() {
     const oldParentId = sourcePos?.reports_to_position_id || null;
 
     const res = await movePosition(sourceId, targetId);
-    if (!res.ok) { setToast(res.error || "Move failed."); return; }
+    if (!res.ok) { setToast(res.error || t("mgmt.toastMoveFailed")); return; }
 
     if (rightView === "fullchart") await loadFullOrgChart();
     else if (selectedDeptId) await loadDeptDetail(selectedDeptId);
@@ -1779,10 +1856,10 @@ export default function ManagementPage() {
       await movePosition(sourceId, oldParentId);
       if (rightView === "fullchart") await loadFullOrgChart();
       else if (selectedDeptId) await loadDeptDetail(selectedDeptId);
-      setToast("Move undone.");
+      setToast(t("mgmt.toastUndone"));
       setToastUndo(null);
     });
-    setToast("Position moved.");
+    setToast(t("mgmt.toastMoved"));
   };
 
   const toggleTreeNode = (id: string) => {
@@ -1903,7 +1980,7 @@ export default function ManagementPage() {
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
                 <Network size={16} />
               </div>
-              <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">Management</h1>
+              <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">{t("mgmt.title")}</h1>
               <button onClick={() => { setEditDept(null); setShowDeptModal(true); }}
                 className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0">
                 <Plus size={16} />
@@ -1912,13 +1989,13 @@ export default function ManagementPage() {
 
             <div className="relative">
               <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search departments..."
+              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("mgmt.searchDepts")}
                 className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-faint)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
               {search && <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={14} /></button>}
             </div>
 
             <div className="flex items-center justify-between mt-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Departments</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{t("mgmt.departments")}</span>
               <span className="text-[10px] font-medium text-[var(--text-faint)]">{departments.length}</span>
             </div>
           </div>
@@ -1926,7 +2003,7 @@ export default function ManagementPage() {
           {/* Department tree */}
           <div className="flex-1 overflow-y-auto will-change-scroll px-2.5 py-2 space-y-0.5">
             {departments.length === 0 ? (
-              <EmptyState icon={Building2} title="No departments yet" subtitle="Create your first department to get started." />
+              <EmptyState icon={Building2} title={t("mgmt.noDepts")} subtitle={t("mgmt.noDeptsDesc")} />
             ) : filteredDepts ? (
               filteredDepts.map((dept) => (
                 <button key={dept.id} onClick={() => handleSelectDept(dept)}
@@ -1945,28 +2022,28 @@ export default function ManagementPage() {
           {/* Bottom links */}
           <div className="px-3 py-2.5 border-t border-[var(--border-color)] space-y-0.5">
             <div className="px-3 pb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Views</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">{t("mgmt.views")}</span>
             </div>
             <button onClick={() => { setRightView("dashboard"); setSelectedDeptId(null); setMobileShowDetail(true); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "dashboard" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
               <BarChart3 size={16} />
-              <span className="text-[13px] font-medium">Dashboard</span>
+              <span className="text-[13px] font-medium">{t("mgmt.dashboard")}</span>
             </button>
             <button onClick={() => { setRightView("fullchart"); setSelectedDeptId(null); setMobileShowDetail(true); setOrgChartZoom(1); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "fullchart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
               <Globe size={16} />
-              <span className="text-[13px] font-medium">Full Org Chart</span>
+              <span className="text-[13px] font-medium">{t("mgmt.fullOrgChart")}</span>
             </button>
             <button onClick={() => { setRightView("roles"); setSelectedDeptId(null); setMobileShowDetail(true); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "roles" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
               <Shield size={16} />
-              <span className="text-[13px] font-medium">Roles & Permissions</span>
+              <span className="text-[13px] font-medium">{t("mgmt.rolesPerms")}</span>
             </button>
           </div>
         </div>
@@ -1977,7 +2054,7 @@ export default function ManagementPage() {
 
         {/* ── DASHBOARD VIEW ── */}
         {rightView === "dashboard" ? (
-          <HeadcountDashboard onDeptClick={(deptId) => {
+          <HeadcountDashboard t={t} onDeptClick={(deptId) => {
             const dept = departments.find((d) => d.id === deptId);
             if (dept) handleSelectDept(dept);
           }} />
@@ -1988,6 +2065,7 @@ export default function ManagementPage() {
             contacts={contacts}
             onClose={() => { setRightView("dept"); setMobileShowDetail(false); }}
             onOpenEmployee={openEmployeeProfile}
+            t={t}
           />
         ) : rightView === "fullchart" ? (
           /* ── FULL ORG CHART VIEW ── */
@@ -1995,21 +2073,21 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> Back
+                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
               </button>
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-sm">
                   <Globe size={20} className="text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Company Org Chart</h2>
-                  <p className="text-[12px] text-[var(--text-dim)]">Drag & drop to reorganize hierarchy</p>
+                  <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.companyOrgChart")}</h2>
+                  <p className="text-[12px] text-[var(--text-dim)]">{t("mgmt.dragDropHint")}</p>
                 </div>
               </div>
             </div>
             <div className="flex-1 overflow-auto">
               {fullOrgLoading ? <Spinner /> : fullOrgChart.length === 0 ? (
-                <EmptyState icon={GitBranchPlus} title="No positions to visualize" subtitle="Create departments and positions first." />
+                <EmptyState icon={GitBranchPlus} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.createDeptsPosFirst")} />
               ) : renderOrgChart(fullOrgChart, fullOrgPositions, true, true)}
             </div>
           </div>
@@ -2019,7 +2097,7 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> Back
+                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
               </button>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
@@ -2027,20 +2105,20 @@ export default function ManagementPage() {
                     <Shield size={20} className="text-violet-400" />
                   </div>
                   <div>
-                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Roles & Permissions</h2>
-                    <p className="text-[12px] text-[var(--text-dim)]">Manage access control across modules</p>
+                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.rolesPerms")}</h2>
+                    <p className="text-[12px] text-[var(--text-dim)]">{t("mgmt.manageAccess")}</p>
                   </div>
                 </div>
                 <button onClick={() => { setEditRole(null); setShowRoleModal(true); }}
                   className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all">
-                  <Plus size={13} /> New Role
+                  <Plus size={13} /> {t("mgmt.newRole")}
                 </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {roles.length === 0 ? (
-                <EmptyState icon={Shield} title="No roles defined" subtitle="Create roles and assign module permissions." />
+                <EmptyState icon={Shield} title={t("mgmt.noRoles")} subtitle={t("mgmt.noRolesSub")} />
               ) : (
                 <div className="px-4 md:px-6 py-4 space-y-3">
                   {roles.map((role) => (
@@ -2059,10 +2137,10 @@ export default function ManagementPage() {
                               selectedRoleId === role.id ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "hover:bg-[var(--bg-surface)] text-[var(--text-faint)]"
                             }`}>
                             {selectedRoleId === role.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                            Permissions
+                            {t("mgmt.permissions")}
                           </button>
                           <button onClick={() => handleCloneRole(role.id)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title="Clone role">
+                            className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title={t("mgmt.cloneRole")}>
                             <Copy size={11} className="text-[var(--text-dim)]" />
                           </button>
                           <button onClick={() => { setEditRole(role); setShowRoleModal(true); }}
@@ -2077,7 +2155,7 @@ export default function ManagementPage() {
                       </div>
                       {selectedRoleId === role.id && (
                         <div className="px-4 pb-4 border-t border-[var(--border-color)]">
-                          <div className="pt-3"><PermissionsEditor roleId={role.id} /></div>
+                          <div className="pt-3"><PermissionsEditor roleId={role.id} t={t} /></div>
                         </div>
                       )}
                     </div>
@@ -2089,7 +2167,7 @@ export default function ManagementPage() {
         ) : !selectedDept ? (
           /* ── EMPTY STATE ── */
           <div className="flex-1 flex items-center justify-center">
-            <EmptyState icon={Building2} title="Select a department" subtitle="Choose a department to manage positions and people." />
+            <EmptyState icon={Building2} title={t("mgmt.selectDeptPrompt")} subtitle={t("mgmt.selectDeptDesc")} />
           </div>
         ) : (
           /* ── DEPARTMENT DETAIL ── */
@@ -2097,7 +2175,7 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => setMobileShowDetail(false)}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> All Departments
+                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.allDepartments")}
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -2132,27 +2210,27 @@ export default function ManagementPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]">
                     <Briefcase size={12} className="text-[var(--text-dim)]" />
-                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">{analytics.totalPositions} positions</span>
+                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">{analytics.totalPositions} {t("mgmt.nPositions")}</span>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/10">
                     <Users size={12} className="text-emerald-400/70" />
-                    <span className="text-[11px] font-medium text-emerald-400/70">{analytics.totalAssigned} assigned</span>
+                    <span className="text-[11px] font-medium text-emerald-400/70">{analytics.totalAssigned} {t("mgmt.assigned")}</span>
                   </div>
                   {analytics.emptyPositions > 0 && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/[0.06] border border-amber-500/10">
                       <AlertCircle size={12} className="text-amber-400/70" />
-                      <span className="text-[11px] font-medium text-amber-400/70">{analytics.emptyPositions} vacant</span>
+                      <span className="text-[11px] font-medium text-amber-400/70">{analytics.emptyPositions} {t("mgmt.vacant").toLowerCase()}</span>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center border border-[var(--border-subtle)] rounded-lg overflow-hidden shrink-0">
                   <button onClick={() => setViewMode("list")}
                     className={`h-7 px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors ${viewMode === "list" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}>
-                    <LayoutList size={12} /> List
+                    <LayoutList size={12} /> {t("mgmt.list")}
                   </button>
                   <button onClick={() => setViewMode("chart")}
                     className={`h-7 px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors ${viewMode === "chart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}>
-                    <GitBranchPlus size={12} /> Org Chart
+                    <GitBranchPlus size={12} /> {t("mgmt.orgChart")}
                   </button>
                 </div>
               </div>
@@ -2164,24 +2242,24 @@ export default function ManagementPage() {
                 /* ── DEPT ORG CHART ── */
                 <div className="px-4 md:px-6 py-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Organizational Chart</h3>
+                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.orgChartTitle")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
                       className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
-                      <Plus size={12} /> Add Position
+                      <Plus size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
                   {positions.length === 0 ? (
-                    <EmptyState icon={GitBranchPlus} title="No positions to visualize" subtitle="Create positions to see the org chart." />
+                    <EmptyState icon={GitBranchPlus} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.noPosYetSub")} />
                   ) : renderOrgChart(deptOrgChart, positions, false)}
                 </div>
               ) : (
                 /* ── LIST VIEW ── */
                 <div className="px-4 md:px-6 py-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Positions</h3>
+                    <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.positions")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
                       className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
-                      <Plus size={12} /> Add Position
+                      <Plus size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
 
@@ -2190,16 +2268,16 @@ export default function ManagementPage() {
                     <div className="relative">
                       <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
                       <input type="text" value={posSearch} onChange={(e) => setPosSearch(e.target.value)}
-                        placeholder="Filter positions or people..."
+                        placeholder={t("mgmt.filterPosOrPeople")}
                         className="w-full h-8 ps-8 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-faint)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
                       {posSearch && <button onClick={() => setPosSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={12} /></button>}
                     </div>
                   )}
 
                   {positions.length === 0 ? (
-                    <EmptyState icon={Briefcase} title="No positions defined yet" subtitle="Create positions, then assign people to them." />
+                    <EmptyState icon={Briefcase} title={t("mgmt.noPosYet")} subtitle={t("mgmt.noPosYetSub")} />
                   ) : filteredPositions.length === 0 ? (
-                    <div className="text-center py-8 text-[12px] text-[var(--text-dim)]">No positions matching &ldquo;{posSearch}&rdquo;</div>
+                    <div className="text-center py-8 text-[12px] text-[var(--text-dim)]">{t("mgmt.noPosMatch")} &ldquo;{posSearch}&rdquo;</div>
                   ) : (
                     filteredPositions.map((pos) => {
                       const posAssignments = assignmentsByPos.get(pos.id) || [];
@@ -2229,16 +2307,17 @@ export default function ManagementPage() {
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => { setDetailPos(pos); setShowPosDetail(true); }}
                                 className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
-                                <FileText size={11} /> Details
+                                <FileText size={11} /> {t("mgmt.details")}
                               </button>
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
                                 className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
-                                <UserPlus size={11} /> Assign
+                                <UserPlus size={11} /> {t("mgmt.assign")}
                               </button>
                               <button onClick={() => handleDuplicatePosition(pos.id)}
-                                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title="Duplicate position">
+                                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title={t("mgmt.duplicatePos")}>
                                 <Copy size={11} className="text-[var(--text-dim)]" />
                               </button>
+
                               <button onClick={() => { setEditPos(pos); setShowPosModal(true); }}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]">
                                 <Pencil size={11} className="text-[var(--text-dim)]" />
@@ -2254,7 +2333,7 @@ export default function ManagementPage() {
                             <div className="px-4 py-3">
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
                                 className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] flex items-center justify-center gap-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all">
-                                <UserPlus size={12} /> Assign someone to this position
+                                <UserPlus size={12} /> {t("mgmt.assignSomeone")}
                               </button>
                             </div>
                           ) : (
@@ -2270,16 +2349,16 @@ export default function ManagementPage() {
                                       <div className="flex items-center gap-2">
                                         <span className="text-[13px] font-medium text-[var(--text-primary)] truncate cursor-pointer hover:underline"
                                           onClick={(e) => { e.stopPropagation(); if (ctc) openEmployeeProfile(ctc.id); }}>{ctc?.name || "Unknown"}</span>
-                                        {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/[0.12] text-emerald-400/80">Primary</span>}
+                                        {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/[0.12] text-emerald-400/80">{t("mgmt.primary")}</span>}
                                       </div>
                                       <div className="flex items-center gap-2 mt-0.5">
                                         {ctc?.email && <span className="text-[11px] text-[var(--text-dim)] truncate">{ctc.email}</span>}
-                                        {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">Since {a.start_date}</span></>}
+                                        {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">{t("mgmt.since")} {a.start_date}</span></>}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                       <button onClick={() => { setTransferAssignment(a); setTransferContactName(ctc?.name || "Employee"); setShowTransferModal(true); }}
-                                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title="Transfer">
+                                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title={t("mgmt.transfer")}>
                                         <ArrowRightLeft size={11} className="text-[var(--text-dim)]" />
                                       </button>
                                       <button onClick={() => { setAssignPosId(a.position_id); setEditAssign(a); setShowAssignModal(true); }}
@@ -2315,7 +2394,7 @@ export default function ManagementPage() {
             {toastUndo && (
               <button onClick={() => { toastUndo(); setToast(null); setToastUndo(null); }}
                 className="ml-1 flex items-center gap-1 text-[12px] font-semibold underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity">
-                <Undo2 size={11} /> Undo
+                <Undo2 size={11} /> {t("mgmt.undo")}
               </button>
             )}
           </div>
@@ -2323,30 +2402,30 @@ export default function ManagementPage() {
       )}
 
       {/* ═══════════ MODALS ═══════════ */}
-      <DepartmentModal open={showDeptModal} onClose={() => setShowDeptModal(false)} dept={editDept} departments={departments} onSaved={handleDeptSaved} />
+      <DepartmentModal open={showDeptModal} onClose={() => setShowDeptModal(false)} dept={editDept} departments={departments} onSaved={handleDeptSaved} t={t} />
 
       {selectedDeptId && (
         <>
           <PositionModal open={showPosModal} onClose={() => setShowPosModal(false)}
-            position={editPos} departmentId={selectedDeptId} allPositions={positions} roles={roles} onSaved={handlePosSaved} />
+            position={editPos} departmentId={selectedDeptId} allPositions={positions} roles={roles} onSaved={handlePosSaved} t={t} />
           <AssignmentModal open={showAssignModal} onClose={() => setShowAssignModal(false)}
             assignment={editAssign} positionId={assignPosId} departmentId={selectedDeptId}
-            contacts={contacts} onSaved={handleAssignSaved} onContactCreated={handleContactCreated} />
+            contacts={contacts} onSaved={handleAssignSaved} onContactCreated={handleContactCreated} t={t} />
         </>
       )}
 
       <TransferModal open={showTransferModal} onClose={() => setShowTransferModal(false)}
         assignment={transferAssignment} contactName={transferContactName}
-        departments={departments} onSaved={handleTransferSaved} />
+        departments={departments} onSaved={handleTransferSaved} t={t} />
 
-      <RoleModal open={showRoleModal} onClose={() => setShowRoleModal(false)} role={editRole} onSaved={handleRoleSaved} />
+      <RoleModal open={showRoleModal} onClose={() => setShowRoleModal(false)} role={editRole} onSaved={handleRoleSaved} t={t} />
 
       <PositionDetailModal open={showPosDetail} onClose={() => setShowPosDetail(false)}
-        position={detailPos} contacts={contacts} />
+        position={detailPos} contacts={contacts} t={t} />
 
       <DeleteModal open={showDeleteModal} target={deleteTarget} departments={departments}
         onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
-        onConfirm={handleDeleteConfirm} deleting={deleting} />
+        onConfirm={handleDeleteConfirm} deleting={deleting} t={t} />
     </div>
   );
 }
