@@ -151,10 +151,12 @@ function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; s
 
 function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-[var(--text-dim)]">
-      <Icon size={32} className="mb-3 opacity-40" />
-      <p className="text-[13px] font-medium mb-1">{title}</p>
-      {subtitle && <p className="text-[11px]">{subtitle}</p>}
+    <div className="flex flex-col items-center justify-center py-20 text-[var(--text-dim)]">
+      <div className="w-14 h-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center mb-4">
+        <Icon size={24} className="opacity-40" />
+      </div>
+      <p className="text-[14px] font-semibold text-[var(--text-secondary)] mb-1">{title}</p>
+      {subtitle && <p className="text-[12px] text-[var(--text-dim)]">{subtitle}</p>}
     </div>
   );
 }
@@ -913,42 +915,45 @@ function OrgChartCard({
         ${isDragging ? "opacity-40 scale-95" : ""}
       `}>
       {/* Drag handle */}
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing">
+      <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing">
         <GripVertical size={12} className="text-[var(--text-dim)]" />
       </div>
 
+      {/* Position title + level */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">{node.position.title}</div>
+          {showDept && node.department && (
+            <div className="text-[10px] text-[var(--text-dim)] truncate mt-0.5">{node.department.icon} {node.department.name}</div>
+          )}
+        </div>
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0 ${LEVEL_COLORS[node.position.level] || LEVEL_COLORS[5]}`}>
+          L{node.position.level}
+        </span>
+      </div>
+
+      {/* Divider */}
+      <div className="h-px bg-[var(--border-faint)] -mx-3 mb-2.5" />
+
       {/* Person */}
-      <div className="flex items-center gap-2.5 mb-2">
-        <Avatar src={node.contact?.avatar} name={node.contact?.name || "?"} size={34} />
+      <div className="flex items-center gap-2.5">
+        <Avatar src={node.contact?.avatar} name={node.contact?.name || "?"} size={30} />
         <div className="min-w-0 flex-1">
           {node.contact ? (
-            <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{node.contact.name}</div>
+            <>
+              <div className="text-[12px] font-medium text-[var(--text-secondary)] truncate">{node.contact.name}</div>
+              {node.contact.email && <div className="text-[10px] text-[var(--text-dim)] truncate">{node.contact.email}</div>}
+            </>
           ) : (
             <button onClick={(e) => { e.stopPropagation(); onAssign(node.position.id); }}
               className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1 transition-colors">
               <UserPlus size={10} /> Assign
             </button>
           )}
-          {node.contact?.email && <div className="text-[10px] text-[var(--text-dim)] truncate">{node.contact.email}</div>}
         </div>
-      </div>
-
-      {/* Position title */}
-      <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">{node.position.title}</div>
-
-      {/* Meta: level + department */}
-      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[node.position.level] || LEVEL_COLORS[5]}`}>
-          L{node.position.level}
-        </span>
-        {showDept && node.department && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)] truncate max-w-[120px]">
-            {node.department.icon} {node.department.name}
-          </span>
-        )}
         {hasChildren && (
           <button onClick={(e) => { e.stopPropagation(); onToggle(); }}
-            className="ml-auto w-5 h-5 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface)] transition-colors">
+            className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface)] transition-colors shrink-0">
             {expanded ? <ChevronUp size={11} className="text-[var(--text-dim)]" /> : <ChevronDown size={11} className="text-[var(--text-dim)]" />}
           </button>
         )}
@@ -1260,7 +1265,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: 
         <div className="flex items-center gap-4">
           <Avatar src={contact.avatar} name={contact.name} size={56} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate">{contact.name}</h2>
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{contact.name}</h2>
             {primary && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[13px] text-[var(--text-secondary)]">{primary.position.title}</span>
@@ -1406,16 +1411,17 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
   if (loading) return <Spinner />;
   if (!analytics) return <EmptyState icon={BarChart3} title="No data available" />;
 
-  const StatCard = ({ icon: Icon, label, value, sub, color }: {
-    icon: React.ElementType; label: string; value: string | number; sub?: string; color: string;
+  const StatCard = ({ icon: Icon, label, value, sub, color, accent }: {
+    icon: React.ElementType; label: string; value: string | number; sub?: string; color: string; accent: string;
   }) => (
-    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 relative overflow-hidden">
+      <div className={`absolute top-0 inset-x-0 h-[2px] ${accent}`} />
+      <div className="flex items-center gap-2 mb-3">
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}><Icon size={15} /></div>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{label}</span>
       </div>
       <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{value}</div>
-      {sub && <div className="text-[11px] text-[var(--text-dim)] mt-1">{sub}</div>}
+      {sub && <div className="text-[11px] text-[var(--text-dim)] mt-1.5">{sub}</div>}
     </div>
   );
 
@@ -1424,12 +1430,12 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-            <BarChart3 size={18} className="text-emerald-400" />
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-sm">
+            <BarChart3 size={20} className="text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Headcount Dashboard</h2>
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Headcount Dashboard</h2>
             <p className="text-[12px] text-[var(--text-dim)]">Organization overview and workforce analytics</p>
           </div>
         </div>
@@ -1438,10 +1444,10 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Users} label="Employees" value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" />
-          <StatCard icon={Briefcase} label="Positions" value={analytics.totalPositions} sub={`${analytics.filledPositions} filled`} color="bg-violet-500/10 text-violet-400" />
-          <StatCard icon={UserX} label="Vacant" value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% rate`} color="bg-amber-500/10 text-amber-400" />
-          <StatCard icon={Layers} label="Org Depth" value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} avg reports`} color="bg-cyan-500/10 text-cyan-400" />
+          <StatCard icon={Users} label="Employees" value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" accent="bg-blue-400" />
+          <StatCard icon={Briefcase} label="Positions" value={analytics.totalPositions} sub={`${analytics.filledPositions} filled`} color="bg-violet-500/10 text-violet-400" accent="bg-violet-400" />
+          <StatCard icon={UserX} label="Vacant" value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% rate`} color="bg-amber-500/10 text-amber-400" accent="bg-amber-400" />
+          <StatCard icon={Layers} label="Org Depth" value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} avg reports`} color="bg-cyan-500/10 text-cyan-400" accent="bg-cyan-400" />
         </div>
 
         {/* Department Breakdown */}
@@ -1454,12 +1460,18 @@ function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => 
             {analytics.departmentBreakdown.map((dept) => (
               <div key={dept.id}
                 onClick={() => onDeptClick(dept.id)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-strong)] transition-all group">
-                <span className="text-lg shrink-0">{dept.icon}</span>
+                className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-strong)] hover:shadow-sm transition-all group">
+                <div className="w-9 h-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0">
+                  <span className="text-base">{dept.icon}</span>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">{dept.name}</span>
-                    <span className="text-[11px] text-[var(--text-dim)] shrink-0 ml-2">{dept.filled}/{dept.total}</span>
+                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{dept.name}</span>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400">{dept.filled}</span>
+                      <span className="text-[10px] text-[var(--text-faint)]">/</span>
+                      <span className="text-[10px] font-medium text-[var(--text-dim)]">{dept.total}</span>
+                    </div>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500 flex">
@@ -1788,10 +1800,11 @@ export default function ManagementPage() {
       <div key={node.id}>
         <div role="button" tabIndex={0} onClick={() => handleSelectDept(node)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSelectDept(node); }}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-start transition-all duration-150 group cursor-pointer ${
-            isSelected ? "bg-[var(--bg-surface-active)] shadow-[inset_3px_0_0_var(--text-subtle)]" : "hover:bg-[var(--bg-surface)]"
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-start transition-all duration-150 group cursor-pointer relative ${
+            isSelected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
           }`}
           style={{ paddingInlineStart: `${12 + depth * 20}px` }}>
+          {isSelected && <div className="absolute inset-y-1.5 start-0.5 w-[3px] rounded-full bg-[var(--text-subtle)]" />}
           {hasChildren ? (
             <button onClick={(e) => { e.stopPropagation(); toggleTreeNode(node.id); }}
               className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface-hover)]">
@@ -1900,12 +1913,13 @@ export default function ManagementPage() {
             <div className="relative">
               <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search departments..."
-                className="w-full h-9 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
+                className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-faint)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
               {search && <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={14} /></button>}
             </div>
 
-            <div className="mt-2.5 text-[11px] font-medium text-[var(--text-faint)]">
-              {departments.length} department{departments.length !== 1 ? "s" : ""}
+            <div className="flex items-center justify-between mt-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Departments</span>
+              <span className="text-[10px] font-medium text-[var(--text-faint)]">{departments.length}</span>
             </div>
           </div>
 
@@ -1929,8 +1943,8 @@ export default function ManagementPage() {
           </div>
 
           {/* Bottom links */}
-          <div className="px-3 py-2 border-t border-[var(--border-color)] space-y-1">
-            <div className="px-3 pt-1 pb-1.5">
+          <div className="px-3 py-2.5 border-t border-[var(--border-color)] space-y-0.5">
+            <div className="px-3 pb-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">Views</span>
             </div>
             <button onClick={() => { setRightView("dashboard"); setSelectedDeptId(null); setMobileShowDetail(true); }}
@@ -1983,12 +1997,12 @@ export default function ManagementPage() {
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
                 <ArrowLeft size={14} className="rtl:rotate-180" /> Back
               </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                  <Globe size={18} className="text-blue-400" />
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-sm">
+                  <Globe size={20} className="text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Company Org Chart</h2>
+                  <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Company Org Chart</h2>
                   <p className="text-[12px] text-[var(--text-dim)]">Drag & drop to reorganize hierarchy</p>
                 </div>
               </div>
@@ -2008,12 +2022,12 @@ export default function ManagementPage() {
                 <ArrowLeft size={14} className="rtl:rotate-180" /> Back
               </button>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                    <Shield size={18} className="text-violet-400" />
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-sm">
+                    <Shield size={20} className="text-violet-400" />
                   </div>
                   <div>
-                    <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Roles & Permissions</h2>
+                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">Roles & Permissions</h2>
                     <p className="text-[12px] text-[var(--text-dim)]">Manage access control across modules</p>
                   </div>
                 </div>
@@ -2030,14 +2044,14 @@ export default function ManagementPage() {
               ) : (
                 <div className="px-4 md:px-6 py-4 space-y-3">
                   {roles.map((role) => (
-                    <div key={role.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
-                      <div className="flex items-center gap-3 px-4 py-3 group">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                          <Shield size={14} className="text-violet-400" />
+                    <div key={role.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all">
+                      <div className="flex items-center gap-3.5 px-4 py-3.5 group">
+                        <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/15 flex items-center justify-center shrink-0">
+                          <Shield size={16} className="text-violet-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{role.name}</div>
-                          {role.description && <p className="text-[11px] text-[var(--text-dim)] truncate">{role.description}</p>}
+                          <div className="text-[15px] font-semibold text-[var(--text-primary)]">{role.name}</div>
+                          {role.description && <p className="text-[11px] text-[var(--text-dim)] truncate mt-0.5">{role.description}</p>}
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => setSelectedRoleId(selectedRoleId === role.id ? null : role.id)}
@@ -2086,18 +2100,18 @@ export default function ManagementPage() {
                 <ArrowLeft size={14} className="rtl:rotate-180" /> All Departments
               </button>
               <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                     <DeptIcon dept={selectedDept} size={28} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-[18px] font-bold text-[var(--text-primary)] truncate">{selectedDept.name}</h2>
+                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{selectedDept.name}</h2>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {(() => {
                         const head = getDepartmentHead(positions, assignments, contacts);
-                        return head ? <span className="text-[12px] text-[var(--text-secondary)]">{head.name} — {head.title}</span> : null;
+                        return head ? <span className="text-[12px] text-[var(--text-muted)]">{head.name} — {head.title}</span> : null;
                       })()}
-                      {selectedDept.description && <span className="text-[12px] text-[var(--text-dim)]">{selectedDept.description}</span>}
+                      {selectedDept.description && <span className="text-[12px] text-[var(--text-dim)] italic">{selectedDept.description}</span>}
                     </div>
                   </div>
                 </div>
@@ -2192,10 +2206,17 @@ export default function ManagementPage() {
                       const roleName = pos.role_id ? roles.find((r) => r.id === pos.role_id)?.name : null;
 
                       return (
-                        <div key={pos.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all duration-200">
+                        <div key={pos.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all duration-200 relative">
+                          <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-xl ${LEVEL_DOT[pos.level] || "bg-slate-400"} opacity-60`} />
                           <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-faint)] group">
-                            <div className="w-9 h-9 rounded-lg bg-violet-500/[0.10] border border-violet-500/15 flex items-center justify-center shrink-0">
-                              <Briefcase size={15} className="text-violet-400" />
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                              pos.level <= 1 ? "bg-amber-500/[0.08] border border-amber-500/15" :
+                              pos.level <= 3 ? "bg-violet-500/[0.08] border border-violet-500/15" :
+                              "bg-blue-500/[0.08] border border-blue-500/15"
+                            }`}>
+                              <Briefcase size={15} className={`${
+                                pos.level <= 1 ? "text-amber-400" : pos.level <= 3 ? "text-violet-400" : "text-blue-400"
+                              }`} />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -2232,7 +2253,7 @@ export default function ManagementPage() {
                           {posAssignments.length === 0 ? (
                             <div className="px-4 py-3">
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
-                                className="text-[12px] flex items-center gap-1.5 text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors">
+                                className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] flex items-center justify-center gap-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all">
                                 <UserPlus size={12} /> Assign someone to this position
                               </button>
                             </div>
