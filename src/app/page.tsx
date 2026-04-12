@@ -361,7 +361,7 @@ export default function HomePage() {
               : dk ? "text-white/45 group-hover:text-white" : "text-black/45 group-hover:text-black"
             : dk ? "text-white/15" : "text-black/15"
         }`}>
-          <Icon size={24} strokeWidth={1.6} />
+          <Icon size={28} strokeWidth={1.5} />
         </span>
         <span className={`text-[11px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active
@@ -569,7 +569,7 @@ export default function HomePage() {
 
         {isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category */
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
             {filteredApps.map((app) => (
               <AppCard key={app.id} app={app} showStar />
             ))}
@@ -588,7 +588,7 @@ export default function HomePage() {
                     {group.apps.filter((a) => a.active).length}/{group.apps.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
                   {group.apps.map((app) => (
                     <AppCard key={app.id} app={app} showStar />
                   ))}
