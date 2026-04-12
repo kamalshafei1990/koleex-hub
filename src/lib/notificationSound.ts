@@ -1,85 +1,76 @@
 /* ---------------------------------------------------------------------------
-   notificationSound — tiny Web Audio "ping" used by Discuss (and later by
-   Mail / Notifications) to alert the user when something arrives.
+   notificationSound — plays /notification.wav whenever Discuss (and
+   later Mail / Notifications) wants to alert the user.
 
-   Why Web Audio and not an <audio> tag with an mp3:
-     · Zero network round-trip and zero asset to ship.
-     · No CORS / mime-type / preload headaches.
-     · Plays the same on every browser that supports AudioContext.
+   Implementation:
+     · A single shared HTMLAudioElement that points at /notification.wav.
+       Reused across calls — we just rewind and play() each time, which
+       is much cheaper than creating a new <audio> per ping and avoids
+       hitting the browser's max-concurrent-media limit on rapid bursts.
+     · The asset lives in /public so it ships with the Next build and is
+       served from the same origin (no CORS, no auth headers).
 
    Browser autoplay policy:
      · Most browsers (Chrome, Safari, Firefox) require a user gesture
-       before audio can start. We lazily create the AudioContext and
-       attach a one-shot click/touchstart/keydown listener that resumes
-       it the first time the user interacts with the page. After that,
-       playNotificationSound() can be called from any callback (including
-       a Supabase realtime handler) and it just works.
-
-   The tone itself is a quick two-note chime (A5 → E6) — pleasant enough
-   to notice but short enough not to be annoying.
+       before audio can start. We attach one-shot click/touchstart/
+       keydown listeners on first import and use them to "unlock" the
+       audio element with a silent muted play() inside the gesture.
+       After that, playNotificationSound() can be called from any
+       callback (including a Supabase realtime handler) and it just
+       plays.
+     · If a chime is requested before the unlock has happened we set a
+       pending flag, and the very next user gesture fires a single
+       backlog chime instead of swallowing it silently.
    --------------------------------------------------------------------------- */
 
-let audioCtx: AudioContext | null = null;
+const SOUND_URL = "/notification.wav";
+
+let audioEl: HTMLAudioElement | null = null;
+let unlocked = false;
 let unlockListenersAttached = false;
 let pendingPlayUntilUnlock = false;
 
-type CtorType = typeof AudioContext | undefined;
-
-function getCtor(): CtorType {
-  if (typeof window === "undefined") return undefined;
-  return (
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext
-  );
-}
-
-function ensureCtx(): AudioContext | null {
+function ensureAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
-  if (audioCtx) return audioCtx;
-  const Ctor = getCtor();
-  if (!Ctor) return null;
+  if (audioEl) return audioEl;
   try {
-    audioCtx = new Ctor();
+    const el = new Audio(SOUND_URL);
+    el.preload = "auto";
+    /* A reasonable default — most users find ~70% pleasant. The user
+       can still adjust via the OS volume. */
+    el.volume = 0.8;
+    audioEl = el;
   } catch {
     return null;
   }
-  /* Newly-created AudioContexts are usually "suspended" until a user
-     gesture; resume() inside a gesture promotes them to "running". We
-     try here optimistically — if we're not currently in a gesture the
-     promise just rejects silently. */
-  if (audioCtx.state === "suspended") {
-    void audioCtx.resume().catch(() => {});
-  }
-  return audioCtx;
+  return audioEl;
 }
 
-function actuallyPlay() {
-  const ctx = audioCtx;
-  if (!ctx || ctx.state !== "running") return false;
-  try {
-    const now = ctx.currentTime;
-    const tones: Array<{ freq: number; start: number; dur: number }> = [
-      { freq: 880, start: 0, dur: 0.13 }, // A5
-      { freq: 1320, start: 0.09, dur: 0.2 }, // E6
-    ];
-    for (const tone of tones) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = tone.freq;
-      const t0 = now + tone.start;
-      const t1 = t0 + tone.dur;
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t1);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t1 + 0.02);
-    }
-    return true;
-  } catch {
-    return false;
+function tryUnlock() {
+  const el = ensureAudio();
+  if (!el) return;
+  /* Trigger a silent play() inside a user gesture so the autoplay
+     unlock happens. We mute it first so the user doesn't hear a stray
+     ping during the unlock click. */
+  const wasMuted = el.muted;
+  el.muted = true;
+  const p = el.play();
+  if (p && typeof p.then === "function") {
+    p.then(() => {
+      el.pause();
+      el.currentTime = 0;
+      el.muted = wasMuted;
+      unlocked = true;
+      if (pendingPlayUntilUnlock) {
+        pendingPlayUntilUnlock = false;
+        playNow();
+      }
+    }).catch(() => {
+      el.muted = wasMuted;
+    });
+  } else {
+    el.muted = wasMuted;
+    unlocked = true;
   }
 }
 
@@ -87,73 +78,71 @@ function attachUnlockListeners() {
   if (unlockListenersAttached) return;
   if (typeof window === "undefined") return;
   unlockListenersAttached = true;
-  const unlock = () => {
-    const ctx = ensureCtx();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-      void ctx.resume().then(() => {
-        if (pendingPlayUntilUnlock) {
-          pendingPlayUntilUnlock = false;
-          actuallyPlay();
-        }
-      });
-    } else if (pendingPlayUntilUnlock) {
-      pendingPlayUntilUnlock = false;
-      actuallyPlay();
-    }
+  const onGesture = () => {
+    if (!unlocked) tryUnlock();
   };
-  window.addEventListener("click", unlock, { passive: true });
-  window.addEventListener("touchstart", unlock, { passive: true });
-  window.addEventListener("keydown", unlock);
+  window.addEventListener("click", onGesture, { passive: true });
+  window.addEventListener("touchstart", onGesture, { passive: true });
+  window.addEventListener("keydown", onGesture);
 }
 
-/** Call once on app mount so the AudioContext is ready as soon as the
- *  user clicks anywhere. Safe to call multiple times — the listeners
- *  are only attached on the first call. */
+function playNow(): boolean {
+  const el = ensureAudio();
+  if (!el) return false;
+  try {
+    el.currentTime = 0;
+  } catch {
+    /* Some browsers throw if the media isn't ready yet — fine, just
+       play from wherever. */
+  }
+  const p = el.play();
+  if (p && typeof p.then === "function") {
+    p.catch(() => {
+      /* Most likely the autoplay policy blocked us. Mark unlocked
+         false so the next user gesture re-tries. */
+      unlocked = false;
+      pendingPlayUntilUnlock = true;
+    });
+  }
+  return true;
+}
+
+/** Call once on app mount so the audio asset is preloaded and the
+ *  unlock listeners are attached as early as possible. Safe to call
+ *  multiple times. */
 export function primeNotificationSound() {
   attachUnlockListeners();
-  /* Best-effort: try to create the context now. On most browsers it
-     starts suspended and the unlock listeners will resume it on the
-     first click. */
-  ensureCtx();
+  ensureAudio();
 }
 
-/** Play the two-note notification chime. Safe to call from any
- *  callback. If the audio context can't play yet (no prior user
- *  gesture) we set a flag and the next click/keydown/touchstart will
- *  fire a single chime — better than swallowing it silently. */
+/** Play the notification sound. Safe to call from any callback — if
+ *  the audio element hasn't been unlocked by a user gesture yet, the
+ *  call queues a one-shot chime that fires on the next gesture. */
 export function playNotificationSound() {
   attachUnlockListeners();
-  const ctx = ensureCtx();
-  if (!ctx) {
+  const el = ensureAudio();
+  if (!el) {
     if (typeof console !== "undefined") {
-      console.warn("[notificationSound] no AudioContext support");
+      console.warn("[notificationSound] HTMLAudioElement not available");
     }
     return;
   }
-  if (ctx.state === "running") {
-    actuallyPlay();
+  if (!unlocked) {
+    /* No gesture yet — try anyway (some browsers allow play() if the
+       call came from inside a recent gesture chain), but also queue. */
+    pendingPlayUntilUnlock = true;
+    const ok = playNow();
     if (typeof console !== "undefined") {
-      console.log("[notificationSound] played");
+      console.log(
+        ok
+          ? "[notificationSound] play() called pre-unlock"
+          : "[notificationSound] queued for next user gesture",
+      );
     }
     return;
   }
-  /* Suspended → try to resume; if it works inside this turn, play
-     immediately. Otherwise queue a one-shot play for the next user
-     gesture. */
-  void ctx.resume().then(() => {
-    if (ctx.state === "running") {
-      actuallyPlay();
-      if (typeof console !== "undefined") {
-        console.log("[notificationSound] played after resume");
-      }
-    } else {
-      pendingPlayUntilUnlock = true;
-      if (typeof console !== "undefined") {
-        console.log(
-          "[notificationSound] suspended — will play on next click",
-        );
-      }
-    }
-  });
+  playNow();
+  if (typeof console !== "undefined") {
+    console.log("[notificationSound] played");
+  }
 }
