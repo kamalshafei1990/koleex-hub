@@ -107,6 +107,13 @@ const PERMISSION_GROUPS: { label: string; modules: string[] }[] = [
 
 const PERMISSION_MODULES = PERMISSION_GROUPS.flatMap((g) => g.modules);
 
+/** Translate a department name — falls back to original if no translation key exists. */
+function deptName(name: string, t: (k: string) => string): string {
+  const key = `dept.${name}`;
+  const v = t(key);
+  return v === key ? name : v;
+}
+
 /** Lookup app icon by permission module name */
 const getAppIcon = (moduleName: string) => {
   const app = APP_REGISTRY.find((a) =>
@@ -184,7 +191,7 @@ function Spinner() {
 }
 
 /** Department icon renderer — system-style: uploaded images in rounded containers, emoji fallback */
-function DeptIcon({ dept, size = 32 }: { dept: DepartmentRow; size?: number }) {
+function DeptIcon({ dept, size = 34 }: { dept: DepartmentRow; size?: number }) {
   const iconSize = Math.round(size * 0.5);
   // Uploaded / URL image
   if (dept.icon_type === "image" && dept.icon_value) {
@@ -362,7 +369,7 @@ function DepartmentModal({
         <FieldLabel>{t("mgmt.parentDept")}</FieldLabel>
         <select value={parentId || ""} onChange={(e) => setParentId(e.target.value || null)} className={selectCls}>
           <option value="">{t("mgmt.noneTopLevel")}</option>
-          {parentOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {parentOptions.map((d) => <option key={d.id} value={d.id}>{deptName(d.name, t)}</option>)}
         </select>
       </div>
     </ModalShell>
@@ -744,7 +751,7 @@ function TransferModal({
         <FieldLabel>{t("mgmt.targetDept")}</FieldLabel>
         <select value={targetDeptId} onChange={(e) => setTargetDeptId(e.target.value)} className={selectCls}>
           <option value="">{t("mgmt.selectDept")}</option>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+          {departments.map((d) => <option key={d.id} value={d.id}>{deptName(d.name, t)}</option>)}
         </select>
       </div>
       {targetDeptId && (
@@ -859,7 +866,7 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting, 
               <FieldLabel>{t("mgmt.moveTo")}</FieldLabel>
               <select value={reassignDeptId} onChange={(e) => setReassignDeptId(e.target.value)} className={selectCls}>
                 <option value="">Select department...</option>
-                {departments.filter((d) => d.id !== target.id).map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+                {departments.filter((d) => d.id !== target.id).map((d) => <option key={d.id} value={d.id}>{deptName(d.name, t)}</option>)}
               </select>
             </div>
           )}
@@ -959,12 +966,12 @@ function PositionDetailModal({ open, onClose, position, contacts, t }: {
 
 function OrgChartCard({
   node, hasChildren, expanded, isDragOver, isDragging, showDept,
-  onToggle, onAssign, onClick, onDragStart, onDragOver, onDragLeave, onDrop,
+  onToggle, onAssign, onClick, onDragStart, onDragOver, onDragLeave, onDrop, t,
 }: {
   node: OrgChartNode; hasChildren: boolean; expanded: boolean;
   isDragOver: boolean; isDragging: boolean; showDept: boolean;
   onToggle: () => void; onAssign: (posId: string) => void;
-  onClick: () => void;
+  onClick: () => void; t: (k: string) => string;
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
@@ -992,7 +999,7 @@ function OrgChartCard({
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">{node.position.title}</div>
           {showDept && node.department && (
-            <div className="text-[10px] text-[var(--text-dim)] truncate mt-0.5">{node.department.icon} {node.department.name}</div>
+            <div className="text-[10px] text-[var(--text-dim)] truncate mt-0.5">{deptName(node.department.name, t)}</div>
           )}
         </div>
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0 ${LEVEL_COLORS[node.position.level] || LEVEL_COLORS[5]}`}>
@@ -1032,7 +1039,7 @@ function OrgChartCard({
 
 function OrgChartBranch({
   node, showDept, dragSourceId, dragOverId, allPositions,
-  onAssign, onClickNode, setDragSourceId, setDragOverId, onDrop,
+  onAssign, onClickNode, setDragSourceId, setDragOverId, onDrop, t,
 }: {
   node: OrgChartNode; showDept: boolean;
   dragSourceId: string | null; dragOverId: string | null;
@@ -1042,6 +1049,7 @@ function OrgChartBranch({
   setDragSourceId: (id: string | null) => void;
   setDragOverId: (id: string | null) => void;
   onDrop: (sourceId: string, targetId: string) => void;
+  t: (k: string) => string;
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
@@ -1079,6 +1087,7 @@ function OrgChartBranch({
           setDragSourceId(null);
           setDragOverId(null);
         }}
+        t={t}
       />
 
       {/* Children with connectors + animation */}
@@ -1116,6 +1125,7 @@ function OrgChartBranch({
                     setDragSourceId={setDragSourceId}
                     setDragOverId={setDragOverId}
                     onDrop={onDrop}
+                    t={t}
                   />
                 </div>
               ))}
@@ -1340,7 +1350,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
                 <span className="text-[13px] text-[var(--text-secondary)]">{primary.position.title}</span>
                 {primary.department && (
                   <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)]">
-                    {primary.department.icon} {primary.department.name}
+                    {deptName(primary.department.name, t)}
                   </span>
                 )}
               </div>
@@ -1377,7 +1387,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
                     {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400/80">{t("mgmt.primary")}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    {a.department && <span className="text-[11px] text-[var(--text-dim)]">{a.department.icon} {a.department.name}</span>}
+                    {a.department && <span className="text-[11px] text-[var(--text-dim)]">{deptName(a.department.name, t)}</span>}
                     {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">{t("mgmt.since")} {a.start_date}</span></>}
                   </div>
                 </div>
@@ -1541,7 +1551,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{dept.name}</span>
+                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{deptName(dept.name, t)}</span>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400">{dept.filled}</span>
                       <span className="text-[10px] text-[var(--text-faint)]">/</span>
@@ -1618,6 +1628,9 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
    ═══════════════════════════════════════════════════ */
 export default function ManagementPage() {
   const { t, lang } = useTranslation(managementT);
+
+  /** Shorthand: translate department name. */
+  const dn = useCallback((name: string) => deptName(name, t), [t]);
 
   /* ── Data ── */
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
@@ -1888,9 +1901,9 @@ export default function ManagementPage() {
               {isExpanded ? <ChevronDown size={12} className="text-[var(--text-dim)]" /> : <ChevronRight size={12} className="text-[var(--text-dim)]" />}
             </button>
           ) : <div className="w-5 shrink-0" />}
-          <DeptIcon dept={node} size={28} />
+          <DeptIcon dept={node} size={34} />
           <div className="flex-1 min-w-0">
-            <div className={`text-[13px] font-medium truncate ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{node.name}</div>
+            <div className={`text-[13px] font-medium truncate ${isSelected ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{dn(node.name)}</div>
           </div>
           {stat && (
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md shrink-0 bg-[var(--bg-surface)] text-[var(--text-faint)]">
@@ -1900,7 +1913,7 @@ export default function ManagementPage() {
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button onClick={(e) => { e.stopPropagation(); setEditDept(node); setShowDeptModal(true); }}
               className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]"><Pencil size={11} className="text-[var(--text-dim)]" /></button>
-            <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "dept", id: node.id, name: node.name }); setShowDeleteModal(true); }}
+            <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "dept", id: node.id, name: dn(node.name) }); setShowDeleteModal(true); }}
               className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]"><Trash2 size={11} className="text-red-400/60" /></button>
           </div>
         </div>
@@ -1958,6 +1971,7 @@ export default function ManagementPage() {
             setDragSourceId={setDragSourceId}
             setDragOverId={setDragOverId}
             onDrop={handleOrgDrop}
+            t={t}
           />
         ))}
       </div>
@@ -2010,9 +2024,9 @@ export default function ManagementPage() {
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all group ${
                     selectedDeptId === dept.id ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface)]"
                   }`}>
-                  <DeptIcon dept={dept} size={28} />
+                  <DeptIcon dept={dept} size={34} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium truncate text-[var(--text-secondary)]">{dept.name}</div>
+                    <div className="text-[13px] font-medium truncate text-[var(--text-secondary)]">{dn(dept.name)}</div>
                   </div>
                 </button>
               ))
@@ -2181,7 +2195,7 @@ export default function ManagementPage() {
                 <div className="flex items-center gap-3.5 min-w-0">
                   <DeptIcon dept={selectedDept} size={44} />
                   <div className="min-w-0">
-                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{selectedDept.name}</h2>
+                    <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{dn(selectedDept.name)}</h2>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {(() => {
                         const head = getDepartmentHead(positions, assignments, contacts);
@@ -2196,7 +2210,7 @@ export default function ManagementPage() {
                     className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] transition-colors">
                     <Pencil size={13} className="text-[var(--text-dim)]" />
                   </button>
-                  <button onClick={() => { setDeleteTarget({ type: "dept", id: selectedDept.id, name: selectedDept.name }); setShowDeleteModal(true); }}
+                  <button onClick={() => { setDeleteTarget({ type: "dept", id: selectedDept.id, name: dn(selectedDept.name) }); setShowDeleteModal(true); }}
                     className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--border-subtle)] hover:bg-red-400/[0.08] transition-colors">
                     <Trash2 size={13} className="text-red-400/60" />
                   </button>

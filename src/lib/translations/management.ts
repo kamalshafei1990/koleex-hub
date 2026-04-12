@@ -211,4 +211,18 @@ export const managementT: Translations = {
   /* ── Misc ── */
   "mgmt.undo":                 { en: "Undo",                          zh: "撤销",                        ar: "تراجع" },
   "mgmt.duplicatePos":         { en: "Duplicate position",            zh: "复制职位",                     ar: "نسخ المنصب" },
+
+  /* ── Department Names ── */
+  "dept.Executive Office":              { en: "Executive Office",              zh: "行政办公室",                   ar: "المكتب التنفيذي" },
+  "dept.Sales Department":              { en: "Sales Department",              zh: "销售部",                       ar: "قسم المبيعات" },
+  "dept.Marketing Department":          { en: "Marketing Department",          zh: "市场部",                       ar: "قسم التسويق" },
+  "dept.Production Department":         { en: "Production Department",         zh: "生产部",                       ar: "قسم الإنتاج" },
+  "dept.Finance Department":            { en: "Finance Department",            zh: "财务部",                       ar: "القسم المالي" },
+  "dept.Human Resources":               { en: "Human Resources",               zh: "人力资源部",                   ar: "الموارد البشرية" },
+  "dept.IT Department":                 { en: "IT Department",                 zh: "信息技术部",                   ar: "قسم تكنولوجيا المعلومات" },
+  "dept.Logistics & Supply Chain":      { en: "Logistics & Supply Chain",      zh: "物流与供应链",                  ar: "الخدمات اللوجستية وسلسلة التوريد" },
+  "dept.Legal & Compliance":            { en: "Legal & Compliance",            zh: "法务与合规部",                  ar: "الشؤون القانونية والامتثال" },
+  "dept.Public Relations":              { en: "Public Relations",              zh: "公共关系部",                   ar: "العلاقات العامة" },
+  "dept.Investors":                     { en: "Investors",                     zh: "投资者关系",                   ar: "المستثمرون" },
+  "dept.Global Agents & Distributors":  { en: "Global Agents & Distributors",  zh: "全球代理与经销商",              ar: "الوكلاء والموزعون العالميون" },
 };
