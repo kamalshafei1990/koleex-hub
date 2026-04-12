@@ -730,3 +730,181 @@ export async function fetchDeptStats(): Promise<Record<string, { total: number; 
   }
   return stats;
 }
+
+/* ═══════════════════════════════════════════════════
+   EMPLOYEE PROFILE
+   ═══════════════════════════════════════════════════ */
+
+export interface EmployeeProfile {
+  contact: ContactRef;
+  assignments: (AssignmentRow & { position: PositionRow; department: DepartmentRow | null })[];
+  reportingChain: { position: PositionRow; contact: ContactRef | null; department: DepartmentRow | null }[];
+  directReports: { position: PositionRow; contact: ContactRef | null; department: DepartmentRow | null }[];
+  history: PositionHistoryRow[];
+}
+
+export async function fetchEmployeeProfile(contactId: string): Promise<EmployeeProfile | null> {
+  const [allContacts, allPositions, allAssignments, allDepts] = await Promise.all([
+    fetchContactsForLinking(),
+    fetchPositions(),
+    fetchAssignments(),
+    fetchDepartments(),
+  ]);
+
+  const contact = allContacts.find((c) => c.id === contactId);
+  if (!contact) return null;
+
+  const deptMap = new Map(allDepts.map((d) => [d.id, d]));
+  const posMap = new Map(allPositions.map((p) => [p.id, p]));
+
+  // Get this employee's assignments with position/dept info
+  const myAssignments = allAssignments
+    .filter((a) => a.contact_id === contactId)
+    .map((a) => ({
+      ...a,
+      position: posMap.get(a.position_id)!,
+      department: deptMap.get(a.department_id) || null,
+    }))
+    .filter((a) => a.position);
+
+  // Build reporting chain (walk upward from primary position)
+  const primaryAssign = myAssignments.find((a) => a.is_primary) || myAssignments[0];
+  const reportingChain: EmployeeProfile["reportingChain"] = [];
+  if (primaryAssign) {
+    let currentPosId = primaryAssign.position.reports_to_position_id;
+    const visited = new Set<string>();
+    while (currentPosId && !visited.has(currentPosId)) {
+      visited.add(currentPosId);
+      const pos = posMap.get(currentPosId);
+      if (!pos) break;
+      const posAssign = allAssignments.find((a) => a.position_id === currentPosId && a.is_primary);
+      const ctc = posAssign ? allContacts.find((c) => c.id === posAssign.contact_id) || null : null;
+      reportingChain.push({ position: pos, contact: ctc, department: deptMap.get(pos.department_id) || null });
+      currentPosId = pos.reports_to_position_id;
+    }
+  }
+
+  // Direct reports (people who report to this employee's primary position)
+  const directReports: EmployeeProfile["directReports"] = [];
+  if (primaryAssign) {
+    const subordinatePositions = allPositions.filter((p) => p.reports_to_position_id === primaryAssign.position.id);
+    for (const pos of subordinatePositions) {
+      const posAssign = allAssignments.find((a) => a.position_id === pos.id && a.is_primary);
+      const ctc = posAssign ? allContacts.find((c) => c.id === posAssign.contact_id) || null : null;
+      directReports.push({ position: pos, contact: ctc, department: deptMap.get(pos.department_id) || null });
+    }
+  }
+
+  // Fetch history for all positions this person holds
+  const historyPromises = myAssignments.map((a) => fetchPositionHistory(a.position_id));
+  const allHistory = (await Promise.all(historyPromises)).flat();
+  const myHistory = allHistory.filter((h) => h.contact_id === contactId).sort((a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  return { contact, assignments: myAssignments, reportingChain, directReports, history: myHistory };
+}
+
+/* ═══════════════════════════════════════════════════
+   GLOBAL ACTIVITY FEED
+   ═══════════════════════════════════════════════════ */
+
+export async function fetchRecentActivity(limit = 50): Promise<PositionHistoryRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("koleex_position_history")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return (data as PositionHistoryRow[]) || [];
+}
+
+/* ═══════════════════════════════════════════════════
+   HEADCOUNT ANALYTICS
+   ═══════════════════════════════════════════════════ */
+
+export interface HeadcountAnalytics {
+  totalDepartments: number;
+  totalPositions: number;
+  filledPositions: number;
+  vacantPositions: number;
+  vacancyRate: number;
+  totalEmployees: number;
+  avgSpanOfControl: number;
+  maxOrgDepth: number;
+  departmentBreakdown: {
+    id: string; name: string; icon: string;
+    total: number; filled: number; vacant: number;
+  }[];
+  levelDistribution: { level: number; label: string; count: number }[];
+}
+
+export async function fetchHeadcountAnalytics(): Promise<HeadcountAnalytics> {
+  const [depts, positions, assignments] = await Promise.all([
+    fetchDepartments(), fetchPositions(), fetchAssignments(),
+  ]);
+
+  const assignedPosIds = new Set(assignments.map((a) => a.position_id));
+  const uniqueContactIds = new Set(assignments.map((a) => a.contact_id));
+
+  const filledPositions = positions.filter((p) => assignedPosIds.has(p.id)).length;
+  const vacantPositions = positions.length - filledPositions;
+  const vacancyRate = positions.length > 0 ? (vacantPositions / positions.length) * 100 : 0;
+
+  // Avg span of control: positions that have direct reports / count of direct reports
+  const managersWithReports = new Map<string, number>();
+  for (const pos of positions) {
+    if (pos.reports_to_position_id) {
+      managersWithReports.set(pos.reports_to_position_id, (managersWithReports.get(pos.reports_to_position_id) || 0) + 1);
+    }
+  }
+  const managerCount = managersWithReports.size;
+  const totalDirectReports = Array.from(managersWithReports.values()).reduce((a, b) => a + b, 0);
+  const avgSpanOfControl = managerCount > 0 ? totalDirectReports / managerCount : 0;
+
+  // Max org depth
+  const posMap = new Map(positions.map((p) => [p.id, p]));
+  const depthCache = new Map<string, number>();
+  const getDepth = (posId: string): number => {
+    if (depthCache.has(posId)) return depthCache.get(posId)!;
+    const pos = posMap.get(posId);
+    if (!pos || !pos.reports_to_position_id) { depthCache.set(posId, 0); return 0; }
+    const d = 1 + getDepth(pos.reports_to_position_id);
+    depthCache.set(posId, d);
+    return d;
+  };
+  let maxOrgDepth = 0;
+  for (const p of positions) { maxOrgDepth = Math.max(maxOrgDepth, getDepth(p.id)); }
+
+  // Department breakdown
+  const deptBreakdown = depts.map((d) => {
+    const deptPos = positions.filter((p) => p.department_id === d.id);
+    const filled = deptPos.filter((p) => assignedPosIds.has(p.id)).length;
+    return { id: d.id, name: d.name, icon: d.icon || "🏢", total: deptPos.length, filled, vacant: deptPos.length - filled };
+  }).sort((a, b) => b.total - a.total);
+
+  // Level distribution
+  const levelCounts = new Map<number, number>();
+  for (const p of positions) { levelCounts.set(p.level, (levelCounts.get(p.level) || 0) + 1); }
+  const levelDistribution = Array.from(levelCounts.entries())
+    .map(([level, count]) => ({
+      level,
+      label: level === 0 ? "Executive" : level === 1 ? "Senior Mgmt" : level === 2 ? "Management" : level === 3 ? "Senior" : level === 4 ? "Mid-Level" : "Entry Level",
+      count,
+    }))
+    .sort((a, b) => a.level - b.level);
+
+  return {
+    totalDepartments: depts.length,
+    totalPositions: positions.length,
+    filledPositions,
+    vacantPositions,
+    vacancyRate,
+    totalEmployees: uniqueContactIds.size,
+    avgSpanOfControl,
+    maxOrgDepth,
+    departmentBreakdown: deptBreakdown,
+    levelDistribution,
+  };
+}

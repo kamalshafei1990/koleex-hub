@@ -23,7 +23,9 @@ import {
   Users, UserPlus, Building2, User, ArrowLeft,
   Briefcase, Network, LayoutList, GitBranchPlus, Shield,
   Check, History, ChevronUp, ArrowRightLeft, FileText, AlertCircle,
-  GripVertical, Image, Smile, Globe,
+  GripVertical, Image, Smile, Globe, BarChart3, Activity,
+  ZoomIn, ZoomOut, RotateCcw, Mail, Phone, Clock,
+  TrendingUp, Layers, UserCheck, UserX,
 } from "lucide-react";
 import {
   fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
@@ -35,9 +37,11 @@ import {
   fetchPermissions, upsertPermissions,
   fetchPositionHistory, addPositionHistory,
   transferEmployee, fetchFullOrgData, fetchDeptStats,
+  fetchEmployeeProfile, fetchRecentActivity, fetchHeadcountAnalytics,
   type DepartmentRow, type PositionRow, type AssignmentRow,
   type DeptTreeNode, type ContactRef, type OrgChartNode,
   type RoleRow, type PermissionRow, type PositionHistoryRow,
+  type EmployeeProfile, type HeadcountAnalytics,
 } from "@/lib/management-admin";
 
 /* ═══════════════════════════════════════════════════
@@ -1115,6 +1119,303 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
 }
 
 /* ═══════════════════════════════════════════════════
+   EMPLOYEE PROFILE PANEL
+   ═══════════════════════════════════════════════════ */
+function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee }: {
+  contactId: string; contacts: ContactRef[];
+  onClose: () => void; onOpenEmployee: (id: string) => void;
+}) {
+  const [profile, setProfile] = useState<EmployeeProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchEmployeeProfile(contactId).then((p) => { setProfile(p); setLoading(false); });
+  }, [contactId]);
+
+  if (loading) return <Spinner />;
+  if (!profile) return <EmptyState icon={User} title="Employee not found" />;
+
+  const { contact, assignments, reportingChain, directReports, history } = profile;
+  const primary = assignments.find((a) => a.is_primary) || assignments[0];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
+        <button onClick={onClose}
+          className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
+          <ArrowLeft size={14} className="rtl:rotate-180" /> Back
+        </button>
+        <div className="flex items-center gap-4">
+          <Avatar src={contact.avatar} name={contact.name} size={56} />
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate">{contact.name}</h2>
+            {primary && (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-[13px] text-[var(--text-secondary)]">{primary.position.title}</span>
+                {primary.department && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)]">
+                    {primary.department.icon} {primary.department.name}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              {contact.email && (
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><Mail size={11} /> {contact.email}</span>
+              )}
+              {contact.phone && (
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><Phone size={11} /> {contact.phone}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
+        {/* Current Positions */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Briefcase size={14} className="text-[var(--text-dim)]" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Current Positions</span>
+          </div>
+          <div className="space-y-2">
+            {assignments.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                  <Briefcase size={14} className="text-violet-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{a.position.title}</span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[a.position.level] || LEVEL_COLORS[5]}`}>L{a.position.level}</span>
+                    {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400/80">Primary</span>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {a.department && <span className="text-[11px] text-[var(--text-dim)]">{a.department.icon} {a.department.name}</span>}
+                    {a.start_date && <><span className="text-[var(--text-dim)]">·</span><span className="text-[11px] text-[var(--text-dim)]">Since {a.start_date}</span></>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Reporting Chain */}
+        {reportingChain.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp size={14} className="text-[var(--text-dim)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Reports To</span>
+            </div>
+            <div className="relative pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
+              {reportingChain.map((r, i) => (
+                <div key={r.position.id}
+                  onClick={() => r.contact && onOpenEmployee(r.contact.id)}
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.contact ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
+                  <div className={`absolute -left-[21px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 ${LEVEL_DOT[r.position.level] || "bg-slate-400"} border-[var(--bg-primary)]`} />
+                  <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
+                    <div className="text-[11px] text-[var(--text-dim)] truncate">{r.position.title}</div>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[r.position.level] || LEVEL_COLORS[5]}`}>L{r.position.level}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Direct Reports */}
+        {directReports.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Users size={14} className="text-[var(--text-dim)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Direct Reports ({directReports.length})</span>
+            </div>
+            <div className="space-y-1.5">
+              {directReports.map((r) => (
+                <div key={r.position.id}
+                  onClick={() => r.contact && onOpenEmployee(r.contact.id)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.contact ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
+                  <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
+                    <div className="text-[11px] text-[var(--text-dim)] truncate">{r.position.title}</div>
+                  </div>
+                  {r.department && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{r.department.icon}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Position History */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <History size={14} className="text-[var(--text-dim)]" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">History</span>
+          </div>
+          {history.length === 0 ? (
+            <div className="text-[12px] text-[var(--text-dim)] text-center py-4">No history recorded yet.</div>
+          ) : (
+            <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-3">
+              {history.map((h) => (
+                <div key={h.id} className="relative">
+                  <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-primary)] ${
+                    h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
+                  }`} />
+                  <div className="text-[12px] font-medium text-[var(--text-primary)] capitalize">{h.action}</div>
+                  <div className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</div>
+                  {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   HEADCOUNT DASHBOARD
+   ═══════════════════════════════════════════════════ */
+function HeadcountDashboard({ onDeptClick }: { onDeptClick: (deptId: string) => void }) {
+  const [analytics, setAnalytics] = useState<HeadcountAnalytics | null>(null);
+  const [activity, setActivity] = useState<PositionHistoryRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([fetchHeadcountAnalytics(), fetchRecentActivity(20)]).then(([a, act]) => {
+      setAnalytics(a); setActivity(act); setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <Spinner />;
+  if (!analytics) return <EmptyState icon={BarChart3} title="No data available" />;
+
+  const StatCard = ({ icon: Icon, label, value, sub, color }: {
+    icon: React.ElementType; label: string; value: string | number; sub?: string; color: string;
+  }) => (
+    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color}`}><Icon size={15} /></div>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)]">{label}</span>
+      </div>
+      <div className="text-[28px] font-bold text-[var(--text-primary)] leading-none">{value}</div>
+      {sub && <div className="text-[11px] text-[var(--text-dim)] mt-1">{sub}</div>}
+    </div>
+  );
+
+  const maxDeptSize = Math.max(...analytics.departmentBreakdown.map((d) => d.total), 1);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <BarChart3 size={18} className="text-emerald-400" />
+          </div>
+          <div>
+            <h2 className="text-[18px] font-bold text-[var(--text-primary)]">Headcount Dashboard</h2>
+            <p className="text-[12px] text-[var(--text-dim)]">Organization overview and workforce analytics</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard icon={Users} label="Employees" value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" />
+          <StatCard icon={Briefcase} label="Positions" value={analytics.totalPositions} sub={`${analytics.filledPositions} filled`} color="bg-violet-500/10 text-violet-400" />
+          <StatCard icon={UserX} label="Vacant" value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% rate`} color="bg-amber-500/10 text-amber-400" />
+          <StatCard icon={Layers} label="Org Depth" value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} avg reports`} color="bg-cyan-500/10 text-cyan-400" />
+        </div>
+
+        {/* Department Breakdown */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Building2 size={14} className="text-[var(--text-dim)]" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Department Breakdown</span>
+          </div>
+          <div className="space-y-2">
+            {analytics.departmentBreakdown.map((dept) => (
+              <div key={dept.id}
+                onClick={() => onDeptClick(dept.id)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] cursor-pointer hover:border-[var(--border-strong)] transition-all group">
+                <span className="text-lg shrink-0">{dept.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">{dept.name}</span>
+                    <span className="text-[11px] text-[var(--text-dim)] shrink-0 ml-2">{dept.filled}/{dept.total}</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-[var(--bg-surface)] overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500 flex">
+                      <div className="h-full bg-emerald-400/70 rounded-l-full" style={{ width: `${(dept.filled / maxDeptSize) * 100}%` }} />
+                      <div className="h-full bg-amber-400/30 rounded-r-full" style={{ width: `${(dept.vacant / maxDeptSize) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Level Distribution */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Layers size={14} className="text-[var(--text-dim)]" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Level Distribution</span>
+          </div>
+          <div className="flex items-end gap-2 h-[120px] px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+            {analytics.levelDistribution.map((l) => {
+              const maxCount = Math.max(...analytics.levelDistribution.map((x) => x.count), 1);
+              const height = (l.count / maxCount) * 100;
+              return (
+                <div key={l.level} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-semibold text-[var(--text-primary)]">{l.count}</span>
+                  <div className={`w-full rounded-t-md ${LEVEL_DOT[l.level] || "bg-slate-400"} transition-all duration-500`}
+                    style={{ height: `${Math.max(height, 8)}%`, opacity: 0.7 }} />
+                  <span className="text-[9px] text-[var(--text-dim)] text-center leading-tight">{l.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Activity Feed */}
+        {activity.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Activity size={14} className="text-[var(--text-dim)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Recent Activity</span>
+            </div>
+            <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-2.5">
+              {activity.slice(0, 10).map((h) => (
+                <div key={h.id} className="relative">
+                  <div className={`absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-primary)] ${
+                    h.action === "assigned" ? "bg-emerald-400" : h.action === "transferred" ? "bg-blue-400" : "bg-red-400"
+                  }`} />
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-semibold capitalize ${
+                      h.action === "assigned" ? "text-emerald-400" : h.action === "transferred" ? "text-blue-400" : "text-red-400"
+                    }`}>{h.action}</span>
+                    <span className="text-[11px] text-[var(--text-dim)]">·</span>
+                    <span className="text-[11px] text-[var(--text-dim)]">{new Date(h.created_at).toLocaleDateString()}</span>
+                  </div>
+                  {h.notes && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{h.notes}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════ */
 export default function ManagementPage() {
@@ -1136,11 +1437,15 @@ export default function ManagementPage() {
 
   /* ── Selection ── */
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
-  const [rightView, setRightView] = useState<"dept" | "roles" | "fullchart">("dept");
+  const [rightView, setRightView] = useState<"dept" | "roles" | "fullchart" | "dashboard" | "employee">("dept");
   const [search, setSearch] = useState("");
   const [expandedTree, setExpandedTree] = useState<Set<string>>(new Set());
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+
+  /* ── Org Chart Zoom ── */
+  const [orgChartZoom, setOrgChartZoom] = useState(1);
 
   /* ── Drag & Drop ── */
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
@@ -1363,10 +1668,37 @@ export default function ManagementPage() {
     return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><Loader2 size={24} className="text-[var(--text-dim)] animate-spin" /></div>;
   }
 
+  /* ── Zoom helpers ── */
+  const zoomIn = () => setOrgChartZoom((z) => Math.min(z + 0.15, 2));
+  const zoomOut = () => setOrgChartZoom((z) => Math.max(z - 0.15, 0.3));
+  const zoomReset = () => setOrgChartZoom(1);
+
+  /* ── Open employee profile ── */
+  const openEmployeeProfile = (contactId: string) => {
+    setSelectedEmployeeId(contactId);
+    setRightView("employee");
+    setMobileShowDetail(true);
+  };
+
   /* ── Render org chart helper ── */
-  const renderOrgChart = (chartNodes: OrgChartNode[], posArr: PositionRow[], showDept: boolean) => (
-    <div className="overflow-auto pb-8">
-      <div className="flex justify-center gap-6 pt-4 min-w-max">
+  const renderOrgChart = (chartNodes: OrgChartNode[], posArr: PositionRow[], showDept: boolean, withZoom = false) => (
+    <div className="overflow-auto pb-8 relative flex-1">
+      {withZoom && (
+        <div className="sticky top-2 left-2 z-10 flex items-center gap-1 mb-2 ml-2">
+          <button onClick={zoomIn} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Zoom in">
+            <ZoomIn size={14} className="text-[var(--text-dim)]" />
+          </button>
+          <button onClick={zoomOut} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Zoom out">
+            <ZoomOut size={14} className="text-[var(--text-dim)]" />
+          </button>
+          <button onClick={zoomReset} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Reset zoom">
+            <RotateCcw size={14} className="text-[var(--text-dim)]" />
+          </button>
+          <span className="text-[10px] font-medium text-[var(--text-dim)] ml-1">{Math.round(orgChartZoom * 100)}%</span>
+        </div>
+      )}
+      <div className="flex justify-center gap-6 pt-4 min-w-max origin-top transition-transform duration-200"
+        style={withZoom ? { transform: `scale(${orgChartZoom})` } : undefined}>
         {chartNodes.map((node) => (
           <OrgChartBranch
             key={node.position.id}
@@ -1442,7 +1774,14 @@ export default function ManagementPage() {
 
           {/* Bottom links */}
           <div className="px-3 py-2 border-t border-[var(--border-color)] space-y-1">
-            <button onClick={() => { setRightView("fullchart"); setSelectedDeptId(null); setMobileShowDetail(true); }}
+            <button onClick={() => { setRightView("dashboard"); setSelectedDeptId(null); setMobileShowDetail(true); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
+                rightView === "dashboard" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+              }`}>
+              <BarChart3 size={16} />
+              <span className="text-[13px] font-medium">Dashboard</span>
+            </button>
+            <button onClick={() => { setRightView("fullchart"); setSelectedDeptId(null); setMobileShowDetail(true); setOrgChartZoom(1); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "fullchart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
@@ -1463,8 +1802,22 @@ export default function ManagementPage() {
       {/* ═══════════ RIGHT PANEL ═══════════ */}
       <div className={`${mobileShowDetail ? "flex" : "hidden md:flex"} flex-col flex-1 min-w-0 h-full bg-[var(--bg-primary)]`}>
 
-        {/* ── FULL ORG CHART VIEW ── */}
-        {rightView === "fullchart" ? (
+        {/* ── DASHBOARD VIEW ── */}
+        {rightView === "dashboard" ? (
+          <HeadcountDashboard onDeptClick={(deptId) => {
+            const dept = departments.find((d) => d.id === deptId);
+            if (dept) handleSelectDept(dept);
+          }} />
+        ) : rightView === "employee" && selectedEmployeeId ? (
+          /* ── EMPLOYEE PROFILE VIEW ── */
+          <EmployeeProfilePanel
+            contactId={selectedEmployeeId}
+            contacts={contacts}
+            onClose={() => { setRightView("dept"); setMobileShowDetail(false); }}
+            onOpenEmployee={openEmployeeProfile}
+          />
+        ) : rightView === "fullchart" ? (
+          /* ── FULL ORG CHART VIEW ── */
           <div className="flex flex-col h-full">
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
@@ -1484,7 +1837,7 @@ export default function ManagementPage() {
             <div className="flex-1 overflow-auto">
               {fullOrgLoading ? <Spinner /> : fullOrgChart.length === 0 ? (
                 <EmptyState icon={GitBranchPlus} title="No positions to visualize" subtitle="Create departments and positions first." />
-              ) : renderOrgChart(fullOrgChart, fullOrgPositions, true)}
+              ) : renderOrgChart(fullOrgChart, fullOrgPositions, true, true)}
             </div>
           </div>
         ) : rightView === "roles" ? (
@@ -1713,10 +2066,13 @@ export default function ManagementPage() {
                                 const ctc = contactMap.get(a.contact_id);
                                 return (
                                   <div key={a.id} className="flex items-center gap-3 px-4 py-2.5 group/row hover:bg-[var(--bg-surface-subtle)] transition-colors">
-                                    <Avatar src={ctc?.avatar} name={ctc?.name || "?"} size={32} />
+                                    <div className="cursor-pointer" onClick={(e) => { e.stopPropagation(); if (ctc) openEmployeeProfile(ctc.id); }}>
+                                      <Avatar src={ctc?.avatar} name={ctc?.name || "?"} size={32} />
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">{ctc?.name || "Unknown"}</span>
+                                        <span className="text-[13px] font-medium text-[var(--text-primary)] truncate cursor-pointer hover:underline"
+                                          onClick={(e) => { e.stopPropagation(); if (ctc) openEmployeeProfile(ctc.id); }}>{ctc?.name || "Unknown"}</span>
                                         {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/[0.12] text-emerald-400/80">Primary</span>}
                                       </div>
                                       <div className="flex items-center gap-2 mt-0.5">
