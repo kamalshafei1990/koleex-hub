@@ -114,6 +114,13 @@ function deptName(name: string, t: (k: string) => string): string {
   return v === key ? name : v;
 }
 
+/** Translate a position title — falls back to original if no translation key exists. */
+function posTitle(title: string, t: (k: string) => string): string {
+  const key = `pos.${title}`;
+  const v = t(key);
+  return v === key ? title : v;
+}
+
 /** Lookup app icon by permission module name */
 const getAppIcon = (moduleName: string) => {
   const app = APP_REGISTRY.find((a) =>
@@ -480,7 +487,7 @@ function PositionModal({
         <FieldLabel>{t("mgmt.reportsTo")}</FieldLabel>
         <select value={reportsTo || ""} onChange={(e) => setReportsTo(e.target.value || null)} className={selectCls}>
           <option value="">{t("mgmt.noneTopHierarchy")}</option>
-          {reportsToOptions.map((p) => <option key={p.id} value={p.id}>{p.title} (L{p.level})</option>)}
+          {reportsToOptions.map((p) => <option key={p.id} value={p.id}>{posTitle(p.title, t)} (L{p.level})</option>)}
         </select>
       </div>
 
@@ -764,7 +771,7 @@ function TransferModal({
           ) : (
             <select value={targetPosId} onChange={(e) => setTargetPosId(e.target.value)} className={selectCls}>
               <option value="">{t("mgmt.selectPos")}</option>
-              {deptPositions.map((p) => <option key={p.id} value={p.id}>{p.title} (L{p.level})</option>)}
+              {deptPositions.map((p) => <option key={p.id} value={p.id}>{posTitle(p.title, t)} (L{p.level})</option>)}
             </select>
           )}
         </div>
@@ -904,7 +911,7 @@ function PositionDetailModal({ open, onClose, position, contacts, t }: {
   const ctcMap = new Map(contacts.map((c) => [c.id, c]));
 
   return (
-    <ModalShell open={open} onClose={onClose} title={position?.title || t("mgmt.posDetails")} width="max-w-[540px]">
+    <ModalShell open={open} onClose={onClose} title={position ? posTitle(position.title, t) : t("mgmt.posDetails")} width="max-w-[540px]">
       {position && (
         <div className="space-y-5">
           <div className="flex items-center gap-2">
@@ -997,7 +1004,7 @@ function OrgChartCard({
       {/* Position title + level */}
       <div className="flex items-center gap-2 mb-2.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">{node.position.title}</div>
+          <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">{posTitle(node.position.title, t)}</div>
           {showDept && node.department && (
             <div className="text-[10px] text-[var(--text-dim)] truncate mt-0.5">{deptName(node.department.name, t)}</div>
           )}
@@ -1347,7 +1354,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
             <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{contact.name}</h2>
             {primary && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[13px] text-[var(--text-secondary)]">{primary.position.title}</span>
+                <span className="text-[13px] text-[var(--text-secondary)]">{posTitle(primary.position.title, t)}</span>
                 {primary.department && (
                   <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)]">
                     {deptName(primary.department.name, t)}
@@ -1382,7 +1389,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{a.position.title}</span>
+                    <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{posTitle(a.position.title, t)}</span>
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[a.position.level] || LEVEL_COLORS[5]}`}>L{a.position.level}</span>
                     {a.is_primary && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400/80">{t("mgmt.primary")}</span>}
                   </div>
@@ -1412,7 +1419,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
                   <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
-                    <div className="text-[11px] text-[var(--text-dim)] truncate">{r.position.title}</div>
+                    <div className="text-[11px] text-[var(--text-dim)] truncate">{posTitle(r.position.title, t)}</div>
                   </div>
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[r.position.level] || LEVEL_COLORS[5]}`}>L{r.position.level}</span>
                 </div>
@@ -1436,9 +1443,9 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
                   <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
-                    <div className="text-[11px] text-[var(--text-dim)] truncate">{r.position.title}</div>
+                    <div className="text-[11px] text-[var(--text-dim)] truncate">{posTitle(r.position.title, t)}</div>
                   </div>
-                  {r.department && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{r.department.icon}</span>}
+                  {r.department && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{deptName(r.department.name, t)}</span>}
                 </div>
               ))}
             </div>
@@ -2199,7 +2206,7 @@ export default function ManagementPage() {
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {(() => {
                         const head = getDepartmentHead(positions, assignments, contacts);
-                        return head ? <span className="text-[12px] text-[var(--text-muted)]">{head.name} — {head.title}</span> : null;
+                        return head ? <span className="text-[12px] text-[var(--text-muted)]">{head.name} — {posTitle(head.title, t)}</span> : null;
                       })()}
                       {selectedDept.description && <span className="text-[12px] text-[var(--text-dim)] italic">{selectedDept.description}</span>}
                     </div>
@@ -2310,7 +2317,7 @@ export default function ManagementPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-[14px] font-semibold text-[var(--text-primary)]">{pos.title}</span>
+                                <span className="text-[14px] font-semibold text-[var(--text-primary)]">{posTitle(pos.title, t)}</span>
                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[pos.level] || LEVEL_COLORS[5]}`}>L{pos.level}</span>
                                 {roleName && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-400/80 border border-violet-500/15">{roleName}</span>}
                               </div>
@@ -2334,7 +2341,7 @@ export default function ManagementPage() {
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]">
                                 <Pencil size={11} className="text-[var(--text-dim)]" />
                               </button>
-                              <button onClick={() => { setDeleteTarget({ type: "pos", id: pos.id, name: pos.title }); setShowDeleteModal(true); }}
+                              <button onClick={() => { setDeleteTarget({ type: "pos", id: pos.id, name: posTitle(pos.title, t) }); setShowDeleteModal(true); }}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]">
                                 <Trash2 size={11} className="text-red-400/60" />
                               </button>
