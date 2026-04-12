@@ -21,7 +21,7 @@ import {
   getActiveAppId,
   type AppDef,
 } from "@/lib/navigation";
-import { getCurrentAccountIdSync } from "@/lib/identity";
+import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import {
   fetchFavorites,
   addFavorite,
@@ -32,11 +32,29 @@ import {
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
+function getGreetingKey(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "greeting.morning";
+  if (h < 18) return "greeting.afternoon";
+  return "greeting.evening";
+}
+
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
   const { t, lang } = useTranslation(hubT);
   const currentAppId = getActiveAppId(pathname);
+  const { account } = useCurrentAccount();
+
+  /* ── Derive user's first name for greeting ── */
+  const firstName = useMemo(() => {
+    if (!account) return null;
+    if (account.person?.first_name) return account.person.first_name;
+    if (account.person?.display_name) return account.person.display_name.split(" ")[0];
+    if (account.person?.full_name) return account.person.full_name.split(" ")[0];
+    if (account.username) return account.username;
+    return null;
+  }, [account]);
 
   /* ── Theme ── */
   const [theme, setTheme] = useState<"light" | "dark">("dark");
@@ -157,15 +175,18 @@ export default function HomePage() {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
+  const activeCount = filteredApps.filter((a) => a.active).length;
+  const totalCount = filteredApps.length;
+
   const chipCls = (active: boolean) =>
-    `h-8 px-4 rounded-lg text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
+    `h-8 px-4 rounded-full text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
       active
         ? dk
-          ? "bg-white/[0.12] border-white/[0.20] text-white"
-          : "bg-black/[0.10] border-black/[0.18] text-black"
+          ? "bg-white text-black border-white"
+          : "bg-black text-white border-black"
         : dk
-          ? "bg-transparent border-white/[0.06] text-white/35 hover:text-white/60 hover:border-white/[0.12]"
-          : "bg-transparent border-black/[0.06] text-black/35 hover:text-black/60 hover:border-black/[0.12]"
+          ? "bg-transparent border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/[0.16]"
+          : "bg-transparent border-black/[0.08] text-black/40 hover:text-black/70 hover:border-black/[0.16]"
     }`;
 
   /* ── Full App Card (for grid) ── */
@@ -176,10 +197,12 @@ export default function HomePage() {
     const isCurrentApp = currentAppId === app.id;
 
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
-        disabled={!app.active}
-        className={`relative flex flex-col items-center justify-center gap-3 p-5 min-h-[110px] border rounded-2xl transition-all duration-200 ${
+        onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
+        className={`relative flex flex-col items-center justify-center gap-2.5 p-4 md:p-5 min-h-[100px] md:min-h-[110px] border rounded-2xl transition-all duration-200 select-none ${
           app.active
             ? isCurrentApp
               ? `cursor-pointer group ${
@@ -189,16 +212,19 @@ export default function HomePage() {
                 }`
               : `cursor-pointer group ${
                   dk
-                    ? "bg-[#111] border-white/[0.05] hover:border-white/[0.16] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] active:translate-y-0 active:scale-[0.98]"
-                    : "bg-white border-black/[0.05] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.10)] active:translate-y-0 active:scale-[0.98]"
+                    ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:translate-y-0 active:scale-[0.97]"
+                    : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.97]"
                 }`
-            : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
+            : `cursor-default ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
         }`}
       >
         {showStar && app.active && (
-          <button
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(app.id); }}
-            className={`absolute top-2.5 end-2.5 p-1 rounded-md transition-all duration-200 ${
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavorite(app.id); } }}
+            className={`absolute top-2 end-2 p-1.5 rounded-lg transition-all duration-200 ${
               isFav
                 ? "text-amber-400 hover:text-amber-300 hover:scale-110"
                 : dk
@@ -207,28 +233,28 @@ export default function HomePage() {
             }`}
             aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
-            <Star size={13} fill={isFav ? "currentColor" : "none"} />
-          </button>
+            <Star size={12} fill={isFav ? "currentColor" : "none"} />
+          </span>
         )}
         <span className={`transition-all duration-200 ${
           app.active
             ? isCurrentApp
               ? dk ? "text-white" : "text-black"
-              : dk ? "text-white/50 group-hover:text-white" : "text-black/50 group-hover:text-black"
-            : dk ? "text-white/25" : "text-black/25"
+              : dk ? "text-white/45 group-hover:text-white" : "text-black/45 group-hover:text-black"
+            : dk ? "text-white/15" : "text-black/15"
         }`}>
-          <Icon size={26} strokeWidth={1.8} />
+          <Icon size={24} strokeWidth={1.6} />
         </span>
-        <span className={`text-[11px] md:text-[11.5px] font-medium text-center leading-tight transition-all duration-200 ${
+        <span className={`text-[11px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active
             ? isCurrentApp
               ? dk ? "text-white font-semibold" : "text-black font-semibold"
               : dk ? "text-white/50 group-hover:text-white/90" : "text-black/50 group-hover:text-black/90"
-            : dk ? "text-white/25" : "text-black/25"
+            : dk ? "text-white/15" : "text-black/15"
         }`}>
           {label}
         </span>
-      </button>
+      </div>
     );
   };
 
@@ -239,14 +265,16 @@ export default function HomePage() {
     const isFav = favoriteIds.includes(app.id);
 
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
-        disabled={!app.active}
-        className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 ${
+        onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
+        className={`relative flex items-center gap-2.5 px-3.5 py-2.5 border rounded-xl transition-all duration-200 shrink-0 select-none ${
           app.active
             ? `cursor-pointer group ${
                 dk
-                  ? "bg-[#111] border-white/[0.06] hover:border-white/[0.16] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:translate-y-0 active:scale-[0.98]"
+                  ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] active:translate-y-0 active:scale-[0.98]"
                   : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.98]"
               }`
             : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
@@ -254,21 +282,24 @@ export default function HomePage() {
       >
         <span className={`transition-colors duration-200 ${
           app.active
-            ? dk ? "text-white/50 group-hover:text-white" : "text-black/50 group-hover:text-black"
+            ? dk ? "text-white/45 group-hover:text-white" : "text-black/45 group-hover:text-black"
             : dk ? "text-white/25" : "text-black/25"
         }`}>
-          <Icon size={18} strokeWidth={1.8} />
+          <Icon size={17} strokeWidth={1.6} />
         </span>
         <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
           app.active
-            ? dk ? "text-white/60 group-hover:text-white/90" : "text-black/60 group-hover:text-black/90"
+            ? dk ? "text-white/55 group-hover:text-white/90" : "text-black/55 group-hover:text-black/90"
             : dk ? "text-white/25" : "text-black/25"
         }`}>
           {label}
         </span>
         {showStar && app.active && (
-          <button
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(app.id); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleFavorite(app.id); } }}
             className={`p-0.5 rounded transition-all duration-200 ${
               isFav
                 ? "text-amber-400 hover:text-amber-300"
@@ -279,24 +310,44 @@ export default function HomePage() {
             aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
             <Star size={11} fill={isFav ? "currentColor" : "none"} />
-          </button>
+          </span>
         )}
-      </button>
+      </div>
     );
   };
 
   return (
     <div className={`${dk ? "bg-black" : "bg-white"} min-h-screen transition-colors duration-300`}>
-      <div className="px-4 md:px-10 py-5 md:py-4 pb-20 max-w-[1400px]">
+      <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px]">
+
+        {/* ── Header: Greeting + Date ── */}
+        <div className="mb-5 md:mb-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 md:gap-3">
+            <div>
+              <h1 className={`text-[22px] md:text-[32px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
+                {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
+              </h1>
+              <p className={`text-[13px] mt-0.5 ${dk ? "text-white/30" : "text-black/30"}`}>{t("applicationsDesc")}</p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className={`text-[11px] font-medium ${dk ? "text-white/20" : "text-black/20"}`}>{today}</span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                dk ? "text-white/25 bg-white/[0.04]" : "text-black/25 bg-black/[0.04]"
+              }`}>
+                {activeCount}/{totalCount}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* ── Zone A: Search ── */}
-        <div className="max-w-md mb-6 mt-1">
-          <div className={`relative flex items-center w-full h-10 border rounded-xl px-3.5 gap-2.5 transition-all duration-200 ${
+        <div className="mb-6">
+          <div className={`relative flex items-center w-full h-11 border rounded-xl px-4 gap-3 transition-all duration-200 ${
             dk
-              ? "bg-white/[0.03] border-white/[0.08] focus-within:border-white/[0.20] focus-within:bg-white/[0.05]"
-              : "bg-black/[0.03] border-black/[0.08] focus-within:border-black/[0.20] focus-within:bg-black/[0.04]"
+              ? "bg-white/[0.03] border-white/[0.06] focus-within:border-white/[0.20] focus-within:bg-white/[0.05]"
+              : "bg-black/[0.02] border-black/[0.06] focus-within:border-black/[0.20] focus-within:bg-black/[0.04]"
           }`}>
-            <Search size={15} className={dk ? "text-white/25" : "text-black/25"} />
+            <Search size={16} className={dk ? "text-white/20" : "text-black/20"} />
             <input
               id="hub-search"
               type="text"
@@ -307,48 +358,35 @@ export default function HomePage() {
                 dk ? "text-white placeholder:text-white/25" : "text-black placeholder:text-black/25"
               }`}
             />
+            {search && (
+              <button onClick={() => setSearch("")} className={`text-[11px] font-medium px-2 py-0.5 rounded-md transition-colors ${
+                dk ? "text-white/40 hover:text-white/70 hover:bg-white/[0.06]" : "text-black/40 hover:text-black/70 hover:bg-black/[0.06]"
+              }`}>
+                Clear
+              </button>
+            )}
             <kbd className={`hidden md:inline text-[10px] font-medium px-1.5 py-0.5 rounded ${
-              dk ? "bg-white/[0.06] text-white/25" : "bg-black/[0.06] text-black/25"
+              dk ? "bg-white/[0.06] text-white/20" : "bg-black/[0.06] text-black/20"
             }`}>⌘K</kbd>
           </div>
-        </div>
-
-        {/* ── Title ── */}
-        <div className="mb-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-1">
-            <h1 className={`text-2xl md:text-[34px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
-              {t("title")}
-            </h1>
-            <div className="flex items-center gap-3">
-              <span className={`text-[11px] font-medium ${dk ? "text-white/25" : "text-black/25"}`}>{today}</span>
-              <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${
-                dk ? "text-white/30 bg-white/[0.03] border-white/[0.06]" : "text-black/30 bg-black/[0.03] border-black/[0.06]"
-              }`}>
-                {filteredApps.filter((a) => a.active).length}/{filteredApps.length}
-              </span>
-            </div>
-          </div>
-          <p className={`text-[13px] ${dk ? "text-white/30" : "text-black/30"}`}>{t("applicationsDesc")}</p>
         </div>
 
         {/* ── Zone B: Favorites ── */}
         {!isSearchOrFilter && favoriteApps.length > 0 && (
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-2.5">
-              <Star size={12} className={dk ? "text-amber-400/60" : "text-amber-500/60"} fill="currentColor" />
-              <span className={`text-[10px] font-semibold tracking-[1.2px] uppercase ${dk ? "text-white/30" : "text-black/30"}`}>
-                Favorites
+              <Star size={11} className={dk ? "text-amber-400/50" : "text-amber-500/50"} fill="currentColor" />
+              <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                {t("favorites")}
               </span>
             </div>
             {favoriteApps.length < 3 ? (
-              /* Compact horizontal row for 1-2 favorites */
               <div className="flex gap-2.5 overflow-x-auto scrollbar-none">
                 {favoriteApps.map((app) => (
                   <CompactCard key={app.id} app={app} showStar />
                 ))}
               </div>
             ) : (
-              /* Grid for 3+ favorites, max 4 per row */
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                 {favoriteApps.map((app) => (
                   <CompactCard key={app.id} app={app} showStar />
@@ -362,9 +400,9 @@ export default function HomePage() {
         {!isSearchOrFilter && recentApps.length > 0 && (
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-2.5">
-              <Clock size={12} className={dk ? "text-white/20" : "text-black/20"} />
-              <span className={`text-[10px] font-semibold tracking-[1.2px] uppercase ${dk ? "text-white/30" : "text-black/30"}`}>
-                Recent
+              <Clock size={11} className={dk ? "text-white/18" : "text-black/18"} />
+              <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                {t("recent")}
               </span>
             </div>
             <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-0.5">
@@ -381,9 +419,9 @@ export default function HomePage() {
         )}
 
         {/* ── Zone D: All Apps ── */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-5">
+        <div className="flex flex-wrap items-center gap-2 mb-5">
           <button onClick={() => { setActiveCategory("all"); setShowMore(false); }} className={chipCls(activeCategory === "all")}>
-            All
+            {t("all")}
           </button>
           {primaryCats.map((cat) => (
             <button
@@ -397,13 +435,13 @@ export default function HomePage() {
           {secondaryCats.length > 0 && (
             <button
               onClick={() => setShowMore((v) => !v)}
-              className={`h-8 px-3 rounded-lg text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
+              className={`h-8 px-3.5 rounded-full text-[12px] font-semibold transition-all duration-200 border whitespace-nowrap ${
                 showMore || secondaryCats.some((c) => c.id === activeCategory)
                   ? dk ? "bg-white/[0.08] border-white/[0.14] text-white/60" : "bg-black/[0.06] border-black/[0.12] text-black/60"
                   : dk ? "bg-transparent border-white/[0.06] text-white/25 hover:text-white/50" : "bg-transparent border-black/[0.06] text-black/25 hover:text-black/50"
               }`}
             >
-              More{showMore ? " −" : " +"}
+              {t("more")}{showMore ? " -" : " +"}
             </button>
           )}
           {showMore && secondaryCats.map((cat) => (
@@ -417,7 +455,7 @@ export default function HomePage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3.5">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
           {filteredApps.map((app) => (
             <AppCard key={app.id} app={app} showStar />
           ))}
@@ -425,11 +463,11 @@ export default function HomePage() {
       </div>
 
       {/* AI FAB */}
-      <button className={`fixed bottom-6 end-6 z-40 w-14 h-14 rounded-full ${
+      <button className={`fixed bottom-6 end-6 z-40 w-12 h-12 rounded-full ${
         dk ? "bg-white text-black" : "bg-black text-white"
       } flex flex-col items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-transform duration-200`}>
-        <Sparkles size={20} />
-        <span className="text-[8px] font-bold tracking-wider mt-0.5">AI</span>
+        <Sparkles size={18} />
+        <span className="text-[7px] font-bold tracking-wider mt-0.5">AI</span>
       </button>
     </div>
   );

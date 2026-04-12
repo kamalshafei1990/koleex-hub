@@ -10,6 +10,15 @@ export const hubT: Translations = {
   "of":               { en: "of",               zh: "/",                 ar: "من" },
   "apps":             { en: "apps",             zh: "个应用",             ar: "تطبيقات" },
   "platformVersion":  { en: "Platform v2.4",    zh: "平台 v2.4",         ar: "المنصة v2.4" },
+  "favorites":        { en: "Favorites",        zh: "收藏",              ar: "المفضلة" },
+  "recent":           { en: "Recent",           zh: "最近使用",           ar: "الأخيرة" },
+  "all":              { en: "All",              zh: "全部",              ar: "الكل" },
+  "more":             { en: "More",             zh: "更多",              ar: "المزيد" },
+  "greeting.morning": { en: "Good morning",     zh: "早上好",            ar: "صباح الخير" },
+  "greeting.afternoon":{ en: "Good afternoon",  zh: "下午好",            ar: "مساء الخير" },
+  "greeting.evening": { en: "Good evening",     zh: "晚上好",            ar: "مساء الخير" },
+  "active":           { en: "active",           zh: "可用",              ar: "نشط" },
+  "comingSoon":       { en: "Coming soon",      zh: "即将推出",           ar: "قريبًا" },
 
   /* ── Sidebar Sections ── */
   "allApps":          { en: "All Apps",          zh: "全部应用",           ar: "جميع التطبيقات" },
