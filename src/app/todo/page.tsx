@@ -251,8 +251,8 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const lbl = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
 
   return (
-    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[5vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10">
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-start justify-center p-3 md:p-4 pt-[3vh] md:pt-[5vh] overflow-y-auto bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-xl rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl overflow-hidden mb-10 max-h-[94vh] md:max-h-none flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
@@ -267,7 +267,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto min-h-0">
           {error && (
             <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px]">
               {error}
@@ -421,7 +421,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
+        <div className="shrink-0 flex items-center justify-end gap-2 px-4 md:px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose}
             className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
             Cancel
@@ -484,7 +484,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           )}
 
           {/* Meta badges */}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 md:gap-2 mt-1.5 flex-wrap min-w-0">
             <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityConfig.color}`}>
               <Flag size={10} /> {priorityConfig.label}
             </span>
@@ -530,8 +530,8 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           )}
         </div>
 
-        {/* Actions */}
-        <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions — always visible on mobile (no hover), fade-in on desktop */}
+        <div className="shrink-0 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button onClick={() => setExpanded(!expanded)} title="Notes"
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
             <MessageSquare size={14} />
@@ -628,12 +628,12 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
   return (
     <div className="space-y-3">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 min-w-0">
         {cards.map((c) => (
-          <div key={c.label} className={`rounded-xl border px-3 py-3 ${c.bg}`}>
-            <div className="flex items-center gap-1.5 mb-1">
-              <c.icon size={12} className={c.color} />
-              <span className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{c.label}</span>
+          <div key={c.label} className={`rounded-xl border px-3 py-3 min-w-0 overflow-hidden ${c.bg}`}>
+            <div className="flex items-center gap-1.5 mb-1 min-w-0">
+              <c.icon size={12} className={`${c.color} shrink-0`} />
+              <span className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</span>
             </div>
             <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
           </div>
@@ -647,17 +647,17 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
             <Award size={14} className="text-yellow-400" />
             <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Top Performers</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap min-w-0">
             {topPerformers.map((p, i) => (
-              <div key={p.info.account_id} className="flex items-center gap-2">
-                <div className="relative">
+              <div key={p.info.account_id} className="flex items-center gap-2 min-w-0">
+                <div className="relative shrink-0">
                   <MiniAvatar info={p.info} size={28} />
                   {i === 0 && <span className="absolute -top-1 -right-1 text-[10px]">🥇</span>}
                   {i === 1 && <span className="absolute -top-1 -right-1 text-[10px]">🥈</span>}
                   {i === 2 && <span className="absolute -top-1 -right-1 text-[10px]">🥉</span>}
                 </div>
-                <div>
-                  <p className="text-[12px] font-medium text-[var(--text-primary)]">{p.info.full_name || p.info.username}</p>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{p.info.full_name || p.info.username}</p>
                   <p className="text-[10px] text-[var(--text-dim)]">{p.count} completed</p>
                 </div>
               </div>
@@ -811,12 +811,12 @@ export default function TodoPage() {
   const hasActiveFilters = labelFilter || deptFilter || assigneeFilter;
 
   return (
-    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden"
+    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}>
 
       {/* ── FIXED HEADER (never scrolls) ── */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10">
-        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] z-10 w-full overflow-x-hidden">
+        <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
 
           {/* Title row */}
           <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
@@ -835,12 +835,12 @@ export default function TodoPage() {
           </p>
 
           {/* Search + Add */}
-          <div className="flex items-center gap-2 pb-2">
-            <div className="flex-1 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 gap-3 focus-within:border-[var(--border-focus)] transition-all">
-              <Search size={16} className="text-[var(--text-dim)]" />
+          <div className="flex items-center gap-2 pb-2 min-w-0">
+            <div className="flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
+              <Search size={16} className="text-[var(--text-dim)] shrink-0" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by title, user, department, priority, status, tags..."
-                className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10" />
+                placeholder="Search tasks..."
+                className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10" />
               {search && (
                 <button onClick={() => setSearch("")} className="p-0.5">
                   <X size={14} className="text-[var(--text-dim)]" />
@@ -894,7 +894,7 @@ export default function TodoPage() {
           {/* Advanced filters panel */}
           {showFilters && (
             <div className="pb-3 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 {/* Department filter */}
                 <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
                   className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] outline-none">
@@ -931,8 +931,8 @@ export default function TodoPage() {
       </div>
 
       {/* ── SCROLLABLE CONTENT ── */}
-      <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-5 w-full min-w-0">
 
         {/* KPI Dashboard */}
         {!loading && todos.length > 0 && <div className="mb-5"><KpiDashboard todos={todos} /></div>}

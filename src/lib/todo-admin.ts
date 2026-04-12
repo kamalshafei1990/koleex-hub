@@ -234,6 +234,15 @@ export async function createTodo(input: {
         },
       }));
       await supabase.from("inbox_messages").insert(notifs);
+
+      /* Kick NotificationBell to recount immediately — this covers
+         the case where the sender is also a recipient, or where the
+         Supabase realtime event has a slight delay. */
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("inbox:force-recount"));
+        }, 500);
+      }
     }
   }
 

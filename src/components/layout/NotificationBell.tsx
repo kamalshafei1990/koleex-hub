@@ -161,6 +161,10 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   >([]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  /** Grace-period tracking: after a realtime bump, protect the optimistic
+   *  `inboxUnread` from being overwritten by a stale poll result. */
+  const lastRealtimeBumpRef = useRef(0);
+
   /* Discuss unread is derived from the channel list so it stays in
      sync with the dropdown rows the user actually sees. */
   const discussUnread = discussChannels.reduce(
@@ -224,20 +228,40 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
     });
   }, [accountId, recountDiscuss]);
 
+  /* Recount inbox helper — used by focus / force-recount events. */
+  const recountInbox = useCallback(async () => {
+    const aid = accountIdRef.current;
+    if (!aid) return;
+    const n = await fetchUnreadCount(aid);
+    setInboxUnread((prev) => Math.max(prev, n));
+  }, []);
+
   /* React to "discuss:unread-changed" (DiscussApp marked a channel as
-     read) and "focus" (long idle session resyncs on return). */
+     read), "focus" (long idle session resyncs on return), and
+     "inbox:force-recount" (todo-admin / other code that inserts
+     into inbox_messages and wants the bell to update now). */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    function onChange() {
+    function onDiscussChange() {
       void recountDiscuss();
     }
-    window.addEventListener("discuss:unread-changed", onChange);
-    window.addEventListener("focus", onChange);
+    function onFocus() {
+      void recountDiscuss();
+      void recountInbox();
+    }
+    function onForceRecount() {
+      lastRealtimeBumpRef.current = Date.now();
+      void recountInbox();
+    }
+    window.addEventListener("discuss:unread-changed", onDiscussChange);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("inbox:force-recount", onForceRecount);
     return () => {
-      window.removeEventListener("discuss:unread-changed", onChange);
-      window.removeEventListener("focus", onChange);
+      window.removeEventListener("discuss:unread-changed", onDiscussChange);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("inbox:force-recount", onForceRecount);
     };
-  }, [recountDiscuss]);
+  }, [recountDiscuss, recountInbox]);
 
   /* ── Inbox: poll unread count + fetch on open ────────────────────── */
   useEffect(() => {
@@ -250,7 +274,16 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       const aid = accountIdRef.current;
       if (!aid) return;
       const n = await fetchUnreadCount(aid);
-      if (!cancelled) setInboxUnread(n);
+      if (cancelled) return;
+      /* If we received a realtime bump within the last 5 seconds, don't
+         overwrite it with a potentially stale DB count — use whichever
+         value is higher so the badge never flickers backwards. */
+      const withinGrace = Date.now() - lastRealtimeBumpRef.current < 5000;
+      if (withinGrace) {
+        setInboxUnread((prev) => Math.max(prev, n));
+      } else {
+        setInboxUnread(n);
+      }
     }
     void tick();
     const t = window.setInterval(tick, POLL_INTERVAL_MS);
@@ -271,6 +304,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
       /* If the row landed already-read (e.g. an admin marked it read on
          insert), don't bump. Otherwise treat it like a fresh inbound. */
       if (msg.read_at) return;
+      lastRealtimeBumpRef.current = Date.now();
       setInboxUnread((n) => n + 1);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
@@ -279,6 +313,16 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
         return [{ ...msg, sender: null } as InboxMessageWithSender, ...prev];
       });
       playNotificationSound();
+
+      /* Verification fetch: after a short delay, reconcile with the DB
+         to ensure the count is accurate once replication has settled. */
+      const aid = accountIdRef.current;
+      if (aid) {
+        setTimeout(async () => {
+          const fresh = await fetchUnreadCount(aid);
+          setInboxUnread((prev) => Math.max(prev, fresh));
+        }, 2000);
+      }
     });
   }, [accountId]);
 
