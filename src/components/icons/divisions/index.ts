@@ -30,6 +30,7 @@ type IconProps = { size?: number | string; className?: string; style?: React.CSS
 export const divisionIconMap: Record<string, ComponentType<IconProps>> = {
   "garment-machinery": GarmentMachineryIcon,
   "smart-home": SmartHomeIcon,
+  "smart-living": SmartHomeIcon,
   "mobility": MobilityIcon,
   "medical": MedicalIcon,
   "life-style": LifeStyleIcon,
