@@ -18,14 +18,12 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Calendar as CalendarIcon,
-  Clock,
-  Globe2,
-  Plane,
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
+import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import Globe2Icon from "@/components/icons/ui/Globe2Icon";
+import PlaneIcon from "@/components/icons/ui/PlaneIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type {
   AccountWithLinks,
   AccountPreferences,
@@ -105,7 +103,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       {/* Timezone */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Globe2 className="h-3.5 w-3.5" />
+          <Globe2Icon className="h-3.5 w-3.5" />
           Timezone
         </h2>
         <select
@@ -127,7 +125,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       {/* Working Hours */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Clock className="h-3.5 w-3.5" />
+          <ClockIcon className="h-3.5 w-3.5" />
           Working Hours
         </h2>
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -206,7 +204,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       {/* Out of Office */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Plane className="h-3.5 w-3.5" />
+          <PlaneIcon className="h-3.5 w-3.5" />
           Out of Office
         </h2>
         <Toggle
@@ -259,13 +257,13 @@ export default function CalendarTab({ account, onChanged }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}

@@ -1,10 +1,18 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
-import {
-  Settings2, Zap, Info, Check,
-  Gauge, Scissors, Wrench, Ruler, Shirt, Workflow, Cog, Layers,
-} from "lucide-react";
+import ShirtIcon from "@/components/icons/ui/ShirtIcon";
+import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
+import CogIcon from "@/components/icons/ui/CogIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
 import type { TemplateField } from "@/lib/sewing-machine-templates";
 import {
   COMMON_SEWING_FIELDS,
@@ -16,24 +24,24 @@ import {
 
 /* ── Icons and colors for each group ── */
 const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
-  Performance: { icon: <Gauge className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
-  "Needle & Thread": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Mechanical: { icon: <Wrench className="h-3.5 w-3.5" />, color: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400" },
-  Physical: { icon: <Ruler className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
-  Application: { icon: <Shirt className="h-3.5 w-3.5" />, color: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400" },
-  Automation: { icon: <Workflow className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
-  Stitch: { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Capacity: { icon: <Gauge className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
-  Configuration: { icon: <Cog className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
-  "Needle Setup": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  "Thread Configuration": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
-  Feed: { icon: <Workflow className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
-  Cutting: { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400" },
-  "Needle Configuration": { icon: <Scissors className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Performance: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
+  "Needle & Thread": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Mechanical: { icon: <WrenchIcon className="h-3.5 w-3.5" />, color: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400" },
+  Physical: { icon: <RulerIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
+  Application: { icon: <ShirtIcon className="h-3.5 w-3.5" />, color: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400" },
+  Automation: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
+  Stitch: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Capacity: { icon: <GaugeIcon className="h-3.5 w-3.5" />, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400" },
+  Configuration: { icon: <CogIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" },
+  "Needle Setup": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  "Thread Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
+  Feed: { icon: <WorkflowIcon className="h-3.5 w-3.5" />, color: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400" },
+  Cutting: { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400" },
+  "Needle Configuration": { icon: <ScissorsIcon className="h-3.5 w-3.5" />, color: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400" },
 };
 
 function getGroupMeta(name: string) {
-  return GROUP_META[name] || { icon: <Layers className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" };
+  return GROUP_META[name] || { icon: <LayersIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" };
 }
 
 /* ── Types ── */
@@ -100,7 +108,7 @@ function FieldRenderer({
           />
           {field.helpText && (
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 flex items-center gap-1">
-              <Info className="h-2.5 w-2.5 shrink-0" /> {field.helpText}
+              <InfoIcon className="h-2.5 w-2.5 shrink-0" /> {field.helpText}
             </p>
           )}
         </div>
@@ -151,7 +159,7 @@ function FieldRenderer({
           </select>
           {field.helpText && (
             <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 flex items-center gap-1">
-              <Info className="h-2.5 w-2.5 shrink-0" /> {field.helpText}
+              <InfoIcon className="h-2.5 w-2.5 shrink-0" /> {field.helpText}
             </p>
           )}
         </div>
@@ -182,7 +190,7 @@ function FieldRenderer({
                         : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
                     }`}
                 >
-                  {isSelected && <Check className="h-3 w-3" />}
+                  {isSelected && <CheckIcon className="h-3 w-3" />}
                   {opt.label}
                 </button>
               );
@@ -288,7 +296,7 @@ function TemplatePicker({
             >
               {isSelected && (
                 <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
-                  <Check className="h-3 w-3 text-white" />
+                  <CheckIcon className="h-3 w-3 text-white" />
                 </div>
               )}
               <span className="text-3xl mt-1 mb-1">{t.icon}</span>
@@ -409,7 +417,7 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
             <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center">
-                <Settings2 className="h-4 w-4 text-emerald-400" />
+                <Settings2Icon className="h-4 w-4 text-emerald-400" />
               </div>
               <div className="flex-1">
                 <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Common Sewing Specs</h3>
@@ -466,7 +474,7 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
       {mode === "full" && !activeTemplateSlug && (
         <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
           <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-3 flex items-center justify-center">
-            <Zap className="h-6 w-6 text-[var(--text-ghost)]" />
+            <ZapIcon className="h-6 w-6 text-[var(--text-ghost)]" />
           </div>
           <p className="text-[13px] text-[var(--text-dim)] font-medium">Select a machine type above</p>
           <p className="text-[11px] text-[var(--text-ghost)] mt-1">Template-specific fields will appear based on your selection</p>
@@ -476,7 +484,7 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
       {mode === "specs" && !activeTemplateSlug && (
         <div className="text-center py-12 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
           <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-3 flex items-center justify-center">
-            <Zap className="h-6 w-6 text-[var(--text-ghost)]" />
+            <ZapIcon className="h-6 w-6 text-[var(--text-ghost)]" />
           </div>
           <p className="text-[13px] text-[var(--text-dim)] font-medium">Pick a machine type first</p>
           <p className="text-[11px] text-[var(--text-ghost)] mt-1">Go back to the Machine Type step to select a template before filling specs.</p>

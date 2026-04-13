@@ -32,13 +32,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Bell,
-  CheckCheck,
-  Inbox as InboxIcon,
-  Loader2,
-  MessageSquare,
-} from "lucide-react";
+import BellIcon from "@/components/icons/ui/BellIcon";
+import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
+import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
 import {
   fetchInboxMessages,
   fetchUnreadCount,
@@ -447,7 +445,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
         } ${open ? (dk ? "text-white bg-white/[0.06]" : "text-black bg-black/[0.06]") : ""}`}
       >
-        <Bell size={15} className="md:w-4 md:h-4" />
+        <BellIcon size={15} className="md:w-4 md:h-4" />
         {totalUnread > 0 && (
           <span
             aria-hidden
@@ -474,7 +472,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
             }`}
           >
             <div className="flex items-center gap-2">
-              <Bell
+              <BellIcon
                 size={14}
                 className={dk ? "text-white/60" : "text-black/60"}
               />
@@ -507,7 +505,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                   : "text-black/60 hover:text-black"
               }`}
             >
-              <CheckCheck size={12} />
+              <CheckCheckIcon size={12} />
               Mark all read
             </button>
           </div>
@@ -522,7 +520,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                     dk ? "text-white/40" : "text-black/40"
                   }`}
                 >
-                  <MessageSquare size={11} />
+                  <MessageSquareIcon size={11} />
                   Discuss
                 </div>
                 <ul className="pb-1">
@@ -596,7 +594,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                     dk ? "text-white/40" : "text-black/40"
                   }`}
                 >
-                  <InboxIcon size={11} />
+                  <InboxRawIcon size={11} />
                   Inbox
                 </div>
                 <ul className="py-1">
@@ -688,7 +686,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
                       dk ? "bg-white/[0.04]" : "bg-black/[0.04]"
                     }`}
                   >
-                    <Bell
+                    <BellIcon
                       size={18}
                       className={dk ? "text-white/40" : "text-black/40"}
                     />
@@ -714,7 +712,7 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
               discussRows.length === 0 &&
               messages.length === 0 && (
                 <div className="flex items-center justify-center py-10">
-                  <Loader2
+                  <SpinnerIcon
                     className={`h-4 w-4 animate-spin ${
                       dk ? "text-white/40" : "text-black/40"
                     }`}

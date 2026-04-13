@@ -1,0 +1,14 @@
+import { forwardRef } from "react";
+
+const SmartphoneIcon = forwardRef<SVGSVGElement, { size?: number | string; className?: string; style?: React.CSSProperties }>(
+  ({ size = 24, className, style, ...rest }, ref) => {
+    const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
+    return (
+      <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={s} height={s} fill="currentColor" className={className} style={style} {...rest}>
+        <path d="M15,0H9A5.006,5.006,0,0,0,4,5V19a5.006,5.006,0,0,0,5,5h6a5.006,5.006,0,0,0,5-5V5A5.006,5.006,0,0,0,15,0ZM9,2h6a3,3,0,0,1,3,3V16H6V5A3,3,0,0,1,9,2Zm6,20H9a3,3,0,0,1-3-3V18H18v1A3,3,0,0,1,15,22Z"/><circle cx="12" cy="20" r="1"/>
+      </svg>
+    );
+  },
+);
+SmartphoneIcon.displayName = "SmartphoneIcon";
+export default SmartphoneIcon;

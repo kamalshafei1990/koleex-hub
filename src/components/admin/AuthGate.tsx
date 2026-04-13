@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AdminAuth from "./AdminAuth";
 import {
   isSupabaseAuthEnabled,
@@ -86,7 +86,7 @@ function SupabaseGate({ children }: { children: React.ReactNode }) {
   if (state !== "authed") {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
       </div>
     );
   }

@@ -3,13 +3,36 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft, Save, Loader2, Package, Ship, Truck, Building2,
-  DollarSign, BarChart3, ChevronDown, ChevronUp, AlertTriangle,
-  Globe, Users, FileText, Calculator, Boxes, Anchor, CircleDollarSign,
-  Info, TrendingUp, Printer, CheckCircle2, HelpCircle, AlertCircle, Zap,
-  Pencil, Lightbulb, Eye, EyeOff,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import ShipIcon from "@/components/icons/ui/ShipIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import CalculatorIcon from "@/components/icons/ui/CalculatorIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import AnchorIcon from "@/components/icons/ui/AnchorIcon";
+import CircleDollarSignIcon from "@/components/icons/ui/CircleDollarSignIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import PrinterIcon from "@/components/icons/ui/PrinterIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import LightbulbIcon from "@/components/icons/ui/LightbulbIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import {
   fetchSimulation, createSimulation, updateSimulation,
   fetchProductsForLookup, fetchModelsForProduct,
@@ -36,13 +59,13 @@ function fmt(n: number, d = 2) { return n.toLocaleString("en-US", { minimumFract
 /* ═══════════════════ TAB NAVIGATION ═══════════════════ */
 
 const TABS = [
-  { key: "customer", label: "Customer", icon: Users },
-  { key: "product", label: "Product", icon: Package },
-  { key: "export", label: "Export", icon: Building2 },
-  { key: "shipping", label: "Shipping", icon: Ship },
-  { key: "import", label: "Import", icon: Anchor },
-  { key: "inland", label: "Delivery", icon: Truck },
-  { key: "financial", label: "Financial", icon: CircleDollarSign },
+  { key: "customer", label: "Customer", icon: UsersIcon },
+  { key: "product", label: "Product", icon: PackageIcon },
+  { key: "export", label: "Export", icon: Building2Icon },
+  { key: "shipping", label: "Shipping", icon: ShipIcon },
+  { key: "import", label: "Import", icon: AnchorIcon },
+  { key: "inland", label: "Delivery", icon: TruckIcon },
+  { key: "financial", label: "Financial", icon: CircleDollarSignIcon },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -72,7 +95,7 @@ function Section({ id, icon: Icon, title, description, subtotal, currency, badge
             </span>
           )}
           <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${open ? "bg-[var(--bg-inverted)]/[0.06]" : ""}`}>
-            {open ? <ChevronUp className="h-3.5 w-3.5 text-[var(--text-ghost)]" /> : <ChevronDown className="h-3.5 w-3.5 text-[var(--text-ghost)]" />}
+            {open ? <AngleUpIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" /> : <AngleDownIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />}
           </div>
         </div>
       </button>
@@ -116,9 +139,9 @@ function SectionFooter({ label, value, currency }: { label: string; value: numbe
 type FieldState = "auto" | "manual" | "suggested";
 
 const FIELD_BADGES: Record<FieldState, { bg: string; text: string; icon: React.ElementType; labelKey: string }> = {
-  auto: { bg: "bg-blue-500/[0.08]", text: "text-blue-400", icon: Zap, labelKey: "auto" },
-  manual: { bg: "bg-amber-500/[0.08]", text: "text-amber-400", icon: Pencil, labelKey: "edited" },
-  suggested: { bg: "bg-emerald-500/[0.08]", text: "text-emerald-400", icon: Lightbulb, labelKey: "suggested" },
+  auto: { bg: "bg-blue-500/[0.08]", text: "text-blue-400", icon: ZapIcon, labelKey: "auto" },
+  manual: { bg: "bg-amber-500/[0.08]", text: "text-amber-400", icon: PencilIcon, labelKey: "edited" },
+  suggested: { bg: "bg-emerald-500/[0.08]", text: "text-emerald-400", icon: LightbulbIcon, labelKey: "suggested" },
 };
 
 const FIELD_INPUT_STYLES: Record<FieldState, string> = {
@@ -146,7 +169,7 @@ function Field({ label, hint, fieldState, warn, children, span = 1, badgeLabels 
         )}
         {hint && (
           <span className="group relative ml-1 inline-flex">
-            <HelpCircle className="h-3 w-3 text-[var(--text-ghost)] inline -mt-px cursor-help" />
+            <HelpCircleIcon className="h-3 w-3 text-[var(--text-ghost)] inline -mt-px cursor-help" />
             <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-48 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] leading-snug px-2.5 py-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
               {hint}
             </span>
@@ -156,7 +179,7 @@ function Field({ label, hint, fieldState, warn, children, span = 1, badgeLabels 
       {children}
       {warn && (
         <p className="mt-1 text-[10px] text-amber-400 flex items-center gap-1">
-          <AlertCircle className="h-3 w-3 shrink-0" /> {warn}
+          <ExclamationIcon className="h-3 w-3 shrink-0" /> {warn}
         </p>
       )}
     </div>
@@ -183,7 +206,7 @@ function Callout({ type = "info", children }: { type?: "info" | "warning"; child
   const styles = type === "warning"
     ? "bg-amber-500/[0.06] border-amber-500/15 text-amber-300/80"
     : "bg-blue-500/[0.06] border-blue-500/15 text-blue-300/80";
-  const IconC = type === "warning" ? AlertTriangle : Info;
+  const IconC = type === "warning" ? TriangleWarningIcon : InfoIcon;
   return (
     <div className={`flex items-start gap-2 mb-4 px-3.5 py-2.5 rounded-lg border ${styles}`}>
       <IconC className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${type === "warning" ? "text-amber-400" : "text-blue-400"}`} />
@@ -208,7 +231,7 @@ function BreakdownPanel({ breakdown, currency, t }: { breakdown: DutyBreakdown; 
   return (
     <div className="mt-5 pt-4 border-t border-[var(--border-subtle)]/60">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-2 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
-        {open ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+        {open ? <EyeOffIcon className="h-3 w-3" /> : <EyeIcon className="h-3 w-3" />}
         {open ? t("hideBreakdown") : t("viewBreakdown")}
       </button>
       {open && (
@@ -514,7 +537,7 @@ export default function SimulationForm({ id }: { id?: string }) {
   const updateFinancial = (key: keyof FinancialSettings, v: number | string | boolean) => setFinancial(prev => ({ ...prev, [key]: v }));
 
   if (loading) {
-    return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></div>;
+    return <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" /></div>;
   }
 
   const productTotal = unitPrice * (quantity || 1);
@@ -543,21 +566,21 @@ export default function SimulationForm({ id }: { id?: string }) {
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/landed-cost" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className={`h-4 w-4 ${isRtl ? "rotate-180" : ""}`} />
+            <ArrowLeftIcon className={`h-4 w-4 ${isRtl ? "rotate-180" : ""}`} />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><CalculatorIcon className="h-4 w-4" /></div>
             <input type="text" value={name} onChange={e => setName(e.target.value)} className="text-xl md:text-[22px] font-bold tracking-tight bg-transparent outline-none flex-1 min-w-0 placeholder:text-[var(--text-ghost)]" placeholder={t("untitledSimulation")} />
           </div>
           <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${status === "completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>{t(status)}</span>
             <button onClick={() => handleSave()} disabled={saving} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
               {saving ? t("saving") : t("save")}
             </button>
             {status === "draft" && (
               <button onClick={() => handleSave("completed")} disabled={saving} className="flex h-10 px-4 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50">
-                <CheckCircle2 className="h-4 w-4" /> {t("finalize")}
+                <CheckCircleIcon className="h-4 w-4" /> {t("finalize")}
               </button>
             )}
           </div>
@@ -612,7 +635,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.customer = el; }} data-tab="customer" className="scroll-mt-24" />
             <Section
               id="section-customer"
-              icon={Users}
+              icon={UsersIcon}
               title={t("sec.customer")}
               description={t("sec.customerDesc")}
               forceOpen={openedSections.has("customer")}
@@ -630,7 +653,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.product = el; }} data-tab="product" className="scroll-mt-24" />
             <Section
               id="section-product"
-              icon={Package}
+              icon={PackageIcon}
               title={t("sec.product")}
               description={t("sec.productDesc")}
               subtotal={productTotal}
@@ -656,7 +679,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                 <Field label={t("countryOfOrigin")}><input type="text" value={originCountry} onChange={e => setOriginCountry(e.target.value)} className={inputCls} placeholder={t("ph.countryOfOrigin")} /></Field>
               </div>
 
-              <SubGroup label={t("sub.pricingTerms")} icon={DollarSign}>
+              <SubGroup label={t("sub.pricingTerms")} icon={DollarSignIcon}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <NumField label={t("quantity")} value={quantity} onChange={v => {
                     setQuantity(v);
@@ -685,7 +708,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                 </div>
               </SubGroup>
 
-              <SubGroup label={t("sub.physicalSpecs")} icon={Boxes}>
+              <SubGroup label={t("sub.physicalSpecs")} icon={BoxesIcon}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Field label={t("packingType")} fieldState={fs("packingType")} badgeLabels={bl}><input type="text" value={productInfo.packingType} onChange={e => { setProductInfo(p => ({ ...p, packingType: e.target.value })); markManual("packingType"); }} className={`${inputCls} ${fs("packingType") && productInfo.packingType ? FIELD_INPUT_STYLES[fs("packingType")!] : ""}`} placeholder={t("ph.packingType")} /></Field>
                   <NumField label={t("numCartons")} value={productInfo.numCartons} onChange={v => setProductInfo(p => ({ ...p, numCartons: v }))} />
@@ -709,7 +732,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.export = el; }} data-tab="export" className="scroll-mt-24" />
             <Section
               id="section-export"
-              icon={Building2}
+              icon={Building2Icon}
               title={t("sec.export")}
               description={t("sec.exportDesc")}
               subtotal={results.exportTotal}
@@ -761,7 +784,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.shipping = el; }} data-tab="shipping" className="scroll-mt-24" />
             <Section
               id="section-shipping"
-              icon={Ship}
+              icon={ShipIcon}
               title={t("sec.shipping")}
               description={t("sec.shippingDesc")}
               subtotal={results.shippingTotal}
@@ -809,7 +832,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.import = el; }} data-tab="import" className="scroll-mt-24" />
             <Section
               id="section-import"
-              icon={Anchor}
+              icon={AnchorIcon}
               title={t("sec.import")}
               description={t("sec.importDesc")}
               subtotal={results.importTotal}
@@ -864,7 +887,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.inland = el; }} data-tab="inland" className="scroll-mt-24" />
             <Section
               id="section-inland"
-              icon={Truck}
+              icon={TruckIcon}
               title={t("sec.inland")}
               description={t("sec.inlandDesc")}
               subtotal={results.inlandTotal}
@@ -903,7 +926,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             <div ref={el => { sectionRefs.current.financial = el; }} data-tab="financial" className="scroll-mt-24" />
             <Section
               id="section-financial"
-              icon={CircleDollarSign}
+              icon={CircleDollarSignIcon}
               title={t("sec.financial")}
               description={t("sec.financialDesc")}
               subtotal={results.financialTotal}
@@ -947,7 +970,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             </Section>
 
             {/* ──────── General Notes ──────── */}
-            <Section icon={FileText} title={t("sec.notes")} description={t("sec.notesDesc")} defaultOpen={false}>
+            <Section icon={DocumentIcon} title={t("sec.notes")} description={t("sec.notesDesc")} defaultOpen={false}>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} className={`${inputCls} h-32 py-3 resize-none`} placeholder={t("ph.notes")} />
             </Section>
           </div>
@@ -969,7 +992,7 @@ export default function SimulationForm({ id }: { id?: string }) {
                 )}
                 {results.totalLandedCost > 0 && unitPrice > 0 && (
                   <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)]">
-                    <TrendingUp className="h-3 w-3 text-[var(--text-ghost)]" />
+                    <TrendingUpIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                     <span className="text-[10px] font-medium text-[var(--text-dim)]">
                       {((results.totalLandedCost / productTotal - 1) * 100).toFixed(1)}% {t("overProductCost")}
                     </span>
@@ -985,7 +1008,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             {warnings.length > 0 && (
               <div className="bg-amber-500/[0.05] rounded-2xl border border-amber-500/15 px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                  <TriangleWarningIcon className="h-3.5 w-3.5 text-amber-400" />
                   <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">{warnings.length} {warnings.length > 1 ? t("missingFieldsPlural") : t("missingFields")}</span>
                 </div>
                 <div className="space-y-1">
@@ -1087,7 +1110,7 @@ export default function SimulationForm({ id }: { id?: string }) {
             {/* Print button */}
             {!isNew && (
               <Link href={`/landed-cost/${id}/print`} target="_blank" className="w-full h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-                <Printer className="h-3.5 w-3.5" /> {t("printReport")}
+                <PrinterIcon className="h-3.5 w-3.5" /> {t("printReport")}
               </Link>
             )}
             </div>{/* end scrollable sidebar content */}

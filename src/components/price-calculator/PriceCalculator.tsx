@@ -2,11 +2,29 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Plus, Trash2, RefreshCw, ChevronDown, ChevronUp,
-  TrendingUp, DollarSign, Globe, Users, Package, Percent, ShieldCheck,
-  Zap, Tag, Copy, FileText, Printer, Share2, Info, Activity, Layers, Settings,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import PercentIcon from "@/components/icons/ui/PercentIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import PrinterIcon from "@/components/icons/ui/PrinterIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import { fetchPricingConfig, type PricingConfig } from "@/lib/pricing-config";
 import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
 
@@ -189,7 +207,7 @@ export default function PriceCalculator() {
         {/* ── Page Header ── */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex-1 flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PriceCalculatorIcon size={16} /></div>
@@ -197,13 +215,13 @@ export default function PriceCalculator() {
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <Link href="/price-calculator/settings" className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <Settings className="h-3.5 w-3.5" /> <span className="hidden md:inline">Settings</span>
+              <SettingsIcon2 className="h-3.5 w-3.5" /> <span className="hidden md:inline">Settings</span>
             </Link>
             <button onClick={resetForm} className="h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center justify-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <RefreshCw className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
+              <RefreshCwIcon className="h-3.5 w-3.5" /> <span className="hidden md:inline">Reset</span>
             </button>
             <button onClick={generate} className="hidden md:flex h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <Zap className="h-4 w-4" /> Generate Price
+              <ZapIcon className="h-4 w-4" /> Generate Price
             </button>
           </div>
         </div>
@@ -218,10 +236,10 @@ export default function PriceCalculator() {
             {/* Products Section */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Package className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PackageIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Products</span>
                 <button onClick={addProduct} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
-                  <Plus className="h-3.5 w-3.5" /> Add
+                  <PlusIcon className="h-3.5 w-3.5" /> Add
                 </button>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-0 border-t border-[var(--border-subtle)] space-y-3">
@@ -232,7 +250,7 @@ export default function PriceCalculator() {
                       <span className="text-[10px] text-[var(--text-ghost)] w-4 shrink-0 text-center font-mono">{i + 1}</span>
                       <input type="text" value={prod.name} onChange={e => updateProduct(prod.id, "name", e.target.value)} placeholder="Product name" className={`${inputCls} flex-1 min-w-0`} />
                       {products.length > 1
-                        ? <button onClick={() => removeProduct(prod.id)} className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                        ? <button onClick={() => removeProduct(prod.id)} className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors shrink-0"><TrashIcon className="h-3.5 w-3.5" /></button>
                         : <span className="w-8 shrink-0 hidden md:block" />}
                     </div>
                     {/* Row 2: Cost + Qty */}
@@ -254,7 +272,7 @@ export default function PriceCalculator() {
             {/* Exchange Rate */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><DollarSign className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><DollarSignIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Exchange Rate</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-3">
@@ -283,7 +301,7 @@ export default function PriceCalculator() {
             {/* Pricing Configuration */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Layers className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><LayersIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Pricing Configuration</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-5">
@@ -300,7 +318,7 @@ export default function PriceCalculator() {
                     {cfgCountries.map(c => <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>)}
                   </select>
                   <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-blue-500/[0.06] border border-blue-500/15">
-                    <Info className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                    <InfoIcon className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                     <span className="text-[11px] text-blue-300/80">Country adjustment: <span className="font-semibold">{selectedCountry.adjustmentPct >= 0 ? "+" : ""}{(selectedCountry.adjustmentPct * 100).toFixed(0)}%</span></span>
                   </div>
                 </div>
@@ -316,7 +334,7 @@ export default function PriceCalculator() {
             {/* Adjustments */}
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Percent className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PercentIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Adjustments</span>
               </div>
               <div className="px-4 md:px-6 pb-5 pt-2 border-t border-[var(--border-subtle)] space-y-4">
@@ -347,7 +365,7 @@ export default function PriceCalculator() {
                 {/* Discount */}
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><Tag className="h-3.5 w-3.5 text-orange-400" /> Manual Discount</label>
+                    <label className="text-[12px] font-medium text-[var(--text-subtle)] flex items-center gap-2"><TagsIcon className="h-3.5 w-3.5 text-orange-400" /> Manual Discount</label>
                     <span className="text-[13px] font-mono font-semibold text-blue-400 tabular-nums">{discountPct}%</span>
                   </div>
                   <input type="range" min={0} max={cfgMaxDiscount} step={1} value={discountPct} onChange={e => setDiscountPct(parseInt(e.target.value))} className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-blue-500" style={{ background: `linear-gradient(to right, #3b82f6 ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%, rgba(255,255,255,0.06) ${cfgMaxDiscount > 0 ? (discountPct / cfgMaxDiscount) * 100 : 0}%)` }} />
@@ -357,7 +375,7 @@ export default function PriceCalculator() {
                 {cfgUI.showTaxRefund && (
                   <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
                     <input type="checkbox" checked={includeTaxRefund} onChange={() => setIncludeTaxRefund(!includeTaxRefund)} className="w-4 h-4 rounded border-[var(--border-subtle)] bg-transparent accent-emerald-600 cursor-pointer" />
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                    <ShieldCheckIcon className="h-3.5 w-3.5 text-emerald-400" />
                     <span className="text-[13px] font-medium">Include Tax Refund ({(cfgTaxRefund * 100).toFixed(0)}%)</span>
                   </label>
                 )}
@@ -366,7 +384,7 @@ export default function PriceCalculator() {
 
             {/* Mobile Generate Button */}
             <button onClick={generate} className="w-full h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg lg:hidden">
-              <Zap className="h-4 w-4" /> Generate Price
+              <ZapIcon className="h-4 w-4" /> Generate Price
             </button>
           </div>
 
@@ -385,14 +403,14 @@ export default function PriceCalculator() {
                 {/* Quotation Header */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Activity className="h-4 w-4" /></div>
+                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><ActivityIcon className="h-4 w-4" /></div>
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Quotation Details</span>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-medium text-purple-300">
-                        <Globe className="h-3 w-3" /> {result.countryName}
+                        <GlobeIcon className="h-3 w-3" /> {result.countryName}
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-[10px] font-medium text-pink-300">
-                        <Users className="h-3 w-3" /> {cfgCustomers.find(r => r.id === result.customerType)?.name}
+                        <UsersIcon className="h-3 w-3" /> {cfgCustomers.find(r => r.id === result.customerType)?.name}
                       </span>
                     </div>
                   </div>
@@ -427,11 +445,11 @@ export default function PriceCalculator() {
                     <div key={idx} className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                       <button onClick={() => { setExpandedItems(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; }); }} className="w-full px-4 md:px-6 py-3.5 flex items-center justify-between hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
-                          <Package className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                          <PackageIcon className="h-3.5 w-3.5 text-orange-400 shrink-0" />
                           <span className="text-[13px] font-medium truncate">{item.name}</span>
                           <span className="text-[10px] text-[var(--text-ghost)] shrink-0">Qty: {item.qty} | ¥{fmt(item.costCny)} | ${fmt(item.costUsd)}</span>
                         </div>
-                        {isExp ? <ChevronUp className="h-4 w-4 text-[var(--text-ghost)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-ghost)]" />}
+                        {isExp ? <AngleUpIcon className="h-4 w-4 text-[var(--text-ghost)]" /> : <AngleDownIcon className="h-4 w-4 text-[var(--text-ghost)]" />}
                       </button>
                       {isExp && (
                         <div className="border-t border-[var(--border-subtle)]">
@@ -451,7 +469,7 @@ export default function PriceCalculator() {
                 {/* Grand Total Table */}
                 <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
                   <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><TrendingUp className="h-4 w-4" /></div>
+                    <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><TrendingUpIcon className="h-4 w-4" /></div>
                     <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Grand Total Pricing</span>
                   </div>
                   <div className="overflow-x-auto border-t border-[var(--border-subtle)]">
@@ -507,10 +525,10 @@ export default function PriceCalculator() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {[
-                    { icon: Copy, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${cfgCustomers.find(r => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
-                    { icon: FileText, label: "Export PDF", fn: () => {} },
-                    { icon: Printer, label: "Print", fn: () => window.print() },
-                    { icon: Share2, label: "Share", fn: () => {} },
+                    { icon: CopyIcon, label: "Copy", fn: () => { navigator.clipboard?.writeText(`Quotation: ${result.countryName} | ${cfgCustomers.find(r => r.id === result.customerType)?.name}\nBase Price: $${fmt(result.items[0].finalBase)}\nTotal Cost: $${fmt(result.totalCostUsd)}`); } },
+                    { icon: DocumentIcon, label: "Export PDF", fn: () => {} },
+                    { icon: PrinterIcon, label: "Print", fn: () => window.print() },
+                    { icon: Share2Icon, label: "Share", fn: () => {} },
                   ].map(b => (
                     <button key={b.label} onClick={b.fn} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
                       <b.icon className="h-3.5 w-3.5" /> {b.label}

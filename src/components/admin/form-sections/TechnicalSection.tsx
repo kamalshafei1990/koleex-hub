@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, ChevronDown, Plus, Check } from "lucide-react";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
 import type { ProductFormState } from "@/types/product-form";
 
 interface PlugTypeOption {
@@ -70,7 +73,7 @@ function ChipInput({
           {values.map(v => (
             <span key={v} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] text-[12px] text-[var(--text-muted)]">
               {v}
-              <button onClick={() => onChange(values.filter(x => x !== v))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X className="h-3 w-3" /></button>
+              <button onClick={() => onChange(values.filter(x => x !== v))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><CrossIcon className="h-3 w-3" /></button>
             </span>
           ))}
         </div>
@@ -90,14 +93,14 @@ function ChipInput({
         />
         {hasSuggestions && (
           <button type="button" onClick={() => setOpen(!open)} className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors">
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+            <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
         )}
         {open && hasSuggestions && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/[0.08] rounded-xl shadow-2xl z-[110] max-h-[200px] overflow-y-auto">
             {available.length === 0 && input.trim() ? (
               <button type="button" onClick={() => add()} className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-blue-400 hover:bg-white/[0.04] transition-colors">
-                <Plus className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
+                <PlusIcon className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
               </button>
             ) : available.length === 0 ? (
               <div className="px-3 py-3 text-[11px] text-white/25 text-center">All options selected</div>
@@ -110,7 +113,7 @@ function ChipInput({
             )}
             {available.length > 0 && input.trim() && !available.some(s => s.toLowerCase() === input.trim().toLowerCase()) && (
               <button type="button" onClick={() => add()} className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-blue-400 hover:bg-white/[0.04] transition-colors border-t border-white/[0.04]">
-                <Plus className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
+                <PlusIcon className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
               </button>
             )}
           </div>
@@ -193,7 +196,7 @@ function ColorChipInput({
                   title={swatch || "unknown color"}
                 />
                 {v}
-                <button onClick={() => onChange(values.filter(x => x !== v))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)] ml-0.5"><X className="h-3 w-3" /></button>
+                <button onClick={() => onChange(values.filter(x => x !== v))} className="text-[var(--text-dim)] hover:text-[var(--text-muted)] ml-0.5"><CrossIcon className="h-3 w-3" /></button>
               </span>
             );
           })}
@@ -220,14 +223,14 @@ function ColorChipInput({
         )}
         {hasSuggestions && (
           <button type="button" onClick={() => setOpen(!open)} className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors">
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+            <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
         )}
         {open && hasSuggestions && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/[0.08] rounded-xl shadow-2xl z-[110] max-h-[220px] overflow-y-auto">
             {available.length === 0 && input.trim() ? (
               <button type="button" onClick={() => add()} className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-blue-400 hover:bg-white/[0.04] transition-colors">
-                <Plus className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
+                <PlusIcon className="h-3 w-3" /> Create &quot;{input.trim()}&quot;
               </button>
             ) : available.length === 0 ? (
               <div className="px-3 py-3 text-[11px] text-white/25 text-center">All options selected</div>
@@ -271,7 +274,7 @@ function WattInput({ value, onChange, suggestions }: { value: string; onChange: 
       <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">Watt</label>
       <div className="relative">
         <input type="text" value={value} onChange={(e) => { onChange(e.target.value); if (hasSuggestions) setOpen(true); }} onFocus={() => { if (hasSuggestions) setOpen(true); }} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }} placeholder="e.g. 500W" className="w-full h-10 px-4 pr-9 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
-        {hasSuggestions && <button type="button" onClick={() => setOpen(!open)} className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-muted)]"><ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
+        {hasSuggestions && <button type="button" onClick={() => setOpen(!open)} className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-muted)]"><AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} /></button>}
         {open && hasSuggestions && available.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-white/[0.08] rounded-xl shadow-2xl z-[110] max-h-[200px] overflow-y-auto">
             {available.map(s => <button key={s} type="button" onClick={() => { onChange(s); setOpen(false); }} className="w-full flex items-center px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.04] hover:text-white transition-colors text-left">{s}</button>)}
@@ -316,7 +319,7 @@ function PlugTypeSelector({
             >
               {selected && (
                 <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                  <Check className="h-2.5 w-2.5 text-white" />
+                  <CheckIcon className="h-2.5 w-2.5 text-white" />
                 </div>
               )}
               {opt.image ? (

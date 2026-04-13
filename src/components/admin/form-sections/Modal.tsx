@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 
 interface Props {
   open: boolean;
@@ -48,7 +48,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
             onClick={onClose}
             className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 

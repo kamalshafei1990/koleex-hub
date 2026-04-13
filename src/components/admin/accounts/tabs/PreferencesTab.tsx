@@ -9,15 +9,13 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Settings2,
-  Languages,
-  Palette,
-  Mail,
-  Bell,
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
+import BellIcon from "@/components/icons/ui/BellIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type {
   AccountWithLinks,
   AccountPreferences,
@@ -76,13 +74,13 @@ export default function PreferencesTab({ account, onChanged }: Props) {
     <div className="space-y-4">
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Settings2 className="h-3.5 w-3.5" />
+          <Settings2Icon className="h-3.5 w-3.5" />
           General
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>
-              <Languages className="h-3 w-3 inline mr-1" /> Language
+              <LanguagesIcon className="h-3 w-3 inline mr-1" /> Language
             </label>
             <select
               className={selectClass}
@@ -98,7 +96,7 @@ export default function PreferencesTab({ account, onChanged }: Props) {
 
           <div>
             <label className={labelClass}>
-              <Palette className="h-3 w-3 inline mr-1" /> Theme
+              <PaletteIcon className="h-3 w-3 inline mr-1" /> Theme
             </label>
             <select
               className={selectClass}
@@ -120,7 +118,7 @@ export default function PreferencesTab({ account, onChanged }: Props) {
 
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Mail className="h-3.5 w-3.5" />
+          <EnvelopeIcon className="h-3.5 w-3.5" />
           Email Signature
         </h2>
         <textarea
@@ -137,7 +135,7 @@ export default function PreferencesTab({ account, onChanged }: Props) {
 
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Bell className="h-3.5 w-3.5" />
+          <BellIcon className="h-3.5 w-3.5" />
           Notifications
         </h2>
         <div className="space-y-4">
@@ -174,13 +172,13 @@ export default function PreferencesTab({ account, onChanged }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}

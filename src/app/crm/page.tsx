@@ -9,7 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { Suspense } from "react";
-import { Loader2 } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CRM from "@/components/crm/CRM";
 
 export default function CrmPage() {
@@ -17,7 +17,7 @@ export default function CrmPage() {
     <Suspense
       fallback={
         <div className="flex-1 min-h-0 flex items-center justify-center bg-[var(--bg-primary)]">
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
         </div>
       }
     >

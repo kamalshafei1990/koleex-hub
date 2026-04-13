@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sun, Moon, ChevronDown, Menu } from "lucide-react";
+import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
+import MoonIcon from "@/components/icons/ui/MoonIcon";
+import SunIcon from "@/components/icons/ui/SunIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import UserMenu from "./UserMenu";
@@ -104,7 +107,7 @@ export default function MainHeader() {
       dir="ltr"
       className={`fixed top-0 left-0 right-0 z-[100] h-14 flex items-center justify-between px-3 md:px-6 border-b transition-colors duration-300 ${
         dk
-          ? "border-white/[0.08] bg-black"
+          ? "border-white/[0.08] bg-[#0A0A0A]"
           : "border-black/[0.08] bg-white"
       }`}
     >
@@ -116,7 +119,7 @@ export default function MainHeader() {
           aria-label="Toggle navigation"
           className={`md:hidden ${btnCls}`}
         >
-          <Menu size={16} />
+          <MenuBurgerIcon size={16} />
         </button>
 
         <Link
@@ -185,7 +188,7 @@ export default function MainHeader() {
             }`}
           >
             {languages.find((l) => l.code === lang)?.short}
-            <ChevronDown size={12} className={`transition-transform ${langOpen ? "rotate-180" : ""}`} />
+            <AngleDownIcon size={12} className={`transition-transform ${langOpen ? "rotate-180" : ""}`} />
           </button>
           {langOpen && (
             <div
@@ -234,7 +237,7 @@ export default function MainHeader() {
               : "border-black/[0.08] bg-black/[0.03] text-black/55 hover:text-black hover:bg-black/[0.06]"
           }`}
         >
-          {dk ? <Sun size={15} className="md:w-4 md:h-4" /> : <Moon size={15} className="md:w-4 md:h-4" />}
+          {dk ? <SunIcon size={15} className="md:w-4 md:h-4" /> : <MoonIcon size={15} className="md:w-4 md:h-4" />}
         </button>
 
         {/* Notification bell — system-wide notifications dropdown

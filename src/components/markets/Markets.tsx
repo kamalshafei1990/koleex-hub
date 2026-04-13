@@ -2,22 +2,20 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Search,
-  Users,
-  TrendingUp,
-  MapPin,
-  Building2,
-  ChevronRight,
-  BarChart3,
-  Shield,
-  Star,
-  Mail,
-  Phone,
-  Briefcase,
-  Eye,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import MarketsIcon from "@/components/icons/MarketsIcon";
 
@@ -253,7 +251,7 @@ export default function Markets() {
               onClick={closeMarketProfile}
               className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
-              <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
+              <ArrowLeftIcon size={18} className="text-[var(--text-secondary)]" />
             </button>
             <div className="flex items-center gap-3">
               <span className="text-3xl">{selectedMarket.flag}</span>
@@ -273,7 +271,7 @@ export default function Markets() {
             {/* Band Card */}
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
-                <Shield size={16} />
+                <ShieldIcon size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Band Classification
                 </span>
@@ -296,7 +294,7 @@ export default function Markets() {
             {/* Adjustment Card */}
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
-                <TrendingUp size={16} />
+                <TrendingUpIcon size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Price Adjustment
                 </span>
@@ -326,7 +324,7 @@ export default function Markets() {
             {/* Market Status Card */}
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 space-y-3">
               <div className="flex items-center gap-2 text-[var(--text-subtle)]">
-                <MapPin size={16} />
+                <MapPinIcon size={16} />
                 <span className="text-xs font-medium uppercase tracking-wider">
                   Market Status
                 </span>
@@ -348,7 +346,7 @@ export default function Markets() {
             <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-surface)]">
-                  <Users size={18} className="text-[var(--text-muted)]" />
+                  <UsersIcon size={18} className="text-[var(--text-muted)]" />
                 </div>
                 <div>
                   <h2 className="text-base font-semibold">
@@ -376,7 +374,7 @@ export default function Markets() {
             ) : customers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
-                  <Users size={24} className="text-[var(--text-ghost)]" />
+                  <UsersIcon size={24} className="text-[var(--text-ghost)]" />
                 </div>
                 <p className="text-[var(--text-faint)] text-sm font-medium">
                   No customers in this market yet
@@ -447,7 +445,7 @@ export default function Markets() {
                         <td className="px-6 py-4">
                           {c.email ? (
                             <span className="flex items-center gap-1.5 text-[var(--text-subtle)]">
-                              <Mail size={12} />
+                              <EnvelopeIcon size={12} />
                               {c.email}
                             </span>
                           ) : (
@@ -457,7 +455,7 @@ export default function Markets() {
                         <td className="px-6 py-4">
                           {c.phone ? (
                             <span className="flex items-center gap-1.5 text-[var(--text-subtle)]">
-                              <Phone size={12} />
+                              <PhoneIcon size={12} />
                               {c.phone}
                             </span>
                           ) : (
@@ -483,7 +481,7 @@ export default function Markets() {
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
@@ -538,7 +536,7 @@ export default function Markets() {
           >
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
-                <BarChart3 size={16} className="text-blue-400" />
+                <BarChart3Icon size={16} className="text-blue-400" />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">
                 Band A
@@ -563,7 +561,7 @@ export default function Markets() {
           >
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-500/10">
-                <Building2 size={16} className="text-gray-400" />
+                <Building2Icon size={16} className="text-gray-400" />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400/60">
                 Band B
@@ -588,7 +586,7 @@ export default function Markets() {
           >
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
-                <Star size={16} className="text-amber-400" />
+                <StarIcon size={16} className="text-amber-400" />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">
                 Band C
@@ -604,7 +602,7 @@ export default function Markets() {
         {/* Search Bar */}
         <div className="relative">
           <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 gap-3 focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-white/5 transition-all">
-            <Search size={18} className="text-[var(--text-dim)] flex-shrink-0" />
+            <SearchIcon size={18} className="text-[var(--text-dim)] flex-shrink-0" />
             <input
               id="markets-search"
               type="text"
@@ -646,7 +644,7 @@ export default function Markets() {
           {filteredMarkets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
-                <Search size={24} className="text-[var(--text-ghost)]" />
+                <SearchIcon size={24} className="text-[var(--text-ghost)]" />
               </div>
               <p className="text-[var(--text-faint)] text-sm font-medium">
                 No markets found
@@ -732,11 +730,11 @@ export default function Markets() {
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-subtle)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] hover:border-[var(--border-focus)] transition-all"
                           >
-                            <Eye size={13} />
+                            <EyeIcon size={13} />
                             <span className="hidden sm:inline">
                               View Profile
                             </span>
-                            <ChevronRight
+                            <AngleRightIcon
                               size={13}
                               className="sm:hidden"
                             />

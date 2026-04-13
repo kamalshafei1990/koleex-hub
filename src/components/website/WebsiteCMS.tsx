@@ -2,21 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ExternalLink,
-  Monitor,
-  Tablet,
-  Smartphone,
-  Maximize2,
-  RefreshCw,
-  Eye,
-  Layout,
-  FileText,
-  Package,
-  Layers,
-  Tag,
-} from "lucide-react";
+import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import TabletIcon from "@/components/icons/ui/TabletIcon";
+import SmartphoneIcon from "@/components/icons/ui/SmartphoneIcon";
+import Maximize2Icon from "@/components/icons/ui/Maximize2Icon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import RefreshIcon from "@/components/icons/ui/RefreshIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import LayoutIcon from "@/components/icons/ui/LayoutIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 
 /* ── Config ── */
@@ -24,11 +22,11 @@ const WEBSITE_URL = "https://koleex-website.vercel.app";
 const CMS_URL = `${WEBSITE_URL}/admin?v=2`;
 
 const quickLinks = [
-  { label: "Page Builder", icon: <Layout size={16} />, url: `${WEBSITE_URL}/admin?v=2` },
-  { label: "Products", icon: <Package size={16} />, url: "/products" },
-  { label: "Divisions", icon: <Layers size={16} />, url: "/divisions" },
-  { label: "Categories", icon: <Tag size={16} />, url: "/categories" },
-  { label: "Subcategories", icon: <FileText size={16} />, url: "/subcategories" },
+  { label: "Page Builder", icon: <LayoutIcon size={16} />, url: `${WEBSITE_URL}/admin?v=2` },
+  { label: "Products", icon: <PackageIcon size={16} />, url: "/products" },
+  { label: "Divisions", icon: <LayersIcon size={16} />, url: "/divisions" },
+  { label: "Categories", icon: <TagsIcon size={16} />, url: "/categories" },
+  { label: "Subcategories", icon: <DocumentIcon size={16} />, url: "/subcategories" },
 ];
 
 const websitePages = [
@@ -76,7 +74,7 @@ export default function WebsiteCMS() {
               href="/"
               className="flex items-center gap-2 text-gray-400 hover:text-[var(--text-primary)] transition-colors text-sm"
             >
-              <ArrowLeft size={16} />
+              <ArrowLeftIcon size={16} />
               <span className="hidden sm:inline">Hub</span>
             </Link>
             <div className="w-px h-6 bg-[#333]" />
@@ -104,7 +102,7 @@ export default function WebsiteCMS() {
               }`}
             >
               <span className="flex items-center gap-1.5">
-                <Layout size={13} />
+                <LayoutIcon size={13} />
                 <span className="hidden sm:inline">Page Builder</span>
               </span>
             </button>
@@ -117,7 +115,7 @@ export default function WebsiteCMS() {
               }`}
             >
               <span className="flex items-center gap-1.5">
-                <Eye size={13} />
+                <EyeIcon size={13} />
                 <span className="hidden sm:inline">Live Preview</span>
               </span>
             </button>
@@ -129,10 +127,10 @@ export default function WebsiteCMS() {
             {activeTab === "preview" && (
               <div className="hidden md:flex items-center gap-1 bg-[var(--bg-secondary)] rounded-lg p-0.5 border border-[var(--border-color)]">
                 {([
-                  { key: "full" as Viewport, icon: <Maximize2 size={13} />, title: "Full Width" },
-                  { key: "desktop" as Viewport, icon: <Monitor size={13} />, title: "Desktop" },
-                  { key: "tablet" as Viewport, icon: <Tablet size={13} />, title: "Tablet" },
-                  { key: "mobile" as Viewport, icon: <Smartphone size={13} />, title: "Mobile" },
+                  { key: "full" as Viewport, icon: <Maximize2Icon size={13} />, title: "Full Width" },
+                  { key: "desktop" as Viewport, icon: <MonitorIcon size={13} />, title: "Desktop" },
+                  { key: "tablet" as Viewport, icon: <TabletIcon size={13} />, title: "Tablet" },
+                  { key: "mobile" as Viewport, icon: <SmartphoneIcon size={13} />, title: "Mobile" },
                 ]).map(({ key, icon, title }) => (
                   <button
                     key={key}
@@ -174,7 +172,7 @@ export default function WebsiteCMS() {
               className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
               title="Refresh"
             >
-              <RefreshCw size={14} />
+              <RefreshIcon size={14} />
             </button>
 
             <a
@@ -184,7 +182,7 @@ export default function WebsiteCMS() {
               className="p-2 rounded-lg text-gray-400 hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all"
               title="Open in New Tab"
             >
-              <ExternalLink size={14} />
+              <ExternalLinkIcon size={14} />
             </a>
           </div>
         </div>
@@ -232,7 +230,7 @@ export default function WebsiteCMS() {
           >
             <WebsiteIcon size={13} />
             Visit Website
-            <ExternalLink size={10} />
+            <ExternalLinkIcon size={10} />
           </a>
         </div>
       </header>

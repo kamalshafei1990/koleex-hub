@@ -22,7 +22,10 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import { Shield, RotateCcw, AlertCircle, CheckCircle2 } from "lucide-react";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import UndoIcon from "@/components/icons/ui/UndoIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type {
   AccountWithLinks,
   AccountPermissionOverrideRow,
@@ -131,7 +134,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
       {/* Header */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Shield className="h-3.5 w-3.5" />
+          <ShieldIcon className="h-3.5 w-3.5" />
           Access Rights
         </h2>
         <p className="text-[12px] text-[var(--text-dim)] mb-0">
@@ -158,13 +161,13 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -228,7 +231,7 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
                     className="h-10 w-10 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Reset to preset default"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
+                    <UndoIcon className="h-3.5 w-3.5" />
                   </button>
                 </div>
               );

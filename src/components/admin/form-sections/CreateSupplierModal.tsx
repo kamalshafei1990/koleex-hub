@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Loader2, Plus, Trash2, ChevronDown, Search, ImageIcon } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { Country, State, City } from "country-state-city";
 import Modal from "./Modal";
 import { createContact } from "@/lib/contacts-admin";
@@ -113,7 +118,7 @@ function CountryPicker({ value, countryCode, onChange, label }: {
           placeholder="Search country..."
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
@@ -195,7 +200,7 @@ function ProvincePicker({ countryCode, value, stateCode, onChange, label }: {
           placeholder="Search province..."
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
@@ -287,7 +292,7 @@ function CityPicker({ countryCode, stateCode, value, onChange, label }: {
           placeholder="Search city..."
           className="flex-1 bg-transparent outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-[110] mt-1.5 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/30">
@@ -514,7 +519,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving || !companyNameEn.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Creating..." : "Create Supplier"}
           </button>
         </>
@@ -553,7 +558,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
                 ) : (
                   <button type="button" onClick={() => logoRef.current?.click()}
                     className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group">
-                    <ImageIcon className="h-5 w-5 text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]" />
+                    <PictureIcon className="h-5 w-5 text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]" />
                     <span className="text-[9px] text-[var(--text-ghost)]">Upload</span>
                   </button>
                 )}
@@ -664,7 +669,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
           <div className="flex items-center justify-between mb-3">
             <p className={sectionTitle + " mb-0"}>Contact Persons</p>
             <button type="button" onClick={addContactPerson} className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5 transition-colors">
-              <Plus className="h-3 w-3" /> Add Person
+              <PlusIcon className="h-3 w-3" /> Add Person
             </button>
           </div>
           {contactPersons.length === 0 ? (
@@ -676,7 +681,7 @@ export default function CreateSupplierModal({ open, onClose, onCreated }: Props)
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-[var(--text-dim)]">Person {idx + 1}</span>
                     <button type="button" onClick={() => removeContactPerson(idx)} className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-ghost)] hover:text-red-400 transition-colors">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

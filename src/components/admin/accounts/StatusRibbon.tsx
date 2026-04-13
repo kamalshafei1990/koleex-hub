@@ -12,7 +12,12 @@
    --------------------------------------------------------------------------- */
 
 import type { AccountStatus } from "@/types/supabase";
-import { Mail, CheckCircle2, Power, PowerOff, ShieldAlert, Clock } from "lucide-react";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import PowerIcon from "@/components/icons/ui/PowerIcon";
+import ToggleOffIcon from "@/components/icons/ui/ToggleOffIcon";
+import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 
 interface Props {
   status: AccountStatus;
@@ -28,27 +33,27 @@ const STATUS_META: Record<
 > = {
   invited: {
     label: "Invited",
-    icon: Mail,
+    icon: EnvelopeIcon,
     className: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   },
   pending: {
     label: "Pending",
-    icon: Clock,
+    icon: ClockIcon,
     className: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   },
   active: {
     label: "Active",
-    icon: CheckCircle2,
+    icon: CheckCircleIcon,
     className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   },
   inactive: {
     label: "Inactive",
-    icon: PowerOff,
+    icon: ToggleOffIcon,
     className: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
   },
   suspended: {
     label: "Suspended",
-    icon: ShieldAlert,
+    icon: ShieldExclamationIcon,
     className: "bg-red-500/15 text-red-300 border-red-500/30",
   },
 };

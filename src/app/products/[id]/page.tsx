@@ -23,12 +23,35 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft, Pencil, Check, Download, Play, Tag, Boxes, Globe, Zap,
-  Ruler, Layers, Factory, Sparkles, ShieldCheck, Image as ImageIcon,
-  ChevronRight, FileText, ExternalLink, Gauge, Cpu, Droplets, Target,
-  Volume2, Wrench, Activity, Award, Scissors, ChevronDown, Package,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import PlayIcon from "@/components/icons/ui/PlayIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import CpuIcon from "@/components/icons/ui/CpuIcon";
+import DropletsIcon from "@/components/icons/ui/DropletsIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import Volume2Icon from "@/components/icons/ui/Volume2Icon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
+import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
 
 import {
   fetchProductByIdOrSlug,
@@ -95,7 +118,7 @@ function deriveKeyFeatures(
   // 1. Max sewing speed
   if (cs.max_sewing_speed) {
     features.push({
-      icon: <Gauge className="h-5 w-5" />,
+      icon: <GaugeIcon className="h-5 w-5" />,
       title: "High Speed",
       value: `${cs.max_sewing_speed} spm`,
       description: "Built for high-volume production runs.",
@@ -112,7 +135,7 @@ function deriveKeyFeatures(
       stepper: { title: "Stepper Motor", desc: "Precise incremental positioning." },
     };
     const m = labels[motor] || { title: "Advanced Motor", desc: "Precision drive system." };
-    features.push({ icon: <Cpu className="h-5 w-5" />, title: m.title, description: m.desc });
+    features.push({ icon: <CpuIcon className="h-5 w-5" />, title: m.title, description: m.desc });
   }
 
   // 3. Lubrication
@@ -125,13 +148,13 @@ function deriveKeyFeatures(
       "dry-head": { title: "Dry Head", desc: "Oil-free — ideal for clean garments." },
     };
     const l = labels[lube] || { title: "Smart Lubrication", desc: "Engineered for durability." };
-    features.push({ icon: <Droplets className="h-5 w-5" />, title: l.title, description: l.desc });
+    features.push({ icon: <DropletsIcon className="h-5 w-5" />, title: l.title, description: l.desc });
   }
 
   // 4. Needle system
   if (cs.needle_system) {
     features.push({
-      icon: <Target className="h-5 w-5" />,
+      icon: <TargetIcon className="h-5 w-5" />,
       title: "Precision Needle",
       value: String(cs.needle_system),
       description: "Industrial-grade needle system.",
@@ -142,7 +165,7 @@ function deriveKeyFeatures(
   if (cs.stitch_length_max) {
     const min = cs.stitch_length_min ? `${cs.stitch_length_min}–` : "Up to ";
     features.push({
-      icon: <Ruler className="h-5 w-5" />,
+      icon: <RulerIcon className="h-5 w-5" />,
       title: "Wide Stitch Range",
       value: `${min}${cs.stitch_length_max} mm`,
       description: "Versatile across fabric thicknesses.",
@@ -152,7 +175,7 @@ function deriveKeyFeatures(
   // 6. Presser foot lift
   if (features.length < 6 && cs.presser_foot_lift) {
     features.push({
-      icon: <Activity className="h-5 w-5" />,
+      icon: <ActivityIcon className="h-5 w-5" />,
       title: "Generous Clearance",
       value: `${cs.presser_foot_lift} mm lift`,
       description: "Handles thick and layered materials.",
@@ -163,7 +186,7 @@ function deriveKeyFeatures(
   const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
   if (features.length < 6 && ts.noise_level) {
     features.push({
-      icon: <Volume2 className="h-5 w-5" />,
+      icon: <Volume2Icon className="h-5 w-5" />,
       title: "Low Noise",
       value: `${ts.noise_level} dB`,
       description: "Quieter workstation environment.",
@@ -173,7 +196,7 @@ function deriveKeyFeatures(
   // Fallbacks — always show at least 4
   if (features.length < 4 && product.warranty) {
     features.push({
-      icon: <ShieldCheck className="h-5 w-5" />,
+      icon: <ShieldCheckIcon className="h-5 w-5" />,
       title: "Manufacturer Warranty",
       value: product.warranty,
       description: "Backed by Koleex support.",
@@ -181,7 +204,7 @@ function deriveKeyFeatures(
   }
   if (features.length < 4 && product.country_of_origin) {
     features.push({
-      icon: <Award className="h-5 w-5" />,
+      icon: <AwardIcon className="h-5 w-5" />,
       title: "Quality Sourcing",
       value: product.country_of_origin,
       description: "Curated manufacturing origin.",
@@ -189,7 +212,7 @@ function deriveKeyFeatures(
   }
   if (features.length < 4 && (product.voltage?.length || 0) > 0) {
     features.push({
-      icon: <Zap className="h-5 w-5" />,
+      icon: <ZapIcon className="h-5 w-5" />,
       title: "Global Voltage",
       value: (product.voltage || []).join(" / "),
       description: "Ready for international deployment.",
@@ -197,7 +220,7 @@ function deriveKeyFeatures(
   }
   if (features.length < 4) {
     features.push({
-      icon: <Wrench className="h-5 w-5" />,
+      icon: <WrenchIcon className="h-5 w-5" />,
       title: "Built to Serve",
       description: "Engineered for industrial sewing lines.",
     });
@@ -241,49 +264,49 @@ function describeApplication(tag: string): AppInfo {
 
   // Fabric types
   if (/denim|jean/.test(t))
-    return { kind: "Heavy fabric", icon: Layers, description: "Engineered for dense denim and jeanswear production." };
+    return { kind: "Heavy fabric", icon: LayersIcon, description: "Engineered for dense denim and jeanswear production." };
   if (/leather/.test(t))
-    return { kind: "Heavy material", icon: ShieldCheck, description: "Handles thick hides and multi-layer leather work." };
+    return { kind: "Heavy material", icon: ShieldCheckIcon, description: "Handles thick hides and multi-layer leather work." };
   if (/canvas|tarp/.test(t))
-    return { kind: "Heavy fabric", icon: Layers, description: "Ideal for canvas, tarpaulin and technical textiles." };
+    return { kind: "Heavy fabric", icon: LayersIcon, description: "Ideal for canvas, tarpaulin and technical textiles." };
   if (/knit|jersey/.test(t))
-    return { kind: "Stretch fabric", icon: Activity, description: "Smooth handling of knit and jersey materials." };
+    return { kind: "Stretch fabric", icon: ActivityIcon, description: "Smooth handling of knit and jersey materials." };
   if (/silk|satin|chiffon/.test(t))
-    return { kind: "Fine fabric", icon: Sparkles, description: "Precision feed for delicate and luxury fabrics." };
+    return { kind: "Fine fabric", icon: SparklesIcon, description: "Precision feed for delicate and luxury fabrics." };
 
   // Garment types
   if (/shirt|blouse/.test(t))
-    return { kind: "Garment", icon: Scissors, description: "Clean seams for shirting and light tailoring." };
+    return { kind: "Garment", icon: ScissorsIcon, description: "Clean seams for shirting and light tailoring." };
   if (/trouser|pant|jean/.test(t))
-    return { kind: "Garment", icon: Scissors, description: "Production-grade stitching for bottoms and jeans." };
+    return { kind: "Garment", icon: ScissorsIcon, description: "Production-grade stitching for bottoms and jeans." };
   if (/jacket|coat|outerwear/.test(t))
-    return { kind: "Outerwear", icon: ShieldCheck, description: "Reliable seams across heavy-layered garments." };
+    return { kind: "Outerwear", icon: ShieldCheckIcon, description: "Reliable seams across heavy-layered garments." };
   if (/dress|skirt/.test(t))
-    return { kind: "Garment", icon: Sparkles, description: "Elegant finish for dresses, skirts and womenswear." };
+    return { kind: "Garment", icon: SparklesIcon, description: "Elegant finish for dresses, skirts and womenswear." };
   if (/underwear|lingerie|intimate/.test(t))
-    return { kind: "Intimates", icon: Sparkles, description: "Gentle feed for fine intimate apparel." };
+    return { kind: "Intimates", icon: SparklesIcon, description: "Gentle feed for fine intimate apparel." };
   if (/sport|active|athletic/.test(t))
-    return { kind: "Activewear", icon: Activity, description: "Built for performance and athletic garments." };
+    return { kind: "Activewear", icon: ActivityIcon, description: "Built for performance and athletic garments." };
   if (/workwear|uniform/.test(t))
-    return { kind: "Workwear", icon: Factory, description: "Durable construction for uniforms and workwear." };
+    return { kind: "Workwear", icon: FactoryIcon, description: "Durable construction for uniforms and workwear." };
 
   // Accessories / home
   if (/bag|backpack|luggage/.test(t))
-    return { kind: "Accessory", icon: Package, description: "Tough stitching for bags, backpacks and luggage." };
+    return { kind: "Accessory", icon: PackageIcon, description: "Tough stitching for bags, backpacks and luggage." };
   if (/shoe|footwear/.test(t))
-    return { kind: "Footwear", icon: Target, description: "Specialised seams for footwear and uppers." };
+    return { kind: "Footwear", icon: TargetIcon, description: "Specialised seams for footwear and uppers." };
   if (/home|upholstery|curtain|cushion/.test(t))
-    return { kind: "Home textile", icon: Layers, description: "Consistent finish for upholstery and home goods." };
+    return { kind: "Home textile", icon: LayersIcon, description: "Consistent finish for upholstery and home goods." };
   if (/automotive|car|seat/.test(t))
-    return { kind: "Technical", icon: Wrench, description: "Heavy-duty seams for automotive interiors." };
+    return { kind: "Technical", icon: WrenchIcon, description: "Heavy-duty seams for automotive interiors." };
   if (/medical|ppe|mask/.test(t))
-    return { kind: "Technical", icon: ShieldCheck, description: "Precise assembly for medical and PPE goods." };
+    return { kind: "Technical", icon: ShieldCheckIcon, description: "Precise assembly for medical and PPE goods." };
   if (/embroidery|decor/.test(t))
-    return { kind: "Decoration", icon: Sparkles, description: "Decorative stitching and embellishment work." };
+    return { kind: "Decoration", icon: SparklesIcon, description: "Decorative stitching and embellishment work." };
   if (/quilt/.test(t))
-    return { kind: "Multi-layer", icon: Layers, description: "Controlled feed across thick quilted layers." };
+    return { kind: "Multi-layer", icon: LayersIcon, description: "Controlled feed across thick quilted layers." };
 
-  return { kind: "Application", icon: Layers, description: "Optimised for industrial garment production." };
+  return { kind: "Application", icon: LayersIcon, description: "Optimised for industrial garment production." };
 }
 
 function Section({
@@ -514,7 +537,7 @@ export default function ProductViewPage() {
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center gap-4 px-6 text-center bg-white dark:bg-[#0A0A0A]">
         <div className="h-16 w-16 rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.04] flex items-center justify-center">
-          <ImageIcon className="h-7 w-7 text-[#86868B] dark:text-white/30" />
+          <ImageRawIcon className="h-7 w-7 text-[#86868B] dark:text-white/30" />
         </div>
         <h1 className="text-[22px] font-semibold text-[#1D1D1F] dark:text-white">Product not found</h1>
         <p className="text-[14px] text-[#6E6E73] dark:text-white/60">
@@ -524,7 +547,7 @@ export default function ProductViewPage() {
           href="/products"
           className="inline-flex items-center gap-2 h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to products
+          <ArrowLeftIcon className="h-4 w-4" /> Back to products
         </Link>
       </div>
     );
@@ -551,7 +574,7 @@ export default function ProductViewPage() {
             href="/products"
             className="inline-flex items-center gap-1.5 text-[12px] text-[#6E6E73] hover:text-[#1D1D1F] dark:text-white/60 dark:hover:text-white transition"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> All products
+            <ArrowLeftIcon className="h-3.5 w-3.5" /> All products
           </Link>
           <div className="flex items-center gap-3">
             {divisionName && (
@@ -565,7 +588,7 @@ export default function ProductViewPage() {
               href={`/products/${product.id}/edit`}
               className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] dark:border-white/15 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:text-white transition"
             >
-              <Pencil className="h-3 w-3" /> Edit
+              <PencilIcon className="h-3 w-3" /> Edit
             </Link>
           </div>
         </div>
@@ -617,7 +640,7 @@ export default function ProductViewPage() {
               href="#specs"
               className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
             >
-              Learn more <ChevronRight className="h-3.5 w-3.5 mt-0.5" />
+              Learn more <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
             </a>
           </div>
 
@@ -632,7 +655,7 @@ export default function ProductViewPage() {
               />
             ) : (
               <div className="w-full max-w-[900px] mx-auto aspect-[4/3] flex items-center justify-center bg-[#F5F5F7] dark:bg-white/[0.03] rounded-[22px]">
-                <ImageIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
+                <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
               </div>
             )}
           </div>
@@ -744,7 +767,7 @@ export default function ProductViewPage() {
             <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <Factory className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  <FactoryIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Machine Type
@@ -765,7 +788,7 @@ export default function ProductViewPage() {
             <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <Scissors className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  <ScissorsIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Main Function
@@ -782,7 +805,7 @@ export default function ProductViewPage() {
             <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <Layers className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  <LayersIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
                   Application
@@ -825,12 +848,12 @@ export default function ProductViewPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[...commonSpecsRendered, ...templateSpecsRendered].map((g) => {
               const GroupIcon =
-                g.group === "Performance" ? Gauge :
-                g.group === "Mechanical" ? Factory :
-                g.group === "Electrical" ? Zap :
-                (g.group === "Physical" || g.group === "Physical / Installation") ? Ruler :
-                g.group === "Needle & Thread" ? Target :
-                Wrench;
+                g.group === "Performance" ? GaugeIcon :
+                g.group === "Mechanical" ? FactoryIcon :
+                g.group === "Electrical" ? ZapIcon :
+                (g.group === "Physical" || g.group === "Physical / Installation") ? RulerIcon :
+                g.group === "Needle & Thread" ? TargetIcon :
+                WrenchIcon;
               return (
                 <div
                   key={g.group}
@@ -863,7 +886,7 @@ export default function ProductViewPage() {
               <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 md:col-span-2">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
-                    <Wrench className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                    <WrenchIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                   </div>
                   <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
                     Additional
@@ -927,7 +950,7 @@ export default function ProductViewPage() {
                     {/* Best Choice ribbon — Apple-style top bar */}
                     {isBestChoice && (
                       <div className="absolute top-0 left-0 right-0 z-10 h-7 bg-[#06C] dark:bg-[#2997FF] flex items-center justify-center gap-1.5 text-[11px] font-medium text-white tracking-[-0.005em]">
-                        <Sparkles className="h-3 w-3" /> Best Choice
+                        <SparklesIcon className="h-3 w-3" /> Best Choice
                       </div>
                     )}
 
@@ -942,7 +965,7 @@ export default function ProductViewPage() {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
-                          <ImageIcon className="h-12 w-12" />
+                          <ImageRawIcon className="h-12 w-12" />
                         </div>
                       )}
                     </div>
@@ -987,12 +1010,12 @@ export default function ProductViewPage() {
                         )}
                         {m.supports_head_only && (
                           <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
-                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Head only
+                            <CheckIcon className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Head only
                           </span>
                         )}
                         {m.supports_complete_set && (
                           <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
-                            <Check className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Complete set
+                            <CheckIcon className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Complete set
                           </span>
                         )}
                       </div>
@@ -1032,7 +1055,7 @@ export default function ProductViewPage() {
                             <div className="overflow-hidden">
                               <div className="pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08]">
                                 <p className="text-[12px] font-medium text-[#6E6E73] dark:text-white/50 mb-3 flex items-center gap-1.5">
-                                  <Package className="h-3 w-3" /> Packaging
+                                  <PackageIcon className="h-3 w-3" /> Packaging
                                 </p>
                                 <dl className="text-[12px] space-y-1.5">
                                   {m.weight && (
@@ -1088,7 +1111,7 @@ export default function ProductViewPage() {
                             className="mt-5 inline-flex items-center gap-1 text-[13px] font-normal text-[#06C] dark:text-[#2997FF] hover:underline self-start"
                           >
                             {isExpanded ? "Hide details" : "Show details"}
-                            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                           </button>
                         </>
                       )}
@@ -1128,7 +1151,7 @@ export default function ProductViewPage() {
                     {/* Large icon as visual anchor */}
                     <div className="flex-1 flex items-center justify-center">
                       <div className="h-20 w-20 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none group-hover:scale-105 transition-transform duration-300">
-                        <Icon className="h-9 w-9 text-[#06C] dark:text-[#2997FF]" strokeWidth={1.4} />
+                        <Icon className="h-9 w-9 text-[#06C] dark:text-[#2997FF]" />
                       </div>
                     </div>
 
@@ -1161,13 +1184,13 @@ export default function ProductViewPage() {
               <a key={v.id} href={v.url} target="_blank" rel="noreferrer"
                  className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
                 <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <Play className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" fill="currentColor" />
+                  <PlayIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">Video</p>
                   <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{v.alt_text || "Product video"}</p>
                   <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    Watch now <ExternalLink className="h-3 w-3" />
+                    Watch now <ExternalLinkIcon className="h-3 w-3" />
                   </p>
                 </div>
               </a>
@@ -1176,13 +1199,13 @@ export default function ProductViewPage() {
               <a key={m.id} href={m.url} target="_blank" rel="noreferrer"
                  className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
                 <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <FileText className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  <DocumentIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">PDF manual</p>
                   <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{m.alt_text || "Technical manual"}</p>
                   <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    Download <Download className="h-3 w-3" />
+                    Download <DownloadIcon className="h-3 w-3" />
                   </p>
                 </div>
               </a>
@@ -1191,13 +1214,13 @@ export default function ProductViewPage() {
               <a key={d.id} href={d.url} target="_blank" rel="noreferrer"
                  className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
                 <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <ImageIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  <ImageRawIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1 capitalize">{d.type.replace(/_/g, " ")}</p>
                   <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em] capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
                   <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    View <ExternalLink className="h-3 w-3" />
+                    View <ExternalLinkIcon className="h-3 w-3" />
                   </p>
                 </div>
               </a>
@@ -1229,7 +1252,7 @@ export default function ProductViewPage() {
                            className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.05] transition-transform duration-700 ease-out" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
-                        <ImageIcon className="h-10 w-10" />
+                        <ImageRawIcon className="h-10 w-10" />
                       </div>
                     )}
                   </div>
@@ -1239,7 +1262,7 @@ export default function ProductViewPage() {
                     )}
                     <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] line-clamp-2 tracking-[-0.01em]">{rp.product_name}</p>
                     <p className="mt-3 inline-flex items-center gap-1 text-[13px] text-[#06C] dark:text-[#2997FF] group-hover:underline">
-                      Learn more <ChevronRight className="h-3 w-3" />
+                      Learn more <AngleRightIcon className="h-3 w-3" />
                     </p>
                   </div>
                 </Link>
@@ -1268,18 +1291,18 @@ export default function ProductViewPage() {
               href="/contacts"
               className="inline-flex items-center gap-1 h-[44px] px-[22px] rounded-full bg-[#06C] text-white text-[17px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
             >
-              Contact sales <ChevronRight className="h-4 w-4 mt-0.5" />
+              Contact sales <AngleRightIcon className="h-4 w-4 mt-0.5" />
             </Link>
             <a
               href="#models"
               className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] text-[17px] font-normal hover:underline"
             >
-              Review models <ChevronRight className="h-4 w-4 mt-0.5" />
+              Review models <AngleRightIcon className="h-4 w-4 mt-0.5" />
             </a>
           </div>
           <div className="mt-12 flex items-center justify-center gap-4 text-[12px] text-[#86868B] dark:text-white/40">
             <span className="inline-flex items-center gap-1.5">
-              <Boxes className="h-3 w-3" />
+              <BoxesIcon className="h-3 w-3" />
               {models.length} model{models.length === 1 ? "" : "s"}
             </span>
             {product.hs_code && (
@@ -1292,7 +1315,7 @@ export default function ProductViewPage() {
               <>
                 <span className="h-1 w-1 rounded-full bg-[#D2D2D7] dark:bg-white/20" />
                 <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheck className="h-3 w-3" /> {product.warranty}
+                  <ShieldCheckIcon className="h-3 w-3" /> {product.warranty}
                 </span>
               </>
             )}

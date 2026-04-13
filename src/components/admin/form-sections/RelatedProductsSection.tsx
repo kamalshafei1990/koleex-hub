@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X, Link as LinkIcon } from "lucide-react";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import LinkIcon from "@/components/icons/ui/LinkIcon";
 import { searchProducts } from "@/lib/products-admin";
 import type { RelatedProductFormState } from "@/types/product-form";
 
@@ -41,7 +43,7 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
         <input
           type="text"
           value={query}
@@ -77,7 +79,7 @@ export default function RelatedProductsSection({ related, onChange, currentProdu
                 {r.related_name}
               </div>
               <button onClick={() => remove(r.related_id)} className="text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
-                <X className="h-3.5 w-3.5" />
+                <CrossIcon className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}

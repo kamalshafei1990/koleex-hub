@@ -11,11 +11,8 @@
    To hide by role:     fill the `visibleTo` array (engine coming later).
    --------------------------------------------------------------------------- */
 
-import {
-  LayoutGrid,
-  CalendarCheck,
-  type LucideIcon,
-} from "lucide-react";
+import AppsIcon from "@/components/icons/ui/AppsIcon";
+import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
 import ManagementIcon from "@/components/icons/ManagementIcon";
 import CrmIcon from "@/components/icons/CrmIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
@@ -70,7 +67,7 @@ import SystemSidebarIcon from "@/components/icons/SystemSidebarIcon";
    ═══════════════════════════════════════════════════ */
 
 /** Icon type — Lucide icons or custom SVG components */
-type AppIcon = LucideIcon | React.ComponentType<{ size?: number | string; className?: string }>;
+type AppIcon = React.ComponentType<{ size?: number | string; className?: string }>;
 
 /** Every navigable app in the platform. */
 export interface AppDef {
@@ -136,7 +133,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "recruitment",      tKey: "app.recruitment",      name: "Recruitment",       icon: RecruitmentIcon, route: "/recruitment",    active: false },
   { id: "appraisals",       tKey: "app.appraisals",       name: "Appraisals",        icon: AppraisalsIcon, route: "/appraisals",      active: false },
   { id: "appointments",     tKey: "app.appointments",     name: "Appointments",      icon: AppointmentsIcon, route: "/appointments",  active: false },
-  { id: "attendance",       tKey: "app.attendance",       name: "Attendance",        icon: CalendarCheck, route: "/attendance",       active: false },
+  { id: "attendance",       tKey: "app.attendance",       name: "Attendance",        icon: CalendarCheckIcon, route: "/attendance",       active: false },
 
   /* ── Communication ── */
   { id: "discuss",          tKey: "app.discuss",          name: "Discuss",           icon: DiscussIcon,   route: "/discuss",          active: true  },
@@ -167,7 +164,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "inbox",            tKey: "app.inbox",            name: "Koleex Mail",       icon: MailIcon,      route: "/inbox",            active: true  },
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   { id: "brands",           tKey: "app.brands",           name: "Brands",            icon: BrandIcon,     route: "/brands",           active: true  },
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: LayoutGrid,    route: "/dashboard",        active: false },
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
 ];
 
 /* ═══════════════════════════════════════════════════

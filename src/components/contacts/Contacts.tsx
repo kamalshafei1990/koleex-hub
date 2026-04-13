@@ -3,19 +3,80 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
-import {
-  ArrowLeft, Plus, Search, X, Trash2, Edit3, Save, Phone, Mail,
-  MapPin, Globe, Calendar, Users, Building2, User, Crown, ChevronDown,
-  ChevronRight, Copy, Check, AlertTriangle, Camera, Minus, UserPlus,
-  Briefcase, Heart, Share2, FileText, Star, Shield, Gem, Award,
-  CreditCard, BadgeCheck, UserCheck, TrendingUp, MapPinned,
-  DollarSign, Tag, MessageSquare, Languages, Ship, FileCheck, Paperclip,
-  Clock, CalendarPlus, CalendarCheck, Receipt, Wallet, HandCoins,
-  Factory, Target, UserCog, Hash, Package, Boxes, Timer, StarIcon,
-  ShieldCheck, Truck, Warehouse, ClipboardCheck, Eye,
-  Download, BookOpen, Landmark, ExternalLink, ImageIcon, FilePlus,
-  GraduationCap, ShieldAlert, Plane, Home, HelpCircle,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import Edit3Icon from "@/components/icons/ui/Edit3Icon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import CrownIcon from "@/components/icons/ui/CrownIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
+import MinusIcon from "@/components/icons/ui/MinusIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import HeartIcon from "@/components/icons/ui/HeartIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import GemIcon from "@/components/icons/ui/GemIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
+import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
+import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
+import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
+import ShipIcon from "@/components/icons/ui/ShipIcon";
+import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
+import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
+import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
+import WalletIcon from "@/components/icons/ui/WalletIcon";
+import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import UserCogIcon from "@/components/icons/ui/UserCogIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import TimerIcon from "@/components/icons/ui/TimerIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import WarehouseIcon from "@/components/icons/ui/WarehouseIcon";
+import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
+import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
+import GraduationCapIcon from "@/components/icons/ui/GraduationCapIcon";
+import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
+import PlaneIcon from "@/components/icons/ui/PlaneIcon";
+import HomeIcon from "@/components/icons/ui/HomeIcon";
+import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
 import ContactsIcon from "@/components/icons/ContactsIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
@@ -200,11 +261,11 @@ interface ContactForm {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const CONTACT_TYPES: { value: ContactType; label: string; icon: React.ReactNode; color: string }[] = [
-  { value: "customer", label: "Customer", icon: <Crown size={16} />, color: "text-amber-400" },
-  { value: "supplier", label: "Supplier", icon: <Building2 size={16} />, color: "text-blue-400" },
-  { value: "company", label: "Company", icon: <Briefcase size={16} />, color: "text-purple-400" },
-  { value: "employee", label: "Employee", icon: <BadgeCheck size={16} />, color: "text-teal-400" },
-  { value: "people", label: "People", icon: <User size={16} />, color: "text-green-400" },
+  { value: "customer", label: "Customer", icon: <CrownIcon size={16} />, color: "text-amber-400" },
+  { value: "supplier", label: "Supplier", icon: <Building2Icon size={16} />, color: "text-blue-400" },
+  { value: "company", label: "Company", icon: <BriefcaseIcon size={16} />, color: "text-purple-400" },
+  { value: "employee", label: "Employee", icon: <BadgeCheckIcon size={16} />, color: "text-teal-400" },
+  { value: "people", label: "People", icon: <UserIcon size={16} />, color: "text-green-400" },
 ];
 
 const CUSTOMER_TIERS: { value: CustomerTier; label: string; color: string; bg: string }[] = [
@@ -957,7 +1018,7 @@ const SelectInput = React.memo(function SelectInput({ label, value, onChange, op
           <option value="" className="bg-[var(--bg-secondary)]">{selectLabel ?? "Select..."}</option>
           {options.map(o => <option key={o} value={o} className="bg-[var(--bg-secondary)]">{renderLabel ? renderLabel(o) : o}</option>)}
         </select>
-        <ChevronDown size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
+        <AngleDownIcon size={14} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none" />
       </div>
     </div>
   );
@@ -968,7 +1029,7 @@ const AddButton = React.memo(function AddButton({ label, onClick }: { label: str
   return (
     <button onClick={onClick} className="flex items-center gap-2 text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] py-2 transition-colors">
       <div className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center">
-        <Plus size={14} className="text-[var(--text-muted)]" />
+        <PlusIcon size={14} className="text-[var(--text-muted)]" />
       </div>
       {label}
     </button>
@@ -979,7 +1040,7 @@ const AddButton = React.memo(function AddButton({ label, onClick }: { label: str
 const RemoveBtn = React.memo(function RemoveBtn({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-6 h-6 rounded-full bg-[var(--bg-surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 hover:bg-[var(--bg-surface-bright)] transition-colors">
-      <Minus size={14} className="text-[var(--text-muted)]" />
+      <MinusIcon size={14} className="text-[var(--text-muted)]" />
     </button>
   );
 });
@@ -1127,7 +1188,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
           placeholder={placeholder ?? "Search country..."}
           className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
@@ -1207,7 +1268,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
           placeholder={placeholder ?? "Search province..."}
           className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
@@ -1292,7 +1353,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
           placeholder={placeholder ?? "Search city..."}
           className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)]"
         />
-        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-xl">
@@ -1691,7 +1752,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <div className="max-w-2xl w-full">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="text-amber-400" size={32} />
+              <TriangleWarningIcon className="text-amber-400" size={32} />
             </div>
             <h1 className="text-2xl font-semibold mb-2">{t("setup.title")}</h1>
             <p className="text-[var(--text-subtle)] text-sm">
@@ -1707,7 +1768,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-surface-subtle)]">
               <span className="text-xs text-[var(--text-faint)] font-mono">{t("setup.sqlMigration")}</span>
               <button onClick={copySql} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] transition-colors">
-                {copied ? <><Check size={12} className="text-green-400" /> {t("btn.copied")}</> : <><Copy size={12} /> {t("btn.copy")}</>}
+                {copied ? <><CheckIcon size={12} className="text-green-400" /> {t("btn.copied")}</> : <><CopyIcon size={12} /> {t("btn.copy")}</>}
               </button>
             </div>
             <pre className="p-4 text-xs text-[var(--text-secondary)] font-mono overflow-x-auto max-h-80 overflow-y-auto leading-relaxed">
@@ -1750,7 +1811,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2.5 mb-3">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft size={16} className="rtl:rotate-180" />
+            <ArrowLeftIcon size={16} className="rtl:rotate-180" />
           </Link>
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
             {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : filterType === "employee" ? <EmployeesIcon size={16} /> : <ContactsIcon size={16} />}
@@ -1768,13 +1829,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             }}
             className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0"
           >
-            <Plus size={16} />
+            <PlusIcon size={16} />
           </button>
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+          <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
             placeholder={t("searchPlaceholder")}
@@ -1784,7 +1845,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           />
           {search && (
             <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-              <X size={14} />
+              <CrossIcon size={14} />
             </button>
           )}
         </div>
@@ -1887,7 +1948,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-dim)] gap-2">
-            <Users size={32} />
+            <UsersIcon size={32} />
             <p className="text-sm">{t("noContactsFound")}</p>
           </div>
         ) : (
@@ -1912,7 +1973,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       {c.photo_url ? (
                         <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
-                        <Building2 size={16} className="text-[var(--text-dim)]" />
+                        <Building2Icon size={16} className="text-[var(--text-dim)]" />
                       ) : (
                         getInitials(c)
                       )}
@@ -1940,7 +2001,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     </div>
 
-                    <ChevronRight size={14} className="text-[var(--text-ghost)] shrink-0 rtl:rotate-180" />
+                    <AngleRightIcon size={14} className="text-[var(--text-ghost)] shrink-0 rtl:rotate-180" />
                   </button>
                 );
               })}
@@ -1974,7 +2035,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
-                      <Building2 size={16} className="text-blue-400" />
+                      <Building2Icon size={16} className="text-blue-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
@@ -1986,7 +2047,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
-                      <UserCheck size={16} className="text-emerald-400" />
+                      <UserCheckIcon size={16} className="text-emerald-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
@@ -1998,7 +2059,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-orange-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-orange-500/10">
-                      <Globe size={16} className="text-orange-400" />
+                      <GlobeIcon size={16} className="text-orange-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-400/60">{t("kpi.countries")}</span>
                   </div>
@@ -2010,7 +2071,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
-                      <Star size={16} className="text-amber-400" />
+                      <StarIcon size={16} className="text-amber-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("kpi.avgRating")}</span>
                   </div>
@@ -2024,7 +2085,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Catalogues */}
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <BookOpen size={16} className="text-violet-400" />
+                    <BookOpenIcon size={16} className="text-violet-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.catalogues")}</span>
                   </div>
                   <p className="text-3xl font-bold text-violet-400">{supplierKpis.withCatalogues}</p>
@@ -2034,7 +2095,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Contact Persons */}
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <Users size={16} className="text-cyan-400" />
+                    <UsersIcon size={16} className="text-cyan-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.contacts")}</span>
                   </div>
                   <p className="text-3xl font-bold text-cyan-400">{supplierKpis.withContacts}</p>
@@ -2044,7 +2105,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Divisions */}
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <Briefcase size={16} className="text-pink-400" />
+                    <BriefcaseIcon size={16} className="text-pink-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.divisions")}</span>
                   </div>
                   <p className="text-3xl font-bold text-pink-400">{supplierKpis.divisions}</p>
@@ -2054,7 +2115,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 {/* Categories */}
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <Package size={16} className="text-teal-400" />
+                    <PackageIcon size={16} className="text-teal-400" />
                     <span className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("kpi.categories")}</span>
                   </div>
                   <p className="text-3xl font-bold text-teal-400">{supplierKpis.categories}</p>
@@ -2084,7 +2145,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {supplierKpis.newThisMonth > 0 && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
-                    <TrendingUp size={20} className="text-green-400" />
+                    <TrendingUpIcon size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{supplierKpis.newThisMonth}</p>
@@ -2126,7 +2187,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-[var(--border-focus)]">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10">
-                      <Crown size={16} className="text-amber-400" />
+                      <CrownIcon size={16} className="text-amber-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">{t("kpi.total")}</span>
                   </div>
@@ -2138,7 +2199,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10">
-                      <UserCheck size={16} className="text-emerald-400" />
+                      <UserCheckIcon size={16} className="text-emerald-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
@@ -2150,7 +2211,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-violet-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-violet-500/10">
-                      <Gem size={16} className="text-violet-400" />
+                      <GemIcon size={16} className="text-violet-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-violet-400/60">{t("kpi.vip")}</span>
                   </div>
@@ -2162,7 +2223,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10">
-                      <MapPinned size={16} className="text-blue-400" />
+                      <MapPinnedIcon size={16} className="text-blue-400" />
                     </div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
                   </div>
@@ -2218,7 +2279,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {moduleKpis.newThisMonth > 0 && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
-                    <TrendingUp size={20} className="text-green-400" />
+                    <TrendingUpIcon size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
@@ -2237,7 +2298,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       /* ── Generic KPI Dashboard (Employee / Company / People) ── */
       if (filterType && moduleKpis) {
         const typeLabel = t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1));
-        const typeIcon = filterType === "employee" ? <BadgeCheck size={16} className="text-teal-400" /> : filterType === "company" ? <Briefcase size={16} className="text-purple-400" /> : <User size={16} className="text-green-400" />;
+        const typeIcon = filterType === "employee" ? <BadgeCheckIcon size={16} className="text-teal-400" /> : filterType === "company" ? <BriefcaseIcon size={16} className="text-purple-400" /> : <UserIcon size={16} className="text-green-400" />;
         const accentColor = filterType === "employee" ? "teal" : filterType === "company" ? "purple" : "green";
         return (
           <div className="h-full overflow-y-auto">
@@ -2256,7 +2317,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-emerald-500/20">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10"><UserCheck size={16} className="text-emerald-400" /></div>
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10"><UserCheckIcon size={16} className="text-emerald-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/60">{t("kpi.active")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-emerald-400">{moduleKpis.active}</p>
@@ -2264,7 +2325,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-blue-500/20">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10"><MapPinned size={16} className="text-blue-400" /></div>
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10"><MapPinnedIcon size={16} className="text-blue-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/60">{t("kpi.countries")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-blue-400">{moduleKpis.countries}</p>
@@ -2272,7 +2333,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 transition-all hover:border-amber-500/20">
                   <div className="flex items-center gap-2 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10"><TrendingUp size={16} className="text-amber-400" /></div>
+                    <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10"><TrendingUpIcon size={16} className="text-amber-400" /></div>
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400/60">{t("kpi.new")}</span>
                   </div>
                   <p className="text-2xl md:text-3xl font-bold text-amber-400">{moduleKpis.newThisMonth}</p>
@@ -2298,7 +2359,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               {moduleKpis.newThisMonth > 0 && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-3 md:p-5 flex items-center gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-green-500/10">
-                    <TrendingUp size={20} className="text-green-400" />
+                    <TrendingUpIcon size={20} className="text-green-400" />
                   </div>
                   <div>
                     <p className="text-xl font-bold text-green-400">+{moduleKpis.newThisMonth}</p>
@@ -2314,7 +2375,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
       return (
         <div className="flex flex-col items-center justify-center h-full text-[var(--text-ghost)] gap-3">
-          <User size={48} />
+          <UserIcon size={48} />
           <p className="text-sm">{t("selectContact")}</p>
         </div>
       );
@@ -2338,7 +2399,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Back button */}
         <div className="px-4 py-3 border-b border-[var(--border-color)]">
           <button onClick={handleBack} className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
-            <ArrowLeft size={16} className="rtl:rotate-180" /> {backLabel}
+            <ArrowLeftIcon size={16} className="rtl:rotate-180" /> {backLabel}
           </button>
         </div>
 
@@ -2348,7 +2409,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {c.photo_url ? (
               <img src={c.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : c.contact_type === "supplier" || c.contact_type === "company" || (c.contact_type === "customer" && c.entity_type === "company") ? (
-              <Building2 size={32} className="text-[var(--text-ghost)]" />
+              <Building2Icon size={32} className="text-[var(--text-ghost)]" />
             ) : (
               getInitials(c)
             )}
@@ -2380,20 +2441,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           {/* Action buttons */}
           <div className="flex items-center justify-center gap-2 mt-5">
             <button onClick={handleEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-sm transition-colors">
-              <Edit3 size={14} /> {t("btn.edit")}
+              <Edit3Icon size={14} /> {t("btn.edit")}
             </button>
             <button
               onClick={() => setDeleteConfirm(c.id)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors"
             >
-              <Trash2 size={14} /> {t("btn.delete")}
+              <TrashIcon size={14} /> {t("btn.delete")}
             </button>
           </div>
         </div>
 
         {/* Phone numbers (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (phones.length > 0 || c.phone) && (
-          <Section title={t("detail.phone")} icon={<Phone size={14} />}>
+          <Section title={t("detail.phone")} icon={<PhoneIcon size={14} />}>
             {phones.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5">
                 <div>
@@ -2410,7 +2471,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Emails (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (emails.length > 0 || c.email) && (
-          <Section title={t("detail.email")} icon={<Mail size={14} />}>
+          <Section title={t("detail.email")} icon={<EnvelopeIcon size={14} />}>
             {emails.map((e, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{e.label}</span>
@@ -2425,7 +2486,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Addresses (hidden for suppliers) */}
         {c.contact_type !== "supplier" && addresses.length > 0 && (
-          <Section title={t("detail.address")} icon={<MapPin size={14} />}>
+          <Section title={t("detail.address")} icon={<MapPinIcon size={14} />}>
             {addresses.map((a, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{a.label}</span>
@@ -2439,7 +2500,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Country / Province / City (hidden for suppliers - shown in Contact Details) */}
         {c.contact_type !== "supplier" && (c.country || c.province || c.city) && (
-          <Section title={t("section.location")} icon={<MapPin size={14} />}>
+          <Section title={t("section.location")} icon={<MapPinIcon size={14} />}>
             <div className="flex items-center gap-2">
               {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
               <p className="text-sm text-[var(--text-primary)]">
@@ -2451,7 +2512,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers) */}
         {c.contact_type !== "supplier" && (websitesList.length > 0 || c.website) && (
-          <Section title={t("detail.website")} icon={<Globe size={14} />}>
+          <Section title={t("detail.website")} icon={<GlobeIcon size={14} />}>
             {websitesList.map((w, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{w.label}</span>
@@ -2466,14 +2527,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
         {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.birthday && (
-          <Section title={t("section.birthday")} icon={<Calendar size={14} />}>
+          <Section title={t("section.birthday")} icon={<CalendarRawIcon size={14} />}>
             <p className="text-sm text-[var(--text-primary)]">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
         )}
 
         {/* Social Profiles (hidden for company customers) */}
         {!(c.contact_type === "customer" && c.entity_type === "company") && socials.length > 0 && (
-          <Section title={t("section.socialProfiles")} icon={<Share2 size={14} />}>
+          <Section title={t("section.socialProfiles")} icon={<Share2Icon size={14} />}>
             {socials.map((s, i) => (
               <div key={i} className="flex items-center gap-3 py-2">
                 <div className="flex-1">
@@ -2490,7 +2551,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Related People (hidden for suppliers, company customers, and company type) */}
         {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && family.length > 0 && (
-          <Section title={t("section.relatedPeople")} icon={<Users size={14} />}>
+          <Section title={t("section.relatedPeople")} icon={<UsersIcon size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
                 <div className="flex items-center gap-3">
@@ -2515,7 +2576,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Business Card (customers only) */}
         {c.contact_type === "customer" && (c.business_card_front || c.business_card_back) && (
-          <Section title={t("section.businessCard")} icon={<CreditCard size={14} />}>
+          <Section title={t("section.businessCard")} icon={<CreditCardIcon size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               {c.business_card_front && (
                 <div>
@@ -2535,7 +2596,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Customer: Company Info ── */}
         {c.contact_type === "customer" && c.entity_type === "company" && (c.company || c.industry || c.tax_id) && (
-          <Section title={t("section.companyInfo")} icon={<Building2 size={14} />}>
+          <Section title={t("section.companyInfo")} icon={<Building2Icon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
                 <div className="col-span-2">
@@ -2561,7 +2622,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Customer: Contact Persons ── */}
         {c.contact_type === "customer" && c.entity_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
@@ -2593,7 +2654,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Type: Company Info ── */}
         {c.contact_type === "company" && (c.company || c.industry || c.tax_id || c.source || c.language) && (
-          <Section title={t("section.companyInfo")} icon={<Building2 size={14} />}>
+          <Section title={t("section.companyInfo")} icon={<Building2Icon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
                 <div className="col-span-2">
@@ -2631,7 +2692,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Company Type: Contact Persons ── */}
         {c.contact_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
@@ -2663,7 +2724,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only) ── */}
         {c.contact_type === "customer" && (c.total_revenue || c.outstanding_balance || c.credit_limit || c.payment_terms || c.currency || c.last_order_date) && (
-          <Section title={t("section.financialBusiness")} icon={<DollarSign size={14} />}>
+          <Section title={t("section.financialBusiness")} icon={<DollarSignIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.total_revenue && (
                 <div>
@@ -2707,7 +2768,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only) ── */}
         {c.contact_type === "customer" && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
-          <Section title={t("section.classification")} icon={<Tag size={14} />}>
+          <Section title={t("section.classification")} icon={<TagsIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.industry && (
                 <div>
@@ -2743,7 +2804,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Relationship & Activity ── */}
         {c.contact_type === "customer" && (c.first_contact_date || c.last_contacted || c.follow_up_date || c.communication_preference || c.language) && (
-          <Section title={t("section.relationshipActivity")} icon={<Clock size={14} />}>
+          <Section title={t("section.relationshipActivity")} icon={<ClockIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.first_contact_date && (
                 <div>
@@ -2781,7 +2842,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade-Specific (customer only) ── */}
         {c.contact_type === "customer" && (c.preferred_shipping || c.tax_id || c.incoterms || (Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0)) && (
-          <Section title={t("section.tradeShipping")} icon={<Ship size={14} />}>
+          <Section title={t("section.tradeShipping")} icon={<ShipIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.preferred_shipping && (
                 <div>
@@ -2818,11 +2879,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Attachments (hidden for suppliers) ── */}
         {c.contact_type !== "supplier" && Array.isArray(c.attachments) && c.attachments.length > 0 && (
-          <Section title={t("section.documents")} icon={<Paperclip size={14} />}>
+          <Section title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
             <div className="space-y-2">
               {c.attachments.map((a: Attachment, i: number) => (
                 <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
-                  <FileCheck size={16} className="text-blue-400 shrink-0" />
+                  <FileCheckIcon size={16} className="text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text-primary)] truncate">{a.name}</p>
                     <p className="text-[10px] text-[var(--text-dim)]">{a.type} &middot; {a.uploaded_at ? new Date(a.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
@@ -2835,7 +2896,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 1. Company Name ── */}
         {c.contact_type === "supplier" && (
-          <Section title={t("section.companyName")} icon={<Building2 size={14} />}>
+          <Section title={t("section.companyName")} icon={<Building2Icon size={14} />}>
             <div className="space-y-2">
               {c.company_name_en && (
                 <div>
@@ -2868,7 +2929,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 2. Contact Details ── */}
         {c.contact_type === "supplier" && (c.supplier_tel || c.supplier_mobile || c.supplier_email || c.supplier_website || c.supplier_address || c.country) && (
-          <Section title={t("section.contactDetails")} icon={<Phone size={14} />}>
+          <Section title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.supplier_tel && (
                 <div>
@@ -2912,7 +2973,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 3. Contact Persons ── */}
         {c.contact_type === "supplier" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
-          <Section title={t("section.contactPersons")} icon={<Users size={14} />}>
+          <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
@@ -2944,7 +3005,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 4. Company Profile ── */}
         {c.contact_type === "supplier" && (c.supplier_type || c.industry || c.source || c.division || c.category || (Array.isArray(c.brand_names) && c.brand_names.length > 0)) && (
-          <Section title={t("section.companyProfile")} icon={<Briefcase size={14} />}>
+          <Section title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />}>
             {Array.isArray(c.brand_names) && c.brand_names.length > 0 && (
               <div className="mb-3">
                 <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("detail.brands")}</span>
@@ -2992,7 +3053,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 5. Payment & Currency ── */}
         {c.contact_type === "supplier" && (c.payment_terms || c.currency || c.payment_info) && (
-          <Section title={t("section.paymentCurrency")} icon={<DollarSign size={14} />}>
+          <Section title={t("section.paymentCurrency")} icon={<DollarSignIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.payment_terms && (
                 <div>
@@ -3018,12 +3079,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 6. Bank Accounts ── */}
         {c.contact_type === "supplier" && Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0 && (
-          <Section title={t("section.bankAccounts")} icon={<Landmark size={14} />}>
+          <Section title={t("section.bankAccounts")} icon={<LandmarkIcon size={14} />}>
             <div className="space-y-3">
               {c.bank_accounts.map((bank: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
                 <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <Landmark size={14} className="text-blue-400" />
+                    <LandmarkIcon size={14} className="text-blue-400" />
                     <span className="text-sm text-[var(--text-primary)] font-medium">{bank.bank_name || "Bank " + (i + 1)}</span>
                     {bank.currency && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{bank.currency}</span>}
                   </div>
@@ -3067,20 +3128,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 7. Catalogue ── */}
         {c.contact_type === "supplier" && Array.isArray(c.catalogues) && c.catalogues.length > 0 && (
-          <Section title={t("section.catalogue")} icon={<BookOpen size={14} />}>
+          <Section title={t("section.catalogue")} icon={<BookOpenIcon size={14} />}>
             <div className="space-y-2">
               {c.catalogues.map((cat: { name: string; url: string; type: string; uploaded_at: string }, i: number) => (
                 <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
-                  {cat.type === "PDF" ? <FileText size={16} className="text-red-400 shrink-0" /> : <ImageIcon size={16} className="text-blue-400 shrink-0" />}
+                  {cat.type === "PDF" ? <DocumentIcon size={16} className="text-red-400 shrink-0" /> : <ImageRawIcon size={16} className="text-blue-400 shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text-primary)] truncate">{cat.name}</p>
                     <p className="text-[10px] text-[var(--text-dim)]">{cat.type} {cat.uploaded_at ? " \u00B7 " + new Date(cat.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
                   </div>
                   <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                    <Eye size={10} /> Preview
+                    <EyeIcon size={10} /> Preview
                   </button>
                   <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                    <Download size={10} /> Download
+                    <DownloadIcon size={10} /> Download
                   </button>
                 </div>
               ))}
@@ -3090,11 +3151,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 8. Documents ── */}
         {c.contact_type === "supplier" && Array.isArray(c.documents) && c.documents.length > 0 && (
-          <Section title={t("section.documents")} icon={<Paperclip size={14} />}>
+          <Section title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
             <div className="space-y-2">
               {c.documents.map((doc: { doc_name: string; name: string; url: string; type: string; uploaded_at: string }, i: number) => (
                 <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
-                  <FileCheck size={16} className="text-blue-400 shrink-0" />
+                  <FileCheckIcon size={16} className="text-blue-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text-primary)] truncate">{doc.doc_name || doc.name}</p>
                     <p className="text-[10px] text-[var(--text-dim)]">{doc.type} {doc.uploaded_at ? " · " + new Date(doc.uploaded_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}</p>
@@ -3102,10 +3163,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   {doc.url && (
                     <>
                       <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                        <Eye size={10} /> Preview
+                        <EyeIcon size={10} /> Preview
                       </button>
                       <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                        <Download size={10} /> {t("btn.download")}
+                        <DownloadIcon size={10} /> {t("btn.download")}
                       </button>
                     </>
                   )}
@@ -3117,14 +3178,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 9. Quality & Performance ── */}
         {c.contact_type === "supplier" && (c.rating || c.reliability_score || c.sample_status || c.quality_notes || c.last_quality_issue || (Array.isArray(c.certifications) && c.certifications.length > 0)) && (
-          <Section title={t("section.qualityPerformance")} icon={<ShieldCheck size={14} />}>
+          <Section title={t("section.qualityPerformance")} icon={<ShieldCheckIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.rating > 0 && (
                 <div>
                   <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.rating")}</span>
                   <div className="flex items-center gap-0.5 mt-0.5">
                     {[1, 2, 3, 4, 5].map(s => (
-                      <Star key={s} size={14} className={s <= (c.rating || 0) ? "text-amber-400 fill-amber-400" : "text-[var(--text-barely)]"} />
+                      <StarIcon key={s} size={14} className={s <= (c.rating || 0) ? "text-amber-400 fill-amber-400" : "text-[var(--text-barely)]"} />
                     ))}
                   </div>
                 </div>
@@ -3169,10 +3230,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Supplier: 10. Products (placeholder) ── */}
         {c.contact_type === "supplier" && (
-          <Section title={t("section.products")} icon={<Package size={14} />}>
+          <Section title={t("section.products")} icon={<PackageIcon size={14} />}>
             <div className="flex items-center gap-3 py-3">
               <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                <Package size={18} className="text-[var(--text-ghost)]" />
+                <PackageIcon size={18} className="text-[var(--text-ghost)]" />
               </div>
               <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
             </div>
@@ -3184,7 +3245,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <>
           {/* Work Contact */}
           {(c.work_email || c.work_tel || c.work_mobile) && (
-            <Section title={t("section.workContact")} icon={<Phone size={14} />}>
+            <Section title={t("section.workContact")} icon={<PhoneIcon size={14} />}>
               {c.work_email && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.email")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_email}</p></div>}
               {c.work_tel && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.tel")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_tel}</p></div>}
               {c.work_mobile && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.mobile")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_mobile}</p></div>}
@@ -3192,7 +3253,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Work */}
           {(c.department || c.job_position || c.job_title || c.management || c.manager) && (
-            <Section title={t("section.work")} icon={<Briefcase size={14} />}>
+            <Section title={t("section.work")} icon={<BriefcaseIcon size={14} />}>
               {c.management && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.managementLevel")}</span><p className="text-sm text-[var(--text-primary)]">{c.management}</p></div>}
               {c.department && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.department")}</span><p className="text-sm text-[var(--text-primary)]">{c.department}</p></div>}
               {c.job_position && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.position")}</span><p className="text-sm text-[var(--text-primary)]">{c.job_position}</p></div>}
@@ -3202,14 +3263,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Work Location */}
           {(c.work_address || c.work_location) && (
-            <Section title={t("section.workLocation")} icon={<MapPin size={14} />}>
+            <Section title={t("section.workLocation")} icon={<MapPinIcon size={14} />}>
               {c.work_address && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.address")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_address}</p></div>}
               {c.work_location && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.workLocationLabel")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_location}</p></div>}
             </Section>
           )}
           {/* Resume */}
           {Array.isArray(c.resume_lines) && c.resume_lines.length > 0 && (
-            <Section title={t("section.resume")} icon={<FileText size={14} />}>
+            <Section title={t("section.resume")} icon={<DocumentIcon size={14} />}>
               {c.resume_lines.map((rl: any, i: number) => (
                 <div key={i} className="py-2 border-b border-[var(--border-color)] last:border-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -3232,7 +3293,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Personal Info */}
           {(c.legal_name || c.birthday || c.place_of_birth || c.gender) && (
-            <Section title={t("section.personalInfo")} icon={<User size={14} />}>
+            <Section title={t("section.personalInfo")} icon={<UserIcon size={14} />}>
               {c.legal_name && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.legalName")}</span><p className="text-sm text-[var(--text-primary)]">{c.legal_name}</p></div>}
               {c.birthday && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.birthday")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p></div>}
               {c.place_of_birth && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.placeOfBirth")}</span><p className="text-sm text-[var(--text-primary)]">{c.place_of_birth}</p></div>}
@@ -3241,7 +3302,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Emergency Contact */}
           {Array.isArray(c.emergency_contacts) && c.emergency_contacts.length > 0 && (
-            <Section title={t("section.emergencyContact")} icon={<ShieldAlert size={14} />}>
+            <Section title={t("section.emergencyContact")} icon={<ShieldExclamationIcon size={14} />}>
               {c.emergency_contacts.map((ec: any, i: number) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-[var(--border-color)] last:border-0">
                   <span className="text-sm text-[var(--text-primary)]">{ec.contact}</span>
@@ -3252,14 +3313,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Visa & Work Permit */}
           {(c.visa_no || c.work_permit) && (
-            <Section title={t("section.visaWorkPermit")} icon={<Plane size={14} />}>
+            <Section title={t("section.visaWorkPermit")} icon={<PlaneIcon size={14} />}>
               {c.visa_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.visaNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.visa_no}</p></div>}
               {c.work_permit && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.workPermit")}</span><p className="text-sm text-[var(--text-primary)]">{c.work_permit}</p></div>}
             </Section>
           )}
           {/* Citizenship */}
           {(c.nationality || c.id_no || c.ssn_no || c.passport_no) && (
-            <Section title={t("section.citizenship")} icon={<Globe size={14} />}>
+            <Section title={t("section.citizenship")} icon={<GlobeIcon size={14} />}>
               {c.nationality && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.nationality")}</span><p className="text-sm text-[var(--text-primary)]">{c.nationality}</p></div>}
               {c.id_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.idNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.id_no}</p></div>}
               {c.ssn_no && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.ssnNo")}</span><p className="text-sm text-[var(--text-primary)]">{c.ssn_no}</p></div>}
@@ -3268,21 +3329,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
           {/* Private Location */}
           {(c.private_address || c.home_work_distance) && (
-            <Section title={t("section.privateLocation")} icon={<Home size={14} />}>
+            <Section title={t("section.privateLocation")} icon={<HomeIcon size={14} />}>
               {c.private_address && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.address")}</span><p className="text-sm text-[var(--text-primary)]">{c.private_address}</p></div>}
               {c.home_work_distance && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.distance")}</span><p className="text-sm text-[var(--text-primary)]">{c.home_work_distance} KM</p></div>}
             </Section>
           )}
           {/* Family */}
           {(c.marital_status || c.number_of_children) && (
-            <Section title={t("section.family")} icon={<Heart size={14} />}>
+            <Section title={t("section.family")} icon={<HeartIcon size={14} />}>
               {c.marital_status && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.maritalStatus")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{tOpt(c.marital_status)}</p></div>}
               {c.number_of_children && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("detail.children")}</span><p className="text-sm text-[var(--text-primary)]">{c.number_of_children}</p></div>}
             </Section>
           )}
           {/* Education */}
           {(c.certificate_level || c.field_of_study) && (
-            <Section title={t("section.education")} icon={<GraduationCap size={14} />}>
+            <Section title={t("section.education")} icon={<GraduationCapIcon size={14} />}>
               {c.certificate_level && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.certificateLevel")}</span><p className="text-sm text-[var(--text-primary)] capitalize">{tOpt(c.certificate_level)}</p></div>}
               {c.field_of_study && <div className="py-1"><span className="text-xs text-[var(--text-faint)]">{t("field.fieldOfStudy")}</span><p className="text-sm text-[var(--text-primary)]">{c.field_of_study}</p></div>}
             </Section>
@@ -3292,7 +3353,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Custom Fields */}
         {customs.length > 0 && (
-          <Section title={t("section.customFields")} icon={<FileText size={14} />}>
+          <Section title={t("section.customFields")} icon={<DocumentIcon size={14} />}>
             {customs.map((cf, i) => (
               <div key={i} className="py-1.5">
                 <span className="text-xs text-blue-400 font-medium">{cf.field_name}</span>
@@ -3304,7 +3365,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Notes */}
         {c.notes && (
-          <Section title={t("section.notes")} icon={<FileText size={14} />}>
+          <Section title={t("section.notes")} icon={<DocumentIcon size={14} />}>
             <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.notes}</p>
           </Section>
         )}
@@ -3355,7 +3416,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         <div className="px-3 md:px-6 py-3 md:py-4 border-b border-[var(--border-color)] flex items-center justify-between sticky top-0 bg-[var(--bg-secondary)] z-10 gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <button onClick={handleBack} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-              <ArrowLeft size={18} className="rtl:rotate-180" />
+              <ArrowLeftIcon size={18} className="rtl:rotate-180" />
             </button>
             <h2 className="text-base md:text-lg font-semibold text-[var(--text-primary)] truncate">
               {editingId ? t("editContact") : t("newContact")}
@@ -3370,7 +3431,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               disabled={saving || (!form.first_name && !form.last_name && !form.company && !form.company_name_en)}
               className="flex items-center gap-1 md:gap-1.5 px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm bg-[var(--bg-inverted)] text-[var(--text-inverted)] font-medium hover:bg-[var(--bg-inverted-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <Save size={14} />}
+              {saving ? <div className="w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-[var(--border-focus)] border-t-black rounded-full animate-spin" /> : <DiskIcon size={14} />}
               {saving ? t("btn.saving") : t("btn.save")}
             </button>
           </div>
@@ -3380,13 +3441,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {saveError && (
           <div className="mx-4 md:mx-6 mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
             <div className="flex items-start gap-2">
-              <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <TriangleWarningIcon size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-red-400 font-medium">{t("error.saveFailed")}</p>
                 <p className="text-xs text-red-400/70 mt-0.5">{saveError}</p>
               </div>
               <button onClick={() => setSaveError(null)} className="text-red-400/50 hover:text-red-400 shrink-0">
-                <X size={14} />
+                <CrossIcon size={14} />
               </button>
             </div>
             <div className="mt-3 flex items-center gap-2 ms-6">
@@ -3397,7 +3458,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 onClick={() => { navigator.clipboard.writeText(RLS_FIX_SQL); setRlsCopied(true); setTimeout(() => setRlsCopied(false), 2000); }}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-[var(--bg-surface-hover)] hover:bg-[var(--bg-surface-active)] text-[var(--text-secondary)] shrink-0 transition-colors"
               >
-                {rlsCopied ? <><Check size={12} className="text-green-400" /> {t("btn.copied")}</> : <><Copy size={12} /> {t("btn.copyFixSql")}</>}
+                {rlsCopied ? <><CheckIcon size={12} className="text-green-400" /> {t("btn.copied")}</> : <><CopyIcon size={12} /> {t("btn.copyFixSql")}</>}
               </button>
             </div>
           </div>
@@ -3409,7 +3470,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             {form.photo_url ? (
               <img src={form.photo_url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             ) : form.contact_type === "supplier" || isCompanyCustomer || isCompanyType ? (
-              <Building2 size={32} className="text-[var(--text-ghost)]" />
+              <Building2Icon size={32} className="text-[var(--text-ghost)]" />
             ) : (
               <div className="flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-[var(--bg-surface-bright)] mb-1" />
@@ -3464,7 +3525,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   form.entity_type === "person" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"
                 }`}
               >
-                <User size={14} /> {t("entity.individual")}
+                <UserIcon size={14} /> {t("entity.individual")}
               </button>
               <button
                 onClick={() => setField("entity_type", "company")}
@@ -3472,7 +3533,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   form.entity_type === "company" ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)]"
                 }`}
               >
-                <Building2 size={14} /> {t("entity.business")}
+                <Building2Icon size={14} /> {t("entity.business")}
               </button>
             </div>
           )}
@@ -3480,12 +3541,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Company Customer: Company Name section */}
         {isCompanyCustomer && (
-        <FormSection title={t("section.companyName")} icon={<Building2 size={14} />}>
+        <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.companyName")}</label>
               <div className="relative">
-                <Building2 size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
+                <Building2Icon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
                 <input
                   value={form.company}
                   onChange={e => setField("company", e.target.value)}
@@ -3518,7 +3579,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Company Customer: Contact Persons */}
         {isCompanyCustomer && (
-        <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
+        <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
               <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -3540,7 +3601,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     onClick={() => setExpandedFamily(expandedFamily === 2000 + i ? null : 2000 + i)}
                     className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                   >
-                    <ChevronDown size={14} className={`transition-transform ${expandedFamily === 2000 + i ? "rotate-180" : ""}`} />
+                    <AngleDownIcon size={14} className={`transition-transform ${expandedFamily === 2000 + i ? "rotate-180" : ""}`} />
                   </button>
                 </div>
                 {expandedFamily === 2000 + i && (
@@ -3564,12 +3625,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* Company Type: Company Information */}
         {isCompanyType && (
         <>
-        <FormSection title={t("section.companyInformation")} icon={<Building2 size={14} />}>
+        <FormSection title={t("section.companyInformation")} icon={<Building2Icon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.companyName")}</label>
               <div className="relative">
-                <Building2 size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
+                <Building2Icon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
                 <input
                   value={form.company}
                   onChange={e => setField("company", e.target.value)}
@@ -3622,7 +3683,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* Company Type: Contact Persons */}
-        <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
+        <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
               <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -3644,7 +3705,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     onClick={() => setExpandedFamily(expandedFamily === 3000 + i ? null : 3000 + i)}
                     className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                   >
-                    <ChevronDown size={14} className={`transition-transform ${expandedFamily === 3000 + i ? "rotate-180" : ""}`} />
+                    <AngleDownIcon size={14} className={`transition-transform ${expandedFamily === 3000 + i ? "rotate-180" : ""}`} />
                   </button>
                 </div>
                 {expandedFamily === 3000 + i && (
@@ -3668,7 +3729,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Basic Info (hidden for suppliers, company customers, and company type) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
-        <FormSection title={t("section.basicInfo")} icon={<User size={14} />}>
+        <FormSection title={t("section.basicInfo")} icon={<UserIcon size={14} />}>
           <div className="space-y-3">
             <SelectInput label={t("field.title")} value={form.title} onChange={v => setField("title", v)} options={TITLES} renderLabel={tOpt} selectLabel={t("detail.select")} />
             <div className="grid grid-cols-2 gap-3">
@@ -3676,15 +3737,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <Input label={t("field.middleName")} value={form.middle_name} onChange={v => setField("middle_name", v)} />
             </div>
             <Input label={t("field.lastName")} value={form.last_name} onChange={v => setField("last_name", v)} />
-            <Input label={t("field.company")} value={form.company} onChange={v => setField("company", v)} icon={<Building2 size={14} />} />
-            <Input label={t("field.position")} value={form.position} onChange={v => setField("position", v)} icon={<Briefcase size={14} />} />
+            <Input label={t("field.company")} value={form.company} onChange={v => setField("company", v)} icon={<Building2Icon size={14} />} />
+            <Input label={t("field.position")} value={form.position} onChange={v => setField("position", v)} icon={<BriefcaseIcon size={14} />} />
           </div>
         </FormSection>
         )}
 
         {/* Phones (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title={t("section.phoneNumbers")} icon={<Phone size={14} />}>
+        <FormSection title={t("section.phoneNumbers")} icon={<PhoneIcon size={14} />}>
           {form.phones.map((p, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removePhone(i)} />
@@ -3704,7 +3765,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Emails (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title={t("section.emailAddresses")} icon={<Mail size={14} />}>
+        <FormSection title={t("section.emailAddresses")} icon={<EnvelopeIcon size={14} />}>
           {form.emails.map((e, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeEmail(i)} />
@@ -3724,7 +3785,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Addresses (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title={t("section.addresses")} icon={<MapPin size={14} />}>
+        <FormSection title={t("section.addresses")} icon={<MapPinIcon size={14} />}>
           {form.addresses.map((a, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
               <div className="flex items-center gap-2 mb-3">
@@ -3750,7 +3811,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Location (country/province/city cascade) - hidden for suppliers and employees */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title={t("section.location")} icon={<MapPinned size={14} />}>
+        <FormSection title={t("section.location")} icon={<MapPinnedIcon size={14} />}>
           <div className="space-y-3">
             <CountryDropdown
               value={form.country_code}
@@ -3788,7 +3849,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Websites (hidden for suppliers and employees) */}
         {form.contact_type !== "supplier" && !isEmployee && (
-        <FormSection title={t("section.websites")} icon={<Globe size={14} />}>
+        <FormSection title={t("section.websites")} icon={<GlobeIcon size={14} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeWebsite(i)} />
@@ -3808,14 +3869,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
-        <FormSection title={t("section.birthday")} icon={<Calendar size={14} />}>
+        <FormSection title={t("section.birthday")} icon={<CalendarRawIcon size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} dayLabel={t("field.day")} monthLabel={t("field.month")} yearLabel={t("field.year")} renderMonth={m => t("month." + m, m)} />
         </FormSection>
         )}
 
         {/* Social Profiles (hidden for suppliers, company customers, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isEmployee && (
-        <FormSection title={t("section.socialProfiles")} icon={<Share2 size={14} />}>
+        <FormSection title={t("section.socialProfiles")} icon={<Share2Icon size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
               <div className="flex items-center gap-2 mb-3">
@@ -3832,7 +3893,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <img src={s.qr_code_url} alt="QR" className="w-14 h-14 rounded border border-[var(--border-color)] object-cover" loading="lazy" decoding="async" />
                     )}
                     <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] cursor-pointer hover:bg-[var(--bg-surface-hover)] transition-colors">
-                      <Camera size={14} />
+                      <CameraIcon size={14} />
                       {s.qr_code_url ? t("btn.change") : t("photo.uploadQr")}
                       <input type="file" accept="image/*" className="hidden" onChange={e => {
                         const file = e.target.files?.[0];
@@ -3853,7 +3914,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Related People (hidden for suppliers, company customers, company type, and employees) */}
         {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
-        <FormSection title={t("section.relatedPeople")} icon={<Users size={14} />}>
+        <FormSection title={t("section.relatedPeople")} icon={<UsersIcon size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
               <div className="flex items-center gap-2 p-3">
@@ -3869,7 +3930,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   onClick={() => setExpandedFamily(expandedFamily === i ? null : i)}
                   className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                 >
-                  <ChevronDown size={14} className={`transition-transform ${expandedFamily === i ? "rotate-180" : ""}`} />
+                  <AngleDownIcon size={14} className={`transition-transform ${expandedFamily === i ? "rotate-180" : ""}`} />
                 </button>
               </div>
               {expandedFamily === i && (
@@ -3890,7 +3951,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Notes (shared — hidden for suppliers, they have their own at the end) */}
         {form.contact_type !== "supplier" && (
-        <FormSection title={t("section.notes")} icon={<FileText size={14} />}>
+        <FormSection title={t("section.notes")} icon={<DocumentIcon size={14} />}>
           <textarea
             value={form.notes}
             onChange={e => setField("notes", e.target.value)}
@@ -3903,7 +3964,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Custom Fields (hidden for suppliers) */}
         {form.contact_type !== "supplier" && (
-        <FormSection title={t("section.customFields")} icon={<Hash size={14} />}>
+        <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />}>
           {form.custom_fields.map((cf, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeCustomField(i)} />
@@ -3927,7 +3988,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Business Card (customers only) */}
         {isCustomer && (
-          <FormSection title={t("section.businessCard")} icon={<CreditCard size={14} />}>
+          <FormSection title={t("section.businessCard")} icon={<CreditCardIcon size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("detail.front")}</label>
@@ -3936,7 +3997,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <img src={form.business_card_front} alt="Front" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-[var(--text-dim)]">
-                      <CreditCard size={18} />
+                      <CreditCardIcon size={18} />
                       <span className="text-[11px]">{t("photo.uploadFront")}</span>
                     </div>
                   )}
@@ -3956,7 +4017,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <img src={form.business_card_back} alt="Back" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-[var(--text-dim)]">
-                      <CreditCard size={18} />
+                      <CreditCardIcon size={18} />
                       <span className="text-[11px]">{t("photo.uploadBack")}</span>
                     </div>
                   )}
@@ -3975,17 +4036,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Financial & Business (customer only) ── */}
         {isCustomer && (
-          <FormSection title={t("section.financialBusiness")} icon={<DollarSign size={14} />}>
+          <FormSection title={t("section.financialBusiness")} icon={<DollarSignIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} selectLabel={t("detail.select")} />
-                <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label={t("field.totalRevenue")} value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUp size={14} />} />
-                <Input label={t("field.outstandingBalance")} value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<Receipt size={14} />} />
+                <Input label={t("field.totalRevenue")} value={form.total_revenue} onChange={v => setField("total_revenue", v)} placeholder="0.00" icon={<TrendingUpIcon size={14} />} />
+                <Input label={t("field.outstandingBalance")} value={form.outstanding_balance} onChange={v => setField("outstanding_balance", v)} placeholder="0.00" icon={<ReceiptIcon size={14} />} />
               </div>
-              <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<Wallet size={14} />} />
+              <Input label={t("field.creditLimit")} value={form.credit_limit} onChange={v => setField("credit_limit", v)} placeholder="0.00" icon={<WalletIcon size={14} />} />
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.lastOrderDate")}</label>
                 <input
@@ -4001,13 +4062,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Classification & Segmentation (customer only) ── */}
         {isCustomer && (
-          <FormSection title={t("section.classification")} icon={<Tag size={14} />}>
+          <FormSection title={t("section.classification")} icon={<TagsIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<Target size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={LEAD_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
-              <Input label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.name")} icon={<UserCog size={14} />} />
+              <Input label={t("field.accountManager")} value={form.account_manager} onChange={v => setField("account_manager", v)} placeholder={t("field.name")} icon={<UserCogIcon size={14} />} />
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.tags")}</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -4015,7 +4076,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
                       {tag}
                       <button onClick={() => setField("tags", form.tags.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-                        <X size={10} />
+                        <CrossIcon size={10} />
                       </button>
                     </span>
                   ))}
@@ -4057,11 +4118,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Relationship & Activity (customer only) ── */}
         {isCustomer && (
-          <FormSection title={t("section.relationshipActivity")} icon={<Clock size={14} />}>
+          <FormSection title={t("section.relationshipActivity")} icon={<ClockIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.communication")} value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} icon={<MessageSquare size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                <SelectInput label={t("field.language")} value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} icon={<Languages size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.communication")} value={form.communication_preference} onChange={v => setField("communication_preference", v)} options={COMM_PREFERENCES} icon={<MessageSquareIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.language")} value={form.language} onChange={v => setField("language", v)} options={LANGUAGES} icon={<LanguagesIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -4083,13 +4144,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Trade & Shipping (customer only) ── */}
         {isCustomer && (
-          <FormSection title={t("section.tradeShipping")} icon={<Ship size={14} />}>
+          <FormSection title={t("section.tradeShipping")} icon={<ShipIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <SelectInput label={t("field.shippingMethod")} value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<Ship size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                <SelectInput label={t("field.incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} icon={<FileCheck size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.shippingMethod")} value={form.preferred_shipping} onChange={v => setField("preferred_shipping", v)} options={SHIPPING_METHODS} icon={<ShipIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.incoterms")} value={form.incoterms} onChange={v => setField("incoterms", v)} options={INCOTERMS_OPTIONS} icon={<FileCheckIcon size={14} />} selectLabel={t("detail.select")} />
               </div>
-              <Input label={t("field.taxIdImport")} value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder={t("placeholder.vatCr")} icon={<Hash size={14} />} />
+              <Input label={t("field.taxIdImport")} value={form.tax_id} onChange={v => setField("tax_id", v)} placeholder={t("placeholder.vatCr")} icon={<HashtagIcon size={14} />} />
               {/* Shipping Addresses */}
               <div>
                 <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.shippingAddresses")}</label>
@@ -4120,17 +4181,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* ── Documents / Attachments (customer only) ── */}
         {isCustomer && (
-          <FormSection title={t("section.documentsAttachments")} icon={<Paperclip size={14} />}>
+          <FormSection title={t("section.documentsAttachments")} icon={<PaperclipIcon size={14} />}>
             {form.attachments.map((a, i) => (
               <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                 <RemoveBtn onClick={() => setField("attachments", form.attachments.filter((_, idx) => idx !== i))} />
-                <FileCheck size={14} className="text-blue-400 shrink-0" />
+                <FileCheckIcon size={14} className="text-blue-400 shrink-0" />
                 <span className="text-sm text-[var(--text-primary)] truncate flex-1">{a.name}</span>
                 <span className="text-[10px] text-[var(--text-dim)]">{a.type}</span>
               </div>
             ))}
             <label className="flex items-center gap-2 mt-2 px-3 py-2.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] cursor-pointer transition-colors">
-              <Paperclip size={14} className="text-[var(--text-faint)]" />
+              <PaperclipIcon size={14} className="text-[var(--text-faint)]" />
               <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadDocument")}</span>
               <input type="file" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
@@ -4155,10 +4216,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {form.contact_type === "supplier" && (
           <>
             {/* 1. Company Name — Most important, identity of the supplier */}
-            <FormSection title={t("section.companyName")} icon={<Building2 size={14} />}>
+            <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
               <div className="space-y-3">
-                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2 size={14} />} />
-                <Input label={t("field.companyNameCn")} value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<Languages size={14} />} />
+                <Input label={t("field.companyNameEn")} value={form.company_name_en} onChange={v => setField("company_name_en", v)} placeholder={t("placeholder.companyNameEn")} icon={<Building2Icon size={14} />} />
+                <Input label={t("field.companyNameCn")} value={form.company_name_cn} onChange={v => setField("company_name_cn", v)} placeholder={t("placeholder.companyNameCn")} icon={<LanguagesIcon size={14} />} />
                 {/* Additional Company Names */}
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-2 block">{t("field.additionalNames")}</label>
@@ -4186,15 +4247,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 2. Contact Details — How to reach the supplier */}
-            <FormSection title={t("section.contactDetails")} icon={<Phone size={14} />}>
+            <FormSection title={t("section.contactDetails")} icon={<PhoneIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} icon={<Phone size={14} />} />
-                  <Input label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} icon={<Phone size={14} />} />
+                  <Input label={t("field.contactTel")} value={form.supplier_tel} onChange={v => setField("supplier_tel", v)} placeholder={t("field.contactTel")} icon={<PhoneIcon size={14} />} />
+                  <Input label={t("field.contactMobile")} value={form.supplier_mobile} onChange={v => setField("supplier_mobile", v)} placeholder={t("field.contactMobile")} icon={<PhoneIcon size={14} />} />
                 </div>
-                <Input label={t("field.contactEmail")} value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<Mail size={14} />} />
-                <Input label={t("field.website")} value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<Globe size={14} />} />
-                <Input label={t("field.supplierAddress")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("field.supplierAddress")} icon={<MapPin size={14} />} />
+                <Input label={t("field.contactEmail")} value={form.supplier_email} onChange={v => setField("supplier_email", v)} placeholder="company@example.com" icon={<EnvelopeIcon size={14} />} />
+                <Input label={t("field.website")} value={form.supplier_website} onChange={v => setField("supplier_website", v)} placeholder="https://www.example.com" icon={<GlobeIcon size={14} />} />
+                <Input label={t("field.supplierAddress")} value={form.supplier_address} onChange={v => setField("supplier_address", v)} placeholder={t("field.supplierAddress")} icon={<MapPinIcon size={14} />} />
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("placeholder.countryProvCity")}</label>
                   <div className="space-y-2">
@@ -4211,7 +4272,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 3. Contact Persons — Key people to communicate with */}
-            <FormSection title={t("section.contactPersons")} icon={<Users size={14} />}>
+            <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
               <div className="space-y-3">
                 {form.contact_persons.map((cp, i) => (
                   <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -4233,7 +4294,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                         onClick={() => setExpandedFamily(expandedFamily === 1000 + i ? null : 1000 + i)}
                         className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] transition-colors"
                       >
-                        <ChevronDown size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
+                        <AngleDownIcon size={14} className={`transition-transform ${expandedFamily === 1000 + i ? "rotate-180" : ""}`} />
                       </button>
                     </div>
                     {expandedFamily === 1000 + i && (
@@ -4254,7 +4315,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 4. Company Profile — Brand, classification, and business identity */}
-            <FormSection title={t("section.companyProfile")} icon={<Briefcase size={14} />}>
+            <FormSection title={t("section.companyProfile")} icon={<BriefcaseIcon size={14} />}>
               <div className="space-y-3">
                 {/* Brand Names */}
                 <div>
@@ -4263,7 +4324,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {form.brand_names.map((b, i) => (
                       <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
                         {b}
-                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={10} /></button>
+                        <button onClick={() => setField("brand_names", form.brand_names.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={10} /></button>
                       </span>
                     ))}
                   </div>
@@ -4278,19 +4339,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   <Input label={t("field.category")} value={form.category} onChange={v => setField("category", v)} placeholder={t("field.category")} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.supplierType")} value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2 size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<Factory size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.supplierType")} value={form.supplier_type} onChange={v => setField("supplier_type", v)} options={SUPPLIER_TYPES} icon={<Building2Icon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.industry")} value={form.industry} onChange={v => setField("industry", v)} options={INDUSTRIES} icon={<FactoryIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
-                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<Target size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.source")} value={form.source} onChange={v => setField("source", v)} options={SUPPLIER_SOURCES} icon={<TargetIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
               </div>
             </FormSection>
 
             {/* 5. Payment & Currency */}
-            <FormSection title={t("section.paymentCurrency")} icon={<DollarSign size={14} />}>
+            <FormSection title={t("section.paymentCurrency")} icon={<DollarSignIcon size={14} />}>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<Receipt size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
-                  <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSign size={14} />} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.paymentTerms")} value={form.payment_terms} onChange={v => setField("payment_terms", v)} options={PAYMENT_TERMS_OPTIONS} icon={<ReceiptIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <SelectInput label={t("field.currency")} value={form.currency} onChange={v => setField("currency", v)} options={CURRENCIES} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.paymentInfo")}</label>
@@ -4300,7 +4361,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 6. Bank Account Information */}
-            <FormSection title={t("section.bankAccountInfo")} icon={<Landmark size={14} />}>
+            <FormSection title={t("section.bankAccountInfo")} icon={<LandmarkIcon size={14} />}>
               <div className="space-y-3">
                 {form.bank_accounts.map((bank, i) => (
                   <div key={i} className="p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
@@ -4330,28 +4391,28 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 7. Catalogue */}
-            <FormSection title={t("section.catalogue")} icon={<BookOpen size={14} />}>
+            <FormSection title={t("section.catalogue")} icon={<BookOpenIcon size={14} />}>
               <div className="space-y-2">
                 {form.catalogues.map((cat, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
                     <RemoveBtn onClick={() => setField("catalogues", form.catalogues.filter((_, idx) => idx !== i))} />
-                    {cat.type === "PDF" ? <FileText size={14} className="text-red-400 shrink-0" /> : <ImageIcon size={14} className="text-blue-400 shrink-0" />}
+                    {cat.type === "PDF" ? <DocumentIcon size={14} className="text-red-400 shrink-0" /> : <ImageRawIcon size={14} className="text-blue-400 shrink-0" />}
                     <span className="text-sm text-[var(--text-primary)] truncate flex-1">{cat.name}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium">{cat.type}</span>
                     {cat.url && (
                       <button onClick={() => openFilePreview(cat.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                        {cat.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {cat.type === "PDF" ? t("btn.open") : t("btn.preview")}
+                        {cat.type === "PDF" ? <ExternalLinkIcon size={10} /> : <EyeIcon size={10} />} {cat.type === "PDF" ? t("btn.open") : t("btn.preview")}
                       </button>
                     )}
                     {cat.url && (
                       <button onClick={() => downloadFile(cat.url, cat.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                        <Download size={10} /> {t("btn.download")}
+                        <DownloadIcon size={10} /> {t("btn.download")}
                       </button>
                     )}
                   </div>
                 ))}
                 <label className="flex items-center gap-2 px-3 py-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-color)] hover:border-[var(--border-focus)] cursor-pointer transition-colors">
-                  <FilePlus size={14} className="text-[var(--text-faint)]" />
+                  <FilePlusIcon size={14} className="text-[var(--text-faint)]" />
                   <span className="text-xs text-[var(--text-faint)]">{t("photo.uploadCatalogue")}</span>
                   <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                     const file = e.target.files?.[0];
@@ -4368,7 +4429,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 8. Documents */}
-            <FormSection title={t("section.documents")} icon={<Paperclip size={14} />}>
+            <FormSection title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
               <div className="space-y-2">
                 {form.documents.map((doc, i) => (
                   <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] space-y-2">
@@ -4376,14 +4437,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       <RemoveBtn onClick={() => setField("documents", form.documents.filter((_, idx) => idx !== i))} />
                       {doc.url ? (
                         <>
-                          <FileCheck size={14} className="text-blue-400 shrink-0" />
+                          <FileCheckIcon size={14} className="text-blue-400 shrink-0" />
                           <span className="text-xs text-[var(--text-muted)] font-medium truncate">{doc.doc_name || t("misc.untitled")}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-faint)] font-medium ms-auto">{doc.type}</span>
                           <button onClick={() => openFilePreview(doc.url)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                            {doc.type === "PDF" ? <ExternalLink size={10} /> : <Eye size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
+                            {doc.type === "PDF" ? <ExternalLinkIcon size={10} /> : <EyeIcon size={10} />} {doc.type === "PDF" ? t("btn.open") : t("btn.preview")}
                           </button>
                           <button onClick={() => downloadFile(doc.url, doc.name)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] text-[10px] text-[var(--text-subtle)] hover:text-[var(--text-primary)] transition-colors">
-                            <Download size={10} /> {t("btn.download")}
+                            <DownloadIcon size={10} /> {t("btn.download")}
                           </button>
                         </>
                       ) : (
@@ -4395,7 +4456,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                             className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
                           />
                           <label className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-subtle)] hover:text-[var(--text-primary)] cursor-pointer transition-colors shrink-0">
-                            <Paperclip size={12} /> {t("btn.upload")}
+                            <PaperclipIcon size={12} /> {t("btn.upload")}
                             <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                               const file = e.target.files?.[0];
                               if (file) {
@@ -4419,22 +4480,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 9. Quality & Performance */}
-            <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheck size={14} />}>
+            <FormSection title={t("section.qualityPerformance")} icon={<ShieldCheckIcon size={14} />}>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.rating")}</label>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map(s => (
                       <button key={s} onClick={() => setField("rating", form.rating === s ? 0 : s)} className="p-0.5 transition-colors">
-                        <Star size={22} className={s <= form.rating ? "text-amber-400 fill-amber-400" : "text-[var(--text-whisper)] hover:text-[var(--text-dim)]"} />
+                        <StarIcon size={22} className={s <= form.rating ? "text-amber-400 fill-amber-400" : "text-[var(--text-whisper)] hover:text-[var(--text-dim)]"} />
                       </button>
                     ))}
                     {form.rating > 0 && <span className="text-xs text-[var(--text-dim)] ms-2">{form.rating}/5</span>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input label={t("field.reliabilityScore")} value={form.reliability_score} onChange={v => setField("reliability_score", v)} placeholder={t("placeholder.reliabilityScore")} icon={<TrendingUp size={14} />} />
-                  <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<Package size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
+                  <Input label={t("field.reliabilityScore")} value={form.reliability_score} onChange={v => setField("reliability_score", v)} placeholder={t("placeholder.reliabilityScore")} icon={<TrendingUpIcon size={14} />} />
+                  <SelectInput label={t("field.sampleStatus")} value={form.sample_status} onChange={v => setField("sample_status", v)} options={SAMPLE_STATUSES} icon={<PackageIcon size={14} />} renderLabel={tOpt} selectLabel={t("detail.select")} />
                 </div>
                 {/* Certifications */}
                 <div>
@@ -4443,7 +4504,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     {form.certifications.map((cert, i) => (
                       <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
                         {cert}
-                        <button onClick={() => setField("certifications", form.certifications.filter((_, idx) => idx !== i))} className="text-emerald-400/50 hover:text-emerald-400"><X size={10} /></button>
+                        <button onClick={() => setField("certifications", form.certifications.filter((_, idx) => idx !== i))} className="text-emerald-400/50 hover:text-emerald-400"><CrossIcon size={10} /></button>
                       </span>
                     ))}
                   </div>
@@ -4466,17 +4527,17 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 10. Products (placeholder) */}
-            <FormSection title={t("section.products")} icon={<Package size={14} />}>
+            <FormSection title={t("section.products")} icon={<PackageIcon size={14} />}>
               <div className="flex items-center gap-3 py-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                  <Package size={18} className="text-[var(--text-ghost)]" />
+                  <PackageIcon size={18} className="text-[var(--text-ghost)]" />
                 </div>
                 <p className="text-sm text-[var(--text-dim)]">{t("detail.productsPlaceholder")}</p>
               </div>
             </FormSection>
 
             {/* 11. Notes */}
-            <FormSection title={t("section.notes")} icon={<FileText size={14} />}>
+            <FormSection title={t("section.notes")} icon={<DocumentIcon size={14} />}>
               <textarea
                 value={form.notes}
                 onChange={e => setField("notes", e.target.value)}
@@ -4487,7 +4548,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             </FormSection>
 
             {/* 12. Custom Fields */}
-            <FormSection title={t("section.customFields")} icon={<Hash size={14} />}>
+            <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />}>
               {form.custom_fields.map((cf, i) => (
                 <div key={i} className="flex items-center gap-2 mb-3">
                   <RemoveBtn onClick={() => removeCustomField(i)} />
@@ -4514,12 +4575,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {isEmployee && (
         <>
         {/* 1. Work Contact */}
-        <FormSection title={t("section.workContact")} icon={<Phone size={14} />}>
+        <FormSection title={t("section.workContact")} icon={<PhoneIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workEmail")}</label>
               <div className="relative">
-                <Mail size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
+                <EnvelopeIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]" />
                 <input value={form.work_email} onChange={e => setField("work_email", e.target.value)} placeholder="employee@company.com" className="w-full h-10 ps-9 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]" />
               </div>
             </div>
@@ -4537,7 +4598,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 2. Work */}
-        <FormSection title={t("section.work")} icon={<Briefcase size={14} />}>
+        <FormSection title={t("section.work")} icon={<BriefcaseIcon size={14} />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -4567,7 +4628,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 3. Work Location */}
-        <FormSection title={t("section.workLocation")} icon={<MapPin size={14} />}>
+        <FormSection title={t("section.workLocation")} icon={<MapPinIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.workAddress")}</label>
@@ -4581,7 +4642,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 4. Resume */}
-        <FormSection title={t("section.resume")} icon={<FileText size={14} />}>
+        <FormSection title={t("section.resume")} icon={<DocumentIcon size={14} />}>
           {form.resume_lines.map((rl, i) => (
             <div key={i} className="mb-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
               <div className="flex items-center gap-2 p-3 cursor-pointer" onClick={() => setExpandedResumeLine(expandedResumeLine === i ? null : i)}>
@@ -4593,7 +4654,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   "bg-violet-500/10 text-violet-400"
                 }`}>{t("resumeType." + rl.type, rl.type)}</span>
                 <span className="flex-1 text-sm text-[var(--text-highlight)] truncate">{rl.title || t("misc.untitled")}</span>
-                <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${expandedResumeLine === i ? "rotate-180" : ""}`} />
+                <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${expandedResumeLine === i ? "rotate-180" : ""}`} />
               </div>
               {expandedResumeLine === i && (
                 <div className="px-3 pb-3 space-y-3 border-t border-[var(--border-color)] pt-3">
@@ -4637,7 +4698,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                       </div>
                     ) : (
                       <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-strong)] hover:border-[var(--border-focus)] text-xs text-[var(--text-faint)] cursor-pointer transition-colors">
-                        <FilePlus size={14} />
+                        <FilePlusIcon size={14} />
                         {t("field.uploadCertificate")}
                         <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => {
                           const file = e.target.files?.[0];
@@ -4662,22 +4723,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           ))}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => addResumeLine("experience")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium hover:bg-blue-500/15 transition-colors">
-              <Plus size={12} /> {t("resumeType.experience")}
+              <PlusIcon size={12} /> {t("resumeType.experience")}
             </button>
             <button onClick={() => addResumeLine("education")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs text-green-400 font-medium hover:bg-green-500/15 transition-colors">
-              <Plus size={12} /> {t("resumeType.education")}
+              <PlusIcon size={12} /> {t("resumeType.education")}
             </button>
             <button onClick={() => addResumeLine("training")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 font-medium hover:bg-amber-500/15 transition-colors">
-              <Plus size={12} /> {t("resumeType.training")}
+              <PlusIcon size={12} /> {t("resumeType.training")}
             </button>
             <button onClick={() => addResumeLine("certification")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-xs text-violet-400 font-medium hover:bg-violet-500/15 transition-colors">
-              <Plus size={12} /> {t("resumeType.internalCert")}
+              <PlusIcon size={12} /> {t("resumeType.internalCert")}
             </button>
           </div>
         </FormSection>
 
         {/* 5. Private Contact */}
-        <FormSection title={t("section.privateContact")} icon={<Phone size={14} />}>
+        <FormSection title={t("section.privateContact")} icon={<PhoneIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.privateEmail")}</label>
@@ -4695,7 +4756,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 6. Personal Information */}
-        <FormSection title={t("section.personalInfo")} icon={<User size={14} />}>
+        <FormSection title={t("section.personalInfo")} icon={<UserIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.legalName")}</label>
@@ -4724,7 +4785,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 7. Emergency Contact */}
-        <FormSection title={t("section.emergencyContact")} icon={<ShieldAlert size={14} />}>
+        <FormSection title={t("section.emergencyContact")} icon={<ShieldExclamationIcon size={14} />}>
           {form.emergency_contacts.map((ec, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
               <RemoveBtn onClick={() => removeEmergencyContact(i)} />
@@ -4736,7 +4797,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 8. Visa & Work Permit */}
-        <FormSection title={t("section.visaWorkPermit")} icon={<Plane size={14} />}>
+        <FormSection title={t("section.visaWorkPermit")} icon={<PlaneIcon size={14} />}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -4759,7 +4820,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 </div>
               ))}
               <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-dashed border-[var(--border-strong)] hover:border-[var(--border-focus)] text-xs text-[var(--text-faint)] cursor-pointer transition-colors">
-                <FilePlus size={14} />
+                <FilePlusIcon size={14} />
                 {t("photo.uploadDoc")}
                 <input type="file" accept=".pdf,image/*,.doc,.docx" className="hidden" onChange={e => {
                   const file = e.target.files?.[0];
@@ -4776,7 +4837,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 9. Citizenship */}
-        <FormSection title={t("section.citizenship")} icon={<Globe size={14} />}>
+        <FormSection title={t("section.citizenship")} icon={<GlobeIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.nationalityCountry")}</label>
@@ -4786,7 +4847,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block flex items-center gap-1">
                 {t("field.nationalIdNumber")}
                 <span className="relative group">
-                  <HelpCircle size={12} className="text-[var(--text-ghost)] cursor-help" />
+                  <HelpCircleIcon size={12} className="text-[var(--text-ghost)] cursor-help" />
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[var(--border-color)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t("tooltip.nationalId")}</span>
                 </span>
               </label>
@@ -4796,7 +4857,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block flex items-center gap-1">
                 {t("field.ssn")}
                 <span className="relative group">
-                  <HelpCircle size={12} className="text-[var(--text-ghost)] cursor-help" />
+                  <HelpCircleIcon size={12} className="text-[var(--text-ghost)] cursor-help" />
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-[var(--border-color)] text-[10px] text-[var(--text-secondary)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t("tooltip.ssn")}</span>
                 </span>
               </label>
@@ -4810,7 +4871,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 10. Private Location */}
-        <FormSection title={t("section.privateLocation")} icon={<Home size={14} />}>
+        <FormSection title={t("section.privateLocation")} icon={<HomeIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.privateAddress")}</label>
@@ -4827,7 +4888,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 11. Family */}
-        <FormSection title={t("section.family")} icon={<Heart size={14} />}>
+        <FormSection title={t("section.family")} icon={<HeartIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.maritalStatus")}</label>
@@ -4847,7 +4908,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
 
         {/* 12. Education */}
-        <FormSection title={t("section.education")} icon={<GraduationCap size={14} />}>
+        <FormSection title={t("section.education")} icon={<GraduationCapIcon size={14} />}>
           <div className="space-y-3">
             <div>
               <label className="text-xs text-[var(--text-faint)] mb-1.5 block">{t("field.certificateLevel")}</label>
@@ -4872,7 +4933,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Customer Type (only for customer contacts) */}
         {isCustomer && (
-          <FormSection title={t("section.customerType")} icon={<Crown size={14} />}>
+          <FormSection title={t("section.customerType")} icon={<CrownIcon size={14} />}>
             <div className="space-y-3">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -4896,11 +4957,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                           : "border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-subtle)] hover:border-[var(--border-strong)]"
                       }`}
                     >
-                      {tier.value === "end_user" && <User size={14} />}
-                      {tier.value === "silver" && <Shield size={14} />}
-                      {tier.value === "gold" && <Star size={14} />}
-                      {tier.value === "platinum" && <Award size={14} />}
-                      {tier.value === "diamond" && <Gem size={14} />}
+                      {tier.value === "end_user" && <UserIcon size={14} />}
+                      {tier.value === "silver" && <ShieldIcon size={14} />}
+                      {tier.value === "gold" && <StarIcon size={14} />}
+                      {tier.value === "platinum" && <AwardIcon size={14} />}
+                      {tier.value === "diamond" && <GemIcon size={14} />}
                       {tier.label}
                     </button>
                   ))}
@@ -4961,7 +5022,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                  <User size={22} />
+                  <UserIcon size={22} />
                 </div>
                 <span className="text-sm font-medium">{t("typeChooser.individual")}</span>
                 <span className="text-[11px] text-[var(--text-dim)] text-center leading-tight">{t("typeChooser.individualDesc")}</span>
@@ -4971,14 +5032,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-color)] hover:border-amber-500/30 bg-[var(--bg-surface-subtle)] hover:bg-amber-500/[0.05] transition-all text-amber-400"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                  <Building2 size={22} />
+                  <Building2Icon size={22} />
                 </div>
                 <span className="text-sm font-medium">{t("typeChooser.business")}</span>
                 <span className="text-[11px] text-[var(--text-dim)] text-center leading-tight">{t("typeChooser.businessDesc")}</span>
               </button>
             </div>
             <button onClick={() => setTypeChooserStep(1)} className="w-full mt-4 py-2.5 rounded-lg text-sm text-[var(--text-subtle)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-colors flex items-center justify-center gap-2">
-              <ArrowLeft size={14} className="rtl:rotate-180" /> {t("back")}
+              <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("back")}
             </button>
           </>
         )}

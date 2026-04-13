@@ -2,12 +2,27 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Plus, Search, Pencil, Trash2, X, Loader2,
-  Layers, Award, Tag, Plug, Palette, Zap, Activity,
-  Package, ChevronRight, FolderTree, RefreshCw, Settings,
-  ImageIcon, Bookmark,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import PlugIcon from "@/components/icons/ui/PlugIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import RefreshIcon from "@/components/icons/ui/RefreshIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
+import ImageIcon from "@/components/icons/ui/PictureIcon";
+import BookmarkIcon from "@/components/icons/ui/BookmarkIcon";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
   createDivision, updateDivision, deleteDivision,
@@ -29,14 +44,14 @@ import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase"
 
 /* ── Tabs ── */
 const TABS = [
-  { id: "classifications", label: "Classifications", icon: FolderTree },
-  { id: "brands", label: "Brands", icon: Bookmark },
-  { id: "levels", label: "Level", icon: Award },
-  { id: "tags", label: "Tags", icon: Tag },
-  { id: "plug_types", label: "Plug Types", icon: Plug },
-  { id: "colors", label: "Colors", icon: Palette },
-  { id: "watt", label: "Watt", icon: Zap },
-  { id: "voltage", label: "Voltage", icon: Activity },
+  { id: "classifications", label: "Classifications", icon: FolderTreeIcon },
+  { id: "brands", label: "Brands", icon: BookmarkIcon },
+  { id: "levels", label: "Level", icon: AwardIcon },
+  { id: "tags", label: "Tags", icon: TagsIcon },
+  { id: "plug_types", label: "Plug Types", icon: PlugIcon },
+  { id: "colors", label: "Colors", icon: PaletteIcon },
+  { id: "watt", label: "Watt", icon: ZapIcon },
+  { id: "voltage", label: "Voltage", icon: ActivityIcon },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -154,7 +169,7 @@ function AttributeModal({
       <div className="relative w-full max-w-[440px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{editValue ? `Edit ${l.title}` : `New ${l.title}`}</h2>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><CrossIcon className="h-4 w-4" /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
           {error && <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</div>}
@@ -169,7 +184,7 @@ function AttributeModal({
                   <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-bright)]">
                     <img src={imagePreview} alt="" className="w-full h-full object-contain p-1.5" />
                     <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); setRemoveImage(true); if (fileRef.current) fileRef.current.value = ""; }}
-                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-[var(--bg-surface-active)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-surface-bright)] transition-colors"><X className="h-2.5 w-2.5" /></button>
+                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-[var(--bg-surface-active)] flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-surface-bright)] transition-colors"><CrossIcon className="h-2.5 w-2.5" /></button>
                   </div>
                 ) : (
                   <button type="button" onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/30 bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group">
@@ -207,7 +222,7 @@ function AttributeModal({
                 {tagColor && (
                   <button type="button" onClick={() => setTagColor(null)}
                     className="h-7 px-2 rounded-lg border border-[var(--border-subtle)] text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1">
-                    <X className="h-2.5 w-2.5" /> Clear
+                    <CrossIcon className="h-2.5 w-2.5" /> Clear
                   </button>
                 )}
               </div>
@@ -223,7 +238,7 @@ function AttributeModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !value.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? "Saving..." : editValue ? "Save" : "Create"}
           </button>
         </div>
@@ -289,7 +304,7 @@ function ClassificationModal({
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{editItem ? `Edit ${typeLabel}` : `New ${typeLabel}`}</h2>
             {parentName && <p className="text-[11px] text-[var(--text-dim)] mt-0.5">in {parentName}</p>}
           </div>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><CrossIcon className="h-4 w-4" /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
           {error && <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</div>}
@@ -308,11 +323,11 @@ function ClassificationModal({
                 </div>
                 <div className="flex flex-col gap-1">
                   <button type="button" onClick={() => logoRef.current?.click()} className="h-7 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors">
-                    <Plus className="h-2.5 w-2.5" />{logoPreview && !removeLogo ? "Replace" : "Upload"}
+                    <PlusIcon className="h-2.5 w-2.5" />{logoPreview && !removeLogo ? "Replace" : "Upload"}
                   </button>
                   {logoPreview && !removeLogo && (
                     <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null); setRemoveLogo(true); }} className="h-7 px-3 rounded-lg bg-red-500/10 border border-red-500/20 text-[10px] font-medium text-red-400/70 hover:text-red-400 flex items-center gap-1 transition-colors">
-                      <Trash2 className="h-2.5 w-2.5" />Remove
+                      <TrashIcon className="h-2.5 w-2.5" />Remove
                     </button>
                   )}
                   <span className="text-[9px] text-[var(--text-dim)]">SVG, PNG, JPG</span>
@@ -327,7 +342,7 @@ function ClassificationModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
+            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}{saving ? "Saving..." : editItem ? "Save" : "Create"}
           </button>
         </div>
       </div>
@@ -354,7 +369,7 @@ function DeleteModal({ open, onClose, title, message, warning, onConfirm, deleti
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border-subtle)]">
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
           <button onClick={onConfirm} disabled={deleting} className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-40">
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{deleting ? "Deleting..." : "Delete"}
+            {deleting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}{deleting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </div>
@@ -382,12 +397,12 @@ function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCo
         <h3 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{title}</h3>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-medium text-[var(--text-dim)] tabular-nums">{items.length}</span>
-          <button onClick={onAdd} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Plus className="h-3.5 w-3.5" /></button>
+          <button onClick={onAdd} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PlusIcon className="h-3.5 w-3.5" /></button>
         </div>
       </div>
       {items.length > 5 && (
         <div className="px-3 py-2 border-b border-[var(--border-subtle)]">
-          <div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)]" />
+          <div className="relative"><SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)]" />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="w-full h-7 pl-7 pr-3 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-subtle)]" />
           </div>
         </div>
@@ -410,10 +425,10 @@ function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCo
                 <div className="flex items-center gap-2 mt-0.5">{cc > 0 && <span className="text-[10px] text-[var(--text-dim)]">{cc} sub</span>}{pc > 0 && <span className="text-[10px] text-[var(--text-dim)]">{pc} prod</span>}{!cc && !pc && <span className="text-[10px] text-[var(--text-dim)] font-mono">{item.slug}</span>}</div>
               </div>
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); onEdit({ id: item.id, name: item.name, slug: item.slug, description: item.description || "" }); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Pencil className="h-3 w-3" /></button>
-                <button onClick={(e) => { e.stopPropagation(); onDelete({ id: item.id, name: item.name, slug: item.slug }); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={(e) => { e.stopPropagation(); onEdit({ id: item.id, name: item.name, slug: item.slug, description: item.description || "" }); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3 w-3" /></button>
+                <button onClick={(e) => { e.stopPropagation(); onDelete({ id: item.id, name: item.name, slug: item.slug }); }} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3 w-3" /></button>
               </div>
-              {cc > 0 && isActive && <ChevronRight className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />}
+              {cc > 0 && isActive && <AngleRightIcon className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />}
             </div>
           );
         })}
@@ -658,8 +673,8 @@ export default function ProductSettingsPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">
-          <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"><ArrowLeft className="h-4 w-4" /></Link>
-          <div className="flex items-center gap-2"><Settings className="h-5 w-5 text-[var(--text-dim)]" /><h1 className="text-xl md:text-[26px] font-bold tracking-tight">Product Control Panel</h1></div>
+          <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"><ArrowLeftIcon className="h-4 w-4" /></Link>
+          <div className="flex items-center gap-2"><SettingsIcon2 className="h-5 w-5 text-[var(--text-dim)]" /><h1 className="text-xl md:text-[26px] font-bold tracking-tight">Product Control Panel</h1></div>
         </div>
         <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mb-6 md:mb-8 ml-11">Manage classifications, brands, attributes, and options</p>
 
@@ -675,12 +690,12 @@ export default function ProductSettingsPage() {
               </button>
             );
           })}
-          <button onClick={loadAll} disabled={loading} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ml-auto"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
+          <button onClick={loadAll} disabled={loading} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors ml-auto"><RefreshIcon className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
         </div>
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+          <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
         ) : (
           <div className="min-h-[500px]">
 
@@ -702,7 +717,7 @@ export default function ProductSettingsPage() {
                     onEdit={(item) => setClassModal({ open: true, type: "category", editItem: item })}
                     onDelete={(item) => { const sc = subCounts[item.id] || 0; setDeleteModal({ open: true, title: `Delete "${item.name}"`, message: "Delete this category?", warning: sc > 0 ? `Has ${sc} subcategories.` : undefined, onConfirm: async () => { setDeleting(true); await handleClassDelete("category", item.id); setDeleting(false); setDeleteModal(m => ({ ...m, open: false })); } }); }}
                     emptyLabel="No categories" />
-                  : <div className="flex flex-col items-center justify-center py-16 text-center px-6"><div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-3"><Layers className="h-5 w-5 text-[var(--text-dim)]" /></div><p className="text-[12px] text-[var(--text-dim)]">Select a division</p></div>}
+                  : <div className="flex flex-col items-center justify-center py-16 text-center px-6"><div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-3"><LayersIcon className="h-5 w-5 text-[var(--text-dim)]" /></div><p className="text-[12px] text-[var(--text-dim)]">Select a division</p></div>}
                 </div>
                 <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden">
                   {selectedCat ? <ClassPanel title={`Subcategories`} items={filteredSubcategories.map(s => ({ id: s.id, name: s.name, slug: s.slug, description: s.description }))} selectedId={null} onSelect={() => {}} childCounts={{}} productCounts={prodCounts.bySubcategory}
@@ -711,7 +726,7 @@ export default function ProductSettingsPage() {
                     onEdit={(item) => setClassModal({ open: true, type: "subcategory", editItem: item })}
                     onDelete={(item) => { setDeleteModal({ open: true, title: `Delete "${item.name}"`, message: "Delete this subcategory?", onConfirm: async () => { setDeleting(true); await handleClassDelete("subcategory", item.id); setDeleting(false); setDeleteModal(m => ({ ...m, open: false })); } }); }}
                     emptyLabel="No subcategories" />
-                  : <div className="flex flex-col items-center justify-center py-16 text-center px-6"><div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-3"><FolderTree className="h-5 w-5 text-[var(--text-dim)]" /></div><p className="text-[12px] text-[var(--text-dim)]">{selectedDiv ? "Select a category" : "Select a division first"}</p></div>}
+                  : <div className="flex flex-col items-center justify-center py-16 text-center px-6"><div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-3"><FolderTreeIcon className="h-5 w-5 text-[var(--text-dim)]" /></div><p className="text-[12px] text-[var(--text-dim)]">{selectedDiv ? "Select a category" : "Select a division first"}</p></div>}
                 </div>
               </div>
             )}
@@ -789,11 +804,11 @@ function BrandsTab({ brands, brandLogos, onAdd, onEdit, onDelete }: {
     <div>
       <div className="flex gap-3 mb-5">
         <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{brands.length}</span><span className="text-[11px] text-[var(--text-dim)]">brands</span></div>
-        <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><Package className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{brands.reduce((s, b) => s + b.productCount, 0)}</span><span className="text-[11px] text-[var(--text-dim)]">products</span></div>
+        <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{brands.reduce((s, b) => s + b.productCount, 0)}</span><span className="text-[11px] text-[var(--text-dim)]">products</span></div>
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="relative flex-1 max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands..." className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><Plus className="h-3.5 w-3.5" /> Add brand</button>
+        <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brands..." className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
+        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add brand</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : "No brands yet."}</p></div>
@@ -804,10 +819,10 @@ function BrandsTab({ brands, brandLogos, onAdd, onEdit, onDelete }: {
               <div className="shrink-0 w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
                 {b.logoUrl ? <img src={b.logoUrl} alt={b.name} className="w-full h-full object-contain p-1.5" /> : <span className="text-[16px] font-bold text-[var(--text-dim)]">{b.name.charAt(0).toUpperCase()}</span>}
               </div>
-              <div className="flex-1 min-w-0"><h3 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{b.name}</h3><p className="text-[10px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1"><Package className="h-3 w-3" />{b.productCount} product{b.productCount !== 1 ? "s" : ""}</p></div>
+              <div className="flex-1 min-w-0"><h3 className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{b.name}</h3><p className="text-[10px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1"><PackageIcon className="h-3 w-3" />{b.productCount} product{b.productCount !== 1 ? "s" : ""}</p></div>
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onEdit(b)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Pencil className="h-3 w-3" /></button>
-                <button onClick={() => onDelete(b)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => onEdit(b)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3 w-3" /></button>
+                <button onClick={() => onDelete(b)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3 w-3" /></button>
               </div>
             </div>
           ))}
@@ -833,7 +848,7 @@ function PlugTypesTab({ items, counts, onAdd, onEdit, onDelete }: {
         <div className="flex gap-3">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">plug types</span></div>
         </div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><Plus className="h-3.5 w-3.5" /> Add plug type</button>
+        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add plug type</button>
       </div>
       {items.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">No plug types yet.</p></div>
@@ -849,7 +864,7 @@ function PlugTypesTab({ items, counts, onAdd, onEdit, onDelete }: {
                     <img src={item.image} alt={item.name} className="plug-icon w-full h-full object-contain" />
                   ) : (
                     <div className="flex flex-col items-center justify-center">
-                      <Plug className="h-10 w-10 text-[var(--text-dim)]" />
+                      <PlugIcon className="h-10 w-10 text-[var(--text-dim)]" />
                     </div>
                   )}
                 </div>
@@ -877,8 +892,8 @@ function PlugTypesTab({ items, counts, onAdd, onEdit, onDelete }: {
 
                 {/* Actions on hover */}
                 <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(item)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><Pencil className="h-3 w-3" /></button>
-                  <button onClick={() => onDelete(item)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-red-400 transition-colors"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => onEdit(item)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><PencilIcon className="h-3 w-3" /></button>
+                  <button onClick={() => onDelete(item)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-red-400 transition-colors"><TrashIcon className="h-3 w-3" /></button>
                 </div>
               </div>
             );
@@ -973,12 +988,12 @@ function VisualValueTab({ type, items, counts, onAdd, onEdit, onDelete }: {
       <div className="flex items-center justify-between gap-4 mb-5">
         <div className="flex gap-3">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">{label}s</span></div>
-          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><Package className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{totalUsages}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
+          <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{totalUsages}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
         </div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><Plus className="h-3.5 w-3.5" /> Add {label}</button>
+        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {items.length > 4 && (
-        <div className="relative max-w-sm mb-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
+        <div className="relative max-w-sm mb-4"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
       )}
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : `No ${label}s yet.`}</p></div>
@@ -993,8 +1008,8 @@ function VisualValueTab({ type, items, counts, onAdd, onEdit, onDelete }: {
                 <h3 className="text-[14px] font-bold text-[var(--text-primary)] text-center tracking-tight">{value}</h3>
                 <p className="text-[10px] text-[var(--text-dim)] mt-1.5 tabular-nums">{count} product{count !== 1 ? "s" : ""}</p>
                 <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(value)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><Pencil className="h-3 w-3" /></button>
-                  <button onClick={() => onDelete(value)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-red-400 transition-colors"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => onEdit(value)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"><PencilIcon className="h-3 w-3" /></button>
+                  <button onClick={() => onDelete(value)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[var(--bg-surface-active)] backdrop-blur-sm text-[var(--text-secondary)] hover:text-red-400 transition-colors"><TrashIcon className="h-3 w-3" /></button>
                 </div>
               </div>
             );
@@ -1022,11 +1037,11 @@ function SimpleTab({ type, items, counts, tagColors, onAdd, onEdit, onDelete }: 
     <div>
       <div className="flex gap-3 mb-5">
         <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.length}</span><span className="text-[11px] text-[var(--text-dim)]">{label}s</span></div>
-        <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><Package className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.reduce((s, i) => s + (counts[i] || 0), 0)}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
+        <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"><PackageIcon className="h-3 w-3 text-[var(--text-dim)]" /><span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{items.reduce((s, i) => s + (counts[i] || 0), 0)}</span><span className="text-[11px] text-[var(--text-dim)]">usages</span></div>
       </div>
       <div className="flex items-center justify-between gap-4 mb-4">
-        <div className="relative flex-1 max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
-        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><Plus className="h-3.5 w-3.5" /> Add {label}</button>
+        <div className="relative flex-1 max-w-sm"><SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${label}s...`} className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" /></div>
+        <button onClick={onAdd} className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0"><PlusIcon className="h-3.5 w-3.5" /> Add {label}</button>
       </div>
       {filtered.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-[var(--border-subtle)] rounded-xl"><p className="text-[13px] text-[var(--text-dim)]">{search ? "No match." : `No ${label}s yet.`}</p></div>
@@ -1049,8 +1064,8 @@ function SimpleTab({ type, items, counts, tagColors, onAdd, onEdit, onDelete }: 
                 )}
                 <div className="flex-1 min-w-0"><p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{value}</p><p className="text-[10px] text-[var(--text-dim)] mt-0.5">{count > 0 ? `${count} product${count !== 1 ? "s" : ""}` : "Not used"}</p></div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(value)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Pencil className="h-3 w-3" /></button>
-                  <button onClick={() => onDelete(value)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => onEdit(value)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3 w-3" /></button>
+                  <button onClick={() => onDelete(value)} className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3 w-3" /></button>
                 </div>
               </div>
             );

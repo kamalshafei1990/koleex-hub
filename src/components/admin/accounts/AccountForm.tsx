@@ -25,11 +25,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Shield, KeyRound, Link2, Globe, StickyNote, Save, ArrowLeft,
-  Copy, RefreshCcw, Eye, EyeOff, AlertCircle, Plus, Building2, UserCircle2,
-  Layers, CheckCircle2,
-} from "lucide-react";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
+import Link2Icon from "@/components/icons/ui/Link2Icon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import StickyNoteIcon from "@/components/icons/ui/StickyNoteIcon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import {
   createAccount, updateAccount,
   fetchCompanies, fetchRoles, fetchPeople, fetchAccessPresetByRoleId,
@@ -305,7 +317,7 @@ export default function AccountForm({ mode, account }: Props) {
               href={mode === "edit" && account ? `/accounts/${account.id}` : "/accounts"}
               className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
             </Link>
             <div>
               <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)]">
@@ -322,7 +334,7 @@ export default function AccountForm({ mode, account }: Props) {
 
         {error && (
           <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -333,7 +345,7 @@ export default function AccountForm({ mode, account }: Props) {
           <section className={sectionWrap}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>1</span>
-              <Shield className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+              <ShieldIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
               Account Type
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -397,7 +409,7 @@ export default function AccountForm({ mode, account }: Props) {
             {preset && (
               <div className="mt-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-4">
                 <div className="flex items-start gap-2">
-                  <Layers className="h-3.5 w-3.5 text-[var(--text-faint)] mt-0.5 shrink-0" />
+                  <LayersIcon className="h-3.5 w-3.5 text-[var(--text-faint)] mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                       Access preset · {preset.preset_name}
@@ -428,7 +440,7 @@ export default function AccountForm({ mode, account }: Props) {
           <section className={sectionWrap}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>2</span>
-              <KeyRound className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+              <KeyIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
               Login Identity
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -475,7 +487,7 @@ export default function AccountForm({ mode, account }: Props) {
                       onClick={() => setShowPw((s) => !s)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
                     >
-                      {showPw ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      {showPw ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                   <button
@@ -483,14 +495,14 @@ export default function AccountForm({ mode, account }: Props) {
                     onClick={() => set("temporary_password", generateTemporaryPassword())}
                     className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                   >
-                    <RefreshCcw className="h-3.5 w-3.5" /> New
+                    <RefreshCcwIcon className="h-3.5 w-3.5" /> New
                   </button>
                   <button
                     type="button"
                     onClick={copyPassword}
                     className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
                   >
-                    <Copy className="h-3.5 w-3.5" /> Copy
+                    <CopyIcon className="h-3.5 w-3.5" /> Copy
                   </button>
                 </div>
                 <p className="text-[11px] text-[var(--text-dim)] mt-2">
@@ -514,7 +526,7 @@ export default function AccountForm({ mode, account }: Props) {
           <section className={sectionWrap}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>3</span>
-              <Link2 className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+              <Link2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
               Link Records
             </h2>
             <p className="text-[11px] text-[var(--text-dim)] -mt-3 mb-4">
@@ -549,7 +561,7 @@ export default function AccountForm({ mode, account }: Props) {
                     className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
                     title="Create new company"
                   >
-                    <Plus className="h-3.5 w-3.5" /> New
+                    <PlusIcon className="h-3.5 w-3.5" /> New
                   </button>
                 </div>
                 {selectedCompany && (
@@ -597,7 +609,7 @@ export default function AccountForm({ mode, account }: Props) {
                     className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
                     title="Create new person"
                   >
-                    <Plus className="h-3.5 w-3.5" /> New
+                    <PlusIcon className="h-3.5 w-3.5" /> New
                   </button>
                 </div>
                 {selectedPerson && (
@@ -633,7 +645,7 @@ export default function AccountForm({ mode, account }: Props) {
             <section className={sectionWrap}>
               <h2 className={sectionHead}>
                 <span className={sectionNumber}>4</span>
-                <Globe className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                <GlobeIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
                 Customer Settings
               </h2>
               {selectedCompany ? (
@@ -685,7 +697,7 @@ export default function AccountForm({ mode, account }: Props) {
           <section className={sectionWrap}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>{isCustomer ? 5 : 4}</span>
-              <StickyNote className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+              <StickyNoteIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
               Notes
             </h2>
             <label className={labelClass}>Internal Notes (admin only)</label>
@@ -710,7 +722,7 @@ export default function AccountForm({ mode, account }: Props) {
               disabled={saving}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
             >
-              <Save className="h-4 w-4" />
+              <DiskIcon className="h-4 w-4" />
               {saving ? "Saving…" : mode === "create" ? "Create Account" : "Save Changes"}
             </button>
           </div>
@@ -764,14 +776,14 @@ function InlineCompanyPanel({
   return (
     <div className="mt-5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Building2 className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+        <Building2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
         <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
           New Company
         </span>
       </div>
       {err && (
         <p className="text-[11px] text-red-400 mb-2 flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" /> {err}
+          <ExclamationIcon className="h-3 w-3" /> {err}
         </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -858,7 +870,7 @@ function InlineCompanyPanel({
           disabled={saving}
           className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
         >
-          <CheckCircle2 className="h-3.5 w-3.5" />
+          <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? "Saving…" : "Add Company"}
         </button>
       </div>
@@ -919,14 +931,14 @@ function InlinePersonPanel({
   return (
     <div className="mt-5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] p-4">
       <div className="flex items-center gap-2 mb-3">
-        <UserCircle2 className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+        <UserCircle2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
         <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
           New Contact (Person)
         </span>
       </div>
       {err && (
         <p className="text-[11px] text-red-400 mb-2 flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" /> {err}
+          <ExclamationIcon className="h-3 w-3" /> {err}
         </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -989,7 +1001,7 @@ function InlinePersonPanel({
           disabled={saving}
           className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
         >
-          <CheckCircle2 className="h-3.5 w-3.5" />
+          <CheckCircleIcon className="h-3.5 w-3.5" />
           {saving ? "Saving…" : "Add Contact"}
         </button>
       </div>

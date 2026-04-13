@@ -17,7 +17,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import SignInIcon from "@/components/icons/ui/SignInIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import {
   isSupabaseAuthEnabled,
   signInWithPassword,
@@ -91,7 +94,7 @@ function LoginInner() {
         <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-center">
-              <AlertCircle className="h-5 w-5" />
+              <ExclamationIcon className="h-5 w-5" />
             </div>
             <h1 className="text-[17px] font-bold text-[var(--text-primary)]">
               Supabase Auth not yet enabled
@@ -123,7 +126,7 @@ function LoginInner() {
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
       </div>
     );
   }
@@ -137,9 +140,9 @@ function LoginInner() {
           <div className="flex items-center gap-3 mb-5">
             <div className="h-10 w-10 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center">
               {showingMfa ? (
-                <ShieldCheck className="h-5 w-5" />
+                <ShieldCheckIcon className="h-5 w-5" />
               ) : (
-                <LogIn className="h-5 w-5" />
+                <SignInIcon className="h-5 w-5" />
               )}
             </div>
             <div className="min-w-0">
@@ -186,7 +189,7 @@ function LoginInner() {
 
               {error && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px] flex items-start gap-2">
-                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <ExclamationIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -198,11 +201,11 @@ function LoginInner() {
               >
                 {busy ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Signing in…
+                    <SpinnerIcon className="h-4 w-4 animate-spin" /> Signing in…
                   </>
                 ) : (
                   <>
-                    <LogIn className="h-4 w-4" /> Sign In
+                    <SignInIcon className="h-4 w-4" /> Sign In
                   </>
                 )}
               </button>
@@ -231,7 +234,7 @@ function LoginInner() {
 
               {error && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px] flex items-start gap-2">
-                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <ExclamationIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -243,11 +246,11 @@ function LoginInner() {
               >
                 {busy ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Verifying…
+                    <SpinnerIcon className="h-4 w-4 animate-spin" /> Verifying…
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="h-4 w-4" /> Verify &amp; continue
+                    <ShieldCheckIcon className="h-4 w-4" /> Verify &amp; continue
                   </>
                 )}
               </button>
@@ -279,7 +282,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-          <Loader2 className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+          <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
         </div>
       }
     >

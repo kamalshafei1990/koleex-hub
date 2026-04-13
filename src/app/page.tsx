@@ -11,7 +11,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, Sparkles, Star, Clock } from "lucide-react";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import {
@@ -43,7 +45,16 @@ function getGreetingKey(): string {
 function ClockWidget({ dk = true }: { dk?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [digitalTime, setDigitalTime] = useState("");
-  const size = 80; // analog clock size
+  const [tzLabel, setTzLabel] = useState("");
+  const [size, setSize] = useState(120);
+
+  /* Responsive clock size */
+  useEffect(() => {
+    const update = () => setSize(window.innerWidth < 640 ? 80 : 120);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     const cvs = canvasRef.current;
@@ -78,13 +89,13 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       /* Hour ticks */
       for (let i = 0; i < 12; i++) {
         const angle = (i * Math.PI) / 6 - Math.PI / 2;
-        const outer = r - 4;
-        const inner = i % 3 === 0 ? r - 10 : r - 7;
+        const outer = r - 6;
+        const inner = i % 3 === 0 ? r - 16 : r - 11;
         ctx.beginPath();
         ctx.moveTo(r + Math.cos(angle) * inner, r + Math.sin(angle) * inner);
         ctx.lineTo(r + Math.cos(angle) * outer, r + Math.sin(angle) * outer);
         ctx.strokeStyle = dk ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.30)";
-        ctx.lineWidth = i % 3 === 0 ? 2 : 1;
+        ctx.lineWidth = i % 3 === 0 ? 2.5 : 1.2;
         ctx.stroke();
       }
 
@@ -93,8 +104,8 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       ctx.beginPath();
       ctx.moveTo(r, r);
       ctx.lineTo(r + Math.cos(hAngle) * (r * 0.45), r + Math.sin(hAngle) * (r * 0.45));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.75)";
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.80)" : "rgba(0,0,0,0.80)";
+      ctx.lineWidth = 3.5;
       ctx.lineCap = "round";
       ctx.stroke();
 
@@ -103,24 +114,24 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       ctx.beginPath();
       ctx.moveTo(r, r);
       ctx.lineTo(r + Math.cos(mAngle) * (r * 0.62), r + Math.sin(mAngle) * (r * 0.62));
-      ctx.strokeStyle = dk ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = dk ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.60)";
+      ctx.lineWidth = 2.5;
       ctx.lineCap = "round";
       ctx.stroke();
 
       /* Second hand — thin red line */
       const sAngle = (s * Math.PI) / 30 - Math.PI / 2;
       ctx.beginPath();
-      ctx.moveTo(r + Math.cos(sAngle + Math.PI) * (r * 0.15), r + Math.sin(sAngle + Math.PI) * (r * 0.15));
-      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.72), r + Math.sin(sAngle) * (r * 0.72));
+      ctx.moveTo(r + Math.cos(sAngle + Math.PI) * (r * 0.18), r + Math.sin(sAngle + Math.PI) * (r * 0.18));
+      ctx.lineTo(r + Math.cos(sAngle) * (r * 0.75), r + Math.sin(sAngle) * (r * 0.75));
       ctx.strokeStyle = "rgba(239,68,68,0.7)";
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.2;
       ctx.lineCap = "round";
       ctx.stroke();
 
       /* Center dot */
       ctx.beginPath();
-      ctx.arc(r, r, 2.5, 0, Math.PI * 2);
+      ctx.arc(r, r, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(239,68,68,0.8)";
       ctx.fill();
 
@@ -129,19 +140,38 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       setDigitalTime(`${pad(now.getHours())}:${pad(m)}:${pad(s)}`);
     }
 
+    /* Timezone label — e.g. "Dubai (GMT+4)" */
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
+      const offset = -new Date().getTimezoneOffset();
+      const sign = offset >= 0 ? "+" : "-";
+      const hrs = Math.floor(Math.abs(offset) / 60);
+      const mins = Math.abs(offset) % 60;
+      const gmtStr = `GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""}`;
+      setTzLabel(`${city} (${gmtStr})`);
+    } catch { setTzLabel(""); }
+
     draw();
     const interval = setInterval(draw, 1000);
     return () => clearInterval(interval);
-  }, [dk]);
+  }, [dk, size]);
 
   return (
     <div className="flex flex-col items-center gap-1.5 shrink-0">
       <canvas ref={canvasRef} style={{ width: size, height: size }} />
-      <span className={`text-[13px] font-mono font-semibold tracking-wider tabular-nums ${
+      <span className={`text-[12px] sm:text-[15px] font-mono font-semibold tracking-wider tabular-nums ${
         dk ? "text-white/40" : "text-black/40"
       }`}>
         {digitalTime}
       </span>
+      {tzLabel && (
+        <span className={`text-[10px] font-medium tracking-wide ${
+          dk ? "text-white/20" : "text-black/20"
+        }`}>
+          {tzLabel}
+        </span>
+      )}
     </div>
   );
 }
@@ -313,6 +343,7 @@ export default function HomePage() {
     const label = t(app.tKey, app.name);
     const isFav = favoriteIds.includes(app.id);
     const isCurrentApp = currentAppId === app.id;
+    const isAi = app.id === "ai";
 
     return (
       <div
@@ -320,20 +351,22 @@ export default function HomePage() {
         tabIndex={app.active ? 0 : -1}
         onClick={() => handleAppClick(app)}
         onKeyDown={(e) => { if (e.key === "Enter") handleAppClick(app); }}
-        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square border rounded-2xl transition-all duration-200 select-none ${
-          app.active
-            ? isCurrentApp
-              ? `cursor-pointer group ${
-                  dk
-                    ? "bg-white/[0.08] border-white/[0.18] ring-1 ring-white/[0.08]"
-                    : "bg-black/[0.05] border-black/[0.15] ring-1 ring-black/[0.05]"
-                }`
-              : `cursor-pointer group ${
-                  dk
-                    ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:translate-y-0 active:scale-[0.97]"
-                    : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.97]"
-                }`
-            : `cursor-default ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
+        className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-all duration-200 select-none ${
+          isAi
+            ? "ai-card-neon cursor-default"
+            : app.active
+              ? isCurrentApp
+                ? `cursor-pointer group border ${
+                    dk
+                      ? "bg-white/[0.08] border-white/[0.18] ring-1 ring-white/[0.08]"
+                      : "bg-black/[0.05] border-black/[0.15] ring-1 ring-black/[0.05]"
+                  }`
+                : `cursor-pointer group border ${
+                    dk
+                      ? "bg-[#111] border-white/[0.06] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)] active:translate-y-0 active:scale-[0.97]"
+                      : "bg-white border-black/[0.06] hover:border-black/[0.14] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:translate-y-0 active:scale-[0.97]"
+                  }`
+              : `cursor-default border ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
         }`}
       >
         {showStar && app.active && (
@@ -351,19 +384,19 @@ export default function HomePage() {
             }`}
             aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
-            <Star size={12} fill={isFav ? "currentColor" : "none"} />
+            <StarIcon size={12} style={{ fill: isFav ? "currentColor" : "none" }} />
           </span>
         )}
         <span className={`transition-all duration-200 ${
           app.active
             ? isCurrentApp
-              ? dk ? "text-white" : "text-black"
-              : dk ? "text-white/45 group-hover:text-white" : "text-black/45 group-hover:text-black"
-            : dk ? "text-white/15" : "text-black/15"
+              ? dk ? "text-white opacity-100" : "text-black opacity-100"
+              : dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
+            : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
         }`}>
-          <Icon size={28} strokeWidth={1.5} />
+          <Icon size={34} />
         </span>
-        <span className={`text-[11px] font-medium text-center leading-tight transition-all duration-200 ${
+        <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active
             ? isCurrentApp
               ? dk ? "text-white font-semibold" : "text-black font-semibold"
@@ -372,6 +405,13 @@ export default function HomePage() {
         }`}>
           {label}
         </span>
+        {!app.active && (
+          <span className={`text-[8px] font-semibold tracking-[0.5px] uppercase ${
+            dk ? "text-white/10" : "text-black/10"
+          }`}>
+            {t("comingSoon")}
+          </span>
+        )}
       </div>
     );
   };
@@ -398,12 +438,12 @@ export default function HomePage() {
             : `cursor-default opacity-20 ${dk ? "bg-[#0e0e0e] border-white/[0.02]" : "bg-[#f5f5f5] border-black/[0.02]"}`
         }`}
       >
-        <span className={`transition-colors duration-200 ${
+        <span className={`transition-all duration-200 ${
           app.active
-            ? dk ? "text-white/45 group-hover:text-white" : "text-black/45 group-hover:text-black"
-            : dk ? "text-white/25" : "text-black/25"
+            ? dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
+            : dk ? "text-white opacity-25" : "text-black opacity-25"
         }`}>
-          <Icon size={17} strokeWidth={1.6} />
+          <Icon size={17} />
         </span>
         <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
           app.active
@@ -427,7 +467,7 @@ export default function HomePage() {
             }`}
             aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
-            <Star size={11} fill={isFav ? "currentColor" : "none"} />
+            <StarIcon size={11} style={{ fill: isFav ? "currentColor" : "none" }} />
           </span>
         )}
       </div>
@@ -435,13 +475,13 @@ export default function HomePage() {
   };
 
   return (
-    <div className={`${dk ? "bg-black" : "bg-white"} min-h-screen transition-colors duration-300`}>
+    <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
       <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px]">
 
         {/* ── Header: Greeting + Clock + Date ── */}
-        <div className="mb-5 md:mb-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 pt-1">
+        <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
+          <div className="flex items-center justify-between gap-4 w-full">
+            <div className="min-w-0">
               <h1 className={`text-[22px] md:text-[30px] font-bold tracking-tight ${dk ? "text-white" : "text-black"}`}>
                 {t(getGreetingKey())}{firstName ? `, ${firstName}` : ""}
               </h1>
@@ -459,7 +499,7 @@ export default function HomePage() {
               ? "bg-white/[0.03] border-white/[0.06] focus-within:border-white/[0.20] focus-within:bg-white/[0.05]"
               : "bg-black/[0.02] border-black/[0.06] focus-within:border-black/[0.20] focus-within:bg-black/[0.04]"
           }`}>
-            <Search size={16} className={dk ? "text-white/20" : "text-black/20"} />
+            <SearchIcon size={16} className={dk ? "text-white/20" : "text-black/20"} />
             <input
               id="hub-search"
               type="text"
@@ -487,7 +527,7 @@ export default function HomePage() {
         {!isSearchOrFilter && favoriteApps.length > 0 && (
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-2.5">
-              <Star size={11} className={dk ? "text-amber-400/50" : "text-amber-500/50"} fill="currentColor" />
+              <StarIcon size={11} className={dk ? "text-amber-400/50" : "text-amber-500/50"} />
               <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
                 {t("favorites")}
               </span>
@@ -512,7 +552,7 @@ export default function HomePage() {
         {!isSearchOrFilter && recentApps.length > 0 && (
           <div className="mb-5">
             <div className="flex items-center gap-2 mb-2.5">
-              <Clock size={11} className={dk ? "text-white/18" : "text-black/18"} />
+              <ClockIcon size={11} className={dk ? "text-white/18" : "text-black/18"} />
               <span className={`text-[10px] font-semibold tracking-[1.5px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
                 {t("recent")}
               </span>
@@ -599,13 +639,44 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* AI FAB */}
-      <button className={`fixed bottom-6 end-6 z-40 w-12 h-12 rounded-full ${
-        dk ? "bg-white text-black" : "bg-black text-white"
-      } flex flex-col items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-transform duration-200`}>
-        <Sparkles size={18} />
-        <span className="text-[7px] font-bold tracking-wider mt-0.5">AI</span>
-      </button>
+      {/* AI card animated neon border */}
+      <style>{`
+        @property --ai-card-angle {
+          syntax: "<angle>";
+          initial-value: 0deg;
+          inherits: false;
+        }
+        @keyframes ai-card-spin {
+          0% { --ai-card-angle: 0deg; }
+          100% { --ai-card-angle: 360deg; }
+        }
+        .ai-card-neon {
+          animation: ai-card-spin 3s linear infinite;
+          border: 1.5px solid transparent;
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+          background-image:
+            linear-gradient(${dk ? "#0c0c0c" : "#f8f8f8"}, ${dk ? "#0c0c0c" : "#f8f8f8"}),
+            conic-gradient(
+              from var(--ai-card-angle),
+              rgba(0,212,255,0.6),
+              rgba(123,97,255,0.6),
+              rgba(255,110,199,0.5),
+              rgba(0,212,255,0.15),
+              rgba(123,97,255,0.6),
+              rgba(0,212,255,0.6)
+            );
+          box-shadow:
+            0 0 12px rgba(123,97,255,0.15),
+            0 0 24px rgba(0,212,255,0.08);
+        }
+        .ai-card-neon:hover {
+          box-shadow:
+            0 0 16px rgba(123,97,255,0.25),
+            0 0 32px rgba(0,212,255,0.15);
+          transform: translateY(-2px);
+        }
+      `}</style>
     </div>
   );
 }

@@ -8,28 +8,26 @@
    role's access preset summary.
 
    This tab does NOT include anything that has its own dedicated tab
-   (Access Rights, Preferences, Calendar, Private HR, Notes).
+   (Access Rights, Preferences, CalendarRawIcon, Private HR, Notes).
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
-import {
-  AtSign,
-  Mail,
-  Phone,
-  Clock,
-  Shield,
-  UserCircle2,
-  Briefcase,
-  MapPin,
-  Languages,
-  Smartphone,
-  Building2,
-  Layers,
-  Flag,
-  Globe,
-  AlertCircle,
-  KeyRound,
-} from "lucide-react";
+import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
+import SmartphoneIcon from "@/components/icons/ui/SmartphoneIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import FlagIcon from "@/components/icons/ui/FlagIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
 import type {
   AccountWithLinks,
   CustomerLevel,
@@ -63,22 +61,22 @@ export default function OverviewTab({ account }: Props) {
       {/* Login Identity */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <KeyRound className="h-3.5 w-3.5" />
+          <KeyIcon className="h-3.5 w-3.5" />
           Login Identity
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <InfoField
-            icon={<AtSign className="h-3.5 w-3.5" />}
+            icon={<AtSignIcon className="h-3.5 w-3.5" />}
             label="Username"
             value={<span className="font-mono">@{account.username}</span>}
           />
           <InfoField
-            icon={<Mail className="h-3.5 w-3.5" />}
+            icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
             label="Login Email"
             value={account.login_email}
           />
           <InfoField
-            icon={<Clock className="h-3.5 w-3.5" />}
+            icon={<ClockIcon className="h-3.5 w-3.5" />}
             label="Last Login"
             value={
               account.last_login_at
@@ -87,7 +85,7 @@ export default function OverviewTab({ account }: Props) {
             }
           />
           <InfoField
-            icon={<Shield className="h-3.5 w-3.5" />}
+            icon={<ShieldIcon className="h-3.5 w-3.5" />}
             label="2FA"
             value={account.two_factor_enabled ? "Enabled" : "Disabled"}
           />
@@ -114,53 +112,53 @@ export default function OverviewTab({ account }: Props) {
       {person && (
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
-            <UserCircle2 className="h-3.5 w-3.5" />
+            <UserCircle2Icon className="h-3.5 w-3.5" />
             Contact Profile
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoField
-              icon={<UserCircle2 className="h-3.5 w-3.5" />}
+              icon={<UserCircle2Icon className="h-3.5 w-3.5" />}
               label="Full Name"
               value={person.full_name}
             />
             {person.display_name && (
               <InfoField
-                icon={<UserCircle2 className="h-3.5 w-3.5" />}
+                icon={<UserCircle2Icon className="h-3.5 w-3.5" />}
                 label="Display Name"
                 value={person.display_name}
               />
             )}
             {person.job_title && (
               <InfoField
-                icon={<Briefcase className="h-3.5 w-3.5" />}
+                icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
                 label="Job Title"
                 value={person.job_title}
               />
             )}
             {person.email && (
               <InfoField
-                icon={<Mail className="h-3.5 w-3.5" />}
+                icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
                 label="Email"
                 value={person.email}
               />
             )}
             {person.phone && (
               <InfoField
-                icon={<Phone className="h-3.5 w-3.5" />}
+                icon={<PhoneIcon className="h-3.5 w-3.5" />}
                 label="Phone"
                 value={person.phone}
               />
             )}
             {person.mobile && (
               <InfoField
-                icon={<Smartphone className="h-3.5 w-3.5" />}
+                icon={<SmartphoneIcon className="h-3.5 w-3.5" />}
                 label="Mobile"
                 value={person.mobile}
               />
             )}
             {person.language && (
               <InfoField
-                icon={<Languages className="h-3.5 w-3.5" />}
+                icon={<LanguagesIcon className="h-3.5 w-3.5" />}
                 label="Language"
                 value={person.language}
               />
@@ -169,7 +167,7 @@ export default function OverviewTab({ account }: Props) {
           {(person.address_line1 || person.city || person.country) && (
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] font-semibold mb-2 flex items-center gap-1.5">
-                <MapPin className="h-3 w-3" />
+                <MapPinIcon className="h-3 w-3" />
                 Address
               </p>
               <p className="text-[13px] text-[var(--text-muted)] whitespace-pre-line">
@@ -193,17 +191,17 @@ export default function OverviewTab({ account }: Props) {
       {company && (
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
-            <Building2 className="h-3.5 w-3.5" />
+            <Building2Icon className="h-3.5 w-3.5" />
             Company
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoField
-              icon={<Building2 className="h-3.5 w-3.5" />}
+              icon={<Building2Icon className="h-3.5 w-3.5" />}
               label="Name"
               value={company.name}
             />
             <InfoField
-              icon={<Layers className="h-3.5 w-3.5" />}
+              icon={<LayersIcon className="h-3.5 w-3.5" />}
               label="Type"
               value={
                 <span className="uppercase tracking-wider">{company.type}</span>
@@ -211,14 +209,14 @@ export default function OverviewTab({ account }: Props) {
             />
             {company.country && (
               <InfoField
-                icon={<Flag className="h-3.5 w-3.5" />}
+                icon={<FlagIcon className="h-3.5 w-3.5" />}
                 label="Country"
                 value={company.country}
               />
             )}
             {company.currency && (
               <InfoField
-                icon={<Globe className="h-3.5 w-3.5" />}
+                icon={<GlobeIcon className="h-3.5 w-3.5" />}
                 label="Currency"
                 value={company.currency}
               />
@@ -226,7 +224,7 @@ export default function OverviewTab({ account }: Props) {
             {customerLevel && (
               <>
                 <InfoField
-                  icon={<Shield className="h-3.5 w-3.5" />}
+                  icon={<ShieldIcon className="h-3.5 w-3.5" />}
                   label="Customer Level"
                   value={
                     <span
@@ -237,7 +235,7 @@ export default function OverviewTab({ account }: Props) {
                   }
                 />
                 <InfoField
-                  icon={<Layers className="h-3.5 w-3.5" />}
+                  icon={<LayersIcon className="h-3.5 w-3.5" />}
                   label="Price Level"
                   value={priceLevelFor[customerLevel]}
                 />
@@ -246,7 +244,7 @@ export default function OverviewTab({ account }: Props) {
           </div>
           {account.user_type === "customer" && !customerLevel && (
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] text-[12px] text-amber-300/80 flex items-center gap-1.5">
-              <AlertCircle className="h-3.5 w-3.5" />
+              <ExclamationIcon className="h-3.5 w-3.5" />
               This company has no customer level set. Set it on the company
               record to enable pricing.
             </div>
@@ -258,33 +256,33 @@ export default function OverviewTab({ account }: Props) {
       {employee && (
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
-            <Briefcase className="h-3.5 w-3.5" />
+            <BriefcaseIcon className="h-3.5 w-3.5" />
             Employee Record
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {employee.employee_number && (
               <InfoField
-                icon={<Briefcase className="h-3.5 w-3.5" />}
+                icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
                 label="Employee #"
                 value={employee.employee_number}
               />
             )}
             {employee.department && (
               <InfoField
-                icon={<Layers className="h-3.5 w-3.5" />}
+                icon={<LayersIcon className="h-3.5 w-3.5" />}
                 label="Department"
                 value={employee.department}
               />
             )}
             {employee.position && (
               <InfoField
-                icon={<Briefcase className="h-3.5 w-3.5" />}
+                icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
                 label="Position"
                 value={employee.position}
               />
             )}
             <InfoField
-              icon={<Shield className="h-3.5 w-3.5" />}
+              icon={<ShieldIcon className="h-3.5 w-3.5" />}
               label="Employment"
               value={
                 <span className="uppercase tracking-wider">
@@ -294,21 +292,21 @@ export default function OverviewTab({ account }: Props) {
             />
             {employee.hire_date && (
               <InfoField
-                icon={<Clock className="h-3.5 w-3.5" />}
+                icon={<ClockIcon className="h-3.5 w-3.5" />}
                 label="Hire Date"
                 value={new Date(employee.hire_date).toLocaleDateString()}
               />
             )}
             {employee.work_email && (
               <InfoField
-                icon={<Mail className="h-3.5 w-3.5" />}
+                icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
                 label="Work Email"
                 value={employee.work_email}
               />
             )}
             {employee.work_phone && (
               <InfoField
-                icon={<Phone className="h-3.5 w-3.5" />}
+                icon={<PhoneIcon className="h-3.5 w-3.5" />}
                 label="Work Phone"
                 value={employee.work_phone}
               />
@@ -324,7 +322,7 @@ export default function OverviewTab({ account }: Props) {
       {/* Role */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Shield className="h-3.5 w-3.5" />
+          <ShieldIcon className="h-3.5 w-3.5" />
           Role
         </h2>
         {role ? (
@@ -359,7 +357,7 @@ export default function OverviewTab({ account }: Props) {
           </>
         ) : (
           <p className="text-[12px] text-amber-300/80 flex items-center gap-1.5">
-            <AlertCircle className="h-3.5 w-3.5" />
+            <ExclamationIcon className="h-3.5 w-3.5" />
             No role assigned. Edit this account to assign one.
           </p>
         )}

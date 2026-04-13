@@ -3,13 +3,37 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
-import {
-  ArrowLeft, Plus, Search, X, Loader2, CheckSquare, Square, Trash2,
-  Pencil, Calendar, Flag, Tag, ChevronDown, Circle, CheckCircle2,
-  AlertCircle, Clock, MoreHorizontal, ListTodo, Users, Building2,
-  Send, MessageSquare, TrendingUp, BarChart3, Target, Award,
-  UserCheck, Filter, ChevronUp,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
+import SquareIcon from "@/components/icons/ui/SquareIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import FlagIcon from "@/components/icons/ui/FlagIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import CircleIcon from "@/components/icons/ui/CircleIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import FilterIcon from "@/components/icons/ui/FilterIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import TodoIcon from "@/components/icons/TodoIcon";
 import {
   fetchTodos, createTodo, updateTodo, toggleTodo, deleteTodo,
   addTodoNote, deleteTodoNote,
@@ -79,7 +103,7 @@ function Section({ title, count, color, children }: {
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 px-4 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors">
-        <ChevronDown size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "" : "-rotate-90"}`} />
+        <AngleDownIcon size={14} className={`text-[var(--text-dim)] transition-transform ${open ? "" : "-rotate-90"}`} />
         <span className={`text-[12px] font-bold uppercase tracking-wider ${color}`}>{title}</span>
         <span className="text-[10px] font-semibold text-[var(--text-ghost)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-full">{count}</span>
       </button>
@@ -105,7 +129,7 @@ function DeleteModal({ open, deleting, onConfirm, onClose }: {
           </button>
           <button onClick={onConfirm} disabled={deleting}
             className="h-9 px-4 rounded-lg bg-red-500/90 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500 transition-colors disabled:opacity-50">
-            {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {deleting && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             Delete
           </button>
         </div>
@@ -256,13 +280,13 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <ListTodo size={18} className="text-[var(--text-dim)]" />
+            <ListTodoIcon size={18} className="text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
               {editEntry ? "Edit Task" : "New Task"}
             </h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors">
-            <X size={16} className="text-[var(--text-dim)]" />
+            <CrossIcon size={16} className="text-[var(--text-dim)]" />
           </button>
         </div>
 
@@ -299,21 +323,21 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                 className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 ${
                   assignAll ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
-                <Users size={10} /> All
+                <UsersIcon size={10} /> All
               </button>
               {departments.map((dept) => (
                 <button key={dept} onClick={() => selectDept(dept)}
                   className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 ${
                     selectedDept === dept ? "bg-violet-500/15 border-violet-500/30 text-violet-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                   }`}>
-                  <Building2 size={10} /> {dept}
+                  <Building2Icon size={10} /> {dept}
                 </button>
               ))}
             </div>
 
             {/* Employee search */}
             <div className="relative mb-2">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+              <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input type="text" value={empSearch} onChange={(e) => setEmpSearch(e.target.value)}
                 placeholder="Search employees..." className={inp + " pl-9 h-9 text-[12px]"} />
             </div>
@@ -331,7 +355,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                       <MiniAvatar info={emp} size={36} />
                       {selected && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                          <CheckCircle2 size={10} className="text-white" />
+                          <CheckCircleIcon size={10} className="text-white" />
                         </div>
                       )}
                     </div>
@@ -408,12 +432,12 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                     className="h-7 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] outline-none w-24"
                     onKeyDown={(e) => { if (e.key === "Enter") handleNewLabel(); if (e.key === "Escape") setShowNewLabel(false); }} />
                   <button onClick={handleNewLabel} className="h-7 px-2 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">Add</button>
-                  <button onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)]"><X size={12} /></button>
+                  <button onClick={() => setShowNewLabel(false)} className="text-[var(--text-dim)]"><CrossIcon size={12} /></button>
                 </div>
               ) : (
                 <button onClick={() => setShowNewLabel(true)}
                   className="h-7 px-3 rounded-full text-[11px] font-medium border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-all flex items-center gap-1">
-                  <Plus size={10} /> New
+                  <PlusIcon size={10} /> New
                 </button>
               )}
             </div>
@@ -428,7 +452,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           </button>
           <button onClick={handleSave} disabled={saving || !title.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? "Saving..." : editEntry ? "Save Changes" : "Create Task"}
           </button>
         </div>
@@ -466,9 +490,9 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
         {/* Checkbox */}
         <button onClick={onToggle} className="mt-0.5 shrink-0 transition-transform hover:scale-110">
           {task.completed ? (
-            <CheckCircle2 size={20} className="text-green-400" />
+            <CheckCircleIcon size={20} className="text-green-400" />
           ) : (
-            <Circle size={20} className="text-[var(--text-ghost)]" />
+            <CircleIcon size={20} className="text-[var(--text-ghost)]" />
           )}
         </button>
 
@@ -486,18 +510,18 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           {/* Meta badges */}
           <div className="flex items-center gap-1.5 md:gap-2 mt-1.5 flex-wrap min-w-0">
             <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${priorityConfig.color}`}>
-              <Flag size={10} /> {priorityConfig.label}
+              <FlagIcon size={10} /> {priorityConfig.label}
             </span>
             {task.label && (
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded">
-                <Tag size={9} /> {task.label}
+                <TagsIcon size={9} /> {task.label}
               </span>
             )}
             {task.due_date && (
               <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${
                 overdue ? "text-red-400" : task.completed ? "text-[var(--text-dim)]" : "text-[var(--text-faint)]"
               }`}>
-                {overdue ? <AlertCircle size={10} /> : <Clock size={10} />}
+                {overdue ? <ExclamationIcon size={10} /> : <ClockIcon size={10} />}
                 {formatDate(task.due_date)}
               </span>
             )}
@@ -534,18 +558,18 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
         <div className="shrink-0 flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button onClick={() => setExpanded(!expanded)} title="Notes"
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-            <MessageSquare size={14} />
+            <MessageSquareIcon size={14} />
             {task.notes.length > 0 && (
               <span className="ml-0.5 text-[9px] font-bold">{task.notes.length}</span>
             )}
           </button>
           <button onClick={onEdit}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-            <Pencil size={14} />
+            <PencilIcon size={14} />
           </button>
           <button onClick={onDelete}
             className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-[var(--text-dim)] hover:text-red-400">
-            <Trash2 size={14} />
+            <TrashIcon size={14} />
           </button>
         </div>
       </div>
@@ -565,7 +589,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
               </div>
               {note.author_account_id === currentAccountId && (
                 <button onClick={() => onDeleteNote(note.id)} className="text-[var(--text-dim)] hover:text-red-400 p-0.5 shrink-0">
-                  <X size={10} />
+                  <CrossIcon size={10} />
                 </button>
               )}
             </div>
@@ -578,7 +602,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
               onKeyDown={(e) => { if (e.key === "Enter") handleSubmitNote(); }} />
             <button onClick={handleSubmitNote} disabled={!noteText.trim()}
               className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 transition-all disabled:opacity-30">
-              <Send size={12} />
+              <PaperPlaneIcon size={12} />
             </button>
           </div>
         </div>
@@ -616,13 +640,13 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
   const doneThisWeek = todos.filter((t) => t.completed_at && new Date(t.completed_at) >= weekAgo).length;
 
   const cards = [
-    { label: "Total Tasks", value: total, icon: ListTodo, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-    { label: "Active", value: active, icon: Target, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-    { label: "Completed", value: completed, icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
-    { label: "Overdue", value: overdue, icon: AlertCircle, color: "text-red-400", bg: overdue > 0 ? "bg-red-500/10 border-red-500/20" : "bg-[var(--bg-surface)] border-[var(--border-subtle)]" },
-    { label: "High Priority", value: high, icon: Flag, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
-    { label: "Done This Week", value: doneThisWeek, icon: TrendingUp, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
-    { label: "Completion", value: `${completionRate}%`, icon: BarChart3, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
+    { label: "Total Tasks", value: total, icon: ListTodoIcon, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+    { label: "Active", value: active, icon: TargetIcon, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+    { label: "Completed", value: completed, icon: CheckCircleIcon, color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
+    { label: "Overdue", value: overdue, icon: ExclamationIcon, color: "text-red-400", bg: overdue > 0 ? "bg-red-500/10 border-red-500/20" : "bg-[var(--bg-surface)] border-[var(--border-subtle)]" },
+    { label: "High Priority", value: high, icon: FlagIcon, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
+    { label: "Done This Week", value: doneThisWeek, icon: TrendingUpIcon, color: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
+    { label: "Completion", value: `${completionRate}%`, icon: BarChart3Icon, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
   ];
 
   return (
@@ -644,7 +668,7 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
       {topPerformers.length > 0 && (
         <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
-            <Award size={14} className="text-yellow-400" />
+            <AwardIcon size={14} className="text-yellow-400" />
             <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Top Performers</span>
           </div>
           <div className="flex items-center gap-4 flex-wrap min-w-0">
@@ -871,11 +895,11 @@ export default function TodoPage() {
           {/* Title row */}
           <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
             <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <CheckSquare className="h-4 w-4" />
+                <CheckSquareIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">To-do</h1>
             </div>
@@ -887,13 +911,13 @@ export default function TodoPage() {
           {/* Search + Add */}
           <div className="flex items-center gap-2 pb-2 min-w-0">
             <div className="flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
-              <Search size={16} className="text-[var(--text-dim)] shrink-0" />
+              <SearchIcon size={16} className="text-[var(--text-dim)] shrink-0" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search tasks..."
                 className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10" />
               {search && (
                 <button onClick={() => setSearch("")} className="p-0.5">
-                  <X size={14} className="text-[var(--text-dim)]" />
+                  <CrossIcon size={14} className="text-[var(--text-dim)]" />
                 </button>
               )}
             </div>
@@ -903,13 +927,13 @@ export default function TodoPage() {
                   ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
                   : "bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
               }`}>
-              <Filter size={14} />
+              <FilterIcon size={14} />
               <span className="hidden md:inline">Filters</span>
               {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
             </button>
             <button onClick={() => setModal({ open: true, entry: null })}
               className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0">
-              <Plus size={16} />
+              <PlusIcon size={16} />
               <span className="hidden md:inline">Add Task</span>
             </button>
           </div>
@@ -936,7 +960,7 @@ export default function TodoPage() {
                       : "bg-blue-500/15 border-blue-500/30 text-blue-400"
                     : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
-                <Flag size={10} /> {p.label}
+                <FlagIcon size={10} /> {p.label}
               </button>
             ))}
           </div>
@@ -971,14 +995,14 @@ export default function TodoPage() {
                 {/* Date range filter */}
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-                    <Calendar size={12} className="text-[var(--text-dim)] shrink-0" />
+                    <CalendarRawIcon size={12} className="text-[var(--text-dim)] shrink-0" />
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                       className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
                       title="From date" />
                   </div>
                   <span className="text-[11px] text-[var(--text-dim)]">→</span>
                   <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-                    <Calendar size={12} className="text-[var(--text-dim)] shrink-0" />
+                    <CalendarRawIcon size={12} className="text-[var(--text-dim)] shrink-0" />
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                       className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
                       title="To date" />
@@ -988,7 +1012,7 @@ export default function TodoPage() {
                 {hasActiveFilters && (
                   <button onClick={() => { setLabelFilter(""); setDeptFilter(""); setAssigneeFilter(""); setDateFrom(""); setDateTo(""); }}
                     className="h-8 px-3 rounded-lg text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                    <X size={12} /> Clear Filters
+                    <CrossIcon size={12} /> Clear Filters
                   </button>
                 )}
               </div>
@@ -1007,12 +1031,12 @@ export default function TodoPage() {
         {/* Task List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--bg-surface)]">
-              <CheckSquare size={24} className="text-[var(--text-ghost)]" />
+              <TodoIcon size={24} className="text-[var(--text-ghost)]" />
             </div>
             <p className="text-[var(--text-faint)] text-sm font-medium">
               {search ? "No tasks match your search" : filter === "completed" ? "No completed tasks" : "No tasks yet"}

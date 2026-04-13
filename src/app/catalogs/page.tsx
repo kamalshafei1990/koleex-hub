@@ -2,11 +2,25 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Plus, Search, X, Loader2, Download, Eye, Pencil, Trash2,
-  FileText, Image as ImageIcon, Layers, PenTool, File, Upload,
-  Building2, ChevronDown, LayoutGrid, List,
-} from "lucide-react";
+import FileIcon from "@/components/icons/ui/FileIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import PenToolIcon from "@/components/icons/ui/PenToolIcon";
+import UploadIcon from "@/components/icons/ui/UploadIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
 import {
   fetchCatalogs, createCatalog, updateCatalog, deleteCatalog,
   uploadCatalogFile, uploadCatalogCover, replaceCatalogFile,
@@ -38,15 +52,15 @@ function isImageFile(type: string): boolean {
   return ["jpg", "jpeg", "png"].includes(type);
 }
 
-const FILE_TYPE_CONFIG: Record<string, { label: string; color: string; bgFrom: string; bgTo: string; icon: typeof FileText }> = {
-  pdf: { label: "PDF", color: "text-red-400", bgFrom: "from-red-950", bgTo: "to-red-900/60", icon: FileText },
-  jpg: { label: "JPG", color: "text-emerald-400", bgFrom: "from-emerald-950", bgTo: "to-emerald-900/60", icon: ImageIcon },
-  jpeg: { label: "JPG", color: "text-emerald-400", bgFrom: "from-emerald-950", bgTo: "to-emerald-900/60", icon: ImageIcon },
-  png: { label: "PNG", color: "text-blue-400", bgFrom: "from-blue-950", bgTo: "to-blue-900/60", icon: ImageIcon },
-  psd: { label: "PSD", color: "text-indigo-400", bgFrom: "from-indigo-950", bgTo: "to-indigo-900/60", icon: Layers },
-  cdr: { label: "CDR", color: "text-orange-400", bgFrom: "from-orange-950", bgTo: "to-orange-900/60", icon: PenTool },
+const FILE_TYPE_CONFIG: Record<string, { label: string; color: string; bgFrom: string; bgTo: string; icon: typeof DocumentIcon }> = {
+  pdf: { label: "PDF", color: "text-red-400", bgFrom: "from-red-950", bgTo: "to-red-900/60", icon: DocumentIcon },
+  jpg: { label: "JPG", color: "text-emerald-400", bgFrom: "from-emerald-950", bgTo: "to-emerald-900/60", icon: PictureIcon },
+  jpeg: { label: "JPG", color: "text-emerald-400", bgFrom: "from-emerald-950", bgTo: "to-emerald-900/60", icon: PictureIcon },
+  png: { label: "PNG", color: "text-blue-400", bgFrom: "from-blue-950", bgTo: "to-blue-900/60", icon: PictureIcon },
+  psd: { label: "PSD", color: "text-indigo-400", bgFrom: "from-indigo-950", bgTo: "to-indigo-900/60", icon: LayersIcon },
+  cdr: { label: "CDR", color: "text-orange-400", bgFrom: "from-orange-950", bgTo: "to-orange-900/60", icon: PenToolIcon },
 };
-const DEFAULT_FT = { label: "FILE", color: "text-zinc-400", bgFrom: "from-zinc-950", bgTo: "to-zinc-900/60", icon: File };
+const DEFAULT_FT = { label: "FILE", color: "text-zinc-400", bgFrom: "from-zinc-950", bgTo: "to-zinc-900/60", icon: FileIcon };
 
 type ContactOption = {
   id: string;
@@ -216,11 +230,11 @@ function QuickAddContactModal({
       <div className="relative w-full max-w-[440px] bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-subtle)] shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <Building2 className="h-4 w-4 text-[var(--text-dim)]" />
+            <Building2Icon className="h-4 w-4 text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Add New Supplier / Company</h2>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -280,7 +294,7 @@ function QuickAddContactModal({
           <button onClick={onClose} className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || !nameEn.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
             {saving ? "Creating..." : "Create"}
           </button>
         </div>
@@ -597,7 +611,7 @@ function CatalogModal({
             </h2>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors">
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -620,9 +634,9 @@ function CatalogModal({
                   {thumbPreview ? (
                     <img src={thumbPreview} alt="" className="w-full h-full object-contain bg-white" />
                   ) : generatingThumb ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+                    <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
                   ) : (
-                    (() => { const Icon = (FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.icon) || File; return <Icon className={`h-5 w-5 ${FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.color || "text-zinc-400"}`} />; })()
+                    (() => { const Icon = (FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.icon) || FileIcon; return <Icon className={`h-5 w-5 ${FILE_TYPE_CONFIG[getFileType(file?.name || editEntry?.file_name || "")]?.color || "text-zinc-400"}`} />; })()
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -642,7 +656,7 @@ function CatalogModal({
             ) : (
               <button onClick={() => fileRef.current?.click()}
                 className="w-full py-8 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/40 bg-[var(--bg-surface)] flex flex-col items-center gap-2 transition-all cursor-pointer group">
-                <Upload className="h-6 w-6 text-[var(--text-dim)] group-hover:text-blue-400 transition-colors" />
+                <UploadIcon className="h-6 w-6 text-[var(--text-dim)] group-hover:text-blue-400 transition-colors" />
                 <span className="text-[12px] text-[var(--text-dim)] group-hover:text-[var(--text-secondary)]">
                   Click to upload or drag file here
                 </span>
@@ -667,7 +681,7 @@ function CatalogModal({
                     <img src={selectedContact.photo_url} alt="" className="w-full h-full object-contain" />
                   </div>
                 ) : (
-                  <Building2 className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
+                  <Building2Icon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   <span className="text-[13px] text-[var(--text-primary)] truncate block">
@@ -681,12 +695,12 @@ function CatalogModal({
                   {selectedContact.contact_type}
                 </span>
                 <button onClick={() => setContactId("")} className="h-6 w-6 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-                  <X className="h-3 w-3" />
+                  <CrossIcon className="h-3 w-3" />
                 </button>
               </div>
             ) : (
               <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
+                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
                 <input type="text" value={contactSearch}
                   onChange={(e) => { setContactSearch(e.target.value); setShowContactDropdown(true); }}
                   onFocus={() => setShowContactDropdown(true)}
@@ -707,7 +721,7 @@ function CatalogModal({
                           {c.photo_url ? (
                             <img src={c.photo_url} alt="" className="w-full h-full object-contain" />
                           ) : (
-                            <Building2 className="h-3.5 w-3.5 text-zinc-500" />
+                            <Building2Icon className="h-3.5 w-3.5 text-zinc-500" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -732,7 +746,7 @@ function CatalogModal({
                 <button onClick={() => { setShowContactDropdown(false); setShowQuickAdd(true); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#252525] transition-colors text-left border-t border-[#333]">
                   <div className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                    <Plus className="h-3.5 w-3.5 text-blue-400" />
+                    <PlusIcon className="h-3.5 w-3.5 text-blue-400" />
                   </div>
                   <span className="text-[12px] font-medium text-blue-400">Add new supplier / company</span>
                 </button>
@@ -750,7 +764,7 @@ function CatalogModal({
                   <option value="">Select division</option>
                   {divisions.map(d => <option key={d.id} value={d.slug}>{d.name}</option>)}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
+                <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
               </div>
               {divisionSlug && divLogos[divisionSlug] && (
                 <div className="flex items-center gap-2 mt-1.5 px-1">
@@ -767,7 +781,7 @@ function CatalogModal({
                   <option value="">Select category</option>
                   {filteredCategories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
+                <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
               </div>
               {categorySlug && catLogos[categorySlug] && (
                 <div className="flex items-center gap-2 mt-1.5 px-1">
@@ -807,7 +821,7 @@ function CatalogModal({
             </button>
             <button onClick={handleSave} disabled={saving || (!file && !editEntry) || !title.trim()}
               className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving && <SpinnerIcon className="h-4 w-4 animate-spin" />}
               {saving ? (progress || "Uploading...") : editEntry ? "Save Changes" : "Upload"}
             </button>
           </div>
@@ -857,11 +871,11 @@ function DeleteModal({ open, onClose, catalog, onConfirm, deleting }: {
           <button onClick={onConfirm} disabled={deleting}
             className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-40 relative overflow-hidden whitespace-nowrap">
             <span className={`inline-flex items-center gap-2 transition-opacity duration-150 ${deleting ? "opacity-0" : "opacity-100"}`}>
-              <Trash2 className="h-3.5 w-3.5 shrink-0" />
+              <TrashIcon className="h-3.5 w-3.5 shrink-0" />
               <span>Delete</span>
             </span>
             <span className={`absolute inset-0 inline-flex items-center justify-center gap-2 transition-opacity duration-150 ${deleting ? "opacity-100" : "opacity-0"}`}>
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+              <SpinnerIcon className="h-4 w-4 animate-spin shrink-0" />
               <span>Deleting...</span>
             </span>
           </button>
@@ -921,19 +935,19 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
           <button onClick={onPreview} title="Preview"
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
-            <Eye className="h-4.5 w-4.5" />
+            <EyeIcon className="h-4.5 w-4.5" />
           </button>
           <button onClick={handleDownload} title="Download"
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
-            <Download className="h-4.5 w-4.5" />
+            <DownloadIcon className="h-4.5 w-4.5" />
           </button>
           <button onClick={onEdit} title="Edit"
             className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/30 transition-colors">
-            <Pencil className="h-4 w-4" />
+            <PencilIcon className="h-4 w-4" />
           </button>
           <button onClick={onDelete} title="Delete"
             className="h-10 w-10 rounded-xl bg-red-500/30 backdrop-blur-md border border-red-500/30 text-red-300 flex items-center justify-center hover:bg-red-500/40 transition-colors">
-            <Trash2 className="h-4 w-4" />
+            <TrashIcon className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -1044,10 +1058,10 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
         <p className="text-[10px] text-[var(--text-dim)] mt-0.5">{ft.label} &middot; {formatFileSize(catalog.file_size)}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onPreview} title="Preview" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Eye className="h-3.5 w-3.5" /></button>
-        <button onClick={handleDownload} title="Download" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Download className="h-3.5 w-3.5" /></button>
-        <button onClick={onEdit} title="Edit" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
-        <button onClick={onDelete} title="Delete" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button onClick={onPreview} title="Preview" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><EyeIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={handleDownload} title="Download" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><DownloadIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={onEdit} title="Edit" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"><PencilIcon className="h-3.5 w-3.5" /></button>
+        <button onClick={onDelete} title="Delete" className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors"><TrashIcon className="h-3.5 w-3.5" /></button>
       </div>
     </div>
   );
@@ -1157,7 +1171,7 @@ export default function CatalogsPage() {
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
@@ -1176,7 +1190,7 @@ export default function CatalogsPage() {
             <span className="text-[11px] text-[var(--text-dim)]">catalogs</span>
           </div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-            <Building2 className="h-3 w-3 text-[var(--text-dim)]" />
+            <Building2Icon className="h-3 w-3 text-[var(--text-dim)]" />
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{catalogSuppliers.length}</span>
             <span className="text-[11px] text-[var(--text-dim)]">suppliers</span>
           </div>
@@ -1189,7 +1203,7 @@ export default function CatalogsPage() {
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)]" />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search catalogs..."
               className="w-full h-9 pl-9 pr-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-blue-500/50 transition-colors" />
           </div>
@@ -1201,7 +1215,7 @@ export default function CatalogsPage() {
                 <option value="all">All Suppliers</option>
                 {catalogSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
             </div>
           )}
 
@@ -1212,7 +1226,7 @@ export default function CatalogsPage() {
                 <option value="all">All Divisions</option>
                 {catalogDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
             </div>
           )}
 
@@ -1223,28 +1237,28 @@ export default function CatalogsPage() {
                 <option value="all">All Types</option>
                 {catalogTypes.map(t => <option key={t} value={t}>{(FILE_TYPE_CONFIG[t]?.label || t).toUpperCase()}</option>)}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
+              <AngleDownIcon className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-dim)] pointer-events-none" />
             </div>
           )}
 
           <div className="flex items-center h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
             <button onClick={() => setViewMode("grid")} className={`h-full px-2.5 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
-              <LayoutGrid className="h-3.5 w-3.5" />
+              <LayoutGridIcon className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => setViewMode("list")} className={`h-full px-2.5 flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}>
-              <List className="h-3.5 w-3.5" />
+              <ListIcon className="h-3.5 w-3.5" />
             </button>
           </div>
 
           <button onClick={() => setUploadModal({ open: true, editEntry: null })}
             className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors shrink-0 ml-auto">
-            <Plus className="h-3.5 w-3.5" /> Upload Catalog
+            <PlusIcon className="h-3.5 w-3.5" /> Upload Catalog
           </button>
         </div>
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
+          <div className="flex items-center justify-center py-20"><SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" /></div>
         ) : catalogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-[var(--border-subtle)] rounded-2xl">
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-4">
@@ -1254,7 +1268,7 @@ export default function CatalogsPage() {
             <p className="text-[12px] text-[var(--text-dim)] mb-5">Upload your first supplier catalog to get started.</p>
             <button onClick={() => setUploadModal({ open: true, editEntry: null })}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors">
-              <Upload className="h-4 w-4" /> Upload Catalog
+              <UploadIcon className="h-4 w-4" /> Upload Catalog
             </button>
           </div>
         ) : filtered.length === 0 ? (

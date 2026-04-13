@@ -2,11 +2,22 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import {
-  Plus, Search, Trash2, Copy, Filter, X,
-  Loader2, MoreHorizontal, CheckCircle2, Clock, Globe,
-  Building2, Package, FileText, ArrowUpDown, ArrowLeft,
-} from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import FilterIcon from "@/components/icons/ui/FilterIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import ArrowUpDownIcon from "@/components/icons/ui/ArrowUpDownIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import {
   fetchSimulations, deleteSimulation, duplicateSimulation,
 } from "@/lib/landed-cost-admin";
@@ -73,7 +84,7 @@ export default function LandedCostListPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -83,7 +94,7 @@ export default function LandedCostListPage() {
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8">
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
@@ -94,7 +105,7 @@ export default function LandedCostListPage() {
             </h1>
           </div>
           <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shrink-0">
-            <Plus className="h-4 w-4" /> {t("list.newSimulation")}
+            <PlusIcon className="h-4 w-4" /> {t("list.newSimulation")}
           </Link>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
@@ -109,7 +120,7 @@ export default function LandedCostListPage() {
         {/* ── Search & Filters ── */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 mb-5">
           <div className="relative flex-1">
-            <Search className={`absolute ${isRtl ? "right-3.5" : "left-3.5"} top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-ghost)]`} />
+            <SearchIcon className={`absolute ${isRtl ? "right-3.5" : "left-3.5"} top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-ghost)]`} />
             <input
               type="text"
               value={search}
@@ -119,7 +130,7 @@ export default function LandedCostListPage() {
             />
             {search && (
               <button onClick={() => setSearch("")} className={`absolute ${isRtl ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-[var(--text-ghost)] hover:text-[var(--text-primary)]`}>
-                <X className="h-3.5 w-3.5" />
+                <CrossIcon className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -161,7 +172,7 @@ export default function LandedCostListPage() {
             </p>
             {!search && !statusFilter && (
               <Link href="/landed-cost/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all">
-                <Plus className="h-4 w-4" /> {t("list.createSimulation")}
+                <PlusIcon className="h-4 w-4" /> {t("list.createSimulation")}
               </Link>
             )}
           </div>
@@ -197,7 +208,7 @@ export default function LandedCostListPage() {
 
                     {/* Product info */}
                     <div className="flex items-center gap-1.5 mb-3">
-                      <Package className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
+                      <PackageIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                       <span className="text-[11px] text-[var(--text-dim)] truncate">
                         {sim.product_name || t("list.noProduct")}{sim.sku ? ` · ${sim.sku}` : ""}
                       </span>
@@ -236,18 +247,18 @@ export default function LandedCostListPage() {
                       onClick={e => { e.preventDefault(); e.stopPropagation(); setMenuOpen(menuOpen === sim.id ? null : sim.id); }}
                       className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] opacity-0 group-hover:opacity-100 hover:text-[var(--text-primary)] transition-all"
                     >
-                      <MoreHorizontal className="h-3.5 w-3.5" />
+                      <MoreHorizontalIcon className="h-3.5 w-3.5" />
                     </button>
                     {menuOpen === sim.id && (
                       <div className={`absolute ${isRtl ? "left-0" : "right-0"} top-8 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-xl overflow-hidden min-w-[140px] z-20`}>
                         <Link href={`/landed-cost/${sim.id}`} className="flex items-center gap-2 px-3.5 py-2.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]/50 transition-colors" onClick={() => setMenuOpen(null)}>
-                          <FileText className="h-3.5 w-3.5 text-[var(--text-dim)]" /> {t("list.open")}
+                          <DocumentIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /> {t("list.open")}
                         </Link>
                         <button onClick={() => handleDuplicate(sim.id)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]/50 transition-colors">
-                          <Copy className="h-3.5 w-3.5 text-[var(--text-dim)]" /> {t("list.duplicate")}
+                          <CopyIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" /> {t("list.duplicate")}
                         </button>
                         <button onClick={() => handleDelete(sim.id)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[12px] text-red-400 hover:bg-red-500/[0.06] transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" /> {t("list.delete")}
+                          <TrashIcon className="h-3.5 w-3.5" /> {t("list.delete")}
                         </button>
                       </div>
                     )}

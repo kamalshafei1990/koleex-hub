@@ -18,7 +18,10 @@
 
 import { useEffect, useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
-import { X, Trash2, Save, CalendarPlus } from "lucide-react";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import type {
   CalendarEventRow,
   CalendarEventInsert,
@@ -179,7 +182,7 @@ export default function EventModal({
                 border: `1px solid ${color}55`,
               }}
             >
-              <CalendarPlus className="h-4 w-4" />
+              <CalendarPlusIcon className="h-4 w-4" />
             </div>
             <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
               {existingId ? "Edit Event" : "New Event"}
@@ -190,7 +193,7 @@ export default function EventModal({
             onClick={onClose}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center transition-all"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -344,7 +347,7 @@ export default function EventModal({
               disabled={saving}
               className="h-10 px-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[13px] font-medium flex items-center gap-2 hover:bg-red-500/15 transition-all disabled:opacity-60"
             >
-              <Trash2 className="h-4 w-4" /> Delete
+              <TrashIcon className="h-4 w-4" /> Delete
             </button>
           ) : (
             <span />
@@ -364,7 +367,7 @@ export default function EventModal({
               disabled={saving}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
             >
-              <Save className="h-4 w-4" />
+              <DiskIcon className="h-4 w-4" />
               {saving ? "Saving…" : existingId ? "Save" : "Create"}
             </button>
           </div>

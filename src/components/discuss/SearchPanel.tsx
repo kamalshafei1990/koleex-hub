@@ -18,7 +18,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Hash, Loader2, MessageSquare, Search, User, X } from "lucide-react";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import CommentIcon from "@/components/icons/ui/CommentIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { searchDiscussMessages } from "@/lib/discuss";
 import type {
   DiscussChannelKind,
@@ -130,11 +135,11 @@ export function SearchPanel({
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             aria-label={t("btn.close", "Close")}
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-          <Search className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
+          <SearchIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
           <input
             type="text"
             autoFocus
@@ -152,7 +157,7 @@ export function SearchPanel({
               onClick={() => setQuery("")}
               className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"
             >
-              <X className="h-3.5 w-3.5" />
+              <CrossIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -170,7 +175,7 @@ export function SearchPanel({
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && (
           <div className="flex items-center justify-center py-10 text-[var(--text-dim)]">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <SpinnerIcon className="h-4 w-4 animate-spin" />
           </div>
         )}
         {!loading && query.trim().length < 2 && (
@@ -253,10 +258,10 @@ export function SearchPanel({
 
 function ChannelIcon({ kind }: { kind: DiscussChannelKind }) {
   if (kind === "direct")
-    return <User className="h-3 w-3 text-[var(--text-dim)]" />;
+    return <UserIcon className="h-3 w-3 text-[var(--text-dim)]" />;
   if (kind === "customer")
-    return <MessageSquare className="h-3 w-3 text-[var(--text-dim)]" />;
-  return <Hash className="h-3 w-3 text-[var(--text-dim)]" />;
+    return <CommentIcon className="h-3 w-3 text-[var(--text-dim)]" />;
+  return <HashtagIcon className="h-3 w-3 text-[var(--text-dim)]" />;
 }
 
 /** Turn a snippet string with <mark>…</mark> tags into a safe React tree

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Loader2, Printer } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PrintIcon from "@/components/icons/ui/PrintIcon";
 import { fetchSimulation } from "@/lib/landed-cost-admin";
 import { sumExportCosts, sumShippingCosts, sumImportFixed, sumInlandCosts, sumFinancialCosts } from "@/lib/landed-cost-calc";
 import type { SimulationRow, SimulationResults } from "@/lib/landed-cost-types";
@@ -38,7 +39,7 @@ export default function PrintReportPage() {
   }, [id]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>;
+    return <div className="min-h-screen flex items-center justify-center"><SpinnerIcon className="h-6 w-6 animate-spin text-gray-400" /></div>;
   }
   if (!sim) {
     return <div className="min-h-screen flex items-center justify-center text-gray-500">Simulation not found</div>;
@@ -57,7 +58,7 @@ export default function PrintReportPage() {
       {/* Print button (hidden in print) */}
       <div className="print:hidden fixed top-4 right-4 z-50">
         <button onClick={() => window.print()} className="h-10 px-5 rounded-xl bg-gray-900 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
-          <Printer className="h-4 w-4" /> Print Report
+          <PrintIcon className="h-4 w-4" /> Print Report
         </button>
       </div>
 

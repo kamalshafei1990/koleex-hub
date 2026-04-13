@@ -3,7 +3,12 @@
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type { ProductFormState } from "@/types/product-form";
 import { useMemo } from "react";
-import { Plus, Check, ChevronLeft, Layers, FolderTree, Tag } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Image from "next/image";
 
 interface Props {
@@ -79,7 +84,7 @@ export default function ClassificationSection({
             <>
               <span className="text-[var(--text-ghost)] text-[10px]">/</span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-semibold text-emerald-400">
-                <Check className="h-3 w-3" />
+                <CheckIcon className="h-3 w-3" />
                 {selectedSub.name}
               </span>
             </>
@@ -103,7 +108,7 @@ export default function ClassificationSection({
                   {logo ? (
                     <Image src={logo} alt={div.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                   ) : (
-                    <Layers className="h-10 w-10 text-[var(--text-ghost)]" />
+                    <LayersIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                   )}
                   <div>
                     <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight block">{div.name}</span>
@@ -117,7 +122,7 @@ export default function ClassificationSection({
                 onClick={onClickCreateDivision}
                 className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
               >
-                <Plus className="h-8 w-8" />
+                <PlusIcon className="h-8 w-8" />
                 <span className="text-[11px] font-medium">New Division</span>
               </button>
             )}
@@ -133,7 +138,7 @@ export default function ClassificationSection({
               onClick={() => onChange({ division_slug: "", category_slug: "", subcategory_slug: "" })}
               className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
             <p className="text-[12px] font-medium text-[var(--text-subtle)]">Select Category in <span className="text-[var(--text-primary)]">{selectedDiv?.name}</span></p>
           </div>
@@ -152,7 +157,7 @@ export default function ClassificationSection({
                     {logo ? (
                       <Image src={logo} alt={cat.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
-                      <FolderTree className="h-10 w-10 text-[var(--text-ghost)]" />
+                      <FolderTreeIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                     )}
                     <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{cat.name}</span>
                   </button>
@@ -163,7 +168,7 @@ export default function ClassificationSection({
                   onClick={onClickCreateCategory}
                   className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
-                  <Plus className="h-8 w-8" />
+                  <PlusIcon className="h-8 w-8" />
                   <span className="text-[11px] font-medium">New Category</span>
                 </button>
               )}
@@ -180,7 +185,7 @@ export default function ClassificationSection({
               onClick={() => onChange({ category_slug: "", subcategory_slug: "" })}
               className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <AngleLeftIcon className="h-3.5 w-3.5" />
             </button>
             <p className="text-[12px] font-medium text-[var(--text-subtle)]">Select Subcategory in <span className="text-[var(--text-primary)]">{selectedCat?.name}</span></p>
           </div>
@@ -199,7 +204,7 @@ export default function ClassificationSection({
                     {logo ? (
                       <Image src={logo} alt={sub.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                     ) : (
-                      <Tag className="h-8 w-8 text-[var(--text-ghost)]" />
+                      <TagsIcon className="h-8 w-8 text-[var(--text-ghost)]" />
                     )}
                     <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight">{sub.name}</span>
                   </button>
@@ -210,7 +215,7 @@ export default function ClassificationSection({
                   onClick={onClickCreateSubcategory}
                   className="flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/40 transition-all"
                 >
-                  <Plus className="h-8 w-8" />
+                  <PlusIcon className="h-8 w-8" />
                   <span className="text-[11px] font-medium">New Subcategory</span>
                 </button>
               )}

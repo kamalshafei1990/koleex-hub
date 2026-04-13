@@ -2,7 +2,19 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, Pencil, ArrowLeft, X, Save, Loader2, ChevronUp, ChevronDown, FolderTree, Upload, ImageIcon } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import UploadIcon from "@/components/icons/ui/UploadIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { slugify } from "@/types/product-form";
 
 /* ---------------------------------------------------------------------------
@@ -191,11 +203,11 @@ export default function TaxonomyAdmin({
             href={backHref}
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <FolderTree className="h-4 w-4" />
+              <FolderTreeIcon className="h-4 w-4" />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{title}</h1>
           </div>
@@ -203,7 +215,7 @@ export default function TaxonomyAdmin({
             onClick={openCreate}
             className="h-9 md:h-10 px-4 md:px-5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] md:text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-colors"
           >
-            <Plus className="h-4 w-4" />
+            <PlusIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Add {singular}</span>
             <span className="sm:hidden">Add</span>
           </button>
@@ -214,7 +226,7 @@ export default function TaxonomyAdmin({
         <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
                 type="text"
                 value={search}
@@ -242,7 +254,7 @@ export default function TaxonomyAdmin({
             <div className="p-12 text-center text-white/30 text-[14px]">Loading...</div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
-              <FolderTree className="h-10 w-10 text-white/10 mx-auto mb-3" />
+              <FolderTreeIcon className="h-10 w-10 text-white/10 mx-auto mb-3" />
               <p className="text-white/30 text-[14px]">
                 {items.length === 0 ? `No ${title.toLowerCase()} yet.` : "No matches."}
               </p>
@@ -266,11 +278,11 @@ export default function TaxonomyAdmin({
                     <td className="px-3 py-3 text-center">
                       <div className="flex flex-col items-center gap-0.5">
                         <button onClick={() => handleMoveUp(item, idx)} disabled={idx === 0} className="text-white/15 hover:text-white/50 disabled:opacity-20 transition-colors">
-                          <ChevronUp className="h-3.5 w-3.5" />
+                          <AngleUpIcon className="h-3.5 w-3.5" />
                         </button>
                         <span className="text-[11px] text-white/25 font-mono">{item.order}</span>
                         <button onClick={() => handleMoveDown(item, idx)} disabled={idx === filtered.length - 1} className="text-white/15 hover:text-white/50 disabled:opacity-20 transition-colors">
-                          <ChevronDown className="h-3.5 w-3.5" />
+                          <AngleDownIcon className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -282,7 +294,7 @@ export default function TaxonomyAdmin({
                           </div>
                         ) : (
                           <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] border-dashed flex items-center justify-center mx-auto">
-                            <ImageIcon className="h-3.5 w-3.5 text-white/15" />
+                            <PictureIcon className="h-3.5 w-3.5 text-white/15" />
                           </div>
                         )}
                       </td>
@@ -310,13 +322,13 @@ export default function TaxonomyAdmin({
                           onClick={() => openEdit(item)}
                           className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <PencilIcon className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.id, item.name)}
                           className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <TrashIcon className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -358,7 +370,7 @@ export default function TaxonomyAdmin({
                 {editId ? `Edit ${singular}` : `New ${singular}`}
               </h2>
               <button onClick={() => setModalOpen(false)} className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white/60 transition-colors">
-                <X className="h-4 w-4" />
+                <CrossIcon className="h-4 w-4" />
               </button>
             </div>
 
@@ -382,7 +394,7 @@ export default function TaxonomyAdmin({
                       {logoPreview && !removeLogo ? (
                         <img src={logoFile ? URL.createObjectURL(logoFile) : logoPreview} alt="" className="w-10 h-10 object-contain" />
                       ) : (
-                        <ImageIcon className="h-5 w-5 text-white/15" />
+                        <PictureIcon className="h-5 w-5 text-white/15" />
                       )}
                     </div>
                     {/* Actions */}
@@ -407,7 +419,7 @@ export default function TaxonomyAdmin({
                         onClick={() => logoInputRef.current?.click()}
                         className="h-8 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-white/60 hover:text-white/90 flex items-center gap-1.5 transition-colors"
                       >
-                        <Upload className="h-3 w-3" />
+                        <UploadIcon className="h-3 w-3" />
                         {logoPreview && !removeLogo ? "Replace" : "Upload"}
                       </button>
                       {logoPreview && !removeLogo && (
@@ -416,7 +428,7 @@ export default function TaxonomyAdmin({
                           onClick={() => { setLogoFile(null); setLogoPreview(null); setRemoveLogo(true); }}
                           className="h-8 px-3 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] font-medium text-red-400/70 hover:text-red-400 flex items-center gap-1.5 transition-colors"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <TrashIcon className="h-3 w-3" />
                           Remove
                         </button>
                       )}
@@ -501,7 +513,7 @@ export default function TaxonomyAdmin({
                 disabled={saving}
                 className="h-10 px-6 rounded-lg bg-white text-black text-[13px] font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-50"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
                 {saving ? "Saving..." : editId ? "Update" : "Create"}
               </button>
             </div>

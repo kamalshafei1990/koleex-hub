@@ -1,9 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import {
-  Plus, Trash2, Upload, Image as ImageIcon, Film, FileText, Box, Tag, Layers,
-} from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import UploadIcon from "@/components/icons/ui/UploadIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import FilmIcon from "@/components/icons/ui/FilmIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
 import type { MediaFormState } from "@/types/product-form";
 import type { ProductMediaType } from "@/types/supabase";
 
@@ -24,13 +30,13 @@ interface MediaTypeDef {
 }
 
 const MEDIA_TYPES: MediaTypeDef[] = [
-  { type: "main_image", label: "Main Image", description: "Primary product photo used in hero and lists", icon: <ImageIcon className="h-4 w-4" />, accentColor: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400", multiple: false, accept: "image/*" },
-  { type: "gallery", label: "Gallery", description: "Additional product photos, angles and details", icon: <Layers className="h-4 w-4" />, accentColor: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400", multiple: true, accept: "image/*" },
-  { type: "packing_photo", label: "Packing Photos", description: "Show crate, box, and packaging dimensions", icon: <Box className="h-4 w-4" />, accentColor: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400", multiple: true, accept: "image/*" },
-  { type: "label", label: "Labels & Logos", description: "Brand labels, origin stickers, certifications", icon: <Tag className="h-4 w-4" />, accentColor: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400", multiple: true, accept: "image/*" },
-  { type: "manual", label: "Manual / Datasheet", description: "PDF manuals, datasheets, spec sheets", icon: <FileText className="h-4 w-4" />, accentColor: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300", multiple: true, accept: ".pdf,.doc,.docx" },
-  { type: "ar_3d", label: "AR / 3D View", description: "GLB, GLTF, USDZ files for AR preview", icon: <Box className="h-4 w-4" />, accentColor: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400", multiple: true, accept: ".glb,.gltf,.usdz" },
-  { type: "video", label: "Videos", description: "Product demo and operation videos", icon: <Film className="h-4 w-4" />, accentColor: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400", multiple: true, accept: "video/*" },
+  { type: "main_image", label: "Main Image", description: "Primary product photo used in hero and lists", icon: <PictureIcon className="h-4 w-4" />, accentColor: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400", multiple: false, accept: "image/*" },
+  { type: "gallery", label: "Gallery", description: "Additional product photos, angles and details", icon: <LayersIcon className="h-4 w-4" />, accentColor: "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400", multiple: true, accept: "image/*" },
+  { type: "packing_photo", label: "Packing Photos", description: "Show crate, box, and packaging dimensions", icon: <BoxIcon className="h-4 w-4" />, accentColor: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400", multiple: true, accept: "image/*" },
+  { type: "label", label: "Labels & Logos", description: "Brand labels, origin stickers, certifications", icon: <TagsIcon className="h-4 w-4" />, accentColor: "from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400", multiple: true, accept: "image/*" },
+  { type: "manual", label: "Manual / Datasheet", description: "PDF manuals, datasheets, spec sheets", icon: <DocumentIcon className="h-4 w-4" />, accentColor: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300", multiple: true, accept: ".pdf,.doc,.docx" },
+  { type: "ar_3d", label: "AR / 3D View", description: "GLB, GLTF, USDZ files for AR preview", icon: <BoxIcon className="h-4 w-4" />, accentColor: "from-pink-500/20 to-pink-600/10 border-pink-500/30 text-pink-400", multiple: true, accept: ".glb,.gltf,.usdz" },
+  { type: "video", label: "Videos", description: "Product demo and operation videos", icon: <FilmIcon className="h-4 w-4" />, accentColor: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400", multiple: true, accept: "video/*" },
 ];
 
 function MediaSlot({
@@ -72,7 +78,7 @@ function MediaSlot({
             onClick={() => ref.current?.click()}
             className="h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] flex items-center gap-1.5 transition-colors shrink-0"
           >
-            <Upload className="h-3 w-3" /> Upload
+            <UploadIcon className="h-3 w-3" /> Upload
           </button>
         )}
         <input
@@ -100,7 +106,7 @@ function MediaSlot({
             }`}
           >
             <div className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] mx-auto mb-2 flex items-center justify-center">
-              <Plus className="h-4 w-4 text-[var(--text-ghost)]" />
+              <PlusIcon className="h-4 w-4 text-[var(--text-ghost)]" />
             </div>
             <p className="text-[11px] font-medium text-[var(--text-dim)]">
               Click to upload{multiple ? " or drag files" : ""}
@@ -121,7 +127,7 @@ function MediaSlot({
                     <img src={src} alt={item.alt_text} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-ghost)] p-2">
-                      {item.type === "video" ? <Film className="h-8 w-8 mb-1" /> : item.type === "manual" ? <FileText className="h-8 w-8 mb-1" /> : <Box className="h-8 w-8 mb-1" />}
+                      {item.type === "video" ? <FilmIcon className="h-8 w-8 mb-1" /> : item.type === "manual" ? <DocumentIcon className="h-8 w-8 mb-1" /> : <BoxIcon className="h-8 w-8 mb-1" />}
                       <span className="text-[9px] truncate max-w-full text-center">{item._file?.name || (item.url ? item.url.split("/").pop() : "File")}</span>
                     </div>
                   )}
@@ -133,7 +139,7 @@ function MediaSlot({
                       className="h-8 w-8 rounded-lg bg-red-500/90 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
                       title="Remove"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <TrashIcon className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -146,7 +152,7 @@ function MediaSlot({
                 onClick={() => ref.current?.click()}
                 className="aspect-square rounded-xl border border-dashed border-[var(--border-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:border-[var(--border-focus)]/60 hover:bg-[var(--bg-surface-subtle)]/30 transition-all"
               >
-                <Plus className="h-5 w-5" />
+                <PlusIcon className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Add more</span>
               </button>
             )}

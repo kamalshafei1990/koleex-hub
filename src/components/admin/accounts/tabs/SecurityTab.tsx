@@ -16,28 +16,26 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import {
-  Shield,
-  KeyRound,
-  Monitor,
-  Smartphone,
-  Tablet,
-  HardDrive,
-  Fingerprint,
-  History,
-  Plus,
-  Trash2,
-  XCircle,
-  CheckCircle2,
-  AlertCircle,
-  LogIn,
-  LogOut,
-  RefreshCcw,
-  ShieldCheck,
-  ShieldOff,
-  Ban,
-  Clock,
-} from "lucide-react";
+import TabletIcon from "@/components/icons/ui/TabletIcon";
+import BanIcon from "@/components/icons/ui/BanIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
+import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import SmartphoneIcon from "@/components/icons/ui/SmartphoneIcon";
+import HardDriveIcon from "@/components/icons/ui/HardDriveIcon";
+import FingerprintIcon from "@/components/icons/ui/FingerprintIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import SignInIcon from "@/components/icons/ui/SignInIcon";
+import SignOutIcon from "@/components/icons/ui/SignOutIcon";
+import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import ShieldOffIcon from "@/components/icons/ui/ShieldOffIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
 import type {
   AccountWithLinks,
   ApiKeyRow,
@@ -171,12 +169,12 @@ export default function SecurityTab({ account }: Props) {
       {/* ── Password & sign-in ── */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Shield className="h-3.5 w-3.5" />
+          <ShieldIcon className="h-3.5 w-3.5" />
           Password &amp; Sign-in
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <InfoTile
-            icon={<KeyRound className="h-4 w-4" />}
+            icon={<KeyIcon className="h-4 w-4" />}
             label="Password"
             value={
               account.password_hash
@@ -186,13 +184,13 @@ export default function SecurityTab({ account }: Props) {
             tone={account.password_hash ? "neutral" : "warn"}
           />
           <InfoTile
-            icon={<RefreshCcw className="h-4 w-4" />}
+            icon={<RefreshCcwIcon className="h-4 w-4" />}
             label="Force change on next login"
             value={account.force_password_change ? "Required" : "Not required"}
             tone={account.force_password_change ? "warn" : "ok"}
           />
           <InfoTile
-            icon={<Fingerprint className="h-4 w-4" />}
+            icon={<FingerprintIcon className="h-4 w-4" />}
             label="Two-factor auth"
             value="Not configured"
             tone="neutral"
@@ -210,13 +208,13 @@ export default function SecurityTab({ account }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -225,7 +223,7 @@ export default function SecurityTab({ account }: Props) {
       <section className={tabCardClass}>
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <h2 className={tabSectionTitle + " mb-0"}>
-            <KeyRound className="h-3.5 w-3.5" />
+            <KeyIcon className="h-3.5 w-3.5" />
             API Keys
           </h2>
           <span className="text-[11px] text-[var(--text-dim)]">
@@ -250,7 +248,7 @@ export default function SecurityTab({ account }: Props) {
             disabled={busy || !newKeyName.trim()}
             className={primaryBtnClass}
           >
-            <Plus className="h-4 w-4" /> Create
+            <PlusIcon className="h-4 w-4" /> Create
           </button>
         </div>
 
@@ -258,7 +256,7 @@ export default function SecurityTab({ account }: Props) {
           <SkeletonRows count={2} />
         ) : keys.length === 0 ? (
           <EmptyRow
-            icon={<KeyRound className="h-4 w-4" />}
+            icon={<KeyIcon className="h-4 w-4" />}
             title="No API keys yet"
             description="Create one to authenticate programmatic access to Koleex."
           />
@@ -278,7 +276,7 @@ export default function SecurityTab({ account }: Props) {
                         : "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
                     }`}
                   >
-                    <KeyRound className="h-4 w-4" />
+                    <KeyIcon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
@@ -310,7 +308,7 @@ export default function SecurityTab({ account }: Props) {
                         disabled={busy}
                         className={ghostBtnClass}
                       >
-                        <Ban className="h-3.5 w-3.5" />
+                        <BanIcon className="h-3.5 w-3.5" />
                         Revoke
                       </button>
                     )}
@@ -320,7 +318,7 @@ export default function SecurityTab({ account }: Props) {
                       disabled={busy}
                       className="h-10 px-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[12px] font-medium flex items-center gap-1.5 hover:bg-red-500/15 transition-all disabled:opacity-60"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                       Delete
                     </button>
                   </div>
@@ -335,7 +333,7 @@ export default function SecurityTab({ account }: Props) {
       <section className={tabCardClass}>
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <h2 className={tabSectionTitle + " mb-0"}>
-            <Monitor className="h-3.5 w-3.5" />
+            <MonitorIcon className="h-3.5 w-3.5" />
             Active Devices
           </h2>
           <span className="text-[11px] text-[var(--text-dim)]">
@@ -347,7 +345,7 @@ export default function SecurityTab({ account }: Props) {
           <SkeletonRows count={2} />
         ) : sessions.length === 0 ? (
           <EmptyRow
-            icon={<Monitor className="h-4 w-4" />}
+            icon={<MonitorIcon className="h-4 w-4" />}
             title="No active devices"
             description="Sessions will appear here once Supabase Auth is wired and a user signs in."
           />
@@ -378,7 +376,7 @@ export default function SecurityTab({ account }: Props) {
                   disabled={busy}
                   className="h-10 px-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[12px] font-medium flex items-center gap-1.5 hover:bg-red-500/15 transition-all disabled:opacity-60"
                 >
-                  <XCircle className="h-3.5 w-3.5" />
+                  <XCircleIcon className="h-3.5 w-3.5" />
                   Sign out
                 </button>
               </div>
@@ -390,12 +388,12 @@ export default function SecurityTab({ account }: Props) {
       {/* ── Passkeys placeholder ── */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Fingerprint className="h-3.5 w-3.5" />
+          <FingerprintIcon className="h-3.5 w-3.5" />
           Passkeys
         </h2>
         <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-5 text-center">
           <div className="inline-flex h-10 w-10 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] items-center justify-center mb-3">
-            <Fingerprint className="h-4 w-4" />
+            <FingerprintIcon className="h-4 w-4" />
           </div>
           <p className="text-[13px] font-semibold text-[var(--text-muted)]">
             Passkey enrolment coming with Supabase Auth
@@ -411,7 +409,7 @@ export default function SecurityTab({ account }: Props) {
       {/* ── Login history ── */}
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <History className="h-3.5 w-3.5" />
+          <HistoryIcon className="h-3.5 w-3.5" />
           Recent Activity
         </h2>
 
@@ -419,7 +417,7 @@ export default function SecurityTab({ account }: Props) {
           <SkeletonRows count={3} />
         ) : history.length === 0 ? (
           <EmptyRow
-            icon={<History className="h-4 w-4" />}
+            icon={<HistoryIcon className="h-4 w-4" />}
             title="No events yet"
             description="Password resets, forced resets, API key activity and logins will be listed here."
           />
@@ -448,7 +446,7 @@ export default function SecurityTab({ account }: Props) {
                       </p>
                     )}
                     <p className="text-[11px] text-[var(--text-dim)] mt-0.5 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                      <ClockIcon className="h-3 w-3" />
                       {formatDate(h.created_at)}
                       {h.ip_address && <> · {h.ip_address}</>}
                     </p>
@@ -546,10 +544,10 @@ function SkeletonRows({ count }: { count: number }) {
 }
 
 function DeviceIcon({ type }: { type: AccountSessionRow["device_type"] }) {
-  if (type === "mobile") return <Smartphone className="h-4 w-4" />;
-  if (type === "tablet") return <Tablet className="h-4 w-4" />;
-  if (type === "other") return <HardDrive className="h-4 w-4" />;
-  return <Monitor className="h-4 w-4" />;
+  if (type === "mobile") return <SmartphoneIcon className="h-4 w-4" />;
+  if (type === "tablet") return <TabletIcon className="h-4 w-4" />;
+  if (type === "other") return <HardDriveIcon className="h-4 w-4" />;
+  return <MonitorIcon className="h-4 w-4" />;
 }
 
 function formatDate(iso: string): string {
@@ -582,45 +580,45 @@ function eventMeta(ev: LoginEventType): {
     LoginEventType,
     { label: string; icon: React.ElementType; tone: Tone }
   > = {
-    login_success: { label: "Login successful", icon: LogIn, tone: "ok" },
-    login_failed: { label: "Failed login attempt", icon: XCircle, tone: "danger" },
-    logout: { label: "Logged out", icon: LogOut, tone: "neutral" },
-    password_reset: { label: "Password reset", icon: KeyRound, tone: "warn" },
+    login_success: { label: "Login successful", icon: SignInIcon, tone: "ok" },
+    login_failed: { label: "Failed login attempt", icon: XCircleIcon, tone: "danger" },
+    logout: { label: "Logged out", icon: SignOutIcon, tone: "neutral" },
+    password_reset: { label: "Password reset", icon: KeyIcon, tone: "warn" },
     force_reset_enabled: {
       label: "Forced password change enabled",
-      icon: RefreshCcw,
+      icon: RefreshCcwIcon,
       tone: "warn",
     },
     force_reset_cleared: {
       label: "Forced password change cleared",
-      icon: RefreshCcw,
+      icon: RefreshCcwIcon,
       tone: "neutral",
     },
     two_factor_enabled: {
       label: "Two-factor enabled",
-      icon: ShieldCheck,
+      icon: ShieldCheckIcon,
       tone: "ok",
     },
     two_factor_disabled: {
       label: "Two-factor disabled",
-      icon: ShieldOff,
+      icon: ShieldOffIcon,
       tone: "warn",
     },
-    api_key_created: { label: "API key created", icon: KeyRound, tone: "ok" },
-    api_key_revoked: { label: "API key revoked", icon: Ban, tone: "warn" },
+    api_key_created: { label: "API key created", icon: KeyIcon, tone: "ok" },
+    api_key_revoked: { label: "API key revoked", icon: BanIcon, tone: "warn" },
     session_revoked: {
       label: "Session revoked",
-      icon: XCircle,
+      icon: XCircleIcon,
       tone: "warn",
     },
     passkey_enrolled: {
       label: "Passkey enrolled",
-      icon: Fingerprint,
+      icon: FingerprintIcon,
       tone: "ok",
     },
     passkey_revoked: {
       label: "Passkey revoked",
-      icon: Fingerprint,
+      icon: FingerprintIcon,
       tone: "warn",
     },
   };

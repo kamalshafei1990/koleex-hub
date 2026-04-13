@@ -25,22 +25,20 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import {
-  LogIn,
-  Loader2,
-  AlertCircle,
-  UserPlus,
-  CheckCircle2,
-  Mail,
-  User as UserIcon,
-  Building2,
-  MessageSquare,
-  Phone,
-  MapPin,
-  Briefcase,
-  Globe,
-  Link2,
-} from "lucide-react";
+import SignInIcon from "@/components/icons/ui/SignInIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import Link2Icon from "@/components/icons/ui/Link2Icon";
 import { verifyAccountLogin } from "@/lib/accounts-admin";
 import { createMembershipRequest } from "@/lib/inbox";
 import { setCurrentAccountId } from "@/lib/identity";
@@ -266,7 +264,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
   if (authed === null) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 text-white/40 animate-spin" />
+        <SpinnerIcon className="h-5 w-5 text-white/40 animate-spin" />
       </div>
     );
   }
@@ -333,7 +331,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 }`}
                 aria-pressed={tab === "signin"}
               >
-                <LogIn className="h-3.5 w-3.5" />
+                <SignInIcon className="h-3.5 w-3.5" />
                 Sign In
                 {tab === "signin" && (
                   <span
@@ -355,7 +353,7 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
                 }`}
                 aria-pressed={tab === "join"}
               >
-                <UserPlus className="h-3.5 w-3.5" />
+                <UserPlusIcon className="h-3.5 w-3.5" />
                 Be a Koleex Member
                 {tab === "join" && (
                   <span
@@ -508,7 +506,7 @@ function SignInPanel({
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px] flex items-start gap-2">
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -520,11 +518,11 @@ function SignInPanel({
       >
         {busy ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Signing in…
+            <SpinnerIcon className="h-4 w-4 animate-spin" /> Signing in…
           </>
         ) : (
           <>
-            <LogIn className="h-4 w-4" /> Sign In
+            <SignInIcon className="h-4 w-4" /> Sign In
           </>
         )}
       </button>
@@ -631,7 +629,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>Work Email *</label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="email"
               autoComplete="email"
@@ -645,7 +643,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>Phone</label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="tel"
               autoComplete="tel"
@@ -663,7 +661,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>Company</label>
           <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <Building2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="text"
               autoComplete="organization"
@@ -677,7 +675,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>Job Title</label>
           <div className="relative">
-            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <BriefcaseIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="text"
               autoComplete="organization-title"
@@ -695,7 +693,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>Country</label>
           <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+            <GlobeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
             <select
               value={state.country}
               onChange={(e) => setters.setCountry(e.target.value)}
@@ -715,7 +713,7 @@ function JoinPanel({
         <div>
           <label className={labelBase}>City</label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+            <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
             <input
               type="text"
               autoComplete="address-level2"
@@ -732,7 +730,7 @@ function JoinPanel({
       <div>
         <label className={labelBase}>How did you hear about us?</label>
         <div className="relative">
-          <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+          <Link2Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
           <select
             value={state.heardFrom}
             onChange={(e) => setters.setHeardFrom(e.target.value)}
@@ -751,7 +749,7 @@ function JoinPanel({
       <div>
         <label className={labelBase}>Purpose of access</label>
         <div className="relative">
-          <MessageSquare className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
+          <MessageSquareIcon className="absolute left-3 top-3 h-3.5 w-3.5 text-white/30" />
           <textarea
             value={state.message}
             onChange={(e) => setters.setMessage(e.target.value)}
@@ -763,7 +761,7 @@ function JoinPanel({
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px] flex items-start gap-2">
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -775,11 +773,11 @@ function JoinPanel({
       >
         {busy ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+            <SpinnerIcon className="h-4 w-4 animate-spin" /> Submitting…
           </>
         ) : (
           <>
-            <UserPlus className="h-4 w-4" /> Request Access
+            <UserPlusIcon className="h-4 w-4" /> Request Access
           </>
         )}
       </button>
@@ -804,7 +802,7 @@ function JoinSuccessPanel({ name, onReset }: JoinSuccessPanelProps) {
   return (
     <div className="py-4 flex flex-col items-center text-center">
       <div className="h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-4">
-        <CheckCircle2 className="h-6 w-6 text-emerald-300" />
+        <CheckCircleIcon className="h-6 w-6 text-emerald-300" />
       </div>
       <h3 className="text-[15px] font-semibold text-white">
         Thanks, {firstName}!

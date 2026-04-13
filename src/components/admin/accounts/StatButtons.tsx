@@ -14,13 +14,11 @@
    --------------------------------------------------------------------------- */
 
 import Link from "next/link";
-import {
-  Briefcase,
-  UserCircle2,
-  Building2,
-  Calendar,
-  ArrowUpRight,
-} from "lucide-react";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import type {
   AccountWithLinks,
   EmployeeRow,
@@ -67,7 +65,7 @@ export default function StatButtons({ account }: Props) {
                 {b.value}
               </p>
             </div>
-            <ArrowUpRight className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ArrowUpRightIcon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
           </Link>
         );
       })}
@@ -93,7 +91,7 @@ function employeeButton(employee: EmployeeRow | null): StatButtonDef {
       ? employee.employee_number || employee.position || "View record"
       : "",
     href: employee ? `/accounts?employee=${employee.id}` : "#",
-    icon: Briefcase,
+    icon: BriefcaseIcon,
     hidden: !employee,
   };
 }
@@ -104,7 +102,7 @@ function contactButton(person: PersonRow | null): StatButtonDef {
     label: "Contact",
     value: person ? person.full_name : "",
     href: person ? `/contacts/${person.id}` : "#",
-    icon: UserCircle2,
+    icon: UserCircle2Icon,
     hidden: !person,
   };
 }
@@ -115,7 +113,7 @@ function companyButton(company: CompanyRow | null): StatButtonDef {
     label: "Company",
     value: company ? company.name : "",
     href: company ? `/companies/${company.id}` : "#",
-    icon: Building2,
+    icon: Building2Icon,
     hidden: !company,
   };
 }
@@ -126,7 +124,7 @@ function calendarButton(accountId: string): StatButtonDef {
     label: "Calendar",
     value: "View schedule",
     href: `/calendar?account=${accountId}`,
-    icon: Calendar,
+    icon: CalendarRawIcon,
     // Always visible — calendar is available per-account even without HR record.
     hidden: false,
   };

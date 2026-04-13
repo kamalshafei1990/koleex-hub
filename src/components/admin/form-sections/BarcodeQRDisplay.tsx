@@ -10,7 +10,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import RefreshIcon from "@/components/icons/ui/RefreshIcon";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 
@@ -100,7 +101,7 @@ export default function BarcodeQRDisplay({ value, label, qrPayload, compact = fa
   if (!value) {
     return (
       <div className="flex items-center gap-2 text-[10px] text-[var(--text-ghost)] italic py-3 px-4 rounded-lg border border-dashed border-[var(--border-subtle)]">
-        <RefreshCw className="h-3 w-3" />
+        <RefreshIcon className="h-3 w-3" />
         Barcode &amp; QR will generate automatically once the SKU is saved
       </div>
     );
@@ -121,7 +122,7 @@ export default function BarcodeQRDisplay({ value, label, qrPayload, compact = fa
             className="h-6 w-6 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors"
             title="Download PNG"
           >
-            <Download className="h-3 w-3" />
+            <DownloadIcon className="h-3 w-3" />
           </button>
         </div>
         <div className="flex items-center justify-center py-1">
@@ -146,7 +147,7 @@ export default function BarcodeQRDisplay({ value, label, qrPayload, compact = fa
             className="h-6 w-6 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors"
             title="Download PNG"
           >
-            <Download className="h-3 w-3" />
+            <DownloadIcon className="h-3 w-3" />
           </button>
         </div>
         <div className="flex items-center justify-center py-1">

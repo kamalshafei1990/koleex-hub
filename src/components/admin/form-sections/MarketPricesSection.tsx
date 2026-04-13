@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import type { MarketPriceFormState, ModelFormState } from "@/types/product-form";
 import { COUNTRIES } from "@/types/product-form";
 
@@ -61,7 +62,7 @@ export default function MarketPricesSection({ prices, models, onChange }: Props)
                 onClick={() => add(model._tempId)}
                 className="h-7 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-subtle)] hover:text-[var(--text-primary)]/80 flex items-center gap-1 transition-colors"
               >
-                <Plus className="h-3 w-3" /> Add Country
+                <PlusIcon className="h-3 w-3" /> Add Country
               </button>
             </div>
             {modelPrices.length === 0 ? (
@@ -100,7 +101,7 @@ export default function MarketPricesSection({ prices, models, onChange }: Props)
                       className="w-[80px] h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
                     />
                     <button onClick={() => remove(p._tempId)} className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}

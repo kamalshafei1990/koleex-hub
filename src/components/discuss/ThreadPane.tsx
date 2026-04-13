@@ -27,7 +27,10 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { Loader2, Send, Smile, X } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import SmileIcon from "@/components/icons/ui/SmileIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
   fetchThreadMessages,
   sendDiscussMessage,
@@ -230,7 +233,7 @@ export function ThreadPane({
           className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           aria-label={t("btn.close", "Close")}
         >
-          <X className="h-4 w-4" />
+          <CrossIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -238,7 +241,7 @@ export function ThreadPane({
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
         {loading ? (
           <div className="flex items-center justify-center py-8 text-[var(--text-dim)]">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <SpinnerIcon className="h-4 w-4 animate-spin" />
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -280,7 +283,7 @@ export function ThreadPane({
               aria-label="Emoji"
               disabled
             >
-              <Smile className="h-3.5 w-3.5" />
+              <SmileIcon className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
@@ -289,9 +292,9 @@ export function ThreadPane({
               className="h-7 px-3 rounded-md bg-blue-500 text-white text-[11px] font-semibold hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none inline-flex items-center gap-1.5"
             >
               {sending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <SpinnerIcon className="h-3 w-3 animate-spin" />
               ) : (
-                <Send className="h-3 w-3" />
+                <PaperPlaneIcon className="h-3 w-3" />
               )}
               {t("thread.reply.send", "Reply")}
             </button>
@@ -417,7 +420,7 @@ function ThreadMessage({
             className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
             aria-label="React"
           >
-            <Smile className="h-3.5 w-3.5" />
+            <SmileIcon className="h-3.5 w-3.5" />
           </button>
           {pickerOpen && (
             <div

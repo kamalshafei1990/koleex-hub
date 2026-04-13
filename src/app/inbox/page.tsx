@@ -17,32 +17,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  Archive,
-  CheckCheck,
-  CheckCircle2,
-  CornerUpLeft,
-  CornerUpRight,
-  Download,
-  ExternalLink,
-  FileText,
-  Inbox as InboxIcon,
-  Loader2,
-  Mail,
-  MailOpen,
-  Package,
-  Paperclip,
-  PenSquare,
-  Plus,
-  Search,
-  Send,
-  X,
-  XCircle,
-  Users,
-  User as UserIcon,
-  AlertCircle,
-} from "lucide-react";
+import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
+import MailOpenIcon from "@/components/icons/ui/MailOpenIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
+import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ReplyIcon from "@/components/icons/ui/ReplyIcon";
+import ForwardMsgIcon from "@/components/icons/ui/ForwardMsgIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import PenSquareIcon from "@/components/icons/ui/PenSquareIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import MailIcon from "@/components/icons/MailIcon";
 import {
   archiveMessage,
@@ -457,7 +455,7 @@ export default function InboxPage() {
   if (accountLoading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -502,7 +500,7 @@ export default function InboxPage() {
           className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
           aria-label="Back to Hub"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeftIcon className="h-4 w-4" />
         </Link>
         {/* Mobile back: when we're on the detail view, this flips us
             back to the list. Invisible on desktop where the list is
@@ -513,7 +511,7 @@ export default function InboxPage() {
             onClick={() => setMobileView("list")}
             className="md:hidden h-8 px-2 flex items-center gap-1 rounded-lg text-[12px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
             Mailboxes
           </button>
         )}
@@ -531,7 +529,7 @@ export default function InboxPage() {
           disabled={mailboxCounts.unread === 0}
           className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5 disabled:opacity-40 disabled:pointer-events-none"
         >
-          <CheckCheck className="h-3.5 w-3.5" />
+          <CheckCheckIcon className="h-3.5 w-3.5" />
           Mark all read
         </button>
         <button
@@ -544,7 +542,7 @@ export default function InboxPage() {
           }}
           className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all"
         >
-          <PenSquare className="h-3.5 w-3.5" />
+          <PenSquareIcon className="h-3.5 w-3.5" />
           <span className="hidden md:inline">Compose</span>
         </button>
       </header>
@@ -570,14 +568,14 @@ export default function InboxPage() {
                 const count = mailboxCounts[box];
                 const Icon =
                   box === "inbox"
-                    ? InboxIcon
+                    ? InboxRawIcon
                     : box === "unread"
-                      ? MailOpen
+                      ? MailOpenIcon
                       : box === "membership"
-                        ? Users
+                        ? UsersIcon
                         : box === "system"
-                          ? AlertCircle
-                          : Archive;
+                          ? ExclamationIcon
+                          : ArchiveIcon;
                 return (
                   <button
                     key={box}
@@ -652,7 +650,7 @@ export default function InboxPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-              <Search size={14} className="text-[var(--text-dim)] shrink-0" />
+              <SearchIcon size={14} className="text-[var(--text-dim)] shrink-0" />
               <input
                 type="text"
                 value={search}
@@ -666,7 +664,7 @@ export default function InboxPage() {
                   onClick={() => setSearch("")}
                   className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 >
-                  <X size={14} />
+                  <CrossIcon size={14} />
                 </button>
               )}
             </div>
@@ -676,7 +674,7 @@ export default function InboxPage() {
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loading ? (
               <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
               </div>
             ) : filtered.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
@@ -779,10 +777,10 @@ export default function InboxPage() {
                             )}
                             <div className="flex items-center gap-1.5 mt-1.5">
                               {hasAttachments && (
-                                <Paperclip className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                                <PaperclipIcon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
                               )}
                               {hasProducts && (
-                                <Package className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                                <PackageIcon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
                               )}
                               <span
                                 className={`inline-block text-[9px] font-semibold uppercase tracking-wider px-1.5 py-[1px] rounded border ${categoryBadge(msg.category).className}`}
@@ -807,7 +805,7 @@ export default function InboxPage() {
                             title="Reply"
                             className="h-7 w-7 rounded-md bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center shadow-md"
                           >
-                            <CornerUpLeft className="h-3 w-3" />
+                            <ReplyIcon className="h-3 w-3" />
                           </button>
                         )}
                         <button
@@ -820,9 +818,9 @@ export default function InboxPage() {
                           className="h-7 w-7 rounded-md bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors flex items-center justify-center shadow-md"
                         >
                           {msg.read_at ? (
-                            <Mail className="h-3 w-3" />
+                            <EnvelopeIcon className="h-3 w-3" />
                           ) : (
-                            <MailOpen className="h-3 w-3" />
+                            <MailOpenIcon className="h-3 w-3" />
                           )}
                         </button>
                         {!msg.archived_at && (
@@ -835,7 +833,7 @@ export default function InboxPage() {
                             title="Archive"
                             className="h-7 w-7 rounded-md bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-red-300 hover:border-red-500/30 transition-colors flex items-center justify-center shadow-md"
                           >
-                            <Archive className="h-3 w-3" />
+                            <ArchiveIcon className="h-3 w-3" />
                           </button>
                         )}
                       </div>
@@ -911,9 +909,9 @@ export default function InboxPage() {
           }`}
         >
           {toast.kind === "success" ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
+            <CheckCircleIcon className="h-3.5 w-3.5" />
           ) : (
-            <AlertCircle className="h-3.5 w-3.5" />
+            <ExclamationIcon className="h-3.5 w-3.5" />
           )}
           {toast.text}
         </div>
@@ -1099,7 +1097,7 @@ function MessageDetail({
             title="Archive"
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
-            <Archive className="h-4 w-4" />
+            <ArchiveIcon className="h-4 w-4" />
           </button>
         )}
         {canReply && (
@@ -1109,7 +1107,7 @@ function MessageDetail({
             title="Reply"
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
-            <CornerUpLeft className="h-4 w-4" />
+            <ReplyIcon className="h-4 w-4" />
           </button>
         )}
         <button
@@ -1118,7 +1116,7 @@ function MessageDetail({
           title="Forward"
           className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
         >
-          <CornerUpRight className="h-4 w-4" />
+          <ForwardMsgIcon className="h-4 w-4" />
         </button>
         {canModerate && (
           <>
@@ -1131,7 +1129,7 @@ function MessageDetail({
               }}
               className="h-8 px-3 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors flex items-center gap-1.5"
             >
-              <CheckCircle2 className="h-3 w-3" />
+              <CheckCircleIcon className="h-3 w-3" />
               Approve
             </button>
             <button
@@ -1142,7 +1140,7 @@ function MessageDetail({
               }}
               className="h-8 px-3 rounded-md bg-red-500/10 border border-red-500/30 text-[11px] font-semibold text-red-300 hover:bg-red-500/20 transition-colors flex items-center gap-1.5"
             >
-              <XCircle className="h-3 w-3" />
+              <XCircleIcon className="h-3 w-3" />
               Reject
             </button>
           </>
@@ -1202,12 +1200,12 @@ function MessageDetail({
             >
               {confirmMode === "approve" ? (
                 <>
-                  <CheckCircle2 className="h-3 w-3" />
+                  <CheckCircleIcon className="h-3 w-3" />
                   Confirm approve
                 </>
               ) : (
                 <>
-                  <XCircle className="h-3 w-3" />
+                  <XCircleIcon className="h-3 w-3" />
                   Confirm reject
                 </>
               )}
@@ -1271,7 +1269,7 @@ function MessageDetail({
           {attachments.length > 0 && (
             <div className="mt-10 pt-6 border-t border-[var(--border-subtle)]">
               <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Paperclip className="h-3 w-3" />
+                <PaperclipIcon className="h-3 w-3" />
                 {attachments.length} attachment{attachments.length === 1 ? "" : "s"}
               </div>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1285,7 +1283,7 @@ function MessageDetail({
                       className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-secondary)] transition-colors group"
                     >
                       <div className="h-10 w-10 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                        <FileText className="h-4 w-4 text-[var(--text-dim)]" />
+                        <DocumentIcon className="h-4 w-4 text-[var(--text-dim)]" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[12.5px] font-semibold text-[var(--text-primary)] truncate">
@@ -1296,7 +1294,7 @@ function MessageDetail({
                           {a.type ? ` · ${a.type.split("/").pop()}` : ""}
                         </div>
                       </div>
-                      <Download className="h-4 w-4 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] shrink-0" />
+                      <DownloadIcon className="h-4 w-4 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] shrink-0" />
                     </a>
                   </li>
                 ))}
@@ -1308,7 +1306,7 @@ function MessageDetail({
           {products.length > 0 && (
             <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
               <div className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Package className="h-3 w-3" />
+                <PackageIcon className="h-3 w-3" />
                 Referenced product{products.length === 1 ? "" : "s"}
               </div>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1327,7 +1325,7 @@ function MessageDetail({
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <Package className="h-5 w-5 text-[var(--text-dim)]" />
+                          <PackageIcon className="h-5 w-5 text-[var(--text-dim)]" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1338,7 +1336,7 @@ function MessageDetail({
                           {p.slug}
                         </div>
                       </div>
-                      <ExternalLink className="h-4 w-4 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] shrink-0" />
+                      <ExternalLinkIcon className="h-4 w-4 text-[var(--text-dim)] group-hover:text-[var(--text-primary)] shrink-0" />
                     </Link>
                   </li>
                 ))}
@@ -1614,7 +1612,7 @@ function ComposeView({
               className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
               aria-label="Close compose"
             >
-              <X className="h-4 w-4" />
+              <CrossIcon className="h-4 w-4" />
             </button>
           </div>
           {/* Group-mode toggle: shown on fresh compose so the user can
@@ -1631,7 +1629,7 @@ function ComposeView({
                 }`}
                 title={mode === "role" ? "Switch to single recipient" : "Broadcast to role"}
               >
-                <Users className="h-3.5 w-3.5" />
+                <UsersIcon className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
@@ -1665,7 +1663,7 @@ function ComposeView({
                      again — Apple Mail uses the same interaction for
                      group contacts. */
                   <span className="inline-flex items-center gap-1.5 h-6 pl-1 pr-1.5 rounded-full bg-purple-500/15 text-purple-300 text-[12px] font-semibold border border-purple-500/30">
-                    <Users className="h-3 w-3" />
+                    <UsersIcon className="h-3 w-3" />
                     All {roleName}
                     <button
                       type="button"
@@ -1673,7 +1671,7 @@ function ComposeView({
                       className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-purple-500/25"
                       aria-label="Clear role"
                     >
-                      <X className="h-2.5 w-2.5" />
+                      <CrossIcon className="h-2.5 w-2.5" />
                     </button>
                   </span>
                 ) : (
@@ -1697,7 +1695,7 @@ function ComposeView({
                           className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-blue-500/25"
                           aria-label="Remove recipient"
                         >
-                          <X className="h-2.5 w-2.5" />
+                          <CrossIcon className="h-2.5 w-2.5" />
                         </button>
                       </span>
                     )}
@@ -1731,7 +1729,7 @@ function ComposeView({
                 <div className="absolute top-full start-4 end-4 z-10 mt-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl max-h-56 overflow-y-auto">
                   {loadingRecipients ? (
                     <div className="h-16 flex items-center justify-center">
-                      <Loader2 className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+                      <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
                     </div>
                   ) : filteredRecipients.length === 0 ? (
                     <div className="h-16 flex items-center justify-center text-[12px] text-[var(--text-dim)]">
@@ -1839,7 +1837,7 @@ function ComposeView({
                         className="flex items-center gap-2.5 p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
                       >
                         <div className="h-8 w-8 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
-                          <FileText className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                          <DocumentIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
@@ -1859,7 +1857,7 @@ function ComposeView({
                           className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center shrink-0"
                           aria-label={`Remove ${a.name}`}
                         >
-                          <X className="h-3 w-3" />
+                          <CrossIcon className="h-3 w-3" />
                         </button>
                       </li>
                     ))}
@@ -1881,7 +1879,7 @@ function ComposeView({
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <Package className="h-4 w-4 text-[var(--text-dim)]" />
+                            <PackageIcon className="h-4 w-4 text-[var(--text-dim)]" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1902,7 +1900,7 @@ function ComposeView({
                           className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center shrink-0"
                           aria-label={`Remove ${p.name}`}
                         >
-                          <X className="h-3 w-3" />
+                          <CrossIcon className="h-3 w-3" />
                         </button>
                       </li>
                     ))}
@@ -1916,7 +1914,7 @@ function ComposeView({
                 attachment list. */}
             {error && (
               <div className="mx-5 mb-4 rounded-lg border border-red-500/30 bg-red-500/[0.08] text-red-300 px-3 py-2 text-[12px] flex items-start gap-2">
-                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <ExclamationIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -1947,9 +1945,9 @@ function ComposeView({
               className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors disabled:opacity-50"
             >
               {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <SpinnerIcon className="h-4 w-4 animate-spin" />
               ) : (
-                <Paperclip className="h-4 w-4" />
+                <PaperclipIcon className="h-4 w-4" />
               )}
             </button>
             <button
@@ -1958,7 +1956,7 @@ function ComposeView({
               title="Select product"
               className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
-              <Package className="h-4 w-4" />
+              <PackageIcon className="h-4 w-4" />
             </button>
             {(attachments.length > 0 || attachedProducts.length > 0) && (
               <span className="text-[10.5px] text-[var(--text-dim)] ml-1.5 tabular-nums">
@@ -1978,9 +1976,9 @@ function ComposeView({
               aria-label="Send"
             >
               {busy ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Send className="h-3.5 w-3.5" />
+                <PaperPlaneIcon className="h-3.5 w-3.5" />
               )}
             </button>
           </div>
@@ -2099,7 +2097,7 @@ function ProductPickerModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Package size={16} className="text-[var(--text-dim)]" />
+            <PackageIcon size={16} className="text-[var(--text-dim)]" />
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
               Select product
             </h2>
@@ -2114,14 +2112,14 @@ function ProductPickerModal({
             onClick={onCancel}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors"
           >
-            <X size={15} className="text-[var(--text-dim)]" />
+            <CrossIcon size={15} className="text-[var(--text-dim)]" />
           </button>
         </div>
 
         {/* Search */}
         <div className="px-5 pt-4">
           <div className="flex items-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 gap-2 focus-within:border-[var(--border-focus)] transition-all">
-            <Search size={14} className="text-[var(--text-dim)]" />
+            <SearchIcon size={14} className="text-[var(--text-dim)]" />
             <input
               type="text"
               value={search}
@@ -2132,7 +2130,7 @@ function ProductPickerModal({
             />
             {search && (
               <button onClick={() => setSearch("")} className="p-0.5">
-                <X size={14} className="text-[var(--text-dim)]" />
+                <CrossIcon size={14} className="text-[var(--text-dim)]" />
               </button>
             )}
           </div>
@@ -2142,12 +2140,12 @@ function ProductPickerModal({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+              <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <div className="h-12 w-12 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                <Package className="h-5 w-5 text-[var(--text-ghost)]" />
+                <PackageIcon className="h-5 w-5 text-[var(--text-ghost)]" />
               </div>
               <p className="text-[12px] text-[var(--text-dim)]">
                 {search ? "No products match your search" : "No products yet"}
@@ -2181,7 +2179,7 @@ function ProductPickerModal({
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <Package className="h-5 w-5 text-[var(--text-dim)]" />
+                          <PackageIcon className="h-5 w-5 text-[var(--text-dim)]" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -2204,9 +2202,9 @@ function ProductPickerModal({
                           Added
                         </span>
                       ) : isSelected ? (
-                        <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0" />
+                        <CheckCircleIcon className="h-4 w-4 text-blue-400 shrink-0" />
                       ) : (
-                        <Plus className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
+                        <PlusIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
                       )}
                     </button>
                   </li>
@@ -2231,7 +2229,7 @@ function ProductPickerModal({
             disabled={selected.size === 0}
             className="h-9 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <PlusIcon className="h-3.5 w-3.5" />
             Add {selected.size > 0 ? `(${selected.size})` : ""}
           </button>
         </div>

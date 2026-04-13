@@ -2,15 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import {
-  ClipboardList,
-  ArrowLeft,
-  Plus,
-  Trash2,
-  Printer,
-  FileText,
-  Download,
-} from "lucide-react";
+import QuotationIcon from "@/components/icons/QuotationIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PrintIcon from "@/components/icons/ui/PrintIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 
 /* ══════════════════════════════════════════════════════════
    Types
@@ -655,10 +653,10 @@ export default function Quotations() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 mb-1">
               <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeftIcon className="h-4 w-4" />
               </Link>
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <ClipboardList className="h-4 w-4" />
+                <QuotationIcon size={16} />
               </div>
               <div className="flex items-center gap-2.5 min-w-0">
                 <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
@@ -674,7 +672,7 @@ export default function Quotations() {
               onClick={handleNew}
               className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-[var(--text-primary)] rounded-xl text-sm font-medium transition active:scale-95"
             >
-              <Plus size={18} />
+              <PlusIcon size={18} />
               New Quotation
             </button>
           </div>
@@ -684,7 +682,7 @@ export default function Quotations() {
         <div className="max-w-[1500px] mx-auto px-4 py-6">
           {sortedQuotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-              <FileText size={48} className="mb-4 opacity-40" />
+              <DocumentIcon size={48} className="mb-4 opacity-40" />
               <p className="text-lg font-medium">No quotations yet</p>
               <p className="text-sm mt-1">
                 Create your first quotation to get started.
@@ -740,7 +738,7 @@ export default function Quotations() {
                           className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100"
                           title="Delete"
                         >
-                          <Trash2 size={16} />
+                          <TrashIcon size={16} />
                         </button>
                       </div>
                     </div>
@@ -780,7 +778,7 @@ export default function Quotations() {
           onClick={() => setView("list")}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
-          <ArrowLeft size={15} />
+          <ArrowLeftIcon size={15} />
           Back
         </button>
         <div style={{ flex: 1 }} />
@@ -810,21 +808,21 @@ export default function Quotations() {
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
-          <Download size={14} />
+          <DownloadIcon size={14} />
           Export PDF
         </button>
         <button
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
-          <Printer size={14} />
+          <PrintIcon size={14} />
           Print
         </button>
         <button
           onClick={handleDeleteCurrent}
           className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"
         >
-          <Trash2 size={14} />
+          <TrashIcon size={14} />
         </button>
       </div>
 

@@ -8,7 +8,7 @@
    Click an event chip → open the editor.
    --------------------------------------------------------------------------- */
 
-import { Plus } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
 import type { CalendarEventRow, AccountPreferences } from "@/types/supabase";
 import {
   eventsOnDay,
@@ -114,7 +114,7 @@ export default function MonthView({
                   className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
                   title="New event"
                 >
-                  <Plus className="h-3 w-3" />
+                  <PlusIcon className="h-3 w-3" />
                 </button>
               </div>
 

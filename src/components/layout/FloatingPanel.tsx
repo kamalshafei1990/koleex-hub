@@ -18,12 +18,10 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import {
-  X,
-  Send,
-  ChevronLeft,
-  Loader2,
-} from "lucide-react";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
@@ -291,7 +289,7 @@ export default function FloatingPanel() {
             {tab === "discuss" && activeChannel ? (
               <div className="flex items-center gap-2 min-w-0">
                 <button onClick={handleBack} className={`p-1 rounded-lg transition-colors ${hoverBg} ${textM}`}>
-                  <ChevronLeft size={16} />
+                  <AngleLeftIcon size={16} />
                 </button>
                 <span className={`text-[13px] font-semibold truncate ${textP}`}>
                   {channelLabel(activeChannel)}
@@ -347,7 +345,7 @@ export default function FloatingPanel() {
               className={`p-1.5 rounded-lg transition-colors ${hoverBg} ${textM}`}
               title="Close"
             >
-              <X size={14} />
+              <CrossIcon size={14} />
             </button>
           </div>
 
@@ -360,7 +358,7 @@ export default function FloatingPanel() {
                   <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                     {loadingMsgs && (
                       <div className="flex justify-center py-8">
-                        <Loader2 className={`h-5 w-5 animate-spin ${textG}`} />
+                        <SpinnerIcon className={`h-5 w-5 animate-spin ${textG}`} />
                       </div>
                     )}
                     {messages.map((msg) => {
@@ -524,7 +522,7 @@ export default function FloatingPanel() {
                     dk ? "text-white/60 hover:text-white hover:bg-white/[0.06]" : "text-black/60 hover:text-black hover:bg-black/[0.06]"
                   }`}
                 >
-                  <Send size={14} />
+                  <PaperPlaneIcon size={14} />
                 </button>
               </div>
             </div>
@@ -725,7 +723,7 @@ export default function FloatingPanel() {
                 onClick={handleClose}
                 className="flex items-center justify-center w-full h-full"
               >
-                <X size={16} className={`fab-x-enter ${dk ? "text-white/60" : "text-black/60"}`} />
+                <CrossIcon size={16} className={`fab-x-enter ${dk ? "text-white/60" : "text-black/60"}`} />
               </button>
             ) : (
               /* ── Expanded: pill with AI | Discuss ── */

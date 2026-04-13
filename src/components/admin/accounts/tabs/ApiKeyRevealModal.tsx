@@ -9,7 +9,11 @@
    --------------------------------------------------------------------------- */
 
 import { useState } from "react";
-import { X, Copy, Check, AlertTriangle, KeyRound } from "lucide-react";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
 import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface Props {
@@ -46,7 +50,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-8 w-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 flex items-center justify-center shrink-0">
-              <KeyRound className="h-4 w-4" />
+              <KeyIcon className="h-4 w-4" />
             </div>
             <h2 className="text-[15px] font-bold text-[var(--text-primary)] truncate">
               API key created
@@ -57,7 +61,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
             onClick={onClose}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center transition-all"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -72,7 +76,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
           </p>
 
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-200 px-3 py-2.5 text-[12px] flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <TriangleWarningIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
               Koleex only stores a hash of this key. If you lose it, create a
               new one — it cannot be recovered.
@@ -91,11 +95,11 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
               >
                 {copied ? (
                   <>
-                    <Check className="h-3 w-3" /> Copied
+                    <CheckIcon className="h-3 w-3" /> Copied
                   </>
                 ) : (
                   <>
-                    <Copy className="h-3 w-3" /> Copy
+                    <CopyIcon className="h-3 w-3" /> Copy
                   </>
                 )}
               </button>

@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import type { ProductFormState } from "@/types/product-form";
 
 interface Props {
@@ -41,7 +42,7 @@ export default function SpecsSection({ data, onChange }: Props) {
           onClick={addSpec}
           className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]/80 flex items-center gap-1.5 transition-colors"
         >
-          <Plus className="h-3.5 w-3.5" /> Add Spec
+          <PlusIcon className="h-3.5 w-3.5" /> Add Spec
         </button>
       </div>
       {entries.length === 0 ? (
@@ -65,7 +66,7 @@ export default function SpecsSection({ data, onChange }: Props) {
                 className="flex-1 h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
               />
               <button onClick={() => removeSpec(key)} className="h-10 w-10 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
-                <Trash2 className="h-3.5 w-3.5" />
+                <TrashIcon className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}

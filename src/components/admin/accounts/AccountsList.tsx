@@ -18,11 +18,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Plus, Search, Filter, X, UserCircle2, Shield, Mail, Building2,
-  MoreHorizontal, Eye, Pencil, KeyRound, PowerOff, Power, RefreshCcw,
-  CheckCircle2, AlertCircle, Copy, Flag,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import FilterIcon from "@/components/icons/ui/FilterIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
+import ToggleOffIcon from "@/components/icons/ui/ToggleOffIcon";
+import PowerIcon from "@/components/icons/ui/PowerIcon";
+import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import FlagIcon from "@/components/icons/ui/FlagIcon";
 import {
   fetchAccounts, fetchCompanies, fetchRoles, fetchPeople,
   setAccountStatus, resetAccountPassword, setForcePasswordChange,
@@ -273,7 +288,7 @@ export default function AccountsList() {
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
@@ -285,7 +300,7 @@ export default function AccountsList() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <Plus className="h-4 w-4" /> New Account
+              <PlusIcon className="h-4 w-4" /> New Account
             </Link>
           </div>
         </div>
@@ -296,13 +311,13 @@ export default function AccountsList() {
         {/* Toasts */}
         {toast && (
           <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{toast}</span>
           </div>
         )}
         {error && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -324,13 +339,13 @@ export default function AccountsList() {
                 onClick={copyTempPw}
                 className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
               >
-                <Copy className="h-3.5 w-3.5" /> Copy
+                <CopyIcon className="h-3.5 w-3.5" /> Copy
               </button>
               <button
                 onClick={() => setNewTempPw(null)}
                 className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
               >
-                <X className="h-4 w-4" />
+                <CrossIcon className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -340,7 +355,7 @@ export default function AccountsList() {
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
                 type="text"
                 value={search}
@@ -357,7 +372,7 @@ export default function AccountsList() {
                   : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
-              <Filter className="h-3.5 w-3.5" />
+              <FilterIcon className="h-3.5 w-3.5" />
               Filters
               {activeFilters > 0 && (
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold flex items-center justify-center">
@@ -370,7 +385,7 @@ export default function AccountsList() {
                 onClick={clearFilters}
                 className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1.5 transition-colors"
               >
-                <X className="h-3 w-3" /> Clear
+                <CrossIcon className="h-3 w-3" /> Clear
               </button>
             )}
           </div>
@@ -517,7 +532,7 @@ export default function AccountsList() {
                 href="/accounts/new"
                 className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
               >
-                <Plus className="h-4 w-4" /> New Account
+                <PlusIcon className="h-4 w-4" /> New Account
               </Link>
             )}
           </div>
@@ -560,7 +575,7 @@ export default function AccountsList() {
                                   className="h-full w-full object-cover"
                                 />
                               ) : (
-                                <UserCircle2 className="h-5 w-5 text-[var(--text-dim)]" />
+                                <UserCircle2Icon className="h-5 w-5 text-[var(--text-dim)]" />
                               )}
                             </div>
                             <div className="min-w-0">
@@ -580,7 +595,7 @@ export default function AccountsList() {
                         </td>
                         <td className="px-3 py-3 text-[var(--text-muted)]">
                           <span className="flex items-center gap-1.5 truncate">
-                            <Mail className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                            <EnvelopeIcon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
                             <span className="truncate">{a.login_email}</span>
                           </span>
                         </td>
@@ -592,7 +607,7 @@ export default function AccountsList() {
                         <td className="px-3 py-3 text-[var(--text-muted)]">
                           {company ? (
                             <span className="flex items-center gap-1.5 truncate">
-                              <Building2 className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                              <Building2Icon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
                               <span className="truncate">{company.name}</span>
                             </span>
                           ) : (
@@ -602,7 +617,7 @@ export default function AccountsList() {
                         <td className="px-3 py-3 text-[var(--text-muted)]">
                           {role ? (
                             <span className="flex items-center gap-1.5 truncate">
-                              <Shield className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
+                              <ShieldIcon className="h-3 w-3 text-[var(--text-dim)] shrink-0" />
                               <span className="truncate">{role.name}</span>
                             </span>
                           ) : (
@@ -644,7 +659,7 @@ export default function AccountsList() {
                             aria-expanded={openMenu === a.id}
                             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center ml-auto disabled:opacity-60"
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MoreHorizontalIcon className="h-4 w-4" />
                           </button>
                         </td>
                       </tr>
@@ -670,7 +685,7 @@ export default function AccountsList() {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <UserCircle2 className="h-6 w-6 text-[var(--text-dim)]" />
+                          <UserCircle2Icon className="h-6 w-6 text-[var(--text-dim)]" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0 pr-10">
@@ -684,24 +699,24 @@ export default function AccountsList() {
                         </div>
                         <div className="flex items-center gap-3 text-[11px] text-[var(--text-dim)] mt-1 flex-wrap">
                           <span className="flex items-center gap-1 truncate max-w-full">
-                            <Mail className="h-3 w-3" />
+                            <EnvelopeIcon className="h-3 w-3" />
                             {a.login_email}
                           </span>
                           {company && (
                             <span className="flex items-center gap-1 truncate max-w-full">
-                              <Building2 className="h-3 w-3" />
+                              <Building2Icon className="h-3 w-3" />
                               {company.name}
                             </span>
                           )}
                           {role && (
                             <span className="flex items-center gap-1">
-                              <Shield className="h-3 w-3" />
+                              <ShieldIcon className="h-3 w-3" />
                               {role.name}
                             </span>
                           )}
                           {country && (
                             <span className="flex items-center gap-1">
-                              <Flag className="h-3 w-3" />
+                              <FlagIcon className="h-3 w-3" />
                               {country}
                             </span>
                           )}
@@ -735,7 +750,7 @@ export default function AccountsList() {
                       aria-expanded={openMenu === a.id}
                       className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center disabled:opacity-60"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <MoreHorizontalIcon className="h-4 w-4" />
                     </button>
                   </div>
                 );
@@ -802,21 +817,21 @@ function RowMenu({
         style={{ top: anchor.top, right: anchor.right }}
         className="fixed z-[70] w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
       >
-        <MenuItem icon={<Eye className="h-4 w-4" />} label="View" href={`/accounts/${account.id}`} />
-        <MenuItem icon={<Pencil className="h-4 w-4" />} label="Edit" href={`/accounts/${account.id}/edit`} />
+        <MenuItem icon={<EyeIcon className="h-4 w-4" />} label="View" href={`/accounts/${account.id}`} />
+        <MenuItem icon={<PencilIcon className="h-4 w-4" />} label="Edit" href={`/accounts/${account.id}/edit`} />
         <div className="h-px bg-[var(--border-subtle)]" />
         <MenuItem
-          icon={isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+          icon={isActive ? <ToggleOffIcon className="h-4 w-4" /> : <PowerIcon className="h-4 w-4" />}
           label={isActive ? "Deactivate" : "Activate"}
           onClick={onToggleStatus}
         />
         <MenuItem
-          icon={<KeyRound className="h-4 w-4" />}
+          icon={<KeyIcon className="h-4 w-4" />}
           label="Reset Password"
           onClick={onResetPassword}
         />
         <MenuItem
-          icon={<RefreshCcw className="h-4 w-4" />}
+          icon={<RefreshCcwIcon className="h-4 w-4" />}
           label={account.force_password_change ? "Clear Force Reset" : "Force Password Reset"}
           onClick={onToggleForce}
         />

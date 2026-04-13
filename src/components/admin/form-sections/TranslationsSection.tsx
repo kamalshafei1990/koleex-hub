@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import type { TranslationFormState } from "@/types/product-form";
 import { LOCALES } from "@/types/product-form";
 
@@ -40,7 +41,7 @@ export default function TranslationsSection({ translations, onChange }: Props) {
           disabled={!availableLocales.length}
           className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]/80 flex items-center gap-1.5 transition-colors disabled:opacity-30"
         >
-          <Plus className="h-3.5 w-3.5" /> Add Translation
+          <PlusIcon className="h-3.5 w-3.5" /> Add Translation
         </button>
       </div>
       {translations.length === 0 ? (
@@ -61,7 +62,7 @@ export default function TranslationsSection({ translations, onChange }: Props) {
                     {availableLocales.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
                   </select>
                   <button onClick={() => remove(t._tempId)} className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--text-ghost)] hover:text-red-400/70 transition-colors">
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <TrashIcon className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <div>

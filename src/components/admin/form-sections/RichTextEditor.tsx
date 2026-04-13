@@ -11,11 +11,25 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import {
-  Bold, Italic, Underline as UnderlineIcon, List, ListOrdered,
-  AlignLeft, AlignCenter, AlignRight, Quote, Link2, Type,
-  Palette, RemoveFormatting, Undo2, Redo2, Table as TableIcon, Heading1, Heading2, Heading3,
-} from "lucide-react";
+import BoldIcon from "@/components/icons/ui/BoldIcon";
+import ItalicIcon from "@/components/icons/ui/ItalicIcon";
+import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
+import ListOrderedIcon from "@/components/icons/ui/ListOrderedIcon";
+import AlignLeftIcon from "@/components/icons/ui/AlignLeftIcon";
+import AlignCenterIcon from "@/components/icons/ui/AlignCenterIcon";
+import AlignRightIcon from "@/components/icons/ui/AlignRightIcon";
+import QuoteIcon from "@/components/icons/ui/QuoteIcon";
+import Link2Icon from "@/components/icons/ui/Link2Icon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import RemoveFormattingIcon from "@/components/icons/ui/RemoveFormattingIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import Redo2Icon from "@/components/icons/ui/Redo2Icon";
+import TableIcon from "@/components/icons/ui/TableIcon";
+import Heading1Icon from "@/components/icons/ui/Heading1Icon";
+import Heading2Icon from "@/components/icons/ui/Heading2Icon";
+import Heading3Icon from "@/components/icons/ui/Heading3Icon";
 
 interface Props {
   value: string;
@@ -152,14 +166,14 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 backdrop-blur">
         {/* Headings */}
-        <button type="button" onClick={() => setBlock("H1")} className={btn(false)} title="Heading 1"><Heading1 className="h-4 w-4" /></button>
-        <button type="button" onClick={() => setBlock("H2")} className={btn(false)} title="Heading 2"><Heading2 className="h-4 w-4" /></button>
-        <button type="button" onClick={() => setBlock("H3")} className={btn(false)} title="Heading 3"><Heading3 className="h-4 w-4" /></button>
-        <button type="button" onClick={() => setBlock("P")} className={btn(false)} title="Paragraph"><Type className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setBlock("H1")} className={btn(false)} title="Heading 1"><Heading1Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setBlock("H2")} className={btn(false)} title="Heading 2"><Heading2Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setBlock("H3")} className={btn(false)} title="Heading 3"><Heading3Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setBlock("P")} className={btn(false)} title="Paragraph"><TypeIcon className="h-4 w-4" /></button>
         {divider}
         {/* Basic formatting */}
-        <button type="button" onClick={() => exec("bold")} className={btn(activeFormats.bold)} title="Bold (Ctrl+B)"><Bold className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("italic")} className={btn(activeFormats.italic)} title="Italic (Ctrl+I)"><Italic className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("bold")} className={btn(activeFormats.bold)} title="Bold (Ctrl+B)"><BoldIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("italic")} className={btn(activeFormats.italic)} title="Italic (Ctrl+I)"><ItalicIcon className="h-4 w-4" /></button>
         <button type="button" onClick={() => exec("underline")} className={btn(activeFormats.underline)} title="Underline (Ctrl+U)"><UnderlineIcon className="h-4 w-4" /></button>
         {divider}
         {/* Font size */}
@@ -180,7 +194,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         {/* Font color */}
         <div className="relative">
           <button type="button" onClick={() => { setShowColors(!showColors); setShowSizes(false); }} className={`${btn(false)} ${showColors ? "bg-[var(--bg-surface)]" : ""}`} title="Font color">
-            <Palette className="h-4 w-4" />
+            <PaletteIcon className="h-4 w-4" />
           </button>
           {showColors && (
             <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl shadow-2xl z-30 p-2 grid grid-cols-6 gap-1.5">
@@ -192,25 +206,25 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         </div>
         {divider}
         {/* Lists */}
-        <button type="button" onClick={() => exec("insertUnorderedList")} className={btn(activeFormats.insertUnorderedList)} title="Bullet list"><List className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("insertOrderedList")} className={btn(activeFormats.insertOrderedList)} title="Numbered list"><ListOrdered className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("insertUnorderedList")} className={btn(activeFormats.insertUnorderedList)} title="Bullet list"><ListIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("insertOrderedList")} className={btn(activeFormats.insertOrderedList)} title="Numbered list"><ListOrderedIcon className="h-4 w-4" /></button>
         {divider}
         {/* Alignment */}
-        <button type="button" onClick={() => exec("justifyLeft")} className={btn(activeFormats.justifyLeft)} title="Align left"><AlignLeft className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("justifyCenter")} className={btn(activeFormats.justifyCenter)} title="Align center"><AlignCenter className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("justifyRight")} className={btn(activeFormats.justifyRight)} title="Align right"><AlignRight className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("justifyLeft")} className={btn(activeFormats.justifyLeft)} title="Align left"><AlignLeftIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("justifyCenter")} className={btn(activeFormats.justifyCenter)} title="Align center"><AlignCenterIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("justifyRight")} className={btn(activeFormats.justifyRight)} title="Align right"><AlignRightIcon className="h-4 w-4" /></button>
         {divider}
         {/* Quote */}
-        <button type="button" onClick={() => setBlock("BLOCKQUOTE")} className={btn(false)} title="Quote"><Quote className="h-4 w-4" /></button>
+        <button type="button" onClick={() => setBlock("BLOCKQUOTE")} className={btn(false)} title="Quote"><QuoteIcon className="h-4 w-4" /></button>
         {/* Link */}
-        <button type="button" onClick={insertLink} className={btn(false)} title="Insert link"><Link2 className="h-4 w-4" /></button>
+        <button type="button" onClick={insertLink} className={btn(false)} title="Insert link"><Link2Icon className="h-4 w-4" /></button>
         {/* Table */}
         <button type="button" onClick={insertTable} className={btn(false)} title="Insert table"><TableIcon className="h-4 w-4" /></button>
         {divider}
         {/* Undo/Redo/Clear */}
-        <button type="button" onClick={() => exec("undo")} className={btn(false)} title="Undo"><Undo2 className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("redo")} className={btn(false)} title="Redo"><Redo2 className="h-4 w-4" /></button>
-        <button type="button" onClick={clearFormatting} className={btn(false)} title="Clear formatting"><RemoveFormatting className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("undo")} className={btn(false)} title="Undo"><Undo2Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("redo")} className={btn(false)} title="Redo"><Redo2Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={clearFormatting} className={btn(false)} title="Clear formatting"><RemoveFormattingIcon className="h-4 w-4" /></button>
       </div>
 
       {/* Editor surface */}

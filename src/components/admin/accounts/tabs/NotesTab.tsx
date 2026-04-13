@@ -8,7 +8,9 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import { FileText, AlertCircle, CheckCircle2 } from "lucide-react";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type { AccountWithLinks } from "@/types/supabase";
 import { updateAccount } from "@/lib/accounts-admin";
 import {
@@ -59,7 +61,7 @@ export default function NotesTab({ account, onChanged }: Props) {
     <div className="space-y-4">
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <FileText className="h-3.5 w-3.5" />
+          <DocumentIcon className="h-3.5 w-3.5" />
           Internal Notes
         </h2>
         <p className="text-[12px] text-[var(--text-dim)] mb-4">
@@ -77,13 +79,13 @@ export default function NotesTab({ account, onChanged }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}

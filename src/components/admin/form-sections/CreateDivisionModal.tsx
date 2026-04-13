@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import Modal from "./Modal";
 import { createDivision } from "@/lib/products-admin";
 import type { DivisionRow } from "@/types/supabase";
@@ -65,7 +65,7 @@ export default function CreateDivisionModal({ open, onClose, onCreated, existing
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Creating..." : "Create Division"}
           </button>
         </>

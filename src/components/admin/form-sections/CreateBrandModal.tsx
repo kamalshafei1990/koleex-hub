@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Loader2, ImageIcon, X } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "./Modal";
 import { uploadBrandLogo } from "@/lib/products-admin";
 
@@ -76,7 +78,7 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving || !name.trim()} className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Creating..." : "Create Brand"}
           </button>
         </>
@@ -109,7 +111,7 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
                   onClick={removeLogo}
                   className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
                 >
-                  <X className="h-3 w-3" />
+                  <CrossIcon className="h-3 w-3" />
                 </button>
               </div>
             ) : (
@@ -118,7 +120,7 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
                 onClick={() => fileRef.current?.click()}
                 className="w-24 h-24 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
               >
-                <ImageIcon className="h-6 w-6 text-[var(--text-ghost)] group-hover:text-[var(--text-dim)] transition-colors" />
+                <PictureIcon className="h-6 w-6 text-[var(--text-ghost)] group-hover:text-[var(--text-dim)] transition-colors" />
                 <span className="text-[10px] text-[var(--text-ghost)] group-hover:text-[var(--text-dim)]">Upload</span>
               </button>
             )}

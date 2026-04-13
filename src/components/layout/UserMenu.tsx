@@ -24,7 +24,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LogIn, LogOut, Shield, User as UserIcon } from "lucide-react";
+import SignInIcon from "@/components/icons/ui/SignInIcon";
+import SignOutIcon from "@/components/icons/ui/SignOutIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
 import {
   getCurrentUser,
   isSupabaseAuthEnabled,
@@ -308,7 +311,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                 }`}
               >
-                <Shield className="h-2.5 w-2.5" />
+                <ShieldIcon className="h-2.5 w-2.5" />
                 {identity.mode === "supabase" ? "Supabase Auth" : "Legacy"}
               </span>
               {signedIn && (
@@ -337,7 +340,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                     : "text-black/80 hover:text-black hover:bg-black/[0.04]"
                 }`}
               >
-                <LogIn className="h-4 w-4" />
+                <SignInIcon className="h-4 w-4" />
                 Sign in
               </button>
             ) : (
@@ -377,7 +380,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                       : "text-red-600 hover:text-red-700 hover:bg-red-500/[0.06]"
                   }`}
                 >
-                  <LogOut className="h-4 w-4" />
+                  <SignOutIcon className="h-4 w-4" />
                   Sign out
                 </button>
               </>

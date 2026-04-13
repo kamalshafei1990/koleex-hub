@@ -17,15 +17,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  CheckCircle2,
-  AlertCircle,
-  UserCircle2,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
 import CalendarIcon from "@/components/icons/CalendarIcon";
 import type {
   AccountRow,
@@ -273,7 +271,7 @@ export default function CalendarApp() {
               href="/"
               className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
@@ -286,7 +284,7 @@ export default function CalendarApp() {
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               {/* Account picker */}
               <div className="flex items-center gap-2">
-                <UserCircle2 className="h-4 w-4 text-[var(--text-dim)]" />
+                <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" />
                 <select
                   value={activeAccountId || ""}
                   onChange={(e) => setActiveAccountId(e.target.value || null)}
@@ -310,7 +308,7 @@ export default function CalendarApp() {
                 disabled={!activeAccountId}
                 className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
-                <Plus className="h-4 w-4" /> New Event
+                <PlusIcon className="h-4 w-4" /> New Event
               </button>
             </div>
           </div>
@@ -322,13 +320,13 @@ export default function CalendarApp() {
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
         {toast && (
           <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{toast}</span>
           </div>
         )}
         {error && (
           <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -348,14 +346,14 @@ export default function CalendarApp() {
                 className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
                 title="Previous"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <AngleLeftIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={goNext}
                 className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
                 title="Next"
               >
-                <ChevronRight className="h-4 w-4" />
+                <AngleRightIcon className="h-4 w-4" />
               </button>
             </div>
             <h2 className="ml-2 text-[16px] md:text-[18px] font-bold text-[var(--text-primary)]">

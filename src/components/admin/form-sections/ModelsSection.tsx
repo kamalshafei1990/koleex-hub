@@ -1,9 +1,19 @@
 "use client";
 
-import {
-  Plus, Trash2, ChevronDown, ChevronUp, Copy, ArrowUp, ArrowDown,
-  Package, DollarSign, Scale, ScanLine, Warehouse, Tag, Crown,
-} from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
+import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
+import ScaleIcon from "@/components/icons/ui/ScaleIcon";
+import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
+import WarehouseIcon from "@/components/icons/ui/WarehouseIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import CrownIcon from "@/components/icons/ui/CrownIcon";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
@@ -78,7 +88,7 @@ function ModelCard({
               ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-amber-500/40 text-amber-300"
               : "bg-gradient-to-br from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-muted)]"
           }`}>
-            {isPrimary ? <Crown className="h-4 w-4" /> : idx + 1}
+            {isPrimary ? <CrownIcon className="h-4 w-4" /> : idx + 1}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -87,7 +97,7 @@ function ModelCard({
               </span>
               {isPrimary && (
                 <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/15 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-                  <Crown className="h-2.5 w-2.5" /> Primary
+                  <CrownIcon className="h-2.5 w-2.5" /> Primary
                 </span>
               )}
               <span
@@ -114,7 +124,7 @@ function ModelCard({
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Move up"
           >
-            <ArrowUp className="h-3.5 w-3.5" />
+            <ArrowUpIcon className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
@@ -122,23 +132,23 @@ function ModelCard({
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Move down"
           >
-            <ArrowDown className="h-3.5 w-3.5" />
+            <ArrowDownIcon className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
             title="Duplicate"
           >
-            <Copy className="h-3.5 w-3.5" />
+            <CopyIcon className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
             title="Delete"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </button>
-          {open ? <ChevronUp className="h-4 w-4 text-[var(--text-ghost)] ml-1" /> : <ChevronDown className="h-4 w-4 text-[var(--text-ghost)] ml-1" />}
+          {open ? <AngleUpIcon className="h-4 w-4 text-[var(--text-ghost)] ml-1" /> : <AngleDownIcon className="h-4 w-4 text-[var(--text-ghost)] ml-1" />}
         </div>
       </div>
 
@@ -190,7 +200,7 @@ function ModelCard({
           </div>
 
           {/* Supplier + Pricing panel */}
-          <Panel icon={<DollarSign className="h-3.5 w-3.5" />} title="Supplier & Pricing">
+          <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Supplier & Pricing">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Supplier</label>
@@ -252,7 +262,7 @@ function ModelCard({
           </Panel>
 
           {/* Packaging & Logistics panel */}
-          <Panel icon={<Package className="h-3.5 w-3.5" />} title="Packaging & Logistics">
+          <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={lbl}>Weight (kg)</label>
@@ -282,9 +292,9 @@ function ModelCard({
           {/* Advanced (MOQ / Lead Time / Barcode override) */}
           <details className="group">
             <summary className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-subtle)]/50 transition-colors list-none">
-              <Warehouse className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
+              <WarehouseIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Advanced · Fulfillment & Codes</span>
-              <ChevronDown className="h-3.5 w-3.5 text-[var(--text-ghost)] ml-auto transition-transform group-open:rotate-180" />
+              <AngleDownIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] ml-auto transition-transform group-open:rotate-180" />
             </summary>
             <div className="pt-3 px-1 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -305,7 +315,7 @@ function ModelCard({
           </details>
 
           {/* Auto-generated codes panel */}
-          <Panel icon={<ScanLine className="h-3.5 w-3.5" />} title="Auto-Generated Codes">
+          <Panel icon={<ScanLineIcon className="h-3.5 w-3.5" />} title="Auto-Generated Codes">
             <BarcodeQRDisplay value={barcodeValue} label={model.model_name} qrPayload={qrPayload} />
           </Panel>
         </div>
@@ -365,7 +375,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-[var(--text-muted)]" />
+            <TagsIcon className="h-4 w-4 text-[var(--text-muted)]" />
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
               {hidePrimary ? "Additional Model Variants" : "Product Models / Variants"}
             </h3>
@@ -380,13 +390,13 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
           onClick={addModel}
           className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shadow-sm"
         >
-          <Plus className="h-3.5 w-3.5" /> Add Model
+          <PlusIcon className="h-3.5 w-3.5" /> Add Model
         </button>
       </div>
 
       {visibleModels.length === 0 ? (
         <div className="py-12 text-center border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
-          <Scale className="h-8 w-8 text-[var(--text-ghost)] mx-auto mb-2" />
+          <ScaleIcon className="h-8 w-8 text-[var(--text-ghost)] mx-auto mb-2" />
           <p className="text-[13px] text-[var(--text-dim)] font-medium">
             {hidePrimary ? "No additional variants" : "No models yet"}
           </p>

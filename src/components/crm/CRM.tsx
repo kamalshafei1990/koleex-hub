@@ -32,40 +32,38 @@ import {
   useState,
   type DragEvent,
 } from "react";
-import {
-  Activity,
-  Archive,
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  ChartPie,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Filter,
-  Globe,
-  Inbox,
-  LayoutGrid,
-  LineChart,
-  List as ListIcon,
-  Loader2,
-  Mail,
-  MoreHorizontal,
-  Phone,
-  Plus,
-  Search,
-  Settings,
-  Sparkles,
-  Star,
-  Trash2,
-  TrendingUp,
-  User as UserIcon,
-  Users,
-  X,
-  XCircle,
-  Zap,
-} from "lucide-react";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import CalendarRawIcon from "@/components/icons/ui/CalendarRawIcon";
+import ChartPieIcon from "@/components/icons/ui/ChartPieIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import FilterIcon from "@/components/icons/ui/FilterIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import LineChartIcon from "@/components/icons/ui/LineChartIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
 import {
   archiveOpportunity,
   completeActivity,
@@ -390,11 +388,11 @@ export default function CRM() {
             href="/"
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUpIcon className="h-4 w-4" />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               {t("title")}
@@ -412,9 +410,9 @@ export default function CRM() {
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
             {(
               [
-                { id: "pipeline",      label: t("nav.sales"),         icon: LayoutGrid },
-                { id: "reporting",     label: t("nav.reporting"),     icon: ChartPie },
-                { id: "configuration", label: t("nav.configuration"), icon: Settings },
+                { id: "pipeline",      label: t("nav.sales"),         icon: LayoutGridIcon },
+                { id: "reporting",     label: t("nav.reporting"),     icon: ChartPieIcon },
+                { id: "configuration", label: t("nav.configuration"), icon: SettingsIcon2 },
               ] as const
             ).map((tab) => {
               const TabIcon = tab.icon;
@@ -474,7 +472,7 @@ export default function CRM() {
             onClick={() => setEditingId("new")}
             className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 transition-all shadow-sm"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <PlusIcon className="h-3.5 w-3.5" />
             {t("new")}
           </button>
           <button
@@ -482,22 +480,22 @@ export default function CRM() {
             onClick={() => setShowGenerateLeads(true)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-hover)] transition-colors"
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <SparklesIcon className="h-3.5 w-3.5" />
             {t("generateLeads")}
           </button>
 
           {/* Search bar — Hub-style: bg-secondary, rounded-xl */}
           <div className="flex items-center gap-2 flex-1 min-w-[240px] max-w-[520px] mx-auto h-9 px-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] focus-within:border-[var(--border-focus)] focus-within:ring-1 focus-within:ring-white/5 transition-all">
-            <Search className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
+            <SearchIcon className="h-3.5 w-3.5 text-[var(--text-dim)] shrink-0" />
             {myOnly && (
               <button
                 type="button"
                 onClick={() => setMyOnly(false)}
                 className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--bg-surface-active)] text-[var(--text-primary)] text-[11px] font-semibold shrink-0"
               >
-                <Filter className="h-2.5 w-2.5" />
+                <FilterIcon className="h-2.5 w-2.5" />
                 {t("myPipeline")}
-                <X className="h-3 w-3 ml-0.5" />
+                <CrossIcon className="h-3 w-3 ml-0.5" />
               </button>
             )}
             <input
@@ -517,7 +515,7 @@ export default function CRM() {
               }`}
               title={t("filters")}
             >
-              <Filter className="h-3.5 w-3.5" />
+              <FilterIcon className="h-3.5 w-3.5" />
             </button>
           </div>
 
@@ -538,13 +536,13 @@ export default function CRM() {
           <div className="ml-auto inline-flex items-center h-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
             {(
               [
-                { id: "pipeline", label: t("view.pipeline"), icon: LayoutGrid },
+                { id: "pipeline", label: t("view.pipeline"), icon: LayoutGridIcon },
                 { id: "list",     label: t("view.list"),     icon: ListIcon },
-                { id: "calendar", label: t("view.calendar"), icon: CalendarIcon },
-                { id: "pivot",    label: t("view.pivot"),    icon: ChartPie },
-                { id: "graph",    label: t("view.graph"),    icon: LineChart },
-                { id: "map",      label: t("view.map"),      icon: Globe },
-                { id: "activity", label: t("view.activity"), icon: Zap },
+                { id: "calendar", label: t("view.calendar"), icon: CalendarRawIcon },
+                { id: "pivot",    label: t("view.pivot"),    icon: ChartPieIcon },
+                { id: "graph",    label: t("view.graph"),    icon: LineChartIcon },
+                { id: "map",      label: t("view.map"),      icon: GlobeIcon },
+                { id: "activity", label: t("view.activity"), icon: ZapIcon },
               ] as const
             ).map((m) => (
               <button
@@ -609,7 +607,7 @@ export default function CRM() {
                 }}
                 className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
               >
-                <X className="h-3.5 w-3.5" />
+                <CrossIcon className="h-3.5 w-3.5" />
                 Clear filters
               </button>
             </div>
@@ -619,7 +617,7 @@ export default function CRM() {
         {/* ─ Body ─ */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+            <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
           </div>
         ) : opps.length === 0 ? (
           <EmptyState onCreate={() => setEditingId("new")} t={t} />
@@ -734,7 +732,7 @@ function EmptyState({
   return (
     <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
       <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mx-auto mb-4">
-        <TrendingUp className="h-6 w-6 text-[var(--text-barely)]" />
+        <TrendingUpIcon className="h-6 w-6 text-[var(--text-barely)]" />
       </div>
       <p className="text-[var(--text-primary)] text-[15px] font-semibold">
         {t("empty.all")}
@@ -747,7 +745,7 @@ function EmptyState({
         onClick={onCreate}
         className="inline-flex items-center gap-2 mt-5 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
       >
-        <Plus className="h-4 w-4" />
+        <PlusIcon className="h-4 w-4" />
         {t("newOpp")}
       </button>
     </div>
@@ -860,7 +858,7 @@ function PipelineView({
                 title={`${col.name} — ${list.length}`}
               >
                 <div className="flex flex-col items-center gap-1.5">
-                  <ChevronRight className="h-4 w-4 text-[var(--text-dim)]" />
+                  <AngleRightIcon className="h-4 w-4 text-[var(--text-dim)]" />
                   <span className="text-[10px] font-bold text-[var(--text-ghost)]">
                     {list.length}
                   </span>
@@ -1018,7 +1016,7 @@ function PipelineColumn({
                 className="p-0.5 rounded text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
                 title={t("quick.add")}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <PlusIcon className="h-3.5 w-3.5" />
               </button>
             )}
             {isStageColumn && (
@@ -1029,7 +1027,7 @@ function PipelineColumn({
                   className="p-0.5 rounded text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
                   title="Stage actions"
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontalIcon className="h-3.5 w-3.5" />
                 </button>
                 {menuOpen && col.stage && (
                   <div className="absolute left-0 top-6 z-30 w-44 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-lg overflow-hidden">
@@ -1041,7 +1039,7 @@ function PipelineColumn({
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] text-left"
                     >
-                      <ChevronLeft className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                      <AngleLeftIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                       {col.fold ? t("stage.menu.unfold") : t("stage.menu.fold")}
                     </button>
                     <button
@@ -1052,7 +1050,7 @@ function PipelineColumn({
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] text-left"
                     >
-                      <Settings className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                      <SettingsIcon2 className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                       {t("stage.menu.edit")}
                     </button>
                     <button
@@ -1063,7 +1061,7 @@ function PipelineColumn({
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-red-500 hover:bg-red-500/10 text-left"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                       {t("stage.menu.delete")}
                     </button>
                   </div>
@@ -1168,7 +1166,7 @@ function PipelineColumn({
                   disabled={quickBusy || !quickName.trim()}
                   className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                 >
-                  {quickBusy && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {quickBusy && <SpinnerIcon className="h-3 w-3 animate-spin" />}
                   {t("quick.add.btn")}
                 </button>
               </div>
@@ -1236,7 +1234,7 @@ function OpportunityCard({
             title={`${o.activities_overdue} ${t("card.activitiesOverdue")}`}
             className="inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-red-500/15 text-red-500 text-[9px] font-bold shrink-0"
           >
-            <Clock className="h-3 w-3 mr-0.5" />
+            <ClockIcon className="h-3 w-3 mr-0.5" />
             {o.activities_overdue}
           </span>
         )}
@@ -1244,7 +1242,7 @@ function OpportunityCard({
 
       {/* Customer */}
       <div className="pl-1 text-[11.5px] text-[var(--text-dim)] truncate flex items-center gap-1">
-        <Users className="h-3 w-3 shrink-0 text-[var(--text-ghost)]" />
+        <UsersIcon className="h-3 w-3 shrink-0 text-[var(--text-ghost)]" />
         {customerLine}
       </div>
 
@@ -1276,7 +1274,7 @@ function OpportunityCard({
           {stars > 0 && (
             <span className="inline-flex items-center text-amber-500 text-[10px]">
               {[...Array(stars)].map((_, i) => (
-                <Star key={i} className="h-2.5 w-2.5 fill-current" />
+                <StarIcon key={i} className="h-2.5 w-2.5 fill-current" />
               ))}
             </span>
           )}
@@ -1292,7 +1290,7 @@ function OpportunityCard({
                     : "text-[var(--text-dim)]"
               }`}
             >
-              <CalendarIcon className="h-2.5 w-2.5" />
+              <CalendarRawIcon className="h-2.5 w-2.5" />
               {due.label}
             </span>
           )}
@@ -1397,7 +1395,7 @@ function ListView({
                 {o.stage ? (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                     {o.stage.is_won && (
-                      <Check className="h-2.5 w-2.5 mr-1 text-emerald-500" />
+                      <CheckIcon className="h-2.5 w-2.5 mr-1 text-emerald-500" />
                     )}
                     {o.stage.name}
                   </span>
@@ -1424,7 +1422,7 @@ function ListView({
               <div className="md:flex hidden items-center text-amber-500">
                 {stars > 0 ? (
                   [...Array(stars)].map((_, i) => (
-                    <Star key={i} className="h-3 w-3 fill-current" />
+                    <StarIcon key={i} className="h-3 w-3 fill-current" />
                   ))
                 ) : (
                   <span className="text-[var(--text-ghost)] text-[11px]">—</span>
@@ -1674,7 +1672,7 @@ function ContactComboboxField({
                   }`}
                 >
                   <div className="h-7 w-7 rounded-full bg-[var(--bg-inverted)]/[0.08] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-primary)] shrink-0">
-                    <Plus className="h-3.5 w-3.5" />
+                    <PlusIcon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[12.5px] font-medium text-[var(--text-primary)] truncate">
@@ -1911,7 +1909,7 @@ function OpportunityModal({
               onClick={onClose}
               className="md:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
             </button>
             <h2 className="text-[15px] md:text-[17px] font-bold text-[var(--text-primary)] truncate">
               {isNew ? t("newOpp") : opportunity?.name || t("form.title")}
@@ -1926,7 +1924,7 @@ function OpportunityModal({
                   disabled={saving || !!opportunity.won_at}
                   className="hidden md:inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-emerald-500/15 text-emerald-500 text-[11.5px] font-bold uppercase tracking-wider hover:bg-emerald-500/20 disabled:opacity-40 transition-colors"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircleIcon className="h-3.5 w-3.5" />
                   {t("form.markWon")}
                 </button>
                 <button
@@ -1935,7 +1933,7 @@ function OpportunityModal({
                   disabled={saving || !!opportunity.lost_at}
                   className="hidden md:inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-red-500/15 text-red-500 text-[11.5px] font-bold uppercase tracking-wider hover:bg-red-500/20 disabled:opacity-40 transition-colors"
                 >
-                  <XCircle className="h-3.5 w-3.5" />
+                  <XCircleIcon className="h-3.5 w-3.5" />
                   {t("form.markLost")}
                 </button>
               </>
@@ -1945,7 +1943,7 @@ function OpportunityModal({
               onClick={onClose}
               className="hidden md:flex p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
             >
-              <X className="h-4 w-4" />
+              <CrossIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -1964,7 +1962,7 @@ function OpportunityModal({
                     disabled={saving || !!opportunity.won_at}
                     className="flex-1 h-9 rounded-lg bg-emerald-500/15 text-emerald-500 text-[11.5px] font-bold uppercase tracking-wider hover:bg-emerald-500/20 disabled:opacity-40 inline-flex items-center justify-center gap-1"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <CheckCircleIcon className="h-3.5 w-3.5" />
                     {t("form.markWon")}
                   </button>
                   <button
@@ -1973,7 +1971,7 @@ function OpportunityModal({
                     disabled={saving || !!opportunity.lost_at}
                     className="flex-1 h-9 rounded-lg bg-red-500/15 text-red-500 text-[11.5px] font-bold uppercase tracking-wider hover:bg-red-500/20 disabled:opacity-40 inline-flex items-center justify-center gap-1"
                   >
-                    <XCircle className="h-3.5 w-3.5" />
+                    <XCircleIcon className="h-3.5 w-3.5" />
                     {t("form.markLost")}
                   </button>
                 </div>
@@ -2049,7 +2047,7 @@ function OpportunityModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label={t("form.email")}>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
+                    <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
                     <input
                       type="email"
                       value={email}
@@ -2060,7 +2058,7 @@ function OpportunityModal({
                 </Field>
                 <Field label={t("form.phone")}>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
+                    <PhoneIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)] pointer-events-none" />
                     <input
                       type="tel"
                       value={phone}
@@ -2134,9 +2132,9 @@ function OpportunityModal({
                             : "text-[var(--text-ghost)] hover:text-[var(--text-dim)]"
                         }`}
                       >
-                        <Star
+                        <StarIcon
                           className="h-4 w-4"
-                          fill={n <= priority ? "currentColor" : "none"}
+                          style={{ fill: n <= priority ? "currentColor" : "none" }}
                         />
                       </button>
                     ))}
@@ -2231,7 +2229,7 @@ function OpportunityModal({
                       onClick={() => setShowActForm((v) => !v)}
                       className="text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] inline-flex items-center gap-0.5"
                     >
-                      <Plus className="h-3 w-3" />
+                      <PlusIcon className="h-3 w-3" />
                       {t("act.add")}
                     </button>
                   )}
@@ -2290,7 +2288,7 @@ function OpportunityModal({
                 onClick={handleArchive}
                 className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
               >
-                <Archive className="h-3.5 w-3.5" />
+                <ArchiveIcon className="h-3.5 w-3.5" />
                 {t("form.archive")}
               </button>
               <button
@@ -2298,7 +2296,7 @@ function OpportunityModal({
                 onClick={handleDelete}
                 className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <TrashIcon className="h-3.5 w-3.5" />
                 {t("form.delete")}
               </button>
             </div>
@@ -2319,7 +2317,7 @@ function OpportunityModal({
               disabled={saving}
               className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
             >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
               {isNew ? t("form.create") : t("form.save")}
             </button>
           </div>
@@ -2475,7 +2473,7 @@ function ActivitiesPanel({
 
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <Loader2 className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+          <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
         </div>
       ) : activities.length === 0 ? (
         <p className="text-[11.5px] text-[var(--text-ghost)] italic py-2">
@@ -2487,14 +2485,14 @@ function ActivitiesPanel({
             const due = relativeDate(a.due_at);
             const Icon =
               a.type === "call"
-                ? Phone
+                ? PhoneIcon
                 : a.type === "meeting"
-                  ? Users
+                  ? UsersIcon
                   : a.type === "email"
-                    ? Mail
+                    ? EnvelopeIcon
                     : a.type === "note"
-                      ? Activity
-                      : Check;
+                      ? ActivityIcon
+                      : CheckIcon;
             return (
               <li
                 key={a.id}
@@ -2512,7 +2510,7 @@ function ActivitiesPanel({
                         : "border-[var(--border-color)] hover:border-emerald-500"
                     }`}
                   >
-                    {a.done_at && <Check className="h-2.5 w-2.5 text-white" />}
+                    {a.done_at && <CheckIcon className="h-2.5 w-2.5 text-white" />}
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -2551,7 +2549,7 @@ function ActivitiesPanel({
                     onClick={() => handleDelete(a.id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--text-ghost)] hover:text-red-500"
                   >
-                    <X className="h-3 w-3" />
+                    <CrossIcon className="h-3 w-3" />
                   </button>
                 </div>
               </li>
@@ -2672,7 +2670,7 @@ function CalendarView({
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
             title={t("cal.prev")}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <AngleLeftIcon className="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -2694,7 +2692,7 @@ function CalendarView({
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
             title={t("cal.next")}
           >
-            <ChevronRight className="h-4 w-4" />
+            <AngleRightIcon className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -3137,7 +3135,7 @@ function MapView({
     return (
       <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-12 text-center">
         <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mx-auto mb-4">
-          <Globe className="h-6 w-6 text-[var(--text-barely)]" />
+          <GlobeIcon className="h-6 w-6 text-[var(--text-barely)]" />
         </div>
         <p className="text-[var(--text-primary)] text-[14px] font-semibold">
           {t("map.empty")}
@@ -3283,7 +3281,7 @@ function ActivityView({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -3293,7 +3291,7 @@ function ActivityView({
     return (
       <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-12 text-center">
         <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-          <Inbox className="h-6 w-6 text-emerald-500" />
+          <InboxRawIcon className="h-6 w-6 text-emerald-500" />
         </div>
         <p className="text-[var(--text-primary)] text-[14px] font-semibold">
           {t("act.feed.empty")}
@@ -3327,14 +3325,14 @@ function ActivityView({
                   : null;
                 const Icon =
                   a.type === "call"
-                    ? Phone
+                    ? PhoneIcon
                     : a.type === "meeting"
-                      ? Users
+                      ? UsersIcon
                       : a.type === "email"
-                        ? Mail
+                        ? EnvelopeIcon
                         : a.type === "note"
-                          ? Activity
-                          : Check;
+                          ? ActivityIcon
+                          : CheckIcon;
                 return (
                   <button
                     key={a.id}
@@ -3451,7 +3449,7 @@ function GenerateLeadsModal({
       <div className="bg-[var(--bg-primary)] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[var(--text-dim)]" />
+            <SparklesIcon className="h-4 w-4 text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
               {t("gen.title")}
             </h2>
@@ -3461,7 +3459,7 @@ function GenerateLeadsModal({
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -3532,7 +3530,7 @@ function GenerateLeadsModal({
             disabled={busy || count < 1}
             className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
             {t("gen.create")}
           </button>
         </div>
@@ -3644,7 +3642,7 @@ function StageEditModal({
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)]"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -3707,7 +3705,7 @@ function StageEditModal({
               disabled={busy}
               className="inline-flex items-center gap-1 h-9 px-3 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <TrashIcon className="h-3.5 w-3.5" />
               {t("stage.edit.delete")}
             </button>
           ) : (
@@ -3727,7 +3725,7 @@ function StageEditModal({
               disabled={busy || !name.trim()}
               className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12.5px] font-semibold hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
             >
-              {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {busy && <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />}
               {t("stage.edit.save")}
             </button>
           </div>
@@ -3846,18 +3844,18 @@ function ReportingPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
 
   const kpis = [
-    { label: t("rep.kpi.opps"), value: String(data.open), icon: TrendingUp },
-    { label: t("rep.kpi.value"), value: formatCurrency(data.pipelineValue), icon: LayoutGrid },
-    { label: t("rep.kpi.weighted"), value: formatCurrency(data.weighted), icon: Activity },
-    { label: t("rep.kpi.avg"), value: formatCurrency(data.avgDeal), icon: ChartPie },
-    { label: t("rep.kpi.winrate"), value: `${data.winRate.toFixed(0)}%`, icon: CheckCircle2 },
-    { label: t("rep.kpi.cycle"), value: `${data.avgCycle} ${t("rep.kpi.days")}`, icon: Clock },
+    { label: t("rep.kpi.opps"), value: String(data.open), icon: TrendingUpIcon },
+    { label: t("rep.kpi.value"), value: formatCurrency(data.pipelineValue), icon: LayoutGridIcon },
+    { label: t("rep.kpi.weighted"), value: formatCurrency(data.weighted), icon: ActivityIcon },
+    { label: t("rep.kpi.avg"), value: formatCurrency(data.avgDeal), icon: ChartPieIcon },
+    { label: t("rep.kpi.winrate"), value: `${data.winRate.toFixed(0)}%`, icon: CheckCircleIcon },
+    { label: t("rep.kpi.cycle"), value: `${data.avgCycle} ${t("rep.kpi.days")}`, icon: ClockIcon },
   ];
 
   const maxStage = Math.max(1, ...data.stageRows.map((r) => r.value));
@@ -3981,7 +3979,7 @@ function ConfigurationPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -4003,7 +4001,7 @@ function ConfigurationPage({
             onClick={onAddStage}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-all shrink-0"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <PlusIcon className="h-3.5 w-3.5" />
             {t("cfg.addStage")}
           </button>
         </div>
@@ -4055,7 +4053,7 @@ function ConfigurationPage({
                       className="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
                       title={s.fold ? t("stage.menu.unfold") : t("stage.menu.fold")}
                     >
-                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <AngleLeftIcon className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -4063,7 +4061,7 @@ function ConfigurationPage({
                       className="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
                       title={t("stage.menu.edit")}
                     >
-                      <Settings className="h-3.5 w-3.5" />
+                      <SettingsIcon2 className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -4071,7 +4069,7 @@ function ConfigurationPage({
                       className="p-1.5 rounded-lg text-red-500 hover:bg-red-500/10"
                       title={t("stage.menu.delete")}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>

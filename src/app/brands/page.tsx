@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Plus, Search, Pencil, Trash2, ImageIcon, X,
-  Loader2, Package, RefreshCw,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import RefreshIcon from "@/components/icons/ui/RefreshIcon";
 import BrandIcon from "@/components/icons/BrandIcon";
 import {
   fetchBrandsWithDetails, renameBrand, deleteBrand,
@@ -123,7 +129,7 @@ function BrandModal({
             {brand ? "Edit Brand" : "New Brand"}
           </h2>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -155,7 +161,7 @@ function BrandModal({
                     onClick={handleRemoveLogo}
                     className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
                   >
-                    <X className="h-2.5 w-2.5" />
+                    <CrossIcon className="h-2.5 w-2.5" />
                   </button>
                 </div>
               ) : (
@@ -164,7 +170,7 @@ function BrandModal({
                   onClick={() => fileRef.current?.click()}
                   className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-blue-500/30 bg-[var(--bg-surface)] flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
                 >
-                  <ImageIcon className="h-5 w-5 text-[var(--text-muted)] group-hover:text-[var(--text-dim)] transition-colors" />
+                  <PictureIcon className="h-5 w-5 text-[var(--text-muted)] group-hover:text-[var(--text-dim)] transition-colors" />
                   <span className="text-[9px] text-[var(--text-muted)] group-hover:text-[var(--text-dim)]">Upload</span>
                 </button>
               )}
@@ -192,7 +198,7 @@ function BrandModal({
 
           {brand && (
             <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-              <Package className="h-3 w-3" />
+              <PackageIcon className="h-3 w-3" />
               <span>Used by {brand.productCount} product{brand.productCount !== 1 ? "s" : ""}</span>
             </div>
           )}
@@ -208,7 +214,7 @@ function BrandModal({
             disabled={saving || !name.trim()}
             className="h-10 px-6 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : null}
             {saving ? "Saving..." : brand ? "Save Changes" : "Create Brand"}
           </button>
         </div>
@@ -254,7 +260,7 @@ function DeleteModal({
             disabled={deleting}
             className="h-10 px-6 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold flex items-center gap-2 hover:bg-red-500/30 transition-all disabled:opacity-40"
           >
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            {deleting ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}
             {deleting ? "Deleting..." : "Delete Brand"}
           </button>
         </div>
@@ -322,7 +328,7 @@ export default function BrandsPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">
           <Link href="/products" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
             <BrandIcon size={16} />
@@ -340,7 +346,7 @@ export default function BrandsPage() {
             <span className="text-[11px] text-[var(--text-dim)]">Brands</span>
           </div>
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-            <Package className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <PackageIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             <span className="text-[18px] font-bold text-[var(--text-primary)]">{totalProducts}</span>
             <span className="text-[11px] text-[var(--text-dim)]">Products</span>
           </div>
@@ -349,7 +355,7 @@ export default function BrandsPage() {
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
             <input
               type="text"
               value={search}
@@ -360,13 +366,13 @@ export default function BrandsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={load} className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshIcon className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={handleCreate}
               className="h-9 px-4 rounded-lg bg-[var(--text-primary)] text-[var(--bg-primary)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-colors"
             >
-              <Plus className="h-3.5 w-3.5" /> New Brand
+              <PlusIcon className="h-3.5 w-3.5" /> New Brand
             </button>
           </div>
         </div>
@@ -374,7 +380,7 @@ export default function BrandsPage() {
         {/* Brands Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+            <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-[var(--border-subtle)] rounded-xl">
@@ -406,7 +412,7 @@ export default function BrandsPage() {
                   <div className="flex items-center gap-3 mt-0.5">
                     <span className="text-[11px] text-[var(--text-muted)] font-mono">{brand.slug}</span>
                     <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1">
-                      <Package className="h-3 w-3" /> {brand.productCount}
+                      <PackageIcon className="h-3 w-3" /> {brand.productCount}
                     </span>
                   </div>
                 </div>
@@ -417,13 +423,13 @@ export default function BrandsPage() {
                     onClick={() => handleEdit(brand)}
                     className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    <PencilIcon className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(brand)}
                     className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <TrashIcon className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>

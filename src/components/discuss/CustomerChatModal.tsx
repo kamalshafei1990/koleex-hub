@@ -20,16 +20,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
-import {
-  Building2,
-  Check,
-  Loader2,
-  Mail,
-  Phone,
-  Search,
-  UserPlus,
-  X,
-} from "lucide-react";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
   findOrCreateCustomerChannel,
   searchContactsForChat,
@@ -134,7 +132,7 @@ export function CustomerChatModal({
     if (loading) {
       return (
         <div className="p-6 flex items-center justify-center text-[var(--text-dim)]">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <SpinnerIcon className="h-4 w-4 animate-spin" />
         </div>
       );
     }
@@ -176,20 +174,20 @@ export function CustomerChatModal({
                 <div className="mt-0.5 flex items-center gap-2 text-[10.5px] text-[var(--text-dim)]">
                   {c.company && (
                     <span className="inline-flex items-center gap-1 truncate max-w-[140px]">
-                      <Building2 className="h-3 w-3 shrink-0" />
+                      <Building2Icon className="h-3 w-3 shrink-0" />
                       <span className="truncate">{c.company}</span>
                     </span>
                   )}
                   {c.email && (
                     <span className="inline-flex items-center gap-1 truncate max-w-[180px]">
-                      <Mail className="h-3 w-3 shrink-0" />
+                      <EnvelopeIcon className="h-3 w-3 shrink-0" />
                       <span className="truncate">{c.email}</span>
                     </span>
                   )}
                 </div>
               </div>
               {isOn && (
-                <Check className="h-4 w-4 text-blue-400 shrink-0" />
+                <CheckIcon className="h-4 w-4 text-blue-400 shrink-0" />
               )}
             </button>
           );
@@ -212,7 +210,7 @@ export function CustomerChatModal({
         <div className="h-14 px-5 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg flex items-center justify-center bg-blue-500/15 text-blue-300">
-              <UserPlus className="h-3.5 w-3.5" />
+              <UserPlusIcon className="h-3.5 w-3.5" />
             </div>
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
               {t("customer.newChat.title", "Start a customer conversation")}
@@ -223,7 +221,7 @@ export function CustomerChatModal({
             onClick={onCancel}
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -238,7 +236,7 @@ export function CustomerChatModal({
         {/* Search input */}
         <div className="px-5 pb-3">
           <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-            <Search className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
+            <SearchIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
             <input
               type="text"
               autoFocus
@@ -254,7 +252,7 @@ export function CustomerChatModal({
                 className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 aria-label={t("btn.clear", "Clear")}
               >
-                <X className="h-3.5 w-3.5" />
+                <CrossIcon className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -288,7 +286,7 @@ export function CustomerChatModal({
           >
             {creating ? (
               <>
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <SpinnerIcon className="h-3 w-3 animate-spin" />
                 {t("btn.creating", "Starting…")}
               </>
             ) : (
@@ -342,7 +340,7 @@ export function CustomerContactCard({
       <div className="p-3 flex flex-col gap-2.5 text-[11.5px]">
         {contact.email && (
           <DetailRow
-            icon={<Mail className="h-3.5 w-3.5" />}
+            icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
             label={t("customer.email", "Email")}
             value={
               <a
@@ -356,7 +354,7 @@ export function CustomerContactCard({
         )}
         {contact.phone && (
           <DetailRow
-            icon={<Phone className="h-3.5 w-3.5" />}
+            icon={<PhoneIcon className="h-3.5 w-3.5" />}
             label={t("customer.phone", "Phone")}
             value={
               <a
@@ -370,7 +368,7 @@ export function CustomerContactCard({
         )}
         {contact.company && (
           <DetailRow
-            icon={<Building2 className="h-3.5 w-3.5" />}
+            icon={<Building2Icon className="h-3.5 w-3.5" />}
             label={t("customer.company", "Company")}
             value={
               <span className="text-[var(--text-primary)]">

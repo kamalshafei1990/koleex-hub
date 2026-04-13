@@ -14,15 +14,13 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Lock,
-  MapPin,
-  PhoneCall,
-  IdCard,
-  FileBadge2,
-  AlertCircle,
-  CheckCircle2,
-} from "lucide-react";
+import LockIcon from "@/components/icons/ui/LockIcon";
+import MapPinIcon from "@/components/icons/ui/MapPinIcon";
+import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
+import IdCardIcon from "@/components/icons/ui/IdCardIcon";
+import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type {
   AccountWithLinks,
   EmployeeRow,
@@ -126,7 +124,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
   if (account.user_type !== "internal") {
     return (
       <TabEmptyState
-        icon={<Lock className="h-5 w-5" />}
+        icon={<LockIcon className="h-5 w-5" />}
         title="Private HR data is internal-only"
         description="Customer accounts don't have private HR records. Switch the account type to Internal to manage this data."
       />
@@ -164,7 +162,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
     <div className="space-y-4">
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
-          <Lock className="h-3.5 w-3.5" />
+          <LockIcon className="h-3.5 w-3.5" />
           Private & Confidential
         </h2>
         <p className="text-[12px] text-[var(--text-dim)]">
@@ -176,7 +174,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
       {/* Private Address */}
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
-          <MapPin className="h-3.5 w-3.5" />
+          <MapPinIcon className="h-3.5 w-3.5" />
           Private Address
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -236,7 +234,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
       {/* Emergency Contact */}
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
-          <PhoneCall className="h-3.5 w-3.5" />
+          <PhoneCallIcon className="h-3.5 w-3.5" />
           Emergency Contact
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -273,7 +271,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
       {/* Personal */}
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
-          <IdCard className="h-3.5 w-3.5" />
+          <IdCardIcon className="h-3.5 w-3.5" />
           Personal
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -310,7 +308,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
       {/* Documents */}
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
-          <FileBadge2 className="h-3.5 w-3.5" />
+          <FileBadge2Icon className="h-3.5 w-3.5" />
           Documents
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -352,13 +350,13 @@ export default function PrivateTab({ account, onChanged }: Props) {
 
       {toast && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{toast}</span>
         </div>
       )}
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}

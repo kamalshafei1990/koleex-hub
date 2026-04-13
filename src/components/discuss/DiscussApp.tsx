@@ -36,46 +36,43 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  AtSign,
-  BellOff,
-  Bell,
-  Check,
-  CheckCheck,
-  Copy,
-  CornerUpLeft,
-  Edit3,
-  File as FileIcon,
-  FileText,
-  Hash,
-  Image as ImageIcon,
-  Info,
-  Link as LinkIcon,
-  Loader2,
-  Lock,
-  MessageSquare,
-  MessageSquarePlus,
-  Mic,
-  MoreHorizontal,
-  MoonStar,
-  Package,
-  Paperclip,
-  Pin,
-  PinOff,
-  Plus,
-  Reply,
-  Search,
-  Send,
-  Smile,
-  Star,
-  Trash2,
-  UserPlus,
-  Users,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+import BellOffIcon from "@/components/icons/ui/BellOffIcon";
+import FileIcon from "@/components/icons/ui/FileIcon";
+import MessageSquarePlusIcon from "@/components/icons/ui/MessageSquarePlusIcon";
+import MoonStarIcon from "@/components/icons/ui/MoonStarIcon";
+import PinIcon from "@/components/icons/ui/PinIcon";
+import PinOffIcon from "@/components/icons/ui/PinOffIcon";
+import ReplyIcon from "@/components/icons/ui/ReplyIcon";
+import VolumeXIcon from "@/components/icons/ui/VolumeXIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import AtSignIcon from "@/components/icons/ui/AtSignIcon";
+import BellIcon from "@/components/icons/ui/BellIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import CheckCheckIcon from "@/components/icons/ui/CheckCheckIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import Edit3Icon from "@/components/icons/ui/Edit3Icon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import ImageIcon from "@/components/icons/ui/PictureIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import LinkIcon from "@/components/icons/ui/LinkIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
+import MessageSquareIcon from "@/components/icons/ui/MessageSquareIcon";
+import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
+import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import PaperclipIcon from "@/components/icons/ui/PaperclipIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import SmileIcon from "@/components/icons/ui/SmileIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import Volume2Icon from "@/components/icons/ui/Volume2Icon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
   addMembers,
@@ -1441,7 +1438,7 @@ export default function DiscussApp() {
   if (accountLoading) {
     return (
       <div className="flex-1 min-h-0 bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -1497,7 +1494,7 @@ export default function DiscussApp() {
           }`}
           aria-label={t("back")}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeftIcon className="h-4 w-4" />
         </Link>
         {mobileView !== "list" && (
           <button
@@ -1506,7 +1503,7 @@ export default function DiscussApp() {
             className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
             aria-label={t("mobile.list")}
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeftIcon className="h-5 w-5" />
           </button>
         )}
         <div
@@ -1538,9 +1535,9 @@ export default function DiscussApp() {
             ) : (
               <div className="h-[30px] w-[30px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                 {selectedChannel.kind === "channel" ? (
-                  <Hash className="h-4 w-4 text-[var(--text-muted)]" />
+                  <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
                 ) : (
-                  <Users className="h-4 w-4 text-[var(--text-muted)]" />
+                  <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
                 )}
               </div>
             )}
@@ -1559,7 +1556,7 @@ export default function DiscussApp() {
           className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
           title={t("header.search", "Search")}
         >
-          <Search className="h-3.5 w-3.5" />
+          <SearchIcon className="h-3.5 w-3.5" />
         </button>
         {/* DND toggle */}
         <button
@@ -1576,7 +1573,7 @@ export default function DiscussApp() {
               : t("notif.dnd.off", "Do Not Disturb off")
           }
         >
-          <MoonStar className="h-3.5 w-3.5" />
+          <MoonStarIcon className="h-3.5 w-3.5" />
         </button>
         {/* Sound toggle */}
         <button
@@ -1590,9 +1587,9 @@ export default function DiscussApp() {
           }
         >
           {notifApi.soundEnabled ? (
-            <Volume2 className="h-3.5 w-3.5" />
+            <Volume2Icon className="h-3.5 w-3.5" />
           ) : (
-            <VolumeX className="h-3.5 w-3.5" />
+            <VolumeXIcon className="h-3.5 w-3.5" />
           )}
         </button>
         {/* Start customer chat */}
@@ -1602,7 +1599,7 @@ export default function DiscussApp() {
           className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5"
           title={t("customer.newChat", "Start customer chat")}
         >
-          <UserPlus className="h-3.5 w-3.5" />
+          <UserPlusIcon className="h-3.5 w-3.5" />
           {t("customer.newChat", "Customer chat")}
         </button>
         <button
@@ -1611,7 +1608,7 @@ export default function DiscussApp() {
           className="hidden md:flex h-8 px-3 rounded-lg hover:bg-[var(--bg-surface)] text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors items-center gap-1.5"
           title={t("sidebar.newDirect")}
         >
-          <AtSign className="h-3.5 w-3.5" />
+          <AtSignIcon className="h-3.5 w-3.5" />
           {t("sidebar.newDirect")}
         </button>
         <button
@@ -1619,7 +1616,7 @@ export default function DiscussApp() {
           onClick={() => setNewChannelOpen(true)}
           className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11.5px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all"
         >
-          <MessageSquarePlus className="h-3.5 w-3.5" />
+          <MessageSquarePlusIcon className="h-3.5 w-3.5" />
           <span className="hidden md:inline">{t("sidebar.newChannel")}</span>
         </button>
       </header>
@@ -1635,7 +1632,7 @@ export default function DiscussApp() {
           {/* Search + filter */}
           <div className="shrink-0 px-3 pt-3 pb-2 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors mb-2">
-              <Search size={14} className="text-[var(--text-dim)] shrink-0" />
+              <SearchIcon size={14} className="text-[var(--text-dim)] shrink-0" />
               <input
                 type="text"
                 value={sidebarSearch}
@@ -1649,7 +1646,7 @@ export default function DiscussApp() {
                   onClick={() => setSidebarSearch("")}
                   className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 >
-                  <X size={14} />
+                  <CrossIcon size={14} />
                 </button>
               )}
             </div>
@@ -1678,7 +1675,7 @@ export default function DiscussApp() {
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loadingChannels ? (
               <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
               </div>
             ) : filteredChannels.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
@@ -1696,7 +1693,7 @@ export default function DiscussApp() {
                   onClick={() => setNewChannelOpen(true)}
                   className="mt-1 h-8 px-3 rounded-lg bg-blue-500/15 text-blue-300 text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-500/25 transition-colors"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <PlusIcon className="h-3.5 w-3.5" />
                   {t("sidebar.newChannel")}
                 </button>
               </div>
@@ -1774,9 +1771,9 @@ export default function DiscussApp() {
                 ) : (
                   <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
                     {selectedChannel.kind === "channel" ? (
-                      <Hash className="h-4 w-4 text-[var(--text-muted)]" />
+                      <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
                     ) : (
-                      <Users className="h-4 w-4 text-[var(--text-muted)]" />
+                      <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
                     )}
                   </div>
                 )}
@@ -1811,9 +1808,9 @@ export default function DiscussApp() {
                   }
                 >
                   {selectedChannel.muted ? (
-                    <BellOff className="h-4 w-4" />
+                    <BellOffIcon className="h-4 w-4" />
                   ) : (
-                    <Bell className="h-4 w-4" />
+                    <BellIcon className="h-4 w-4" />
                   )}
                 </button>
                 <button
@@ -1825,7 +1822,7 @@ export default function DiscussApp() {
                   className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                   title={t("header.details")}
                 >
-                  <Info className="h-4 w-4" />
+                  <InfoIcon className="h-4 w-4" />
                 </button>
               </div>
 
@@ -1836,7 +1833,7 @@ export default function DiscussApp() {
               >
                 {loadingMessages ? (
                   <div className="h-full flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
+                    <SpinnerIcon className="h-5 w-5 animate-spin text-[var(--text-dim)]" />
                   </div>
                 ) : messages.length === 0 ? (
                   <ThreadEmptyState
@@ -2101,9 +2098,9 @@ function ChannelRow({
           ) : (
             <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
               {channel.kind === "channel" ? (
-                <Hash className="h-4 w-4 text-[var(--text-muted)]" />
+                <HashtagIcon className="h-4 w-4 text-[var(--text-muted)]" />
               ) : (
-                <Users className="h-4 w-4 text-[var(--text-muted)]" />
+                <UsersIcon className="h-4 w-4 text-[var(--text-muted)]" />
               )}
             </div>
           )}
@@ -2522,7 +2519,7 @@ function MessageBubble({
                   onClick={() => setReactionPickerOpen(true)}
                   className="inline-flex items-center h-6 w-6 justify-center rounded-full border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
                 >
-                  <Smile className="h-3 w-3" />
+                  <SmileIcon className="h-3 w-3" />
                 </button>
               </div>
             )}
@@ -2534,7 +2531,7 @@ function MessageBubble({
                 onClick={() => onOpenThread(msg)}
                 className="mt-1.5 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[10.5px] font-semibold hover:bg-blue-500/15 transition-colors"
               >
-                <MessageSquare className="h-3 w-3" />
+                <MessageSquareIcon className="h-3 w-3" />
                 {msg.thread.reply_count === 1
                   ? t("thread.replyCount.one", "1 reply")
                   : t("thread.replyCount.many", "{count} replies").replace(
@@ -2576,31 +2573,31 @@ function MessageBubble({
                   title={t("msg.react", "Add reaction")}
                   onClick={() => setReactionPickerOpen(true)}
                 >
-                  <Smile className="h-3.5 w-3.5" />
+                  <SmileIcon className="h-3.5 w-3.5" />
                 </HoverAction>
                 <HoverAction
                   title={t("msg.replyInThread", "Reply in thread")}
                   onClick={() => onOpenThread(msg)}
                 >
-                  <Reply className="h-3.5 w-3.5" />
+                  <ReplyIcon className="h-3.5 w-3.5" />
                 </HoverAction>
                 <HoverAction
                   title={t("msg.reply", "Reply")}
                   onClick={() => onReply(msg)}
                 >
-                  <CornerUpLeft className="h-3.5 w-3.5" />
+                  <ReplyIcon className="h-3.5 w-3.5" />
                 </HoverAction>
                 <HoverAction
                   title={t("msg.star", "Save for later")}
                   onClick={() => onStar(msg.id)}
                 >
-                  <Star className="h-3.5 w-3.5" />
+                  <StarIcon className="h-3.5 w-3.5" />
                 </HoverAction>
                 <HoverAction
                   title={t("msg.pin", "Pin")}
                   onClick={() => onPin(msg.id)}
                 >
-                  <Pin className="h-3.5 w-3.5" />
+                  <PinIcon className="h-3.5 w-3.5" />
                 </HoverAction>
                 <HoverAction
                   title={t("msg.copyLink", "Copy link")}
@@ -2614,14 +2611,14 @@ function MessageBubble({
                       title={t("msg.edit", "Edit")}
                       onClick={() => onStartEdit(msg)}
                     >
-                      <Edit3 className="h-3.5 w-3.5" />
+                      <Edit3Icon className="h-3.5 w-3.5" />
                     </HoverAction>
                     <HoverAction
                       title={t("msg.delete", "Delete")}
                       onClick={() => onDelete(msg.id)}
                       danger
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </HoverAction>
                   </>
                 )}
@@ -2715,7 +2712,7 @@ function AttachmentChip({ attachment }: { attachment: DiscussAttachment }) {
       className="flex items-center gap-2 h-12 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-colors max-w-[280px]"
     >
       <div className="h-8 w-8 shrink-0 rounded bg-[var(--bg-primary)] border border-[var(--border-subtle)] flex items-center justify-center">
-        <FileText className="h-4 w-4 text-[var(--text-muted)]" />
+        <DocumentIcon className="h-4 w-4 text-[var(--text-muted)]" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">
@@ -2744,7 +2741,7 @@ function ProductChip({ product }: { product: DiscussProductRef }) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <Package className="h-4 w-4 text-[var(--text-muted)]" />
+          <PackageIcon className="h-4 w-4 text-[var(--text-muted)]" />
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -2780,7 +2777,7 @@ function ThreadEmptyState({
             size={44}
           />
         ) : (
-          <Hash className="h-5 w-5 text-[var(--text-dim)]" />
+          <HashtagIcon className="h-5 w-5 text-[var(--text-dim)]" />
         )}
       </div>
       <div>
@@ -2899,7 +2896,7 @@ function Composer({
             className="h-6 w-6 shrink-0 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]"
             aria-label={t("reply.cancel", "Cancel reply")}
           >
-            <X className="h-3 w-3" />
+            <CrossIcon className="h-3 w-3" />
           </button>
         </div>
       )}
@@ -2952,7 +2949,7 @@ function Composer({
                 onClick={() => onRemoveAttachment(i)}
                 className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors"
               >
-                <X className="h-3 w-3" />
+                <CrossIcon className="h-3 w-3" />
               </button>
             </div>
           ))}
@@ -2961,7 +2958,7 @@ function Composer({
               key={`cp-${i}`}
               className="flex items-center gap-2 h-9 ps-2 pe-1 rounded-lg bg-blue-500/10 border border-blue-500/30"
             >
-              <Package className="h-3.5 w-3.5 text-blue-300" />
+              <PackageIcon className="h-3.5 w-3.5 text-blue-300" />
               <span className="text-[11.5px] text-[var(--text-primary)] max-w-[180px] truncate font-medium">
                 {p.name}
               </span>
@@ -2970,7 +2967,7 @@ function Composer({
                 onClick={() => onRemoveProduct(i)}
                 className="h-6 w-6 rounded-md text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors"
               >
-                <X className="h-3 w-3" />
+                <CrossIcon className="h-3 w-3" />
               </button>
             </div>
           ))}
@@ -2990,29 +2987,29 @@ function Composer({
         />
         <div className="flex items-center gap-1 px-2 pb-2">
           <ComposerIconButton title="Attach file" onClick={onPickFile}>
-            <Paperclip className="h-4 w-4" />
+            <PaperclipIcon className="h-4 w-4" />
           </ComposerIconButton>
           <ComposerIconButton title="Mention" onClick={onOpenMentionPicker}>
-            <AtSign className="h-4 w-4" />
+            <AtSignIcon className="h-4 w-4" />
           </ComposerIconButton>
           <ComposerIconButton title="Product" onClick={onOpenProductPicker}>
-            <Package className="h-4 w-4" />
+            <PackageIcon className="h-4 w-4" />
           </ComposerIconButton>
           <ComposerIconButton title="Emoji" onClick={onOpenEmojiPicker}>
-            <Smile className="h-4 w-4" />
+            <SmileIcon className="h-4 w-4" />
           </ComposerIconButton>
           <ComposerIconButton
             title={t("voice.record", "Record voice")}
             onClick={onOpenVoice}
           >
-            <Mic className="h-4 w-4" />
+            <MicrophoneIcon className="h-4 w-4" />
           </ComposerIconButton>
 
           <div className="flex-1" />
 
           {uploading && (
             <span className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <SpinnerIcon className="h-3 w-3 animate-spin" />
               Uploading…
             </span>
           )}
@@ -3024,9 +3021,9 @@ function Composer({
             className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
           >
             {sending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Send className="h-3.5 w-3.5" />
+              <PaperPlaneIcon className="h-3.5 w-3.5" />
             )}
             <span>{sendLabel}</span>
           </button>
@@ -3096,7 +3093,7 @@ function DetailsPane({
           onClick={onClose}
           className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
         >
-          <X className="h-4 w-4" />
+          <CrossIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -3112,11 +3109,11 @@ function DetailsPane({
           ) : (
             <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
               {channel.kind === "channel" ? (
-                <Hash className="h-6 w-6 text-[var(--text-muted)]" />
+                <HashtagIcon className="h-6 w-6 text-[var(--text-muted)]" />
               ) : isCustomer ? (
-                <MessageSquare className="h-6 w-6 text-[var(--text-muted)]" />
+                <MessageSquareIcon className="h-6 w-6 text-[var(--text-muted)]" />
               ) : (
-                <Users className="h-6 w-6 text-[var(--text-muted)]" />
+                <UsersIcon className="h-6 w-6 text-[var(--text-muted)]" />
               )}
             </div>
           )}
@@ -3218,15 +3215,15 @@ function DetailsPane({
           </div>
           <div className="flex flex-col gap-1">
             <DetailsRow
-              icon={<Pin className="h-3.5 w-3.5" />}
+              icon={<PinIcon className="h-3.5 w-3.5" />}
               label={t("details.pinned")}
             />
             <DetailsRow
-              icon={<Star className="h-3.5 w-3.5" />}
+              icon={<StarIcon className="h-3.5 w-3.5" />}
               label={t("sidebar.starred")}
             />
             <DetailsRow
-              icon={<FileText className="h-3.5 w-3.5" />}
+              icon={<DocumentIcon className="h-3.5 w-3.5" />}
               label={t("details.files")}
             />
             <DetailsRow
@@ -3285,7 +3282,7 @@ function DetailsRow({
     >
       <span className="text-[var(--text-dim)]">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
-      <MoreHorizontal className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+      <MoreHorizontalIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
     </button>
   );
 }
@@ -3321,7 +3318,7 @@ function ModalShell({
             onClick={onCancel}
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
-            <X className="h-4 w-4" />
+            <CrossIcon className="h-4 w-4" />
           </button>
         </div>
         {children}
@@ -3387,7 +3384,7 @@ function NewChannelModal({
             }`}
           >
             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
-              <Hash className="h-3.5 w-3.5" />
+              <HashtagIcon className="h-3.5 w-3.5" />
               {t("new.channel.public")}
             </div>
             <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
@@ -3404,7 +3401,7 @@ function NewChannelModal({
             }`}
           >
             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-primary)]">
-              <Lock className="h-3.5 w-3.5" />
+              <LockIcon className="h-3.5 w-3.5" />
               {t("new.channel.private")}
             </div>
             <div className="text-[10.5px] text-[var(--text-dim)] mt-0.5">
@@ -3446,7 +3443,7 @@ function NewChannelModal({
           </label>
           <div className="rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] max-h-[240px] overflow-hidden flex flex-col">
             <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
-              <Search className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+              <SearchIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
               <input
                 type="text"
                 value={search}
@@ -3490,7 +3487,7 @@ function NewChannelModal({
                         )}
                       </div>
                     </div>
-                    {isOn && <Check className="h-4 w-4 text-blue-400" />}
+                    {isOn && <CheckIcon className="h-4 w-4 text-blue-400" />}
                   </button>
                 );
               })}
@@ -3562,7 +3559,7 @@ function NewDmModal({
     <ModalShell title={t("new.dm.title")} onCancel={onCancel} width={440}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-          <Search className="h-4 w-4 text-[var(--text-dim)]" />
+          <SearchIcon className="h-4 w-4 text-[var(--text-dim)]" />
           <input
             type="text"
             autoFocus
@@ -3642,7 +3639,7 @@ function ProductPicker({
     <ModalShell title={t("composer.product")} onCancel={onCancel} width={520}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-          <Search className="h-4 w-4 text-[var(--text-dim)]" />
+          <SearchIcon className="h-4 w-4 text-[var(--text-dim)]" />
           <input
             type="text"
             autoFocus
@@ -3674,7 +3671,7 @@ function ProductPicker({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <Package className="h-4 w-4 text-[var(--text-muted)]" />
+                  <PackageIcon className="h-4 w-4 text-[var(--text-muted)]" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -3724,7 +3721,7 @@ function MentionPicker({
     <ModalShell title={t("composer.mention")} onCancel={onCancel} width={420}>
       <div className="p-5 flex flex-col gap-3">
         <div className="h-10 px-3 flex items-center gap-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
-          <AtSign className="h-4 w-4 text-[var(--text-dim)]" />
+          <AtSignIcon className="h-4 w-4 text-[var(--text-dim)]" />
           <input
             type="text"
             autoFocus

@@ -29,7 +29,13 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Mic, Pause, Play, Send, Square, Trash2 } from "lucide-react";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
+import PauseIcon from "@/components/icons/ui/PauseIcon";
+import PlayIcon from "@/components/icons/ui/PlayIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import StopIcon from "@/components/icons/ui/StopIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 
 export interface VoiceRecorderProps {
   /** Called when the user clicks "send". Receives the raw Blob,
@@ -301,7 +307,7 @@ export default function VoiceRecorder({
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
         <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center">
-          <Mic className="h-4 w-4 text-red-300" />
+          <MicrophoneIcon className="h-4 w-4 text-red-300" />
         </div>
         <div className="flex-1 min-w-0 text-[12px] text-red-300">
           {errorMsg}
@@ -320,7 +326,7 @@ export default function VoiceRecorder({
   if (state === "requesting" || state === "idle") {
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-        <Loader2 className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-4 w-4 animate-spin text-[var(--text-dim)]" />
         <div className="flex-1 text-[12px] text-[var(--text-dim)]">
           {labels.recording}…
         </div>
@@ -339,7 +345,7 @@ export default function VoiceRecorder({
     return (
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
         <div className="relative h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center">
-          <Mic className="h-4 w-4 text-red-300" />
+          <MicrophoneIcon className="h-4 w-4 text-red-300" />
           <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-75" />
         </div>
         <div className="flex-1 min-w-0">
@@ -356,14 +362,14 @@ export default function VoiceRecorder({
           className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
           title={labels.cancel}
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <TrashIcon className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
           onClick={handleStop}
           className="h-8 px-3 rounded-lg bg-red-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-red-600 transition-colors"
         >
-          <Square className="h-3 w-3 fill-current" />
+          <StopIcon className="h-3 w-3 fill-current" />
           {labels.stop}
         </button>
       </div>
@@ -384,9 +390,9 @@ export default function VoiceRecorder({
         className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors"
       >
         {isPlaying ? (
-          <Pause className="h-4 w-4 fill-current" />
+          <PauseIcon className="h-4 w-4 fill-current" />
         ) : (
-          <Play className="h-4 w-4 fill-current ms-0.5" />
+          <PlayIcon className="h-4 w-4 fill-current ms-0.5" />
         )}
       </button>
       <div className="flex-1 min-w-0 flex items-end gap-0.5 h-8">
@@ -414,7 +420,7 @@ export default function VoiceRecorder({
         title={labels.cancel}
         disabled={state === "sending"}
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <TrashIcon className="h-3.5 w-3.5" />
       </button>
       <button
         type="button"
@@ -423,9 +429,9 @@ export default function VoiceRecorder({
         className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[11.5px] font-semibold flex items-center gap-1.5 hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:pointer-events-none"
       >
         {state === "sending" ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <Send className="h-3.5 w-3.5" />
+          <PaperPlaneIcon className="h-3.5 w-3.5" />
         )}
         {labels.send}
       </button>
@@ -490,9 +496,9 @@ export function VoicePlaybackBubble({
         className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0"
       >
         {isPlaying ? (
-          <Pause className="h-4 w-4 fill-current" />
+          <PauseIcon className="h-4 w-4 fill-current" />
         ) : (
-          <Play className="h-4 w-4 fill-current ms-0.5" />
+          <PlayIcon className="h-4 w-4 fill-current ms-0.5" />
         )}
       </button>
       <div className="flex-1 min-w-0 flex items-end gap-0.5 h-7">

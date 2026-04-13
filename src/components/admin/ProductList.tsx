@@ -3,10 +3,24 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Plus, Search, Trash2, Pencil, Eye, EyeOff, Package, Filter, X,
-  Star, Boxes, ImageIcon, Tag, Layers, LayoutGrid, List, Settings, ArrowLeft,
-} from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import FilterIcon from "@/components/icons/ui/FilterIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ProductsIcon from "@/components/icons/ProductsIcon";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
@@ -125,11 +139,11 @@ export default function ProductList() {
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 mb-1">
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <Package className="h-4 w-4" />
+              <ProductsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               Products
@@ -137,11 +151,11 @@ export default function ProductList() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link href="/products/settings" className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <Settings className="h-4 w-4" />
+              <SettingsIcon2 className="h-4 w-4" />
               <span className="hidden sm:inline">Control Panel</span>
             </Link>
             <Link href="/products/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <Plus className="h-4 w-4" /> Add Product
+              <PlusIcon className="h-4 w-4" /> Add Product
             </Link>
           </div>
         </div>
@@ -153,7 +167,7 @@ export default function ProductList() {
         <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
                 type="text"
                 value={search}
@@ -172,7 +186,7 @@ export default function ProductList() {
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}
               >
-                <LayoutGrid className="h-4 w-4" />
+                <LayoutGridIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
@@ -182,7 +196,7 @@ export default function ProductList() {
                     : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}
               >
-                <List className="h-4 w-4" />
+                <ListIcon className="h-4 w-4" />
               </button>
             </div>
             <button
@@ -193,7 +207,7 @@ export default function ProductList() {
                   : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-faint)] hover:text-[var(--text-muted)]"
               }`}
             >
-              <Filter className="h-3.5 w-3.5" />
+              <FilterIcon className="h-3.5 w-3.5" />
               Filters
               {activeFilterCount > 0 && (
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold flex items-center justify-center">
@@ -206,7 +220,7 @@ export default function ProductList() {
                 onClick={clearAllFilters}
                 className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1.5 transition-colors"
               >
-                <X className="h-3 w-3" /> Clear
+                <CrossIcon className="h-3 w-3" /> Clear
               </button>
             )}
           </div>
@@ -323,7 +337,7 @@ export default function ProductList() {
           )
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
-            <Package className="h-12 w-12 text-[var(--text-barely)] mx-auto mb-4" />
+            <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-dim)] text-[15px] font-medium">
               {products.length === 0 ? "No products yet" : "No products match your filters"}
             </p>
@@ -332,7 +346,7 @@ export default function ProductList() {
             </p>
             {products.length === 0 && (
               <Link href="/products/new" className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all">
-                <Plus className="h-4 w-4" /> Add Product
+                <PlusIcon className="h-4 w-4" /> Add Product
               </Link>
             )}
           </div>
@@ -360,7 +374,7 @@ export default function ProductList() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon className="h-10 w-10 text-[var(--text-ghost)]" />
+                        <ImageRawIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                       </div>
                     )}
 
@@ -368,7 +382,7 @@ export default function ProductList() {
                     <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
                       {p.featured && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/90 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-                          <Star className="h-2.5 w-2.5" /> Featured
+                          <StarIcon className="h-2.5 w-2.5" /> Featured
                         </span>
                       )}
                       {p.level && (
@@ -382,11 +396,11 @@ export default function ProductList() {
                     <div className="absolute top-2.5 right-2.5">
                       {p.visible ? (
                         <span className="h-6 w-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center backdrop-blur-sm">
-                          <Eye className="h-3 w-3 text-emerald-400" />
+                          <EyeIcon className="h-3 w-3 text-emerald-400" />
                         </span>
                       ) : (
                         <span className="h-6 w-6 rounded-full bg-[var(--bg-overlay)] border border-[var(--border-subtle)] flex items-center justify-center backdrop-blur-sm">
-                          <EyeOff className="h-3 w-3 text-[var(--text-dim)]" />
+                          <EyeOffIcon className="h-3 w-3 text-[var(--text-dim)]" />
                         </span>
                       )}
                     </div>
@@ -403,14 +417,14 @@ export default function ProductList() {
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <PencilIcon className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
                         title="Delete product"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <TrashIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -424,7 +438,7 @@ export default function ProductList() {
 
                     {/* Category */}
                     <p className="text-[11px] text-[var(--text-dim)] mt-1 truncate flex items-center gap-1">
-                      <Layers className="h-3 w-3 shrink-0" />
+                      <LayersIcon className="h-3 w-3 shrink-0" />
                       {catMap[p.category_slug] || p.category_slug}
                     </p>
 
@@ -445,11 +459,11 @@ export default function ProductList() {
                       })()}
                       {p.brand && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-                          <Tag className="h-2.5 w-2.5" /> {p.brand}
+                          <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-                        <Boxes className="h-2.5 w-2.5" /> {models} {models === 1 ? "model" : "models"}
+                        <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? "model" : "models"}
                       </span>
                     </div>
 
@@ -495,7 +509,7 @@ export default function ProductList() {
                       {imgUrl ? (
                         <img src={imgUrl} alt={p.product_name} className="w-full h-full object-contain p-1" />
                       ) : (
-                        <ImageIcon className="h-5 w-5 text-[var(--text-ghost)]" />
+                        <ImageRawIcon className="h-5 w-5 text-[var(--text-ghost)]" />
                       )}
                     </div>
 
@@ -506,7 +520,7 @@ export default function ProductList() {
                           {p.product_name}
                         </h3>
                         {p.featured && (
-                          <Star className="h-3 w-3 text-amber-400 shrink-0" />
+                          <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />
                         )}
                       </div>
                       {/* Mobile: show all meta inline */}
@@ -531,7 +545,7 @@ export default function ProductList() {
 
                     {/* Category (desktop only) */}
                     <div className="hidden md:flex items-center gap-1.5 min-w-0">
-                      <Layers className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
+                      <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                       <span className="text-[12px] text-[var(--text-muted)] truncate">
                         {catMap[p.category_slug] || p.category_slug}
                       </span>
@@ -541,7 +555,7 @@ export default function ProductList() {
                     <div className="hidden md:flex items-center gap-1.5 min-w-0">
                       {p.brand ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)] truncate">
-                          <Tag className="h-2.5 w-2.5 shrink-0" /> {p.brand}
+                          <TagsIcon className="h-2.5 w-2.5 shrink-0" /> {p.brand}
                         </span>
                       ) : (
                         <span className="text-[11px] text-[var(--text-ghost)]">—</span>
@@ -551,7 +565,7 @@ export default function ProductList() {
                     {/* Models count (desktop only) */}
                     <div className="hidden md:flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)]">
-                        <Boxes className="h-2.5 w-2.5" /> {models}
+                        <BoxesIcon className="h-2.5 w-2.5" /> {models}
                       </span>
                       {p.level && (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold uppercase tracking-wider border ${lvl}`}>
@@ -582,9 +596,9 @@ export default function ProductList() {
                       {/* Mobile visibility indicator */}
                       <div className="md:hidden">
                         {p.visible ? (
-                          <Eye className="h-3.5 w-3.5 text-emerald-400" />
+                          <EyeIcon className="h-3.5 w-3.5 text-emerald-400" />
                         ) : (
-                          <EyeOff className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                          <EyeOffIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                         )}
                       </div>
                       <button
@@ -597,14 +611,14 @@ export default function ProductList() {
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <PencilIcon className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={(e) => handleDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
                         title="Delete product"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <TrashIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </Link>

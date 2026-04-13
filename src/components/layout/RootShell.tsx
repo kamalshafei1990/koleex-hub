@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import Sidebar from "./Sidebar";
+import FloatingPanel from "./FloatingPanel";
 import {
   SidebarProvider,
   useSidebar,
@@ -57,6 +58,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </div>
+      <FloatingPanel />
     </>
   );
 }

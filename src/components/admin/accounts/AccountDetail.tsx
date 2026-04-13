@@ -11,7 +11,7 @@
      ├─────────────────────────────────────────────────────────────┤
      │ Avatar | Status ribbon · Type · Role badge · Customer level  │
      ├─────────────────────────────────────────────────────────────┤
-     │ [Employee]  [Contact]  [Company]  [Calendar]  ← stat buttons │
+     │ [Employee]  [Contact]  [Company]  [CalendarRawIcon]  ← stat buttons │
      ├─────────────────────────────────────────────────────────────┤
      │ Overview | Access Rights | Preferences | Calendar | Private |│
      │  Notes                                                       │
@@ -30,28 +30,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Pencil,
-  KeyRound,
-  PowerOff,
-  Power,
-  UserCircle2,
-  Copy,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCcw,
-  Shield,
-  LayoutGrid,
-  Settings2,
-  Calendar as CalendarIcon,
-  Lock,
-  FileText,
-  Briefcase,
-  Camera,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import KeyIcon from "@/components/icons/ui/KeyIcon";
+import ToggleOffIcon from "@/components/icons/ui/ToggleOffIcon";
+import PowerIcon from "@/components/icons/ui/PowerIcon";
+import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
+import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import {
   fetchAccountWithLinks,
   setAccountStatus,
@@ -137,13 +135,13 @@ export default function AccountDetail({ accountId }: Props) {
   const tabs: TabDef[] = useMemo(() => {
     const isInternal = data?.user_type === "internal";
     return [
-      { key: "overview", label: "Overview", icon: LayoutGrid },
-      { key: "access", label: "Access Rights", icon: Shield },
-      { key: "preferences", label: "Preferences", icon: Settings2 },
+      { key: "overview", label: "Overview", icon: LayoutGridIcon },
+      { key: "access", label: "Access Rights", icon: ShieldIcon },
+      { key: "preferences", label: "Preferences", icon: Settings2Icon },
       { key: "calendar", label: "Calendar", icon: CalendarIcon },
-      { key: "private", label: "Private", icon: Lock, hidden: !isInternal },
-      { key: "security", label: "Security", icon: KeyRound },
-      { key: "notes", label: "Notes", icon: FileText },
+      { key: "private", label: "Private", icon: LockIcon, hidden: !isInternal },
+      { key: "security", label: "Security", icon: KeyIcon },
+      { key: "notes", label: "Notes", icon: DocumentIcon },
     ];
   }, [data?.user_type]);
 
@@ -324,7 +322,7 @@ export default function AccountDetail({ accountId }: Props) {
             href="/accounts"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to accounts
+            <ArrowLeftIcon className="h-4 w-4" /> Back to accounts
           </Link>
         </div>
       </div>
@@ -346,7 +344,7 @@ export default function AccountDetail({ accountId }: Props) {
               href="/accounts"
               className="h-9 w-9 shrink-0 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeftIcon className="h-4 w-4" />
             </Link>
             <div className="min-w-0">
               <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
@@ -363,7 +361,7 @@ export default function AccountDetail({ accountId }: Props) {
               disabled={working}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
             >
-              <KeyRound className="h-4 w-4" /> Reset Password
+              <KeyIcon className="h-4 w-4" /> Reset Password
             </button>
             <button
               onClick={handleToggleForce}
@@ -375,7 +373,7 @@ export default function AccountDetail({ accountId }: Props) {
                   : "Require user to change password on next login"
               }
             >
-              <RefreshCcw className="h-4 w-4" />
+              <RefreshCcwIcon className="h-4 w-4" />
               {data.force_password_change
                 ? "Clear Force Reset"
                 : "Force Password Reset"}
@@ -387,11 +385,11 @@ export default function AccountDetail({ accountId }: Props) {
             >
               {isActive ? (
                 <>
-                  <PowerOff className="h-4 w-4" /> Deactivate
+                  <ToggleOffIcon className="h-4 w-4" /> Deactivate
                 </>
               ) : (
                 <>
-                  <Power className="h-4 w-4" /> Activate
+                  <PowerIcon className="h-4 w-4" /> Activate
                 </>
               )}
             </button>
@@ -399,20 +397,20 @@ export default function AccountDetail({ accountId }: Props) {
               href={`/accounts/${data.id}/edit`}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
             >
-              <Pencil className="h-4 w-4" /> Edit
+              <PencilIcon className="h-4 w-4" /> Edit
             </Link>
           </div>
         </div>
 
         {toast && (
           <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{toast}</span>
           </div>
         )}
         {error && (
           <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -434,7 +432,7 @@ export default function AccountDetail({ accountId }: Props) {
               onClick={copyNewPw}
               className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
             >
-              <Copy className="h-3.5 w-3.5" /> Copy
+              <CopyIcon className="h-3.5 w-3.5" /> Copy
             </button>
           </div>
         )}
@@ -462,18 +460,18 @@ export default function AccountDetail({ accountId }: Props) {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <UserCircle2 className="h-10 w-10 text-[var(--text-dim)]" />
+                  <UserCircle2Icon className="h-10 w-10 text-[var(--text-dim)]" />
                 )}
                 <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   {uploadingAvatar ? (
-                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
                   ) : (
-                    <Camera className="h-5 w-5 text-white" />
+                    <CameraIcon className="h-5 w-5 text-white" />
                   )}
                 </span>
                 {uploadingAvatar && (
                   <span className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    <SpinnerIcon className="h-5 w-5 text-white animate-spin" />
                   </span>
                 )}
               </button>
@@ -494,7 +492,7 @@ export default function AccountDetail({ accountId }: Props) {
                   disabled={uploadingAvatar}
                   className="text-[11px] text-[var(--text-dim)] hover:text-red-300 flex items-center gap-1 disabled:opacity-60"
                 >
-                  <Trash2 className="h-3 w-3" /> Remove
+                  <TrashIcon className="h-3 w-3" /> Remove
                 </button>
               )}
             </div>
@@ -506,7 +504,7 @@ export default function AccountDetail({ accountId }: Props) {
                 </span>
                 {role && (
                   <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] flex items-center gap-1.5">
-                    <Shield className="h-3 w-3" />
+                    <ShieldIcon className="h-3 w-3" />
                     {role.name}
                   </span>
                 )}
@@ -520,7 +518,7 @@ export default function AccountDetail({ accountId }: Props) {
               </div>
               {person?.job_title && (
                 <p className="text-[13px] text-[var(--text-muted)] mt-3 flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-[var(--text-dim)]" />
+                  <BriefcaseIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                   {person.job_title}
                   {data.company?.name && (
                     <span className="text-[var(--text-dim)]">
@@ -531,7 +529,7 @@ export default function AccountDetail({ accountId }: Props) {
               )}
               {!person && (
                 <p className="text-[12px] text-amber-300/80 mt-3 flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" />
+                  <ExclamationIcon className="h-3.5 w-3.5" />
                   No linked contact record. Edit this account to link one.
                 </p>
               )}

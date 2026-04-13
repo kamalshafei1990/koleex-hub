@@ -1,0 +1,14 @@
+import { forwardRef } from "react";
+
+const PenSquareIcon = forwardRef<SVGSVGElement, { size?: number | string; className?: string; style?: React.CSSProperties }>(
+  ({ size = 24, className, style, ...rest }, ref) => {
+    const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
+    return (
+      <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={s} height={s} fill="currentColor" className={className} style={style} {...rest}>
+        <path d="m19,0H5C2.243,0,0,2.243,0,5v14c0,2.757,2.243,5,5,5h14c2.757,0,5-2.243,5-5V5c0-2.757-2.243-5-5-5Zm3,19c0,1.654-1.346,3-3,3H5c-1.654,0-3-1.346-3-3V5c0-1.654,1.346-3,3-3h14c1.654,0,3,1.346,3,3v14ZM13.879,6.379l-6.707,6.707c-.755.755-1.172,1.76-1.172,2.828v1.586c0,.553.448,1,1,1h1.586c1.068,0,2.073-.416,2.828-1.172l6.707-6.707c1.17-1.17,1.17-3.072,0-4.242-1.134-1.133-3.11-1.133-4.243,0Zm-3.879,9.535c-.373.372-.888.586-1.414.586h-.586v-.586c0-.534.208-1.036.586-1.414l4.25-4.25,1.414,1.414-4.25,4.25Zm6.707-6.707l-1.043,1.043-1.414-1.414,1.043-1.043c.377-.379,1.036-.379,1.414,0,.39.39.39,1.024,0,1.414Z"/>
+      </svg>
+    );
+  },
+);
+PenSquareIcon.displayName = "PenSquareIcon";
+export default PenSquareIcon;

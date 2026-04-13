@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, Check, ChevronDown, Search } from "lucide-react";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
 
 export interface SelectOption {
   value: string;
@@ -74,7 +77,7 @@ export default function SelectWithCreate({
           )}
           <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
-        <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon className={`h-3.5 w-3.5 text-[var(--text-ghost)] shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       {/* Dropdown */}
@@ -84,7 +87,7 @@ export default function SelectWithCreate({
           {options.length > 5 && (
             <div className="p-2 border-b border-[var(--border-subtle)]">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
                 <input
                   ref={inputRef}
                   type="text"
@@ -127,7 +130,7 @@ export default function SelectWithCreate({
                   )
                 )}
                 <span className="truncate flex-1">{o.label}</span>
-                {o.value === value && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+                {o.value === value && <CheckIcon className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
               </button>
             ))}
 
@@ -144,7 +147,7 @@ export default function SelectWithCreate({
                 onClick={() => { setOpen(false); setSearch(""); onClickCreate(); }}
                 className="w-full px-4 py-3 text-left text-[12px] font-medium text-blue-400 hover:bg-blue-500/10 flex items-center gap-2 transition-colors"
               >
-                <Plus className="h-3.5 w-3.5" /> {createLabel}
+                <PlusIcon className="h-3.5 w-3.5" /> {createLabel}
               </button>
             </div>
           )}

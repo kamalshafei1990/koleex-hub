@@ -18,21 +18,81 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import {
-  Plus, Search, Pencil, Trash2, X, Loader2, ChevronRight, ChevronDown,
-  Users, UserPlus, Building2, User, ArrowLeft,
-  Briefcase, Network, LayoutList, GitBranchPlus, Shield,
-  Check, History, ChevronUp, ArrowRightLeft, FileText, AlertCircle,
-  GripVertical, Image, Smile, Globe, BarChart3, Activity,
-  ZoomIn, ZoomOut, RotateCcw, Mail, Phone, Clock,
-  TrendingUp, Layers, UserCheck, UserX, Copy, Undo2, Upload,
-  Building, Code, Wrench, Heart, Truck, BookOpen, Headphones,
-  Scale, Factory, Cpu, Palette, GraduationCap, Warehouse,
-  Stethoscope, Lock, Radio, ShoppingCart, Plane, FlaskConical,
-  Ruler, Target, Lightbulb, Package, Rocket, CreditCard,
-  Megaphone, Monitor, Landmark, PieChart, Settings, Handshake,
-  type LucideIcon,
-} from "lucide-react";
+import ZoomInIcon from "@/components/icons/ui/ZoomInIcon";
+import ZoomOutIcon from "@/components/icons/ui/ZoomOutIcon";
+import CodeIcon from "@/components/icons/ui/CodeIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
+import Building2Icon from "@/components/icons/ui/Building2Icon";
+import UserIcon from "@/components/icons/ui/UserIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
+import NetworkIcon from "@/components/icons/ui/NetworkIcon";
+import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
+import GitBranchPlusIcon from "@/components/icons/ui/GitBranchPlusIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
+import ArrowRightLeftIcon from "@/components/icons/ui/ArrowRightLeftIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
+import GripVerticalIcon from "@/components/icons/ui/GripVerticalIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import SmileIcon from "@/components/icons/ui/SmileIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
+import ActivityIcon from "@/components/icons/ui/ActivityIcon";
+import UndoIcon from "@/components/icons/ui/UndoIcon";
+import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
+import PhoneIcon from "@/components/icons/ui/PhoneIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import UserXIcon from "@/components/icons/ui/UserXIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import UploadIcon from "@/components/icons/ui/UploadIcon";
+import BuildingIcon from "@/components/icons/ui/BuildingIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import HeartIcon from "@/components/icons/ui/HeartIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
+import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
+import HeadphonesIcon from "@/components/icons/ui/HeadphonesIcon";
+import ScaleIcon from "@/components/icons/ui/ScaleIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import CpuIcon from "@/components/icons/ui/CpuIcon";
+import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import GraduationCapIcon from "@/components/icons/ui/GraduationCapIcon";
+import WarehouseIcon from "@/components/icons/ui/WarehouseIcon";
+import StethoscopeIcon from "@/components/icons/ui/StethoscopeIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
+import RadioIcon from "@/components/icons/ui/RadioIcon";
+import ShoppingCartIcon from "@/components/icons/ui/ShoppingCartIcon";
+import PlaneIcon from "@/components/icons/ui/PlaneIcon";
+import FlaskConicalIcon from "@/components/icons/ui/FlaskConicalIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import LightbulbIcon from "@/components/icons/ui/LightbulbIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import RocketIcon from "@/components/icons/ui/RocketIcon";
+import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
+import MegaphoneIcon from "@/components/icons/ui/MegaphoneIcon";
+import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";
+import PieChartIcon from "@/components/icons/ui/PieChartIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
+import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
+import ManagementIcon from "@/components/icons/ManagementIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { managementT } from "@/lib/translations/management";
@@ -58,19 +118,19 @@ import {
    CONSTANTS
    ═══════════════════════════════════════════════════ */
 
-/** Lucide icon map for department icon picker. Key = stored string, value = component. */
-const DEPT_ICON_MAP: Record<string, LucideIcon> = {
-  building2: Building2, building: Building, briefcase: Briefcase, users: Users,
-  shield: Shield, globe: Globe, "trending-up": TrendingUp, "bar-chart": BarChart3,
-  "credit-card": CreditCard, megaphone: Megaphone, code: Code, wrench: Wrench,
-  heart: Heart, truck: Truck, "book-open": BookOpen, headphones: Headphones,
-  scale: Scale, factory: Factory, cpu: Cpu, palette: Palette,
-  "graduation-cap": GraduationCap, warehouse: Warehouse, stethoscope: Stethoscope,
-  lock: Lock, radio: Radio, "shopping-cart": ShoppingCart, plane: Plane,
-  flask: FlaskConical, ruler: Ruler, target: Target, lightbulb: Lightbulb,
-  package: Package, rocket: Rocket, monitor: Monitor, landmark: Landmark,
-  "pie-chart": PieChart, settings: Settings, handshake: Handshake, network: Network,
-  mail: Mail, layers: Layers, "file-text": FileText, activity: Activity,
+/** Icon map for department icon picker. Key = stored string, value = component. */
+const DEPT_ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  building2: Building2Icon, building: BuildingIcon, briefcase: BriefcaseIcon, users: UsersIcon,
+  shield: ShieldIcon, globe: GlobeIcon, "trending-up": TrendingUpIcon, "bar-chart": BarChart3Icon,
+  "credit-card": CreditCardIcon, megaphone: MegaphoneIcon, code: CodeIcon, wrench: WrenchIcon,
+  heart: HeartIcon, truck: TruckIcon, "book-open": BookOpenIcon, headphones: HeadphonesIcon,
+  scale: ScaleIcon, factory: FactoryIcon, cpu: CpuIcon, palette: PaletteIcon,
+  "graduation-cap": GraduationCapIcon, warehouse: WarehouseIcon, stethoscope: StethoscopeIcon,
+  lock: LockIcon, radio: RadioIcon, "shopping-cart": ShoppingCartIcon, plane: PlaneIcon,
+  flask: FlaskConicalIcon, ruler: RulerIcon, target: TargetIcon, lightbulb: LightbulbIcon,
+  package: PackageIcon, rocket: RocketIcon, monitor: MonitorIcon, landmark: LandmarkIcon,
+  "pie-chart": PieChartIcon, settings: SettingsIcon2, handshake: HandshakeIcon, network: NetworkIcon,
+  mail: EnvelopeIcon, layers: LayersIcon, "file-text": DocumentIcon, activity: ActivityIcon,
 };
 const DEPT_ICON_KEYS = Object.keys(DEPT_ICON_MAP);
 
@@ -160,7 +220,7 @@ function ModalShell({ open, onClose, title, width, children, footer }: {
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] shrink-0">
           <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">{title}</h2>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
-            <X size={16} className="text-[var(--text-dim)]" />
+            <CrossIcon size={16} className="text-[var(--text-dim)]" />
           </button>
         </div>
         <div className="px-6 py-5 space-y-4 overflow-y-auto overscroll-contain flex-1">{children}</div>
@@ -176,7 +236,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function ErrorBanner({ message }: { message: string }) {
   if (!message) return null;
-  return <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex items-center gap-2"><AlertCircle size={14} /> {message}</div>;
+  return <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex items-center gap-2"><ExclamationIcon size={14} /> {message}</div>;
 }
 
 function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; size?: number }) {
@@ -184,7 +244,7 @@ function Avatar({ src, name, size = 32 }: { src?: string | null; name: string; s
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return (
     <div className="rounded-full bg-[var(--bg-surface)] flex items-center justify-center shrink-0 text-[var(--text-dim)]" style={{ width: size, height: size }}>
-      {size >= 28 ? <span className="font-semibold" style={{ fontSize: size * 0.38 }}>{initials || <User size={size * 0.45} />}</span> : <User size={size * 0.5} />}
+      {size >= 28 ? <span className="font-semibold" style={{ fontSize: size * 0.38 }}>{initials || <UserIcon size={size * 0.45} />}</span> : <UserIcon size={size * 0.5} />}
     </div>
   );
 }
@@ -202,7 +262,7 @@ function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; 
 }
 
 function Spinner() {
-  return <div className="flex items-center justify-center py-16"><Loader2 size={20} className="text-[var(--text-dim)] animate-spin" /></div>;
+  return <div className="flex items-center justify-center py-16"><SpinnerIcon size={20} className="text-[var(--text-dim)] animate-spin" /></div>;
 }
 
 /** Department icon renderer — system-style: uploaded images in rounded containers, emoji fallback */
@@ -219,7 +279,7 @@ function DeptIcon({ dept, size = 34 }: { dept: DepartmentRow; size?: number }) {
   }
   // Lucide icon (stored as icon_type="icon", icon_value="building2" etc.)
   const iconKey = dept.icon_type === "icon" && dept.icon_value ? dept.icon_value : "building2";
-  const IconComp = DEPT_ICON_MAP[iconKey] || Building2;
+  const IconComp = DEPT_ICON_MAP[iconKey] || Building2Icon;
   return (
     <div className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0"
       style={{ width: size, height: size }}>
@@ -307,11 +367,11 @@ function DepartmentModal({
         <div className="flex gap-2 mb-2">
           <button onClick={() => setIconTab("icon")}
             className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconTab === "icon" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
-            <Layers size={12} /> {t("mgmt.iconTab")}
+            <LayersIcon size={12} /> {t("mgmt.iconTab")}
           </button>
           <button onClick={() => setIconTab("upload")}
             className={`h-8 px-3 rounded-lg text-[11px] font-medium flex items-center gap-1.5 border transition-all ${iconTab === "upload" ? "bg-[var(--bg-surface-active)] border-[var(--border-focus)] text-[var(--text-primary)]" : "border-[var(--border-subtle)] text-[var(--text-dim)]"}`}>
-            <Upload size={12} /> {t("mgmt.upload")}
+            <UploadIcon size={12} /> {t("mgmt.upload")}
           </button>
         </div>
 
@@ -320,7 +380,7 @@ function DepartmentModal({
             <div className="relative">
               <button onClick={() => setShowIcons(!showIcons)}
                 className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center hover:scale-105 transition-transform">
-                {(() => { const IC = DEPT_ICON_MAP[selectedIcon] || Building2; return <IC size={20} className="text-[var(--text-muted)]" />; })()}
+                {(() => { const IC = DEPT_ICON_MAP[selectedIcon] || Building2Icon; return <IC size={20} className="text-[var(--text-muted)]" />; })()}
               </button>
               {showIcons && (
                 <div className="absolute top-full left-0 rtl:left-auto rtl:right-0 mt-2 z-10 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl p-2.5 w-[280px] grid grid-cols-7 gap-1">
@@ -352,18 +412,18 @@ function DepartmentModal({
                 </div>
               ) : (
                 <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-dashed border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)]">
-                  <Upload size={18} />
+                  <UploadIcon size={18} />
                 </div>
               )}
               <div className="flex-1">
                 {uploading ? (
                   <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
-                    <Loader2 size={14} className="animate-spin" /> {t("mgmt.uploading")}
+                    <SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.uploading")}
                   </div>
                 ) : (
                   <button onClick={() => fileRef.current?.click()}
                     className="h-9 px-4 rounded-lg text-[12px] font-medium border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all flex items-center gap-1.5">
-                    <Upload size={12} /> {iconUrl ? t("mgmt.changeFile") : t("mgmt.uploadFile")}
+                    <UploadIcon size={12} /> {iconUrl ? t("mgmt.changeFile") : t("mgmt.uploadFile")}
                   </button>
                 )}
               </div>
@@ -500,9 +560,9 @@ function PositionModal({
       </div>
 
       <button onClick={() => setShowJD(!showJD)} className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors w-full">
-        <FileText size={13} />
+        <DocumentIcon size={13} />
         <span>{t("mgmt.jobDescription")}</span>
-        {showJD ? <ChevronUp size={12} className="ml-auto" /> : <ChevronDown size={12} className="ml-auto" />}
+        {showJD ? <AngleUpIcon size={12} className="ml-auto" /> : <AngleDownIcon size={12} className="ml-auto" />}
       </button>
       {showJD && (
         <div className="space-y-4 pl-1 border-l-2 border-[var(--border-subtle)] ml-1">
@@ -617,7 +677,7 @@ function AssignmentModal({
               <span className="text-[var(--text-primary)] truncate">{selectedContact.name}</span>
               {selectedContact.email && <span className="text-[var(--text-dim)] text-[11px] truncate">({selectedContact.email})</span>}</>
             ) : (
-              <><User size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">{t("mgmt.selectOrCreate")}</span></>
+              <><UserIcon size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">{t("mgmt.selectOrCreate")}</span></>
             )}
           </button>
 
@@ -625,7 +685,7 @@ function AssignmentModal({
             <div className="md:absolute md:top-full md:left-0 md:right-0 mt-1 z-20 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl shadow-2xl max-h-[280px] overflow-hidden flex flex-col">
               <div className="p-2 shrink-0">
                 <div className="relative">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+                  <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
                   <input type="text" value={contactSearch} onChange={(e) => setContactSearch(e.target.value)}
                     placeholder={t("mgmt.searchNameEmail")} autoFocus
                     className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[12px] outline-none" />
@@ -649,7 +709,7 @@ function AssignmentModal({
               <div className="p-2 border-t border-[var(--border-color)] shrink-0">
                 <button onClick={() => { setShowCreate(true); setShowPicker(false); }}
                   className="w-full h-9 rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 border border-dashed border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-muted)] transition-colors">
-                  <UserPlus size={13} /> {t("mgmt.createNewEmployee")}
+                  <UserPlusIcon size={13} /> {t("mgmt.createNewEmployee")}
                 </button>
               </div>
             </div>
@@ -662,7 +722,7 @@ function AssignmentModal({
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-subtle)] p-4 space-y-3">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{t("mgmt.newEmployee")}</span>
-            <button onClick={() => setShowCreate(false)} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><X size={14} /></button>
+            <button onClick={() => setShowCreate(false)} className="text-[var(--text-dim)] hover:text-[var(--text-muted)]"><CrossIcon size={14} /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -756,7 +816,7 @@ function TransferModal({
     }>
       <ErrorBanner message={error} />
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-        <ArrowRightLeft size={16} className="text-[var(--text-dim)] shrink-0" />
+        <ArrowRightLeftIcon size={16} className="text-[var(--text-dim)] shrink-0" />
         <div>
           <div className="text-[13px] font-medium text-[var(--text-primary)]">{contactName}</div>
           <div className="text-[11px] text-[var(--text-dim)]">{t("mgmt.movingNewPos")}</div>
@@ -773,7 +833,7 @@ function TransferModal({
         <div>
           <FieldLabel>{t("mgmt.targetPos")}</FieldLabel>
           {loadingPos ? (
-            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><Loader2 size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
+            <div className="h-10 flex items-center gap-2 text-[12px] text-[var(--text-dim)]"><SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
           ) : deptPositions.length === 0 ? (
             <div className="h-10 flex items-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noPosAvailable")}</div>
           ) : (
@@ -942,11 +1002,11 @@ function PositionDetailModal({ open, onClose, position, contacts, t }: {
           )}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <History size={13} className="text-[var(--text-dim)]" />
+              <HistoryIcon size={13} className="text-[var(--text-dim)]" />
               <FieldLabel>{t("mgmt.posHistory")}</FieldLabel>
             </div>
             {loading ? (
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><Loader2 size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-dim)] py-4"><SpinnerIcon size={14} className="animate-spin" /> {t("mgmt.loading")}</div>
             ) : history.length === 0 ? (
               <div className="text-[12px] text-[var(--text-dim)] py-4 text-center">{t("mgmt.noHistory")}</div>
             ) : (
@@ -1006,7 +1066,7 @@ function OrgChartCard({
       `}>
       {/* Drag handle */}
       <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing">
-        <GripVertical size={12} className="text-[var(--text-dim)]" />
+        <GripVerticalIcon size={12} className="text-[var(--text-dim)]" />
       </div>
 
       {/* Position title + level */}
@@ -1037,14 +1097,14 @@ function OrgChartCard({
           ) : (
             <button onClick={(e) => { e.stopPropagation(); onAssign(node.position.id); }}
               className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1 transition-colors">
-              <UserPlus size={10} /> Assign
+              <UserPlusIcon size={10} /> Assign
             </button>
           )}
         </div>
         {hasChildren && (
           <button onClick={(e) => { e.stopPropagation(); onToggle(); }}
             className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface)] transition-colors shrink-0">
-            {expanded ? <ChevronUp size={11} className="text-[var(--text-dim)]" /> : <ChevronDown size={11} className="text-[var(--text-dim)]" />}
+            {expanded ? <AngleUpIcon size={11} className="text-[var(--text-dim)]" /> : <AngleDownIcon size={11} className="text-[var(--text-dim)]" />}
           </button>
         )}
       </div>
@@ -1218,14 +1278,14 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (loading) return <div className="flex items-center justify-center py-8"><Loader2 size={16} className="text-[var(--text-dim)] animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-8"><SpinnerIcon size={16} className="text-[var(--text-dim)] animate-spin" /></div>;
 
   const CheckCell = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
     <button onClick={onChange}
       className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
         checked ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-transparent hover:border-[var(--border-focus)]"
       }`}>
-      <Check size={12} />
+      <CheckIcon size={12} />
     </button>
   );
 
@@ -1260,7 +1320,7 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
               <div className="flex items-center gap-2 px-3 py-2.5 bg-[var(--bg-surface-subtle)]">
                 <button onClick={() => toggleGroupCollapse(group.label)}
                   className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface)]">
-                  {collapsed ? <ChevronRight size={12} className="text-[var(--text-dim)]" /> : <ChevronDown size={12} className="text-[var(--text-dim)]" />}
+                  {collapsed ? <AngleRightIcon size={12} className="text-[var(--text-dim)]" /> : <AngleDownIcon size={12} className="text-[var(--text-dim)]" />}
                 </button>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">{group.label}</span>
                 <span className="text-[10px] font-medium text-[var(--text-faint)] mr-2">{stats.pct}%</span>
@@ -1307,7 +1367,7 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
                             className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
                               isFullAccess ? "bg-blue-500/15 border-blue-500/30 text-blue-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-transparent hover:border-[var(--border-focus)]"
                             }`}>
-                            <Shield size={10} />
+                            <ShieldIcon size={10} />
                           </button>
                         </div>
                       </div>
@@ -1320,7 +1380,7 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
         })}
       </div>
       <div className="flex items-center justify-end gap-2 mt-4">
-        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><Check size={12} /> {t("mgmt.saved")}</span>}
+        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><CheckIcon size={12} /> {t("mgmt.saved")}</span>}
         <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? t("mgmt.saving") : t("mgmt.savePerms")}</button>
       </div>
     </div>
@@ -1344,7 +1404,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
   }, [contactId]);
 
   if (loading) return <Spinner />;
-  if (!profile) return <EmptyState icon={User} title={t("mgmt.employeeNotFound")} />;
+  if (!profile) return <EmptyState icon={UserIcon} title={t("mgmt.employeeNotFound")} />;
 
   const { contact, assignments, reportingChain, directReports, history } = profile;
   const primary = assignments.find((a) => a.is_primary) || assignments[0];
@@ -1354,7 +1414,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
         <button onClick={onClose}
           className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-          <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+          <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
         </button>
         <div className="flex items-center gap-4">
           <Avatar src={contact.avatar} name={contact.name} size={56} />
@@ -1372,10 +1432,10 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
             )}
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               {contact.email && (
-                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><Mail size={11} /> {contact.email}</span>
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><EnvelopeIcon size={11} /> {contact.email}</span>
               )}
               {contact.phone && (
-                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><Phone size={11} /> {contact.phone}</span>
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><PhoneIcon size={11} /> {contact.phone}</span>
               )}
             </div>
           </div>
@@ -1386,14 +1446,14 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
         {/* Current Positions */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Briefcase size={14} className="text-[var(--text-dim)]" />
+            <BriefcaseIcon size={14} className="text-[var(--text-dim)]" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.currentPositions")}</span>
           </div>
           <div className="space-y-2">
             {assignments.map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
                 <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                  <Briefcase size={14} className="text-violet-400" />
+                  <BriefcaseIcon size={14} className="text-violet-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1415,7 +1475,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
         {reportingChain.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <TrendingUp size={14} className="text-[var(--text-dim)]" />
+              <TrendingUpIcon size={14} className="text-[var(--text-dim)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.reportsTo")}</span>
             </div>
             <div className="relative pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
@@ -1440,7 +1500,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
         {directReports.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Users size={14} className="text-[var(--text-dim)]" />
+              <UsersIcon size={14} className="text-[var(--text-dim)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.directReports")} ({directReports.length})</span>
             </div>
             <div className="space-y-1.5">
@@ -1463,7 +1523,7 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
         {/* Position History */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <History size={14} className="text-[var(--text-dim)]" />
+            <HistoryIcon size={14} className="text-[var(--text-dim)]" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.history")}</span>
           </div>
           {history.length === 0 ? (
@@ -1503,7 +1563,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
   }, []);
 
   if (loading) return <Spinner />;
-  if (!analytics) return <EmptyState icon={BarChart3} title={t("mgmt.noData")} />;
+  if (!analytics) return <EmptyState icon={BarChart3Icon} title={t("mgmt.noData")} />;
 
   const StatCard = ({ icon: Icon, label, value, sub, color, accent }: {
     icon: React.ElementType; label: string; value: string | number; sub?: string; color: string; accent: string;
@@ -1526,7 +1586,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-sm">
-            <BarChart3 size={20} className="text-emerald-400" />
+            <BarChart3Icon size={20} className="text-emerald-400" />
           </div>
           <div>
             <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.headcountDash")}</h2>
@@ -1538,16 +1598,16 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Users} label={t("mgmt.employees")} value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" accent="bg-blue-400" />
-          <StatCard icon={Briefcase} label={t("mgmt.positions")} value={analytics.totalPositions} sub={`${analytics.filledPositions} ${t("mgmt.filled")}`} color="bg-violet-500/10 text-violet-400" accent="bg-violet-400" />
-          <StatCard icon={UserX} label={t("mgmt.vacant")} value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% ${t("mgmt.rate")}`} color="bg-amber-500/10 text-amber-400" accent="bg-amber-400" />
-          <StatCard icon={Layers} label={t("mgmt.orgDepth")} value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} ${t("mgmt.avgReports")}`} color="bg-cyan-500/10 text-cyan-400" accent="bg-cyan-400" />
+          <StatCard icon={UsersIcon} label={t("mgmt.employees")} value={analytics.totalEmployees} color="bg-blue-500/10 text-blue-400" accent="bg-blue-400" />
+          <StatCard icon={BriefcaseIcon} label={t("mgmt.positions")} value={analytics.totalPositions} sub={`${analytics.filledPositions} ${t("mgmt.filled")}`} color="bg-violet-500/10 text-violet-400" accent="bg-violet-400" />
+          <StatCard icon={UserXIcon} label={t("mgmt.vacant")} value={analytics.vacantPositions} sub={`${analytics.vacancyRate.toFixed(1)}% ${t("mgmt.rate")}`} color="bg-amber-500/10 text-amber-400" accent="bg-amber-400" />
+          <StatCard icon={LayersIcon} label={t("mgmt.orgDepth")} value={analytics.maxOrgDepth} sub={`${analytics.avgSpanOfControl.toFixed(1)} ${t("mgmt.avgReports")}`} color="bg-cyan-500/10 text-cyan-400" accent="bg-cyan-400" />
         </div>
 
         {/* Department Breakdown */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Building2 size={14} className="text-[var(--text-dim)]" />
+            <Building2Icon size={14} className="text-[var(--text-dim)]" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.deptBreakdown")}</span>
           </div>
           <div className="space-y-2">
@@ -1560,7 +1620,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
                     <img src={dept.icon_value} alt="" className="w-full h-full object-cover" />
                   ) : (() => {
                     const key = dept.icon_type === "icon" && dept.icon_value ? dept.icon_value : "building2";
-                    const IC = DEPT_ICON_MAP[key] || Building2;
+                    const IC = DEPT_ICON_MAP[key] || Building2Icon;
                     return <IC size={16} className="text-[var(--text-muted)]" />;
                   })()}
                 </div>
@@ -1588,7 +1648,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
         {/* Level Distribution */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <Layers size={14} className="text-[var(--text-dim)]" />
+            <LayersIcon size={14} className="text-[var(--text-dim)]" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.levelDist")}</span>
           </div>
           <div className="flex items-end justify-center gap-2 h-[120px] px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
@@ -1611,7 +1671,7 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
         {activity.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Activity size={14} className="text-[var(--text-dim)]" />
+              <ActivityIcon size={14} className="text-[var(--text-dim)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.recentActivity")}</span>
             </div>
             <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-2.5">
@@ -1913,7 +1973,7 @@ export default function ManagementPage() {
           {hasChildren ? (
             <button onClick={(e) => { e.stopPropagation(); toggleTreeNode(node.id); }}
               className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface-hover)]">
-              {isExpanded ? <ChevronDown size={12} className="text-[var(--text-dim)]" /> : <ChevronRight size={12} className="text-[var(--text-dim)]" />}
+              {isExpanded ? <AngleDownIcon size={12} className="text-[var(--text-dim)]" /> : <AngleRightIcon size={12} className="text-[var(--text-dim)]" />}
             </button>
           ) : <div className="w-5 shrink-0" />}
           <DeptIcon dept={node} size={34} />
@@ -1927,9 +1987,9 @@ export default function ManagementPage() {
           )}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button onClick={(e) => { e.stopPropagation(); setEditDept(node); setShowDeptModal(true); }}
-              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]"><Pencil size={11} className="text-[var(--text-dim)]" /></button>
+              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]"><PencilIcon size={11} className="text-[var(--text-dim)]" /></button>
             <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "dept", id: node.id, name: dn(node.name) }); setShowDeleteModal(true); }}
-              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]"><Trash2 size={11} className="text-red-400/60" /></button>
+              className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]"><TrashIcon size={11} className="text-red-400/60" /></button>
           </div>
         </div>
         {hasChildren && isExpanded && <div className="mt-0.5">{node.children.map((c) => renderTreeNode(c, depth + 1))}</div>}
@@ -1939,7 +1999,7 @@ export default function ManagementPage() {
 
   /* ── Loading ── */
   if (loading) {
-    return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><Loader2 size={24} className="text-[var(--text-dim)] animate-spin" /></div>;
+    return <div className="h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)] flex items-center justify-center"><SpinnerIcon size={24} className="text-[var(--text-dim)] animate-spin" /></div>;
   }
 
   /* ── Zoom helpers ── */
@@ -1960,13 +2020,13 @@ export default function ManagementPage() {
       {withZoom && (
         <div className="sticky top-2 left-2 z-10 flex items-center gap-1 mb-2 ml-2">
           <button onClick={zoomIn} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Zoom in">
-            <ZoomIn size={14} className="text-[var(--text-dim)]" />
+            <ZoomInIcon size={14} className="text-[var(--text-dim)]" />
           </button>
           <button onClick={zoomOut} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Zoom out">
-            <ZoomOut size={14} className="text-[var(--text-dim)]" />
+            <ZoomOutIcon size={14} className="text-[var(--text-dim)]" />
           </button>
           <button onClick={zoomReset} className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center hover:bg-[var(--bg-surface)] transition-colors" title="Reset zoom">
-            <RotateCcw size={14} className="text-[var(--text-dim)]" />
+            <UndoIcon size={14} className="text-[var(--text-dim)]" />
           </button>
           <span className="text-[10px] font-medium text-[var(--text-dim)] ml-1">{Math.round(orgChartZoom * 100)}%</span>
         </div>
@@ -2004,23 +2064,23 @@ export default function ManagementPage() {
           <div className="px-4 pt-4 pb-3 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2.5 mb-3">
               <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                <ArrowLeft size={16} className="rtl:rotate-180" />
+                <ArrowLeftIcon size={16} className="rtl:rotate-180" />
               </Link>
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <Network size={16} />
+                <ManagementIcon size={16} />
               </div>
               <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">{t("mgmt.title")}</h1>
               <button onClick={() => { setEditDept(null); setShowDeptModal(true); }}
                 className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-colors shrink-0">
-                <Plus size={16} />
+                <PlusIcon size={16} />
               </button>
             </div>
 
             <div className="relative">
-              <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+              <SearchIcon size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("mgmt.searchDepts")}
                 className="w-full h-9 ps-9 pe-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-faint)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
-              {search && <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={14} /></button>}
+              {search && <button onClick={() => setSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>}
             </div>
 
             <div className="flex items-center justify-between mt-2.5">
@@ -2032,7 +2092,7 @@ export default function ManagementPage() {
           {/* Department tree */}
           <div className="flex-1 overflow-y-auto will-change-scroll px-2.5 py-2 space-y-0.5">
             {departments.length === 0 ? (
-              <EmptyState icon={Building2} title={t("mgmt.noDepts")} subtitle={t("mgmt.noDeptsDesc")} />
+              <EmptyState icon={Building2Icon} title={t("mgmt.noDepts")} subtitle={t("mgmt.noDeptsDesc")} />
             ) : filteredDepts ? (
               filteredDepts.map((dept) => (
                 <button key={dept.id} onClick={() => handleSelectDept(dept)}
@@ -2057,21 +2117,21 @@ export default function ManagementPage() {
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "dashboard" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
-              <BarChart3 size={16} />
+              <BarChart3Icon size={16} />
               <span className="text-[13px] font-medium">{t("mgmt.dashboard")}</span>
             </button>
             <button onClick={() => { setRightView("fullchart"); setSelectedDeptId(null); setMobileShowDetail(true); setOrgChartZoom(1); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "fullchart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
-              <Globe size={16} />
+              <GlobeIcon size={16} />
               <span className="text-[13px] font-medium">{t("mgmt.fullOrgChart")}</span>
             </button>
             <button onClick={() => { setRightView("roles"); setSelectedDeptId(null); setMobileShowDetail(true); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-start transition-all ${
                 rightView === "roles" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
               }`}>
-              <Shield size={16} />
+              <ShieldIcon size={16} />
               <span className="text-[13px] font-medium">{t("mgmt.rolesPerms")}</span>
             </button>
           </div>
@@ -2102,11 +2162,11 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
               </button>
               <div className="flex items-center gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-sm">
-                  <Globe size={20} className="text-blue-400" />
+                  <GlobeIcon size={20} className="text-blue-400" />
                 </div>
                 <div>
                   <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.companyOrgChart")}</h2>
@@ -2116,7 +2176,7 @@ export default function ManagementPage() {
             </div>
             <div className="flex-1 overflow-auto">
               {fullOrgLoading ? <Spinner /> : fullOrgChart.length === 0 ? (
-                <EmptyState icon={GitBranchPlus} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.createDeptsPosFirst")} />
+                <EmptyState icon={GitBranchPlusIcon} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.createDeptsPosFirst")} />
               ) : renderOrgChart(fullOrgChart, fullOrgPositions, true, true)}
             </div>
           </div>
@@ -2126,12 +2186,12 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => { setMobileShowDetail(false); setRightView("dept"); }}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
               </button>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
                   <div className="w-11 h-11 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-sm">
-                    <Shield size={20} className="text-violet-400" />
+                    <ShieldIcon size={20} className="text-violet-400" />
                   </div>
                   <div>
                     <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.rolesPerms")}</h2>
@@ -2140,21 +2200,21 @@ export default function ManagementPage() {
                 </div>
                 <button onClick={() => { setEditRole(null); setShowRoleModal(true); }}
                   className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all">
-                  <Plus size={13} /> {t("mgmt.newRole")}
+                  <PlusIcon size={13} /> {t("mgmt.newRole")}
                 </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {roles.length === 0 ? (
-                <EmptyState icon={Shield} title={t("mgmt.noRoles")} subtitle={t("mgmt.noRolesSub")} />
+                <EmptyState icon={ShieldIcon} title={t("mgmt.noRoles")} subtitle={t("mgmt.noRolesSub")} />
               ) : (
                 <div className="px-4 md:px-6 py-4 space-y-3">
                   {roles.map((role) => (
                     <div key={role.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all">
                       <div className="flex items-center gap-3.5 px-4 py-3.5 group">
                         <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/15 flex items-center justify-center shrink-0">
-                          <Shield size={16} className="text-violet-400" />
+                          <ShieldIcon size={16} className="text-violet-400" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-[15px] font-semibold text-[var(--text-primary)]">{role.name}</div>
@@ -2165,20 +2225,20 @@ export default function ManagementPage() {
                             className={`h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1 transition-colors ${
                               selectedRoleId === role.id ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "hover:bg-[var(--bg-surface)] text-[var(--text-faint)]"
                             }`}>
-                            {selectedRoleId === role.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            {selectedRoleId === role.id ? <AngleUpIcon size={11} /> : <AngleDownIcon size={11} />}
                             {t("mgmt.permissions")}
                           </button>
                           <button onClick={() => handleCloneRole(role.id)}
                             className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title={t("mgmt.cloneRole")}>
-                            <Copy size={11} className="text-[var(--text-dim)]" />
+                            <CopyIcon size={11} className="text-[var(--text-dim)]" />
                           </button>
                           <button onClick={() => { setEditRole(role); setShowRoleModal(true); }}
                             className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all">
-                            <Pencil size={11} className="text-[var(--text-dim)]" />
+                            <PencilIcon size={11} className="text-[var(--text-dim)]" />
                           </button>
                           <button onClick={() => { setDeleteTarget({ type: "role", id: role.id, name: role.name }); setShowDeleteModal(true); }}
                             className="w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-400/10 transition-all">
-                            <Trash2 size={11} className="text-red-400/60" />
+                            <TrashIcon size={11} className="text-red-400/60" />
                           </button>
                         </div>
                       </div>
@@ -2196,7 +2256,7 @@ export default function ManagementPage() {
         ) : !selectedDept ? (
           /* ── EMPTY STATE ── */
           <div className="flex-1 flex items-center justify-center">
-            <EmptyState icon={Building2} title={t("mgmt.selectDeptPrompt")} subtitle={t("mgmt.selectDeptDesc")} />
+            <EmptyState icon={Building2Icon} title={t("mgmt.selectDeptPrompt")} subtitle={t("mgmt.selectDeptDesc")} />
           </div>
         ) : (
           /* ── DEPARTMENT DETAIL ── */
@@ -2204,7 +2264,7 @@ export default function ManagementPage() {
             <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
               <button onClick={() => setMobileShowDetail(false)}
                 className="md:hidden flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] mb-3 hover:text-[var(--text-muted)]">
-                <ArrowLeft size={14} className="rtl:rotate-180" /> {t("mgmt.allDepartments")}
+                <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.allDepartments")}
               </button>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
@@ -2223,11 +2283,11 @@ export default function ManagementPage() {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => { setEditDept(selectedDept); setShowDeptModal(true); }}
                     className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] transition-colors">
-                    <Pencil size={13} className="text-[var(--text-dim)]" />
+                    <PencilIcon size={13} className="text-[var(--text-dim)]" />
                   </button>
                   <button onClick={() => { setDeleteTarget({ type: "dept", id: selectedDept.id, name: dn(selectedDept.name) }); setShowDeleteModal(true); }}
                     className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--border-subtle)] hover:bg-red-400/[0.08] transition-colors">
-                    <Trash2 size={13} className="text-red-400/60" />
+                    <TrashIcon size={13} className="text-red-400/60" />
                   </button>
                 </div>
               </div>
@@ -2236,16 +2296,16 @@ export default function ManagementPage() {
               <div className="flex items-center justify-between mt-3 gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)]">
-                    <Briefcase size={12} className="text-[var(--text-dim)]" />
+                    <BriefcaseIcon size={12} className="text-[var(--text-dim)]" />
                     <span className="text-[11px] font-medium text-[var(--text-secondary)]">{analytics.totalPositions} {t("mgmt.nPositions")}</span>
                   </div>
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/[0.06] border border-emerald-500/10">
-                    <Users size={12} className="text-emerald-400/70" />
+                    <UsersIcon size={12} className="text-emerald-400/70" />
                     <span className="text-[11px] font-medium text-emerald-400/70">{analytics.totalAssigned} {t("mgmt.assigned")}</span>
                   </div>
                   {analytics.emptyPositions > 0 && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/[0.06] border border-amber-500/10">
-                      <AlertCircle size={12} className="text-amber-400/70" />
+                      <ExclamationIcon size={12} className="text-amber-400/70" />
                       <span className="text-[11px] font-medium text-amber-400/70">{analytics.emptyPositions} {t("mgmt.vacant").toLowerCase()}</span>
                     </div>
                   )}
@@ -2253,11 +2313,11 @@ export default function ManagementPage() {
                 <div className="flex items-center border border-[var(--border-subtle)] rounded-lg overflow-hidden shrink-0">
                   <button onClick={() => setViewMode("list")}
                     className={`h-7 px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors ${viewMode === "list" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}>
-                    <LayoutList size={12} /> {t("mgmt.list")}
+                    <LayoutListIcon size={12} /> {t("mgmt.list")}
                   </button>
                   <button onClick={() => setViewMode("chart")}
                     className={`h-7 px-2.5 flex items-center gap-1 text-[11px] font-medium transition-colors ${viewMode === "chart" ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}>
-                    <GitBranchPlus size={12} /> {t("mgmt.orgChart")}
+                    <GitBranchPlusIcon size={12} /> {t("mgmt.orgChart")}
                   </button>
                 </div>
               </div>
@@ -2272,11 +2332,11 @@ export default function ManagementPage() {
                     <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.orgChartTitle")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
                       className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
-                      <Plus size={12} /> {t("mgmt.addPosition")}
+                      <PlusIcon size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
                   {positions.length === 0 ? (
-                    <EmptyState icon={GitBranchPlus} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.noPosYetSub")} />
+                    <EmptyState icon={GitBranchPlusIcon} title={t("mgmt.noPosToViz")} subtitle={t("mgmt.noPosYetSub")} />
                   ) : renderOrgChart(deptOrgChart, positions, false)}
                 </div>
               ) : (
@@ -2286,23 +2346,23 @@ export default function ManagementPage() {
                     <h3 className="text-[13px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{t("mgmt.positions")}</h3>
                     <button onClick={() => { setEditPos(null); setShowPosModal(true); }}
                       className="h-8 px-3 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-all">
-                      <Plus size={12} /> {t("mgmt.addPosition")}
+                      <PlusIcon size={12} /> {t("mgmt.addPosition")}
                     </button>
                   </div>
 
                   {/* Position search */}
                   {positions.length > 3 && (
                     <div className="relative">
-                      <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+                      <SearchIcon size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
                       <input type="text" value={posSearch} onChange={(e) => setPosSearch(e.target.value)}
                         placeholder={t("mgmt.filterPosOrPeople")}
                         className="w-full h-8 ps-8 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-faint)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors" />
-                      {posSearch && <button onClick={() => setPosSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><X size={12} /></button>}
+                      {posSearch && <button onClick={() => setPosSearch("")} className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={12} /></button>}
                     </div>
                   )}
 
                   {positions.length === 0 ? (
-                    <EmptyState icon={Briefcase} title={t("mgmt.noPosYet")} subtitle={t("mgmt.noPosYetSub")} />
+                    <EmptyState icon={BriefcaseIcon} title={t("mgmt.noPosYet")} subtitle={t("mgmt.noPosYetSub")} />
                   ) : filteredPositions.length === 0 ? (
                     <div className="text-center py-8 text-[12px] text-[var(--text-dim)]">{t("mgmt.noPosMatch")} &ldquo;{posSearch}&rdquo;</div>
                   ) : (
@@ -2319,7 +2379,7 @@ export default function ManagementPage() {
                               pos.level <= 3 ? "bg-violet-500/[0.08] border border-violet-500/15" :
                               "bg-blue-500/[0.08] border border-blue-500/15"
                             }`}>
-                              <Briefcase size={15} className={`${
+                              <BriefcaseIcon size={15} className={`${
                                 pos.level <= 1 ? "text-amber-400" : pos.level <= 3 ? "text-violet-400" : "text-blue-400"
                               }`} />
                             </div>
@@ -2334,24 +2394,24 @@ export default function ManagementPage() {
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => { setDetailPos(pos); setShowPosDetail(true); }}
                                 className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
-                                <FileText size={11} /> {t("mgmt.details")}
+                                <DocumentIcon size={11} /> {t("mgmt.details")}
                               </button>
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
                                 className="h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 hover:bg-[var(--bg-surface)] text-[var(--text-faint)] transition-colors">
-                                <UserPlus size={11} /> {t("mgmt.assign")}
+                                <UserPlusIcon size={11} /> {t("mgmt.assign")}
                               </button>
                               <button onClick={() => handleDuplicatePosition(pos.id)}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title={t("mgmt.duplicatePos")}>
-                                <Copy size={11} className="text-[var(--text-dim)]" />
+                                <CopyIcon size={11} className="text-[var(--text-dim)]" />
                               </button>
 
                               <button onClick={() => { setEditPos(pos); setShowPosModal(true); }}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]">
-                                <Pencil size={11} className="text-[var(--text-dim)]" />
+                                <PencilIcon size={11} className="text-[var(--text-dim)]" />
                               </button>
                               <button onClick={() => { setDeleteTarget({ type: "pos", id: pos.id, name: posTitle(pos.title, t) }); setShowDeleteModal(true); }}
                                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]">
-                                <Trash2 size={11} className="text-red-400/60" />
+                                <TrashIcon size={11} className="text-red-400/60" />
                               </button>
                             </div>
                           </div>
@@ -2360,7 +2420,7 @@ export default function ManagementPage() {
                             <div className="px-4 py-3">
                               <button onClick={() => { setAssignPosId(pos.id); setEditAssign(null); setShowAssignModal(true); }}
                                 className="w-full h-9 rounded-lg border border-dashed border-[var(--border-subtle)] flex items-center justify-center gap-1.5 text-[12px] font-medium text-[var(--text-dim)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-muted)] hover:border-[var(--border-strong)] transition-all">
-                                <UserPlus size={12} /> {t("mgmt.assignSomeone")}
+                                <UserPlusIcon size={12} /> {t("mgmt.assignSomeone")}
                               </button>
                             </div>
                           ) : (
@@ -2386,15 +2446,15 @@ export default function ManagementPage() {
                                     <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                       <button onClick={() => { setTransferAssignment(a); setTransferContactName(ctc?.name || "Employee"); setShowTransferModal(true); }}
                                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title={t("mgmt.transfer")}>
-                                        <ArrowRightLeft size={11} className="text-[var(--text-dim)]" />
+                                        <ArrowRightLeftIcon size={11} className="text-[var(--text-dim)]" />
                                       </button>
                                       <button onClick={() => { setAssignPosId(a.position_id); setEditAssign(a); setShowAssignModal(true); }}
                                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-surface-hover)]" title="Edit">
-                                        <Pencil size={10} className="text-[var(--text-dim)]" />
+                                        <PencilIcon size={10} className="text-[var(--text-dim)]" />
                                       </button>
                                       <button onClick={() => { setDeleteTarget({ type: "assign", id: a.id, name: ctc?.name || "this assignment" }); setShowDeleteModal(true); }}
                                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-400/[0.10]" title="Remove">
-                                        <Trash2 size={10} className="text-red-400/60" />
+                                        <TrashIcon size={10} className="text-red-400/60" />
                                       </button>
                                     </div>
                                   </div>
@@ -2421,7 +2481,7 @@ export default function ManagementPage() {
             {toastUndo && (
               <button onClick={() => { toastUndo(); setToast(null); setToastUndo(null); }}
                 className="ml-1 flex items-center gap-1 text-[12px] font-semibold underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity">
-                <Undo2 size={11} /> {t("mgmt.undo")}
+                <Undo2Icon size={11} /> {t("mgmt.undo")}
               </button>
             )}
           </div>

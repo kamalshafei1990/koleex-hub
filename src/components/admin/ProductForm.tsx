@@ -3,13 +3,32 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft, Save, Loader2, Camera, ImageIcon, FolderTree,
-  FileText, Wrench, Boxes, Image, DollarSign,
-  Languages, Link2, Zap, Settings2, ChevronDown, ChevronRight,
-  Check, Package, AlertTriangle, Star,
-  ArrowRight, CircleDot, Factory, Tag, Sparkles, Lock,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
+import Link2Icon from "@/components/icons/ui/Link2Icon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
+import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
+import FactoryIcon from "@/components/icons/ui/FactoryIcon";
+import TagsIcon from "@/components/icons/ui/TagsIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import LockIcon from "@/components/icons/ui/LockIcon";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
   fetchProductById, fetchModelsByProductId, fetchMediaByProductId,
@@ -76,7 +95,7 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
         {badge && (
           <span className="text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full">{badge}</span>
         )}
-        <ChevronDown className={`h-4 w-4 text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
+        <AngleDownIcon className={`h-4 w-4 text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>
@@ -98,23 +117,23 @@ interface WizardStep {
 
 function getSteps(isSewing: boolean): WizardStep[] {
   const steps: WizardStep[] = [
-    { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTree className="h-4 w-4" /> },
+    { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
   ];
   if (isSewing) {
-    steps.push({ id: "machine-type", label: "Machine Type", shortLabel: "Machine Type", icon: <Factory className="h-4 w-4" />, conditional: true });
+    steps.push({ id: "machine-type", label: "Machine Type", shortLabel: "Machine Type", icon: <FactoryIcon className="h-4 w-4" />, conditional: true });
   }
   steps.push(
-    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <Sparkles className="h-4 w-4" /> },
-    { id: "description", label: "Description", shortLabel: "Description", icon: <FileText className="h-4 w-4" /> },
+    { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <SparklesIcon className="h-4 w-4" /> },
+    { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
   );
   if (isSewing) {
-    steps.push({ id: "sewing-specs", label: "Machine Specs", shortLabel: "Specs", icon: <Settings2 className="h-4 w-4" />, conditional: true });
+    steps.push({ id: "sewing-specs", label: "Machine Specs", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" />, conditional: true });
   }
   steps.push(
-    { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <Boxes className="h-4 w-4" /> },
-    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <Zap className="h-4 w-4" /> },
-    { id: "media", label: "Media & Files", shortLabel: "Media", icon: <Image className="h-4 w-4" /> },
-    { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <Check className="h-4 w-4" /> },
+    { id: "commercial", label: "Models & Variants", shortLabel: "Models", icon: <BoxesIcon className="h-4 w-4" /> },
+    { id: "technical", label: "Technical Details", shortLabel: "Technical", icon: <ZapIcon className="h-4 w-4" /> },
+    { id: "media", label: "Media & Files", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
+    { id: "finalize", label: "Review & Publish", shortLabel: "Review", icon: <CheckIcon className="h-4 w-4" /> },
   );
   return steps;
 }
@@ -159,11 +178,11 @@ function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps
                 isCompleted ? "bg-emerald-500/20 text-emerald-400" :
                 "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
               }`}>
-                {isLocked ? <Lock className="h-3 w-3" /> : (isCompleted && !isActive ? <Check className="h-3 w-3" /> : i + 1)}
+                {isLocked ? <LockIcon className="h-3 w-3" /> : (isCompleted && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1)}
               </div>
               <span className="hidden md:inline">{step.shortLabel}</span>
               {i < steps.length - 1 && (
-                <ChevronRight className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
+                <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
               )}
             </button>
           );
@@ -204,7 +223,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   return (
     <span className={`inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${colors[status] || colors.draft}`}>
-      <CircleDot className="h-2.5 w-2.5" />
+      <CircleDotIcon className="h-2.5 w-2.5" />
       {status || "draft"}
     </span>
   );
@@ -753,7 +772,7 @@ export default function ProductForm({ productId }: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 text-[var(--text-dim)] animate-spin" />
+        <SpinnerIcon className="h-6 w-6 text-[var(--text-dim)] animate-spin" />
       </div>
     );
   }
@@ -765,7 +784,7 @@ export default function ProductForm({ productId }: Props) {
         <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Products
+              <ArrowLeftIcon className="h-3.5 w-3.5" /> Back to Products
             </Link>
             {product.product_name && (
               <div className="hidden md:flex items-center gap-2">
@@ -781,7 +800,7 @@ export default function ProductForm({ productId }: Props) {
               disabled={saving}
               className="h-9 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
               {saving ? "Saving..." : "Save Product"}
             </button>
           </div>
@@ -793,13 +812,13 @@ export default function ProductForm({ productId }: Props) {
         {/* Messages */}
         {error && (
           <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
+            <TriangleWarningIcon className="h-4 w-4 shrink-0" /> {error}
             <button onClick={() => setError("")} className="ml-auto text-red-400/50 hover:text-red-400">×</button>
           </div>
         )}
         {success && (
           <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
-            <Check className="h-4 w-4 shrink-0" /> {success}
+            <CheckIcon className="h-4 w-4 shrink-0" /> {success}
           </div>
         )}
 
@@ -817,8 +836,8 @@ export default function ProductForm({ productId }: Props) {
           <div className="flex items-center gap-2 text-[11px] text-[var(--text-ghost)] mb-4 px-1">
             <span className="font-bold uppercase tracking-wider text-[var(--text-dim)]">Classification:</span>
             <span>{divisionName}</span>
-            {categoryName && <><ChevronRight className="h-3 w-3" /><span>{categoryName}</span></>}
-            {subcategoryName && <><ChevronRight className="h-3 w-3" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+            {categoryName && <><AngleRightIcon className="h-3 w-3" /><span>{categoryName}</span></>}
+            {subcategoryName && <><AngleRightIcon className="h-3 w-3" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
           </div>
         )}
 
@@ -834,7 +853,7 @@ export default function ProductForm({ productId }: Props) {
                 <div className="lg:col-span-2 p-6 md:p-8 lg:border-r lg:border-[var(--border-subtle)] flex flex-col">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                      <Camera className="h-3 w-3 text-[var(--text-ghost)]" />
+                      <CameraIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Main Product Photo</span>
                   </div>
@@ -856,7 +875,7 @@ export default function ProductForm({ productId }: Props) {
                         <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-6" />
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                           <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
-                            <Camera className="h-4 w-4" />
+                            <CameraIcon className="h-4 w-4" />
                             Change Photo
                           </div>
                         </div>
@@ -864,7 +883,7 @@ export default function ProductForm({ productId }: Props) {
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 group-hover:scale-105 transition-transform duration-300">
                         <div className="h-20 w-20 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg">
-                          <ImageIcon className="h-9 w-9 text-[var(--text-ghost)]" />
+                          <ImageRawIcon className="h-9 w-9 text-[var(--text-ghost)]" />
                         </div>
                         <div className="text-center">
                           <p className="text-[14px] font-semibold text-[var(--text-dim)]">Upload Product Photo</p>
@@ -882,12 +901,12 @@ export default function ProductForm({ productId }: Props) {
                     <StatusBadge status={product.status} />
                     {product.brand && (
                       <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
-                        <Star className="h-3 w-3" /> {product.brand}
+                        <StarIcon className="h-3 w-3" /> {product.brand}
                       </span>
                     )}
                     {product.family && (
                       <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
-                        <Package className="h-3 w-3" /> {product.family}
+                        <PackageIcon className="h-3 w-3" /> {product.family}
                       </span>
                     )}
                   </div>
@@ -911,7 +930,7 @@ export default function ProductForm({ productId }: Props) {
                   {/* Primary Model Name */}
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
-                      <span className="inline-flex items-center gap-1.5"><Tag className="h-3 w-3" /> Primary Model</span>
+                      <span className="inline-flex items-center gap-1.5"><TagsIcon className="h-3 w-3" /> Primary Model</span>
                     </label>
                     <input
                       type="text"
@@ -926,7 +945,7 @@ export default function ProductForm({ productId }: Props) {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Brand</span>
+                        <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> Brand</span>
                       </label>
                       <SelectWithCreate
                         value={product.brand}
@@ -942,7 +961,7 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><Package className="h-3 w-3" /> Family / Series</span>
+                        <span className="inline-flex items-center gap-1.5"><PackageIcon className="h-3 w-3" /> Family / Series</span>
                       </label>
                       <input
                         type="text"
@@ -954,7 +973,7 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><CircleDot className="h-3 w-3" /> Status</span>
+                        <span className="inline-flex items-center gap-1.5"><CircleDotIcon className="h-3 w-3" /> Status</span>
                       </label>
                       <div className="flex gap-1.5 h-11">
                         {([
@@ -986,14 +1005,14 @@ export default function ProductForm({ productId }: Props) {
               <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]/30 px-6 md:px-8 py-6">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="h-6 w-6 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    <DollarSign className="h-3 w-3 text-[var(--text-ghost)]" />
+                    <DollarSignIcon className="h-3 w-3 text-[var(--text-ghost)]" />
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Primary Commercial · Supplier &amp; Pricing</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className={lbl}>
-                      <span className="inline-flex items-center gap-1.5"><Factory className="h-3 w-3" /> Supplier</span>
+                      <span className="inline-flex items-center gap-1.5"><FactoryIcon className="h-3 w-3" /> Supplier</span>
                     </label>
                     <SelectWithCreate
                       value={primaryModel?.supplier || ""}
@@ -1062,7 +1081,7 @@ export default function ProductForm({ productId }: Props) {
             </div>
 
             {/* Tags */}
-            <Section id="tags" icon={<Tag className="h-4 w-4" />} title="Tags & Keywords">
+            <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title="Tags & Keywords">
               <TagsInput
                 tags={product.tags}
                 onChange={(tags) => updateProduct_({ tags })}
@@ -1077,7 +1096,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "classify" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="classification" icon={<FolderTree className="h-4 w-4" />} title="Classification" badge="Division · Category · Subcategory">
+            <Section id="classification" icon={<FolderTreeIcon className="h-4 w-4" />} title="Classification" badge="Division · Category · Subcategory">
               <ClassificationSection
                 data={product}
                 onChange={updateProduct_}
@@ -1102,19 +1121,19 @@ export default function ProductForm({ productId }: Props) {
           <div className="space-y-5 animate-in fade-in duration-300">
             {divisionName && (
               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
-                <FolderTree className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
+                <FolderTreeIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
                 <span>{divisionName}</span>
-                {categoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
-                {subcategoryName && <><ChevronRight className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
+                {categoryName && <><AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
+                {subcategoryName && <><AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
               </div>
             )}
 
-            <Section id="description" icon={<FileText className="h-4 w-4" />} title="Product Description" badge="Rich text">
+            <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title="Product Description" badge="Rich text">
               <DescriptionSection data={product} onChange={updateProduct_} />
             </Section>
 
             {/* Additional text specs (key/value) */}
-            <Section id="specs" icon={<Wrench className="h-4 w-4" />} title="Additional Specifications" badge="Key/value" defaultOpen={false}>
+            <Section id="specs" icon={<WrenchIcon className="h-4 w-4" />} title="Additional Specifications" badge="Key/value" defaultOpen={false}>
               <SpecsSection data={product} onChange={updateProduct_} />
             </Section>
           </div>
@@ -1125,7 +1144,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "machine-type" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="machine-type" icon={<Factory className="h-4 w-4" />} title="Machine Type" badge="Template">
+            <Section id="machine-type" icon={<FactoryIcon className="h-4 w-4" />} title="Machine Type" badge="Template">
               <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
                 <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
                   Choose the machine type that best describes this product. The spec fields, defaults, and
@@ -1147,7 +1166,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "sewing-specs" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="sewing" icon={<Settings2 className="h-4 w-4" />} title="Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
+            <Section id="sewing" icon={<Settings2Icon className="h-4 w-4" />} title="Machine Specs" badge={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : undefined}>
               <SewingMachineSection
                 data={sewingSpecs}
                 onChange={setSewingSpecs}
@@ -1163,12 +1182,12 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "technical" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="technical" icon={<Zap className="h-4 w-4" />} title="Technical Details" badge="Electrical · Physical">
+            <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title="Technical Details" badge="Electrical · Physical">
               <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
             </Section>
 
             {/* Configuration */}
-            <Section id="config" icon={<Settings2 className="h-4 w-4" />} title="Configuration & Options">
+            <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title="Configuration & Options">
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
@@ -1228,7 +1247,7 @@ export default function ProductForm({ productId }: Props) {
             </Section>
 
             {/* Advanced / Internal — collapsed by default */}
-            <Section id="advanced" icon={<Wrench className="h-4 w-4" />} title="Advanced · Internal Only" badge="MOQ · Lead Time · Slug" defaultOpen={false}>
+            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title="Advanced · Internal Only" badge="MOQ · Lead Time · Slug" defaultOpen={false}>
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -1288,7 +1307,7 @@ export default function ProductForm({ productId }: Props) {
             {primaryModel && (
               <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
                 <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <Star className="h-4 w-4 text-emerald-400" />
+                  <StarIcon className="h-4 w-4 text-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[12px] font-semibold text-[var(--text-primary)]">Primary Model: {primaryModel.model_name || "(unnamed)"}</div>
@@ -1299,7 +1318,7 @@ export default function ProductForm({ productId }: Props) {
 
             <Section
               id="models"
-              icon={<Boxes className="h-4 w-4" />}
+              icon={<BoxesIcon className="h-4 w-4" />}
               title="Models &amp; Variants"
               badge={`${models.length} model${models.length !== 1 ? "s" : ""}`}
             >
@@ -1313,7 +1332,7 @@ export default function ProductForm({ productId }: Props) {
             </Section>
 
             {/* Market Prices */}
-            <Section id="prices" icon={<DollarSign className="h-4 w-4" />} title="Market Prices" badge="Per country" defaultOpen={false}>
+            <Section id="prices" icon={<DollarSignIcon className="h-4 w-4" />} title="Market Prices" badge="Per country" defaultOpen={false}>
               <MarketPricesSection prices={prices} models={models} onChange={setPrices} />
             </Section>
           </div>
@@ -1324,7 +1343,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "media" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="media" icon={<Image className="h-4 w-4" />} title="Media & Files">
+            <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title="Media & Files">
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
                 excludeTypes={["main_image"]}
@@ -1358,12 +1377,12 @@ export default function ProductForm({ productId }: Props) {
             </div>
 
             {/* Translations */}
-            <Section id="translations" icon={<Languages className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+            <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title="Translations" defaultOpen={false}>
               <TranslationsSection translations={translations} onChange={setTranslations} />
             </Section>
 
             {/* Related Products */}
-            <Section id="related" icon={<Link2 className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+            <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
               <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
             </Section>
           </div>
@@ -1376,7 +1395,7 @@ export default function ProductForm({ productId }: Props) {
             disabled={currentStep === 0}
             className="h-10 px-5 rounded-xl border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <ArrowLeft className="h-4 w-4" /> Previous
+            <ArrowLeftIcon className="h-4 w-4" /> Previous
           </button>
 
           <div className="text-[11px] text-[var(--text-ghost)]">
@@ -1388,7 +1407,7 @@ export default function ProductForm({ productId }: Props) {
               onClick={handleNext}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg"
             >
-              Next <ArrowRight className="h-4 w-4" />
+              Next <ArrowRightIcon className="h-4 w-4" />
             </button>
           ) : (
             <button
@@ -1396,7 +1415,7 @@ export default function ProductForm({ productId }: Props) {
               disabled={saving}
               className="h-10 px-6 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
               {saving ? "Saving..." : "Save & Publish"}
             </button>
           )}

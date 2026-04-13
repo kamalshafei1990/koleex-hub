@@ -1,6 +1,9 @@
 "use client";
 
-import { FileText, Sparkles, Target, Layers } from "lucide-react";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import TargetIcon from "@/components/icons/ui/TargetIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
 import type { ProductFormState } from "@/types/product-form";
 import RichTextEditor from "./RichTextEditor";
 
@@ -19,28 +22,28 @@ const PRESET_BLOCKS: Array<{
   {
     id: "overview",
     label: "Overview",
-    icon: <FileText className="h-3.5 w-3.5" />,
+    icon: <DocumentIcon className="h-3.5 w-3.5" />,
     description: "High-level product summary",
     html: `<h2>Overview</h2><p>Brief, compelling description of what this product is and who it's for. Highlight the problem it solves and the core value proposition.</p>`,
   },
   {
     id: "key-features",
     label: "Key Features",
-    icon: <Sparkles className="h-3.5 w-3.5" />,
+    icon: <SparklesIcon className="h-3.5 w-3.5" />,
     description: "Bullet list of main features",
     html: `<h3>Key Features</h3><ul><li>Primary feature or capability</li><li>Notable technology or component</li><li>Performance highlight</li><li>Build quality or durability</li><li>Ease of operation / maintenance</li></ul>`,
   },
   {
     id: "applications",
     label: "Applications",
-    icon: <Target className="h-3.5 w-3.5" />,
+    icon: <TargetIcon className="h-3.5 w-3.5" />,
     description: "Use cases and industries",
     html: `<h3>Applications</h3><p>Ideal for the following use cases and industries:</p><ul><li>Industry or use case 1</li><li>Industry or use case 2</li><li>Industry or use case 3</li></ul>`,
   },
   {
     id: "whats-included",
     label: "What's Included",
-    icon: <Layers className="h-3.5 w-3.5" />,
+    icon: <LayersIcon className="h-3.5 w-3.5" />,
     description: "Package contents",
     html: `<h3>What's Included</h3><ul><li>Main unit</li><li>Standard accessories</li><li>Documentation</li></ul>`,
   },
@@ -65,7 +68,7 @@ export default function DescriptionSection({ data, onChange }: Props) {
         {/* Preset content blocks */}
         <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <SparklesIcon className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Quick Start Blocks</span>
             <span className="text-[10px] text-[var(--text-ghost)] italic">— insert pre-built sections</span>
           </div>

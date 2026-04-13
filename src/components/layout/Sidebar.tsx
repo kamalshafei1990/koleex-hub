@@ -15,7 +15,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
+import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   SIDEBAR_GROUPS,
   getGroupApps,
@@ -118,15 +119,15 @@ export default function Sidebar() {
         } ${
           isActive
             ? dk
-              ? "bg-white/[0.10] text-white font-semibold shadow-[inset_2px_0_0_rgba(255,255,255,0.5)]"
-              : "bg-black/[0.08] text-black font-semibold shadow-[inset_2px_0_0_rgba(0,0,0,0.4)]"
+              ? "bg-white/[0.06] text-white/90 font-medium"
+              : "bg-black/[0.05] text-black/90 font-medium"
             : app.active
               ? `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
               : `${textGhost} cursor-default opacity-30`
         }`}
       >
-        <Icon size={compact ? 14 : 16} className="shrink-0" />
-        <span className={`text-[12.5px] truncate ${compact ? "text-[12px]" : ""}`}>
+        <Icon size={compact ? 14 : 17} className="shrink-0" />
+        <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
           {label}
         </span>
       </Link>
@@ -145,7 +146,7 @@ export default function Sidebar() {
       <div>
         <button
           onClick={() => toggleGroup(group.id)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11.5px] font-semibold uppercase tracking-wider transition-all duration-150 ${
+          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12.5px] font-semibold uppercase tracking-wider transition-all duration-150 ${
             isGroupActive
               ? dk
                 ? "text-white/90"
@@ -154,7 +155,7 @@ export default function Sidebar() {
           }`}
         >
           <GroupIcon
-            size={15}
+            size={17}
             className={
               isGroupActive
                 ? dk
@@ -164,8 +165,8 @@ export default function Sidebar() {
             }
           />
           <span className="flex-1 text-start truncate">{label}</span>
-          <ChevronRight
-            size={11}
+          <AngleRightIcon
+            size={12}
             className={`transition-transform duration-300 ${isOpen ? "rotate-90" : ""}`}
           />
         </button>
@@ -198,8 +199,8 @@ export default function Sidebar() {
           className={`w-full flex items-center justify-center h-11 rounded-xl transition-all duration-200 relative ${
             isGroupActive || hasActiveChild
               ? dk
-                ? "bg-white/[0.12] text-white shadow-[inset_2px_0_0_rgba(255,255,255,0.4)]"
-                : "bg-black/[0.10] text-black shadow-[inset_2px_0_0_rgba(0,0,0,0.3)]"
+                ? "bg-white/[0.08] text-white/80"
+                : "bg-black/[0.06] text-black/80"
               : dk
                 ? "text-white/30 hover:bg-white/[0.06] hover:text-white/60 hover:scale-105"
                 : "text-black/30 hover:bg-black/[0.05] hover:text-black/60 hover:scale-105"
@@ -244,24 +245,32 @@ export default function Sidebar() {
     );
   };
 
-  /* ── Edge toggle — 40px touch target ── */
+  /* ── Edge toggle — premium glass pill ── */
   const EdgeToggle = () => {
     return (
       <button
         onClick={toggle}
         aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        className={`flex items-center justify-center w-[24px] h-[40px] rounded-full border cursor-pointer transition-all duration-300 ${
+        className={`flex items-center justify-center w-[18px] h-[48px] rounded-[10px] cursor-pointer transition-all duration-300 group/toggle ${
           dk
-            ? "bg-[#1A1A1A] border-white/[0.12] text-white/50 hover:text-white hover:bg-[#2A2A2A] hover:border-white/[0.25] hover:scale-[1.08]"
-            : "bg-white border-black/[0.10] text-black/45 hover:text-black hover:bg-[#EBEBEB] hover:border-black/[0.22] hover:scale-[1.08]"
+            ? "text-white/25 hover:text-white/60"
+            : "text-black/20 hover:text-black/50"
         }`}
         style={{
+          background: dk
+            ? "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)"
+            : "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.02) 100%)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: dk ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)",
           boxShadow: dk
-            ? "0 2px 10px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)"
-            : "0 2px 10px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.03)",
+            ? "0 4px 16px rgba(0,0,0,0.5)"
+            : "0 4px 16px rgba(0,0,0,0.08)",
         }}
       >
-        {expanded ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        <div className="transition-transform duration-300 group-hover/toggle:scale-110">
+          {expanded ? <AngleLeftIcon size={12} /> : <AngleRightIcon size={12} />}
+        </div>
       </button>
     );
   };

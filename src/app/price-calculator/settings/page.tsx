@@ -2,10 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, Settings, Save, Loader2, Eye, EyeOff, Shield,
-  Percent, Users, Globe, Search, Layers, ChevronDown, Plus, Trash2,
-} from "lucide-react";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
+import DiskIcon from "@/components/icons/ui/DiskIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";
+import PercentIcon from "@/components/icons/ui/PercentIcon";
+import UsersIcon from "@/components/icons/ui/UsersIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import {
   fetchPricingConfig, savePricingConfig,
   DEFAULT_CONFIG,
@@ -17,11 +28,11 @@ import {
 type TabId = "ui" | "limits" | "channels" | "countries" | "categories";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: "ui", label: "UI Visibility", icon: Eye },
-  { id: "limits", label: "Limits & Defaults", icon: Percent },
-  { id: "channels", label: "Customer Channels", icon: Users },
-  { id: "countries", label: "Countries & Bands", icon: Globe },
-  { id: "categories", label: "Product Categories", icon: Layers },
+  { id: "ui", label: "UI Visibility", icon: EyeIcon },
+  { id: "limits", label: "Limits & Defaults", icon: PercentIcon },
+  { id: "channels", label: "Customer Channels", icon: UsersIcon },
+  { id: "countries", label: "Countries & Bands", icon: GlobeIcon },
+  { id: "categories", label: "Product Categories", icon: LayersIcon },
 ];
 
 /* ═══════════════════ COMPONENT ═══════════════════ */
@@ -110,7 +121,7 @@ export default function PricingSettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
+        <SpinnerIcon className="h-6 w-6 animate-spin text-[var(--text-dim)]" />
       </div>
     );
   }
@@ -122,14 +133,14 @@ export default function PricingSettingsPage() {
         {/* ── Page Header ── */}
         <div className="flex items-center gap-3 mb-1">
           <Link href="/price-calculator" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Settings className="h-4 w-4" /></div>
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><SettingsIcon2 className="h-4 w-4" /></div>
             <h1 className="text-xl md:text-[26px] font-bold tracking-tight truncate">System Control Panel</h1>
           </div>
           <button onClick={handleSave} disabled={saving} className="ml-auto h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold flex items-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shrink-0">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
             {saving ? "Saving..." : saved ? "Saved!" : "Save & Apply"}
           </button>
         </div>
@@ -152,7 +163,7 @@ export default function PricingSettingsPage() {
         {activeTab === "ui" && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Eye className="h-4 w-4" /></div>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><EyeIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">UI Visibility & Features</span>
             </div>
             <div className="border-t border-[var(--border-subtle)]">
@@ -180,7 +191,7 @@ export default function PricingSettingsPage() {
           <div className="space-y-4">
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Percent className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PercentIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Global Limits & Defaults</span>
               </div>
               <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)] space-y-5">
@@ -196,7 +207,7 @@ export default function PricingSettingsPage() {
             </div>
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
               <div className="flex items-center gap-3 px-6 py-4">
-                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Shield className="h-4 w-4" /></div>
+                <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><ShieldIcon className="h-4 w-4" /></div>
                 <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight">Regional Band Modifiers</span>
               </div>
               <div className="border-t border-[var(--border-subtle)]">
@@ -218,7 +229,7 @@ export default function PricingSettingsPage() {
         {activeTab === "channels" && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Users className="h-4 w-4" /></div>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><UsersIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Customer Channels Margin Setup</span>
             </div>
             <p className="px-6 text-[11px] text-[var(--text-dim)] -mt-1 pb-2">Define which channels are visible and configure their sequential markups.</p>
@@ -243,15 +254,15 @@ export default function PricingSettingsPage() {
         {activeTab === "countries" && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Globe className="h-4 w-4" /></div>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><GlobeIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Countries & Regional Bands</span>
               <button onClick={addCountry} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
-                <Plus className="h-3.5 w-3.5" /> Add
+                <PlusIcon className="h-3.5 w-3.5" /> Add
               </button>
             </div>
             <div className="px-6 pb-3 border-t border-[var(--border-subtle)] pt-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-ghost)]" />
                 <input type="text" value={countrySearch} onChange={e => setCountrySearch(e.target.value)} placeholder="Search countries..." className={`${inputCls} pl-9`} />
               </div>
             </div>
@@ -280,7 +291,7 @@ export default function PricingSettingsPage() {
                     </select>
                     <span className="w-20 text-center text-[12px] font-mono text-[var(--text-dim)]">{co.adjustmentPct >= 0 ? "+" : ""}{(co.adjustmentPct * 100).toFixed(0)}%</span>
                     <button onClick={() => removeCountry(realIdx)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors shrink-0">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 );
@@ -299,10 +310,10 @@ export default function PricingSettingsPage() {
         {activeTab === "categories" && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
-              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Layers className="h-4 w-4" /></div>
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><LayersIcon className="h-4 w-4" /></div>
               <span className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1">Product Category Margin Levels</span>
               <button onClick={addCategory} className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all">
-                <Plus className="h-3.5 w-3.5" /> Add
+                <PlusIcon className="h-3.5 w-3.5" /> Add
               </button>
             </div>
             <div className="border-t border-[var(--border-subtle)]">
@@ -312,7 +323,7 @@ export default function PricingSettingsPage() {
                     <span className="text-[10px] font-bold text-[var(--text-ghost)] w-5 text-center">{idx + 1}</span>
                     <input type="text" value={cat.name} onChange={e => updateCategory(idx, { name: e.target.value })} placeholder="Category name" className={`${inputCls} flex-1`} />
                     <button onClick={() => removeCategory(idx)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-red-400/[0.06] transition-colors shrink-0">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <TrashIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-3 pl-8">
@@ -338,7 +349,7 @@ export default function PricingSettingsPage() {
         {/* ── Bottom Save ── */}
         <div className="mt-6 flex items-center justify-end">
           <button onClick={handleSave} disabled={saving} className="h-12 px-8 rounded-xl bg-emerald-600 text-white text-[14px] font-semibold flex items-center gap-2.5 hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
             {saving ? "Saving..." : saved ? "Saved!" : "Save Settings & Apply"}
           </button>
         </div>
