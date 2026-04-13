@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Search, X, Loader2, Download, Eye, Pencil, Trash2,
-  FileText, Image as ImageIcon, Layers, PenTool, File, Upload, BookOpen,
+  FileText, Image as ImageIcon, Layers, PenTool, File, Upload,
   Building2, ChevronDown, LayoutGrid, List,
 } from "lucide-react";
 import {
@@ -13,6 +13,7 @@ import {
   fetchCatalogContacts, syncCatalogToContact, removeCatalogFromContact,
 } from "@/lib/catalogs-admin";
 import { createContact } from "@/lib/contacts-admin";
+import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import type { CatalogEntry } from "@/lib/catalogs-admin";
 import {
   fetchDivisions, fetchCategories,
@@ -590,7 +591,7 @@ function CatalogModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
-            <BookOpen className="h-4 w-4 text-[var(--text-dim)]" />
+            <CatalogsIcon size={16} className="text-[var(--text-dim)]" />
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
               {editEntry ? "Edit Catalog" : "Upload Catalog"}
             </h2>
@@ -1160,7 +1161,7 @@ export default function CatalogsPage() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <BookOpen className="h-4 w-4" />
+              <CatalogsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight">Catalogs</h1>
           </div>
@@ -1170,7 +1171,7 @@ export default function CatalogsPage() {
         {/* Stats */}
         <div className="flex flex-wrap gap-2 mb-5">
           <div className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-            <BookOpen className="h-3 w-3 text-[var(--text-dim)]" />
+            <CatalogsIcon size={12} className="text-[var(--text-dim)]" />
             <span className="text-[16px] font-bold text-[var(--text-primary)] tabular-nums">{catalogs.length}</span>
             <span className="text-[11px] text-[var(--text-dim)]">catalogs</span>
           </div>
@@ -1247,7 +1248,7 @@ export default function CatalogsPage() {
         ) : catalogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-[var(--border-subtle)] rounded-2xl">
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface)] flex items-center justify-center mb-4">
-              <BookOpen className="h-7 w-7 text-[var(--text-dim)]" />
+              <CatalogsIcon size={28} className="text-[var(--text-dim)]" />
             </div>
             <h3 className="text-[15px] font-semibold text-[var(--text-secondary)] mb-1">No catalogs yet</h3>
             <p className="text-[12px] text-[var(--text-dim)] mb-5">Upload your first supplier catalog to get started.</p>

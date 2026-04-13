@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Plus, Search, Filter, X, Users, UserCircle2, Shield, Mail, Building2,
+  ArrowLeft, Plus, Search, Filter, X, UserCircle2, Shield, Mail, Building2,
   MoreHorizontal, Eye, Pencil, KeyRound, PowerOff, Power, RefreshCcw,
   CheckCircle2, AlertCircle, Copy, Flag,
 } from "lucide-react";
@@ -32,6 +32,7 @@ import type {
   AccountRow, CompanyRow, RoleRow, PersonRow,
   AccountStatus, UserType, CustomerLevel,
 } from "@/types/supabase";
+import AccountsIcon from "@/components/icons/AccountsIcon";
 
 const selectClass =
   "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -276,7 +277,7 @@ export default function AccountsList() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <Users className="h-4 w-4" />
+              <AccountsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               Accounts
@@ -500,7 +501,7 @@ export default function AccountsList() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
-            <Users className="h-12 w-12 text-[var(--text-barely)] mx-auto mb-4" />
+            <AccountsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-dim)] text-[15px] font-medium">
               {accounts.length === 0
                 ? "No accounts yet"

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Globe,
   ExternalLink,
   Monitor,
   Tablet,
@@ -18,6 +17,7 @@ import {
   Layers,
   Tag,
 } from "lucide-react";
+import WebsiteIcon from "@/components/icons/WebsiteIcon";
 
 /* ── Config ── */
 const WEBSITE_URL = "https://koleex-website.vercel.app";
@@ -82,7 +82,7 @@ export default function WebsiteCMS() {
             <div className="w-px h-6 bg-[#333]" />
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Globe size={18} className="text-emerald-400" />
+                <WebsiteIcon size={18} className="text-emerald-400" />
               </div>
               <div>
                 <h1 className="text-sm font-semibold leading-tight">Website</h1>
@@ -230,7 +230,7 @@ export default function WebsiteCMS() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap bg-[var(--bg-secondary)] text-gray-400 border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-all ml-auto"
           >
-            <Globe size={13} />
+            <WebsiteIcon size={13} />
             Visit Website
             <ExternalLink size={10} />
           </a>
@@ -244,7 +244,7 @@ export default function WebsiteCMS() {
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-primary)]">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center animate-pulse">
-                <Globe size={20} className="text-emerald-400" />
+                <WebsiteIcon size={20} className="text-emerald-400" />
               </div>
               <p className="text-xs text-gray-500">Loading {activeTab === "builder" ? "Page Builder" : "Preview"}...</p>
             </div>

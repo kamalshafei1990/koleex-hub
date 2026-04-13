@@ -76,6 +76,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import DiscussIcon from "@/components/icons/DiscussIcon";
 import {
   addMembers,
   createChannel,
@@ -1449,7 +1450,7 @@ export default function DiscussApp() {
     return (
       <div className="flex-1 min-h-0 bg-[var(--bg-primary)] flex flex-col items-center justify-center gap-3 p-6">
         <div className="h-12 w-12 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-          <MessageSquare className="h-5 w-5 text-[var(--text-dim)]" />
+          <DiscussIcon size={20} className="text-[var(--text-dim)]" />
         </div>
         <p className="text-[13px] text-[var(--text-muted)]">
           You need to sign in to use Discuss.
@@ -1514,7 +1515,7 @@ export default function DiscussApp() {
           }`}
         >
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <MessageSquare className="h-4 w-4" />
+            <DiscussIcon size={16} />
           </div>
           <h1 className="text-[15px] md:text-[18px] font-bold tracking-tight truncate">
             {t("title")}
@@ -1682,7 +1683,7 @@ export default function DiscussApp() {
             ) : filteredChannels.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
                 <div className="h-14 w-14 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                  <MessageSquare className="h-5 w-5 text-[var(--text-ghost)]" />
+                  <DiscussIcon size={20} className="text-[var(--text-ghost)]" />
                 </div>
                 <p className="text-[12.5px] text-[var(--text-faint)] font-medium">
                   {t("sidebar.empty")}
@@ -1749,7 +1750,7 @@ export default function DiscussApp() {
           {!selectedChannel ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                <MessageSquare className="h-6 w-6 text-[var(--text-ghost)]" />
+                <DiscussIcon size={24} className="text-[var(--text-ghost)]" />
               </div>
               <div>
                 <div className="text-[15px] font-semibold text-[var(--text-muted)]">

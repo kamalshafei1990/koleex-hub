@@ -19,7 +19,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -27,6 +26,7 @@ import {
   AlertCircle,
   UserCircle2,
 } from "lucide-react";
+import CalendarIcon from "@/components/icons/CalendarIcon";
 import type {
   AccountRow,
   AccountWithLinks,
@@ -277,7 +277,7 @@ export default function CalendarApp() {
             </Link>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <CalendarIcon className="h-4 w-4" />
+                <CalendarIcon size={16} />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
                 Calendar

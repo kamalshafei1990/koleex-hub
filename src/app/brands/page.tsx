@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Search, Pencil, Trash2, ImageIcon, X,
-  Loader2, Package, RefreshCw, Tag,
+  Loader2, Package, RefreshCw,
 } from "lucide-react";
+import BrandIcon from "@/components/icons/BrandIcon";
 import {
   fetchBrandsWithDetails, renameBrand, deleteBrand,
   uploadBrandLogo, deleteBrandLogo,
@@ -324,7 +325,7 @@ export default function BrandsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <Tag className="h-4 w-4" />
+            <BrandIcon size={16} />
           </div>
           <h1 className="text-xl md:text-[22px] font-bold tracking-tight">Brands</h1>
         </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
-  Globe,
   ArrowLeft,
   Search,
   Users,
@@ -20,6 +19,7 @@ import {
   Eye,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import MarketsIcon from "@/components/icons/MarketsIcon";
 
 /* ─────────── Reference Data ─────────── */
 
@@ -487,7 +487,7 @@ export default function Markets() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <Globe className="h-4 w-4" />
+              <MarketsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               Markets
@@ -513,7 +513,7 @@ export default function Markets() {
           >
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-surface)]">
-                <Globe size={16} className="text-[var(--text-subtle)]" />
+                <MarketsIcon size={16} className="text-[var(--text-subtle)]" />
               </div>
               <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">
                 Total Markets

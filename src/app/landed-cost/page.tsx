@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
-  Plus, Search, Calculator, Trash2, Copy, Filter, X,
+  Plus, Search, Trash2, Copy, Filter, X,
   Loader2, MoreHorizontal, CheckCircle2, Clock, Globe,
   Building2, Package, FileText, ArrowUpDown, ArrowLeft,
 } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 import type { SimulationRow } from "@/lib/landed-cost-types";
 import { useTranslation } from "@/lib/i18n";
 import { landedCostT } from "@/lib/translations/landed-cost";
+import LandedCostIcon from "@/components/icons/LandedCostIcon";
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -86,7 +87,7 @@ export default function LandedCostListPage() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <Calculator className="h-4 w-4" />
+              <LandedCostIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               {t("list.title")}
@@ -148,7 +149,7 @@ export default function LandedCostListPage() {
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-ghost)] mb-4">
-              <Calculator className="h-7 w-7" />
+              <LandedCostIcon size={28} />
             </div>
             <p className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">
               {search || statusFilter ? t("list.noSimsFound") : t("list.noSimsYet")}

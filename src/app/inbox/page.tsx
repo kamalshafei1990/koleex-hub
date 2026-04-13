@@ -43,6 +43,7 @@ import {
   User as UserIcon,
   AlertCircle,
 } from "lucide-react";
+import MailIcon from "@/components/icons/MailIcon";
 import {
   archiveMessage,
   broadcastToRole,
@@ -465,7 +466,7 @@ export default function InboxPage() {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center gap-3 p-6">
         <div className="h-12 w-12 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-          <Mail className="h-5 w-5 text-[var(--text-dim)]" />
+          <MailIcon size={20} className="text-[var(--text-dim)]" />
         </div>
         <p className="text-[13px] text-[var(--text-muted)]">
           You need to sign in to see Koleex Mail.
@@ -518,7 +519,7 @@ export default function InboxPage() {
         )}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <Mail className="h-4 w-4" />
+            <MailIcon size={16} />
           </div>
           <h1 className="text-[15px] md:text-[18px] font-bold tracking-tight truncate">
             Koleex Mail
@@ -680,7 +681,7 @@ export default function InboxPage() {
             ) : filtered.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
                 <div className="h-14 w-14 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
-                  <Mail className="h-5 w-5 text-[var(--text-ghost)]" />
+                  <MailIcon size={20} className="text-[var(--text-ghost)]" />
                 </div>
                 <p className="text-[12.5px] text-[var(--text-faint)] font-medium">
                   {search
@@ -885,7 +886,7 @@ export default function InboxPage() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="h-16 w-16 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
-                <Mail className="h-6 w-6 text-[var(--text-ghost)]" />
+                <MailIcon size={24} className="text-[var(--text-ghost)]" />
               </div>
               <div>
                 <div className="text-[15px] font-semibold text-[var(--text-muted)]">

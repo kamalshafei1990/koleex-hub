@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Calculator, ArrowLeft, Plus, Trash2, RefreshCw, ChevronDown, ChevronUp,
+  ArrowLeft, Plus, Trash2, RefreshCw, ChevronDown, ChevronUp,
   TrendingUp, DollarSign, Globe, Users, Package, Percent, ShieldCheck,
   Zap, Tag, Copy, FileText, Printer, Share2, Info, Activity, Layers, Settings,
 } from "lucide-react";
 import { fetchPricingConfig, type PricingConfig } from "@/lib/pricing-config";
+import PriceCalculatorIcon from "@/components/icons/PriceCalculatorIcon";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
 
@@ -191,7 +192,7 @@ export default function PriceCalculator() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="flex-1 flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><Calculator className="h-4 w-4" /></div>
+            <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0"><PriceCalculatorIcon size={16} /></div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Price Calculator</h1>
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
@@ -374,7 +375,7 @@ export default function PriceCalculator() {
             {!result ? (
               <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-8 md:p-12 flex flex-col items-center justify-center text-center min-h-[500px]">
                 <div className="h-14 w-14 rounded-2xl bg-[var(--bg-surface-subtle)] flex items-center justify-center mb-4">
-                  <Calculator className="h-7 w-7 text-[var(--text-ghost)]" />
+                  <PriceCalculatorIcon size={28} className="text-[var(--text-ghost)]" />
                 </div>
                 <h3 className="text-[14px] font-semibold text-[var(--text-muted)] mb-1">No Quotation Yet</h3>
                 <p className="text-[12px] text-[var(--text-dim)] max-w-[280px]">Fill in the product details and click Generate Price to see channel pricing results.</p>

@@ -16,6 +16,10 @@ import {
   Download, BookOpen, Landmark, ExternalLink, ImageIcon, FilePlus,
   GraduationCap, ShieldAlert, Plane, Home, HelpCircle,
 } from "lucide-react";
+import ContactsIcon from "@/components/icons/ContactsIcon";
+import CustomersIcon from "@/components/icons/CustomersIcon";
+import SuppliersIcon from "@/components/icons/SuppliersIcon";
+import EmployeesIcon from "@/components/icons/EmployeesIcon";
 import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
   type ContactRow,
@@ -1749,7 +1753,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <ArrowLeft size={16} className="rtl:rotate-180" />
           </Link>
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            <Users size={16} />
+            {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : filterType === "employee" ? <EmployeesIcon size={16} /> : <ContactsIcon size={16} />}
           </div>
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : filterType === "employee" ? t("tab.employees") : t("tab.customers")) : t("title")}
