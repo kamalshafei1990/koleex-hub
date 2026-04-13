@@ -28,6 +28,7 @@ import {
 } from "@/lib/catalogs-admin";
 import { createContact } from "@/lib/contacts-admin";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
+import { getDivisionIcon } from "@/components/icons/divisions";
 import type { CatalogEntry } from "@/lib/catalogs-admin";
 import {
   fetchDivisions, fetchCategories,
@@ -766,12 +767,17 @@ function CatalogModal({
                 </select>
                 <AngleDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-dim)] pointer-events-none" />
               </div>
-              {divisionSlug && divLogos[divisionSlug] && (
-                <div className="flex items-center gap-2 mt-1.5 px-1">
-                  <img src={divLogos[divisionSlug]} alt="" className="w-4 h-4 object-contain" />
-                  <span className="text-[10px] text-[var(--text-dim)]">{divisions.find(d => d.slug === divisionSlug)?.name}</span>
-                </div>
-              )}
+              {divisionSlug && (() => {
+                const DivIcon = getDivisionIcon(divisionSlug);
+                const logo = divLogos[divisionSlug];
+                if (!DivIcon && !logo) return null;
+                return (
+                  <div className="flex items-center gap-2 mt-1.5 px-1">
+                    {DivIcon ? <DivIcon className="w-4 h-4 text-[var(--text-dim)]" /> : <img src={logo} alt="" className="w-4 h-4 object-contain" />}
+                    <span className="text-[10px] text-[var(--text-dim)]">{divisions.find(d => d.slug === divisionSlug)?.name}</span>
+                  </div>
+                );
+              })()}
             </div>
             <div>
               <label className={lbl}>Category</label>
@@ -973,9 +979,12 @@ function CatalogCard({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete 
           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
             {catalog.division_name && catalog.division_slug && (
               <span className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-[var(--bg-surface-bright)] text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wide">
-                {divLogos[catalog.division_slug] && (
-                  <img src={divLogos[catalog.division_slug]} alt="" className="w-3 h-3 object-contain" />
-                )}
+                {(() => {
+                  const DivIcon = getDivisionIcon(catalog.division_slug);
+                  if (DivIcon) return <DivIcon className="w-3 h-3" />;
+                  if (divLogos[catalog.division_slug]) return <img src={divLogos[catalog.division_slug]} alt="" className="w-3 h-3 object-contain" />;
+                  return null;
+                })()}
                 {catalog.division_name}
               </span>
             )}
@@ -1044,7 +1053,12 @@ function CatalogRow({ catalog, divLogos, catLogos, onPreview, onEdit, onDelete }
           )}
           {catalog.division_name && catalog.division_slug && (
             <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded bg-[var(--bg-surface-bright)] text-[9px] font-semibold text-[var(--text-dim)]">
-              {divLogos[catalog.division_slug] && <img src={divLogos[catalog.division_slug]} alt="" className="w-2.5 h-2.5 object-contain" />}
+              {(() => {
+                const DivIcon = getDivisionIcon(catalog.division_slug);
+                if (DivIcon) return <DivIcon className="w-2.5 h-2.5" />;
+                if (divLogos[catalog.division_slug]) return <img src={divLogos[catalog.division_slug]} alt="" className="w-2.5 h-2.5 object-contain" />;
+                return null;
+              })()}
               {catalog.division_name}
             </span>
           )}

@@ -61,6 +61,7 @@ function DivisionsContent() {
       onReorder={async (id, newOrder) => updateDivision(id, { order: newOrder })}
       onUploadLogo={uploadDivisionLogo}
       onDeleteLogo={deleteDivisionLogo}
+      useDivisionIcons
     />
   );
 }

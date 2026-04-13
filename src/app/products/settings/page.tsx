@@ -23,6 +23,7 @@ import RefreshIcon from "@/components/icons/ui/RefreshIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ImageIcon from "@/components/icons/ui/PictureIcon";
 import BookmarkIcon from "@/components/icons/ui/BookmarkIcon";
+import { getDivisionIcon } from "@/components/icons/divisions";
 import {
   fetchDivisions, fetchCategories, fetchSubcategories,
   createDivision, updateDivision, deleteDivision,
@@ -380,13 +381,13 @@ function DeleteModal({ open, onClose, title, message, warning, onConfirm, deleti
 /* ═════════════════════════════════
    ── Classification Panel Column ──
    ═════════════════════════════════ */
-function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCounts, onAdd, onEdit, onDelete, emptyLabel, logoMap }: {
+function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCounts, onAdd, onEdit, onDelete, emptyLabel, logoMap, useDivisionIcons }: {
   title: string; items: { id: string; name: string; slug: string; description?: string | null }[];
   selectedId: string | null; onSelect: (id: string) => void;
   childCounts: Record<string, number>; productCounts: Record<string, number>;
   onAdd: () => void; onEdit: (item: { id: string; name: string; slug: string; description: string }) => void;
   onDelete: (item: { id: string; name: string; slug: string }) => void; emptyLabel: string;
-  logoMap?: Record<string, string>;
+  logoMap?: Record<string, string>; useDivisionIcons?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const filtered = search.trim() ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : items;
@@ -415,11 +416,14 @@ function ClassPanel({ title, items, selectedId, onSelect, childCounts, productCo
           return (
             <div key={item.id} onClick={() => onSelect(item.id)} className={`group flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-[var(--border-subtle)] transition-all ${isActive ? "bg-[var(--bg-surface-hover)] border-l-2 border-l-blue-500" : "hover:bg-[var(--bg-surface)] border-l-2 border-l-transparent"}`}>
               <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${isActive ? "bg-blue-500/20 text-blue-400" : "bg-[var(--bg-surface)] text-[var(--text-dim)]"}`}>
-                      {logoMap?.[item.slug] ? (
-                        <img src={logoMap[item.slug]} alt="" className="w-5 h-5 object-contain" />
-                      ) : (
-                        <span className="text-[12px] font-bold">{item.name.charAt(0).toUpperCase()}</span>
-                      )}
+                      {(() => {
+                        if (useDivisionIcons) {
+                          const DivIcon = getDivisionIcon(item.slug);
+                          if (DivIcon) return <DivIcon className="h-4.5 w-4.5" size={18} />;
+                        }
+                        if (logoMap?.[item.slug]) return <img src={logoMap[item.slug]} alt="" className="w-5 h-5 object-contain" />;
+                        return <span className="text-[12px] font-bold">{item.name.charAt(0).toUpperCase()}</span>;
+                      })()}
                     </div>
               <div className="flex-1 min-w-0"><p className={`text-[13px] font-medium truncate ${isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>{item.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">{cc > 0 && <span className="text-[10px] text-[var(--text-dim)]">{cc} sub</span>}{pc > 0 && <span className="text-[10px] text-[var(--text-dim)]">{pc} prod</span>}{!cc && !pc && <span className="text-[10px] text-[var(--text-dim)] font-mono">{item.slug}</span>}</div>
@@ -704,7 +708,7 @@ export default function ProductSettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden">
                   <ClassPanel title="Divisions" items={divisions.map(d => ({ id: d.id, name: d.name, slug: d.slug, description: d.tagline || d.description }))} selectedId={selectedDiv} onSelect={(id) => { setSelectedDiv(id); setSelectedCat(null); }} childCounts={catCounts} productCounts={prodCounts.byDivision}
-                    logoMap={divLogos}
+                    logoMap={divLogos} useDivisionIcons
                     onAdd={() => setClassModal({ open: true, type: "division", editItem: null })}
                     onEdit={(item) => setClassModal({ open: true, type: "division", editItem: item })}
                     onDelete={(item) => { const cc = catCounts[item.id] || 0; setDeleteModal({ open: true, title: `Delete "${item.name}"`, message: "Delete this division?", warning: cc > 0 ? `Has ${cc} categories. Delete those first.` : undefined, onConfirm: async () => { setDeleting(true); await handleClassDelete("division", item.id); setDeleting(false); setDeleteModal(m => ({ ...m, open: false })); } }); }}

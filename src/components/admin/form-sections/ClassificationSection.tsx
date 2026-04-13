@@ -10,6 +10,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Image from "next/image";
+import { getDivisionIcon } from "@/components/icons/divisions";
 
 interface Props {
   data: Pick<ProductFormState, "division_slug" | "category_slug" | "subcategory_slug">;
@@ -60,9 +61,12 @@ export default function ClassificationSection({
               onClick={() => onChange({ division_slug: "", category_slug: "", subcategory_slug: "" })}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]/50 transition-all"
             >
-              {divisionLogos?.[selectedDiv.slug] && (
-                <Image src={divisionLogos[selectedDiv.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />
-              )}
+              {(() => {
+                const DivIcon = getDivisionIcon(selectedDiv.slug);
+                if (DivIcon) return <DivIcon className="h-3.5 w-3.5" />;
+                if (divisionLogos?.[selectedDiv.slug]) return <Image src={divisionLogos[selectedDiv.slug]} alt="" width={14} height={14} className="rounded-sm object-contain" unoptimized />;
+                return null;
+              })()}
               {selectedDiv.name}
             </button>
           )}
@@ -98,6 +102,7 @@ export default function ClassificationSection({
           <p className="text-[12px] font-medium text-[var(--text-subtle)] mb-3">Select Division</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {divisions.map((div) => {
+              const DivIcon = getDivisionIcon(div.slug);
               const logo = divisionLogos?.[div.slug];
               return (
                 <button
@@ -105,7 +110,9 @@ export default function ClassificationSection({
                   onClick={() => onChange({ division_slug: div.slug, category_slug: "", subcategory_slug: "" })}
                   className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
                 >
-                  {logo ? (
+                  {DivIcon ? (
+                    <DivIcon className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" />
+                  ) : logo ? (
                     <Image src={logo} alt={div.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                   ) : (
                     <LayersIcon className="h-10 w-10 text-[var(--text-ghost)]" />

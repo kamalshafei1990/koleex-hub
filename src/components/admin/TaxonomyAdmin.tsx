@@ -15,6 +15,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
 import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
+import { getDivisionIcon } from "@/components/icons/divisions";
 import { slugify } from "@/types/product-form";
 
 /* ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ interface Props {
   onReorder: (id: string, newOrder: number) => Promise<boolean>;
   onUploadLogo?: (slug: string, file: File) => Promise<string | null>;
   onDeleteLogo?: (slug: string) => Promise<boolean>;
+  useDivisionIcons?: boolean;
 }
 
 interface FormData {
@@ -72,7 +74,7 @@ export default function TaxonomyAdmin({
   title, singular, backHref, parentLabel, parentOptions,
   items, parentMap, childCounts, childLabel,
   loading, onRefresh, onCreate, onUpdate, onDelete, onReorder,
-  onUploadLogo, onDeleteLogo,
+  onUploadLogo, onDeleteLogo, useDivisionIcons,
 }: Props) {
   const [search, setSearch] = useState("");
   const [filterParent, setFilterParent] = useState("");
@@ -288,15 +290,26 @@ export default function TaxonomyAdmin({
                     </td>
                     {onUploadLogo && (
                       <td className="px-3 py-3 text-center">
-                        {item.logoUrl ? (
-                          <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center overflow-hidden mx-auto">
-                            <img src={item.logoUrl} alt="" className="w-6 h-6 object-contain" />
-                          </div>
-                        ) : (
-                          <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] border-dashed flex items-center justify-center mx-auto">
-                            <PictureIcon className="h-3.5 w-3.5 text-white/15" />
-                          </div>
-                        )}
+                        {(() => {
+                          if (useDivisionIcons) {
+                            const DivIcon = getDivisionIcon(item.slug);
+                            if (DivIcon) return (
+                              <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center mx-auto">
+                                <DivIcon className="h-5 w-5 text-white/70" />
+                              </div>
+                            );
+                          }
+                          if (item.logoUrl) return (
+                            <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center overflow-hidden mx-auto">
+                              <img src={item.logoUrl} alt="" className="w-6 h-6 object-contain" />
+                            </div>
+                          );
+                          return (
+                            <div className="w-9 h-9 rounded-lg bg-white/[0.03] border border-white/[0.06] border-dashed flex items-center justify-center mx-auto">
+                              <PictureIcon className="h-3.5 w-3.5 text-white/15" />
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     <td className="px-5 py-3">
