@@ -476,7 +476,7 @@ export default function HomePage() {
 
   return (
     <div className={`${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
-      <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px]">
+      <div className="px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         <div className="mb-5 md:mb-6 min-h-[160px] md:min-h-[180px] flex items-center">
