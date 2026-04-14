@@ -52,6 +52,7 @@ import SettingsIcon from "@/components/icons/SettingsIcon";
 import MailIcon from "@/components/icons/MailIcon";
 import BrandIcon from "@/components/icons/BrandIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import HrIcon from "@/components/icons/HrIcon";
 import OperationsSidebarIcon from "@/components/icons/OperationsSidebarIcon";
 import CommercialSidebarIcon from "@/components/icons/CommercialSidebarIcon";
 import FinanceSidebarIcon from "@/components/icons/FinanceSidebarIcon";
@@ -130,10 +131,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── People ── */
   { id: "management",       tKey: "app.management",       name: "Management",        icon: ManagementIcon, route: "/management",       active: true  },
   { id: "employees",        tKey: "app.employees",        name: "Employees",         icon: EmployeesIcon, route: "/employees",        active: true  },
-  { id: "recruitment",      tKey: "app.recruitment",      name: "Recruitment",       icon: RecruitmentIcon, route: "/recruitment",    active: false },
-  { id: "appraisals",       tKey: "app.appraisals",       name: "Appraisals",        icon: AppraisalsIcon, route: "/appraisals",      active: false },
-  { id: "appointments",     tKey: "app.appointments",     name: "Appointments",      icon: AppointmentsIcon, route: "/appointments",  active: false },
-  { id: "attendance",       tKey: "app.attendance",       name: "Attendance",        icon: CalendarCheckIcon, route: "/attendance",       active: false },
+  { id: "hr",               tKey: "app.hr",               name: "HR",                icon: HrIcon,        route: "/hr",               active: true  },
 
   /* ── Communication ── */
   { id: "discuss",          tKey: "app.discuss",          name: "Discuss",           icon: DiscussIcon,   route: "/discuss",          active: true  },
@@ -198,7 +196,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.people",
     label: "People",
     icon: PeopleSidebarIcon,
-    appIds: ["management", "employees", "recruitment", "appraisals", "appointments", "attendance"],
+    appIds: ["management", "employees", "hr"],
   },
   {
     id: "communication",

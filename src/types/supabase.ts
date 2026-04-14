@@ -1733,3 +1733,300 @@ export interface TodoWithRelations extends TodoRow {
     author_avatar_url: string | null;
   })[];
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   HR SYSTEM TYPES
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Leave Management ── */
+export interface LeaveTypeRow {
+  id: string;
+  name: string;
+  code: string;
+  default_days: number;
+  carry_over: boolean;
+  requires_doc: boolean;
+  is_paid: boolean;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+}
+export type LeaveTypeInsert = Omit<LeaveTypeRow, "id" | "created_at">;
+
+export interface LeaveBalanceRow {
+  id: string;
+  employee_id: string;
+  leave_type_id: string;
+  year: number;
+  entitled: number;
+  used: number;
+  carried_over: number;
+  adjustment: number;
+  created_at: string;
+  updated_at: string;
+}
+export type LeaveBalanceInsert = Omit<LeaveBalanceRow, "id" | "created_at" | "updated_at">;
+
+export type LeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface LeaveRequestRow {
+  id: string;
+  employee_id: string;
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  days: number;
+  half_day: boolean;
+  reason: string | null;
+  status: LeaveRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  attachment_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at">;
+
+/* ── Attendance ── */
+export interface AttendancePolicyRow {
+  id: string;
+  name: string;
+  work_start: string;
+  work_end: string;
+  late_threshold_min: number;
+  min_hours: number;
+  weekend_days: string[];
+  is_default: boolean;
+  created_at: string;
+}
+
+export type AttendanceStatus = "present" | "absent" | "late" | "half_day" | "holiday" | "weekend";
+
+export interface AttendanceRecordRow {
+  id: string;
+  employee_id: string;
+  date: string;
+  clock_in: string | null;
+  clock_out: string | null;
+  break_minutes: number;
+  total_hours: number | null;
+  status: AttendanceStatus;
+  source: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type AttendanceRecordInsert = Omit<AttendanceRecordRow, "id" | "created_at" | "updated_at">;
+
+/* ── Recruitment ── */
+export type JobPostingStatus = "draft" | "open" | "paused" | "closed" | "filled";
+
+export interface JobPostingRow {
+  id: string;
+  title: string;
+  department_id: string | null;
+  position_id: string | null;
+  description: string | null;
+  requirements: string | null;
+  location: string | null;
+  employment_type: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string;
+  status: JobPostingStatus;
+  published_at: string | null;
+  closes_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type JobPostingInsert = Omit<JobPostingRow, "id" | "created_at" | "updated_at">;
+
+export type ApplicantStage = "new" | "screening" | "interview" | "offer" | "hired" | "rejected";
+
+export interface ApplicantRow {
+  id: string;
+  job_posting_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  resume_url: string | null;
+  cover_letter: string | null;
+  source: string | null;
+  stage: ApplicantStage;
+  rating: number | null;
+  notes: string | null;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type ApplicantInsert = Omit<ApplicantRow, "id" | "created_at" | "updated_at">;
+
+export interface InterviewRoundRow {
+  id: string;
+  applicant_id: string;
+  round_number: number;
+  interviewer_id: string | null;
+  scheduled_at: string | null;
+  duration_min: number;
+  location: string | null;
+  status: string;
+  feedback: string | null;
+  score: number | null;
+  created_at: string;
+}
+
+/* ── Appraisals ── */
+export interface AppraisalCycleRow {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  created_at: string;
+}
+export type AppraisalCycleInsert = Omit<AppraisalCycleRow, "id" | "created_at">;
+
+export interface AppraisalRow {
+  id: string;
+  cycle_id: string;
+  employee_id: string;
+  reviewer_id: string | null;
+  self_rating: number | null;
+  reviewer_rating: number | null;
+  self_comments: string | null;
+  reviewer_comments: string | null;
+  goals_met: string | null;
+  strengths: string | null;
+  improvements: string | null;
+  overall_score: number | null;
+  status: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type AppraisalInsert = Omit<AppraisalRow, "id" | "created_at" | "updated_at">;
+
+export interface GoalRow {
+  id: string;
+  employee_id: string;
+  appraisal_id: string | null;
+  title: string;
+  description: string | null;
+  target_value: string | null;
+  actual_value: string | null;
+  weight: number;
+  progress: number;
+  status: string;
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type GoalInsert = Omit<GoalRow, "id" | "created_at" | "updated_at">;
+
+/* ── Onboarding / Offboarding ── */
+export interface ChecklistRow {
+  id: string;
+  name: string;
+  type: "onboarding" | "offboarding";
+  department_id: string | null;
+  items: { title: string; assignee_role: string; due_days: number }[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export type ChecklistInsert = Omit<ChecklistRow, "id" | "created_at" | "updated_at">;
+
+export interface ChecklistInstanceRow {
+  id: string;
+  checklist_id: string;
+  employee_id: string;
+  start_date: string;
+  status: string;
+  items_status: { item_index: number; completed: boolean; completed_by?: string; completed_at?: string; notes?: string }[];
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type ChecklistInstanceInsert = Omit<ChecklistInstanceRow, "id" | "created_at" | "updated_at">;
+
+/* ── Payroll ── */
+export interface SalaryRecordRow {
+  id: string;
+  employee_id: string;
+  base_salary: number;
+  currency: string;
+  pay_frequency: string;
+  effective_from: string;
+  effective_to: string | null;
+  allowances: Record<string, number>;
+  deductions: Record<string, number>;
+  notes: string | null;
+  created_at: string;
+}
+export type SalaryRecordInsert = Omit<SalaryRecordRow, "id" | "created_at">;
+
+export interface PayslipRow {
+  id: string;
+  employee_id: string;
+  salary_record_id: string | null;
+  period_start: string;
+  period_end: string;
+  gross_amount: number | null;
+  deductions: Record<string, number>;
+  net_amount: number | null;
+  status: string;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+export type PayslipInsert = Omit<PayslipRow, "id" | "created_at">;
+
+/* ── Training ── */
+export interface CourseRow {
+  id: string;
+  name: string;
+  description: string | null;
+  provider: string | null;
+  duration_hours: number | null;
+  is_mandatory: boolean;
+  department_id: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+export type CourseInsert = Omit<CourseRow, "id" | "created_at">;
+
+export interface TrainingRecordRow {
+  id: string;
+  employee_id: string;
+  course_id: string;
+  status: string;
+  enrolled_at: string;
+  completed_at: string | null;
+  expiry_date: string | null;
+  certificate_url: string | null;
+  score: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type TrainingRecordInsert = Omit<TrainingRecordRow, "id" | "created_at" | "updated_at">;
+
+/* ── HR Documents ── */
+export interface HrDocumentRow {
+  id: string;
+  employee_id: string;
+  name: string;
+  category: string;
+  file_url: string;
+  file_type: string | null;
+  file_size: number | null;
+  expiry_date: string | null;
+  reminder_days: number;
+  notes: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export type HrDocumentInsert = Omit<HrDocumentRow, "id" | "created_at" | "updated_at">;
