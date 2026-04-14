@@ -6,7 +6,7 @@
    Features:
      • Department hierarchy (tree sidebar)
      • Position management + reports_to hierarchy
-     • Employee assignment (contact picker + inline create)
+     • Employee assignment (person picker + inline create)
      • Real org chart (tree with connectors, expand/collapse, drag-drop)
      • Full company org chart (cross-department)
      • Roles & Permissions (per-module access grid)
@@ -100,7 +100,7 @@ import {
   fetchDepartments, createDepartment, updateDepartment, safeDeleteDepartment,
   fetchPositions, createPosition, updatePosition, safeDeletePosition, movePosition, duplicatePosition,
   fetchAssignments, createAssignment, updateAssignment, deleteAssignment,
-  fetchContactsForLinking, createInlineContact,
+  fetchPeopleForLinking, createInlinePerson,
   buildDepartmentTree, buildOrgChart, getDepartmentHead, detectCircularHierarchy,
   fetchRoles, createRole, updateRole, deleteRole, cloneRole,
   fetchPermissions, upsertPermissions,
@@ -109,7 +109,7 @@ import {
   fetchEmployeeProfile, fetchRecentActivity, fetchHeadcountAnalytics,
   uploadManagementIcon,
   type DepartmentRow, type PositionRow, type AssignmentRow,
-  type DeptTreeNode, type ContactRef, type OrgChartNode,
+  type DeptTreeNode, type PersonRef, type OrgChartNode,
   type RoleRow, type PermissionRow, type PositionHistoryRow,
   type EmployeeProfile, type HeadcountAnalytics,
 } from "@/lib/management-admin";
@@ -581,24 +581,24 @@ function PositionModal({
 }
 
 /* ═══════════════════════════════════════════════════
-   ASSIGNMENT MODAL (contact picker + inline create)
+   ASSIGNMENT MODAL (person picker + inline create)
    ═══════════════════════════════════════════════════ */
 function AssignmentModal({
-  open, onClose, assignment, positionId, departmentId, contacts, onSaved, onContactCreated, t,
+  open, onClose, assignment, positionId, departmentId, people, onSaved, onPersonCreated, t,
 }: {
   open: boolean; onClose: () => void;
   assignment: AssignmentRow | null;
   positionId: string; departmentId: string;
-  contacts: ContactRef[]; onSaved: () => void;
-  onContactCreated: (c: ContactRef) => void;
+  people: PersonRef[]; onSaved: () => void;
+  onPersonCreated: (c: PersonRef) => void;
   t: (key: string) => string;
 }) {
-  const [contactId, setContactId] = useState<string | null>(null);
+  const [personId, setContactId] = useState<string | null>(null);
   const [isPrimary, setIsPrimary] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [contactSearch, setContactSearch] = useState("");
+  const [personSearch, setContactSearch] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newFirst, setNewFirst] = useState("");
@@ -609,7 +609,7 @@ function AssignmentModal({
 
   useEffect(() => {
     if (open) {
-      setContactId(assignment?.contact_id || null);
+      setContactId(assignment?.person_id || null);
       setIsPrimary(assignment?.is_primary ?? true);
       setStartDate(assignment?.start_date || "");
       setError(""); setContactSearch(""); setShowPicker(false);
@@ -617,23 +617,23 @@ function AssignmentModal({
     }
   }, [open, assignment]);
 
-  const filtered = contactSearch.trim()
-    ? contacts.filter((c) => c.name.toLowerCase().includes(contactSearch.toLowerCase()) || (c.email && c.email.toLowerCase().includes(contactSearch.toLowerCase())))
-    : contacts.slice(0, 30);
+  const filtered = personSearch.trim()
+    ? people.filter((c) => c.name.toLowerCase().includes(personSearch.toLowerCase()) || (c.email && c.email.toLowerCase().includes(personSearch.toLowerCase())))
+    : people.slice(0, 30);
 
-  const selectedContact = contactId ? contacts.find((c) => c.id === contactId) : null;
+  const selectedPerson = personId ? people.find((c) => c.id === personId) : null;
 
-  const handleCreateContact = async () => {
+  const handleCreatePerson = async () => {
     if (!newFirst.trim()) { setError(t("mgmt.firstNameReq")); return; }
     setCreating(true); setError("");
-    const res = await createInlineContact({
+    const res = await createInlinePerson({
       first_name: newFirst.trim(),
       last_name: newLast.trim() || undefined,
       email: newEmail.trim() || undefined,
       phone: newPhone.trim() || undefined,
     });
-    if (res.error || !res.data) { setError(res.error || "Failed to create contact."); setCreating(false); return; }
-    onContactCreated(res.data);
+    if (res.error || !res.data) { setError(res.error || "Failed to create person."); setCreating(false); return; }
+    onPersonCreated(res.data);
     setContactId(res.data.id);
     setShowCreate(false);
     setShowPicker(false);
@@ -641,10 +641,10 @@ function AssignmentModal({
   };
 
   const handleSave = async () => {
-    if (!contactId) { setError(t("mgmt.selectPerson")); return; }
+    if (!personId) { setError(t("mgmt.selectPerson")); return; }
     setSaving(true); setError("");
     const payload: Record<string, unknown> = {
-      contact_id: contactId, position_id: positionId,
+      person_id: personId, position_id: positionId,
       department_id: departmentId, is_primary: isPrimary,
       start_date: startDate || null,
     };
@@ -654,7 +654,7 @@ function AssignmentModal({
     } else {
       const res = await createAssignment(payload as Partial<AssignmentRow>);
       if (res.error) { setError(res.error); setSaving(false); return; }
-      await addPositionHistory({ position_id: positionId, contact_id: contactId, department_id: departmentId, action: "assigned" });
+      await addPositionHistory({ position_id: positionId, person_id: personId, department_id: departmentId, action: "assigned" });
     }
     setSaving(false); onSaved(); onClose();
   };
@@ -662,7 +662,7 @@ function AssignmentModal({
   return (
     <ModalShell open={open} onClose={onClose} title={assignment ? t("mgmt.editAssign") : t("mgmt.assignEmployee")} width="max-w-[500px]" footer={
       <><button onClick={onClose} className={cancelBtnCls}>{t("mgmt.cancel")}</button>
-      <button onClick={handleSave} disabled={saving || !contactId} className={primaryBtnCls}>{saving ? t("mgmt.saving") : assignment ? t("mgmt.saveChanges") : t("mgmt.assign")}</button></>
+      <button onClick={handleSave} disabled={saving || !personId} className={primaryBtnCls}>{saving ? t("mgmt.saving") : assignment ? t("mgmt.saveChanges") : t("mgmt.assign")}</button></>
     }>
       <ErrorBanner message={error} />
 
@@ -672,10 +672,10 @@ function AssignmentModal({
         <div className="relative">
           <button onClick={() => { setShowPicker(!showPicker); setShowCreate(false); }}
             className="w-full h-10 px-3.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-start flex items-center gap-2.5 transition-colors hover:border-[var(--border-focus)]">
-            {selectedContact ? (
-              <><Avatar src={selectedContact.avatar} name={selectedContact.name} size={22} />
-              <span className="text-[var(--text-primary)] truncate">{selectedContact.name}</span>
-              {selectedContact.email && <span className="text-[var(--text-dim)] text-[11px] truncate">({selectedContact.email})</span>}</>
+            {selectedPerson ? (
+              <><Avatar src={selectedPerson.avatar} name={selectedPerson.name} size={22} />
+              <span className="text-[var(--text-primary)] truncate">{selectedPerson.name}</span>
+              {selectedPerson.email && <span className="text-[var(--text-dim)] text-[11px] truncate">({selectedPerson.email})</span>}</>
             ) : (
               <><UserIcon size={14} className="text-[var(--text-dim)]" /><span className="text-[var(--text-dim)]">{t("mgmt.selectOrCreate")}</span></>
             )}
@@ -686,7 +686,7 @@ function AssignmentModal({
               <div className="p-2 shrink-0">
                 <div className="relative">
                   <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
-                  <input type="text" value={contactSearch} onChange={(e) => setContactSearch(e.target.value)}
+                  <input type="text" value={personSearch} onChange={(e) => setContactSearch(e.target.value)}
                     placeholder={t("mgmt.searchNameEmail")} autoFocus
                     className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-[12px] outline-none" />
                 </div>
@@ -696,7 +696,7 @@ function AssignmentModal({
                   <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">{t("mgmt.noContacts")}</div>
                 ) : filtered.map((c) => (
                   <button key={c.id} onClick={() => { setContactId(c.id); setShowPicker(false); setContactSearch(""); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-start transition-colors hover:bg-[var(--bg-surface)] ${contactId === c.id ? "bg-[var(--bg-surface-active)]" : ""}`}>
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-start transition-colors hover:bg-[var(--bg-surface)] ${personId === c.id ? "bg-[var(--bg-surface-active)]" : ""}`}>
                     <Avatar src={c.avatar} name={c.name} size={28} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{c.name}</div>
@@ -742,7 +742,7 @@ function AssignmentModal({
             <FieldLabel>{t("mgmt.phone")}</FieldLabel>
             <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="+1 234 567 890" className={inputCls} />
           </div>
-          <button onClick={handleCreateContact} disabled={creating || !newFirst.trim()} className={primaryBtnCls + " w-full"}>
+          <button onClick={handleCreatePerson} disabled={creating || !newFirst.trim()} className={primaryBtnCls + " w-full"}>
             {creating ? t("mgmt.creating") : t("mgmt.createAndSelect")}
           </button>
         </div>
@@ -774,10 +774,10 @@ function AssignmentModal({
    TRANSFER MODAL
    ═══════════════════════════════════════════════════ */
 function TransferModal({
-  open, onClose, assignment, contactName, departments, onSaved, t,
+  open, onClose, assignment, personName, departments, onSaved, t,
 }: {
   open: boolean; onClose: () => void;
-  assignment: AssignmentRow | null; contactName: string;
+  assignment: AssignmentRow | null; personName: string;
   departments: DepartmentRow[];
   onSaved: () => void; t: (key: string) => string;
 }) {
@@ -818,7 +818,7 @@ function TransferModal({
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
         <ArrowRightLeftIcon size={16} className="text-[var(--text-dim)] shrink-0" />
         <div>
-          <div className="text-[13px] font-medium text-[var(--text-primary)]">{contactName}</div>
+          <div className="text-[13px] font-medium text-[var(--text-primary)]">{personName}</div>
           <div className="text-[11px] text-[var(--text-dim)]">{t("mgmt.movingNewPos")}</div>
         </div>
       </div>
@@ -962,8 +962,8 @@ function DeleteModal({ open, target, departments, onClose, onConfirm, deleting, 
 /* ═══════════════════════════════════════════════════
    POSITION DETAIL (history + JD)
    ═══════════════════════════════════════════════════ */
-function PositionDetailModal({ open, onClose, position, contacts, t }: {
-  open: boolean; onClose: () => void; position: PositionRow | null; contacts: ContactRef[];
+function PositionDetailModal({ open, onClose, position, people, t }: {
+  open: boolean; onClose: () => void; position: PositionRow | null; people: PersonRef[];
   t: (key: string) => string;
 }) {
   const [history, setHistory] = useState<PositionHistoryRow[]>([]);
@@ -976,7 +976,7 @@ function PositionDetailModal({ open, onClose, position, contacts, t }: {
     }
   }, [open, position]);
 
-  const ctcMap = new Map(contacts.map((c) => [c.id, c]));
+  const ctcMap = new Map(people.map((c) => [c.id, c]));
 
   return (
     <ModalShell open={open} onClose={onClose} title={position ? posTitle(position.title, t) : t("mgmt.posDetails")} width="max-w-[540px]">
@@ -1012,7 +1012,7 @@ function PositionDetailModal({ open, onClose, position, contacts, t }: {
             ) : (
               <div className="relative pl-4 border-l border-[var(--border-subtle)] space-y-3">
                 {history.map((h) => {
-                  const ctc = ctcMap.get(h.contact_id);
+                  const ctc = ctcMap.get(h.person_id);
                   return (
                     <div key={h.id} className="relative">
                       <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[var(--bg-surface)] border-2 border-[var(--border-strong)]" />
@@ -1087,12 +1087,12 @@ function OrgChartCard({
 
       {/* Person */}
       <div className="flex items-center gap-2.5">
-        <Avatar src={node.contact?.avatar} name={node.contact?.name || "?"} size={30} />
+        <Avatar src={node.person?.avatar} name={node.person?.name || "?"} size={30} />
         <div className="min-w-0 flex-1">
-          {node.contact ? (
+          {node.person ? (
             <>
-              <div className="text-[12px] font-medium text-[var(--text-secondary)] truncate">{node.contact.name}</div>
-              {node.contact.email && <div className="text-[10px] text-[var(--text-dim)] truncate">{node.contact.email}</div>}
+              <div className="text-[12px] font-medium text-[var(--text-secondary)] truncate">{node.person.name}</div>
+              {node.person.email && <div className="text-[10px] text-[var(--text-dim)] truncate">{node.person.email}</div>}
             </>
           ) : (
             <button onClick={(e) => { e.stopPropagation(); onAssign(node.position.id); }}
@@ -1390,8 +1390,8 @@ function PermissionsEditor({ roleId, t }: { roleId: string; t: (key: string) => 
 /* ═══════════════════════════════════════════════════
    EMPLOYEE PROFILE PANEL
    ═══════════════════════════════════════════════════ */
-function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t }: {
-  contactId: string; contacts: ContactRef[];
+function EmployeeProfilePanel({ personId, people, onClose, onOpenEmployee, t }: {
+  personId: string; people: PersonRef[];
   onClose: () => void; onOpenEmployee: (id: string) => void;
   t: (key: string) => string;
 }) {
@@ -1400,13 +1400,13 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
 
   useEffect(() => {
     setLoading(true);
-    fetchEmployeeProfile(contactId).then((p) => { setProfile(p); setLoading(false); });
-  }, [contactId]);
+    fetchEmployeeProfile(personId).then((p) => { setProfile(p); setLoading(false); });
+  }, [personId]);
 
   if (loading) return <Spinner />;
   if (!profile) return <EmptyState icon={UserIcon} title={t("mgmt.employeeNotFound")} />;
 
-  const { contact, assignments, reportingChain, directReports, history } = profile;
+  const { person, assignments, reportingChain, directReports, history } = profile;
   const primary = assignments.find((a) => a.is_primary) || assignments[0];
 
   return (
@@ -1417,9 +1417,9 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
           <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
         </button>
         <div className="flex items-center gap-4">
-          <Avatar src={contact.avatar} name={contact.name} size={56} />
+          <Avatar src={person.avatar} name={person.name} size={56} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{contact.name}</h2>
+            <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{person.name}</h2>
             {primary && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[13px] text-[var(--text-secondary)]">{posTitle(primary.position.title, t)}</span>
@@ -1431,11 +1431,11 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
               </div>
             )}
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {contact.email && (
-                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><EnvelopeIcon size={11} /> {contact.email}</span>
+              {person.email && (
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><EnvelopeIcon size={11} /> {person.email}</span>
               )}
-              {contact.phone && (
-                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><PhoneIcon size={11} /> {contact.phone}</span>
+              {person.phone && (
+                <span className="flex items-center gap-1 text-[11px] text-[var(--text-dim)]"><PhoneIcon size={11} /> {person.phone}</span>
               )}
             </div>
           </div>
@@ -1452,8 +1452,8 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
           <div className="space-y-2">
             {assignments.map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                  <BriefcaseIcon size={14} className="text-violet-400" />
+                <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0">
+                  <BriefcaseIcon size={14} className="text-[var(--text-muted)]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -1481,12 +1481,12 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
             <div className="relative pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
               {reportingChain.map((r, i) => (
                 <div key={r.position.id}
-                  onClick={() => r.contact && onOpenEmployee(r.contact.id)}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.contact ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
+                  onClick={() => r.person && onOpenEmployee(r.person.id)}
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.person ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
                   <div className={`absolute -left-[21px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 ${LEVEL_DOT[r.position.level] || "bg-slate-400"} border-[var(--bg-primary)]`} />
-                  <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
+                  <Avatar src={r.person?.avatar} name={r.person?.name || "Vacant"} size={28} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
+                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.person?.name || "Vacant"}</div>
                     <div className="text-[11px] text-[var(--text-dim)] truncate">{posTitle(r.position.title, t)}</div>
                   </div>
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${LEVEL_COLORS[r.position.level] || LEVEL_COLORS[5]}`}>L{r.position.level}</span>
@@ -1506,11 +1506,11 @@ function EmployeeProfilePanel({ contactId, contacts, onClose, onOpenEmployee, t 
             <div className="space-y-1.5">
               {directReports.map((r) => (
                 <div key={r.position.id}
-                  onClick={() => r.contact && onOpenEmployee(r.contact.id)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.contact ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
-                  <Avatar src={r.contact?.avatar} name={r.contact?.name || "Vacant"} size={28} />
+                  onClick={() => r.person && onOpenEmployee(r.person.id)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] ${r.person ? "cursor-pointer hover:border-[var(--border-strong)]" : ""} transition-all`}>
+                  <Avatar src={r.person?.avatar} name={r.person?.name || "Vacant"} size={28} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.contact?.name || "Vacant"}</div>
+                    <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{r.person?.name || "Vacant"}</div>
                     <div className="text-[11px] text-[var(--text-dim)] truncate">{posTitle(r.position.title, t)}</div>
                   </div>
                   {r.department && <span className="text-[10px] text-[var(--text-dim)] shrink-0">{deptName(r.department.name, t)}</span>}
@@ -1585,8 +1585,8 @@ function HeadcountDashboard({ onDeptClick, t }: { onDeptClick: (deptId: string) 
     <div className="flex flex-col h-full">
       <div className="px-4 md:px-6 pt-5 pb-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-sm">
-            <BarChart3Icon size={20} className="text-emerald-400" />
+          <div className="w-11 h-11 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shadow-sm">
+            <BarChart3Icon size={20} className="text-[var(--text-muted)]" />
           </div>
           <div>
             <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.headcountDash")}</h2>
@@ -1711,7 +1711,7 @@ export default function ManagementPage() {
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [positions, setPositions] = useState<PositionRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
-  const [contacts, setContacts] = useState<ContactRef[]>([]);
+  const [people, setPeople] = useState<PersonRef[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1720,7 +1720,7 @@ export default function ManagementPage() {
   /* ── Full org chart data ── */
   const [fullOrgPositions, setFullOrgPositions] = useState<PositionRow[]>([]);
   const [fullOrgAssignments, setFullOrgAssignments] = useState<AssignmentRow[]>([]);
-  const [fullOrgContacts, setFullOrgContacts] = useState<ContactRef[]>([]);
+  const [fullOrgPeople, setFullOrgPeople] = useState<PersonRef[]>([]);
   const [fullOrgLoading, setFullOrgLoading] = useState(false);
 
   /* ── Selection ── */
@@ -1755,7 +1755,7 @@ export default function ManagementPage() {
   const [editRole, setEditRole] = useState<RoleRow | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferAssignment, setTransferAssignment] = useState<AssignmentRow | null>(null);
-  const [transferContactName, setTransferContactName] = useState("");
+  const [transferPersonName, setTransferContactName] = useState("");
   const [showPosDetail, setShowPosDetail] = useState(false);
   const [detailPos, setDetailPos] = useState<PositionRow | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
@@ -1770,9 +1770,9 @@ export default function ManagementPage() {
     (async () => {
       setLoading(true);
       const [depts, ctcs, rls, stats] = await Promise.all([
-        fetchDepartments(), fetchContactsForLinking(), fetchRoles(), fetchDeptStats(),
+        fetchDepartments(), fetchPeopleForLinking(), fetchRoles(), fetchDeptStats(),
       ]);
-      setDepartments(depts); setContacts(ctcs); setRoles(rls); setDeptStats(stats);
+      setDepartments(depts); setPeople(ctcs); setRoles(rls); setDeptStats(stats);
       const pIds = new Set<string>();
       depts.forEach((d) => { if (d.parent_id) pIds.add(d.parent_id); });
       setExpandedTree(pIds);
@@ -1799,7 +1799,7 @@ export default function ManagementPage() {
     const data = await fetchFullOrgData();
     setFullOrgPositions(data.positions);
     setFullOrgAssignments(data.assignments);
-    setFullOrgContacts(data.contacts);
+    setFullOrgPeople(data.people);
     setDepartments(data.departments);
     setFullOrgLoading(false);
   }, []);
@@ -1810,7 +1810,7 @@ export default function ManagementPage() {
 
   const selectedDept = departments.find((d) => d.id === selectedDeptId) || null;
   const tree = useMemo(() => buildDepartmentTree(departments), [departments]);
-  const contactMap = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts]);
+  const personMap = useMemo(() => new Map(people.map((c) => [c.id, c])), [people]);
 
   const filteredDepts = useMemo(() => {
     if (!search.trim()) return null;
@@ -1837,21 +1837,21 @@ export default function ManagementPage() {
       if (p.title.toLowerCase().includes(q)) return true;
       const posAssigns = assignmentsByPos.get(p.id) || [];
       return posAssigns.some((a) => {
-        const ctc = contactMap.get(a.contact_id);
+        const ctc = personMap.get(a.person_id);
         return ctc?.name.toLowerCase().includes(q) || ctc?.email?.toLowerCase().includes(q);
       });
     });
-  }, [positions, posSearch, assignmentsByPos, contactMap]);
+  }, [positions, posSearch, assignmentsByPos, personMap]);
 
   /* ── Org chart trees ── */
   const deptOrgChart = useMemo(
-    () => buildOrgChart(positions, assignments, contacts, departments),
-    [positions, assignments, contacts, departments],
+    () => buildOrgChart(positions, assignments, people, departments),
+    [positions, assignments, people, departments],
   );
 
   const fullOrgChart = useMemo(
-    () => rightView === "fullchart" ? buildOrgChart(fullOrgPositions, fullOrgAssignments, fullOrgContacts, departments) : [],
-    [rightView, fullOrgPositions, fullOrgAssignments, fullOrgContacts, departments],
+    () => rightView === "fullchart" ? buildOrgChart(fullOrgPositions, fullOrgAssignments, fullOrgPeople, departments) : [],
+    [rightView, fullOrgPositions, fullOrgAssignments, fullOrgPeople, departments],
   );
 
   /* ── Handlers ── */
@@ -1860,8 +1860,8 @@ export default function ManagementPage() {
   };
 
   const reloadAll = async () => {
-    const [depts, stats, ctcs] = await Promise.all([fetchDepartments(), fetchDeptStats(), fetchContactsForLinking()]);
-    setDepartments(depts); setDeptStats(stats); setContacts(ctcs);
+    const [depts, stats, ctcs] = await Promise.all([fetchDepartments(), fetchDeptStats(), fetchPeopleForLinking()]);
+    setDepartments(depts); setDeptStats(stats); setPeople(ctcs);
     const pIds = new Set<string>();
     depts.forEach((d) => { if (d.parent_id) pIds.add(d.parent_id); });
     setExpandedTree(pIds);
@@ -1879,8 +1879,8 @@ export default function ManagementPage() {
   const handleRoleSaved = async () => { await reloadRoles(); setToast(editRole ? t("mgmt.toastRoleUpdated") : t("mgmt.toastRoleCreated")); };
   const handleTransferSaved = async () => { if (selectedDeptId) await loadDeptDetail(selectedDeptId); setToast(t("mgmt.toastTransferred")); };
 
-  const handleContactCreated = (c: ContactRef) => {
-    setContacts((prev) => [...prev, c]);
+  const handlePersonCreated = (c: PersonRef) => {
+    setPeople((prev) => [...prev, c]);
   };
 
   const handleDeleteConfirm = async (strategy?: "cascade" | "reassign", reassignId?: string) => {
@@ -2008,8 +2008,8 @@ export default function ManagementPage() {
   const zoomReset = () => setOrgChartZoom(1);
 
   /* ── Open employee profile ── */
-  const openEmployeeProfile = (contactId: string) => {
-    setSelectedEmployeeId(contactId);
+  const openEmployeeProfile = (personId: string) => {
+    setSelectedEmployeeId(personId);
     setRightView("employee");
     setMobileShowDetail(true);
   };
@@ -2150,8 +2150,8 @@ export default function ManagementPage() {
         ) : rightView === "employee" && selectedEmployeeId ? (
           /* ── EMPLOYEE PROFILE VIEW ── */
           <EmployeeProfilePanel
-            contactId={selectedEmployeeId}
-            contacts={contacts}
+            personId={selectedEmployeeId}
+            people={people}
             onClose={() => { setRightView("dept"); setMobileShowDetail(false); }}
             onOpenEmployee={openEmployeeProfile}
             t={t}
@@ -2165,8 +2165,8 @@ export default function ManagementPage() {
                 <ArrowLeftIcon size={14} className="rtl:rotate-180" /> {t("mgmt.back")}
               </button>
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-sm">
-                  <GlobeIcon size={20} className="text-blue-400" />
+                <div className="w-11 h-11 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shadow-sm">
+                  <GlobeIcon size={20} className="text-[var(--text-muted)]" />
                 </div>
                 <div>
                   <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.companyOrgChart")}</h2>
@@ -2190,8 +2190,8 @@ export default function ManagementPage() {
               </button>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-sm">
-                    <ShieldIcon size={20} className="text-violet-400" />
+                  <div className="w-11 h-11 rounded-2xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shadow-sm">
+                    <ShieldIcon size={20} className="text-[var(--text-muted)]" />
                   </div>
                   <div>
                     <h2 className="text-[20px] font-bold text-[var(--text-primary)] tracking-tight">{t("mgmt.rolesPerms")}</h2>
@@ -2213,8 +2213,8 @@ export default function ManagementPage() {
                   {roles.map((role) => (
                     <div key={role.id} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden hover:border-[var(--border-strong)] transition-all">
                       <div className="flex items-center gap-3.5 px-4 py-3.5 group">
-                        <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/15 flex items-center justify-center shrink-0">
-                          <ShieldIcon size={16} className="text-violet-400" />
+                        <div className="w-10 h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center shrink-0">
+                          <ShieldIcon size={16} className="text-[var(--text-muted)]" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-[15px] font-semibold text-[var(--text-primary)]">{role.name}</div>
@@ -2273,7 +2273,7 @@ export default function ManagementPage() {
                     <h2 className="text-[20px] font-bold text-[var(--text-primary)] truncate tracking-tight">{dn(selectedDept.name)}</h2>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {(() => {
-                        const head = getDepartmentHead(positions, assignments, contacts);
+                        const head = getDepartmentHead(positions, assignments, people);
                         return head ? <span className="text-[12px] text-[var(--text-muted)]">{head.name} — {posTitle(head.title, t)}</span> : null;
                       })()}
                       {selectedDept.description && <span className="text-[12px] text-[var(--text-dim)] italic">{selectedDept.description}</span>}
@@ -2426,7 +2426,7 @@ export default function ManagementPage() {
                           ) : (
                             <div className="divide-y divide-[var(--border-faint)]">
                               {posAssignments.map((a) => {
-                                const ctc = contactMap.get(a.contact_id);
+                                const ctc = personMap.get(a.person_id);
                                 return (
                                   <div key={a.id} className="flex items-center gap-3 px-4 py-2.5 group/row hover:bg-[var(--bg-surface-subtle)] transition-colors">
                                     <div className="cursor-pointer" onClick={(e) => { e.stopPropagation(); if (ctc) openEmployeeProfile(ctc.id); }}>
@@ -2497,18 +2497,18 @@ export default function ManagementPage() {
             position={editPos} departmentId={selectedDeptId} allPositions={positions} roles={roles} onSaved={handlePosSaved} t={t} />
           <AssignmentModal open={showAssignModal} onClose={() => setShowAssignModal(false)}
             assignment={editAssign} positionId={assignPosId} departmentId={selectedDeptId}
-            contacts={contacts} onSaved={handleAssignSaved} onContactCreated={handleContactCreated} t={t} />
+            people={people} onSaved={handleAssignSaved} onPersonCreated={handlePersonCreated} t={t} />
         </>
       )}
 
       <TransferModal open={showTransferModal} onClose={() => setShowTransferModal(false)}
-        assignment={transferAssignment} contactName={transferContactName}
+        assignment={transferAssignment} personName={transferPersonName}
         departments={departments} onSaved={handleTransferSaved} t={t} />
 
       <RoleModal open={showRoleModal} onClose={() => setShowRoleModal(false)} role={editRole} onSaved={handleRoleSaved} t={t} />
 
       <PositionDetailModal open={showPosDetail} onClose={() => setShowPosDetail(false)}
-        position={detailPos} contacts={contacts} t={t} />
+        position={detailPos} people={people} t={t} />
 
       <DeleteModal open={showDeleteModal} target={deleteTarget} departments={departments}
         onClose={() => { setShowDeleteModal(false); setDeleteTarget(null); }}

@@ -411,6 +411,9 @@ export type CustomerLevel = "silver" | "gold" | "platinum" | "diamond";
 export type CompanyType = "koleex" | "customer" | "supplier" | "partner";
 export type RoleScope = "internal" | "customer" | "all";
 export type EmploymentStatus = "active" | "on_leave" | "terminated" | "inactive";
+export type EmploymentType = "full_time" | "part_time" | "contract" | "intern" | "freelance";
+export type WorkLocation = "office" | "remote" | "hybrid";
+export type DataScope = "own" | "department" | "all";
 
 /* Re-export the AccountPreferences type from the access-control catalog so
    supabase types and UI types stay in sync. */
@@ -514,12 +517,132 @@ export interface EmployeeRow {
   visa_number: string | null;
   visa_expiry_date: string | null;
 
+  // Employment type & contract (added in management system migration)
+  employment_type: EmploymentType;
+  contract_end_date: string | null;
+  probation_end_date: string | null;
+  work_location: WorkLocation;
+
+  // Bank account
+  bank_name: string | null;
+  bank_account_holder: string | null;
+  bank_account_number: string | null;
+  bank_iban: string | null;
+  bank_swift: string | null;
+  bank_currency: string | null;
+
+  // Additional personal
+  number_of_children: number | null;
+  gender: string | null;
+
   created_at: string;
   updated_at: string;
 }
 
 export type EmployeeInsert = Omit<EmployeeRow, "id" | "created_at" | "updated_at">;
 export type EmployeeUpdate = Partial<EmployeeInsert>;
+
+/* ── Management System (org structure, positions, assignments) ── */
+
+export interface DepartmentRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  icon_type: string;
+  icon_value: string | null;
+  parent_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DepartmentInsert = Omit<DepartmentRow, "id" | "created_at" | "updated_at">;
+export type DepartmentUpdate = Partial<DepartmentInsert>;
+
+export interface PositionRow {
+  id: string;
+  title: string;
+  department_id: string;
+  reports_to_position_id: string | null;
+  level: number;
+  description: string | null;
+  role_id: string | null;
+  responsibilities: string | null;
+  requirements: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PositionInsert = Omit<PositionRow, "id" | "created_at" | "updated_at">;
+export type PositionUpdate = Partial<PositionInsert>;
+
+export interface AssignmentRow {
+  id: string;
+  person_id: string;
+  position_id: string;
+  department_id: string;
+  is_primary: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AssignmentInsert = Omit<AssignmentRow, "id" | "created_at" | "updated_at">;
+export type AssignmentUpdate = Partial<AssignmentInsert>;
+
+export interface OrgRoleRow {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrgRoleInsert = Omit<OrgRoleRow, "id" | "created_at" | "updated_at">;
+export type OrgRoleUpdate = Partial<OrgRoleInsert>;
+
+export interface OrgPermissionRow {
+  id: string;
+  role_id: string;
+  module_name: string;
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  data_scope: DataScope;
+  sensitive_fields: string[];
+}
+
+export type OrgPermissionInsert = Omit<OrgPermissionRow, "id">;
+export type OrgPermissionUpdate = Partial<OrgPermissionInsert>;
+
+export interface PositionHistoryRow {
+  id: string;
+  position_id: string | null;
+  person_id: string | null;
+  department_id: string | null;
+  action: string;
+  from_position_id: string | null;
+  to_position_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+/* ── Employee with all linked data (convenience type) ── */
+export interface EmployeeWithLinks {
+  person: PersonRow;
+  employee: EmployeeRow;
+  account: AccountRow | null;
+  assignment: AssignmentRow | null;
+  department: DepartmentRow | null;
+  position: PositionRow | null;
+}
 
 /* ── Accounts (login identity only) ── */
 export interface AccountRow {

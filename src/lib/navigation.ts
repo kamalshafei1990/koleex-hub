@@ -151,13 +151,13 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "projects",         tKey: "app.projects",         name: "Projects",          icon: ProjectsIcon,  route: "/projects",         active: false },
 
   /* ── Knowledge ── */
-  { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: false },
+  { id: "knowledge",        tKey: "app.knowledge",        name: "Knowledge",         icon: KnowledgeIcon, route: "/knowledge",        active: true  },
   { id: "database",         tKey: "app.database",         name: "Database",          icon: DatabaseIcon,  route: "/database",         active: false },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: AiFaceIcon,  route: "/ai",               active: false },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
-  { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: false },
+  { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: false },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
