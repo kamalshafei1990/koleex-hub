@@ -116,6 +116,9 @@ interface FetchOpportunitiesOptions {
   ownerAccountId?: string | null;
   /** Restrict to a single stage. */
   stageId?: string | null;
+  /** Restrict to a single contact — used by the Customer detail
+   *  pipeline block to show all deals for one customer. */
+  contactId?: string | null;
   /** Free-text search across name / company / contact / email. */
   search?: string | null;
   /** Maximum rows. Defaults to 500 (the kanban handles fewer than that
@@ -142,6 +145,7 @@ export async function fetchOpportunities(
     includeArchived = false,
     ownerAccountId = null,
     stageId = null,
+    contactId = null,
     search = null,
     limit = 500,
   } = options;
@@ -155,6 +159,7 @@ export async function fetchOpportunities(
   if (!includeArchived) q = q.is("archived_at", null);
   if (ownerAccountId) q = q.eq("owner_account_id", ownerAccountId);
   if (stageId) q = q.eq("stage_id", stageId);
+  if (contactId) q = q.eq("contact_id", contactId);
   if (search && search.trim().length > 0) {
     const s = `%${search.trim()}%`;
     q = q.or(

@@ -85,6 +85,8 @@ import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
   type ContactRow,
 } from "@/lib/contacts-admin";
+import { fetchOpportunities } from "@/lib/crm";
+import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
@@ -1581,6 +1583,210 @@ const TagEditor = React.memo(function TagEditor({
   );
 });
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Customer Pipeline Block — shows CRM opportunities for a given contact.
+   Rendered in the Commercial tab of the Customer detail view. Each row
+   deep-links to /crm?opportunity=<id> so the full deal is one click away.
+   ───────────────────────────────────────────────────────────────────────── */
+const CustomerPipelineBlock = React.memo(function CustomerPipelineBlock({
+  contactId,
+  translate,
+}: {
+  contactId: string;
+  translate: (key: string, fallback: string) => string;
+}) {
+  const t = translate;
+  const [opps, setOpps] = useState<CrmOpportunityWithRelations[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      const rows = await fetchOpportunities({ contactId, includeArchived: true });
+      if (!cancelled) {
+        setOpps(rows);
+        setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [contactId]);
+
+  const { open, won, lost, pipelineValue, weightedValue, lastWonAt } = useMemo(() => {
+    let open = 0, won = 0, lost = 0;
+    let pipelineValue = 0, weightedValue = 0;
+    let lastWonAt: string | null = null;
+    for (const o of opps) {
+      if (o.won_at) {
+        won += 1;
+        if (!lastWonAt || o.won_at > lastWonAt) lastWonAt = o.won_at;
+      } else if (o.lost_at) {
+        lost += 1;
+      } else if (!o.archived_at) {
+        open += 1;
+        pipelineValue += o.expected_revenue || 0;
+        weightedValue += (o.expected_revenue || 0) * (o.probability || 0) / 100;
+      }
+    }
+    return { open, won, lost, pipelineValue, weightedValue, lastWonAt };
+  }, [opps]);
+
+  const fmt = (n: number) => {
+    if (!n) return "$0";
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
+    return `$${Math.round(n).toLocaleString()}`;
+  };
+
+  const relDate = (iso: string | null) => {
+    if (!iso) return null;
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return null;
+    const diff = Math.round((then - Date.now()) / 86_400_000);
+    if (diff < 0) return { label: `${Math.abs(diff)}d overdue`, tone: "overdue" as const };
+    if (diff === 0) return { label: t("pipeline.today", "today"), tone: "soon" as const };
+    if (diff <= 7) return { label: `${diff}d`, tone: "soon" as const };
+    return { label: `${diff}d`, tone: "neutral" as const };
+  };
+
+  /* Split for display: open first, then last 3 won/lost for history. */
+  const openOpps = opps.filter(o => !o.won_at && !o.lost_at && !o.archived_at);
+  const closedOpps = opps.filter(o => o.won_at || o.lost_at).slice(0, 3);
+
+  return (
+    <div className="border-b border-[var(--border-color)] px-4 md:px-6 py-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--text-dim)]"><TrendingUpIcon size={14} /></span>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+            {t("section.pipeline", "Pipeline")}
+          </h3>
+        </div>
+        <Link
+          href={`/crm?contact=${contactId}`}
+          className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1"
+        >
+          {t("pipeline.openInCrm", "Open in CRM")} <ExternalLinkIcon size={10} />
+        </Link>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2.5">
+          <div className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("pipeline.open", "Open")}</div>
+          <div className="text-lg font-semibold text-[var(--text-primary)] mt-0.5">{open}</div>
+        </div>
+        <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2.5">
+          <div className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("pipeline.pipelineValue", "Pipeline")}</div>
+          <div className="text-lg font-semibold text-[var(--text-primary)] mt-0.5">{fmt(pipelineValue)}</div>
+          {weightedValue > 0 && (
+            <div className="text-[10px] text-[var(--text-faint)] mt-0.5">
+              {fmt(weightedValue)} {t("pipeline.weighted", "weighted")}
+            </div>
+          )}
+        </div>
+        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5">
+          <div className="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider">{t("pipeline.won", "Won")}</div>
+          <div className="text-lg font-semibold text-emerald-400 mt-0.5">{won}</div>
+          {lastWonAt && (
+            <div className="text-[10px] text-emerald-400/70 mt-0.5">
+              {new Date(lastWonAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+            </div>
+          )}
+        </div>
+        <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2.5">
+          <div className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("pipeline.lost", "Lost")}</div>
+          <div className="text-lg font-semibold text-[var(--text-primary)] mt-0.5">{lost}</div>
+        </div>
+      </div>
+
+      {/* Open opportunities list */}
+      {loading ? (
+        <div className="text-[11px] text-[var(--text-faint)] py-4 text-center">{t("pipeline.loading", "Loading…")}</div>
+      ) : openOpps.length === 0 && closedOpps.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--border-color)] px-4 py-6 text-center">
+          <div className="text-sm text-[var(--text-subtle)] mb-2">{t("pipeline.empty", "No deals yet")}</div>
+          <Link
+            href={`/crm?contact=${contactId}&new=1`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-xs font-medium hover:opacity-90"
+          >
+            <PlusIcon size={12} /> {t("pipeline.newDeal", "New deal")}
+          </Link>
+        </div>
+      ) : (
+        <>
+          {openOpps.length > 0 && (
+            <div className="space-y-1.5 mb-3">
+              {openOpps.map(o => {
+                const due = relDate(o.expected_close_date);
+                return (
+                  <Link
+                    key={o.id}
+                    href={`/crm?opportunity=${o.id}`}
+                    className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                  >
+                    {/* Stage chip */}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-surface-hover)] text-[var(--text-subtle)] shrink-0 max-w-[100px] truncate">
+                      {o.stage?.name || "—"}
+                    </span>
+                    {/* Name + owner */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-[var(--text-primary)] truncate">{o.name}</div>
+                      {o.owner && (
+                        <div className="text-[11px] text-[var(--text-faint)] truncate">
+                          {o.owner.full_name || o.owner.username}
+                        </div>
+                      )}
+                    </div>
+                    {/* Revenue + date */}
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-semibold text-[var(--text-primary)]">{fmt(o.expected_revenue || 0)}</div>
+                      {due && (
+                        <div className={`text-[11px] ${
+                          due.tone === "overdue" ? "text-red-400"
+                          : due.tone === "soon" ? "text-amber-400"
+                          : "text-[var(--text-faint)]"
+                        }`}>
+                          {due.label}
+                        </div>
+                      )}
+                    </div>
+                    <ExternalLinkIcon size={12} className="text-[var(--text-ghost)] group-hover:text-[var(--text-subtle)] shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {closedOpps.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
+                {t("pipeline.recent", "Recent")}
+              </div>
+              <div className="space-y-1">
+                {closedOpps.map(o => (
+                  <Link
+                    key={o.id}
+                    href={`/crm?opportunity=${o.id}`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[var(--bg-surface-hover)] transition-colors"
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${o.won_at ? "bg-emerald-400" : "bg-[var(--text-ghost)]"}`} />
+                    <div className="flex-1 min-w-0 text-xs text-[var(--text-subtle)] truncate">{o.name}</div>
+                    <span className="text-[11px] text-[var(--text-faint)] shrink-0">{fmt(o.expected_revenue || 0)}</span>
+                    <span className={`text-[10px] font-medium shrink-0 ${o.won_at ? "text-emerald-400" : "text-[var(--text-dim)]"}`}>
+                      {o.won_at ? t("pipeline.wonLabel", "Won") : t("pipeline.lostLabel", "Lost")}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+});
+
 /* ── Birthday Picker (DD/MM/YYYY) ── */
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -1937,6 +2143,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, []);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
+
+  /* ── Deep link handler: /customers?selected=<contactId> auto-opens the detail view.
+        This is how the CRM (and any other app) can hand off to us. ── */
+  useEffect(() => {
+    if (loading || contacts.length === 0) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const selected = params.get("selected");
+    if (!selected) return;
+    const match = contacts.find(c => c.id === selected);
+    if (!match) return;
+    setSelectedId(match.id);
+    setView("detail");
+    setMobileShowDetail(true);
+    /* Strip the param so a reload doesn't lock the user into this contact. */
+    const url = new URL(window.location.href);
+    url.searchParams.delete("selected");
+    window.history.replaceState({}, "", url.toString());
+  }, [loading, contacts]);
 
   /* ── Debounced search for performance ── */
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -3940,6 +4165,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         {/* ═══════════════════════════════════════════════════════════════════
              PREMIUM CUSTOMER DETAIL SECTIONS
              ═══════════════════════════════════════════════════════════════════ */}
+
+        {/* ── Pipeline (CRM deals for this customer — Commercial tab) ── */}
+        {isCustomerDetail && detailTab("commercial") && (
+          <CustomerPipelineBlock contactId={c.id} translate={(k, f) => t(k, f)} />
+        )}
 
         {/* ── Commercial Profile (Commercial tab) ── */}
         {isCustomerDetail && detailTab("commercial") && (c.market_band || c.commercial_role || c.territory || c.assigned_branch || c.exclusivity || c.sales_rep || c.backup_account_manager || c.source_details || c.referred_by || c.customer_level_review_date) && (

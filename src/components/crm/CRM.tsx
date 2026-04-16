@@ -216,6 +216,36 @@ export default function CRM() {
     void reload();
   }, [reload]);
 
+  /* ── Deep-link handlers ───────────────────────────────────────────────
+       /crm?opportunity=<id>   → open the full edit modal for that deal
+       /crm?new=1              → open a blank create-new modal
+       /crm?contact=<id>       → filter the list to one customer's deals
+     Once consumed, the param is stripped from the URL so a reload
+     doesn't re-trigger it. */
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const oppId = params.get("opportunity");
+    const wantNew = params.get("new");
+    const contactId = params.get("contact");
+    if (oppId) {
+      setEditingId(oppId);
+    } else if (wantNew === "1") {
+      setEditingId("new");
+    } else if (contactId) {
+      const match = opps.find((o) => o.contact_id === contactId);
+      setSearch(match?.company_name || match?.contact_name || "");
+    }
+    if (oppId || wantNew || contactId) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("opportunity");
+      url.searchParams.delete("new");
+      url.searchParams.delete("contact");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [loading, opps]);
+
   /* Filtered list — applies search + my-only + stage + priority. */
   const filteredOpps = useMemo(() => {
     return opps.filter((o) => {
@@ -2043,6 +2073,19 @@ function OpportunityModal({
                   t={t}
                 />
               </div>
+
+              {/* When a contact is linked, offer a quick deep link
+                  back to the full Customer detail panel. */}
+              {contactId && (
+                <div className="flex items-center justify-end -mt-1">
+                  <Link
+                    href={`/customers?selected=${contactId}`}
+                    className="inline-flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  >
+                    {t("form.viewCustomer")} →
+                  </Link>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label={t("form.email")}>
