@@ -316,6 +316,65 @@ export async function fetchOpportunity(
   return list.find((o) => o.id === id) ?? null;
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   Lifecycle sync: CRM → Contacts
+   --------------------------------------------------------------------
+   When a deal closes Won, reflect that on the linked customer record
+   so the Customers app doesn't drift out of sync with reality. We:
+     · promote `contact_type` from "company" (prospect) → "customer",
+       idempotent for already-flagged customers
+     · stamp `last_order_date` = today so the customer profile shows
+       recency without another query
+   Suppliers and employees are never promoted — those paths are
+   deliberate. Failures are logged but never thrown: this one-way
+   sync must not block the primary CRM write.
+   ──────────────────────────────────────────────────────────────────── */
+
+async function reflectWinOnContact(
+  contactId: string | null | undefined,
+): Promise<void> {
+  if (!contactId) return;
+  const { data: contact, error: cErr } = await supabase
+    .from("contacts")
+    .select("id, contact_type")
+    .eq("id", contactId)
+    .single();
+  if (cErr || !contact) return;
+  if (
+    contact.contact_type === "employee" ||
+    contact.contact_type === "supplier"
+  ) {
+    return;
+  }
+  const patch: Record<string, unknown> = {
+    last_order_date: new Date().toISOString().slice(0, 10),
+  };
+  if (contact.contact_type !== "customer") {
+    patch.contact_type = "customer";
+  }
+  const { error: uErr } = await supabase
+    .from("contacts")
+    .update(patch)
+    .eq("id", contactId);
+  if (uErr) {
+    console.error("[CRM→Contacts] Lifecycle sync:", uErr.message);
+  }
+}
+
+/** True when the given stage id is flagged `is_won`. Used by the
+ *  opportunity mutation helpers to decide whether to fan out a
+ *  lifecycle sync. */
+async function isWonStageId(stageId: string | null | undefined): Promise<boolean> {
+  if (!stageId) return false;
+  const { data, error } = await supabase
+    .from(STAGES)
+    .select("is_won")
+    .eq("id", stageId)
+    .single();
+  if (error) return false;
+  return Boolean(data?.is_won);
+}
+
 export async function createOpportunity(
   input: CrmOpportunityInsert,
 ): Promise<
@@ -331,7 +390,14 @@ export async function createOpportunity(
     console.error("[CRM] Create opportunity:", error.message);
     return { ok: false, error: error.message };
   }
-  return { ok: true, opportunity: data as CrmOpportunityRow };
+  const opp = data as CrmOpportunityRow;
+  // Rare but possible: a deal is created directly in a Won stage
+  // (backfill, import, etc). Sync so we don't leak a prospect that's
+  // actually a customer.
+  if (await isWonStageId(opp.stage_id)) {
+    await reflectWinOnContact(opp.contact_id);
+  }
+  return { ok: true, opportunity: opp };
 }
 
 export async function updateOpportunity(
@@ -342,6 +408,17 @@ export async function updateOpportunity(
   if (error) {
     console.error("[CRM] Update opportunity:", error.message);
     return false;
+  }
+  // If the edit touched the stage and landed in Won, mirror onto the
+  // contact. Reads the row fresh so we pick up the *current* contact
+  // even if the patch reassigned it in the same call.
+  if (patch.stage_id && (await isWonStageId(patch.stage_id))) {
+    const { data: opp } = await supabase
+      .from(OPPS)
+      .select("contact_id")
+      .eq("id", id)
+      .single();
+    await reflectWinOnContact(opp?.contact_id);
   }
   return true;
 }
@@ -368,6 +445,15 @@ export async function moveOpportunityToStage(input: {
   if (error) {
     console.error("[CRM] Move opportunity:", error.message);
     return false;
+  }
+  // Primary kanban / detail-view write path for moving into Won.
+  if (input.isWonStage) {
+    const { data: opp } = await supabase
+      .from(OPPS)
+      .select("contact_id")
+      .eq("id", input.opportunityId)
+      .single();
+    await reflectWinOnContact(opp?.contact_id);
   }
   return true;
 }
