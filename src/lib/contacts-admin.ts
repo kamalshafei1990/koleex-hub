@@ -66,6 +66,93 @@ export interface ContactRow {
   incoterms: string | null;
   /* Documents */
   attachments: { name: string; url: string; type: string; uploaded_at: string }[];
+  /* ── Commercial Profile (Customer Premium) ── */
+  market_band: string | null;
+  commercial_role: string | null;
+  territory: string | null;
+  exclusivity: string | null;
+  exclusivity_scope: string | null;
+  exclusivity_expiry: string | null;
+  backup_account_manager: string | null;
+  assigned_branch: string | null;
+  source_details: string | null;
+  referred_by: string | null;
+  customer_level_assigned_date: string | null;
+  customer_level_review_date: string | null;
+  sales_rep: string | null;
+  /* ── Credit Management (Customer Premium) ── */
+  credit_rating_internal: string | null;
+  credit_rating_external: string | null;
+  credit_limit_approved_by: string | null;
+  credit_limit_approved_date: string | null;
+  overdue_balance: string | null;
+  days_sales_outstanding: string | null;
+  credit_insurance_covered: boolean;
+  credit_insurance_provider: string | null;
+  credit_insurance_coverage: string | null;
+  preferred_payment_method: string | null;
+  max_discount_allowed: string | null;
+  price_list_tier: string | null;
+  special_pricing_agreement: boolean;
+  contract_pricing_expiry: string | null;
+  commission_rate: string | null;
+  /* ── KYC & Compliance ── */
+  kyc_status: string | null;
+  kyc_verified_date: string | null;
+  kyc_verified_by: string | null;
+  kyc_review_due_date: string | null;
+  risk_score: string | null;
+  sanctions_check_status: string | null;
+  sanctions_check_date: string | null;
+  pep_status: boolean;
+  high_risk_country: boolean;
+  aml_status: string | null;
+  business_registration_number: string | null;
+  registration_country: string | null;
+  registration_date: string | null;
+  year_established: string | null;
+  company_type: string | null;
+  trading_name: string | null;
+  employee_count_range: string | null;
+  annual_revenue_range: string | null;
+  /* ── International Trade IDs ── */
+  eori_number: string | null;
+  duns_number: string | null;
+  importer_exporter_code: string | null;
+  customs_code: string | null;
+  gst_number: string | null;
+  cr_number: string | null;
+  /* ── Messaging IDs ── */
+  whatsapp_business: string | null;
+  wechat_id: string | null;
+  telegram_id: string | null;
+  line_id: string | null;
+  skype_id: string | null;
+  /* ── Segmentation extras ── */
+  sub_industry: string | null;
+  buying_behavior: string | null;
+  price_sensitivity: string | null;
+  quality_sensitivity: string | null;
+  customer_health_score: string | null;
+  nps_score: string | null;
+  churn_risk: string | null;
+  vip_status: boolean;
+  strategic_account: boolean;
+  relationship_stage: string | null;
+  support_tier: string | null;
+  /* ── Trade & Shipping extras ── */
+  port_of_entry: string | null;
+  preferred_carriers: string[];
+  customs_broker: string | null;
+  freight_forwarder: string | null;
+  shipping_marks: string | null;
+  container_preference: string | null;
+  certifications_required: string[];
+  labeling_requirements: string | null;
+  hs_codes: string[];
+  /* ── Notes & audit extras ── */
+  internal_notes: string | null;
+  flags: string[];
   /* Supplier-Specific */
   supplier_type: string | null;
   product_categories: string[];

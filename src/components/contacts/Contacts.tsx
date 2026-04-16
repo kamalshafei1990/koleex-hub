@@ -36,7 +36,7 @@ import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import GemIcon from "@/components/icons/ui/GemIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import CreditCardIcon from "@/components/icons/ui/CreditCardIcon";
-import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+
 import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import TrendingUpIcon from "@/components/icons/ui/TrendingUpIcon";
 import MapPinnedIcon from "@/components/icons/ui/MapPinnedIcon";
@@ -80,7 +80,7 @@ import HelpCircleIcon from "@/components/icons/ui/HelpCircleIcon";
 import ContactsIcon from "@/components/icons/ContactsIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
-import EmployeesIcon from "@/components/icons/EmployeesIcon";
+
 import {
   checkContactsSetup, fetchContacts, createContact, updateContact, deleteContact,
   type ContactRow,
@@ -93,7 +93,7 @@ import { contactsT } from "@/lib/translations/contacts";
    TYPES
    ═══════════════════════════════════════════════════════════════════════════ */
 
-type ContactType = "customer" | "supplier" | "company" | "people" | "employee";
+type ContactType = "customer" | "supplier" | "company" | "people";
 type CustomerTier = "end_user" | "silver" | "gold" | "platinum" | "diamond";
 type ViewMode = "list" | "detail" | "form";
 
@@ -189,6 +189,93 @@ interface ContactForm {
   incoterms: string;
   /* ── Documents ── */
   attachments: Attachment[];
+  /* ── Commercial Profile (Customer Premium) ── */
+  market_band: string;
+  commercial_role: string;
+  territory: string;
+  exclusivity: string;
+  exclusivity_scope: string;
+  exclusivity_expiry: string;
+  backup_account_manager: string;
+  assigned_branch: string;
+  source_details: string;
+  referred_by: string;
+  customer_level_assigned_date: string;
+  customer_level_review_date: string;
+  sales_rep: string;
+  /* ── Credit Management (Customer Premium) ── */
+  credit_rating_internal: string;
+  credit_rating_external: string;
+  credit_limit_approved_by: string;
+  credit_limit_approved_date: string;
+  overdue_balance: string;
+  days_sales_outstanding: string;
+  credit_insurance_covered: boolean;
+  credit_insurance_provider: string;
+  credit_insurance_coverage: string;
+  preferred_payment_method: string;
+  max_discount_allowed: string;
+  price_list_tier: string;
+  special_pricing_agreement: boolean;
+  contract_pricing_expiry: string;
+  commission_rate: string;
+  /* ── KYC & Compliance ── */
+  kyc_status: string;
+  kyc_verified_date: string;
+  kyc_verified_by: string;
+  kyc_review_due_date: string;
+  risk_score: string;
+  sanctions_check_status: string;
+  sanctions_check_date: string;
+  pep_status: boolean;
+  high_risk_country: boolean;
+  aml_status: string;
+  business_registration_number: string;
+  registration_country: string;
+  registration_date: string;
+  year_established: string;
+  company_type: string;
+  trading_name: string;
+  employee_count_range: string;
+  annual_revenue_range: string;
+  /* ── International Trade IDs ── */
+  eori_number: string;
+  duns_number: string;
+  importer_exporter_code: string;
+  customs_code: string;
+  gst_number: string;
+  cr_number: string;
+  /* ── Messaging IDs ── */
+  whatsapp_business: string;
+  wechat_id: string;
+  telegram_id: string;
+  line_id: string;
+  skype_id: string;
+  /* ── Segmentation extras ── */
+  sub_industry: string;
+  buying_behavior: string;
+  price_sensitivity: string;
+  quality_sensitivity: string;
+  customer_health_score: string;
+  nps_score: string;
+  churn_risk: string;
+  vip_status: boolean;
+  strategic_account: boolean;
+  relationship_stage: string;
+  support_tier: string;
+  /* ── Trade & Shipping extras ── */
+  port_of_entry: string;
+  preferred_carriers: string[];
+  customs_broker: string;
+  freight_forwarder: string;
+  shipping_marks: string;
+  container_preference: string;
+  certifications_required: string[];
+  labeling_requirements: string;
+  hs_codes: string[];
+  /* ── Notes & audit extras ── */
+  internal_notes: string;
+  flags: string[];
   /* ── Supplier-Specific ── */
   supplier_type: string;
   product_categories: string[];
@@ -264,7 +351,6 @@ const CONTACT_TYPES: { value: ContactType; label: string; icon: React.ReactNode;
   { value: "customer", label: "Customer", icon: <CrownIcon size={16} />, color: "text-amber-400" },
   { value: "supplier", label: "Supplier", icon: <Building2Icon size={16} />, color: "text-blue-400" },
   { value: "company", label: "Company", icon: <BriefcaseIcon size={16} />, color: "text-purple-400" },
-  { value: "employee", label: "Employee", icon: <BadgeCheckIcon size={16} />, color: "text-teal-400" },
   { value: "people", label: "People", icon: <UserIcon size={16} />, color: "text-green-400" },
 ];
 
@@ -337,6 +423,45 @@ const COUNTRIES_WITH_STATES = new Set([
   "NZ", "KE", "TZ", "ET", "GH",
 ]);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CUSTOMER PREMIUM CONSTANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Customer tab identifiers for the premium tabbed form/detail layout */
+type CustomerTab = "overview" | "commercial" | "financial" | "compliance" | "trade" | "activity";
+
+const CUSTOMER_TABS: { id: CustomerTab; label: string; icon: React.ReactNode }[] = [
+  { id: "overview",   label: "Overview",   icon: <UserIcon size={14} /> },
+  { id: "commercial", label: "Commercial", icon: <BriefcaseIcon size={14} /> },
+  { id: "financial",  label: "Financial",  icon: <DollarSignIcon size={14} /> },
+  { id: "compliance", label: "Compliance", icon: <ShieldCheckIcon size={14} /> },
+  { id: "trade",      label: "Trade",      icon: <ShipIcon size={14} /> },
+  { id: "activity",   label: "Activity",   icon: <ClockIcon size={14} /> },
+];
+
+const MARKET_BANDS = ["A", "B", "C", "D"];
+const COMMERCIAL_ROLES = ["Importer", "Distributor", "Wholesaler", "Retailer", "End User", "Agent", "Reseller"];
+const EXCLUSIVITY_LEVELS = ["None", "Non-Exclusive", "Exclusive"];
+const EXCLUSIVITY_SCOPES = ["Country", "Region", "Product Line", "Full Territory"];
+const COMPANY_TYPES = ["LLC", "Ltd", "Corp", "GmbH", "S.A.", "Sole Proprietorship", "Partnership", "Branch", "Other"];
+const EMPLOYEE_COUNT_RANGES = ["1–10", "11–50", "51–200", "201–500", "501–1,000", "1,001–5,000", "5,000+"];
+const ANNUAL_REVENUE_RANGES = ["<$1M", "$1M–$10M", "$10M–$50M", "$50M–$100M", "$100M–$500M", "$500M–$1B", "$1B+"];
+
+const KYC_STATUSES = ["Pending", "Verified", "Flagged", "Expired"];
+const SANCTIONS_STATUSES = ["Clear", "Flagged", "Pending"];
+const CREDIT_RATING_INTERNAL = ["A", "B", "C", "D"];
+
+const PREFERRED_PAYMENT_METHODS = ["Wire Transfer", "LC (Letter of Credit)", "Documentary Collection", "Check", "Credit Card", "Cash", "Cryptocurrency"];
+const PRICE_LIST_TIERS = ["Diamond", "Platinum", "Gold", "Silver", "End User", "Custom"];
+
+const BUYING_BEHAVIORS = ["Frequent", "Seasonal", "Project-based", "One-time"];
+const SENSITIVITY_LEVELS = ["Low", "Medium", "High"];
+const CHURN_RISK_LEVELS = ["Low", "Medium", "High"];
+const RELATIONSHIP_STAGES = ["Prospect", "Lead", "Active", "Dormant", "Churned", "Won-back"];
+const SUPPORT_TIERS = ["Basic", "Standard", "Premium", "Enterprise"];
+
+const CONTAINER_PREFERENCES = ["20ft", "40ft", "40HQ", "LCL", "FCL"];
+
 const EMPTY_FORM: ContactForm = {
   contact_type: "customer",
   entity_type: "",
@@ -391,6 +516,93 @@ const EMPTY_FORM: ContactForm = {
   incoterms: "",
   /* Documents */
   attachments: [],
+  /* Commercial Profile */
+  market_band: "",
+  commercial_role: "",
+  territory: "",
+  exclusivity: "",
+  exclusivity_scope: "",
+  exclusivity_expiry: "",
+  backup_account_manager: "",
+  assigned_branch: "",
+  source_details: "",
+  referred_by: "",
+  customer_level_assigned_date: "",
+  customer_level_review_date: "",
+  sales_rep: "",
+  /* Credit Management */
+  credit_rating_internal: "",
+  credit_rating_external: "",
+  credit_limit_approved_by: "",
+  credit_limit_approved_date: "",
+  overdue_balance: "",
+  days_sales_outstanding: "",
+  credit_insurance_covered: false,
+  credit_insurance_provider: "",
+  credit_insurance_coverage: "",
+  preferred_payment_method: "",
+  max_discount_allowed: "",
+  price_list_tier: "",
+  special_pricing_agreement: false,
+  contract_pricing_expiry: "",
+  commission_rate: "",
+  /* KYC & Compliance */
+  kyc_status: "",
+  kyc_verified_date: "",
+  kyc_verified_by: "",
+  kyc_review_due_date: "",
+  risk_score: "",
+  sanctions_check_status: "",
+  sanctions_check_date: "",
+  pep_status: false,
+  high_risk_country: false,
+  aml_status: "",
+  business_registration_number: "",
+  registration_country: "",
+  registration_date: "",
+  year_established: "",
+  company_type: "",
+  trading_name: "",
+  employee_count_range: "",
+  annual_revenue_range: "",
+  /* International Trade IDs */
+  eori_number: "",
+  duns_number: "",
+  importer_exporter_code: "",
+  customs_code: "",
+  gst_number: "",
+  cr_number: "",
+  /* Messaging IDs */
+  whatsapp_business: "",
+  wechat_id: "",
+  telegram_id: "",
+  line_id: "",
+  skype_id: "",
+  /* Segmentation extras */
+  sub_industry: "",
+  buying_behavior: "",
+  price_sensitivity: "",
+  quality_sensitivity: "",
+  customer_health_score: "",
+  nps_score: "",
+  churn_risk: "",
+  vip_status: false,
+  strategic_account: false,
+  relationship_stage: "",
+  support_tier: "",
+  /* Trade & Shipping extras */
+  port_of_entry: "",
+  preferred_carriers: [],
+  customs_broker: "",
+  freight_forwarder: "",
+  shipping_marks: "",
+  container_preference: "",
+  certifications_required: [],
+  labeling_requirements: "",
+  hs_codes: [],
+  /* Notes & audit extras */
+  internal_notes: "",
+  flags: [],
   /* Supplier-Specific */
   supplier_type: "",
   product_categories: [],
@@ -764,6 +976,93 @@ function contactToForm(c: ContactRow): ContactForm {
     incoterms: c.incoterms || "",
     /* Documents */
     attachments: Array.isArray(c.attachments) ? c.attachments : [],
+    /* Commercial Profile */
+    market_band: c.market_band || "",
+    commercial_role: c.commercial_role || "",
+    territory: c.territory || "",
+    exclusivity: c.exclusivity || "",
+    exclusivity_scope: c.exclusivity_scope || "",
+    exclusivity_expiry: c.exclusivity_expiry || "",
+    backup_account_manager: c.backup_account_manager || "",
+    assigned_branch: c.assigned_branch || "",
+    source_details: c.source_details || "",
+    referred_by: c.referred_by || "",
+    customer_level_assigned_date: c.customer_level_assigned_date || "",
+    customer_level_review_date: c.customer_level_review_date || "",
+    sales_rep: c.sales_rep || "",
+    /* Credit Management */
+    credit_rating_internal: c.credit_rating_internal || "",
+    credit_rating_external: c.credit_rating_external || "",
+    credit_limit_approved_by: c.credit_limit_approved_by || "",
+    credit_limit_approved_date: c.credit_limit_approved_date || "",
+    overdue_balance: c.overdue_balance || "",
+    days_sales_outstanding: c.days_sales_outstanding || "",
+    credit_insurance_covered: c.credit_insurance_covered ?? false,
+    credit_insurance_provider: c.credit_insurance_provider || "",
+    credit_insurance_coverage: c.credit_insurance_coverage || "",
+    preferred_payment_method: c.preferred_payment_method || "",
+    max_discount_allowed: c.max_discount_allowed || "",
+    price_list_tier: c.price_list_tier || "",
+    special_pricing_agreement: c.special_pricing_agreement ?? false,
+    contract_pricing_expiry: c.contract_pricing_expiry || "",
+    commission_rate: c.commission_rate || "",
+    /* KYC & Compliance */
+    kyc_status: c.kyc_status || "",
+    kyc_verified_date: c.kyc_verified_date || "",
+    kyc_verified_by: c.kyc_verified_by || "",
+    kyc_review_due_date: c.kyc_review_due_date || "",
+    risk_score: c.risk_score || "",
+    sanctions_check_status: c.sanctions_check_status || "",
+    sanctions_check_date: c.sanctions_check_date || "",
+    pep_status: c.pep_status ?? false,
+    high_risk_country: c.high_risk_country ?? false,
+    aml_status: c.aml_status || "",
+    business_registration_number: c.business_registration_number || "",
+    registration_country: c.registration_country || "",
+    registration_date: c.registration_date || "",
+    year_established: c.year_established || "",
+    company_type: c.company_type || "",
+    trading_name: c.trading_name || "",
+    employee_count_range: c.employee_count_range || "",
+    annual_revenue_range: c.annual_revenue_range || "",
+    /* International Trade IDs */
+    eori_number: c.eori_number || "",
+    duns_number: c.duns_number || "",
+    importer_exporter_code: c.importer_exporter_code || "",
+    customs_code: c.customs_code || "",
+    gst_number: c.gst_number || "",
+    cr_number: c.cr_number || "",
+    /* Messaging IDs */
+    whatsapp_business: c.whatsapp_business || "",
+    wechat_id: c.wechat_id || "",
+    telegram_id: c.telegram_id || "",
+    line_id: c.line_id || "",
+    skype_id: c.skype_id || "",
+    /* Segmentation extras */
+    sub_industry: c.sub_industry || "",
+    buying_behavior: c.buying_behavior || "",
+    price_sensitivity: c.price_sensitivity || "",
+    quality_sensitivity: c.quality_sensitivity || "",
+    customer_health_score: c.customer_health_score || "",
+    nps_score: c.nps_score || "",
+    churn_risk: c.churn_risk || "",
+    vip_status: c.vip_status ?? false,
+    strategic_account: c.strategic_account ?? false,
+    relationship_stage: c.relationship_stage || "",
+    support_tier: c.support_tier || "",
+    /* Trade & Shipping extras */
+    port_of_entry: c.port_of_entry || "",
+    preferred_carriers: Array.isArray(c.preferred_carriers) ? c.preferred_carriers : [],
+    customs_broker: c.customs_broker || "",
+    freight_forwarder: c.freight_forwarder || "",
+    shipping_marks: c.shipping_marks || "",
+    container_preference: c.container_preference || "",
+    certifications_required: Array.isArray(c.certifications_required) ? c.certifications_required : [],
+    labeling_requirements: c.labeling_requirements || "",
+    hs_codes: Array.isArray(c.hs_codes) ? c.hs_codes : [],
+    /* Notes & audit extras */
+    internal_notes: c.internal_notes || "",
+    flags: Array.isArray(c.flags) ? c.flags : [],
     /* Supplier-Specific */
     supplier_type: c.supplier_type || "",
     product_categories: Array.isArray(c.product_categories) ? c.product_categories : [],
@@ -894,6 +1193,93 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     incoterms: f.incoterms || null,
     /* Documents */
     attachments: f.attachments.length > 0 ? f.attachments : null,
+    /* Commercial Profile */
+    market_band: f.market_band || null,
+    commercial_role: f.commercial_role || null,
+    territory: f.territory || null,
+    exclusivity: f.exclusivity || null,
+    exclusivity_scope: f.exclusivity_scope || null,
+    exclusivity_expiry: f.exclusivity_expiry || null,
+    backup_account_manager: f.backup_account_manager || null,
+    assigned_branch: f.assigned_branch || null,
+    source_details: f.source_details || null,
+    referred_by: f.referred_by || null,
+    customer_level_assigned_date: f.customer_level_assigned_date || null,
+    customer_level_review_date: f.customer_level_review_date || null,
+    sales_rep: f.sales_rep || null,
+    /* Credit Management */
+    credit_rating_internal: f.credit_rating_internal || null,
+    credit_rating_external: f.credit_rating_external || null,
+    credit_limit_approved_by: f.credit_limit_approved_by || null,
+    credit_limit_approved_date: f.credit_limit_approved_date || null,
+    overdue_balance: f.overdue_balance || null,
+    days_sales_outstanding: f.days_sales_outstanding || null,
+    credit_insurance_covered: f.credit_insurance_covered,
+    credit_insurance_provider: f.credit_insurance_provider || null,
+    credit_insurance_coverage: f.credit_insurance_coverage || null,
+    preferred_payment_method: f.preferred_payment_method || null,
+    max_discount_allowed: f.max_discount_allowed || null,
+    price_list_tier: f.price_list_tier || null,
+    special_pricing_agreement: f.special_pricing_agreement,
+    contract_pricing_expiry: f.contract_pricing_expiry || null,
+    commission_rate: f.commission_rate || null,
+    /* KYC & Compliance */
+    kyc_status: f.kyc_status || null,
+    kyc_verified_date: f.kyc_verified_date || null,
+    kyc_verified_by: f.kyc_verified_by || null,
+    kyc_review_due_date: f.kyc_review_due_date || null,
+    risk_score: f.risk_score || null,
+    sanctions_check_status: f.sanctions_check_status || null,
+    sanctions_check_date: f.sanctions_check_date || null,
+    pep_status: f.pep_status,
+    high_risk_country: f.high_risk_country,
+    aml_status: f.aml_status || null,
+    business_registration_number: f.business_registration_number || null,
+    registration_country: f.registration_country || null,
+    registration_date: f.registration_date || null,
+    year_established: f.year_established || null,
+    company_type: f.company_type || null,
+    trading_name: f.trading_name || null,
+    employee_count_range: f.employee_count_range || null,
+    annual_revenue_range: f.annual_revenue_range || null,
+    /* International Trade IDs */
+    eori_number: f.eori_number || null,
+    duns_number: f.duns_number || null,
+    importer_exporter_code: f.importer_exporter_code || null,
+    customs_code: f.customs_code || null,
+    gst_number: f.gst_number || null,
+    cr_number: f.cr_number || null,
+    /* Messaging IDs */
+    whatsapp_business: f.whatsapp_business || null,
+    wechat_id: f.wechat_id || null,
+    telegram_id: f.telegram_id || null,
+    line_id: f.line_id || null,
+    skype_id: f.skype_id || null,
+    /* Segmentation extras */
+    sub_industry: f.sub_industry || null,
+    buying_behavior: f.buying_behavior || null,
+    price_sensitivity: f.price_sensitivity || null,
+    quality_sensitivity: f.quality_sensitivity || null,
+    customer_health_score: f.customer_health_score || null,
+    nps_score: f.nps_score || null,
+    churn_risk: f.churn_risk || null,
+    vip_status: f.vip_status,
+    strategic_account: f.strategic_account,
+    relationship_stage: f.relationship_stage || null,
+    support_tier: f.support_tier || null,
+    /* Trade & Shipping extras */
+    port_of_entry: f.port_of_entry || null,
+    preferred_carriers: f.preferred_carriers.length > 0 ? f.preferred_carriers : null,
+    customs_broker: f.customs_broker || null,
+    freight_forwarder: f.freight_forwarder || null,
+    shipping_marks: f.shipping_marks || null,
+    container_preference: f.container_preference || null,
+    certifications_required: f.certifications_required.length > 0 ? f.certifications_required : null,
+    labeling_requirements: f.labeling_requirements || null,
+    hs_codes: f.hs_codes.length > 0 ? f.hs_codes : null,
+    /* Notes & audit extras */
+    internal_notes: f.internal_notes || null,
+    flags: f.flags.length > 0 ? f.flags : null,
     /* Supplier-Specific */
     supplier_type: f.supplier_type || null,
     product_categories: f.product_categories.length > 0 ? f.product_categories : null,
@@ -1067,6 +1453,130 @@ const FormSection = React.memo(function FormSection({ title, icon, children }: {
         <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
       </div>
       {children}
+    </div>
+  );
+});
+
+/* ── Customer Tab Bar — premium sticky tabs for Customer form & detail ── */
+const CustomerTabBar = React.memo(function CustomerTabBar({
+  activeTab,
+  onChange,
+  translate,
+}: {
+  activeTab: CustomerTab;
+  onChange: (tab: CustomerTab) => void;
+  translate?: (key: string, fallback: string) => string;
+}) {
+  const t = translate ?? ((_k: string, f: string) => f);
+  return (
+    <div className="sticky top-[56px] md:top-[64px] z-20 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-3 md:px-6 py-2.5">
+        {CUSTOMER_TABS.map(tab => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onChange(tab.id)}
+              className={`flex items-center gap-1.5 px-3 md:px-3.5 py-1.5 rounded-full text-xs md:text-[13px] font-medium transition-all whitespace-nowrap shrink-0 ${
+                active
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-sm"
+                  : "text-[var(--text-subtle)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+              }`}
+            >
+              <span className={active ? "text-[var(--text-inverted)]" : "text-[var(--text-faint)]"}>{tab.icon}</span>
+              <span>{t(`customerTab.${tab.id}`, tab.label)}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+/* ── Toggle switch — premium on/off switch used across Compliance/KYC booleans ── */
+const ToggleSwitch = React.memo(function ToggleSwitch({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-focus)] transition-colors text-left"
+    >
+      <div className="min-w-0">
+        <div className="text-sm text-[var(--text-primary)]">{label}</div>
+        {hint && <div className="text-[11px] text-[var(--text-faint)] mt-0.5">{hint}</div>}
+      </div>
+      <div
+        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+          checked ? "bg-emerald-500/70" : "bg-[var(--bg-surface-active)]"
+        }`}
+      >
+        <div
+          className={`absolute top-0.5 start-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+            checked ? "translate-x-4 rtl:-translate-x-4" : ""
+          }`}
+        />
+      </div>
+    </button>
+  );
+});
+
+/* ── Tag Editor — reusable chip input used for hs_codes, preferred_carriers, certifications_required, flags ── */
+const TagEditor = React.memo(function TagEditor({
+  label,
+  values,
+  onChange,
+  placeholder,
+  icon,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  icon?: React.ReactNode;
+}) {
+  const inputId = React.useMemo(() => `tag-editor-${Math.random().toString(36).slice(2, 9)}`, []);
+  return (
+    <div>
+      <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {values.map((v, i) => (
+          <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+            {v}
+            <button onClick={() => onChange(values.filter((_, idx) => idx !== i))} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+              <CrossIcon size={10} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="relative">
+        {icon && <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none">{icon}</span>}
+        <input
+          id={inputId}
+          placeholder={placeholder || "Press Enter to add"}
+          className={`w-full h-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] ${icon ? "ps-9 pe-3" : "px-3"}`}
+          onKeyDown={e => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const el = e.target as HTMLInputElement;
+              const val = el.value.trim();
+              if (val && !values.includes(val)) {
+                onChange([...values, val]);
+                el.value = "";
+              }
+            }
+          }}
+        />
+      </div>
     </div>
   );
 });
@@ -1408,6 +1918,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [rlsCopied, setRlsCopied] = useState(false);
+  /* Customer premium tab — used by both form and detail views for customers */
+  const [customerTab, setCustomerTab] = useState<CustomerTab>("overview");
+  /* Reset to overview whenever the form/detail opens for a different customer */
+  useEffect(() => {
+    if (view === "form" || view === "detail") setCustomerTab("overview");
+  }, [view, editingId, selectedId]);
 
   /* ── Load ── */
   const loadContacts = useCallback(async () => {
@@ -1415,7 +1931,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const ok = await checkContactsSetup();
     if (!ok) { setSetupNeeded(true); setLoading(false); return; }
     const data = await fetchContacts();
-    setContacts(data);
+    // Exclude employees — they are managed via the Employees app now
+    setContacts(data.filter(c => c.contact_type !== "employee"));
     setLoading(false);
   }, []);
 
@@ -1814,10 +2331,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
           </Link>
           <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-            {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : filterType === "employee" ? <EmployeesIcon size={16} /> : <ContactsIcon size={16} />}
+            {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : <ContactsIcon size={16} />}
           </div>
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
-            {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : filterType === "employee" ? t("tab.employees") : t("tab.customers")) : t("title")}
+            {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
           </h1>
           <button
             onClick={() => {
@@ -1871,7 +2388,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                     typeTab === ct.value ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "text-[var(--text-faint)] hover:text-[var(--text-muted)]"
                   }`}
                 >
-                  {ct.icon} {ct.value === "company" ? t("tab.companies") : ct.value === "people" ? t("tab.people") : ct.value === "supplier" ? t("tab.suppliers") : ct.value === "employee" ? t("tab.employees") : t("tab.customers")} ({count})
+                  {ct.icon} {ct.value === "company" ? t("tab.companies") : ct.value === "people" ? t("tab.people") : ct.value === "supplier" ? t("tab.suppliers") : t("tab.customers")} ({count})
                 </button>
               );
             })}
@@ -2295,11 +2812,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         );
       }
 
-      /* ── Generic KPI Dashboard (Employee / Company / People) ── */
+      /* ── Generic KPI Dashboard (Company / People) ── */
       if (filterType && moduleKpis) {
         const typeLabel = t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1));
-        const typeIcon = filterType === "employee" ? <BadgeCheckIcon size={16} className="text-teal-400" /> : filterType === "company" ? <BriefcaseIcon size={16} className="text-purple-400" /> : <UserIcon size={16} className="text-green-400" />;
-        const accentColor = filterType === "employee" ? "teal" : filterType === "company" ? "purple" : "green";
+        const typeIcon = filterType === "company" ? <BriefcaseIcon size={16} className="text-purple-400" /> : <UserIcon size={16} className="text-green-400" />;
+        const accentColor = filterType === "company" ? "purple" : "green";
         return (
           <div className="h-full overflow-y-auto">
             <div className="w-full px-4 md:px-6 py-6 md:py-8 space-y-4 md:space-y-6">
@@ -2392,6 +2909,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const related: RelatedName[] = Array.isArray(c.related_names) ? c.related_names : [];
     const customs: CustomField[] = Array.isArray(c.custom_fields) ? c.custom_fields : [];
 
+    /* Customer detail tabs — non-customer types ignore the tab state entirely. */
+    const isCustomerDetail = c.contact_type === "customer" && !!c.entity_type;
+    const detailTab = (tab: CustomerTab) => !isCustomerDetail || customerTab === tab;
+
     const backLabel = filterType ? t("type." + filterType, filterType.charAt(0).toUpperCase() + filterType.slice(1)) + " " + t("kpi.overview") : t("title");
 
     return (
@@ -2416,11 +2937,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">{contactDisplayName(c)}</h2>
           {c.contact_type === "supplier" && c.company_name_cn && <p className="text-sm text-[var(--text-faint)] mt-0.5">{c.company_name_cn}</p>}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-[var(--text-subtle)] mt-1">{c.position}</p>}
-          {c.contact_type === "employee" && (c.job_position || c.department) && (
-            <p className="text-sm text-[var(--text-faint)]">{[c.job_position, c.department].filter(Boolean).join(" \u00B7 ")}</p>
-          )}
-          {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-[var(--text-faint)]">{c.company}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && c.position && <p className="text-sm text-[var(--text-subtle)] mt-1">{c.position}</p>}
+          {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && c.company && <p className="text-sm text-[var(--text-faint)]">{c.company}</p>}
 
           <div className="flex items-center justify-center gap-2 mt-3">
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border border-[var(--border-color)] ${getTypeColor(c.contact_type)}`}>
@@ -2452,8 +2970,76 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         </div>
 
+        {/* Premium tabs (Customer only) */}
+        {isCustomerDetail && (
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} />
+        )}
+
+        {/* Customer Hero Strip — quick badges for tier, KYC, VIP, Strategic, Flags */}
+        {isCustomerDetail && (c.market_band || c.commercial_role || c.kyc_status || c.sanctions_check_status || c.vip_status || c.strategic_account || c.pep_status || c.high_risk_country) && (
+          <div className="px-4 md:px-6 py-3 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {c.market_band && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[11px] font-medium border border-blue-500/20">
+                  <TargetIcon size={10} /> {t("field.marketBand", "Band")} {c.market_band}
+                </span>
+              )}
+              {c.commercial_role && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[11px] font-medium border border-[var(--border-color)]">
+                  <HandCoinsIcon size={10} /> {c.commercial_role}
+                </span>
+              )}
+              {c.kyc_status && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                  c.kyc_status === "Verified" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : c.kyc_status === "Flagged" ? "bg-red-500/10 text-red-400 border-red-500/20"
+                  : c.kyc_status === "Expired" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  : "bg-[var(--bg-surface)] text-[var(--text-secondary)] border-[var(--border-color)]"
+                }`}>
+                  <ShieldCheckIcon size={10} /> KYC: {c.kyc_status}
+                </span>
+              )}
+              {c.sanctions_check_status === "Clear" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
+                  <ShieldCheckIcon size={10} /> {t("field.sanctionsClear", "Sanctions Clear")}
+                </span>
+              )}
+              {c.sanctions_check_status === "Flagged" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[11px] font-medium border border-red-500/20">
+                  <ShieldExclamationIcon size={10} /> {t("field.sanctionsFlagged", "Sanctions Flagged")}
+                </span>
+              )}
+              {c.vip_status && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[11px] font-medium border border-violet-500/20">
+                  <GemIcon size={10} /> VIP
+                </span>
+              )}
+              {c.strategic_account && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20">
+                  <StarIcon size={10} /> {t("field.strategic", "Strategic")}
+                </span>
+              )}
+              {c.pep_status && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 text-[11px] font-medium border border-orange-500/20">
+                  <TriangleWarningIcon size={10} /> PEP
+                </span>
+              )}
+              {c.high_risk_country && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 text-[11px] font-medium border border-red-500/20">
+                  <TriangleWarningIcon size={10} /> {t("field.highRiskShort", "High-Risk")}
+                </span>
+              )}
+              {Array.isArray(c.flags) && c.flags.map((fl: string, i: number) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[11px] font-medium border border-[var(--border-color)]">
+                  <TriangleWarningIcon size={10} /> {fl}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Phone numbers (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && (phones.length > 0 || c.phone) && (
+        {c.contact_type !== "supplier" && detailTab("overview") && (phones.length > 0 || c.phone) && (
           <Section title={t("detail.phone")} icon={<PhoneIcon size={14} />}>
             {phones.map((p, i) => (
               <div key={i} className="flex items-center justify-between py-1.5">
@@ -2470,7 +3056,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Emails (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && (emails.length > 0 || c.email) && (
+        {c.contact_type !== "supplier" && detailTab("overview") && (emails.length > 0 || c.email) && (
           <Section title={t("detail.email")} icon={<EnvelopeIcon size={14} />}>
             {emails.map((e, i) => (
               <div key={i} className="py-1.5">
@@ -2485,7 +3071,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Addresses (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && addresses.length > 0 && (
+        {c.contact_type !== "supplier" && detailTab("overview") && addresses.length > 0 && (
           <Section title={t("detail.address")} icon={<MapPinIcon size={14} />}>
             {addresses.map((a, i) => (
               <div key={i} className="py-1.5">
@@ -2499,7 +3085,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Country / Province / City (hidden for suppliers - shown in Contact Details) */}
-        {c.contact_type !== "supplier" && (c.country || c.province || c.city) && (
+        {c.contact_type !== "supplier" && detailTab("overview") && (c.country || c.province || c.city) && (
           <Section title={t("section.location")} icon={<MapPinIcon size={14} />}>
             <div className="flex items-center gap-2">
               {c.country_code && <span className="text-base">{countryCodeToFlag(c.country_code)}</span>}
@@ -2511,7 +3097,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Websites (hidden for suppliers) */}
-        {c.contact_type !== "supplier" && (websitesList.length > 0 || c.website) && (
+        {c.contact_type !== "supplier" && detailTab("overview") && (websitesList.length > 0 || c.website) && (
           <Section title={t("detail.website")} icon={<GlobeIcon size={14} />}>
             {websitesList.map((w, i) => (
               <div key={i} className="py-1.5">
@@ -2525,15 +3111,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
-        {c.contact_type !== "supplier" && c.contact_type !== "company" && c.contact_type !== "employee" && !(c.contact_type === "customer" && c.entity_type === "company") && c.birthday && (
+        {/* Birthday (hidden for suppliers, company customers, company type) */}
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && detailTab("overview") && c.birthday && (
           <Section title={t("section.birthday")} icon={<CalendarRawIcon size={14} />}>
             <p className="text-sm text-[var(--text-primary)]">{new Date(c.birthday).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </Section>
         )}
 
         {/* Social Profiles (hidden for company customers) */}
-        {!(c.contact_type === "customer" && c.entity_type === "company") && socials.length > 0 && (
+        {!(c.contact_type === "customer" && c.entity_type === "company") && detailTab("overview") && socials.length > 0 && (
           <Section title={t("section.socialProfiles")} icon={<Share2Icon size={14} />}>
             {socials.map((s, i) => (
               <div key={i} className="flex items-center gap-3 py-2">
@@ -2550,7 +3136,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Related People (hidden for suppliers, company customers, and company type) */}
-        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && family.length > 0 && (
+        {c.contact_type !== "supplier" && c.contact_type !== "company" && !(c.contact_type === "customer" && c.entity_type === "company") && detailTab("activity") && family.length > 0 && (
           <Section title={t("section.relatedPeople")} icon={<UsersIcon size={14} />}>
             {family.map((f, i) => (
               <div key={i} className="py-2 border-b border-[var(--border-faint)] last:border-0">
@@ -2574,8 +3160,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Business Card (customers only) */}
-        {c.contact_type === "customer" && (c.business_card_front || c.business_card_back) && (
+        {/* Business Card (customers only — Overview tab) */}
+        {c.contact_type === "customer" && detailTab("overview") && (c.business_card_front || c.business_card_back) && (
           <Section title={t("section.businessCard")} icon={<CreditCardIcon size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               {c.business_card_front && (
@@ -2594,8 +3180,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Company Customer: Company Info ── */}
-        {c.contact_type === "customer" && c.entity_type === "company" && (c.company || c.industry || c.tax_id) && (
+        {/* ── Company Customer: Company Info (Overview tab) ── */}
+        {c.contact_type === "customer" && c.entity_type === "company" && detailTab("overview") && (c.company || c.industry || c.tax_id) && (
           <Section title={t("section.companyInfo")} icon={<Building2Icon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.company && (
@@ -2620,8 +3206,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Company Customer: Contact Persons ── */}
-        {c.contact_type === "customer" && c.entity_type === "company" && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
+        {/* ── Company Customer: Contact Persons (Activity tab) ── */}
+        {c.contact_type === "customer" && c.entity_type === "company" && detailTab("activity") && Array.isArray(c.contact_persons) && c.contact_persons.length > 0 && (
           <Section title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
             <div className="space-y-2">
               {c.contact_persons.map((cp: { name: string; position: string; department: string; phone: string; mobile: string; email: string; notes: string }, i: number) => (
@@ -2722,8 +3308,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Financial & Business (customer only) ── */}
-        {c.contact_type === "customer" && (c.total_revenue || c.outstanding_balance || c.credit_limit || c.payment_terms || c.currency || c.last_order_date) && (
+        {/* ── Financial & Business (customer only — Financial tab) ── */}
+        {c.contact_type === "customer" && detailTab("financial") && (c.total_revenue || c.outstanding_balance || c.credit_limit || c.payment_terms || c.currency || c.last_order_date) && (
           <Section title={t("section.financialBusiness")} icon={<DollarSignIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.total_revenue && (
@@ -2766,8 +3352,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Classification & Segmentation (customer only) ── */}
-        {c.contact_type === "customer" && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
+        {/* ── Classification & Segmentation (customer only — Commercial tab) ── */}
+        {c.contact_type === "customer" && detailTab("commercial") && (c.industry || c.source || (Array.isArray(c.tags) && c.tags.length > 0) || c.account_manager) && (
           <Section title={t("section.classification")} icon={<TagsIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.industry && (
@@ -2802,8 +3388,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Relationship & Activity ── */}
-        {c.contact_type === "customer" && (c.first_contact_date || c.last_contacted || c.follow_up_date || c.communication_preference || c.language) && (
+        {/* ── Relationship & Activity (Activity tab) ── */}
+        {c.contact_type === "customer" && detailTab("activity") && (c.first_contact_date || c.last_contacted || c.follow_up_date || c.communication_preference || c.language) && (
           <Section title={t("section.relationshipActivity")} icon={<ClockIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.first_contact_date && (
@@ -2840,8 +3426,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Trade-Specific (customer only) ── */}
-        {c.contact_type === "customer" && (c.preferred_shipping || c.tax_id || c.incoterms || (Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0)) && (
+        {/* ── Trade-Specific (customer only — Trade tab) ── */}
+        {c.contact_type === "customer" && detailTab("trade") && (c.preferred_shipping || c.tax_id || c.incoterms || (Array.isArray(c.shipping_addresses) && c.shipping_addresses.length > 0)) && (
           <Section title={t("section.tradeShipping")} icon={<ShipIcon size={14} />}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {c.preferred_shipping && (
@@ -2877,8 +3463,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* ── Attachments (hidden for suppliers) ── */}
-        {c.contact_type !== "supplier" && Array.isArray(c.attachments) && c.attachments.length > 0 && (
+        {/* ── Attachments (hidden for suppliers — Compliance tab for customers) ── */}
+        {c.contact_type !== "supplier" && (c.contact_type !== "customer" || detailTab("compliance")) && Array.isArray(c.attachments) && c.attachments.length > 0 && (
           <Section title={t("section.documents")} icon={<PaperclipIcon size={14} />}>
             <div className="space-y-2">
               {c.attachments.map((a: Attachment, i: number) => (
@@ -3351,8 +3937,238 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </>
         )}
 
-        {/* Custom Fields */}
-        {customs.length > 0 && (
+        {/* ═══════════════════════════════════════════════════════════════════
+             PREMIUM CUSTOMER DETAIL SECTIONS
+             ═══════════════════════════════════════════════════════════════════ */}
+
+        {/* ── Commercial Profile (Commercial tab) ── */}
+        {isCustomerDetail && detailTab("commercial") && (c.market_band || c.commercial_role || c.territory || c.assigned_branch || c.exclusivity || c.sales_rep || c.backup_account_manager || c.source_details || c.referred_by || c.customer_level_review_date) && (
+          <Section title={t("section.commercialProfile", "Commercial Profile")} icon={<BriefcaseIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.market_band && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.marketBand", "Market Band")}</span><p className="text-sm text-[var(--text-primary)]">{c.market_band}</p></div>}
+              {c.commercial_role && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.commercialRole", "Commercial Role")}</span><p className="text-sm text-[var(--text-primary)]">{c.commercial_role}</p></div>}
+              {c.territory && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.territory", "Territory")}</span><p className="text-sm text-[var(--text-primary)]">{c.territory}</p></div>}
+              {c.assigned_branch && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.assignedBranch", "Assigned Branch")}</span><p className="text-sm text-[var(--text-primary)]">{c.assigned_branch}</p></div>}
+              {c.exclusivity && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.exclusivity", "Exclusivity")}</span><p className="text-sm text-[var(--text-primary)]">{c.exclusivity}{c.exclusivity_scope ? ` · ${c.exclusivity_scope}` : ""}</p></div>}
+              {c.exclusivity_expiry && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.exclusivityExpiry", "Exclusivity Expiry")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.exclusivity_expiry).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.sales_rep && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.salesRep", "Sales Rep")}</span><p className="text-sm text-[var(--text-primary)]">{c.sales_rep}</p></div>}
+              {c.backup_account_manager && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.backupAM", "Backup AM")}</span><p className="text-sm text-[var(--text-primary)]">{c.backup_account_manager}</p></div>}
+              {c.source_details && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.sourceDetails", "Source Details")}</span><p className="text-sm text-[var(--text-primary)]">{c.source_details}</p></div>}
+              {c.referred_by && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.referredBy", "Referred By")}</span><p className="text-sm text-[var(--text-primary)]">{c.referred_by}</p></div>}
+              {c.customer_level_review_date && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.levelReviewDate", "Level Review Due")}</span><p className={`text-sm font-medium ${new Date(c.customer_level_review_date) < new Date() ? "text-red-400" : "text-[var(--text-primary)]"}`}>{new Date(c.customer_level_review_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Pricing & Discounts (Commercial tab) ── */}
+        {isCustomerDetail && detailTab("commercial") && (c.price_list_tier || c.max_discount_allowed || c.commission_rate || c.special_pricing_agreement || c.contract_pricing_expiry) && (
+          <Section title={t("section.pricingDiscounts", "Pricing & Discounts")} icon={<HandCoinsIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.price_list_tier && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.priceListTier", "Price List")}</span><p className="text-sm text-[var(--text-primary)]">{c.price_list_tier}</p></div>}
+              {c.max_discount_allowed && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.maxDiscount", "Max Discount")}</span><p className="text-sm text-[var(--text-primary)]">{c.max_discount_allowed}%</p></div>}
+              {c.commission_rate && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.commissionRate", "Commission Rate")}</span><p className="text-sm text-[var(--text-primary)]">{c.commission_rate}%</p></div>}
+              {c.contract_pricing_expiry && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.contractPricingExpiry", "Contract Expires")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.contract_pricing_expiry).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.special_pricing_agreement && (
+                <div className="col-span-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[11px] font-medium border border-blue-500/20">
+                    <FileCheckIcon size={10} /> {t("field.specialPricingAgreement", "Special Pricing Agreement")}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Segmentation & Health (Commercial tab) ── */}
+        {isCustomerDetail && detailTab("commercial") && (c.sub_industry || c.buying_behavior || c.price_sensitivity || c.quality_sensitivity || c.relationship_stage || c.churn_risk || c.support_tier || c.customer_health_score || c.nps_score) && (
+          <Section title={t("section.segmentationHealth", "Segmentation & Health")} icon={<StarIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.sub_industry && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.subIndustry", "Sub Industry")}</span><p className="text-sm text-[var(--text-primary)]">{c.sub_industry}</p></div>}
+              {c.buying_behavior && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.buyingBehavior", "Buying Behavior")}</span><p className="text-sm text-[var(--text-primary)]">{c.buying_behavior}</p></div>}
+              {c.price_sensitivity && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.priceSensitivity", "Price Sensitivity")}</span><p className="text-sm text-[var(--text-primary)]">{c.price_sensitivity}</p></div>}
+              {c.quality_sensitivity && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.qualitySensitivity", "Quality Sensitivity")}</span><p className="text-sm text-[var(--text-primary)]">{c.quality_sensitivity}</p></div>}
+              {c.relationship_stage && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.relationshipStage", "Relationship Stage")}</span><p className="text-sm text-[var(--text-primary)]">{c.relationship_stage}</p></div>}
+              {c.churn_risk && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.churnRisk", "Churn Risk")}</span><p className={`text-sm font-medium ${c.churn_risk === "High" ? "text-red-400" : c.churn_risk === "Medium" ? "text-amber-400" : "text-emerald-400"}`}>{c.churn_risk}</p></div>}
+              {c.support_tier && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.supportTier", "Support Tier")}</span><p className="text-sm text-[var(--text-primary)]">{c.support_tier}</p></div>}
+              {c.customer_health_score && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.healthScore", "Health Score")}</span><p className="text-sm text-[var(--text-primary)]">{c.customer_health_score}/100</p></div>}
+              {c.nps_score && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.npsScore", "NPS Score")}</span><p className="text-sm text-[var(--text-primary)]">{c.nps_score}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Credit Management (Financial tab) ── */}
+        {isCustomerDetail && detailTab("financial") && (c.credit_rating_internal || c.credit_rating_external || c.credit_limit_approved_by || c.overdue_balance || c.days_sales_outstanding || c.preferred_payment_method) && (
+          <Section title={t("section.creditManagement", "Credit Management")} icon={<WalletIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.credit_rating_internal && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.creditRatingInternal", "Internal Rating")}</span><p className="text-sm text-[var(--text-primary)]">{c.credit_rating_internal}</p></div>}
+              {c.credit_rating_external && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.creditRatingExternal", "External Rating")}</span><p className="text-sm text-[var(--text-primary)]">{c.credit_rating_external}</p></div>}
+              {c.credit_limit_approved_by && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.creditApprovedBy", "Limit Approved By")}</span><p className="text-sm text-[var(--text-primary)]">{c.credit_limit_approved_by}</p></div>}
+              {c.credit_limit_approved_date && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.creditApprovedDate", "Approved Date")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.credit_limit_approved_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.overdue_balance && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.overdueBalance", "Overdue Balance")}</span><p className="text-sm text-amber-400 font-semibold">{c.currency || "USD"} {Number(c.overdue_balance).toLocaleString()}</p></div>}
+              {c.days_sales_outstanding && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.dso", "DSO")}</span><p className="text-sm text-[var(--text-primary)]">{c.days_sales_outstanding} {t("unit.days", "days")}</p></div>}
+              {c.preferred_payment_method && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.preferredPaymentMethod", "Preferred Payment")}</span><p className="text-sm text-[var(--text-primary)]">{c.preferred_payment_method}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Credit Insurance (Financial tab) ── */}
+        {isCustomerDetail && detailTab("financial") && c.credit_insurance_covered && (
+          <Section title={t("section.creditInsurance", "Credit Insurance")} icon={<ShieldCheckIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div className="col-span-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-medium border border-emerald-500/20">
+                  <ShieldCheckIcon size={10} /> {t("field.insuredReceivables", "Receivables Insured")}
+                </span>
+              </div>
+              {c.credit_insurance_provider && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.insuranceProvider", "Provider")}</span><p className="text-sm text-[var(--text-primary)]">{c.credit_insurance_provider}</p></div>}
+              {c.credit_insurance_coverage && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.insuranceCoverage", "Coverage")}</span><p className="text-sm text-[var(--text-primary)]">{c.currency || "USD"} {Number(c.credit_insurance_coverage).toLocaleString()}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Bank Accounts (Financial tab) ── */}
+        {isCustomerDetail && detailTab("financial") && Array.isArray(c.bank_accounts) && c.bank_accounts.length > 0 && (
+          <Section title={t("section.bankAccountInfo")} icon={<LandmarkIcon size={14} />}>
+            <div className="space-y-2">
+              {c.bank_accounts.map((b: { bank_name: string; account_name: string; account_number: string; swift_code: string; iban: string; branch: string; currency: string }, i: number) => (
+                <div key={i} className="p-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-sm text-[var(--text-primary)] font-medium">{b.bank_name}</p>
+                    {b.currency && <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase">{b.currency}</span>}
+                  </div>
+                  {b.account_name && <p className="text-xs text-[var(--text-faint)]">{b.account_name}</p>}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1.5 text-xs">
+                    {b.account_number && <div><span className="text-[var(--text-dim)]">A/C: </span><span className="text-[var(--text-primary)] font-mono">{b.account_number}</span></div>}
+                    {b.swift_code && <div><span className="text-[var(--text-dim)]">SWIFT: </span><span className="text-[var(--text-primary)] font-mono">{b.swift_code}</span></div>}
+                    {b.iban && <div className="col-span-2"><span className="text-[var(--text-dim)]">IBAN: </span><span className="text-[var(--text-primary)] font-mono">{b.iban}</span></div>}
+                    {b.branch && <div className="col-span-2"><span className="text-[var(--text-dim)]">{t("field.branch", "Branch")}: </span><span className="text-[var(--text-primary)]">{b.branch}</span></div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Legal Identity (Compliance tab) ── */}
+        {isCustomerDetail && detailTab("compliance") && (c.trading_name || c.company_type || c.business_registration_number || c.registration_country || c.year_established || c.employee_count_range || c.annual_revenue_range) && (
+          <Section title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.trading_name && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.tradingName", "Trading Name")}</span><p className="text-sm text-[var(--text-primary)]">{c.trading_name}</p></div>}
+              {c.company_type && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.companyType", "Company Type")}</span><p className="text-sm text-[var(--text-primary)]">{c.company_type}</p></div>}
+              {c.business_registration_number && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.businessRegNumber", "Business Reg #")}</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.business_registration_number}</p></div>}
+              {c.registration_country && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.registrationCountry", "Reg. Country")}</span><p className="text-sm text-[var(--text-primary)]">{c.registration_country}</p></div>}
+              {c.registration_date && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.registrationDate", "Reg. Date")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.registration_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.year_established && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.yearEstablished", "Established")}</span><p className="text-sm text-[var(--text-primary)]">{c.year_established}</p></div>}
+              {c.employee_count_range && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.employeeCountRange", "Employees")}</span><p className="text-sm text-[var(--text-primary)]">{c.employee_count_range}</p></div>}
+              {c.annual_revenue_range && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.annualRevenueRange", "Annual Revenue")}</span><p className="text-sm text-[var(--text-primary)]">{c.annual_revenue_range}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── International Trade IDs (Compliance tab) ── */}
+        {isCustomerDetail && detailTab("compliance") && (c.eori_number || c.duns_number || c.importer_exporter_code || c.customs_code || c.gst_number || c.cr_number) && (
+          <Section title={t("section.tradeIdentifiers", "International Trade IDs")} icon={<FileCheckIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.eori_number && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">EORI</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.eori_number}</p></div>}
+              {c.duns_number && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">D-U-N-S</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.duns_number}</p></div>}
+              {c.importer_exporter_code && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">IEC</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.importer_exporter_code}</p></div>}
+              {c.customs_code && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.customsCode", "Customs Code")}</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.customs_code}</p></div>}
+              {c.gst_number && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">GST/VAT</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.gst_number}</p></div>}
+              {c.cr_number && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">CR</span><p className="text-sm text-[var(--text-primary)] font-mono">{c.cr_number}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── KYC & Risk (Compliance tab) ── */}
+        {isCustomerDetail && detailTab("compliance") && (c.kyc_status || c.risk_score || c.kyc_verified_date || c.kyc_review_due_date || c.sanctions_check_status || c.aml_status) && (
+          <Section title={t("section.kycRisk", "KYC & Risk")} icon={<ShieldCheckIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.kyc_status && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.kycStatus", "KYC Status")}</span><p className={`text-sm font-medium ${c.kyc_status === "Verified" ? "text-emerald-400" : c.kyc_status === "Flagged" ? "text-red-400" : c.kyc_status === "Expired" ? "text-amber-400" : "text-[var(--text-primary)]"}`}>{c.kyc_status}</p></div>}
+              {c.risk_score && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.riskScore", "Risk Score")}</span><p className="text-sm text-[var(--text-primary)]">{c.risk_score}/100</p></div>}
+              {c.kyc_verified_date && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.kycVerifiedDate", "Verified On")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.kyc_verified_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.kyc_verified_by && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.kycVerifiedBy", "Verified By")}</span><p className="text-sm text-[var(--text-primary)]">{c.kyc_verified_by}</p></div>}
+              {c.kyc_review_due_date && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.kycReviewDueDate", "Next Review")}</span><p className={`text-sm font-medium ${new Date(c.kyc_review_due_date) < new Date() ? "text-red-400" : "text-[var(--text-primary)]"}`}>{new Date(c.kyc_review_due_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.sanctions_check_status && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.sanctionsCheckStatus", "Sanctions")}</span><p className={`text-sm font-medium ${c.sanctions_check_status === "Clear" ? "text-emerald-400" : c.sanctions_check_status === "Flagged" ? "text-red-400" : "text-amber-400"}`}>{c.sanctions_check_status}</p></div>}
+              {c.sanctions_check_date && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.sanctionsCheckDate", "Last Check")}</span><p className="text-sm text-[var(--text-primary)]">{new Date(c.sanctions_check_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p></div>}
+              {c.aml_status && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.amlStatus", "AML Status")}</span><p className="text-sm text-[var(--text-primary)]">{c.aml_status}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Logistics & Trade Ops (Trade tab) ── */}
+        {isCustomerDetail && detailTab("trade") && (c.port_of_entry || c.customs_broker || c.freight_forwarder || c.shipping_marks || c.container_preference || c.labeling_requirements) && (
+          <Section title={t("section.logisticsTrade", "Logistics & Trade Operations")} icon={<TruckIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.port_of_entry && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.portOfEntry", "Port of Entry")}</span><p className="text-sm text-[var(--text-primary)]">{c.port_of_entry}</p></div>}
+              {c.container_preference && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.containerPreference", "Container")}</span><p className="text-sm text-[var(--text-primary)]">{c.container_preference}</p></div>}
+              {c.customs_broker && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.customsBroker", "Customs Broker")}</span><p className="text-sm text-[var(--text-primary)]">{c.customs_broker}</p></div>}
+              {c.freight_forwarder && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.freightForwarder", "Freight Forwarder")}</span><p className="text-sm text-[var(--text-primary)]">{c.freight_forwarder}</p></div>}
+              {c.shipping_marks && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.shippingMarks", "Shipping Marks")}</span><p className="text-sm text-[var(--text-primary)]">{c.shipping_marks}</p></div>}
+              {c.labeling_requirements && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("field.labelingRequirements", "Labeling")}</span><p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{c.labeling_requirements}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Classification & Carriers (Trade tab) ── */}
+        {isCustomerDetail && detailTab("trade") && ((Array.isArray(c.hs_codes) && c.hs_codes.length > 0) || (Array.isArray(c.preferred_carriers) && c.preferred_carriers.length > 0) || (Array.isArray(c.certifications_required) && c.certifications_required.length > 0)) && (
+          <Section title={t("section.tradeCodes", "Classification & Carriers")} icon={<ClipboardCheckIcon size={14} />}>
+            <div className="space-y-3">
+              {Array.isArray(c.hs_codes) && c.hs_codes.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.hsCodes", "HS Codes")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.hs_codes.map((code: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)] font-mono">{code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Array.isArray(c.preferred_carriers) && c.preferred_carriers.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.preferredCarriers", "Preferred Carriers")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.preferred_carriers.map((car: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">{car}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Array.isArray(c.certifications_required) && c.certifications_required.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider block mb-1.5">{t("field.certificationsRequired", "Certifications Required")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.certifications_required.map((cert: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">{cert}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Messaging IDs (Activity tab) ── */}
+        {isCustomerDetail && detailTab("activity") && (c.whatsapp_business || c.wechat_id || c.telegram_id || c.line_id || c.skype_id) && (
+          <Section title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {c.whatsapp_business && <div className="col-span-2"><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">WhatsApp Business</span><p className="text-sm text-[var(--text-primary)]">{c.whatsapp_business}</p></div>}
+              {c.wechat_id && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">WeChat</span><p className="text-sm text-[var(--text-primary)]">{c.wechat_id}</p></div>}
+              {c.telegram_id && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Telegram</span><p className="text-sm text-[var(--text-primary)]">{c.telegram_id}</p></div>}
+              {c.line_id && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Line</span><p className="text-sm text-[var(--text-primary)]">{c.line_id}</p></div>}
+              {c.skype_id && <div><span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Skype</span><p className="text-sm text-[var(--text-primary)]">{c.skype_id}</p></div>}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Internal Notes (Activity tab) ── */}
+        {isCustomerDetail && detailTab("activity") && c.internal_notes && (
+          <Section title={t("section.internalNotes", "Internal Notes")} icon={<DocumentIcon size={14} />}>
+            <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.internal_notes}</p>
+          </Section>
+        )}
+
+        {/* Custom Fields (Activity tab for customers) */}
+        {(c.contact_type !== "customer" || detailTab("activity")) && customs.length > 0 && (
           <Section title={t("section.customFields")} icon={<DocumentIcon size={14} />}>
             {customs.map((cf, i) => (
               <div key={i} className="py-1.5">
@@ -3363,8 +4179,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </Section>
         )}
 
-        {/* Notes */}
-        {c.notes && (
+        {/* Notes (Activity tab for customers) */}
+        {(c.contact_type !== "customer" || detailTab("activity")) && c.notes && (
           <Section title={t("section.notes")} icon={<DocumentIcon size={14} />}>
             <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{c.notes}</p>
           </Section>
@@ -3402,7 +4218,10 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     const isCompanyCustomer = form.contact_type === "customer" && form.entity_type === "company";
     const isPersonCustomer = form.contact_type === "customer" && form.entity_type === "person";
     const isCompanyType = form.contact_type === "company";
-    const isEmployee = form.contact_type === "employee";
+
+    /* Customer premium tabs — for non-customers, every tab check returns true so existing behaviour is preserved.
+       For customers, only sections on the active tab are rendered. */
+    const showTab = (tab: CustomerTab) => !isCustomer || !form.entity_type || customerTab === tab;
 
     /* Determine if province dropdown should show — only for countries that commonly use states/provinces */
     const hasStates = !!form.country_code && COUNTRIES_WITH_STATES.has(form.country_code) && State.getStatesOfCountry(form.country_code).length > 0;
@@ -3539,8 +4358,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           )}
         </div>
 
+        {/* ── Customer Premium Tab Bar ── */}
+        {isCustomer && form.entity_type && (
+          <CustomerTabBar activeTab={customerTab} onChange={setCustomerTab} translate={(k, f) => t(k, f)} />
+        )}
+
         {/* Company Customer: Company Name section */}
-        {isCompanyCustomer && (
+        {isCompanyCustomer && customerTab === "overview" && (
         <FormSection title={t("section.companyName")} icon={<Building2Icon size={14} />}>
           <div className="space-y-3">
             <div>
@@ -3577,8 +4401,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Company Customer: Contact Persons */}
-        {isCompanyCustomer && (
+        {/* Company Customer: Contact Persons (Activity tab) */}
+        {isCompanyCustomer && showTab("activity") && (
         <FormSection title={t("section.contactPersons")} icon={<UsersIcon size={14} />}>
           <div className="space-y-3">
             {form.contact_persons.map((cp, i) => (
@@ -3728,7 +4552,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Basic Info (hidden for suppliers, company customers, and company type) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && (
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && showTab("overview") && (
         <FormSection title={t("section.basicInfo")} icon={<UserIcon size={14} />}>
           <div className="space-y-3">
             <SelectInput label={t("field.title")} value={form.title} onChange={v => setField("title", v)} options={TITLES} renderLabel={tOpt} selectLabel={t("detail.select")} />
@@ -3744,7 +4568,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Phones (hidden for suppliers and employees) */}
-        {form.contact_type !== "supplier" && !isEmployee && (
+        {form.contact_type !== "supplier" && showTab("overview") && (
         <FormSection title={t("section.phoneNumbers")} icon={<PhoneIcon size={14} />}>
           {form.phones.map((p, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3764,7 +4588,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Emails (hidden for suppliers and employees) */}
-        {form.contact_type !== "supplier" && !isEmployee && (
+        {form.contact_type !== "supplier" && showTab("overview") && (
         <FormSection title={t("section.emailAddresses")} icon={<EnvelopeIcon size={14} />}>
           {form.emails.map((e, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3784,7 +4608,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Addresses (hidden for suppliers and employees) */}
-        {form.contact_type !== "supplier" && !isEmployee && (
+        {form.contact_type !== "supplier" && showTab("overview") && (
         <FormSection title={t("section.addresses")} icon={<MapPinIcon size={14} />}>
           {form.addresses.map((a, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
@@ -3810,7 +4634,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Location (country/province/city cascade) - hidden for suppliers and employees */}
-        {form.contact_type !== "supplier" && !isEmployee && (
+        {form.contact_type !== "supplier" && showTab("overview") && (
         <FormSection title={t("section.location")} icon={<MapPinnedIcon size={14} />}>
           <div className="space-y-3">
             <CountryDropdown
@@ -3848,7 +4672,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Websites (hidden for suppliers and employees) */}
-        {form.contact_type !== "supplier" && !isEmployee && (
+        {form.contact_type !== "supplier" && showTab("overview") && (
         <FormSection title={t("section.websites")} icon={<GlobeIcon size={14} />}>
           {form.websites.map((w, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3868,14 +4692,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Birthday (hidden for suppliers, company customers, company type, and employees) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && showTab("overview") && (
         <FormSection title={t("section.birthday")} icon={<CalendarRawIcon size={14} />}>
           <BirthdayPicker value={form.birthday} onChange={v => setField("birthday", v)} dayLabel={t("field.day")} monthLabel={t("field.month")} yearLabel={t("field.year")} renderMonth={m => t("month." + m, m)} />
         </FormSection>
         )}
 
         {/* Social Profiles (hidden for suppliers, company customers, and employees) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isEmployee && (
+        {form.contact_type !== "supplier" && !isCompanyCustomer && showTab("overview") && (
         <FormSection title={t("section.socialProfiles")} icon={<Share2Icon size={14} />}>
           {form.social_profiles.map((s, i) => (
             <div key={i} className="mb-4 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
@@ -3913,7 +4737,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Related People (hidden for suppliers, company customers, company type, and employees) */}
-        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && !isEmployee && (
+        {form.contact_type !== "supplier" && !isCompanyCustomer && !isCompanyType && showTab("activity") && (
         <FormSection title={t("section.relatedPeople")} icon={<UsersIcon size={14} />}>
           {form.family_members.map((f, i) => (
             <div key={i} className="mb-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
@@ -3950,7 +4774,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Notes (shared — hidden for suppliers, they have their own at the end) */}
-        {form.contact_type !== "supplier" && (
+        {form.contact_type !== "supplier" && showTab("activity") && (
         <FormSection title={t("section.notes")} icon={<DocumentIcon size={14} />}>
           <textarea
             value={form.notes}
@@ -3963,7 +4787,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* Custom Fields (hidden for suppliers) */}
-        {form.contact_type !== "supplier" && (
+        {form.contact_type !== "supplier" && showTab("activity") && (
         <FormSection title={t("section.customFields")} icon={<HashtagIcon size={14} />}>
           {form.custom_fields.map((cf, i) => (
             <div key={i} className="flex items-center gap-2 mb-3">
@@ -3986,8 +4810,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </FormSection>
         )}
 
-        {/* Business Card (customers only) */}
-        {isCustomer && (
+        {/* Business Card (customers only — Overview tab) */}
+        {isCustomer && showTab("overview") && (
           <FormSection title={t("section.businessCard")} icon={<CreditCardIcon size={14} />}>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -4034,8 +4858,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Financial & Business (customer only) ── */}
-        {isCustomer && (
+        {/* ── Financial & Business (customer only — Financial tab) ── */}
+        {isCustomer && showTab("financial") && (
           <FormSection title={t("section.financialBusiness")} icon={<DollarSignIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -4060,8 +4884,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Classification & Segmentation (customer only) ── */}
-        {isCustomer && (
+        {/* ── Classification & Segmentation (customer only — Commercial tab) ── */}
+        {isCustomer && showTab("commercial") && (
           <FormSection title={t("section.classification")} icon={<TagsIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -4116,8 +4940,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Relationship & Activity (customer only) ── */}
-        {isCustomer && (
+        {/* ── Relationship & Activity (customer only — Activity tab) ── */}
+        {isCustomer && showTab("activity") && (
           <FormSection title={t("section.relationshipActivity")} icon={<ClockIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -4142,8 +4966,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Trade & Shipping (customer only) ── */}
-        {isCustomer && (
+        {/* ── Trade & Shipping (customer only — Trade tab) ── */}
+        {isCustomer && showTab("trade") && (
           <FormSection title={t("section.tradeShipping")} icon={<ShipIcon size={14} />}>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -4179,8 +5003,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </FormSection>
         )}
 
-        {/* ── Documents / Attachments (customer only) ── */}
-        {isCustomer && (
+        {/* ── Documents / Attachments (customer only — Compliance tab) ── */}
+        {isCustomer && showTab("compliance") && (
           <FormSection title={t("section.documentsAttachments")} icon={<PaperclipIcon size={14} />}>
             {form.attachments.map((a, i) => (
               <div key={i} className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-color)]">
@@ -4209,6 +5033,388 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                 }
               }} />
             </label>
+          </FormSection>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════
+             PREMIUM CUSTOMER SECTIONS — Phase 1
+             ════════════════════════════════════════════════════════════════════ */}
+
+        {/* ── Commercial Profile (customer only — Commercial tab) ── */}
+        {isCustomer && showTab("commercial") && (
+          <FormSection title={t("section.commercialProfile", "Commercial Profile")} icon={<BriefcaseIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.marketBand", "Market Band")} value={form.market_band} onChange={v => setField("market_band", v)} options={MARKET_BANDS} icon={<TargetIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.commercialRole", "Commercial Role")} value={form.commercial_role} onChange={v => setField("commercial_role", v)} options={COMMERCIAL_ROLES} icon={<HandCoinsIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.territory", "Territory")} value={form.territory} onChange={v => setField("territory", v)} placeholder="GCC / MENA / APAC" icon={<MapPinnedIcon size={14} />} />
+                <Input label={t("field.assignedBranch", "Assigned Branch")} value={form.assigned_branch} onChange={v => setField("assigned_branch", v)} placeholder={t("placeholder.branchName", "Branch name")} icon={<Building2Icon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.exclusivity", "Exclusivity")} value={form.exclusivity} onChange={v => setField("exclusivity", v)} options={EXCLUSIVITY_LEVELS} icon={<ShieldCheckIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.exclusivityScope", "Exclusivity Scope")} value={form.exclusivity_scope} onChange={v => setField("exclusivity_scope", v)} options={EXCLUSIVITY_SCOPES} icon={<MapPinIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.exclusivityExpiry", "Exclusivity Expiry")}</label>
+                <input type="date" value={form.exclusivity_expiry} onChange={e => setField("exclusivity_expiry", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.salesRep", "Sales Rep")} value={form.sales_rep} onChange={v => setField("sales_rep", v)} placeholder={t("field.name")} icon={<UserIcon size={14} />} />
+                <Input label={t("field.backupAM", "Backup Account Manager")} value={form.backup_account_manager} onChange={v => setField("backup_account_manager", v)} placeholder={t("field.name")} icon={<UserCogIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.sourceDetails", "Source Details")} value={form.source_details} onChange={v => setField("source_details", v)} placeholder={t("placeholder.sourceCampaign", "Campaign / event")} icon={<TargetIcon size={14} />} />
+                <Input label={t("field.referredBy", "Referred By")} value={form.referred_by} onChange={v => setField("referred_by", v)} placeholder={t("field.name")} icon={<UsersIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.levelAssignedDate", "Level Assigned")}</label>
+                  <input type="date" value={form.customer_level_assigned_date} onChange={e => setField("customer_level_assigned_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.levelReviewDate", "Level Review Due")}</label>
+                  <input type="date" value={form.customer_level_review_date} onChange={e => setField("customer_level_review_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Pricing & Discounts (customer only — Commercial tab) ── */}
+        {isCustomer && showTab("commercial") && (
+          <FormSection title={t("section.pricingDiscounts", "Pricing & Discounts")} icon={<HandCoinsIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.priceListTier", "Price List Tier")} value={form.price_list_tier} onChange={v => setField("price_list_tier", v)} options={PRICE_LIST_TIERS} icon={<TagsIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.maxDiscount", "Max Discount (%)")} value={form.max_discount_allowed} onChange={v => setField("max_discount_allowed", v)} placeholder="0.00" icon={<ReceiptIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.commissionRate", "Commission Rate (%)")} value={form.commission_rate} onChange={v => setField("commission_rate", v)} placeholder="0.00" icon={<DollarSignIcon size={14} />} />
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.contractPricingExpiry", "Contract Pricing Expiry")}</label>
+                  <input type="date" value={form.contract_pricing_expiry} onChange={e => setField("contract_pricing_expiry", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+              </div>
+              <ToggleSwitch
+                label={t("field.specialPricingAgreement", "Special Pricing Agreement")}
+                hint={t("field.specialPricingAgreementHint", "Active custom contract pricing")}
+                checked={form.special_pricing_agreement}
+                onChange={v => setField("special_pricing_agreement", v)}
+              />
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Segmentation & Health (customer only — Commercial tab) ── */}
+        {isCustomer && showTab("commercial") && (
+          <FormSection title={t("section.segmentationHealth", "Segmentation & Health")} icon={<StarIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.subIndustry", "Sub Industry")} value={form.sub_industry} onChange={v => setField("sub_industry", v)} placeholder={t("placeholder.subIndustry", "e.g. Solar EPC")} icon={<FactoryIcon size={14} />} />
+                <SelectInput label={t("field.buyingBehavior", "Buying Behavior")} value={form.buying_behavior} onChange={v => setField("buying_behavior", v)} options={BUYING_BEHAVIORS} icon={<PackageIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.priceSensitivity", "Price Sensitivity")} value={form.price_sensitivity} onChange={v => setField("price_sensitivity", v)} options={SENSITIVITY_LEVELS} icon={<DollarSignIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.qualitySensitivity", "Quality Sensitivity")} value={form.quality_sensitivity} onChange={v => setField("quality_sensitivity", v)} options={SENSITIVITY_LEVELS} icon={<ShieldCheckIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.relationshipStage", "Relationship Stage")} value={form.relationship_stage} onChange={v => setField("relationship_stage", v)} options={RELATIONSHIP_STAGES} icon={<ClockIcon size={14} />} selectLabel={t("detail.select")} />
+                <SelectInput label={t("field.churnRisk", "Churn Risk")} value={form.churn_risk} onChange={v => setField("churn_risk", v)} options={CHURN_RISK_LEVELS} icon={<TriangleWarningIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.supportTier", "Support Tier")} value={form.support_tier} onChange={v => setField("support_tier", v)} options={SUPPORT_TIERS} icon={<HeartIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.healthScore", "Health Score")} value={form.customer_health_score} onChange={v => setField("customer_health_score", v)} placeholder="0–100" icon={<HeartIcon size={14} />} />
+              </div>
+              <Input label={t("field.npsScore", "NPS Score")} value={form.nps_score} onChange={v => setField("nps_score", v)} placeholder="-100 to 100" icon={<StarIcon size={14} />} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <ToggleSwitch
+                  label={t("field.vipStatus", "VIP Status")}
+                  hint={t("field.vipStatusHint", "Priority service & white-glove support")}
+                  checked={form.vip_status}
+                  onChange={v => setField("vip_status", v)}
+                />
+                <ToggleSwitch
+                  label={t("field.strategicAccount", "Strategic Account")}
+                  hint={t("field.strategicAccountHint", "Key account for growth")}
+                  checked={form.strategic_account}
+                  onChange={v => setField("strategic_account", v)}
+                />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Credit Management (customer only — Financial tab) ── */}
+        {isCustomer && showTab("financial") && (
+          <FormSection title={t("section.creditManagement", "Credit Management")} icon={<WalletIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.creditRatingInternal", "Internal Rating")} value={form.credit_rating_internal} onChange={v => setField("credit_rating_internal", v)} options={CREDIT_RATING_INTERNAL} icon={<ShieldIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.creditRatingExternal", "External Rating")} value={form.credit_rating_external} onChange={v => setField("credit_rating_external", v)} placeholder="D&B / S&P" icon={<AwardIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.creditApprovedBy", "Limit Approved By")} value={form.credit_limit_approved_by} onChange={v => setField("credit_limit_approved_by", v)} placeholder={t("field.name")} icon={<UserCheckIcon size={14} />} />
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.creditApprovedDate", "Approved Date")}</label>
+                  <input type="date" value={form.credit_limit_approved_date} onChange={e => setField("credit_limit_approved_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.overdueBalance", "Overdue Balance")} value={form.overdue_balance} onChange={v => setField("overdue_balance", v)} placeholder="0.00" icon={<TriangleWarningIcon size={14} />} />
+                <Input label={t("field.dso", "Days Sales Outstanding")} value={form.days_sales_outstanding} onChange={v => setField("days_sales_outstanding", v)} placeholder="0" icon={<TimerIcon size={14} />} />
+              </div>
+              <SelectInput label={t("field.preferredPaymentMethod", "Preferred Payment Method")} value={form.preferred_payment_method} onChange={v => setField("preferred_payment_method", v)} options={PREFERRED_PAYMENT_METHODS} icon={<CreditCardIcon size={14} />} selectLabel={t("detail.select")} />
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Credit Insurance (customer only — Financial tab) ── */}
+        {isCustomer && showTab("financial") && (
+          <FormSection title={t("section.creditInsurance", "Credit Insurance")} icon={<ShieldCheckIcon size={14} />}>
+            <div className="space-y-3">
+              <ToggleSwitch
+                label={t("field.creditInsuranceCovered", "Credit Insurance Covered")}
+                hint={t("field.creditInsuranceCoveredHint", "Receivables insured by a trade credit policy")}
+                checked={form.credit_insurance_covered}
+                onChange={v => setField("credit_insurance_covered", v)}
+              />
+              {form.credit_insurance_covered && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label={t("field.insuranceProvider", "Provider")} value={form.credit_insurance_provider} onChange={v => setField("credit_insurance_provider", v)} placeholder="Euler Hermes / Coface" icon={<ShieldCheckIcon size={14} />} />
+                  <Input label={t("field.insuranceCoverage", "Coverage Amount")} value={form.credit_insurance_coverage} onChange={v => setField("credit_insurance_coverage", v)} placeholder="0.00" icon={<WalletIcon size={14} />} />
+                </div>
+              )}
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Bank Accounts (customer only — Financial tab) ── */}
+        {isCustomer && showTab("financial") && (
+          <FormSection title={t("section.bankAccountInfo")} icon={<LandmarkIcon size={14} />}>
+            <div className="space-y-3">
+              {form.bank_accounts.map((b, i) => (
+                <div key={i} className="rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-color)] overflow-hidden">
+                  <div className="flex items-center gap-2 p-3">
+                    <RemoveBtn onClick={() => setField("bank_accounts", form.bank_accounts.filter((_, idx) => idx !== i))} />
+                    <input
+                      value={b.bank_name}
+                      onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], bank_name: e.target.value }; setField("bank_accounts", arr); }}
+                      placeholder={t("field.bankName", "Bank name")}
+                      className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+                    />
+                    <input
+                      value={b.currency}
+                      onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], currency: e.target.value }; setField("bank_accounts", arr); }}
+                      placeholder="USD"
+                      className="w-20 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] text-center uppercase"
+                    />
+                  </div>
+                  <div className="px-3 pb-3 ms-8 space-y-2">
+                    <input value={b.account_name} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_name: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountName", "Account name")} className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={b.account_number} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], account_number: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.accountNumber", "Account number")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input value={b.swift_code} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], swift_code: e.target.value }; setField("bank_accounts", arr); }} placeholder="SWIFT / BIC" className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={b.iban} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], iban: e.target.value }; setField("bank_accounts", arr); }} placeholder="IBAN" className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                      <input value={b.branch} onChange={e => { const arr = [...form.bank_accounts]; arr[i] = { ...arr[i], branch: e.target.value }; setField("bank_accounts", arr); }} placeholder={t("field.branch", "Branch")} className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <AddButton label={t("add.bankAccount", "Add bank account")} onClick={() => setField("bank_accounts", [...form.bank_accounts, { bank_name: "", account_name: "", account_number: "", swift_code: "", iban: "", branch: "", currency: "" }])} />
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Legal Identity (customer only — Compliance tab) ── */}
+        {isCustomer && showTab("compliance") && (
+          <FormSection title={t("section.legalIdentity", "Legal Identity")} icon={<Building2Icon size={14} />}>
+            <div className="space-y-3">
+              <Input label={t("field.tradingName", "Trading / DBA Name")} value={form.trading_name} onChange={v => setField("trading_name", v)} placeholder={t("placeholder.tradingName", "Doing business as")} icon={<Building2Icon size={14} />} />
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.companyType", "Company Type")} value={form.company_type} onChange={v => setField("company_type", v)} options={COMPANY_TYPES} icon={<BriefcaseIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.businessRegNumber", "Business Registration #")} value={form.business_registration_number} onChange={v => setField("business_registration_number", v)} placeholder={t("placeholder.regNumber", "CR / ABN / Reg #")} icon={<HashtagIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.registrationCountry", "Registration Country")} value={form.registration_country} onChange={v => setField("registration_country", v)} placeholder={t("placeholder.country")} icon={<GlobeIcon size={14} />} />
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.registrationDate", "Registration Date")}</label>
+                  <input type="date" value={form.registration_date} onChange={e => setField("registration_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.yearEstablished", "Year Established")} value={form.year_established} onChange={v => setField("year_established", v)} placeholder="2000" icon={<CalendarRawIcon size={14} />} />
+                <SelectInput label={t("field.employeeCountRange", "Employee Count")} value={form.employee_count_range} onChange={v => setField("employee_count_range", v)} options={EMPLOYEE_COUNT_RANGES} icon={<UsersIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <SelectInput label={t("field.annualRevenueRange", "Annual Revenue")} value={form.annual_revenue_range} onChange={v => setField("annual_revenue_range", v)} options={ANNUAL_REVENUE_RANGES} icon={<TrendingUpIcon size={14} />} selectLabel={t("detail.select")} />
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── International Trade IDs (customer only — Compliance tab) ── */}
+        {isCustomer && showTab("compliance") && (
+          <FormSection title={t("section.tradeIdentifiers", "International Trade IDs")} icon={<FileCheckIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.eoriNumber", "EORI")} value={form.eori_number} onChange={v => setField("eori_number", v)} placeholder="GB123456789000" icon={<HashtagIcon size={14} />} />
+                <Input label={t("field.dunsNumber", "D-U-N-S")} value={form.duns_number} onChange={v => setField("duns_number", v)} placeholder="123456789" icon={<HashtagIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.iec", "IEC (Importer/Exporter)")} value={form.importer_exporter_code} onChange={v => setField("importer_exporter_code", v)} placeholder="IEC code" icon={<HashtagIcon size={14} />} />
+                <Input label={t("field.customsCode", "Customs Code")} value={form.customs_code} onChange={v => setField("customs_code", v)} placeholder="Customs code" icon={<HashtagIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.gstNumber", "GST / VAT")} value={form.gst_number} onChange={v => setField("gst_number", v)} placeholder="GST / VAT number" icon={<HashtagIcon size={14} />} />
+                <Input label={t("field.crNumber", "CR Number")} value={form.cr_number} onChange={v => setField("cr_number", v)} placeholder="Commercial registration" icon={<HashtagIcon size={14} />} />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── KYC & Risk (customer only — Compliance tab) ── */}
+        {isCustomer && showTab("compliance") && (
+          <FormSection title={t("section.kycRisk", "KYC & Risk")} icon={<ShieldCheckIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.kycStatus", "KYC Status")} value={form.kyc_status} onChange={v => setField("kyc_status", v)} options={KYC_STATUSES} icon={<ClipboardCheckIcon size={14} />} selectLabel={t("detail.select")} />
+                <Input label={t("field.riskScore", "Risk Score")} value={form.risk_score} onChange={v => setField("risk_score", v)} placeholder="0–100" icon={<TriangleWarningIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.kycVerifiedDate", "KYC Verified Date")}</label>
+                  <input type="date" value={form.kyc_verified_date} onChange={e => setField("kyc_verified_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+                <Input label={t("field.kycVerifiedBy", "Verified By")} value={form.kyc_verified_by} onChange={v => setField("kyc_verified_by", v)} placeholder={t("field.name")} icon={<UserCheckIcon size={14} />} />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.kycReviewDueDate", "Next Review Due")}</label>
+                <input type="date" value={form.kyc_review_due_date} onChange={e => setField("kyc_review_due_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SelectInput label={t("field.sanctionsCheckStatus", "Sanctions Check")} value={form.sanctions_check_status} onChange={v => setField("sanctions_check_status", v)} options={SANCTIONS_STATUSES} icon={<ShieldExclamationIcon size={14} />} selectLabel={t("detail.select")} />
+                <div>
+                  <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.sanctionsCheckDate", "Last Check")}</label>
+                  <input type="date" value={form.sanctions_check_date} onChange={e => setField("sanctions_check_date", e.target.value)} className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] [color-scheme:dark]" />
+                </div>
+              </div>
+              <Input label={t("field.amlStatus", "AML Status")} value={form.aml_status} onChange={v => setField("aml_status", v)} placeholder={t("placeholder.amlStatus", "Clear / Pending / Flagged")} icon={<ShieldCheckIcon size={14} />} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <ToggleSwitch
+                  label={t("field.pepStatus", "PEP (Politically Exposed)")}
+                  hint={t("field.pepStatusHint", "Requires enhanced due diligence")}
+                  checked={form.pep_status}
+                  onChange={v => setField("pep_status", v)}
+                />
+                <ToggleSwitch
+                  label={t("field.highRiskCountry", "High-Risk Country")}
+                  hint={t("field.highRiskCountryHint", "Jurisdiction on watchlist")}
+                  checked={form.high_risk_country}
+                  onChange={v => setField("high_risk_country", v)}
+                />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Flags & Audit (customer only — Compliance tab) ── */}
+        {isCustomer && showTab("compliance") && (
+          <FormSection title={t("section.flagsAudit", "Flags & Audit")} icon={<TriangleWarningIcon size={14} />}>
+            <TagEditor
+              label={t("field.flags", "Flags")}
+              values={form.flags}
+              onChange={v => setField("flags", v)}
+              placeholder={t("placeholder.addFlag", "Type a flag and press Enter")}
+              icon={<TriangleWarningIcon size={14} />}
+            />
+          </FormSection>
+        )}
+
+        {/* ── Logistics & Trade Operations (customer only — Trade tab) ── */}
+        {isCustomer && showTab("trade") && (
+          <FormSection title={t("section.logisticsTrade", "Logistics & Trade Operations")} icon={<TruckIcon size={14} />}>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.portOfEntry", "Port of Entry")} value={form.port_of_entry} onChange={v => setField("port_of_entry", v)} placeholder="Jebel Ali / Shanghai" icon={<ShipIcon size={14} />} />
+                <SelectInput label={t("field.containerPreference", "Container Preference")} value={form.container_preference} onChange={v => setField("container_preference", v)} options={CONTAINER_PREFERENCES} icon={<BoxesIcon size={14} />} selectLabel={t("detail.select")} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.customsBroker", "Customs Broker")} value={form.customs_broker} onChange={v => setField("customs_broker", v)} placeholder={t("field.name")} icon={<FileCheckIcon size={14} />} />
+                <Input label={t("field.freightForwarder", "Freight Forwarder")} value={form.freight_forwarder} onChange={v => setField("freight_forwarder", v)} placeholder={t("field.name")} icon={<WarehouseIcon size={14} />} />
+              </div>
+              <Input label={t("field.shippingMarks", "Shipping Marks")} value={form.shipping_marks} onChange={v => setField("shipping_marks", v)} placeholder={t("placeholder.shippingMarks", "Marks & numbers")} icon={<HashtagIcon size={14} />} />
+              <div>
+                <label className="text-xs text-[var(--text-faint)] mb-1 block">{t("field.labelingRequirements", "Labeling Requirements")}</label>
+                <textarea
+                  value={form.labeling_requirements}
+                  onChange={e => setField("labeling_requirements", e.target.value)}
+                  placeholder={t("placeholder.labelingRequirements", "Multi-language labels, regulatory stickers...")}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none"
+                />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── HS Codes, Carriers & Certifications (customer only — Trade tab) ── */}
+        {isCustomer && showTab("trade") && (
+          <FormSection title={t("section.tradeCodes", "Classification & Carriers")} icon={<ClipboardCheckIcon size={14} />}>
+            <div className="space-y-4">
+              <TagEditor
+                label={t("field.hsCodes", "HS Codes")}
+                values={form.hs_codes}
+                onChange={v => setField("hs_codes", v)}
+                placeholder={t("placeholder.hsCode", "e.g. 8541.40")}
+                icon={<HashtagIcon size={14} />}
+              />
+              <TagEditor
+                label={t("field.preferredCarriers", "Preferred Carriers")}
+                values={form.preferred_carriers}
+                onChange={v => setField("preferred_carriers", v)}
+                placeholder={t("placeholder.carrier", "Maersk / DHL / …")}
+                icon={<TruckIcon size={14} />}
+              />
+              <TagEditor
+                label={t("field.certificationsRequired", "Certifications Required")}
+                values={form.certifications_required}
+                onChange={v => setField("certifications_required", v)}
+                placeholder={t("placeholder.certification", "ISO / CE / SASO / …")}
+                icon={<AwardIcon size={14} />}
+              />
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Messaging IDs (customer only — Activity tab) ── */}
+        {isCustomer && showTab("activity") && (
+          <FormSection title={t("section.messagingIds", "Messaging IDs")} icon={<MessageSquareIcon size={14} />}>
+            <div className="space-y-3">
+              <Input label={t("field.whatsappBusiness", "WhatsApp Business")} value={form.whatsapp_business} onChange={v => setField("whatsapp_business", v)} placeholder="+971 …" icon={<PhoneIcon size={14} />} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.wechatId", "WeChat ID")} value={form.wechat_id} onChange={v => setField("wechat_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+                <Input label={t("field.telegramId", "Telegram ID")} value={form.telegram_id} onChange={v => setField("telegram_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label={t("field.lineId", "Line ID")} value={form.line_id} onChange={v => setField("line_id", v)} placeholder="@handle" icon={<MessageSquareIcon size={14} />} />
+                <Input label={t("field.skypeId", "Skype ID")} value={form.skype_id} onChange={v => setField("skype_id", v)} placeholder="live:…" icon={<MessageSquareIcon size={14} />} />
+              </div>
+            </div>
+          </FormSection>
+        )}
+
+        {/* ── Internal Notes (customer only — Activity tab) ── */}
+        {isCustomer && showTab("activity") && (
+          <FormSection title={t("section.internalNotes", "Internal Notes")} icon={<DocumentIcon size={14} />}>
+            <textarea
+              value={form.internal_notes}
+              onChange={e => setField("internal_notes", e.target.value)}
+              placeholder={t("placeholder.internalNotes", "Private notes visible only to team members")}
+              rows={4}
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] resize-none"
+            />
           </FormSection>
         )}
 
@@ -4572,7 +5778,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
 
         {/* ══ EMPLOYEE FORM SECTIONS ══ */}
-        {isEmployee && (
+        {false && /* Employee sections removed — employees use the Employees app */ (
         <>
         {/* 1. Work Contact */}
         <FormSection title={t("section.workContact")} icon={<PhoneIcon size={14} />}>
@@ -4931,8 +6137,8 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         </>
         )}
 
-        {/* Customer Type (only for customer contacts) */}
-        {isCustomer && (
+        {/* Customer Type (only for customer contacts — Commercial tab) */}
+        {isCustomer && showTab("commercial") && (
           <FormSection title={t("section.customerType")} icon={<CrownIcon size={14} />}>
             <div className="space-y-3">
               <label className="flex items-center gap-3 cursor-pointer">

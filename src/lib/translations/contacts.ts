@@ -708,4 +708,160 @@ export const contactsT: Translations = {
   "tooltip.ssn":                { en: "Social Security Number",    zh: "社会保险号码",           ar: "رقم الضمان الاجتماعي" },
   "misc.untitled":          { en: "Untitled",                    zh: "未命名",                   ar: "بدون عنوان" },
   "misc.account":           { en: "Account",                     zh: "账户",                    ar: "حساب" },
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PREMIUM CUSTOMER UI — TABS, SECTIONS, FIELDS (Phase 1)
+     ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* ── Customer Tabs ── */
+  "customerTab.overview":   { en: "Overview",        zh: "概览",       ar: "نظرة عامة" },
+  "customerTab.commercial": { en: "Commercial",      zh: "商务",       ar: "تجاري" },
+  "customerTab.financial":  { en: "Financial",       zh: "财务",       ar: "مالي" },
+  "customerTab.compliance": { en: "Compliance",      zh: "合规",       ar: "الامتثال" },
+  "customerTab.trade":      { en: "Trade",           zh: "贸易",       ar: "التجارة" },
+  "customerTab.activity":   { en: "Activity",        zh: "活动",       ar: "النشاط" },
+
+  /* ── Hero Strip Badges ── */
+  "field.marketBand":         { en: "Band",             zh: "市场带",     ar: "الفئة" },
+  "field.sanctionsClear":     { en: "Sanctions Clear",  zh: "制裁清白",   ar: "لا توجد عقوبات" },
+  "field.sanctionsFlagged":   { en: "Sanctions Flagged",zh: "制裁标记",   ar: "مُعلَّم بالعقوبات" },
+  "field.strategic":          { en: "Strategic",        zh: "战略客户",   ar: "استراتيجي" },
+  "field.highRiskShort":      { en: "High-Risk",        zh: "高风险",     ar: "عالي الخطورة" },
+
+  /* ── Commercial Profile ── */
+  "section.commercialProfile":  { en: "Commercial Profile",  zh: "商业档案",         ar: "الملف التجاري" },
+  "field.commercialRole":       { en: "Commercial Role",     zh: "商业角色",         ar: "الدور التجاري" },
+  "field.territory":            { en: "Territory",           zh: "区域",             ar: "المنطقة" },
+  "field.assignedBranch":       { en: "Assigned Branch",     zh: "指定分支",         ar: "الفرع المخصص" },
+  "field.exclusivity":          { en: "Exclusivity",         zh: "独家性",           ar: "الحصرية" },
+  "field.exclusivityScope":     { en: "Exclusivity Scope",   zh: "独家范围",         ar: "نطاق الحصرية" },
+  "field.exclusivityExpiry":    { en: "Exclusivity Expiry",  zh: "独家到期",         ar: "انتهاء الحصرية" },
+  "field.salesRep":             { en: "Sales Rep",           zh: "销售代表",         ar: "مندوب المبيعات" },
+  "field.backupAM":             { en: "Backup AM",           zh: "备用客户经理",     ar: "مدير حساب احتياطي" },
+  "field.sourceDetails":        { en: "Source Details",      zh: "来源详情",         ar: "تفاصيل المصدر" },
+  "field.referredBy":           { en: "Referred By",         zh: "推荐人",           ar: "أحاله" },
+  "field.levelAssignedDate":    { en: "Level Assigned",      zh: "级别分配日期",     ar: "تاريخ تعيين المستوى" },
+  "field.levelReviewDate":      { en: "Level Review Due",    zh: "级别审核到期",     ar: "مراجعة المستوى" },
+  "placeholder.branchName":     { en: "Branch name",         zh: "分支名称",         ar: "اسم الفرع" },
+  "placeholder.sourceCampaign": { en: "Campaign / event",    zh: "活动 / 事件",      ar: "حملة / حدث" },
+
+  /* ── Pricing & Discounts ── */
+  "section.pricingDiscounts":        { en: "Pricing & Discounts",   zh: "价格与折扣",       ar: "التسعير والخصومات" },
+  "field.priceListTier":             { en: "Price List",            zh: "价格表",           ar: "قائمة الأسعار" },
+  "field.maxDiscount":               { en: "Max Discount",          zh: "最大折扣",         ar: "الحد الأقصى للخصم" },
+  "field.commissionRate":            { en: "Commission Rate",       zh: "佣金率",           ar: "معدل العمولة" },
+  "field.contractPricingExpiry":     { en: "Contract Expires",      zh: "合同到期",         ar: "انتهاء العقد" },
+  "field.specialPricingAgreement":   { en: "Special Pricing Agreement", zh: "特殊定价协议", ar: "اتفاقية تسعير خاصة" },
+  "field.specialPricingAgreementHint": { en: "Active custom contract pricing", zh: "有效的定制合同定价", ar: "تسعير تعاقدي مخصص نشط" },
+
+  /* ── Segmentation & Health ── */
+  "section.segmentationHealth": { en: "Segmentation & Health", zh: "细分与健康",      ar: "التقسيم والصحة" },
+  "field.subIndustry":          { en: "Sub Industry",          zh: "子行业",           ar: "القطاع الفرعي" },
+  "field.buyingBehavior":       { en: "Buying Behavior",       zh: "购买行为",         ar: "سلوك الشراء" },
+  "field.priceSensitivity":     { en: "Price Sensitivity",     zh: "价格敏感度",       ar: "حساسية السعر" },
+  "field.qualitySensitivity":   { en: "Quality Sensitivity",   zh: "质量敏感度",       ar: "حساسية الجودة" },
+  "field.relationshipStage":    { en: "Relationship Stage",    zh: "关系阶段",         ar: "مرحلة العلاقة" },
+  "field.churnRisk":            { en: "Churn Risk",            zh: "流失风险",         ar: "مخاطر التسرب" },
+  "field.supportTier":          { en: "Support Tier",          zh: "支持级别",         ar: "مستوى الدعم" },
+  "field.healthScore":          { en: "Health Score",          zh: "健康度评分",       ar: "درجة الصحة" },
+  "field.npsScore":             { en: "NPS Score",             zh: "NPS评分",          ar: "درجة NPS" },
+  "field.vipStatus":            { en: "VIP Status",            zh: "VIP状态",          ar: "حالة VIP" },
+  "field.vipStatusHint":        { en: "Priority service & white-glove support", zh: "优先服务与贴身支持", ar: "خدمة أولوية ودعم متميز" },
+  "field.strategicAccount":     { en: "Strategic Account",     zh: "战略客户",         ar: "حساب استراتيجي" },
+  "field.strategicAccountHint": { en: "Key account for growth", zh: "增长关键客户",    ar: "حساب رئيسي للنمو" },
+  "placeholder.subIndustry":    { en: "e.g. Solar EPC",        zh: "例如：太阳能EPC",   ar: "مثال: الطاقة الشمسية EPC" },
+
+  /* ── Credit Management ── */
+  "section.creditManagement":       { en: "Credit Management",   zh: "信用管理",        ar: "إدارة الائتمان" },
+  "field.creditRatingInternal":     { en: "Internal Rating",     zh: "内部评级",        ar: "التصنيف الداخلي" },
+  "field.creditRatingExternal":     { en: "External Rating",     zh: "外部评级",        ar: "التصنيف الخارجي" },
+  "field.creditApprovedBy":         { en: "Limit Approved By",   zh: "限额批准人",      ar: "وافق على الحد" },
+  "field.creditApprovedDate":       { en: "Approved Date",       zh: "批准日期",        ar: "تاريخ الموافقة" },
+  "field.overdueBalance":           { en: "Overdue Balance",     zh: "逾期余额",        ar: "الرصيد المتأخر" },
+  "field.dso":                      { en: "DSO",                 zh: "DSO",             ar: "DSO" },
+  "unit.days":                      { en: "days",                zh: "天",              ar: "يوم" },
+  "field.preferredPaymentMethod":   { en: "Preferred Payment",   zh: "首选付款方式",    ar: "طريقة الدفع المفضلة" },
+
+  /* ── Credit Insurance ── */
+  "section.creditInsurance":            { en: "Credit Insurance",   zh: "信用保险",       ar: "تأمين الائتمان" },
+  "field.creditInsuranceCovered":       { en: "Credit Insurance Covered", zh: "信用保险已覆盖", ar: "مغطى بتأمين ائتماني" },
+  "field.creditInsuranceCoveredHint":   { en: "Receivables insured by a trade credit policy", zh: "应收账款由贸易信用保单承保", ar: "الذمم المدينة مؤمنة بوثيقة تأمين ائتماني تجاري" },
+  "field.insuredReceivables":           { en: "Receivables Insured", zh: "应收账款已投保", ar: "الذمم المدينة مؤمنة" },
+  "field.insuranceProvider":            { en: "Provider",           zh: "提供商",          ar: "المزود" },
+  "field.insuranceCoverage":            { en: "Coverage",           zh: "保额",            ar: "التغطية" },
+
+  /* ── Legal Identity ── */
+  "section.legalIdentity":       { en: "Legal Identity",         zh: "法律身份",         ar: "الهوية القانونية" },
+  "field.tradingName":           { en: "Trading Name",           zh: "贸易名称",         ar: "الاسم التجاري" },
+  "field.companyType":           { en: "Company Type",           zh: "公司类型",         ar: "نوع الشركة" },
+  "field.businessRegNumber":     { en: "Business Reg #",         zh: "营业注册号",       ar: "رقم تسجيل النشاط" },
+  "field.registrationCountry":   { en: "Reg. Country",           zh: "注册国家",         ar: "بلد التسجيل" },
+  "field.registrationDate":      { en: "Reg. Date",              zh: "注册日期",         ar: "تاريخ التسجيل" },
+  "field.yearEstablished":       { en: "Established",            zh: "成立年份",         ar: "سنة التأسيس" },
+  "field.employeeCountRange":    { en: "Employees",              zh: "员工人数",         ar: "عدد الموظفين" },
+  "field.annualRevenueRange":    { en: "Annual Revenue",         zh: "年收入",           ar: "الإيرادات السنوية" },
+  "placeholder.tradingName":     { en: "Doing business as",      zh: "营业名称",         ar: "تعمل باسم" },
+  "placeholder.regNumber":       { en: "CR / ABN / Reg #",       zh: "CR / ABN / 注册号", ar: "CR / ABN / رقم التسجيل" },
+
+  /* ── International Trade IDs ── */
+  "section.tradeIdentifiers":   { en: "International Trade IDs", zh: "国际贸易识别码",   ar: "معرفات التجارة الدولية" },
+  "field.eoriNumber":           { en: "EORI",                    zh: "EORI",            ar: "EORI" },
+  "field.dunsNumber":           { en: "D-U-N-S",                 zh: "D-U-N-S",         ar: "D-U-N-S" },
+  "field.iec":                  { en: "IEC (Importer/Exporter)", zh: "IEC (进出口)",     ar: "IEC (المستورد/المصدر)" },
+  "field.customsCode":          { en: "Customs Code",            zh: "海关代码",         ar: "رمز الجمارك" },
+  "field.gstNumber":            { en: "GST / VAT",               zh: "GST / 增值税",     ar: "GST / ضريبة القيمة المضافة" },
+  "field.crNumber":             { en: "CR Number",               zh: "CR 号",            ar: "رقم CR" },
+
+  /* ── KYC & Risk ── */
+  "section.kycRisk":                 { en: "KYC & Risk",           zh: "KYC与风险",       ar: "KYC والمخاطر" },
+  "field.kycStatus":                 { en: "KYC Status",           zh: "KYC状态",         ar: "حالة KYC" },
+  "field.riskScore":                 { en: "Risk Score",           zh: "风险评分",        ar: "درجة المخاطر" },
+  "field.kycVerifiedDate":           { en: "Verified On",          zh: "验证日期",        ar: "تاريخ التحقق" },
+  "field.kycVerifiedBy":             { en: "Verified By",          zh: "验证人",          ar: "تم التحقق بواسطة" },
+  "field.kycReviewDueDate":          { en: "Next Review",          zh: "下次审核",        ar: "المراجعة التالية" },
+  "field.sanctionsCheckStatus":      { en: "Sanctions",            zh: "制裁",            ar: "العقوبات" },
+  "field.sanctionsCheckDate":        { en: "Last Check",           zh: "上次检查",        ar: "آخر فحص" },
+  "field.amlStatus":                 { en: "AML Status",           zh: "反洗钱状态",      ar: "حالة AML" },
+  "field.pepStatus":                 { en: "PEP (Politically Exposed)", zh: "PEP (政治人物)", ar: "PEP (شخصية سياسية)" },
+  "field.pepStatusHint":             { en: "Requires enhanced due diligence", zh: "需要增强尽职调查", ar: "يتطلب عناية معززة" },
+  "field.highRiskCountry":           { en: "High-Risk Country",    zh: "高风险国家",       ar: "دولة عالية الخطورة" },
+  "field.highRiskCountryHint":       { en: "Jurisdiction on watchlist", zh: "监控名单中的司法管辖区", ar: "ولاية قضائية في قائمة المراقبة" },
+  "placeholder.amlStatus":           { en: "Clear / Pending / Flagged", zh: "清白 / 待处理 / 标记", ar: "سليم / قيد المراجعة / مُعلَّم" },
+
+  /* ── Flags & Audit ── */
+  "section.flagsAudit":       { en: "Flags & Audit",              zh: "标记与审计",       ar: "العلامات والتدقيق" },
+  "field.flags":              { en: "Flags",                      zh: "标记",             ar: "العلامات" },
+  "placeholder.addFlag":      { en: "Type a flag and press Enter", zh: "输入标记后按Enter", ar: "اكتب علامة واضغط Enter" },
+
+  /* ── Logistics & Trade Operations ── */
+  "section.logisticsTrade":         { en: "Logistics & Trade Operations", zh: "物流与贸易运营", ar: "اللوجستيات وعمليات التجارة" },
+  "field.portOfEntry":              { en: "Port of Entry",        zh: "入境港口",         ar: "ميناء الدخول" },
+  "field.containerPreference":      { en: "Container",            zh: "集装箱",           ar: "الحاوية" },
+  "field.customsBroker":            { en: "Customs Broker",       zh: "报关行",           ar: "المخلص الجمركي" },
+  "field.freightForwarder":         { en: "Freight Forwarder",    zh: "货运代理",         ar: "وكيل الشحن" },
+  "field.shippingMarks":            { en: "Shipping Marks",       zh: "运输标记",         ar: "علامات الشحن" },
+  "field.labelingRequirements":     { en: "Labeling",             zh: "标签要求",         ar: "متطلبات العلامات" },
+  "placeholder.shippingMarks":      { en: "Marks & numbers",      zh: "标记和编号",       ar: "العلامات والأرقام" },
+  "placeholder.labelingRequirements": { en: "Multi-language labels, regulatory stickers...", zh: "多语言标签、监管贴纸...", ar: "علامات متعددة اللغات، ملصقات تنظيمية..." },
+
+  /* ── Classification & Carriers ── */
+  "section.tradeCodes":             { en: "Classification & Carriers", zh: "分类与承运商", ar: "التصنيف والناقلين" },
+  "field.hsCodes":                  { en: "HS Codes",             zh: "HS编码",           ar: "رموز HS" },
+  "field.preferredCarriers":        { en: "Preferred Carriers",   zh: "首选承运商",       ar: "الناقلون المفضلون" },
+  "field.certificationsRequired":   { en: "Certifications Required", zh: "所需认证",      ar: "الشهادات المطلوبة" },
+  "placeholder.hsCode":             { en: "e.g. 8541.40",         zh: "例如：8541.40",    ar: "مثال: 8541.40" },
+  "placeholder.carrier":            { en: "Maersk / DHL / …",     zh: "马士基 / DHL / …", ar: "Maersk / DHL / …" },
+  "placeholder.certification":      { en: "ISO / CE / SASO / …",  zh: "ISO / CE / SASO / …", ar: "ISO / CE / SASO / …" },
+
+  /* ── Messaging IDs ── */
+  "section.messagingIds":     { en: "Messaging IDs",  zh: "即时通讯账号",   ar: "معرفات المراسلة" },
+  "field.whatsappBusiness":   { en: "WhatsApp Business", zh: "WhatsApp商业版", ar: "WhatsApp Business" },
+  "field.wechatId":           { en: "WeChat ID",         zh: "微信号",         ar: "معرف WeChat" },
+  "field.telegramId":         { en: "Telegram ID",       zh: "Telegram ID",    ar: "معرف Telegram" },
+  "field.lineId":             { en: "Line ID",           zh: "Line ID",        ar: "معرف Line" },
+  "field.skypeId":             { en: "Skype ID",         zh: "Skype ID",       ar: "معرف Skype" },
+
+  /* ── Internal Notes ── */
+  "section.internalNotes":          { en: "Internal Notes",  zh: "内部备注",         ar: "ملاحظات داخلية" },
+  "placeholder.internalNotes":      { en: "Private notes visible only to team members", zh: "仅团队成员可见的私密备注", ar: "ملاحظات خاصة مرئية لأعضاء الفريق فقط" },
 };
