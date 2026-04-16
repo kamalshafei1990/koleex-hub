@@ -237,6 +237,16 @@ export default function AccountForm({ mode, account }: Props) {
     if (isCustomer && !form.company_id)
       return setError(t("acc.err.companyRequired"));
 
+    // ─── No-orphan-accounts policy ───────────────────────────────────────
+    // Every account MUST be tied to a real-world identity — a Person
+    // (employee / individual) or a Company (customer / workspace). Even
+    // though the DB CHECK constraint `accounts_must_have_link` refuses
+    // orphans, we catch it here first so the user gets a clear message
+    // instead of a cryptic Postgres error.
+    if (!form.person_id && !form.company_id) {
+      return setError(t("acc.err.linkRequired"));
+    }
+
     setSaving(true);
 
     // Uniqueness checks
@@ -537,6 +547,17 @@ export default function AccountForm({ mode, account }: Props) {
             <p className="text-[11px] text-[var(--text-dim)] -mt-3 mb-4">
               {t("acc.hint.linkRecords")}
             </p>
+
+            {/* No-orphan-accounts policy banner — appears until the user
+                picks at least one link. Mirrors the CHECK constraint
+                (accounts_must_have_link) so the rule is visible up front
+                rather than failing at submit time. */}
+            {!form.person_id && !form.company_id && (
+              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
+                <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{t("acc.hint.noOrphan")}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Company picker */}
