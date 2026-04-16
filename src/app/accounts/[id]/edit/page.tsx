@@ -33,7 +33,7 @@ export default function EditAccountPage() {
     >
       {loading ? (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-          <div className="max-w-[960px] mx-auto px-4 md:px-6 lg:px-8 py-8">
+          <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-8">
             <div className="animate-pulse space-y-4">
               <div className="h-8 w-64 bg-[var(--bg-surface-subtle)] rounded" />
               <div className="h-64 bg-[var(--bg-surface-subtle)] rounded-2xl" />

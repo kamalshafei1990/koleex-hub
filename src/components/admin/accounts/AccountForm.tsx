@@ -49,6 +49,8 @@ import {
   isUsernameAvailable, isLoginEmailAvailable,
   generateTemporaryPassword, suggestUsername,
 } from "@/lib/accounts-admin";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import type {
   AccountRow, CompanyRow, RoleRow, PersonRow, AccessPresetRow,
   UserType, AccountStatus, CustomerLevel, CompanyType,
@@ -110,6 +112,7 @@ function initialState(a?: AccountRow): FormState {
 }
 
 export default function AccountForm({ mode, account }: Props) {
+  const { t } = useTranslation(accountsT);
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>(() => initialState(account));
@@ -222,17 +225,17 @@ export default function AccountForm({ mode, account }: Props) {
     e.preventDefault();
     setError(null);
 
-    if (!form.username.trim()) return setError("Username is required.");
+    if (!form.username.trim()) return setError(t("acc.err.usernameRequired"));
     if (!/^[a-z0-9._-]{3,32}$/i.test(form.username.trim()))
-      return setError("Username must be 3-32 characters (letters, numbers, . _ -).");
-    if (!form.login_email.trim()) return setError("Login email is required.");
+      return setError(t("acc.err.usernameFormat"));
+    if (!form.login_email.trim()) return setError(t("acc.err.emailRequired"));
     if (!/.+@.+\..+/.test(form.login_email))
-      return setError("Login email looks invalid.");
-    if (!form.role_id) return setError("Please select a role.");
+      return setError(t("acc.err.emailInvalid"));
+    if (!form.role_id) return setError(t("acc.err.roleRequired"));
     if (mode === "create" && !form.temporary_password.trim())
-      return setError("A temporary password is required for new accounts.");
+      return setError(t("acc.err.passwordRequired"));
     if (isCustomer && !form.company_id)
-      return setError("Customer accounts must be linked to a company.");
+      return setError(t("acc.err.companyRequired"));
 
     setSaving(true);
 
@@ -243,11 +246,11 @@ export default function AccountForm({ mode, account }: Props) {
     ]);
     if (!uOk) {
       setSaving(false);
-      return setError("That username is already taken.");
+      return setError(t("acc.err.usernameTaken"));
     }
     if (!eOk) {
       setSaving(false);
-      return setError("An account with that login email already exists.");
+      return setError(t("acc.err.emailExists"));
     }
 
     const base = {
@@ -273,7 +276,7 @@ export default function AccountForm({ mode, account }: Props) {
       });
       setSaving(false);
       if (!created) {
-        setError("Could not create account. Check the browser console for details.");
+        setError(t("acc.err.createFailed"));
         return;
       }
       router.push(`/accounts/${created.id}`);
@@ -284,7 +287,7 @@ export default function AccountForm({ mode, account }: Props) {
       });
       setSaving(false);
       if (!ok) {
-        setError("Could not update account. Check the console for details.");
+        setError(t("acc.err.updateFailed"));
         return;
       }
       router.push(`/accounts/${account.id}`);
@@ -294,12 +297,14 @@ export default function AccountForm({ mode, account }: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        <div className="max-w-[960px] mx-auto px-4 md:px-6 lg:px-8 py-8">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-64 bg-[var(--bg-surface-subtle)] rounded" />
             <div className="h-52 bg-[var(--bg-surface-subtle)] rounded-2xl" />
-            <div className="h-52 bg-[var(--bg-surface-subtle)] rounded-2xl" />
-            <div className="h-52 bg-[var(--bg-surface-subtle)] rounded-2xl" />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="h-52 bg-[var(--bg-surface-subtle)] rounded-2xl" />
+              <div className="h-52 bg-[var(--bg-surface-subtle)] rounded-2xl" />
+            </div>
           </div>
         </div>
       </div>
@@ -308,7 +313,7 @@ export default function AccountForm({ mode, account }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[960px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-6 md:py-8">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8">
@@ -321,12 +326,12 @@ export default function AccountForm({ mode, account }: Props) {
             </Link>
             <div>
               <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)]">
-                {mode === "create" ? "New Account" : "Edit Account"}
+                {mode === "create" ? t("acc.newAccount") : t("acc.editAccount")}
               </h1>
               <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
                 {mode === "create"
-                  ? "Provision a login identity linked to a person and a company."
-                  : `Update the login identity for ${account?.username ?? "this account"}.`}
+                  ? t("acc.createSubtitle")
+                  : `${t("acc.editSubtitle")} ${account?.username ?? t("acc.thisAccount")}.`}
               </p>
             </div>
           </div>
@@ -339,44 +344,47 @@ export default function AccountForm({ mode, account }: Props) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-5"
+        >
 
-          {/* ─── 1. Account Type ─── */}
-          <section className={sectionWrap}>
+          {/* ─── 1. Account Type ─── (spans full width on xl: heavy with access preset) */}
+          <section className={`${sectionWrap} xl:col-span-2`}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>1</span>
               <ShieldIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-              Account Type
+              {t("acc.form.accountType")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>User Type *</label>
+                <label className={labelClass}>{t("acc.field.userType")}</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["internal", "customer"] as UserType[]).map((t) => (
+                  {(["internal", "customer"] as UserType[]).map((ut) => (
                     <button
                       type="button"
-                      key={t}
-                      onClick={() => set("user_type", t)}
+                      key={ut}
+                      onClick={() => set("user_type", ut)}
                       className={`h-10 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${
-                        form.user_type === t
+                        form.user_type === ut
                           ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                           : "bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      {t}
+                      {ut === "internal" ? t("acc.type.internal") : t("acc.type.customer")}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className={labelClass}>Role *</label>
+                <label className={labelClass}>{t("acc.field.role")}</label>
                 <select
                   className={selectClass}
                   value={form.role_id}
                   onChange={(e) => set("role_id", e.target.value)}
                 >
-                  <option value="">— Select role —</option>
+                  <option value="">{t("acc.select.selectRole")}</option>
                   {availableRoles.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
@@ -386,21 +394,20 @@ export default function AccountForm({ mode, account }: Props) {
               </div>
 
               <div>
-                <label className={labelClass}>Status</label>
+                <label className={labelClass}>{t("acc.field.status")}</label>
                 <select
                   className={selectClass}
                   value={form.status}
                   onChange={(e) => set("status", e.target.value as AccountStatus)}
                 >
-                  <option value="invited">Invited</option>
-                  <option value="pending">Pending</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
+                  <option value="invited">{t("acc.status.invited")}</option>
+                  <option value="pending">{t("acc.status.pending")}</option>
+                  <option value="active">{t("acc.status.active")}</option>
+                  <option value="inactive">{t("acc.status.inactive")}</option>
+                  <option value="suspended">{t("acc.status.suspended")}</option>
                 </select>
                 <p className="text-[11px] text-[var(--text-dim)] mt-1.5">
-                  Use <span className="text-[var(--text-muted)] font-medium">Invited</span> when
-                  the account has been created but the user hasn&rsquo;t set a password yet.
+                  {t("acc.hint.statusInvited")}
                 </p>
               </div>
             </div>
@@ -412,23 +419,21 @@ export default function AccountForm({ mode, account }: Props) {
                   <LayersIcon className="h-3.5 w-3.5 text-[var(--text-faint)] mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                      Access preset · {preset.preset_name}
+                      {t("acc.preset.title")} · {preset.preset_name}
                     </p>
                     <p className="text-[11px] text-[var(--text-dim)] mt-1 mb-3">
-                      These are the default access flags for this role. Detailed
-                      module permissions will be managed in the permissions
-                      system later.
+                      {t("acc.preset.description")}
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                      <Flag on={preset.can_access_products} label="Products" />
-                      <Flag on={preset.can_view_pricing} label="Pricing" />
-                      <Flag on={preset.can_create_quotations} label="Quotations" />
-                      <Flag on={preset.can_place_orders} label="Orders" />
-                      <Flag on={preset.can_access_finance} label="Finance" />
-                      <Flag on={preset.can_access_hr} label="HR" />
-                      <Flag on={preset.can_access_marketing} label="Marketing" />
-                      <Flag on={preset.can_manage_products} label="Manage Products" />
-                      <Flag on={preset.can_manage_accounts} label="Manage Accounts" />
+                      <Flag on={preset.can_access_products} label={t("acc.preset.products")} />
+                      <Flag on={preset.can_view_pricing} label={t("acc.preset.pricing")} />
+                      <Flag on={preset.can_create_quotations} label={t("acc.preset.quotations")} />
+                      <Flag on={preset.can_place_orders} label={t("acc.preset.orders")} />
+                      <Flag on={preset.can_access_finance} label={t("acc.preset.finance")} />
+                      <Flag on={preset.can_access_hr} label={t("acc.preset.hr")} />
+                      <Flag on={preset.can_access_marketing} label={t("acc.preset.marketing")} />
+                      <Flag on={preset.can_manage_products} label={t("acc.preset.manageProducts")} />
+                      <Flag on={preset.can_manage_accounts} label={t("acc.preset.manageAccounts")} />
                     </div>
                   </div>
                 </div>
@@ -441,11 +446,11 @@ export default function AccountForm({ mode, account }: Props) {
             <h2 className={sectionHead}>
               <span className={sectionNumber}>2</span>
               <KeyIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-              Login Identity
+              {t("acc.form.loginIdentity")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Username *</label>
+                <label className={labelClass}>{t("acc.field.username")}</label>
                 <input
                   className={inputClass + " font-mono"}
                   value={form.username}
@@ -453,11 +458,11 @@ export default function AccountForm({ mode, account }: Props) {
                   placeholder="jane.cooper"
                 />
                 <p className="text-[10px] text-[var(--text-dim)] mt-1">
-                  3-32 chars, lowercase. Letters, numbers, dot, dash, underscore.
+                  {t("acc.hint.username")}
                 </p>
               </div>
               <div>
-                <label className={labelClass}>Login Email *</label>
+                <label className={labelClass}>{t("acc.field.loginEmail")}</label>
                 <input
                   type="email"
                   className={inputClass}
@@ -466,14 +471,14 @@ export default function AccountForm({ mode, account }: Props) {
                   placeholder="jane@koleex.com"
                 />
                 <p className="text-[10px] text-[var(--text-dim)] mt-1">
-                  Used as the login identifier. Not the person's personal email.
+                  {t("acc.hint.loginEmail")}
                 </p>
               </div>
             </div>
 
             {mode === "create" && (
               <div className="mt-4">
-                <label className={labelClass}>Temporary Password *</label>
+                <label className={labelClass}>{t("acc.field.tempPassword")}</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <input
@@ -506,7 +511,7 @@ export default function AccountForm({ mode, account }: Props) {
                   </button>
                 </div>
                 <p className="text-[11px] text-[var(--text-dim)] mt-2">
-                  The user will be forced to set their own password on first login.
+                  {t("acc.hint.tempPassword")}
                 </p>
               </div>
             )}
@@ -514,7 +519,7 @@ export default function AccountForm({ mode, account }: Props) {
             {mode === "edit" && (
               <div className="mt-4">
                 <Toggle
-                  label="Force password change on next login"
+                  label={t("acc.field.forceChangeOnLogin")}
                   checked={form.force_password_change}
                   onChange={(v) => set("force_password_change", v)}
                 />
@@ -527,18 +532,17 @@ export default function AccountForm({ mode, account }: Props) {
             <h2 className={sectionHead}>
               <span className={sectionNumber}>3</span>
               <Link2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-              Link Records
+              {t("acc.form.linkRecords")}
             </h2>
             <p className="text-[11px] text-[var(--text-dim)] -mt-3 mb-4">
-              Link this account to a company (workspace) and optionally to a
-              person (identity / profile). Create new records inline if needed.
+              {t("acc.hint.linkRecords")}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Company picker */}
               <div>
                 <label className={labelClass}>
-                  Company {isCustomer && "*"}
+                  {t("acc.field.company")} {isCustomer && "*"}
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -546,7 +550,7 @@ export default function AccountForm({ mode, account }: Props) {
                     value={form.company_id}
                     onChange={(e) => set("company_id", e.target.value)}
                   >
-                    <option value="">— Select company —</option>
+                    <option value="">{t("acc.select.selectCompany")}</option>
                     {companies.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -577,7 +581,7 @@ export default function AccountForm({ mode, account }: Props) {
 
               {/* Person picker */}
               <div>
-                <label className={labelClass}>Contact (Person)</label>
+                <label className={labelClass}>{t("acc.field.contactPerson")}</label>
                 <div className="flex gap-2">
                   <select
                     className={selectClass}
@@ -595,7 +599,7 @@ export default function AccountForm({ mode, account }: Props) {
                       }
                     }}
                   >
-                    <option value="">— Select person —</option>
+                    <option value="">{t("acc.select.selectPerson")}</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.full_name}
@@ -614,7 +618,7 @@ export default function AccountForm({ mode, account }: Props) {
                 </div>
                 {selectedPerson && (
                   <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
-                    {selectedPerson.email || "no email"}
+                    {selectedPerson.email || t("acc.hint.noEmail")}
                     {selectedPerson.phone ? ` · ${selectedPerson.phone}` : ""}
                   </p>
                 )}
@@ -646,76 +650,72 @@ export default function AccountForm({ mode, account }: Props) {
               <h2 className={sectionHead}>
                 <span className={sectionNumber}>4</span>
                 <GlobeIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-                Customer Settings
+                {t("acc.form.customerSettings")}
               </h2>
               {selectedCompany ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ReadOnlyField label="Company" value={selectedCompany.name} />
+                  <ReadOnlyField label={t("acc.field.company")} value={selectedCompany.name} />
                   <ReadOnlyField
-                    label="Customer Level"
+                    label={t("acc.inline.customerLevelLabel")}
                     value={
                       selectedCompany.customer_level
                         ? selectedCompany.customer_level.toUpperCase()
-                        : "— not set —"
+                        : t("acc.hint.notSet")
                     }
                   />
                   <ReadOnlyField
-                    label="Price Level"
+                    label={t("acc.preset.pricing")}
                     value={
                       selectedCompany.customer_level
-                        ? `Derived from ${selectedCompany.customer_level}`
+                        ? `${t("acc.hint.derivedFrom")} ${selectedCompany.customer_level}`
                         : "—"
                     }
                   />
                   <ReadOnlyField
-                    label="Country"
+                    label={t("acc.inline.country")}
                     value={selectedCompany.country || "—"}
                   />
                   <ReadOnlyField
-                    label="Currency"
+                    label={t("acc.inline.currency")}
                     value={selectedCompany.currency || "—"}
                   />
                 </div>
               ) : (
                 <p className="text-[13px] text-[var(--text-dim)]">
-                  Select or create a customer company above to see its level,
-                  country, and currency. These fields belong to the company —
-                  not the account — so every user under the same company
-                  inherits the same pricing logic.
+                  {t("acc.hint.customerNoPricing")}
                 </p>
               )}
               {selectedCompany && !selectedCompany.customer_level && (
                 <p className="text-[11px] text-amber-400/80 mt-3">
-                  This company has no customer level set. Edit the company to
-                  set it — customer level drives pricing for all its users.
+                  {t("acc.hint.noCustomerLevel")}
                 </p>
               )}
             </section>
           )}
 
-          {/* ─── 5. Notes ─── */}
-          <section className={sectionWrap}>
+          {/* ─── 5. Notes ─── (spans full width when Customer Settings isn't shown, so it doesn't sit alone on xl) */}
+          <section className={`${sectionWrap} ${isCustomer ? "" : "xl:col-span-2"}`}>
             <h2 className={sectionHead}>
               <span className={sectionNumber}>{isCustomer ? 5 : 4}</span>
               <StickyNoteIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-              Notes
+              {t("acc.form.notes")}
             </h2>
-            <label className={labelClass}>Internal Notes (admin only)</label>
+            <label className={labelClass}>{t("acc.field.internalNotes")}</label>
             <textarea
               className={inputClass + " h-24 py-2 resize-y"}
               value={form.internal_notes}
               onChange={(e) => set("internal_notes", e.target.value)}
-              placeholder="Private notes visible only to admins."
+              placeholder={t("acc.hint.notesPlaceholder")}
             />
           </section>
 
-          {/* ── Actions ── */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          {/* ── Actions (always full width) ── */}
+          <div className="flex items-center justify-end gap-2 pt-2 xl:col-span-2">
             <Link
               href={mode === "edit" && account ? `/accounts/${account.id}` : "/accounts"}
               className="h-10 px-5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              Cancel
+              {t("acc.btn.cancel")}
             </Link>
             <button
               type="submit"
@@ -723,7 +723,7 @@ export default function AccountForm({ mode, account }: Props) {
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
             >
               <DiskIcon className="h-4 w-4" />
-              {saving ? "Saving…" : mode === "create" ? "Create Account" : "Save Changes"}
+              {saving ? t("acc.btn.saving") : mode === "create" ? t("acc.btn.createAccount") : t("acc.btn.save")}
             </button>
           </div>
         </form>
@@ -742,6 +742,7 @@ function InlineCompanyPanel({
   onCreated: (c: CompanyRow) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(accountsT);
   const [name, setName] = useState("");
   const [type, setType] = useState<CompanyType>(defaultType);
   const [country, setCountry] = useState("");
@@ -751,7 +752,7 @@ function InlineCompanyPanel({
   const [err, setErr] = useState<string | null>(null);
 
   async function save() {
-    if (!name.trim()) return setErr("Company name is required.");
+    if (!name.trim()) return setErr(t("acc.err.companyNameRequired"));
     setSaving(true);
     setErr(null);
     const c = await createCompany({
@@ -767,7 +768,7 @@ function InlineCompanyPanel({
     });
     setSaving(false);
     if (!c) {
-      setErr("Could not create company.");
+      setErr(t("acc.err.companyCreateFailed"));
       return;
     }
     onCreated(c);
@@ -778,7 +779,7 @@ function InlineCompanyPanel({
       <div className="flex items-center gap-2 mb-3">
         <Building2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
         <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-          New Company
+          {t("acc.inline.newCompany")}
         </span>
       </div>
       {err && (
@@ -789,7 +790,7 @@ function InlineCompanyPanel({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Company Name *
+            {t("acc.inline.companyName")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -800,40 +801,40 @@ function InlineCompanyPanel({
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Type
+            {t("acc.inline.companyType")}
           </label>
           <select
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
             value={type}
             onChange={(e) => setType(e.target.value as CompanyType)}
           >
-            <option value="koleex">Koleex (internal)</option>
-            <option value="customer">Customer</option>
-            <option value="supplier">Supplier</option>
-            <option value="partner">Partner</option>
+            <option value="koleex">{t("acc.inline.koleexInternal")}</option>
+            <option value="customer">{t("acc.type.customer")}</option>
+            <option value="supplier">{t("acc.inline.supplier")}</option>
+            <option value="partner">{t("acc.inline.partner")}</option>
           </select>
         </div>
         {type === "customer" && (
           <div>
             <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-              Customer Level (drives pricing)
+              {t("acc.inline.customerLevelLabel")}
             </label>
             <select
               className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
               value={customerLevel}
               onChange={(e) => setCustomerLevel(e.target.value as CustomerLevel | "")}
             >
-              <option value="">— None —</option>
-              <option value="silver">Silver</option>
-              <option value="gold">Gold</option>
-              <option value="platinum">Platinum</option>
-              <option value="diamond">Diamond</option>
+              <option value="">{t("acc.select.none")}</option>
+              <option value="silver">{t("acc.level.silver")}</option>
+              <option value="gold">{t("acc.level.gold")}</option>
+              <option value="platinum">{t("acc.level.platinum")}</option>
+              <option value="diamond">{t("acc.level.diamond")}</option>
             </select>
           </div>
         )}
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Country
+            {t("acc.inline.country")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -845,7 +846,7 @@ function InlineCompanyPanel({
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Currency
+            {t("acc.inline.currency")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -862,7 +863,7 @@ function InlineCompanyPanel({
           onClick={onCancel}
           className="h-9 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >
-          Cancel
+          {t("acc.btn.cancel")}
         </button>
         <button
           type="button"
@@ -871,7 +872,7 @@ function InlineCompanyPanel({
           className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
-          {saving ? "Saving…" : "Add Company"}
+          {saving ? t("acc.btn.saving") : t("acc.inline.addCompany")}
         </button>
       </div>
     </div>
@@ -888,6 +889,7 @@ function InlinePersonPanel({
   onCreated: (p: PersonRow) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(accountsT);
   const [fullName, setFullName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [email, setEmail] = useState("");
@@ -896,7 +898,7 @@ function InlinePersonPanel({
   const [err, setErr] = useState<string | null>(null);
 
   async function save() {
-    if (!fullName.trim()) return setErr("Full name is required.");
+    if (!fullName.trim()) return setErr(t("acc.err.personNameRequired"));
     setSaving(true);
     setErr(null);
     const p = await createPerson({
@@ -909,6 +911,9 @@ function InlinePersonPanel({
       phone: phone.trim() || null,
       mobile: null,
       avatar_url: null,
+      name_alt: null,
+      first_name_alt: null,
+      last_name_alt: null,
       address_line1: null,
       address_line2: null,
       city: null,
@@ -922,7 +927,7 @@ function InlinePersonPanel({
     });
     setSaving(false);
     if (!p) {
-      setErr("Could not create person.");
+      setErr(t("acc.err.personCreateFailed"));
       return;
     }
     onCreated(p);
@@ -933,7 +938,7 @@ function InlinePersonPanel({
       <div className="flex items-center gap-2 mb-3">
         <UserCircle2Icon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
         <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-          New Contact (Person)
+          {t("acc.inline.newContact")}
         </span>
       </div>
       {err && (
@@ -944,7 +949,7 @@ function InlinePersonPanel({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="md:col-span-2">
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Full Name *
+            {t("acc.inline.fullName")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -955,7 +960,7 @@ function InlinePersonPanel({
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Job Title
+            {t("acc.inline.jobTitle")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -966,7 +971,7 @@ function InlinePersonPanel({
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Personal Email
+            {t("acc.inline.personalEmail")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -977,7 +982,7 @@ function InlinePersonPanel({
         </div>
         <div>
           <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-            Phone
+            {t("acc.inline.phone")}
           </label>
           <input
             className="w-full h-9 px-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
@@ -993,7 +998,7 @@ function InlinePersonPanel({
           onClick={onCancel}
           className="h-9 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
         >
-          Cancel
+          {t("acc.btn.cancel")}
         </button>
         <button
           type="button"
@@ -1002,7 +1007,7 @@ function InlinePersonPanel({
           className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-60"
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />
-          {saving ? "Saving…" : "Add Contact"}
+          {saving ? t("acc.btn.saving") : t("acc.inline.addContact")}
         </button>
       </div>
     </div>
@@ -1055,12 +1060,12 @@ function Toggle({
     >
       <span>{label}</span>
       <span
-        className={`relative inline-block h-5 w-9 rounded-full transition-colors ${
-          checked ? "bg-emerald-500/80" : "bg-[var(--bg-surface-bright)]"
+        className={`relative inline-block h-5 w-9 rounded-full transition-colors duration-200 ${
+          checked ? "bg-emerald-500" : "bg-zinc-600"
         }`}
       >
         <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
             checked ? "translate-x-4" : "translate-x-0.5"
           }`}
         />
