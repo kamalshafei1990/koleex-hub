@@ -1064,9 +1064,12 @@ function Toggle({
           checked ? "bg-emerald-500" : "bg-zinc-600"
         }`}
       >
+        {/* Anchor the handle at start-0.5 (2px from logical start) and only
+            animate with translate — this keeps the off and on positions
+            symmetric (2px gap on each side) and makes the toggle RTL-safe. */}
         <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
-            checked ? "translate-x-4" : "translate-x-0.5"
+          className={`absolute top-0.5 start-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+            checked ? "translate-x-4 rtl:-translate-x-4" : ""
           }`}
         />
       </span>
