@@ -970,6 +970,16 @@ export async function upsertEmployeeByAccountId(
    ============================================================================ */
 
 export async function fetchRoles(): Promise<RoleRow[]> {
+  try {
+    const res = await fetch("/api/roles", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { roles: RoleRow[] };
+      return json.roles;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Roles] Fetch API failed:", e);
+  }
   const { data, error } = await supabase
     .from(ROLES)
     .select("*")

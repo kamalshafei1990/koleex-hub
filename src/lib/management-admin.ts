@@ -494,6 +494,16 @@ export async function deleteAssignment(
    ═══════════════════════════════════════════════════ */
 
 export async function fetchRoles(): Promise<RoleRow[]> {
+  try {
+    const res = await fetch("/api/roles", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { roles: RoleRow[] };
+      return json.roles;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Management] fetchRoles API failed:", e);
+  }
   const { data, error } = await supabaseAdmin
     .from("koleex_roles")
     .select("*")
@@ -509,6 +519,22 @@ export async function fetchRoles(): Promise<RoleRow[]> {
 export async function createRole(
   obj: Partial<RoleRow>,
 ): Promise<{ data: RoleRow | null; error: string | null }> {
+  try {
+    const res = await fetch("/api/roles", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { role: RoleRow };
+      return { data: json.role, error: null };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { data: null, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Management] createRole API failed:", e);
+  }
   const { data, error } = await supabaseAdmin
     .from("koleex_roles")
     .insert({ ...obj, updated_at: new Date().toISOString() })
@@ -523,6 +549,19 @@ export async function updateRole(
   id: string,
   obj: Partial<RoleRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch("/api/roles/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj),
+    });
+    if (res.ok) return { ok: true, error: null };
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Management] updateRole API failed:", e);
+  }
   const { error } = await supabaseAdmin
     .from("koleex_roles")
     .update({ ...obj, updated_at: new Date().toISOString() })
@@ -535,6 +574,17 @@ export async function updateRole(
 export async function deleteRole(
   id: string,
 ): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch("/api/roles/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return { ok: true, error: null };
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Management] deleteRole API failed:", e);
+  }
   // Unlink positions first
   await supabaseAdmin
     .from("koleex_positions")
@@ -554,6 +604,21 @@ export async function deleteRole(
 export async function cloneRole(
   sourceRoleId: string,
 ): Promise<{ data: RoleRow | null; error: string | null }> {
+  try {
+    const res = await fetch("/api/roles/" + sourceRoleId + "/clone", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { role: RoleRow };
+      return { data: json.role, error: null };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { data: null, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Management] cloneRole API failed:", e);
+  }
+
   const { data: src, error: fetchErr } = await supabaseAdmin
     .from("koleex_roles")
     .select("*")
@@ -594,6 +659,18 @@ export async function cloneRole(
    ═══════════════════════════════════════════════════ */
 
 export async function fetchPermissions(roleId: string): Promise<PermissionRow[]> {
+  try {
+    const res = await fetch("/api/permissions?role_id=" + encodeURIComponent(roleId), {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { permissions: PermissionRow[] };
+      return json.permissions;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Management] fetchPermissions API failed:", e);
+  }
   const { data, error } = await supabaseAdmin
     .from("koleex_permissions")
     .select("*")
@@ -617,6 +694,19 @@ export async function upsertPermissions(
     data_scope?: DataScope;
   }[],
 ): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch("/api/permissions", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role_id: roleId, permissions: perms }),
+    });
+    if (res.ok) return { ok: true, error: null };
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Management] upsertPermissions API failed:", e);
+  }
   const rows = perms.map((p) => ({
     role_id: roleId,
     module_name: p.module_name,
