@@ -29,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  void supabaseServer.from("account_security_events").insert({
+  void supabaseServer.from("account_login_history").insert({
     account_id: id,
     event_type: force ? "force_reset_enabled" : "force_reset_cleared",
     metadata: {},

@@ -29,8 +29,8 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Mirror the status change into the security audit log.
-  void supabaseServer.from("account_security_events").insert({
+  // Mirror the status change into the login-history audit log.
+  void supabaseServer.from("account_login_history").insert({
     account_id: id,
     event_type: "logout",
     metadata: { reason: "status_change", status },
