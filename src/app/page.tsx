@@ -234,12 +234,22 @@ export default function HomePage() {
   const handleAppClick = useCallback(
     (app: AppDef) => {
       if (!app.active) return;
+      // Navigate FIRST so the page layout doesn't jump before navigating
+      // — updating setRecentIds synchronously causes the "Recently Used"
+      // section to grow, shifting the click target before router.push
+      // kicks in, which looks like the page auto-scrolls.
+      router.push(app.route);
       const id = accountIdRef.current;
       if (id) {
         trackAppOpen(id, app.id);
-        setRecentIds((prev) => [app.id, ...prev.filter((a) => a !== app.id)].slice(0, 8));
+        // Defer the state update so it doesn't re-layout the page the
+        // user is about to leave.
+        setTimeout(() => {
+          setRecentIds((prev) =>
+            [app.id, ...prev.filter((a) => a !== app.id)].slice(0, 8),
+          );
+        }, 0);
       }
-      router.push(app.route);
     },
     [router],
   );
