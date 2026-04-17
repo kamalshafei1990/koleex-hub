@@ -48,6 +48,27 @@ export async function fetchEventsInRange(
   rangeEnd: Date,
   ctx?: ScopeContext | null,
 ): Promise<CalendarEventRow[]> {
+  // Try API first — server-side route validates session + enforces
+  // Type C rules (only SA can view someone else's calendar) via the
+  // service_role client, not anon.
+  try {
+    const params = new URLSearchParams({
+      accountId,
+      from: rangeStart.toISOString(),
+      to: rangeEnd.toISOString(),
+    });
+    const res = await fetch("/api/calendar/events?" + params.toString(), {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { events: CalendarEventRow[] };
+      return json.events;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Calendar] fetchEventsInRange API failed:", e);
+  }
+
   // Legacy path: no ctx means the caller hasn't migrated to scope yet.
   // Preserve the old strict per-user behaviour.
   if (!ctx) {

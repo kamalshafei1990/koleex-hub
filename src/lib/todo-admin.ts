@@ -82,6 +82,21 @@ async function resolveAssignees(accountIds: string[]): Promise<TodoAssigneeInfo[
 export async function fetchTodos(
   ctx?: ScopeContext | null,
 ): Promise<TodoWithRelations[]> {
+  // Try API first — server-side route does Type C scope + enrichment via
+  // service_role, so this path stays sound even after temp RLS policies
+  // are dropped.
+  try {
+    const res = await fetch("/api/todos", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { todos: TodoWithRelations[] };
+      return json.todos;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Todos] fetchTodos API failed:", e);
+  }
+
+  // Legacy fallback — direct anon-key query with local scope logic.
   // Build scope filter once (loads shared IDs from assignee junction in a
   // single round-trip) — returns null when no ctx provided (wide-open).
   const filter = ctx
