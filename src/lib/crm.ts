@@ -96,6 +96,21 @@ export async function fetchStages(
 export async function createStage(
   input: CrmStageInsert,
 ): Promise<CrmStageRow | null> {
+  try {
+    const res = await fetch("/api/crm/stages", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { stage: CrmStageRow | null };
+      return json.stage;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[CRM] createStage API failed:", e);
+  }
   const { data, error } = await supabase
     .from(STAGES)
     .insert(input)
@@ -112,6 +127,18 @@ export async function updateStage(
   id: string,
   patch: CrmStageUpdate,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/stages/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] updateStage API failed:", e);
+  }
   const { error } = await supabase.from(STAGES).update(patch).eq("id", id);
   if (error) {
     console.error("[CRM] Update stage:", error.message);
@@ -121,6 +148,16 @@ export async function updateStage(
 }
 
 export async function deleteStage(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/stages/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] deleteStage API failed:", e);
+  }
   const { error } = await supabase.from(STAGES).delete().eq("id", id);
   if (error) {
     console.error("[CRM] Delete stage:", error.message);
@@ -447,6 +484,25 @@ export async function createOpportunity(
   | { ok: true; opportunity: CrmOpportunityRow }
   | { ok: false; error: string }
 > {
+  try {
+    const res = await fetch("/api/crm/opportunities", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { opportunity: CrmOpportunityRow };
+      return { ok: true, opportunity: json.opportunity };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "Not authorized" };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[CRM] createOpportunity API failed:", e);
+  }
   const { data, error } = await supabase
     .from(OPPS)
     .insert(input)
@@ -457,9 +513,6 @@ export async function createOpportunity(
     return { ok: false, error: error.message };
   }
   const opp = data as CrmOpportunityRow;
-  // Rare but possible: a deal is created directly in a Won stage
-  // (backfill, import, etc). Sync so we don't leak a prospect that's
-  // actually a customer.
   if (await isWonStageId(opp.stage_id)) {
     await reflectWinOnContact(opp.contact_id);
   }
@@ -470,14 +523,23 @@ export async function updateOpportunity(
   id: string,
   patch: CrmOpportunityUpdate,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/opportunities/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] updateOpportunity API failed:", e);
+  }
   const { error } = await supabase.from(OPPS).update(patch).eq("id", id);
   if (error) {
     console.error("[CRM] Update opportunity:", error.message);
     return false;
   }
-  // If the edit touched the stage and landed in Won, mirror onto the
-  // contact. Reads the row fresh so we pick up the *current* contact
-  // even if the patch reassigned it in the same call.
   if (patch.stage_id && (await isWonStageId(patch.stage_id))) {
     const { data: opp } = await supabase
       .from(OPPS)
@@ -497,6 +559,24 @@ export async function moveOpportunityToStage(input: {
   stageId: string;
   isWonStage: boolean;
 }): Promise<boolean> {
+  try {
+    const res = await fetch(
+      "/api/crm/opportunities/" + input.opportunityId + "/move",
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stageId: input.stageId,
+          isWonStage: input.isWonStage,
+        }),
+      },
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] moveOpportunityToStage API failed:", e);
+  }
   const patch: CrmOpportunityUpdate = {
     stage_id: input.stageId,
   };
@@ -512,7 +592,6 @@ export async function moveOpportunityToStage(input: {
     console.error("[CRM] Move opportunity:", error.message);
     return false;
   }
-  // Primary kanban / detail-view write path for moving into Won.
   if (input.isWonStage) {
     const { data: opp } = await supabase
       .from(OPPS)
@@ -531,6 +610,18 @@ export async function markOpportunityLost(
   id: string,
   reason: string,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/opportunities/" + id + "/lost", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] markOpportunityLost API failed:", e);
+  }
   const now = new Date().toISOString();
   const { error } = await supabase
     .from(OPPS)
@@ -549,6 +640,16 @@ export async function markOpportunityLost(
 }
 
 export async function archiveOpportunity(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/opportunities/" + id + "/archive", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] archiveOpportunity API failed:", e);
+  }
   const { error } = await supabase
     .from(OPPS)
     .update({ archived_at: new Date().toISOString() })
@@ -561,6 +662,16 @@ export async function archiveOpportunity(id: string): Promise<boolean> {
 }
 
 export async function unarchiveOpportunity(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/opportunities/" + id + "/archive", {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] unarchiveOpportunity API failed:", e);
+  }
   const { error } = await supabase
     .from(OPPS)
     .update({ archived_at: null })
@@ -573,6 +684,16 @@ export async function unarchiveOpportunity(id: string): Promise<boolean> {
 }
 
 export async function deleteOpportunity(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/opportunities/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] deleteOpportunity API failed:", e);
+  }
   const { error } = await supabase.from(OPPS).delete().eq("id", id);
   if (error) {
     console.error("[CRM] Delete opportunity:", error.message);
@@ -605,6 +726,21 @@ export async function fetchActivities(
 export async function createActivity(
   input: CrmActivityInsert,
 ): Promise<CrmActivityRow | null> {
+  try {
+    const res = await fetch("/api/crm/activities", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { activity: CrmActivityRow | null };
+      return json.activity;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[CRM] createActivity API failed:", e);
+  }
   const { data, error } = await supabase
     .from(ACTS)
     .insert(input)
@@ -621,6 +757,18 @@ export async function updateActivity(
   id: string,
   patch: CrmActivityUpdate,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/activities/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] updateActivity API failed:", e);
+  }
   const { error } = await supabase.from(ACTS).update(patch).eq("id", id);
   if (error) {
     console.error("[CRM] Update activity:", error.message);
@@ -638,6 +786,16 @@ export async function reopenActivity(id: string): Promise<boolean> {
 }
 
 export async function deleteActivity(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/crm/activities/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[CRM] deleteActivity API failed:", e);
+  }
   const { error } = await supabase.from(ACTS).delete().eq("id", id);
   if (error) {
     console.error("[CRM] Delete activity:", error.message);

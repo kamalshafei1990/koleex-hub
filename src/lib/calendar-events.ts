@@ -191,6 +191,21 @@ export async function fetchEventById(id: string): Promise<CalendarEventRow | nul
 export async function createEvent(
   input: CalendarEventInsert,
 ): Promise<CalendarEventRow | null> {
+  try {
+    const res = await fetch("/api/calendar/events", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { event: CalendarEventRow | null };
+      return json.event;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Calendar] createEvent API failed:", e);
+  }
   const { data, error } = await supabase
     .from(EVENTS)
     .insert(input)
@@ -207,6 +222,21 @@ export async function updateEvent(
   id: string,
   patch: CalendarEventUpdate,
 ): Promise<CalendarEventRow | null> {
+  try {
+    const res = await fetch("/api/calendar/events/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { event: CalendarEventRow | null };
+      return json.event;
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) return null;
+  } catch (e) {
+    console.error("[Calendar] updateEvent API failed:", e);
+  }
   const { data, error } = await supabase
     .from(EVENTS)
     .update(patch)
@@ -221,6 +251,16 @@ export async function updateEvent(
 }
 
 export async function deleteEvent(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/calendar/events/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Calendar] deleteEvent API failed:", e);
+  }
   const { error } = await supabase.from(EVENTS).delete().eq("id", id);
   if (error) {
     console.error("[Calendar] deleteEvent:", error.message);

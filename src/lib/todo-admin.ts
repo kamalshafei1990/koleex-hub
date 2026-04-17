@@ -226,6 +226,40 @@ export async function createTodo(input: {
   assigned_department?: string | null;
   assign_to_all?: boolean;
 }): Promise<TodoRow | null> {
+  // API-first — server enforces creator/tenant and handles fan-out.
+  try {
+    const res = await fetch("/api/todos", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        label: input.label,
+        due_date: input.due_date,
+        source: input.source,
+        source_id: input.source_id,
+        assignee_account_ids: input.assignee_account_ids,
+        assigned_department: input.assigned_department,
+        assign_to_all: input.assign_to_all,
+      }),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { todo: TodoRow | null };
+      if (typeof window !== "undefined" && json.todo) {
+        setTimeout(
+          () => window.dispatchEvent(new CustomEvent("inbox:force-recount")),
+          500,
+        );
+      }
+      return json.todo;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Todos] createTodo API failed:", e);
+  }
+
   const { data: todo, error } = await supabase
     .from("koleex_todos")
     .insert({
@@ -328,6 +362,19 @@ export async function updateTodo(
   updates: TodoUpdate,
   newAssigneeIds?: string[],
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/todos/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates, newAssigneeIds }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Todos] updateTodo API failed:", e);
+  }
+
   const { error } = await supabase
     .from("koleex_todos")
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -338,7 +385,6 @@ export async function updateTodo(
     return false;
   }
 
-  // Re-sync assignees if provided
   if (newAssigneeIds !== undefined) {
     await supabase.from("koleex_todo_assignees").delete().eq("todo_id", id);
     if (newAssigneeIds.length > 0) {
@@ -354,12 +400,22 @@ export async function updateTodo(
 /* ── Toggle complete ── */
 
 export async function toggleTodo(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/todos/" + id + "/toggle", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Todos] toggleTodo API failed:", e);
+  }
+
   const { data: row } = await supabase
     .from("koleex_todos")
     .select("completed")
     .eq("id", id)
     .single();
-
   if (!row) return false;
 
   const now = new Date().toISOString();
@@ -371,13 +427,22 @@ export async function toggleTodo(id: string): Promise<boolean> {
       updated_at: now,
     })
     .eq("id", id);
-
   return !error;
 }
 
 /* ── Delete todo ── */
 
 export async function deleteTodo(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/todos/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Todos] deleteTodo API failed:", e);
+  }
   const { error } = await supabase.from("koleex_todos").delete().eq("id", id);
   return !error;
 }
@@ -389,6 +454,21 @@ export async function addTodoNote(
   authorAccountId: string,
   body: string,
 ): Promise<TodoNoteRow | null> {
+  try {
+    const res = await fetch("/api/todos/" + todoId + "/notes", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { note: TodoNoteRow | null };
+      return json.note;
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) return null;
+  } catch (e) {
+    console.error("[Todos] addTodoNote API failed:", e);
+  }
   const { data, error } = await supabase
     .from("koleex_todo_notes")
     .insert({ todo_id: todoId, author_account_id: authorAccountId, body })
@@ -403,6 +483,16 @@ export async function addTodoNote(
 }
 
 export async function deleteTodoNote(noteId: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/todo-notes/" + noteId, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Todos] deleteTodoNote API failed:", e);
+  }
   const { error } = await supabase.from("koleex_todo_notes").delete().eq("id", noteId);
   return !error;
 }
@@ -410,6 +500,16 @@ export async function deleteTodoNote(noteId: string): Promise<boolean> {
 /* ── Labels ── */
 
 export async function fetchTodoLabels(): Promise<TodoLabelRow[]> {
+  try {
+    const res = await fetch("/api/todo-labels", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { labels: TodoLabelRow[] };
+      return json.labels;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Todos] fetchTodoLabels API failed:", e);
+  }
   const { data } = await supabase
     .from("koleex_todo_labels")
     .select("*")
@@ -421,6 +521,21 @@ export async function createTodoLabel(
   name: string,
   color?: string | null,
 ): Promise<TodoLabelRow | null> {
+  try {
+    const res = await fetch("/api/todo-labels", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color }),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { label: TodoLabelRow | null };
+      return json.label;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Todos] createTodoLabel API failed:", e);
+  }
   const { data, error } = await supabase
     .from("koleex_todo_labels")
     .insert({ name, color: color ?? null })

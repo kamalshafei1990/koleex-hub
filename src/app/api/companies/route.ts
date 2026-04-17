@@ -24,3 +24,23 @@ export async function GET() {
   }
   return NextResponse.json({ companies: data ?? [] });
 }
+
+/* POST /api/companies — create a company (tenant_id enforced). */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const row = { ...body, tenant_id: auth.tenant_id };
+
+  const { data, error } = await supabaseServer
+    .from("companies")
+    .insert(row)
+    .select("*")
+    .single();
+  if (error) {
+    console.error("[api/companies POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ company: data });
+}

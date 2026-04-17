@@ -313,6 +313,25 @@ export async function fetchContactsByType(
 }
 
 export async function createContact(obj: Record<string, unknown>): Promise<{ data: ContactRow | null; error: string | null }> {
+  try {
+    const res = await fetch("/api/contacts", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { contact: ContactRow | null };
+      return { data: json.contact, error: null };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { data: null, error: "Not authorized" };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { data: null, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Contacts] createContact API failed:", e);
+  }
   const { data, error } = await supabase.from("contacts").insert(obj).select().single();
   if (error) {
     console.error("[Contacts] Create:", error.message);
@@ -322,6 +341,22 @@ export async function createContact(obj: Record<string, unknown>): Promise<{ dat
 }
 
 export async function updateContact(id: string, obj: Record<string, unknown>): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch("/api/contacts/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj),
+    });
+    if (res.ok) return { ok: true, error: null };
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      return { ok: false, error: "Not authorized" };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Contacts] updateContact API failed:", e);
+  }
   const { error } = await supabase.from("contacts").update(obj).eq("id", id);
   if (error) {
     console.error("[Contacts] Update:", error.message);
@@ -331,6 +366,20 @@ export async function updateContact(id: string, obj: Record<string, unknown>): P
 }
 
 export async function deleteContact(id: string): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    const res = await fetch("/api/contacts/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return { ok: true, error: null };
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      return { ok: false, error: "Not authorized" };
+    }
+    const err = await res.json().catch(() => ({ error: "Failed" }));
+    return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
+  } catch (e) {
+    console.error("[Contacts] deleteContact API failed:", e);
+  }
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) {
     console.error("[Contacts] Delete:", error.message);

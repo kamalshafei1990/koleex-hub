@@ -26,3 +26,24 @@ export async function GET() {
 
   return NextResponse.json({ stages: data ?? [] });
 }
+
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "CRM");
+  if (deny) return deny;
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const row = { ...body, tenant_id: auth.tenant_id };
+
+  const { data, error } = await supabaseServer
+    .from("crm_stages")
+    .insert(row)
+    .select("*")
+    .single();
+  if (error) {
+    console.error("[api/crm/stages POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ stage: data });
+}

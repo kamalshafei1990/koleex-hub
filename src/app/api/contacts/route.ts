@@ -52,3 +52,29 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ contacts: data ?? [] });
 }
+
+/* POST /api/contacts — Create a new contact (tenant_id enforced from session). */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Customers");
+  if (deny) return deny;
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const row = { ...body, tenant_id: auth.tenant_id };
+
+  const { data, error } = await supabaseServer
+    .from("contacts")
+    .insert(row)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[api/contacts POST]", error.message);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ contact: data });
+}

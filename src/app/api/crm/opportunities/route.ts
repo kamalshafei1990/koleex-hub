@@ -188,3 +188,67 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ opportunities: enriched });
 }
+
+/* POST /api/crm/opportunities
+   Create a new opportunity. Server enforces tenant_id. If the chosen
+   stage is a Won stage, the contact's customer_type is mirrored. */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "CRM");
+  if (deny) return deny;
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const row = { ...body, tenant_id: auth.tenant_id };
+
+  const { data, error } = await supabaseServer
+    .from("crm_opportunities")
+    .insert(row)
+    .select("*")
+    .single();
+  if (error) {
+    console.error("[api/crm/opportunities POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const opp = data as { id: string; stage_id: string; contact_id: string | null };
+  // Mirror a direct-to-Won creation onto the contact.
+  if (await isWonStage(opp.stage_id, auth.tenant_id)) {
+    await reflectWinOnContact(opp.contact_id, auth.tenant_id);
+  }
+
+  return NextResponse.json({ opportunity: opp });
+}
+
+async function isWonStage(
+  stageId: string,
+  tenantId: string | null,
+): Promise<boolean> {
+  let q = supabaseServer
+    .from("crm_stages")
+    .select("is_won")
+    .eq("id", stageId);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data } = await q.maybeSingle();
+  return Boolean((data as { is_won?: boolean } | null)?.is_won);
+}
+
+async function reflectWinOnContact(
+  contactId: string | null,
+  tenantId: string | null,
+): Promise<void> {
+  if (!contactId) return;
+  let q = supabaseServer
+    .from("contacts")
+    .select("customer_type")
+    .eq("id", contactId);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data } = await q.maybeSingle();
+  const currentType = (data as { customer_type?: string | null } | null)
+    ?.customer_type;
+  if (currentType === "customer") return;
+  await supabaseServer
+    .from("contacts")
+    .update({ customer_type: "customer" })
+    .eq("id", contactId);
+}

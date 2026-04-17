@@ -198,6 +198,118 @@ export async function GET() {
   return NextResponse.json({ todos: enriched });
 }
 
+/* POST /api/todos — create a todo.
+   Body: { title, description?, priority?, label?, due_date?, source?,
+           source_id?, assignee_account_ids?, assigned_department?,
+           assign_to_all?, is_private? }
+   Server enforces creator/assigner = auth.account_id and tenant_id from
+   the session. Fan-out to koleex_todo_assignees + inbox_messages. */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "To-do");
+  if (deny) return deny;
+
+  const body = (await req.json()) as {
+    title: string;
+    description?: string | null;
+    priority?: "high" | "medium" | "low";
+    label?: string | null;
+    due_date?: string | null;
+    source?: "manual" | "crm" | "calendar";
+    source_id?: string | null;
+    assignee_account_ids?: string[];
+    assigned_department?: string | null;
+    assign_to_all?: boolean;
+    is_private?: boolean;
+  };
+
+  const { data: todo, error } = await supabaseServer
+    .from("koleex_todos")
+    .insert({
+      title: body.title,
+      description: body.description ?? null,
+      completed: false,
+      priority: body.priority ?? "medium",
+      label: body.label ?? null,
+      due_date: body.due_date ?? null,
+      created_by_account_id: auth.account_id,
+      assigned_by_account_id: auth.account_id,
+      source: body.source ?? "manual",
+      source_id: body.source_id ?? null,
+      assigned_department: body.assigned_department ?? null,
+      assign_to_all: body.assign_to_all ?? false,
+      is_private: body.is_private ?? false,
+      tenant_id: auth.tenant_id,
+    })
+    .select("*")
+    .single();
+
+  if (error || !todo) {
+    console.error("[api/todos POST]", error?.message);
+    return NextResponse.json(
+      { error: "Failed to create todo" },
+      { status: 500 },
+    );
+  }
+
+  // Resolve assignee ids: explicit list + department expansion + broadcast.
+  let assigneeIds = body.assignee_account_ids ?? [];
+
+  if (body.assigned_department && auth.tenant_id) {
+    const { data: emps } = await supabaseServer
+      .from("koleex_employees")
+      .select("account_id")
+      .eq("department", body.assigned_department)
+      .eq("tenant_id", auth.tenant_id)
+      .not("account_id", "is", null);
+    const deptIds = (emps ?? [])
+      .map((e) => (e as { account_id: string | null }).account_id)
+      .filter(Boolean) as string[];
+    assigneeIds = Array.from(new Set([...assigneeIds, ...deptIds]));
+  }
+
+  if (body.assign_to_all && auth.tenant_id) {
+    const { data: allAccounts } = await supabaseServer
+      .from("accounts")
+      .select("id")
+      .eq("user_type", "internal")
+      .eq("status", "active")
+      .eq("tenant_id", auth.tenant_id);
+    assigneeIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
+  }
+
+  if (assigneeIds.length > 0) {
+    await supabaseServer.from("koleex_todo_assignees").insert(
+      assigneeIds.map((accountId) => ({
+        todo_id: (todo as { id: string }).id,
+        account_id: accountId,
+      })),
+    );
+
+    // Fan out inbox notifications to every assignee except self.
+    const recipientIds = assigneeIds.filter((id) => id !== auth.account_id);
+    if (recipientIds.length > 0) {
+      const notifs = recipientIds.map((recipientId) => ({
+        recipient_account_id: recipientId,
+        sender_account_id: auth.account_id,
+        category: "task",
+        subject: `New task: ${body.title}`,
+        body: body.description || body.title,
+        link: `/todo?task=${(todo as { id: string }).id}`,
+        metadata: {
+          type: "todo_assignment",
+          todo_id: (todo as { id: string }).id,
+          priority: body.priority ?? "medium",
+        },
+      }));
+      await supabaseServer.from("inbox_messages").insert(notifs);
+    }
+  }
+
+  return NextResponse.json({ todo });
+}
+
 /* Resolve assignee info (username, full_name, avatar, dept, position) for
    a batch of account_ids. Mirrors resolveAssignees in todo-admin.ts. */
 async function resolveAssigneeInfos(

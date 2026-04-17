@@ -205,6 +205,22 @@ export async function createAccount(
     preferences?: AccountPreferences;
   },
 ): Promise<AccountRow | null> {
+  try {
+    const res = await fetch("/api/accounts", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { account: AccountRow | null };
+      return json.account;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Accounts] createAccount API failed:", e);
+  }
+
   const { temporary_password, preferences, ...rest } = input;
   const payload: Record<string, unknown> = {
     ...rest,
@@ -230,6 +246,18 @@ export async function updateAccount(
   id: string,
   updates: AccountUpdate,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] updateAccount API failed:", e);
+  }
   const { error } = await supabase.from(ACCOUNTS).update(updates).eq("id", id);
   if (error) {
     console.error("[Accounts] Update:", error.message);
@@ -242,10 +270,20 @@ export async function setAccountStatus(
   id: string,
   status: AccountStatus,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id + "/status", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] setAccountStatus API failed:", e);
+  }
   const ok = await updateAccount(id, { status });
   if (ok) {
-    // Mirror status changes into the audit log so the Security tab can show
-    // "account suspended / archived / activated" alongside login events.
     void logEvent(id, "logout", { reason: "status_change", status });
   }
   return ok;
@@ -275,6 +313,18 @@ export async function setForcePasswordChange(
   id: string,
   force: boolean,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id + "/force-password-change", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] setForcePasswordChange API failed:", e);
+  }
   const { error } = await supabase
     .from(ACCOUNTS)
     .update({ force_password_change: force })
@@ -292,6 +342,16 @@ export async function setForcePasswordChange(
 }
 
 export async function deleteAccount(id: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] deleteAccount API failed:", e);
+  }
   const { error } = await supabase.from(ACCOUNTS).delete().eq("id", id);
   if (error) {
     console.error("[Accounts] Delete:", error.message);
@@ -313,6 +373,18 @@ export async function updateAccountAvatar(
   id: string,
   avatarUrl: string | null,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id + "/avatar", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatar_url: avatarUrl }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] updateAccountAvatar API failed:", e);
+  }
   const { error } = await supabase
     .from(ACCOUNTS)
     .update({ avatar_url: avatarUrl })
@@ -424,6 +496,21 @@ export async function fetchCustomerContacts(
 }
 
 export async function createPerson(input: PersonInsert): Promise<PersonRow | null> {
+  try {
+    const res = await fetch("/api/people", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { person: PersonRow | null };
+      return json.person;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[People] createPerson API failed:", e);
+  }
   const { data, error } = await supabase
     .from(PEOPLE)
     .insert(input)
@@ -440,6 +527,18 @@ export async function updatePerson(
   id: string,
   updates: Partial<PersonInsert>,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/people/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[People] updatePerson API failed:", e);
+  }
   const { error } = await supabase.from(PEOPLE).update(updates).eq("id", id);
   if (error) {
     console.error("[People] Update:", error.message);
@@ -492,6 +591,21 @@ export async function fetchCompanyById(id: string): Promise<CompanyRow | null> {
 export async function createCompany(
   input: CompanyInsert,
 ): Promise<CompanyRow | null> {
+  try {
+    const res = await fetch("/api/companies", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { company: CompanyRow | null };
+      return json.company;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Companies] createCompany API failed:", e);
+  }
   const { data, error } = await supabase
     .from(COMPANIES)
     .insert(input)
@@ -508,6 +622,18 @@ export async function updateCompany(
   id: string,
   updates: Partial<CompanyInsert>,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/companies/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Companies] updateCompany API failed:", e);
+  }
   const { error } = await supabase.from(COMPANIES).update(updates).eq("id", id);
   if (error) {
     console.error("[Companies] Update:", error.message);
@@ -716,6 +842,21 @@ export async function fetchEmployeeByAccountId(
 export async function createEmployee(
   input: EmployeeInsert,
 ): Promise<EmployeeRow | null> {
+  try {
+    const res = await fetch("/api/employees", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { employee: EmployeeRow | null };
+      return json.employee;
+    }
+    if (res.status === 401 || res.status === 403) return null;
+  } catch (e) {
+    console.error("[Employees] createEmployee API failed:", e);
+  }
   const { data, error } = await supabase
     .from(EMPLOYEES)
     .insert(input)
@@ -737,6 +878,18 @@ export async function updateEmployee(
   id: string,
   updates: EmployeeUpdate,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/employees/" + id, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Employees] updateEmployee API failed:", e);
+  }
   const { error } = await supabase.from(EMPLOYEES).update(updates).eq("id", id);
   if (error) {
     console.error("[Employees] Update:", error.message);
@@ -854,6 +1007,18 @@ export async function updateAccountPreferences(
   id: string,
   preferences: AccountPreferences,
 ): Promise<boolean> {
+  try {
+    const res = await fetch("/api/accounts/" + id + "/preferences", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferences }),
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  } catch (e) {
+    console.error("[Accounts] updateAccountPreferences API failed:", e);
+  }
   const { error } = await supabase
     .from(ACCOUNTS)
     .update({ preferences })
@@ -907,6 +1072,21 @@ export async function upsertPermissionOverride(
     can_delete: granular?.can_delete ?? (accessLevel === "admin"),
     data_scope: (granular?.data_scope as "own" | "department" | "all") ?? "own",
   };
+  try {
+    const res = await fetch(
+      "/api/accounts/" + accountId + "/permission-overrides",
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) return false;
+  } catch (e) {
+    console.error("[PermissionOverrides] upsert API failed:", e);
+  }
   const { error } = await supabase
     .from(PERMISSION_OVERRIDES)
     .upsert(payload, { onConflict: "account_id,module_key" });
@@ -925,6 +1105,21 @@ export async function deletePermissionOverride(
   accountId: string,
   moduleKey: string,
 ): Promise<boolean> {
+  try {
+    const res = await fetch(
+      "/api/accounts/" + accountId + "/permission-overrides",
+      {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module_key: moduleKey }),
+      },
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) return false;
+  } catch (e) {
+    console.error("[PermissionOverrides] delete API failed:", e);
+  }
   const { error } = await supabase
     .from(PERMISSION_OVERRIDES)
     .delete()

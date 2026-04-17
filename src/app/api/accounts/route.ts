@@ -26,3 +26,48 @@ export async function GET() {
   }
   return NextResponse.json({ accounts: data ?? [] });
 }
+
+/* POST /api/accounts — create a new account.
+   Body mirrors accounts-admin.createAccount:
+     { ...AccountInsert, temporary_password?: string, preferences?: obj }
+   The temporary_password is hashed server-side (same scheme as the
+   legacy path). tenant_id is enforced from the session. */
+
+function hashTempPassword(plain: string): string {
+  // Matches the hashing used in accounts-admin.ts / auth/signin.
+  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
+}
+
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Accounts");
+  if (deny) return deny;
+
+  const body = (await req.json()) as Record<string, unknown> & {
+    temporary_password?: string;
+    preferences?: Record<string, unknown>;
+  };
+  const { temporary_password, preferences, ...rest } = body;
+
+  const payload = {
+    ...rest,
+    tenant_id: auth.tenant_id, // server-side truth
+    password_hash: temporary_password
+      ? hashTempPassword(temporary_password)
+      : null,
+    force_password_change: true,
+    preferences: preferences ?? {},
+  };
+
+  const { data, error } = await supabaseServer
+    .from("accounts")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error) {
+    console.error("[api/accounts POST]", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ account: data });
+}

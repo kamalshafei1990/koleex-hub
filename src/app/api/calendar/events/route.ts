@@ -97,3 +97,44 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ events: data ?? [] });
 }
+
+/* POST /api/calendar/events — create a new event.
+   Body must set account_id. Type C rule: non-SA can only create events
+   on their OWN calendar. Server enforces tenant_id from the session. */
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Calendar");
+  if (deny) return deny;
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const targetAccountId = (body.account_id as string) || auth.account_id;
+
+  if (targetAccountId !== auth.account_id && !auth.is_super_admin) {
+    return NextResponse.json(
+      { error: "Cannot create events on another account's calendar" },
+      { status: 403 },
+    );
+  }
+
+  const row = {
+    ...body,
+    account_id: targetAccountId,
+    tenant_id: auth.tenant_id, // server-side truth
+  };
+
+  const { data, error } = await supabaseServer
+    .from("koleex_calendar_events")
+    .insert(row)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[api/calendar/events POST]", error.message);
+    return NextResponse.json(
+      { error: "Failed to create event" },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ event: data });
+}
