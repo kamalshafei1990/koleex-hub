@@ -274,7 +274,7 @@ const TYPE_C_MODULE_NAMES = new Set([
   "Inbox",
 ]);
 
-function PermissionsEditor({ roleId }: { roleId: string }) {
+function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSuperAdminRole?: boolean }) {
   const [perms, setPerms] = useState<Record<string, PermCell>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -470,6 +470,25 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
 
   return (
     <div>
+      {/* Super Admin role: permissions here have no effect on SA users.
+          The `is_super_admin` flag on the role makes every user with it
+          bypass every module + scope check. Warn the admin so they
+          don't "hide" an app and get confused when SA still sees it. */}
+      {isSuperAdminRole && (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3 flex items-start gap-3">
+          <ExclamationIcon className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+          <div className="text-[12px] text-amber-100/90 leading-relaxed">
+            <div className="font-semibold text-amber-200 mb-0.5">
+              This is the Super Admin role
+            </div>
+            Changes to these permissions <strong>don&apos;t affect</strong>{" "}
+            users with this role — Super Admin always has full access to
+            every module and every record, by design. To test Hide / View
+            restrictions, edit a non-SA role (e.g. User, Data Entry, Assistant).
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3 overflow-x-auto">
         {PERMISSION_GROUPS.map((group) => {
           const collapsed = collapsedGroups.has(group.label);
@@ -820,7 +839,7 @@ export default function RolesPage() {
                 {selectedRoleId === role.id && (
                   <div className="px-4 pb-4 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
                     <div className="pt-4">
-                      <PermissionsEditor roleId={role.id} />
+                      <PermissionsEditor roleId={role.id} isSuperAdminRole={role.is_super_admin} />
                     </div>
                   </div>
                 )}
