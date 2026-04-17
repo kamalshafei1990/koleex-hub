@@ -133,6 +133,7 @@ export async function fetchAccountForHeader(
     role_id: (row.role_id as string | null) ?? null,
     person_id: (row.person_id as string | null) ?? null,
     company_id: (row.company_id as string | null) ?? null,
+    contact_id: (row.contact_id as string | null) ?? null,
     avatar_url: (row.avatar_url as string | null) ?? null,
     internal_notes: null,
     preferences: {},
@@ -347,6 +348,42 @@ export async function fetchPersonById(id: string): Promise<PersonRow | null> {
   return (data as PersonRow) || null;
 }
 
+/**
+ * List customer-app contacts for the "Linked Customer Contact" picker in
+ * AccountForm. Required for user_type = "customer" under the per-user_type
+ * CHECK constraint — a customer login must point at the contact row where
+ * tier / credit / policy lives.
+ *
+ * Default: customers + suppliers only (the relevant B2B profiles). Pass
+ * `anyType` to include all contact_types (employee / company too).
+ */
+export interface ContactLite {
+  id: string;
+  full_name: string;
+  company_name: string | null;
+  contact_type: string | null;
+  customer_type: string | null;
+  country: string | null;
+}
+
+export async function fetchCustomerContacts(
+  options: { anyType?: boolean } = {},
+): Promise<ContactLite[]> {
+  let q = supabase
+    .from("contacts")
+    .select("id, full_name, company_name, contact_type, customer_type, country")
+    .order("full_name", { ascending: true });
+  if (!options.anyType) {
+    q = q.in("contact_type", ["customer", "supplier"]);
+  }
+  const { data, error } = await q;
+  if (error) {
+    console.error("[Contacts] Fetch for picker:", error.message);
+    return [];
+  }
+  return (data as ContactLite[]) ?? [];
+}
+
 export async function createPerson(input: PersonInsert): Promise<PersonRow | null> {
   const { data, error } = await supabase
     .from(PEOPLE)
@@ -428,6 +465,89 @@ export async function updateCompany(
 /* ============================================================================
    Employees
    ============================================================================ */
+
+/**
+ * List all Koleex employees with their linked person profile, ready for the
+ * AccountForm's "Existing Employee" picker.
+ *
+ * This is the picker that replaces the freestyle Person dropdown for
+ * user_type = "internal", enforcing the rule that every internal login must
+ * be tied to an Employee record (not just any person).
+ *
+ * Excludes employees that already have an account_id linked, unless
+ * `includeAlreadyLinked` is true (which the edit form passes so the currently
+ * linked employee stays selected).
+ */
+export interface EmployeeWithPerson {
+  employee_id: string;
+  person_id: string;
+  account_id: string | null;
+  employee_number: string | null;
+  department: string | null;
+  position: string | null;
+  full_name: string;
+  email: string | null;
+  job_title: string | null;
+  work_email: string | null;
+}
+
+export async function fetchEmployeesWithPerson(
+  options: { includeAlreadyLinked?: boolean } = {},
+): Promise<EmployeeWithPerson[]> {
+  const { data, error } = await supabase
+    .from(EMPLOYEES)
+    .select(
+      `id, person_id, account_id, employee_number, department, position, work_email,
+       person:people(full_name, email, job_title)`,
+    )
+    .order("employee_number", { ascending: true, nullsFirst: false });
+  if (error) {
+    console.error("[Employees] Fetch for picker:", error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const mapped: EmployeeWithPerson[] = rows
+    .map((r) => {
+      const personRaw = r.person;
+      const person = Array.isArray(personRaw)
+        ? (personRaw[0] as Record<string, unknown> | undefined)
+        : (personRaw as Record<string, unknown> | null);
+      if (!r.person_id || !person) return null;
+      return {
+        employee_id: r.id as string,
+        person_id: r.person_id as string,
+        account_id: (r.account_id as string | null) ?? null,
+        employee_number: (r.employee_number as string | null) ?? null,
+        department: (r.department as string | null) ?? null,
+        position: (r.position as string | null) ?? null,
+        full_name: (person.full_name as string) || "Unnamed employee",
+        email: (person.email as string | null) ?? null,
+        job_title: (person.job_title as string | null) ?? null,
+        work_email: (r.work_email as string | null) ?? null,
+      };
+    })
+    .filter((x): x is EmployeeWithPerson => x !== null);
+
+  if (options.includeAlreadyLinked) return mapped;
+  return mapped.filter((e) => e.account_id === null);
+}
+
+/** Write-through: stamp the new account_id on the employee row. Called
+ *  right after the account is created so the HR side knows which login
+ *  belongs to which employee. One-shot, idempotent, never throws. */
+export async function linkEmployeeToAccount(
+  employeeId: string,
+  accountId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from(EMPLOYEES)
+    .update({ account_id: accountId })
+    .eq("id", employeeId);
+  if (error) {
+    console.error("[Employees] Link to account:", error.message);
+  }
+}
 
 export async function fetchEmployeeByAccountId(
   accountId: string,
@@ -623,11 +743,17 @@ export async function upsertPermissionOverride(
   accountId: string,
   moduleKey: string,
   accessLevel: AccessLevel,
+  granular?: { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean; data_scope: string },
 ): Promise<boolean> {
   const payload: AccountPermissionOverrideInsert = {
     account_id: accountId,
     module_key: moduleKey,
     access_level: accessLevel,
+    can_view: granular?.can_view ?? (accessLevel !== "none"),
+    can_create: granular?.can_create ?? (accessLevel !== "none"),
+    can_edit: granular?.can_edit ?? (accessLevel === "manager" || accessLevel === "admin"),
+    can_delete: granular?.can_delete ?? (accessLevel === "admin"),
+    data_scope: (granular?.data_scope as "own" | "department" | "all") ?? "own",
   };
   const { error } = await supabase
     .from(PERMISSION_OVERRIDES)
@@ -666,7 +792,14 @@ export async function deletePermissionOverride(
  */
 export async function replacePermissionOverrides(
   accountId: string,
-  nextOverrides: { module_key: string; access_level: AccessLevel }[],
+  nextOverrides: {
+    module_key: string;
+    can_view: boolean;
+    can_create: boolean;
+    can_edit: boolean;
+    can_delete: boolean;
+    data_scope: string;
+  }[],
 ): Promise<boolean> {
   // Delete every existing row for this account first (simple and correct).
   const { error: delErr } = await supabase
@@ -679,10 +812,23 @@ export async function replacePermissionOverrides(
   }
   if (nextOverrides.length === 0) return true;
 
-  const payload: AccountPermissionOverrideInsert[] = nextOverrides.map((o) => ({
+  // Derive legacy access_level from granular flags for backward compat
+  const deriveLevel = (o: typeof nextOverrides[0]) => {
+    if (o.can_delete) return "admin";
+    if (o.can_edit) return "manager";
+    if (o.can_view || o.can_create) return "user";
+    return "none";
+  };
+
+  const payload = nextOverrides.map((o) => ({
     account_id: accountId,
     module_key: o.module_key,
-    access_level: o.access_level,
+    can_view: o.can_view,
+    can_create: o.can_create,
+    can_edit: o.can_edit,
+    can_delete: o.can_delete,
+    data_scope: o.data_scope,
+    access_level: deriveLevel(o) as "none" | "user" | "manager" | "admin",
   }));
   const { error: insErr } = await supabase
     .from(PERMISSION_OVERRIDES)

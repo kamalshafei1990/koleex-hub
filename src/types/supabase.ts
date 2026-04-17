@@ -467,6 +467,9 @@ export interface PersonRow {
   phone: string | null;
   mobile: string | null;
   avatar_url: string | null;
+  name_alt: string | null;
+  first_name_alt: string | null;
+  last_name_alt: string | null;
   address_line1: string | null;
   address_line2: string | null;
   city: string | null;
@@ -534,6 +537,39 @@ export interface EmployeeRow {
   // Additional personal
   number_of_children: number | null;
   gender: string | null;
+  blood_type: string | null;
+  religion: string | null;
+  languages: string | null;
+
+  // Salary at hire
+  initial_salary: number | null;
+  salary_currency: string | null;
+
+  // Insurance
+  insurance_provider: string | null;
+  insurance_policy_number: string | null;
+  insurance_class: string | null;
+  insurance_expiry_date: string | null;
+
+  // Social Security / Tax
+  social_security_number: string | null;
+  tax_id: string | null;
+
+  // Education
+  education_degree: string | null;
+  education_institution: string | null;
+  education_field: string | null;
+  education_graduation_year: string | null;
+
+  // Driving License
+  driving_license_number: string | null;
+  driving_license_type: string | null;
+  driving_license_expiry: string | null;
+
+  // Second emergency contact
+  emergency_contact2_name: string | null;
+  emergency_contact2_phone: string | null;
+  emergency_contact2_relationship: string | null;
 
   created_at: string;
   updated_at: string;
@@ -665,6 +701,9 @@ export interface AccountRow {
   // Linked records
   person_id: string | null;
   company_id: string | null;
+  /** Link to the Customers-app contact for customer / supplier logins.
+   *  Required for user_type = 'customer' by the per-user_type CHECK. */
+  contact_id: string | null;
 
   // Profile
   avatar_url: string | null;
@@ -710,7 +749,12 @@ export interface AccountPermissionOverrideRow {
   id: string;
   account_id: string;
   module_key: string;
-  access_level: "none" | "user" | "manager" | "admin";
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  data_scope: DataScope;
+  access_level: "none" | "user" | "manager" | "admin"; // legacy
   created_at: string;
   updated_at: string;
 }

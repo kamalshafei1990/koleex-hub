@@ -45,9 +45,12 @@ import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import {
   createAccount, updateAccount,
   fetchCompanies, fetchRoles, fetchPeople, fetchAccessPresetByRoleId,
+  fetchEmployeesWithPerson, linkEmployeeToAccount,
+  fetchCustomerContacts,
   createCompany, createPerson,
   isUsernameAvailable, isLoginEmailAvailable,
   generateTemporaryPassword, suggestUsername,
+  type EmployeeWithPerson, type ContactLite,
 } from "@/lib/accounts-admin";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
@@ -87,8 +90,18 @@ interface FormState {
   temporary_password: string;
   force_password_change: boolean;
 
+  /** For internal users, picked from the Employee picker (auto-derived
+   *  from the employee's person_id). For customer users, unused. */
   person_id: string;
   company_id: string;
+  /** For customer users, required — points to the Customers-app contact
+   *  row where tier / credit / policy lives. Enforced by the database
+   *  CHECK constraint accounts_identity_per_type. */
+  contact_id: string;
+  /** Tracked during create/edit so we can UPDATE koleex_employees.account_id
+   *  after the account is saved. Derived from the selected employee — not
+   *  persisted on the accounts row itself. */
+  employee_id: string;
 
   internal_notes: string;
 }
@@ -106,6 +119,8 @@ function initialState(a?: AccountRow): FormState {
 
     person_id: a?.person_id ?? "",
     company_id: a?.company_id ?? "",
+    contact_id: a?.contact_id ?? "",
+    employee_id: "",  // resolved from the employee fetch below once an employee matches person_id
 
     internal_notes: a?.internal_notes ?? "",
   };
@@ -119,6 +134,8 @@ export default function AccountForm({ mode, account }: Props) {
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
+  const [employees, setEmployees] = useState<EmployeeWithPerson[]>([]);
+  const [customerContacts, setCustomerContacts] = useState<ContactLite[]>([]);
   const [preset, setPreset] = useState<AccessPresetRow | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -129,19 +146,40 @@ export default function AccountForm({ mode, account }: Props) {
   const [showCompanyPanel, setShowCompanyPanel] = useState(false);
   const [showPersonPanel, setShowPersonPanel] = useState(false);
 
-  /* ── Initial load ── */
+  /* ── Initial load ──
+     We fetch in parallel:
+       • companies + roles + people  (legacy data, kept for backward compat)
+       • employees with joined Person (the new "Existing Employee" picker
+         source for user_type = internal)
+       • customer contacts (the new "Linked Customer Contact" picker source
+         for user_type = customer)
+     On edit, we also derive the pre-selected employee_id from the
+     existing person_id by finding the matching employee record. */
   useEffect(() => {
     (async () => {
-      const [c, r, p] = await Promise.all([
-        fetchCompanies(), fetchRoles(), fetchPeople(),
+      const [c, r, p, emps, contacts] = await Promise.all([
+        fetchCompanies(),
+        fetchRoles(),
+        fetchPeople(),
+        fetchEmployeesWithPerson({ includeAlreadyLinked: mode === "edit" }),
+        fetchCustomerContacts(),
       ]);
       setCompanies(c);
       setRoles(r);
       setPeople(p);
+      setEmployees(emps);
+      setCustomerContacts(contacts);
 
       // Auto-generate temp password on create
       if (mode === "create" && !form.temporary_password) {
         setForm((f) => ({ ...f, temporary_password: generateTemporaryPassword() }));
+      }
+
+      // On edit, resolve employee_id from the existing person_id so the
+      // Employee picker shows the current linkage as pre-selected.
+      if (mode === "edit" && account?.person_id) {
+        const matched = emps.find((e) => e.person_id === account.person_id);
+        if (matched) setForm((f) => ({ ...f, employee_id: matched.employee_id }));
       }
 
       setLoading(false);
@@ -234,17 +272,18 @@ export default function AccountForm({ mode, account }: Props) {
     if (!form.role_id) return setError(t("acc.err.roleRequired"));
     if (mode === "create" && !form.temporary_password.trim())
       return setError(t("acc.err.passwordRequired"));
-    if (isCustomer && !form.company_id)
-      return setError(t("acc.err.companyRequired"));
 
-    // ─── No-orphan-accounts policy ───────────────────────────────────────
-    // Every account MUST be tied to a real-world identity — a Person
-    // (employee / individual) or a Company (customer / workspace). Even
-    // though the DB CHECK constraint `accounts_must_have_link` refuses
-    // orphans, we catch it here first so the user gets a clear message
-    // instead of a cryptic Postgres error.
-    if (!form.person_id && !form.company_id) {
-      return setError(t("acc.err.linkRequired"));
+    // ─── Per-user_type identity rule ─────────────────────────────────────
+    // Mirrors the DB CHECK constraint accounts_identity_per_type:
+    //   internal → must have person_id (picked via the Employee picker)
+    //   customer → must have contact_id (picked via the Contact picker)
+    // Catches the error here so the user gets a clear message instead of
+    // a cryptic Postgres error.
+    if (!isCustomer && !form.person_id) {
+      return setError(t("acc.err.employeeRequired"));
+    }
+    if (isCustomer && !form.contact_id) {
+      return setError(t("acc.err.contactRequired"));
     }
 
     setSaving(true);
@@ -271,6 +310,7 @@ export default function AccountForm({ mode, account }: Props) {
       role_id: form.role_id || null,
       person_id: form.person_id || null,
       company_id: form.company_id || null,
+      contact_id: form.contact_id || null,
       internal_notes: form.internal_notes.trim() || null,
     };
 
@@ -289,6 +329,13 @@ export default function AccountForm({ mode, account }: Props) {
         setError(t("acc.err.createFailed"));
         return;
       }
+      // Write-through: if an employee was selected for this internal
+      // account, stamp koleex_employees.account_id so the HR side knows
+      // which login belongs to this employee. Closes the orphan-by-
+      // indirect-path gap (Path B in the design notes).
+      if (!isCustomer && form.employee_id) {
+        await linkEmployeeToAccount(form.employee_id, created.id);
+      }
       router.push(`/accounts/${created.id}`);
     } else if (account) {
       const ok = await updateAccount(account.id, {
@@ -299,6 +346,11 @@ export default function AccountForm({ mode, account }: Props) {
       if (!ok) {
         setError(t("acc.err.updateFailed"));
         return;
+      }
+      // Handle employee re-linking on edit too: if the user changed the
+      // employee picker, update both old and new koleex_employees rows.
+      if (!isCustomer && form.employee_id) {
+        await linkEmployeeToAccount(form.employee_id, account.id);
       }
       router.push(`/accounts/${account.id}`);
     }
@@ -545,108 +597,204 @@ export default function AccountForm({ mode, account }: Props) {
               {t("acc.form.linkRecords")}
             </h2>
             <p className="text-[11px] text-[var(--text-dim)] -mt-3 mb-4">
-              {t("acc.hint.linkRecords")}
+              {isCustomer
+                ? t("acc.hint.linkRecordsCustomer")
+                : t("acc.hint.linkRecordsInternal")}
             </p>
 
-            {/* No-orphan-accounts policy banner — appears until the user
-                picks at least one link. Mirrors the CHECK constraint
-                (accounts_must_have_link) so the rule is visible up front
-                rather than failing at submit time. */}
-            {!form.person_id && !form.company_id && (
-              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
-                <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>{t("acc.hint.noOrphan")}</span>
+            {/* ──────────────────────────────────────────────────────────
+                INTERNAL MODE — Employee picker (replaces the old freestyle
+                Person picker). Every internal login must be tied to an
+                existing employee record; creating logins for brand-new
+                hires flows through the Employees wizard (/employees/new
+                with "Create account" toggled ON), which is the canonical
+                "Path A" in the design.
+
+                If no employees exist (or none are still unlinked), show a
+                redirect banner instead of a useless empty dropdown.
+                ────────────────────────────────────────────────────────── */}
+            {!isCustomer && (
+              <div className="space-y-4">
+                {employees.length === 0 ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
+                    <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">{t("acc.hint.noEmployeesTitle")}</p>
+                      <p className="mt-1">{t("acc.hint.noEmployeesBody")}</p>
+                      <Link
+                        href="/employees/new"
+                        className="inline-flex items-center gap-1 mt-2 text-amber-200 hover:text-amber-100 underline underline-offset-2"
+                      >
+                        {t("acc.hint.goToEmployeesWizard")} →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className={labelClass}>{t("acc.field.linkedEmployee")} *</label>
+                    <select
+                      className={selectClass}
+                      value={form.employee_id}
+                      onChange={(e) => {
+                        const eid = e.target.value;
+                        const emp = employees.find((x) => x.employee_id === eid);
+                        if (emp) {
+                          set("employee_id", eid);
+                          set("person_id", emp.person_id);
+                          // Pre-fill login fields on create if empty
+                          if (mode === "create") {
+                            if (!form.username && emp.full_name)
+                              set("username", suggestUsername(emp.full_name));
+                            const pickEmail = emp.work_email || emp.email;
+                            if (!form.login_email && pickEmail)
+                              set("login_email", pickEmail);
+                          }
+                        } else {
+                          set("employee_id", "");
+                          set("person_id", "");
+                        }
+                      }}
+                    >
+                      <option value="">{t("acc.select.selectEmployee")}</option>
+                      {employees.map((emp) => (
+                        <option key={emp.employee_id} value={emp.employee_id}>
+                          {emp.full_name}
+                          {emp.employee_number ? ` · ${emp.employee_number}` : ""}
+                          {emp.department ? ` · ${emp.department}` : ""}
+                          {emp.account_id && emp.account_id !== account?.id ? " · (has account)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
+                      {t("acc.hint.employeePickerHint")}
+                    </p>
+                  </div>
+                )}
+
+                {/* Warning if the user hasn't picked an employee yet */}
+                {employees.length > 0 && !form.employee_id && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
+                    <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>{t("acc.hint.noOrphanInternal")}</span>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Company picker */}
-              <div>
-                <label className={labelClass}>
-                  {t("acc.field.company")} {isCustomer && "*"}
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    className={selectClass}
-                    value={form.company_id}
-                    onChange={(e) => set("company_id", e.target.value)}
-                  >
-                    <option value="">{t("acc.select.selectCompany")}</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.type !== "customer" ? ` · ${c.type}` : ""}
-                        {c.customer_level ? ` · ${c.customer_level}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowCompanyPanel((s) => !s)}
-                    className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
-                    title="Create new company"
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" /> New
-                  </button>
-                </div>
-                {selectedCompany && (
-                  <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
-                    {selectedCompany.type} · {selectedCompany.country || "—"} ·{" "}
-                    {selectedCompany.currency || "—"}
-                    {selectedCompany.customer_level
-                      ? ` · ${selectedCompany.customer_level}`
-                      : ""}
-                  </p>
+            {/* ──────────────────────────────────────────────────────────
+                CUSTOMER MODE — Customer Contact picker (required) plus an
+                optional Company workspace link. The contact is the anchor
+                for tier / credit / policy; the company is just the
+                workspace where staff collaborate.
+                ────────────────────────────────────────────────────────── */}
+            {isCustomer && (
+              <div className="space-y-4">
+                {customerContacts.length === 0 ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
+                    <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">{t("acc.hint.noContactsTitle")}</p>
+                      <p className="mt-1">{t("acc.hint.noContactsBody")}</p>
+                      <Link
+                        href="/customers"
+                        className="inline-flex items-center gap-1 mt-2 text-amber-200 hover:text-amber-100 underline underline-offset-2"
+                      >
+                        {t("acc.hint.goToCustomersApp")} →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className={labelClass}>
+                      {t("acc.field.linkedContact")} *
+                    </label>
+                    <select
+                      className={selectClass}
+                      value={form.contact_id}
+                      onChange={(e) => {
+                        const cid = e.target.value;
+                        const c = customerContacts.find((x) => x.id === cid);
+                        set("contact_id", cid);
+                        if (c && mode === "create") {
+                          if (!form.username && c.full_name)
+                            set("username", suggestUsername(c.full_name));
+                        }
+                      }}
+                    >
+                      <option value="">{t("acc.select.selectContact")}</option>
+                      {customerContacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name}
+                          {c.company_name ? ` · ${c.company_name}` : ""}
+                          {c.customer_type ? ` · ${c.customer_type}` : ""}
+                          {c.contact_type && c.contact_type !== "customer"
+                            ? ` · ${c.contact_type}`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
+                      {t("acc.hint.contactPickerHint")}
+                    </p>
+                  </div>
                 )}
-              </div>
 
-              {/* Person picker */}
-              <div>
-                <label className={labelClass}>{t("acc.field.contactPerson")}</label>
-                <div className="flex gap-2">
-                  <select
-                    className={selectClass}
-                    value={form.person_id}
-                    onChange={(e) => {
-                      const pid = e.target.value;
-                      const p = people.find((x) => x.id === pid);
-                      set("person_id", pid);
-                      // Offer sensible defaults when first linking
-                      if (p && mode === "create") {
-                        if (!form.username && p.full_name)
-                          set("username", suggestUsername(p.full_name));
-                        if (!form.login_email && p.email)
-                          set("login_email", p.email);
-                      }
-                    }}
-                  >
-                    <option value="">{t("acc.select.selectPerson")}</option>
-                    {people.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.full_name}
-                        {p.job_title ? ` · ${p.job_title}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowPersonPanel((s) => !s)}
-                    className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
-                    title="Create new person"
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" /> New
-                  </button>
-                </div>
-                {selectedPerson && (
-                  <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
-                    {selectedPerson.email || t("acc.hint.noEmail")}
-                    {selectedPerson.phone ? ` · ${selectedPerson.phone}` : ""}
-                  </p>
+                {/* Warning if the user hasn't picked a contact yet */}
+                {customerContacts.length > 0 && !form.contact_id && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-300 px-4 py-3 text-[12px] flex items-start gap-2">
+                    <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>{t("acc.hint.noOrphanCustomer")}</span>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {/* Inline Company create panel */}
+                {/* Optional company workspace link — purely organisational,
+                    not the source of tier/credit */}
+                <div>
+                  <label className={labelClass}>
+                    {t("acc.field.company")}{" "}
+                    <span className="text-[var(--text-ghost)] normal-case">
+                      ({t("acc.hint.optional")})
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      className={selectClass}
+                      value={form.company_id}
+                      onChange={(e) => set("company_id", e.target.value)}
+                    >
+                      <option value="">{t("acc.select.selectCompany")}</option>
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                          {c.type !== "customer" ? ` · ${c.type}` : ""}
+                          {c.customer_level ? ` · ${c.customer_level}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowCompanyPanel((s) => !s)}
+                      className="h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all shrink-0"
+                      title="Create new company"
+                    >
+                      <PlusIcon className="h-3.5 w-3.5" /> New
+                    </button>
+                  </div>
+                  {selectedCompany && (
+                    <p className="text-[10px] text-[var(--text-dim)] mt-1.5">
+                      {selectedCompany.type} · {selectedCompany.country || "—"} ·{" "}
+                      {selectedCompany.currency || "—"}
+                      {selectedCompany.customer_level
+                        ? ` · ${selectedCompany.customer_level}`
+                        : ""}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Inline Company create panel (still used for the optional
+                customer-mode workspace link) */}
             {showCompanyPanel && (
               <InlineCompanyPanel
                 defaultType={isCustomer ? "customer" : "koleex"}
@@ -655,7 +803,9 @@ export default function AccountForm({ mode, account }: Props) {
               />
             )}
 
-            {/* Inline Person create panel */}
+            {/* Inline Person create panel — kept for the rare case where
+                someone needs to back-fill a freestyle person (not on the
+                primary flow anymore) */}
             {showPersonPanel && (
               <InlinePersonPanel
                 defaultCompanyId={form.company_id || null}
