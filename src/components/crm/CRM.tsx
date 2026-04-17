@@ -86,6 +86,7 @@ import {
   type ActivityFeedRow,
 } from "@/lib/crm";
 import { fetchContacts, type ContactRow } from "@/lib/contacts-admin";
+import { useScopeContext } from "@/lib/use-scope";
 import { useCurrentAccount } from "@/lib/identity";
 import { useTranslation } from "@/lib/i18n";
 import { crmT } from "@/lib/translations/crm";
@@ -202,15 +203,23 @@ export default function CRM() {
   const [editingStageId, setEditingStageId] =
     useState<string | "new" | null>(null);
 
+  // Scope context (tenant + role + SA flags) drives tenant isolation on
+  // every fetch below. Without it, this page would fetch wide-open and
+  // leak Koleex's opportunities to a customer-tenant account.
+  const scopeCtx = useScopeContext();
+
   /* Initial load. Stages + opportunities in parallel because they're
      independent queries; we only block UI on the slower of the two. */
   const reload = useCallback(async () => {
     setLoading(true);
-    const [s, o] = await Promise.all([fetchStages(), fetchOpportunities()]);
+    const [s, o] = await Promise.all([
+      fetchStages(scopeCtx),
+      fetchOpportunities({ ctx: scopeCtx }),
+    ]);
     setStages(s);
     setOpps(o);
     setLoading(false);
-  }, []);
+  }, [scopeCtx]);
 
   useEffect(() => {
     void reload();

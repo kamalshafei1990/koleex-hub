@@ -27,6 +27,7 @@ import {
 } from "@/lib/navigation";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+import { usePermittedModules } from "@/lib/use-scope";
 import {
   useSidebar,
   SIDEBAR_EXPANDED_W,
@@ -56,6 +57,24 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { t } = useTranslation(hubT);
   const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
+
+  // Role-based filtering: hide apps the viewer's role has no can_view on.
+  // Super Admin sees everything. During loading we treat everything as
+  // permitted so the sidebar doesn't flash empty. For regular users we
+  // filter down to only the modules their role grants.
+  const { modules: permittedModules, loading: permLoading } =
+    usePermittedModules();
+
+  /** Filter group apps by role permission. Falls back to the full list
+   *  while the permission check is still loading — prevents a flash of
+   *  empty sidebar on first paint. */
+  const filterApps = useCallback(
+    (apps: AppDef[]): AppDef[] => {
+      if (permLoading) return apps;
+      return apps.filter((a) => permittedModules.has(a.name));
+    },
+    [permLoading, permittedModules],
+  );
 
   const activeGroupId = getActiveGroupId(pathname);
   const activeAppId = getActiveAppId(pathname);
@@ -139,7 +158,8 @@ export default function Sidebar() {
     const GroupIcon = group.icon;
     const isOpen = openGroups.has(group.id);
     const isGroupActive = activeGroupId === group.id;
-    const apps = getGroupApps(group);
+    const apps = filterApps(getGroupApps(group));
+    if (apps.length === 0) return null;
     const label = t(group.tKey, group.label);
 
     return (
@@ -189,7 +209,8 @@ export default function Sidebar() {
   const CollapsedGroup = ({ group }: { group: SidebarGroup }) => {
     const GroupIcon = group.icon;
     const isGroupActive = activeGroupId === group.id;
-    const apps = getGroupApps(group);
+    const apps = filterApps(getGroupApps(group));
+    if (apps.length === 0) return null;
     const label = t(group.tKey, group.label);
     const hasActiveChild = apps.some((a) => a.id === activeAppId);
 

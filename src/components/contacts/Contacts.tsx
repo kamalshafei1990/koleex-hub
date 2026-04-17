@@ -86,6 +86,7 @@ import {
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
+import { useScopeContext } from "@/lib/use-scope";
 import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
 import { useTranslation } from "@/lib/i18n";
@@ -2132,15 +2133,21 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   }, [view, editingId, selectedId]);
 
   /* ── Load ── */
+  // Scope context (tenant + role + SA flags) scopes every fetch to the
+  // viewer's tenant. A customer-tenant account opening Customers sees
+  // their own (empty) book; Koleex staff sees Koleex's book. Without
+  // this, everyone would see Koleex's contacts regardless of tenant.
+  const scopeCtx = useScopeContext();
+
   const loadContacts = useCallback(async () => {
     setLoading(true);
     const ok = await checkContactsSetup();
     if (!ok) { setSetupNeeded(true); setLoading(false); return; }
-    const data = await fetchContacts();
+    const data = await fetchContacts(scopeCtx);
     // Exclude employees — they are managed via the Employees app now
     setContacts(data.filter(c => c.contact_type !== "employee"));
     setLoading(false);
-  }, []);
+  }, [scopeCtx]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
