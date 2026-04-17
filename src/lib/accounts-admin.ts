@@ -105,6 +105,23 @@ export async function fetchAccountById(id: string): Promise<AccountRow | null> {
 export async function fetchAccountForHeader(
   id: string,
 ): Promise<AccountWithLinks | null> {
+  // API-first: /api/me/header returns the full enriched account via
+  // service_role. The anon-key read of accounts/people/roles is
+  // blocked by RLS now, so the legacy fallback below won't return data
+  // anyway — it's kept only for network-error resilience.
+  try {
+    const res = await fetch("/api/me/header", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        account: AccountWithLinks | null;
+      };
+      return json.account;
+    }
+    if (res.status === 401) return null;
+  } catch (e) {
+    console.error("[Accounts] fetchAccountForHeader API failed:", e);
+  }
+
   const { data, error } = await supabase
     .from(ACCOUNTS)
     .select(
