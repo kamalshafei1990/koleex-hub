@@ -23,6 +23,8 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
@@ -313,6 +315,30 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     setSaved(false);
   };
 
+  /** One-click hide: clear all V/C/E/D for this module so the role can't
+   *  see the app at all. The sidebar filters by can_view, so this makes
+   *  the app disappear from users with this role. Click again to un-hide
+   *  (reveals it with view-only permission, same as toggling View on). */
+  const toggleHideModule = (mod: string) => {
+    setPerms((prev) => {
+      const p = prev[mod] ?? EMPTY_PERM;
+      const isHidden =
+        !p.can_view && !p.can_create && !p.can_edit && !p.can_delete;
+      return {
+        ...prev,
+        [mod]: {
+          // If currently hidden → flip to view-only. If not hidden → hide.
+          can_view: isHidden,
+          can_create: false,
+          can_edit: false,
+          can_delete: false,
+          data_scope: p.data_scope ?? "all",
+        },
+      };
+    });
+    setSaved(false);
+  };
+
   const toggleFullAccess = (mod: string) => {
     const p = perms[mod];
     const allOn = p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
@@ -472,6 +498,7 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                     <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Del</div>
                     <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">All</div>
                     <div className="w-24 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Scope</div>
+                    <div className="w-16 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Hide</div>
                   </div>
                   {group.modules.map((mod) => {
                     const AppIcon = getAppIcon(mod);
@@ -519,6 +546,29 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                               onClick={() => cycleScope(mod)}
                             />
                           )}
+                        </div>
+                        {/* Hide app — one-click action that clears all V/C/E/D at once.
+                            When the row is "hidden" (no permissions), shows an eye-slash
+                            icon in red; clicking again restores view-only access.
+                            Makes the hide intent visible and discoverable, rather than
+                            requiring the admin to uncheck 4 boxes manually. */}
+                        <div className="w-16 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleHideModule(mod)}
+                            title={hasAny ? "Hide this app from everyone with this role" : "Un-hide (grants view-only)"}
+                            className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
+                              !hasAny
+                                ? "bg-red-500/15 border-red-500/30 text-red-400"
+                                : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-red-500/30 hover:text-red-400"
+                            }`}
+                          >
+                            {!hasAny ? (
+                              <EyeOffIcon size={11} />
+                            ) : (
+                              <EyeIcon size={11} />
+                            )}
+                          </button>
                         </div>
                       </div>
                     );
