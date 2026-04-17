@@ -32,6 +32,7 @@ import {
   fetchAccountByLoginEmail,
 } from "@/lib/accounts-admin";
 import { setCurrentAccountId } from "@/lib/identity";
+import { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY } from "@/components/admin/AdminAuth";
 
 function LoginInner() {
   const router = useRouter();
@@ -87,12 +88,22 @@ function LoginInner() {
           );
           setBusy(false);
           if (byUsername.ok) {
+            // Legacy session bookkeeping so AdminAuth considers the user
+            // signed in and doesn't show the "Welcome back" form again
+            // when they land on /. Without this /login succeeds but
+            // AdminAuth still prompts for credentials.
+            try {
+              window.localStorage.setItem(LEGACY_SESSION_KEY, "true");
+              window.localStorage.setItem(
+                LEGACY_SESSION_USER_KEY,
+                byUsername.account.username,
+              );
+            } catch {
+              /* ignore */
+            }
             setCurrentAccountId(byUsername.account.id);
             // Hard reload so every cached hook (sidebar, scope ctx,
-            // permission gates) re-fires with the new identity. Soft
-            // nav via router.replace leaves the old ScopeContext frozen
-            // in memory — you'd sign in as alex but still see kamal's
-            // sidebar until the page was refreshed manually.
+            // permission gates) re-fires with the new identity.
             window.location.href = next;
             return;
           }
@@ -116,6 +127,17 @@ function LoginInner() {
                 : "No account found.",
           );
           return;
+        }
+        // Legacy session bookkeeping (see above) so AdminAuth skips the
+        // redundant "Welcome back" prompt on the destination page.
+        try {
+          window.localStorage.setItem(LEGACY_SESSION_KEY, "true");
+          window.localStorage.setItem(
+            LEGACY_SESSION_USER_KEY,
+            res.account.username,
+          );
+        } catch {
+          /* ignore */
         }
         setCurrentAccountId(res.account.id);
         // Hard reload (see explanation above) so the new identity
