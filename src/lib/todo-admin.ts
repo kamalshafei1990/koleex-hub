@@ -94,7 +94,20 @@ export async function fetchTodos(
     .order("created_at", { ascending: false });
 
   if (filter && ctx) {
-    // Apply scope-level OR (own / department / all — bypass = no filter)
+    // Multi-tenancy: every fetch is scoped to the viewer's tenant. A
+    // customer-tenant account NEVER sees Koleex's todos and vice versa.
+    // Super Admin viewing across tenants uses the tenant picker in the
+    // top bar to switch ctx.tenant_id, so they still hit this filter —
+    // just with a different tenant.
+    if (ctx.tenant_id) {
+      query = query.eq("tenant_id", ctx.tenant_id);
+    }
+
+    // Apply scope-level OR (own / department / all — bypass = no filter).
+    // For To-do (a Type C module), scope is hardcoded to Own regardless
+    // of koleex_permissions — so non-SA users see only their own records
+    // + explicitly assigned + broadcast. No role can grant visibility into
+    // another account's private productivity data.
     const scopeOr = orClauseForScope(filter, ctx);
     if (scopeOr) {
       query = query.or(scopeOr);

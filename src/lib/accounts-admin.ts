@@ -134,6 +134,8 @@ export async function fetchAccountForHeader(
     person_id: (row.person_id as string | null) ?? null,
     company_id: (row.company_id as string | null) ?? null,
     contact_id: (row.contact_id as string | null) ?? null,
+    tenant_id: (row.tenant_id as string) ?? "",
+    is_super_admin: (row.is_super_admin as boolean) ?? false,
     avatar_url: (row.avatar_url as string | null) ?? null,
     internal_notes: null,
     preferences: {},

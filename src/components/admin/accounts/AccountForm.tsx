@@ -103,6 +103,12 @@ interface FormState {
    *  persisted on the accounts row itself. */
   employee_id: string;
 
+  /** Per-account Super Admin override. Ultimate authority — only grant
+   *  when the person should have unrestricted access across all tenants
+   *  and all personal data. Separate from the role-level is_super_admin
+   *  so the CEO can promote a specific person without inventing a new role. */
+  is_super_admin: boolean;
+
   internal_notes: string;
 }
 
@@ -121,6 +127,7 @@ function initialState(a?: AccountRow): FormState {
     company_id: a?.company_id ?? "",
     contact_id: a?.contact_id ?? "",
     employee_id: "",  // resolved from the employee fetch below once an employee matches person_id
+    is_super_admin: a?.is_super_admin ?? false,
 
     internal_notes: a?.internal_notes ?? "",
   };
@@ -311,6 +318,7 @@ export default function AccountForm({ mode, account }: Props) {
       person_id: form.person_id || null,
       company_id: form.company_id || null,
       contact_id: form.contact_id || null,
+      is_super_admin: form.is_super_admin,
       internal_notes: form.internal_notes.trim() || null,
     };
 
@@ -861,6 +869,47 @@ export default function AccountForm({ mode, account }: Props) {
                   {t("acc.hint.noCustomerLevel")}
                 </p>
               )}
+            </section>
+          )}
+
+          {/* ─── Advanced — per-account Super Admin override ─────────────────
+              Separate from the role-level SA flag. Lets the CEO promote a
+              specific person to Super Admin without inventing a new role.
+              Effective SA = account-level OR role-level. The red styling
+              reflects that this grants the ultimate authority in the system
+              (cross-tenant, cross-personal-data). Internal accounts only —
+              hidden for customer accounts. */}
+          {!isCustomer && (
+            <section className={`${sectionWrap} xl:col-span-2`}>
+              <h2 className={sectionHead}>
+                <span className={sectionNumber}>A</span>
+                <ShieldIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                Advanced &middot; per-account overrides
+              </h2>
+              <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${
+                form.is_super_admin
+                  ? "border-red-500/30 bg-red-500/[0.08]"
+                  : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={form.is_super_admin}
+                  onChange={(e) => set("is_super_admin", e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-red-500 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className={`text-[13px] font-semibold ${
+                    form.is_super_admin ? "text-red-300" : "text-[var(--text-primary)]"
+                  }`}>
+                    Grant Super Admin powers to this account
+                  </div>
+                  <div className={`text-[11px] mt-1 leading-relaxed ${
+                    form.is_super_admin ? "text-red-300/90" : "text-[var(--text-dim)]"
+                  }`}>
+                    When enabled, this account can view every record across every tenant and every account&rsquo;s personal productivity data (Calendar, To-do, Mail). Separate from the role-level SA flag — this is a per-account override. Ultimate authority. Grant only when the person genuinely needs unrestricted access (co-founder, CTO, deputy CEO).
+                  </div>
+                </div>
+              </label>
             </section>
           )}
 

@@ -705,6 +705,14 @@ export interface AccountRow {
    *  Required for user_type = 'customer' by the per-user_type CHECK. */
   contact_id: string | null;
 
+  /** Multi-tenancy anchor. Auto-set to the host tenant (Koleex) for
+   *  internal accounts; customer accounts can be in their own tenant. */
+  tenant_id: string;
+
+  /** Per-account Super Admin override. Effective SA = account-level OR
+   *  role-level. Grants all-tenant + personal-data-bypass privileges. */
+  is_super_admin: boolean;
+
   // Profile
   avatar_url: string | null;
 
@@ -719,7 +727,12 @@ export interface AccountRow {
   created_by: string | null;
 }
 
-export type AccountInsert = Omit<AccountRow, "id" | "created_at" | "updated_at">;
+/** Columns that have DB-level defaults and can be omitted on insert. */
+type AccountInsertDefaulted = "tenant_id" | "is_super_admin";
+
+export type AccountInsert =
+  & Omit<AccountRow, "id" | "created_at" | "updated_at" | AccountInsertDefaulted>
+  & Partial<Pick<AccountRow, AccountInsertDefaulted>>;
 export type AccountUpdate = Partial<AccountInsert>;
 
 /* ── Access Presets (role → default permission bundle) ── */

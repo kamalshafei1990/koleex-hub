@@ -261,6 +261,17 @@ const SCOPE_CYCLE: Record<DataScope, DataScope> = {
   private: "all",
 };
 
+/** Type-C modules — personal productivity data. For these, Scope is not
+ *  configurable: the rule is always "Own + explicit sharing + SA-bypass".
+ *  The Scope chip is replaced with a locked "Personal" badge in the UI
+ *  to make the hard rule visible to admins editing roles. */
+const TYPE_C_MODULE_NAMES = new Set([
+  "To-do",
+  "Calendar",
+  "Koleex Mail",
+  "Inbox",
+]);
+
 function PermissionsEditor({ roleId }: { roleId: string }) {
   const [perms, setPerms] = useState<Record<string, PermCell>>({});
   const [loading, setLoading] = useState(true);
@@ -487,14 +498,27 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                             <ShieldIcon size={10} />
                           </button>
                         </div>
-                        {/* Scope pill — cycles through All → Department → Own → All on click.
-                            Dimmed when the row has no V/C/E/D permissions (scope is a no-op). */}
+                        {/* Scope pill — cycles through All → Department → Own → Private on click.
+                            Dimmed when the row has no V/C/E/D permissions.
+                            For Type C (personal productivity) modules, Scope is not configurable
+                            — replaced with a locked "Personal" badge so admins understand that
+                            no role setting can expose one user's calendar/todos to another. */}
                         <div className="w-24 flex justify-center">
-                          <ScopeChip
-                            scope={scope}
-                            disabled={!hasAny}
-                            onClick={() => cycleScope(mod)}
-                          />
+                          {TYPE_C_MODULE_NAMES.has(mod) ? (
+                            <span
+                              title="Personal productivity data. Always scoped to the owner + explicit sharing. Only Super Admin can view others'."
+                              className="h-7 px-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-300 text-[10px] font-semibold flex items-center gap-1.5"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                              <span>Personal</span>
+                            </span>
+                          ) : (
+                            <ScopeChip
+                              scope={scope}
+                              disabled={!hasAny}
+                              onClick={() => cycleScope(mod)}
+                            />
+                          )}
                         </div>
                       </div>
                     );

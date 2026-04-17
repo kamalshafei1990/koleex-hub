@@ -65,11 +65,10 @@ export async function fetchEventsInRange(
     return (data as CalendarEventRow[]) || [];
   }
 
-  // Permission gate: can this user view the requested account's calendar?
-  // Delegates to canViewAccount() which respects Scope (All / Dept / Own)
-  // for every role, not just Super Admin. This is what "Scope = All" on
-  // Calendar for a regular employee actually buys them — the ability to
-  // use the account-picker and view teammates' calendars.
+  // Permission gate: Calendar is a Type C (Personal) module. canViewAccount
+  // enforces the rule that only Super Admin can view another account's
+  // calendar — Scope = All / Department configured on a role has NO effect
+  // on Type C modules. This is a hard boundary, by design.
   const access = await canViewAccount(ctx, "Calendar", accountId);
   if (!access.allowed) return [];
 
@@ -80,6 +79,13 @@ export async function fetchEventsInRange(
     .lt("start_at", rangeEnd.toISOString())
     .gte("end_at", rangeStart.toISOString())
     .order("start_at", { ascending: true });
+
+  // Multi-tenancy: event must belong to the viewer's tenant. Prevents a
+  // customer-tenant Super Admin from accidentally viewing Koleex employees'
+  // calendars by guessing an account_id from another tenant.
+  if (ctx.tenant_id) {
+    query = query.eq("tenant_id", ctx.tenant_id);
+  }
 
   // Private-record filter. When viewing own calendar we still see our own
   // private events. When viewing someone else's calendar we hide their

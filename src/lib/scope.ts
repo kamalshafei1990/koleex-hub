@@ -34,14 +34,38 @@ import { supabaseAdmin as supabase } from "./supabase-admin";
 /** Four scope levels. Order matters: from most restrictive to least. */
 export type DataScope = "private" | "own" | "department" | "all";
 
+/** Modules that are "Type C — Personal productivity data". These are
+ *  treated as always-Own + explicit-sharing + SA-bypass, regardless of
+ *  what's set in koleex_permissions.data_scope. The Scope column in
+ *  /roles is hidden for these modules because role config can't override
+ *  the personal-by-default rule.
+ *
+ *  Rule: no non-SA can ever see another account's Type C records, even
+ *  with Scope = All configured on their role.  */
+export const TYPE_C_MODULES = new Set([
+  "To-do",
+  "Calendar",
+  "Koleex Mail",
+  "Inbox",
+  // "Notes" — add when the Notes app ships
+  // Discuss is mixed: DMs are Type C, channels are tenant-scoped.
+  // Handled in discuss fetch helpers rather than here.
+]);
+
 /** Effective scope context resolved per-user at request time. */
 export interface ScopeContext {
   account_id: string;
+  /** Multi-tenancy anchor. Every tenant-scoped fetch auto-filters by this
+   *  so a customer-tenant account never sees Koleex's records and vice
+   *  versa (except Super Admin who can switch tenants via the top bar). */
+  tenant_id: string;
   role_id: string | null;
   /** Resolved from koleex_employees.department when the account has an
    *  employee record. Null for customer accounts or service accounts. */
   department: string | null;
-  /** Role flag: bypasses all data_scope filters except is_private. */
+  /** Effective Super Admin: true if EITHER the role OR the account
+   *  is_super_admin flag is set. Lets the CEO promote a specific account
+   *  without inventing a new role. */
   is_super_admin: boolean;
   /** Role flag: break-glass access to is_private records. Audit-logged. */
   can_view_private: boolean;
@@ -125,7 +149,9 @@ export async function loadScopeContext(
   const [accRes, empRes] = await Promise.all([
     supabase
       .from("accounts")
-      .select("role_id, roles:role_id(is_super_admin, can_view_private)")
+      .select(
+        "role_id, tenant_id, is_super_admin, roles:role_id(is_super_admin, can_view_private)",
+      )
       .eq("id", accountId)
       .maybeSingle(),
     supabase
@@ -137,6 +163,8 @@ export async function loadScopeContext(
 
   const accData = (accRes.data ?? null) as {
     role_id: string | null;
+    tenant_id: string;
+    is_super_admin: boolean;
     roles?:
       | { is_super_admin: boolean; can_view_private: boolean }
       | { is_super_admin: boolean; can_view_private: boolean }[]
@@ -147,11 +175,17 @@ export async function loadScopeContext(
   const roleRaw = accData?.roles;
   const role = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw ?? null;
 
+  // Effective SA = account-level OR role-level flag. Lets the CEO promote
+  // a specific account without inventing a new role.
+  const effectiveSA =
+    (accData?.is_super_admin ?? false) || (role?.is_super_admin ?? false);
+
   return {
     account_id: accountId,
+    tenant_id: accData?.tenant_id ?? "",
     role_id: accData?.role_id ?? null,
     department: empRes.data?.department ?? null,
-    is_super_admin: role?.is_super_admin ?? false,
+    is_super_admin: effectiveSA,
     can_view_private: role?.can_view_private ?? false,
   };
 }
@@ -165,6 +199,12 @@ export async function getModuleScope(
   ctx: ScopeContext,
   module_name: string,
 ): Promise<DataScope> {
+  // Type C modules (Personal productivity) are hardcoded to Own regardless
+  // of what /roles has configured. This enforces the rule that no non-SA
+  // can see another account's personal data even with Scope = All on their
+  // role — because for Type C, Scope is not configurable.
+  if (TYPE_C_MODULES.has(module_name)) return "own";
+
   if (!ctx.role_id) return "private";
   const { data } = await supabase
     .from("koleex_permissions")
@@ -195,9 +235,16 @@ export async function canViewAccount(
   ctx: ScopeContext,
   module_name: string,
   target_account_id: string,
-): Promise<{ allowed: boolean; reason: "sa" | "own" | "scope_all" | "scope_dept" | "denied" }> {
+): Promise<{ allowed: boolean; reason: "sa" | "own" | "scope_all" | "scope_dept" | "denied" | "type_c" }> {
   if (ctx.is_super_admin) return { allowed: true, reason: "sa" };
   if (target_account_id === ctx.account_id) return { allowed: true, reason: "own" };
+
+  // Type C modules (Calendar, Todo, Mail, Inbox, Notes): only Super Admin
+  // can view another account's records. No role configuration grants this
+  // — personal productivity data stays personal.
+  if (TYPE_C_MODULES.has(module_name)) {
+    return { allowed: false, reason: "type_c" };
+  }
 
   const scope = await getModuleScope(ctx, module_name);
   if (scope === "all") return { allowed: true, reason: "scope_all" };
@@ -232,6 +279,12 @@ export async function filterAccessibleAccounts(
   if (candidate_account_ids.length === 0) return [];
   if (ctx.is_super_admin) return candidate_account_ids;
 
+  // Type C modules: only the viewer's own account, regardless of any
+  // configured Scope on their role.
+  if (TYPE_C_MODULES.has(module_name)) {
+    return candidate_account_ids.filter((id) => id === ctx.account_id);
+  }
+
   const scope = await getModuleScope(ctx, module_name);
 
   if (scope === "all") return candidate_account_ids;
@@ -257,6 +310,30 @@ export async function filterAccessibleAccounts(
 
   // Fallback — only self
   return candidate_account_ids.filter((id) => id === ctx.account_id);
+}
+
+/* ============================================================================
+   Tenant filtering
+   ============================================================================ */
+
+/**
+ * Apply tenant isolation to any query. Every tenant-scoped module wraps
+ * its fetch with this: data outside the current tenant is invisible unless
+ * the viewer is Super Admin viewing from the host (Koleex) tenant.
+ *
+ * Super Admin behaviour:
+ *   - When their tenant is the host (Koleex), they can see across tenants
+ *     if they explicitly ask for it. The default is still to filter by
+ *     tenant_id to avoid accidentally leaking data between tenants.
+ *   - To switch tenants, the UI surfaces a tenant picker that updates
+ *     ctx.tenant_id for subsequent queries.
+ *
+ * Regular user: always filtered to their own tenant_id. Hard boundary —
+ * a customer-tenant account NEVER sees Koleex's records.
+ */
+export function tenantClause(ctx: ScopeContext): { column: string; value: string } | null {
+  if (!ctx.tenant_id) return null;
+  return { column: "tenant_id", value: ctx.tenant_id };
 }
 
 /* ============================================================================
