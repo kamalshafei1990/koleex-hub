@@ -36,7 +36,6 @@ export async function POST(
     .insert({
       name: `${s.name} (Copy)`,
       description: s.description,
-      tenant_id: auth.tenant_id,
       updated_at: new Date().toISOString(),
     })
     .select("*")

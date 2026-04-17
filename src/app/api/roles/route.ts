@@ -16,22 +16,18 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  // Try the Koleex-specific roles table first (koleex_roles has the
-  // richer fields used by the Roles admin). Fall back to the generic
-  // "roles" table so existing callers that expect that shape still work.
-  let q = supabaseServer
+  // Roles are GLOBAL (no tenant_id column) — role templates are shared
+  // across all tenants. Try koleex_roles first (richer fields for the
+  // Roles admin), fall back to "roles".
+  let { data, error } = await supabaseServer
     .from("koleex_roles")
     .select("*")
     .order("name", { ascending: true });
-  if (auth.tenant_id) q = q.eq("tenant_id", auth.tenant_id);
-  let { data, error } = await q;
   if (error || !data || data.length === 0) {
-    let q2 = supabaseServer
+    const res = await supabaseServer
       .from("roles")
       .select("*")
       .order("name", { ascending: true });
-    if (auth.tenant_id) q2 = q2.eq("tenant_id", auth.tenant_id);
-    const res = await q2;
     data = res.data;
     error = res.error;
   }
@@ -54,9 +50,10 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as Record<string, unknown>;
+  // Roles are global — no tenant_id column.
+  delete body.tenant_id;
   const row = {
     ...body,
-    tenant_id: auth.tenant_id,
     updated_at: new Date().toISOString(),
   };
 
