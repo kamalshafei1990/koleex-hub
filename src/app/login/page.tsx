@@ -88,7 +88,12 @@ function LoginInner() {
           setBusy(false);
           if (byUsername.ok) {
             setCurrentAccountId(byUsername.account.id);
-            router.replace(next);
+            // Hard reload so every cached hook (sidebar, scope ctx,
+            // permission gates) re-fires with the new identity. Soft
+            // nav via router.replace leaves the old ScopeContext frozen
+            // in memory — you'd sign in as alex but still see kamal's
+            // sidebar until the page was refreshed manually.
+            window.location.href = next;
             return;
           }
           setError(
@@ -113,7 +118,9 @@ function LoginInner() {
           return;
         }
         setCurrentAccountId(res.account.id);
-        router.replace(next);
+        // Hard reload (see explanation above) so the new identity
+        // propagates to every hook + cached query on the destination page.
+        window.location.href = next;
       } catch (e) {
         setBusy(false);
         setError(e instanceof Error ? e.message : "Sign-in failed");

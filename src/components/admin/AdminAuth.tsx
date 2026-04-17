@@ -168,7 +168,11 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
       /* ignore — auth still works in-memory for this tab */
     }
     setCurrentAccountId(result.account.id);
-    setAuthed(true);
+    // Hard reload so every mounted component (Sidebar, TenantPicker,
+    // any page still holding kamal's cached ScopeContext) re-runs
+    // against the newly signed-in identity. Without this the sidebar
+    // keeps showing the previous user's app list.
+    window.location.reload();
   }
 
   function resetJoinForm() {
