@@ -26,6 +26,13 @@ import type {
   AccountRow,
   EmployeeRow,
 } from "@/types/supabase";
+import {
+  buildScopeFilter,
+  orClauseForScope,
+  privacyClause,
+  logPrivateAccess,
+  type ScopeContext,
+} from "./scope";
 
 /* ── Helper: resolve assignee info from account_ids ── */
 
@@ -65,15 +72,52 @@ async function resolveAssignees(accountIds: string[]): Promise<TodoAssigneeInfo[
   });
 }
 
-/* ── Fetch all todos with relations ── */
+/* ── Fetch todos with scope enforcement ──
+   When ctx is provided, the fetch filters results to what the user's role
+   allows (own / department / all + is_super_admin bypass + private handling).
+   When ctx is null/undefined the fetch stays wide-open for backwards-compat
+   with integrations that haven't been migrated yet. All UI pages should pass
+   ctx — only Supabase-internal triggers or data migrations may skip it.   */
 
-export async function fetchTodos(): Promise<TodoWithRelations[]> {
-  const { data: todos, error } = await supabase
+export async function fetchTodos(
+  ctx?: ScopeContext | null,
+): Promise<TodoWithRelations[]> {
+  // Build scope filter once (loads shared IDs from assignee junction in a
+  // single round-trip) — returns null when no ctx provided (wide-open).
+  const filter = ctx
+    ? await buildScopeFilter({ ctx, module_name: "To-do" })
+    : null;
+
+  let query = supabase
     .from("koleex_todos")
     .select("*")
     .order("created_at", { ascending: false });
 
+  if (filter && ctx) {
+    // Apply scope-level OR (own / department / all — bypass = no filter)
+    const scopeOr = orClauseForScope(filter, ctx);
+    if (scopeOr) {
+      query = query.or(scopeOr);
+    }
+    // Apply privacy filter: hide is_private unless owner (or break-glass role)
+    const privacyOr = privacyClause(filter, ctx);
+    if (privacyOr) {
+      query = query.or(privacyOr);
+    }
+  }
+
+  const { data: todos, error } = await query;
+
   if (error || !todos || todos.length === 0) return [];
+
+  // Break-glass audit: log every private record the user accessed so we
+  // have a trail for legally-sensitive access.
+  if (ctx?.can_view_private) {
+    const privateIds = todos.filter((t) => t.is_private).map((t) => t.id);
+    if (privateIds.length > 0) {
+      void logPrivateAccess(ctx, "To-do", "koleex_todos", privateIds);
+    }
+  }
 
   const todoIds = todos.map((t) => t.id);
 

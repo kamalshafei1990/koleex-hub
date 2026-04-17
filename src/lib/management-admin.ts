@@ -99,16 +99,25 @@ export interface RoleRow {
   id: string;
   name: string;
   description: string | null;
+  /** When true, the role bypasses every data_scope filter (but is still
+   *  excluded from is_private records unless can_view_private is also true). */
+  is_super_admin: boolean;
+  /** Break-glass: when true, the role can read is_private records. Every
+   *  such read is audit-logged to koleex_private_access_log. Grant sparingly. */
+  can_view_private: boolean;
   created_at: string;
   updated_at: string;
 }
 
-/** Record-level scope a role has on a module.
- *  - `own`        – only records the user owns (created or assigned to)
- *  - `department` – records owned by anyone in the user's department
+/** Record-level scope a role has on a module. Mirrors the DB CHECK on
+ *  koleex_permissions.data_scope.
+ *  - `private`    – only records this user created (locks out even other
+ *                   holders of the same role). Most restrictive.
+ *  - `own`        – records the user owns OR was assigned to OR shared with
+ *  - `department` – own rules + records owned by anyone in user's department
  *  - `all`        – every record in the system (backwards-compatible default)
  */
-export type DataScope = "own" | "department" | "all";
+export type DataScope = "private" | "own" | "department" | "all";
 
 export interface PermissionRow {
   id: string;

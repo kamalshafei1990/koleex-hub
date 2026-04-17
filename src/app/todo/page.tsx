@@ -45,6 +45,7 @@ import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority,
 } from "@/types/supabase";
 import { getCurrentAccountIdSync } from "@/lib/identity";
+import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 
 /* ── Priority config ── */
 const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [
@@ -717,17 +718,26 @@ export default function TodoPage() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [labels, setLabels] = useState<TodoLabelRow[]>([]);
   const accountId = getCurrentAccountIdSync();
+  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
+
+  // Load scope context once per session so fetchTodos knows which filter
+  // (own / department / all + SA bypass) to apply. Non-blocking — if this
+  // returns null we still render the page with the wide-open fetch.
+  useEffect(() => {
+    if (!accountId) return;
+    loadScopeContext(accountId).then(setScopeCtx);
+  }, [accountId]);
 
   const loadAll = useCallback(async () => {
     const [t, e, d, l] = await Promise.all([
-      fetchTodos(),
+      fetchTodos(scopeCtx),
       fetchAssignableEmployees(),
       fetchDepartments(),
       fetchTodoLabels(),
     ]);
     setTodos(t); setEmployees(e); setDepartments(d); setLabels(l);
     setLoading(false);
-  }, []);
+  }, [scopeCtx]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 

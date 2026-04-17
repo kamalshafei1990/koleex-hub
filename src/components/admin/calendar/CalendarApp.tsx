@@ -36,6 +36,8 @@ import {
 } from "@/lib/accounts-admin";
 import { fetchEventsInRange, deleteEvent } from "@/lib/calendar-events";
 import { withDefaults } from "@/lib/access-control";
+import { loadScopeContext, type ScopeContext } from "@/lib/scope";
+import { getCurrentAccountIdSync } from "@/lib/identity";
 import {
   addDays,
   addMonths,
@@ -88,6 +90,17 @@ export default function CalendarApp() {
   // Feedback
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Scope context for the logged-in user — drives whether the "view as
+  // another account" feature actually resolves any events (only Super Admin
+  // can view other accounts' calendars; regular users are restricted to
+  // their own scope).
+  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
+  useEffect(() => {
+    const loggedInId = getCurrentAccountIdSync();
+    if (!loggedInId) return;
+    loadScopeContext(loggedInId).then(setScopeCtx);
+  }, []);
 
   /* ── Initial account load ── */
   useEffect(() => {
@@ -149,10 +162,11 @@ export default function CalendarApp() {
       activeAccountId,
       visibleRange.from,
       visibleRange.to,
+      scopeCtx,
     );
     setEvents(rows);
     setLoadingEvents(false);
-  }, [activeAccountId, visibleRange]);
+  }, [activeAccountId, visibleRange, scopeCtx]);
 
   useEffect(() => {
     loadEvents();

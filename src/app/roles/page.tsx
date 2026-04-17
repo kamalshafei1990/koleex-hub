@@ -112,28 +112,42 @@ function RoleModal({ open, onClose, role, onSaved }: {
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [canViewPrivate, setCanViewPrivate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (open) { setName(role?.name || ""); setDescription(role?.description || ""); setError(""); }
+    if (open) {
+      setName(role?.name || "");
+      setDescription(role?.description || "");
+      setIsSuperAdmin(role?.is_super_admin ?? false);
+      setCanViewPrivate(role?.can_view_private ?? false);
+      setError("");
+    }
   }, [open, role]);
 
   const handleSave = async () => {
     if (!name.trim()) { setError("Role name is required."); return; }
     setSaving(true); setError("");
+    const payload = {
+      name: name.trim(),
+      description: description.trim() || null,
+      is_super_admin: isSuperAdmin,
+      can_view_private: canViewPrivate,
+    };
     if (role) {
-      const res = await updateRole(role.id, { name: name.trim(), description: description.trim() || null });
+      const res = await updateRole(role.id, payload);
       if (!res.ok) { setError(res.error || "Failed."); setSaving(false); return; }
     } else {
-      const res = await createRole({ name: name.trim(), description: description.trim() || null });
+      const res = await createRole(payload);
       if (res.error) { setError(res.error); setSaving(false); return; }
     }
     setSaving(false); onSaved(); onClose();
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={role ? "Edit Role" : "New Role"} width="max-w-[420px]" footer={
+    <ModalShell open={open} onClose={onClose} title={role ? "Edit Role" : "New Role"} width="max-w-[480px]" footer={
       <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
       <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? "Saving..." : role ? "Save" : "Create Role"}</button></>
     }>
@@ -145,6 +159,51 @@ function RoleModal({ open, onClose, role, onSaved }: {
       <div>
         <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Description</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does this role do?" rows={2} className={textareaCls} />
+      </div>
+
+      {/* ── Advanced role flags ──
+          Two orthogonal overrides that bypass the normal scope rules.
+          is_super_admin is safe-ish (still blocked from private records);
+          can_view_private is the break-glass flag — warn the user with a
+          red border + explanation since it's audit-logged. */}
+      <div className="rounded-xl border border-[var(--border-faint)] p-4 space-y-3 bg-[var(--bg-surface-subtle)]">
+        <p className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-dim)]">
+          Advanced — scope overrides
+        </p>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isSuperAdmin}
+            onChange={(e) => setIsSuperAdmin(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-emerald-500 cursor-pointer"
+          />
+          <div className="flex-1">
+            <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
+              Super Admin
+            </div>
+            <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+              Bypasses all data scope rules (Own / Dept / All). Sees every record except those marked Private.
+            </div>
+          </div>
+        </label>
+
+        <label className={`flex items-start gap-3 cursor-pointer p-2 -m-2 rounded-lg ${canViewPrivate ? "bg-red-500/[0.08] border border-red-500/25" : ""}`}>
+          <input
+            type="checkbox"
+            checked={canViewPrivate}
+            onChange={(e) => setCanViewPrivate(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-red-500 cursor-pointer"
+          />
+          <div className="flex-1">
+            <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
+              Break-glass: view Private records
+            </div>
+            <div className={`text-[11px] mt-0.5 ${canViewPrivate ? "text-red-300" : "text-[var(--text-dim)]"}`}>
+              Grants access to records marked Private (personal mail, notes, sensitive HR). Every read is logged to koleex_private_access_log. Grant sparingly — typically only during legal discovery.
+            </div>
+          </div>
+        </label>
       </div>
     </ModalShell>
   );
@@ -194,11 +253,12 @@ const EMPTY_PERM: PermCell = {
   data_scope: "all",
 };
 
-/** Cycle order for the scope button: all → department → own → all. */
+/** Cycle order for the scope button: all → department → own → private → all. */
 const SCOPE_CYCLE: Record<DataScope, DataScope> = {
   all: "department",
   department: "own",
-  own: "all",
+  own: "private",
+  private: "all",
 };
 
 function PermissionsEditor({ roleId }: { roleId: string }) {
@@ -324,16 +384,17 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
    *  but stays clickable so the admin can still pre-configure it. */
   const ScopeChip = ({ scope, disabled, onClick }: { scope: DataScope; disabled?: boolean; onClick: () => void }) => {
     const labels: Record<DataScope, { label: string; cls: string; dot: string }> = {
-      all:        { label: "All",  cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
-      department: { label: "Dept", cls: "bg-blue-500/15 border-blue-500/30 text-blue-300",         dot: "bg-blue-400" },
-      own:        { label: "Own",  cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",      dot: "bg-amber-400" },
+      all:        { label: "All",     cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
+      department: { label: "Dept",    cls: "bg-blue-500/15 border-blue-500/30 text-blue-300",         dot: "bg-blue-400" },
+      own:        { label: "Own",     cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",      dot: "bg-amber-400" },
+      private:    { label: "Private", cls: "bg-red-500/15 border-red-500/30 text-red-300",            dot: "bg-red-400" },
     };
     const cfg = labels[scope];
     return (
       <button
         type="button"
         onClick={onClick}
-        title={`Data scope: ${cfg.label}. Click to cycle (All → Dept → Own).`}
+        title={`Data scope: ${cfg.label}. Click to cycle (All → Dept → Own → Private).`}
         className={`h-7 px-2 rounded-lg border text-[10px] font-semibold flex items-center gap-1.5 transition-all ${
           cfg.cls
         } ${disabled ? "opacity-40" : "hover:brightness-110"}`}
