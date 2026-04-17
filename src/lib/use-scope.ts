@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { getCurrentAccountIdSync } from "./identity";
+import { APP_REGISTRY } from "./navigation";
 import {
   loadScopeContext,
   TYPE_C_MODULES,
@@ -155,10 +156,12 @@ export function usePermittedModules(): {
       return;
     }
 
-    // SA bypass — grants every module
+    // SA bypass — grants every module AND every app in APP_REGISTRY.
+    // Some apps (like "Roles & Permissions", "Settings", category nav
+    // items) don't have rows in koleex_permissions because they're
+    // administrative surfaces, not role-gated modules. Seed the Set
+    // with every app.name so those still show up for SA.
     if (ctx.is_super_admin) {
-      // Fetch the full module list (distinct) once so SA still respects
-      // the system's module catalogue rather than defaulting to something hardcoded.
       supabase
         .from("koleex_permissions")
         .select("module_name")
@@ -166,6 +169,9 @@ export function usePermittedModules(): {
           const set = new Set(
             (data ?? []).map((r: { module_name: string }) => r.module_name),
           );
+          // Union with the app catalogue so admin-only apps (no permission
+          // rows) are still visible to Super Admin.
+          for (const app of APP_REGISTRY) set.add(app.name);
           setState({ modules: set, loading: false });
         });
       return;
