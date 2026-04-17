@@ -55,11 +55,29 @@ function isMissingTable(message: string): boolean {
    ════════════════════════════════════════════════════════════════════════ */
 
 /** All non-folded stages, ordered for kanban + select rendering.
- *  When ctx is provided, filtered to the viewer's tenant — each tenant
- *  maintains their own pipeline stages. */
+ *
+ *  Tries the server-side /api/crm/stages route first (which uses the
+ *  service-role key and enforces auth + permission + tenant scope on
+ *  the server). Falls back to the legacy anon-key direct query when the
+ *  API returns a network error, so anything calling this without a
+ *  session (server-side migrations, tests) still works during the
+ *  transition. Will be removed once RLS deny-by-default is enabled
+ *  across all tables. */
 export async function fetchStages(
   ctx?: ScopeContext | null,
 ): Promise<CrmStageRow[]> {
+  try {
+    const res = await fetch("/api/crm/stages", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { stages: CrmStageRow[] };
+      return json.stages;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[CRM] fetchStages API failed:", e);
+  }
+
+  // Legacy fallback — direct anon-key query.
   let q = supabase
     .from(STAGES)
     .select("*")
@@ -164,6 +182,34 @@ export async function fetchOpportunities(
     ctx = null,
   } = options;
 
+  // API-first: the /api/crm/opportunities route returns the same enriched
+  // shape as this legacy path, scoped to the caller's tenant by the session
+  // cookie. Falls back to direct anon-key query below on network error.
+  try {
+    const params = new URLSearchParams();
+    if (includeArchived) params.set("includeArchived", "1");
+    if (ownerAccountId) params.set("owner", ownerAccountId);
+    if (stageId) params.set("stage", stageId);
+    if (contactId) params.set("contact", contactId);
+    if (search) params.set("search", search);
+    if (limit !== 500) params.set("limit", String(limit));
+    const qs = params.toString();
+    const res = await fetch(
+      "/api/crm/opportunities" + (qs ? "?" + qs : ""),
+      { credentials: "include" },
+    );
+    if (res.ok) {
+      const json = (await res.json()) as {
+        opportunities: CrmOpportunityWithRelations[];
+      };
+      return json.opportunities;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[CRM] fetchOpportunities API failed:", e);
+  }
+
+  // Legacy fallback.
   let q = supabase
     .from(OPPS)
     .select("*")

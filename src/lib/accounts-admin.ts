@@ -50,6 +50,20 @@ const PERMISSION_OVERRIDES = "account_permission_overrides";
 export async function fetchAccounts(
   ctx?: ScopeContext | null,
 ): Promise<AccountRow[]> {
+  // API-first: goes through /api/accounts which requires auth + the
+  // "Accounts" module permission. Legacy direct-Supabase path below
+  // stays as a fallback for code still calling this without a session.
+  try {
+    const res = await fetch("/api/accounts", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { accounts: AccountRow[] };
+      return json.accounts;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Accounts] API failed:", e);
+  }
+
   let q = supabase
     .from(ACCOUNTS)
     .select("*")
@@ -339,6 +353,17 @@ export async function isLoginEmailAvailable(
 export async function fetchPeople(
   ctx?: ScopeContext | null,
 ): Promise<PersonRow[]> {
+  try {
+    const res = await fetch("/api/people", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { people: PersonRow[] };
+      return json.people;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[People] API failed:", e);
+  }
+
   let q = supabase
     .from(PEOPLE)
     .select("*")
@@ -430,6 +455,17 @@ export async function updatePerson(
 export async function fetchCompanies(
   ctx?: ScopeContext | null,
 ): Promise<CompanyRow[]> {
+  try {
+    const res = await fetch("/api/companies", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { companies: CompanyRow[] };
+      return json.companies;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Companies] API failed:", e);
+  }
+
   let q = supabase
     .from(COMPANIES)
     .select("*")
@@ -512,6 +548,21 @@ export interface EmployeeWithPerson {
 export async function fetchEmployeesWithPerson(
   options: { includeAlreadyLinked?: boolean; ctx?: ScopeContext | null } = {},
 ): Promise<EmployeeWithPerson[]> {
+  try {
+    const qs = options.includeAlreadyLinked ? "?includeLinked=1" : "";
+    const res = await fetch("/api/employees-with-person" + qs, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const json = (await res.json()) as { employees: EmployeeWithPerson[] };
+      return json.employees;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Employees] API failed:", e);
+  }
+
+  // Legacy fallback — direct anon-key query.
   let q = supabase
     .from(EMPLOYEES)
     .select(
