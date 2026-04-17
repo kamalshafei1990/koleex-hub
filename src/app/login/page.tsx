@@ -27,10 +27,6 @@ import {
   verifyMfaChallenge,
   getCurrentSession,
 } from "@/lib/auth-client";
-import {
-  verifyAccountLogin,
-  fetchAccountByLoginEmail,
-} from "@/lib/accounts-admin";
 import { setCurrentAccountId } from "@/lib/identity";
 import { LEGACY_SESSION_KEY, LEGACY_SESSION_USER_KEY } from "@/components/admin/AdminAuth";
 
@@ -68,80 +64,47 @@ function LoginInner() {
     setError(null);
     setBusy(true);
 
-    // Legacy path: no real Supabase Auth — look up the account by email
-    // (or username), verify the base64 password tag, and set the
-    // client-side current-account-id so useScopeContext picks them up.
+    // Legacy path: POST to the server-side /api/auth/signin endpoint.
+    // The server verifies the password using the service-role Supabase
+    // client (the anon key never touches password_hash anymore) and sets
+    // an HttpOnly signed session cookie on the response. The browser
+    // never sees — and cannot forge — session credentials.
     if (!isSupabaseAuthEnabled()) {
       try {
-        // The email field accepts either "user@domain" or a bare username
-        // for dev convenience. Try email first, fall back to username.
-        let account = email.includes("@")
-          ? await fetchAccountByLoginEmail(email.trim())
-          : null;
-        const usernameGuess = email.includes("@")
-          ? account?.username ?? email.split("@")[0]
-          : email.trim();
-        if (!account) {
-          const byUsername = await verifyAccountLogin(
-            usernameGuess,
-            password,
-          );
-          setBusy(false);
-          if (byUsername.ok) {
-            // Legacy session bookkeeping so AdminAuth considers the user
-            // signed in and doesn't show the "Welcome back" form again
-            // when they land on /. Without this /login succeeds but
-            // AdminAuth still prompts for credentials.
-            try {
-              window.localStorage.setItem(LEGACY_SESSION_KEY, "true");
-              window.localStorage.setItem(
-                LEGACY_SESSION_USER_KEY,
-                byUsername.account.username,
-              );
-            } catch {
-              /* ignore */
-            }
-            setCurrentAccountId(byUsername.account.id);
-            // Hard reload so every cached hook (sidebar, scope ctx,
-            // permission gates) re-fires with the new identity.
-            window.location.href = next;
-            return;
-          }
-          setError(
-            byUsername.reason === "not_found"
-              ? "No account with that email or username."
-              : byUsername.reason === "disabled"
-                ? "This account is disabled."
-                : "Wrong password.",
-          );
-          return;
-        }
-        const res = await verifyAccountLogin(account.username, password);
+        const resp = await fetch("/api/auth/signin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+          credentials: "include",
+        });
+        const json = (await resp.json()) as
+          | { ok: true; account: { id: string; username: string } }
+          | { ok: false; error: string };
         setBusy(false);
-        if (!res.ok) {
+        if (!resp.ok || !("ok" in json) || !json.ok) {
           setError(
-            res.reason === "wrong_password"
-              ? "Wrong password."
-              : res.reason === "disabled"
-                ? "This account is disabled."
-                : "No account found.",
+            "ok" in json && !json.ok
+              ? json.error
+              : "Sign-in failed — please try again.",
           );
           return;
         }
-        // Legacy session bookkeeping (see above) so AdminAuth skips the
-        // redundant "Welcome back" prompt on the destination page.
+        // Legacy session bookkeeping so AdminAuth skips the redundant
+        // "Welcome back" prompt on the destination page. Still using
+        // localStorage here for the UI flag — actual auth is now the
+        // server-verified cookie.
         try {
           window.localStorage.setItem(LEGACY_SESSION_KEY, "true");
           window.localStorage.setItem(
             LEGACY_SESSION_USER_KEY,
-            res.account.username,
+            json.account.username,
           );
         } catch {
           /* ignore */
         }
-        setCurrentAccountId(res.account.id);
-        // Hard reload (see explanation above) so the new identity
-        // propagates to every hook + cached query on the destination page.
+        setCurrentAccountId(json.account.id);
+        // Hard reload so every cached hook (sidebar, scope ctx,
+        // permission gates) re-fires with the new identity.
         window.location.href = next;
       } catch (e) {
         setBusy(false);

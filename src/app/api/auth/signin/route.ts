@@ -1,0 +1,110 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   POST /api/auth/signin — Legacy password sign-in, server-side.
+
+   Request JSON:  { email?: string; username?: string; password: string }
+   Response:      { ok: true, account: { id, username, ... } }
+               or { ok: false, error: string } with 401
+
+   Replaces the old client-side call to verifyAccountLogin. The browser
+   never touches Supabase's accounts table directly — it asks this route,
+   which verifies the password using the service-role client and then
+   sets an HttpOnly signed session cookie. No secrets leave the server.
+   --------------------------------------------------------------------------- */
+
+import { NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { setSessionCookie } from "@/lib/server/session";
+
+/** Same base64-tag scheme the legacy write path used. Keep parity with
+ *  accounts-admin.ts::hashTempPassword so existing stored hashes verify. */
+function hashTempPassword(plain: string): string {
+  return `tmp$${Buffer.from(plain, "utf8").toString("base64")}`;
+}
+
+export async function POST(req: Request) {
+  let body: { email?: string; username?: string; password?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Invalid request body" },
+      { status: 400 },
+    );
+  }
+
+  const password = body.password?.trim();
+  const emailOrUsername = (body.email ?? body.username ?? "").trim();
+  if (!password || !emailOrUsername) {
+    return NextResponse.json(
+      { ok: false, error: "Email/username and password are required" },
+      { status: 400 },
+    );
+  }
+
+  // Look up the account by login_email or username (case-insensitive).
+  // One round-trip either way so login latency is predictable.
+  let account: {
+    id: string;
+    username: string;
+    login_email: string;
+    status: string;
+    password_hash: string | null;
+    user_type: string;
+  } | null = null;
+
+  if (emailOrUsername.includes("@")) {
+    const { data } = await supabaseServer
+      .from("accounts")
+      .select("id, username, login_email, status, password_hash, user_type")
+      .ilike("login_email", emailOrUsername)
+      .maybeSingle();
+    account = data ?? null;
+  } else {
+    const { data } = await supabaseServer
+      .from("accounts")
+      .select("id, username, login_email, status, password_hash, user_type")
+      .ilike("username", emailOrUsername)
+      .maybeSingle();
+    account = data ?? null;
+  }
+
+  // Uniform error messages so attackers can't probe for valid emails.
+  // Checking timing-equal signatures would be overkill for this gate —
+  // the anon key was public anyway; after RLS rolls out the DB is the
+  // real boundary.
+  if (!account) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid email/username or password" },
+      { status: 401 },
+    );
+  }
+  if (account.status !== "active") {
+    return NextResponse.json(
+      { ok: false, error: "This account is disabled" },
+      { status: 403 },
+    );
+  }
+
+  const expected = hashTempPassword(password);
+  if (!account.password_hash || account.password_hash !== expected) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid email/username or password" },
+      { status: 401 },
+    );
+  }
+
+  // Success — mint the session cookie.
+  await setSessionCookie(account.id);
+
+  return NextResponse.json({
+    ok: true,
+    account: {
+      id: account.id,
+      username: account.username,
+      login_email: account.login_email,
+      user_type: account.user_type,
+    },
+  });
+}

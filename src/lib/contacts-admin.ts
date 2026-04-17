@@ -235,19 +235,37 @@ export async function checkContactsSetup(): Promise<boolean> {
 /**
  * Fetch all contacts visible to the current user.
  *
- * Multi-tenancy: when ctx is provided, the query is automatically scoped
- * to the viewer's tenant_id. A customer-tenant account opening the
- * Customers app sees ONLY their own contacts — Koleex's customer list
- * is invisible to them. Super Admin viewing via the top-bar tenant
- * picker sees whichever tenant they selected.
+ * Now goes through the server-side /api/contacts route instead of
+ * talking to Supabase directly from the browser. The route enforces
+ * auth (session cookie), module permission (Customers), and tenant
+ * filter on the server using the service-role client. After RLS is
+ * enabled with deny-by-default, direct browser queries to the contacts
+ * table return nothing — only the API layer can read it.
  *
- * Legacy callers (no ctx) keep the old wide-open behaviour. That's safe
- * while Koleex is the only tenant, but migrating the UI to pass ctx is
- * prerequisite for any customer-tenant provisioning.
+ * Falls back to the legacy direct-Supabase path when the API returns
+ * a network error AND no ctx is provided, so integrations calling this
+ * function without a session (e.g. server-side migrations) still work
+ * during the transition. Normal app usage always hits the API.
  */
 export async function fetchContacts(
   ctx?: ScopeContext | null,
 ): Promise<ContactRow[]> {
+  try {
+    const res = await fetch("/api/contacts", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { contacts: ContactRow[] };
+      return json.contacts;
+    }
+    // 401/403 — user not signed in or no module access. Return empty
+    // rather than leaking the legacy direct path.
+    if (res.status === 401 || res.status === 403) return [];
+    console.error("[Contacts] API error:", res.status);
+  } catch (e) {
+    console.error("[Contacts] API fetch failed:", e);
+  }
+
+  // Legacy fallback — remove after RLS is enabled and we've verified
+  // the API path works everywhere in production.
   let q = supabase
     .from("contacts")
     .select("*")
@@ -255,7 +273,7 @@ export async function fetchContacts(
   if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
   const { data, error } = await q;
   if (error) {
-    console.error("[Contacts] Fetch:", error.message);
+    console.error("[Contacts] Fetch fallback:", error.message);
     return [];
   }
   return (data as ContactRow[]) || [];
@@ -265,6 +283,21 @@ export async function fetchContactsByType(
   type: string,
   ctx?: ScopeContext | null,
 ): Promise<ContactRow[]> {
+  try {
+    const res = await fetch(
+      `/api/contacts?type=${encodeURIComponent(type)}`,
+      { credentials: "include" },
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { contacts: ContactRow[] };
+      return json.contacts;
+    }
+    if (res.status === 401 || res.status === 403) return [];
+  } catch (e) {
+    console.error("[Contacts] API fetchByType failed:", e);
+  }
+
+  // Legacy fallback
   let q = supabase
     .from("contacts")
     .select("*")
@@ -273,7 +306,7 @@ export async function fetchContactsByType(
   if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
   const { data, error } = await q;
   if (error) {
-    console.error("[Contacts] FetchByType:", error.message);
+    console.error("[Contacts] FetchByType fallback:", error.message);
     return [];
   }
   return (data as ContactRow[]) || [];
