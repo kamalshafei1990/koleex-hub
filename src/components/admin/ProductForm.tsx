@@ -203,9 +203,9 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500/60" : "bg-[var(--bg-surface)]"}`}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500" : "bg-zinc-600"}`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[var(--bg-inverted)] shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
+        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
       </button>
       <span className="text-[13px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)]/80 transition-colors">{label}</span>
     </label>
@@ -779,35 +779,40 @@ export default function ProductForm({ productId }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      {/* ═══ STICKY TOP BAR ═══ */}
-      <div className="sticky top-14 z-40 bg-[var(--bg-secondary)]/90 backdrop-blur-xl border-b border-[var(--border-subtle)]">
-        <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/products" className="text-[13px] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-2">
-              <ArrowLeftIcon className="h-3.5 w-3.5" /> Back to Products
-            </Link>
-            {product.product_name && (
-              <div className="hidden md:flex items-center gap-2">
-                <span className="text-[var(--text-ghost)]">/</span>
-                <span className="text-[13px] text-[var(--text-muted)] font-medium truncate max-w-[200px]">{product.product_name}</span>
-                <StatusBadge status={product.status} />
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="h-9 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
-            >
-              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-              {saving ? "Saving..." : "Save Product"}
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+
+        {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style ═══ */}
+        <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href="/products"
+              className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
+            </Link>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
+                  {product.product_name || "New Product"}
+                </h1>
+                {product.product_name && <StatusBadge status={product.status} />}
+              </div>
+              <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
+                {product.product_name
+                  ? "Edit product details."
+                  : "Create a new product in your catalogue."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="h-9 px-4 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
+          >
+            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+            <span className="hidden sm:inline">{saving ? "Saving..." : "Save Product"}</span>
+          </button>
+        </div>
 
         {/* Messages */}
         {error && (
