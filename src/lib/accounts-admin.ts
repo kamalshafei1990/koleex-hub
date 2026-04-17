@@ -1264,6 +1264,44 @@ export async function verifyAccountLogin(
   | { ok: true; account: AccountRow }
   | { ok: false; reason: "not_found" | "wrong_password" | "disabled" }
 > {
+  // API-first: /api/auth/signin verifies via the service_role client and
+  // mints the HttpOnly session cookie in one round-trip. Required now that
+  // the accounts table is no longer readable via the anon key.
+  try {
+    const res = await fetch("/api/auth/signin", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const json = (await res.json()) as
+      | { ok: true; account: { id: string; username: string; login_email: string; user_type: string } }
+      | { ok: false; error: string };
+    if (res.ok && "ok" in json && json.ok) {
+      // The signin route doesn't return the full AccountRow — it returns
+      // the minimal fields needed to bootstrap the client identity. For
+      // AdminAuth's downstream state (scope ctx, sidebar, etc.) the hard
+      // reload in the caller fetches the full account via /api/me.
+      return {
+        ok: true,
+        account: {
+          id: json.account.id,
+          username: json.account.username,
+          login_email: json.account.login_email,
+          user_type: json.account.user_type,
+          status: "active",
+        } as AccountRow,
+      };
+    }
+    if (res.status === 403) return { ok: false, reason: "disabled" };
+    // 400 / 401 / anything else → indistinguishable bad credentials.
+    return { ok: false, reason: "wrong_password" };
+  } catch (e) {
+    console.error("[Accounts] verifyAccountLogin API failed:", e);
+  }
+
+  // Legacy fallback — only reachable on network failure. Kept so the app
+  // still attempts an auth before giving up.
   const account = await fetchAccountByUsername(username);
   if (!account) return { ok: false, reason: "not_found" };
   if (account.status !== "active") return { ok: false, reason: "disabled" };
