@@ -482,8 +482,13 @@ export default function DiscussApp() {
            what we already have. Concretely, we diff by message count and
            the latest id — if either changed, swap in the server rows,
            otherwise keep the existing array reference so React doesn't
-           re-render unnecessarily. */
+           re-render unnecessarily.
+
+           Guard: if the fetch returned an empty array but we already have
+           messages, it's almost certainly a transient network/DB error —
+           keep the existing state instead of blowing away the chat. */
         if (!silent) return rows;
+        if (rows.length === 0 && prev.length > 0) return prev;
         if (rows.length !== prev.length) return rows;
         const lastNew = rows[rows.length - 1]?.id;
         const lastOld = prev[prev.length - 1]?.id;
@@ -755,7 +760,7 @@ export default function DiscussApp() {
          when nothing changed, so the cost is just one SELECT)
      Both run in addition to realtime — so when realtime is working
      there's nothing to do except compare and keep the existing state
-     reference. When realtime is asleep, worst-case delivery is 5s. */
+     reference. When realtime is asleep, worst-case delivery is 3s. */
   useEffect(() => {
     if (!selectedChannelId || !accountId) return;
     if (typeof window === "undefined") return;
@@ -777,7 +782,7 @@ export default function DiscussApp() {
 
     const pollId = window.setInterval(() => {
       if (document.visibilityState === "visible") refresh();
-    }, 5000);
+    }, 3000);
 
     return () => {
       cancelled = true;
@@ -2456,6 +2461,8 @@ function MessageBubble({
               <div className="mt-1">
                 <VoicePlaybackBubble
                   url={meta.voice.url}
+                  bucket={meta.voice.bucket}
+                  path={meta.voice.path}
                   durationMs={meta.voice.duration_ms}
                   waveform={meta.voice.waveform ?? []}
                 />

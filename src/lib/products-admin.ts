@@ -4,6 +4,12 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import {
+  uploadToStorage,
+  removeFromStorage,
+  listStorage,
+  publicUrl,
+} from "./storage-client";
 import type {
   DivisionRow, CategoryRow, SubcategoryRow,
   ProductRow, ProductModelRow, ProductMediaRow,
@@ -197,15 +203,14 @@ export async function fetchMediaByProductId(productId: string): Promise<ProductM
 }
 
 export async function uploadProductFile(file: File): Promise<{ url: string; file_path: string } | null> {
-  const ext = file.name.split(".").pop() || "jpg";
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
   const filePath = `products/${Date.now()}_${safeName}`;
-
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: "3600", upsert: false });
-  if (error) { console.error("[Media] Upload error:", error.message); return null; }
-
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return { url: data.publicUrl, file_path: filePath };
+  const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600" });
+  if (!result.ok) {
+    console.error("[Media] Upload error:", result.error);
+    return null;
+  }
+  return { url: result.data.publicUrl, file_path: result.data.path };
 }
 
 export async function createProductMedia(media: Record<string, unknown>): Promise<ProductMediaRow | null> {
@@ -392,13 +397,13 @@ export async function fetchUniqueTags(): Promise<string[]> {
 // ── Taxonomy logos (stored in media/divisions/ and media/categories/ folders) ──
 
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {
-  const { data } = await supabase.storage.from(BUCKET).list(folder, { limit: 500 });
+  const result = await listStorage(BUCKET, folder, { limit: 500 });
   const map: Record<string, string> = {};
-  const baseUrl = supabase.storage.from(BUCKET).getPublicUrl("").data.publicUrl.replace(/\/$/, "");
-  for (const file of data || []) {
+  if (!result.ok) return map;
+  for (const file of result.files) {
     if (file.name === ".emptyFolderPlaceholder") continue;
     const slug = file.name.replace(/\.[^.]+$/, "");
-    map[slug] = `${baseUrl}/${folder}/${file.name}?t=${Date.now()}`;
+    map[slug] = `${result.baseUrl}/${folder}/${file.name}?t=${Date.now()}`;
   }
   return map;
 }
@@ -406,19 +411,18 @@ async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string
 async function uploadTaxonomyLogo(folder: string, slug: string, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() || "png";
   const filePath = `${folder}/${slug}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: "3600", upsert: true });
-  if (error) { console.error(`[${folder}Logo] Upload:`, error.message); return null; }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
+  const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600", upsert: true });
+  if (!result.ok) { console.error(`[${folder}Logo] Upload:`, result.error); return null; }
+  return result.data.publicUrl;
 }
 
 async function deleteTaxonomyLogo(folder: string, slug: string): Promise<boolean> {
-  // List folder to find exact filename (could be .svg, .png, .jpg)
-  const { data: files } = await supabase.storage.from(BUCKET).list(folder, { limit: 500 });
-  const match = (files || []).find(f => f.name.replace(/\.[^.]+$/, "") === slug);
-  if (!match) return true; // nothing to delete
-  const { error } = await supabase.storage.from(BUCKET).remove([`${folder}/${match.name}`]);
-  if (error) { console.error(`[${folder}Logo] Delete:`, error.message); return false; }
+  const result = await listStorage(BUCKET, folder, { limit: 500 });
+  if (!result.ok) return false;
+  const match = result.files.find(f => f.name.replace(/\.[^.]+$/, "") === slug);
+  if (!match) return true;
+  const rm = await removeFromStorage(BUCKET, [`${folder}/${match.name}`]);
+  if (!rm.ok) { console.error(`[${folder}Logo] Delete:`, rm.error); return false; }
   return true;
 }
 
@@ -435,14 +439,13 @@ export const deleteSubcategoryLogo = (slug: string) => deleteTaxonomyLogo("subca
 // ── Brand logos (stored in media/brands/ folder) ──
 
 export async function fetchBrandLogos(): Promise<Record<string, string>> {
-  // List files once, compute all URLs (no per-file network calls)
-  const { data } = await supabase.storage.from(BUCKET).list("brands", { limit: 200 });
+  const result = await listStorage(BUCKET, "brands", { limit: 200 });
   const map: Record<string, string> = {};
-  const baseUrl = supabase.storage.from(BUCKET).getPublicUrl("").data.publicUrl.replace(/\/$/, "");
-  for (const file of data || []) {
+  if (!result.ok) return map;
+  for (const file of result.files) {
     if (file.name === ".emptyFolderPlaceholder") continue;
     const slug = file.name.replace(/\.[^.]+$/, "");
-    map[slug] = `${baseUrl}/brands/${file.name}`;
+    map[slug] = `${result.baseUrl}/brands/${file.name}`;
   }
   return map;
 }
@@ -450,11 +453,9 @@ export async function fetchBrandLogos(): Promise<Record<string, string>> {
 export async function uploadBrandLogo(brandSlug: string, file: File): Promise<string | null> {
   const ext = file.name.split(".").pop() || "png";
   const filePath = `brands/${brandSlug}.${ext}`;
-  // Upsert — overwrite if exists
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, { cacheControl: "3600", upsert: true });
-  if (error) { console.error("[BrandLogo] Upload:", error.message); return null; }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
+  const result = await uploadToStorage(BUCKET, filePath, file, { cacheControl: "3600", upsert: true });
+  if (!result.ok) { console.error("[BrandLogo] Upload:", result.error); return null; }
+  return result.data.publicUrl;
 }
 
 // ── Brand Management (brands stored as strings on products, logos in storage) ──
@@ -519,15 +520,26 @@ export async function renameBrand(oldName: string, newName: string): Promise<boo
 
   if (oldSlug !== newSlug) {
     // List files in brands/ to find the old logo
-    const { data: files } = await supabase.storage.from(BUCKET).list("brands", { limit: 200 });
-    const oldFile = (files || []).find(f => f.name.replace(/\.[^.]+$/, "") === oldSlug);
+    const list = await listStorage(BUCKET, "brands", { limit: 200 });
+    const oldFile = list.ok
+      ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === oldSlug)
+      : null;
     if (oldFile) {
       const ext = oldFile.name.split(".").pop() || "png";
-      // Download old file, re-upload with new name, delete old
-      const { data: fileData } = await supabase.storage.from(BUCKET).download(`brands/${oldFile.name}`);
-      if (fileData) {
-        await supabase.storage.from(BUCKET).upload(`brands/${newSlug}.${ext}`, fileData, { cacheControl: "3600", upsert: true });
-        await supabase.storage.from(BUCKET).remove([`brands/${oldFile.name}`]);
+      // Fetch old file via public URL, re-upload with new name, delete old
+      const oldUrl = publicUrl(BUCKET, `brands/${oldFile.name}`);
+      try {
+        const resp = await fetch(oldUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          await uploadToStorage(BUCKET, `brands/${newSlug}.${ext}`, blob, {
+            cacheControl: "3600",
+            upsert: true,
+          });
+          await removeFromStorage(BUCKET, [`brands/${oldFile.name}`]);
+        }
+      } catch (e) {
+        console.error("[Brand] Rename logo copy failed:", e);
       }
     }
   }
@@ -550,10 +562,12 @@ export async function deleteBrand(brandName: string): Promise<boolean> {
 
   // Remove logo from storage
   const slug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const { data: files } = await supabase.storage.from(BUCKET).list("brands", { limit: 200 });
-  const logoFile = (files || []).find(f => f.name.replace(/\.[^.]+$/, "") === slug);
+  const list = await listStorage(BUCKET, "brands", { limit: 200 });
+  const logoFile = list.ok
+    ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === slug)
+    : null;
   if (logoFile) {
-    await supabase.storage.from(BUCKET).remove([`brands/${logoFile.name}`]);
+    await removeFromStorage(BUCKET, [`brands/${logoFile.name}`]);
   }
 
   return true;
@@ -561,11 +575,13 @@ export async function deleteBrand(brandName: string): Promise<boolean> {
 
 /** Delete only the logo for a brand */
 export async function deleteBrandLogo(brandSlug: string): Promise<boolean> {
-  const { data: files } = await supabase.storage.from(BUCKET).list("brands", { limit: 200 });
-  const logoFile = (files || []).find(f => f.name.replace(/\.[^.]+$/, "") === brandSlug);
+  const list = await listStorage(BUCKET, "brands", { limit: 200 });
+  const logoFile = list.ok
+    ? list.files.find(f => f.name.replace(/\.[^.]+$/, "") === brandSlug)
+    : null;
   if (logoFile) {
-    const { error } = await supabase.storage.from(BUCKET).remove([`brands/${logoFile.name}`]);
-    if (error) { console.error("[BrandLogo] Delete:", error.message); return false; }
+    const rm = await removeFromStorage(BUCKET, [`brands/${logoFile.name}`]);
+    if (!rm.ok) { console.error("[BrandLogo] Delete:", rm.error); return false; }
   }
   return true;
 }

@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { uploadToStorage } from "./storage-client";
 import type {
   AccountRow,
   InboxMessageRow,
@@ -371,18 +372,17 @@ export async function uploadInboxAttachment(
 ): Promise<InboxAttachment | null> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const filePath = `inbox-attachments/${Date.now()}_${safeName}`;
-  const { error } = await supabase.storage
-    .from("media")
-    .upload(filePath, file, { cacheControl: "3600", upsert: false });
-  if (error) {
-    console.error("[Inbox] Attachment upload:", error.message);
+  const result = await uploadToStorage("media", filePath, file, {
+    cacheControl: "3600",
+  });
+  if (!result.ok) {
+    console.error("[Inbox] Attachment upload:", result.error);
     return null;
   }
-  const { data } = supabase.storage.from("media").getPublicUrl(filePath);
   return {
     name: file.name,
-    url: data.publicUrl,
-    file_path: filePath,
+    url: result.data.publicUrl,
+    file_path: result.data.path,
     size: file.size,
     type: file.type || "application/octet-stream",
   };

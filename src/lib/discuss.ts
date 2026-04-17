@@ -17,6 +17,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { uploadToStorage } from "./storage-client";
 import type {
   DiscussAttachment,
   DiscussAuthor,
@@ -1009,18 +1010,17 @@ export async function uploadDiscussAttachment(
 ): Promise<DiscussAttachment | null> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const filePath = `discuss-attachments/${Date.now()}_${safeName}`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(filePath, file, { cacheControl: "3600", upsert: false });
-  if (error) {
-    console.error("[Discuss] Attachment upload:", error.message);
+  const result = await uploadToStorage(BUCKET, filePath, file, {
+    cacheControl: "3600",
+  });
+  if (!result.ok) {
+    console.error("[Discuss] Attachment upload:", result.error);
     return null;
   }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
   return {
     name: file.name,
-    url: data.publicUrl,
-    file_path: filePath,
+    url: result.data.publicUrl,
+    file_path: result.data.path,
     size: file.size,
     type: file.type || "application/octet-stream",
   };
@@ -1125,6 +1125,13 @@ export function subscribeToChannel(
         },
       )
       .subscribe((status) => {
+        if (typeof console !== "undefined") {
+          if (status === "SUBSCRIBED") {
+            console.info(
+              `[Discuss] channel ${channelId} realtime SUBSCRIBED ✓`,
+            );
+          }
+        }
         /* Reconnect only on the *abnormal* statuses. CLOSED is the
            normal status emitted during teardown (we called
            removeChannel) and during HMR / strict-mode double-mounts —
@@ -1232,6 +1239,11 @@ export function subscribeToMyChannels(
         () => onChannel?.(),
       )
       .subscribe((status) => {
+        if (typeof console !== "undefined") {
+          if (status === "SUBSCRIBED") {
+            console.info("[Discuss] my-channels realtime SUBSCRIBED ✓");
+          }
+        }
         /* Same caveat as subscribeToChannel: never reconnect on CLOSED,
            that's the normal teardown status and would loop forever. */
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -1903,29 +1915,32 @@ export async function uploadDiscussVoice(input: {
   durationMs: number;
   waveform: number[];
 }): Promise<DiscussVoiceMeta | null> {
+  // Voice notes go to the PRIVATE 'discuss-voice' bucket. Playback in
+  // the UI requests a short-lived signed URL via /api/storage/signed-url,
+  // so leaked message payloads don't expose the audio indefinitely.
   const mime =
     input.blob.type && input.blob.type.length > 0 ? input.blob.type : "audio/webm";
   const ext = pickVoiceExtension(mime);
-  const filePath = `discuss-voice/${Date.now()}_${Math.random()
+  const filePath = `${Date.now()}_${Math.random()
     .toString(36)
     .slice(2, 10)}.${ext}`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(filePath, input.blob, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: mime,
-    });
-  if (error) {
-    console.error("[Discuss] Voice upload:", error.message, {
+  const result = await uploadToStorage("discuss-voice", filePath, input.blob, {
+    cacheControl: "3600",
+    contentType: mime,
+  });
+  if (!result.ok) {
+    console.error("[Discuss] Voice upload:", result.error, {
       mime,
       size: input.blob.size,
     });
     return null;
   }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
   return {
-    url: data.publicUrl,
+    // Leave url empty — the playback component fetches a signed URL
+    // on demand using path + bucket.
+    url: "",
+    bucket: "discuss-voice",
+    path: result.data.path,
     duration_ms: input.durationMs,
     waveform: input.waveform,
   };

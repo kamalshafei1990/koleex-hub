@@ -446,16 +446,52 @@ export default function VoiceRecorder({
 
 export function VoicePlaybackBubble({
   url,
+  bucket,
+  path,
   durationMs,
   waveform,
 }: {
-  url: string;
+  /** Legacy URL (for voice notes uploaded to the public media bucket). */
+  url?: string;
+  /** New voice notes: private bucket id (e.g. "discuss-voice"). */
+  bucket?: string;
+  /** Object path in the private bucket. Playback mints a signed URL. */
+  path?: string;
   durationMs: number;
   waveform: number[];
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentMs, setCurrentMs] = useState(0);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(url ?? "");
+
+  // New-style private voice: resolve a signed URL on mount / when path
+  // changes. Legacy voice notes (just a public `url`) short-circuit.
+  useEffect(() => {
+    let cancelled = false;
+    if (bucket && path) {
+      (async () => {
+        try {
+          const res = await fetch("/api/storage/signed-url", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bucket, path, expiresIn: 3600 }),
+          });
+          if (!res.ok) return;
+          const json = (await res.json()) as { signedUrl: string };
+          if (!cancelled) setResolvedUrl(json.signedUrl);
+        } catch (e) {
+          console.error("[VoicePlayback] signed URL failed:", e);
+        }
+      })();
+    } else if (url && url !== resolvedUrl) {
+      setResolvedUrl(url);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [bucket, path, url, resolvedUrl]);
 
   useEffect(() => {
     const el = audioRef.current;
@@ -522,7 +558,7 @@ export function VoicePlaybackBubble({
         {Math.floor(durationMs / 60000)}:
         {(Math.floor(durationMs / 1000) % 60).toString().padStart(2, "0")}
       </div>
-      <audio ref={audioRef} src={url} preload="metadata" className="hidden" />
+      <audio ref={audioRef} src={resolvedUrl} preload="metadata" className="hidden" />
     </div>
   );
 }

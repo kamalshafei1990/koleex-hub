@@ -1185,9 +1185,16 @@ export interface DiscussMention {
 
 /** Voice-note payload stored in `discuss_messages.metadata.voice`.
  *  `waveform` is a downsampled amplitude array (usually 48–64 bars)
- *  rendered as a mini visualizer next to the play button. */
+ *  rendered as a mini visualizer next to the play button.
+ *
+ *  Legacy voice notes carry `url` pointing into the public media bucket
+ *  (those first 5 recordings — still public). New recordings are
+ *  uploaded to the PRIVATE `discuss-voice` bucket and carry
+ *  `bucket` + `path` instead — playback mints a signed URL on demand. */
 export interface DiscussVoiceMeta {
   url: string;
+  bucket?: string;
+  path?: string;
   duration_ms: number;
   waveform: number[];
 }

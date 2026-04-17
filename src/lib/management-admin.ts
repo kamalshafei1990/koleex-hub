@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin } from "./supabase-admin";
+import { uploadToStorage } from "./storage-client";
 
 const BUCKET = "media";
 
@@ -39,13 +40,11 @@ export async function uploadManagementIcon(
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
   const filePath = `${prefix}/${Date.now()}_${safeName}`;
 
-  const { error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .upload(filePath, file, { cacheControl: "3600", upsert: false });
-
-  if (error) return { url: "", error: error.message };
-  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(filePath);
-  return { url: data.publicUrl, error: null };
+  const result = await uploadToStorage(BUCKET, filePath, file, {
+    cacheControl: "3600",
+  });
+  if (!result.ok) return { url: "", error: result.error };
+  return { url: result.data.publicUrl, error: null };
 }
 
 /* ═══════════════════════════════════════════════════

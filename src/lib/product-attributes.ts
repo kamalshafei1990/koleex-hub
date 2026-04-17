@@ -5,6 +5,12 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import {
+  uploadToStorage,
+  removeFromStorage,
+  listStorage,
+  publicUrl,
+} from "./storage-client";
 
 const BUCKET = "media";
 const CONFIG_PATH = "config/product-attributes.json";
@@ -67,10 +73,10 @@ const DEFAULT_CONFIG: AttributeConfig = {
 
 export async function fetchAttributeConfig(): Promise<AttributeConfig> {
   try {
-    const { data, error } = await supabase.storage.from(BUCKET).download(CONFIG_PATH);
-    if (error || !data) return { ...DEFAULT_CONFIG };
-    const text = await data.text();
-    const raw = JSON.parse(text) as Record<string, unknown>;
+    // Public bucket — fetch via public URL instead of anon-key .download()
+    const resp = await fetch(publicUrl(BUCKET, CONFIG_PATH), { cache: "no-store" });
+    if (!resp.ok) return { ...DEFAULT_CONFIG };
+    const raw = (await resp.json()) as Record<string, unknown>;
 
     // Plug types: ALWAYS use DEFAULT_PLUG_TYPES from code.
     // Stored plug_types are ONLY used for custom user-created types (not in defaults).
@@ -110,11 +116,12 @@ export async function saveAttributeConfig(config: AttributeConfig): Promise<bool
     }),
   };
   const blob = new Blob([JSON.stringify(cleanConfig, null, 2)], { type: "application/json" });
-  const { error } = await supabase.storage.from(BUCKET).upload(CONFIG_PATH, blob, {
+  const result = await uploadToStorage(BUCKET, CONFIG_PATH, blob, {
     cacheControl: "0",
     upsert: true,
+    contentType: "application/json",
   });
-  if (error) { console.error("[Config] Save:", error.message); return false; }
+  if (!result.ok) { console.error("[Config] Save:", result.error); return false; }
   return true;
 }
 
@@ -125,20 +132,20 @@ export async function uploadAttributeImage(
 ): Promise<string | null> {
   const ext = file.name.split(".").pop() || "png";
   const filePath = `attributes/${attrType}/${slug}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-    cacheControl: "3600", upsert: true,
+  const result = await uploadToStorage(BUCKET, filePath, file, {
+    cacheControl: "3600",
+    upsert: true,
   });
-  if (error) { console.error("[AttrImage] Upload:", error.message); return null; }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return data.publicUrl;
+  if (!result.ok) { console.error("[AttrImage] Upload:", result.error); return null; }
+  return result.data.publicUrl;
 }
 
 export async function deleteAttributeImage(attrType: string, slug: string): Promise<boolean> {
-  // List to find exact file (we don't know the extension)
-  const { data: files } = await supabase.storage.from(BUCKET).list(`attributes/${attrType}`, { limit: 200 });
-  const match = (files || []).find(f => f.name.replace(/\.[^.]+$/, "") === slug);
+  const list = await listStorage(BUCKET, `attributes/${attrType}`, { limit: 200 });
+  if (!list.ok) return true;
+  const match = list.files.find(f => f.name.replace(/\.[^.]+$/, "") === slug);
   if (match) {
-    await supabase.storage.from(BUCKET).remove([`attributes/${attrType}/${match.name}`]);
+    await removeFromStorage(BUCKET, [`attributes/${attrType}/${match.name}`]);
   }
   return true;
 }

@@ -6,6 +6,11 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import {
+  uploadToStorage,
+  removeFromStorage,
+  publicUrl,
+} from "./storage-client";
 import * as tus from "tus-js-client";
 
 const BUCKET = "media";
@@ -41,11 +46,11 @@ export interface CatalogEntry {
 // ── Fetch all catalogs ──
 
 export async function fetchCatalogs(): Promise<CatalogEntry[]> {
+  // Public bucket — fetch via public URL so this works without auth.
   try {
-    const { data, error } = await supabase.storage.from(BUCKET).download(CONFIG_PATH);
-    if (error || !data) return [];
-    const text = await data.text();
-    return JSON.parse(text) as CatalogEntry[];
+    const resp = await fetch(publicUrl(BUCKET, CONFIG_PATH), { cache: "no-store" });
+    if (!resp.ok) return [];
+    return (await resp.json()) as CatalogEntry[];
   } catch {
     return [];
   }
@@ -55,12 +60,13 @@ export async function fetchCatalogs(): Promise<CatalogEntry[]> {
 
 async function saveCatalogs(entries: CatalogEntry[]): Promise<boolean> {
   const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
-  const { error } = await supabase.storage.from(BUCKET).upload(CONFIG_PATH, blob, {
+  const result = await uploadToStorage(BUCKET, CONFIG_PATH, blob, {
     cacheControl: "0",
     upsert: true,
+    contentType: "application/json",
   });
-  if (error) {
-    console.error("[Catalogs] Save:", error.message);
+  if (!result.ok) {
+    console.error("[Catalogs] Save:", result.error);
     return false;
   }
   return true;
@@ -126,8 +132,7 @@ export async function uploadCatalogFile(
     console.error("[Catalogs] File upload failed");
     return null;
   }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return { url: data.publicUrl, path: filePath, id };
+  return { url: publicUrl(BUCKET, filePath), path: filePath, id };
 }
 
 // ── Upload cover image ──
@@ -138,16 +143,15 @@ export async function uploadCatalogCover(
 ): Promise<{ url: string; path: string } | null> {
   const ext = file.name.split(".").pop()?.toLowerCase() || "png";
   const filePath = `catalogs/covers/${catalogId}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, {
+  const result = await uploadToStorage(BUCKET, filePath, file, {
     cacheControl: "3600",
     upsert: true,
   });
-  if (error) {
-    console.error("[Catalogs] Cover upload:", error.message);
+  if (!result.ok) {
+    console.error("[Catalogs] Cover upload:", result.error);
     return null;
   }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return { url: `${data.publicUrl}?t=${Date.now()}`, path: filePath };
+  return { url: `${result.data.publicUrl}?t=${Date.now()}`, path: result.data.path };
 }
 
 // ── Replace catalog file ──
@@ -157,9 +161,10 @@ export async function replaceCatalogFile(
   file: File,
   onProgress?: (pct: number) => void,
 ): Promise<{ url: string; path: string } | null> {
-  // Remove old file
-  await supabase.storage.from(BUCKET).remove([oldPath]);
-  // Upload new
+  // Remove old file via API (service_role)
+  await removeFromStorage(BUCKET, [oldPath]);
+  // Upload new (TUS resumable — still uses anon, INSERT-only to a unique
+  // UUID path, so it works even with anon UPDATE/DELETE closed).
   const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
   const id = crypto.randomUUID();
   const filePath = `catalogs/${id}.${ext}`;
@@ -168,8 +173,7 @@ export async function replaceCatalogFile(
     console.error("[Catalogs] Replace file failed");
     return null;
   }
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return { url: data.publicUrl, path: filePath };
+  return { url: publicUrl(BUCKET, filePath), path: filePath };
 }
 
 // ── Delete catalog files from storage ──
@@ -180,7 +184,7 @@ async function deleteCatalogFiles(
 ): Promise<void> {
   const paths = [filePath];
   if (coverPath) paths.push(coverPath);
-  await supabase.storage.from(BUCKET).remove(paths);
+  await removeFromStorage(BUCKET, paths);
 }
 
 // ── Create catalog entry ──
