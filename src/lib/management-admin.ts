@@ -6,7 +6,7 @@
    Tables:
      koleex_departments  – org units (parent_id for nesting, icon system)
      koleex_positions    – jobs within departments, reports_to hierarchy
-     koleex_assignments  – people (contacts) → positions
+     koleex_assignments  – people → positions
      koleex_roles        – named roles attached to positions
      koleex_permissions  – per-module permission flags on roles
      koleex_position_history – audit log
@@ -15,7 +15,7 @@
      • No circular reporting chains (validated before every save)
      • Deleting a department reassigns children + positions safely
      • Deleting a position reassigns subordinates to parent
-     • People always reference existing contacts
+     • Assignments always reference existing people
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin } from "./supabase-admin";
@@ -84,7 +84,7 @@ export interface PositionRow {
 
 export interface AssignmentRow {
   id: string;
-  contact_id: string;
+  person_id: string;
   position_id: string;
   department_id: string;
   is_primary: boolean;
@@ -103,6 +103,13 @@ export interface RoleRow {
   updated_at: string;
 }
 
+/** Record-level scope a role has on a module.
+ *  - `own`        – only records the user owns (created or assigned to)
+ *  - `department` – records owned by anyone in the user's department
+ *  - `all`        – every record in the system (backwards-compatible default)
+ */
+export type DataScope = "own" | "department" | "all";
+
 export interface PermissionRow {
   id: string;
   role_id: string;
@@ -111,12 +118,16 @@ export interface PermissionRow {
   can_create: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  /** Non-optional now that the column exists in Supabase with a NOT NULL
+   *  default of 'all'. Still typed loosely for forward-compat. */
+  data_scope: DataScope;
+  sensitive_fields?: string[];
 }
 
 export interface PositionHistoryRow {
   id: string;
   position_id: string;
-  contact_id: string;
+  person_id: string;
   department_id: string | null;
   action: string;
   from_position_id: string | null;
@@ -125,7 +136,7 @@ export interface PositionHistoryRow {
   created_at: string;
 }
 
-export interface ContactRef {
+export interface PersonRef {
   id: string;
   name: string;
   email: string | null;
@@ -137,7 +148,7 @@ export interface OrgChartNode {
   position: PositionRow;
   department: DepartmentRow | null;
   assignment: AssignmentRow | null;
-  contact: ContactRef | null;
+  person: PersonRef | null;
   children: OrgChartNode[];
 }
 
@@ -587,9 +598,26 @@ export async function fetchPermissions(roleId: string): Promise<PermissionRow[]>
 
 export async function upsertPermissions(
   roleId: string,
-  perms: { module_name: string; can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }[],
+  perms: {
+    module_name: string;
+    can_view: boolean;
+    can_create: boolean;
+    can_edit: boolean;
+    can_delete: boolean;
+    /** Optional for backwards-compat with older callers; defaults to 'all'
+     *  if missing so existing save paths don't regress. */
+    data_scope?: DataScope;
+  }[],
 ): Promise<{ ok: boolean; error: string | null }> {
-  const rows = perms.map((p) => ({ role_id: roleId, ...p }));
+  const rows = perms.map((p) => ({
+    role_id: roleId,
+    module_name: p.module_name,
+    can_view: p.can_view,
+    can_create: p.can_create,
+    can_edit: p.can_edit,
+    can_delete: p.can_delete,
+    data_scope: p.data_scope ?? "all",
+  }));
   const { error } = await supabaseAdmin
     .from("koleex_permissions")
     .upsert(rows, { onConflict: "role_id,module_name" });
@@ -639,7 +667,7 @@ export async function transferEmployee(
   if (fetchErr || !current) return { ok: false, error: fetchErr?.message || "Assignment not found" };
 
   const oldPositionId = current.position_id as string;
-  const contactId = current.contact_id as string;
+  const contactId = current.person_id as string;
   const oldDepartmentId = current.department_id as string;
 
   const { error: updateErr } = await supabaseAdmin
@@ -651,12 +679,12 @@ export async function transferEmployee(
 
   // Audit entries
   await supabaseAdmin.from("koleex_position_history").insert({
-    position_id: oldPositionId, contact_id: contactId, department_id: oldDepartmentId,
+    position_id: oldPositionId, person_id: contactId, department_id: oldDepartmentId,
     action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
     notes: "Transferred out",
   });
   await supabaseAdmin.from("koleex_position_history").insert({
-    position_id: newPositionId, contact_id: contactId, department_id: newDepartmentId,
+    position_id: newPositionId, person_id: contactId, department_id: newDepartmentId,
     action: "transferred", from_position_id: oldPositionId, to_position_id: newPositionId,
     notes: "Transferred in",
   });
@@ -668,41 +696,42 @@ export async function transferEmployee(
    CONTACTS — people picker + inline creation
    ═══════════════════════════════════════════════════ */
 
-export async function fetchContactsForLinking(): Promise<ContactRef[]> {
+export async function fetchPeopleForLinking(): Promise<PersonRef[]> {
   const { data, error } = await supabaseAdmin
-    .from("contacts")
-    .select("id, first_name, last_name, display_name, email, photo_url, phone")
-    .order("first_name", { ascending: true });
+    .from("people")
+    .select("id, first_name, last_name, display_name, full_name, email, avatar_url, phone")
+    .order("full_name", { ascending: true });
 
   if (error) return [];
 
   return (data || []).map((c: Record<string, unknown>) => ({
     id: c.id as string,
-    name: (c.display_name as string) || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed",
+    name: (c.display_name as string) || (c.full_name as string) || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed",
     email: (c.email as string) || null,
-    avatar: (c.photo_url as string) || null,
+    avatar: (c.avatar_url as string) || null,
     phone: (c.phone as string) || null,
   }));
 }
 
-export async function createInlineContact(input: {
+export async function createInlinePerson(input: {
   first_name: string;
   last_name?: string;
   email?: string;
   phone?: string;
-}): Promise<{ data: ContactRef | null; error: string | null }> {
+}): Promise<{ data: PersonRef | null; error: string | null }> {
   const display = [input.first_name, input.last_name].filter(Boolean).join(" ");
 
   const { data, error } = await supabaseAdmin
-    .from("contacts")
+    .from("people")
     .insert({
       first_name: input.first_name,
       last_name: input.last_name || null,
+      full_name: display,
       display_name: display,
       email: input.email || null,
       phone: input.phone || null,
     })
-    .select("id, first_name, last_name, display_name, email, photo_url, phone")
+    .select("id, first_name, last_name, display_name, email, avatar_url, phone")
     .single();
 
   if (error) return { data: null, error: error.message };
@@ -712,7 +741,7 @@ export async function createInlineContact(input: {
       id: data.id,
       name: data.display_name || display,
       email: data.email,
-      avatar: data.photo_url || null,
+      avatar: data.avatar_url || null,
       phone: data.phone,
     },
     error: null,
@@ -726,16 +755,16 @@ export async function createInlineContact(input: {
 export async function fetchFullOrgData(): Promise<{
   positions: PositionRow[];
   assignments: AssignmentRow[];
-  contacts: ContactRef[];
+  people: PersonRef[];
   departments: DepartmentRow[];
 }> {
-  const [positions, assignments, contacts, departments] = await Promise.all([
+  const [positions, assignments, people, departments] = await Promise.all([
     fetchPositions(),
     fetchAssignments(),
-    fetchContactsForLinking(),
+    fetchPeopleForLinking(),
     fetchDepartments(),
   ]);
-  return { positions, assignments, contacts, departments };
+  return { positions, assignments, people, departments };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -763,10 +792,10 @@ export function buildDepartmentTree(departments: DepartmentRow[]): DeptTreeNode[
 export function buildOrgChart(
   positions: PositionRow[],
   assignments: AssignmentRow[],
-  contacts: ContactRef[],
+  people: PersonRef[],
   departments?: DepartmentRow[],
 ): OrgChartNode[] {
-  const ctcMap = new Map(contacts.map((c) => [c.id, c]));
+  const ctcMap = new Map(people.map((c) => [c.id, c]));
   const deptMap = departments ? new Map(departments.map((d) => [d.id, d])) : null;
 
   const assignMap = new Map<string, AssignmentRow>();
@@ -779,9 +808,9 @@ export function buildOrgChart(
 
   for (const pos of positions) {
     const asgn = assignMap.get(pos.id) || null;
-    const ctc = asgn ? ctcMap.get(asgn.contact_id) || null : null;
+    const ctc = asgn ? ctcMap.get(asgn.person_id) || null : null;
     const dept = deptMap?.get(pos.department_id) || null;
-    nodeMap.set(pos.id, { position: pos, department: dept, assignment: asgn, contact: ctc, children: [] });
+    nodeMap.set(pos.id, { position: pos, department: dept, assignment: asgn, person: ctc, children: [] });
   }
 
   for (const pos of positions) {
@@ -807,14 +836,14 @@ export function buildOrgChart(
 export function getDepartmentHead(
   positions: PositionRow[],
   assignments: AssignmentRow[],
-  contacts: ContactRef[],
+  people: PersonRef[],
 ): { name: string; title: string } | null {
   if (!positions.length) return null;
   const sorted = [...positions].sort((a, b) => a.level - b.level);
   const topPos = sorted[0];
   const primaryAssign = assignments.find((a) => a.position_id === topPos.id && a.is_primary);
   if (!primaryAssign) return null;
-  const ctc = contacts.find((c) => c.id === primaryAssign.contact_id);
+  const ctc = people.find((c) => c.id === primaryAssign.person_id);
   return { name: ctc?.name || "Unknown", title: topPos.title };
 }
 
@@ -837,30 +866,30 @@ export async function fetchDeptStats(): Promise<Record<string, { total: number; 
    ═══════════════════════════════════════════════════ */
 
 export interface EmployeeProfile {
-  contact: ContactRef;
+  person: PersonRef;
   assignments: (AssignmentRow & { position: PositionRow; department: DepartmentRow | null })[];
-  reportingChain: { position: PositionRow; contact: ContactRef | null; department: DepartmentRow | null }[];
-  directReports: { position: PositionRow; contact: ContactRef | null; department: DepartmentRow | null }[];
+  reportingChain: { position: PositionRow; person: PersonRef | null; department: DepartmentRow | null }[];
+  directReports: { position: PositionRow; person: PersonRef | null; department: DepartmentRow | null }[];
   history: PositionHistoryRow[];
 }
 
-export async function fetchEmployeeProfile(contactId: string): Promise<EmployeeProfile | null> {
-  const [allContacts, allPositions, allAssignments, allDepts] = await Promise.all([
-    fetchContactsForLinking(),
+export async function fetchEmployeeProfile(personId: string): Promise<EmployeeProfile | null> {
+  const [allPeople, allPositions, allAssignments, allDepts] = await Promise.all([
+    fetchPeopleForLinking(),
     fetchPositions(),
     fetchAssignments(),
     fetchDepartments(),
   ]);
 
-  const contact = allContacts.find((c) => c.id === contactId);
-  if (!contact) return null;
+  const person = allPeople.find((c) => c.id === personId);
+  if (!person) return null;
 
   const deptMap = new Map(allDepts.map((d) => [d.id, d]));
   const posMap = new Map(allPositions.map((p) => [p.id, p]));
 
   // Get this employee's assignments with position/dept info
   const myAssignments = allAssignments
-    .filter((a) => a.contact_id === contactId)
+    .filter((a) => a.person_id === personId)
     .map((a) => ({
       ...a,
       position: posMap.get(a.position_id)!,
@@ -879,8 +908,8 @@ export async function fetchEmployeeProfile(contactId: string): Promise<EmployeeP
       const pos = posMap.get(currentPosId);
       if (!pos) break;
       const posAssign = allAssignments.find((a) => a.position_id === currentPosId && a.is_primary);
-      const ctc = posAssign ? allContacts.find((c) => c.id === posAssign.contact_id) || null : null;
-      reportingChain.push({ position: pos, contact: ctc, department: deptMap.get(pos.department_id) || null });
+      const ctc = posAssign ? allPeople.find((c) => c.id === posAssign.person_id) || null : null;
+      reportingChain.push({ position: pos, person: ctc, department: deptMap.get(pos.department_id) || null });
       currentPosId = pos.reports_to_position_id;
     }
   }
@@ -891,19 +920,19 @@ export async function fetchEmployeeProfile(contactId: string): Promise<EmployeeP
     const subordinatePositions = allPositions.filter((p) => p.reports_to_position_id === primaryAssign.position.id);
     for (const pos of subordinatePositions) {
       const posAssign = allAssignments.find((a) => a.position_id === pos.id && a.is_primary);
-      const ctc = posAssign ? allContacts.find((c) => c.id === posAssign.contact_id) || null : null;
-      directReports.push({ position: pos, contact: ctc, department: deptMap.get(pos.department_id) || null });
+      const ctc = posAssign ? allPeople.find((c) => c.id === posAssign.person_id) || null : null;
+      directReports.push({ position: pos, person: ctc, department: deptMap.get(pos.department_id) || null });
     }
   }
 
   // Fetch history for all positions this person holds
   const historyPromises = myAssignments.map((a) => fetchPositionHistory(a.position_id));
   const allHistory = (await Promise.all(historyPromises)).flat();
-  const myHistory = allHistory.filter((h) => h.contact_id === contactId).sort((a, b) =>
+  const myHistory = allHistory.filter((h) => h.person_id === personId).sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
-  return { contact, assignments: myAssignments, reportingChain, directReports, history: myHistory };
+  return { person, assignments: myAssignments, reportingChain, directReports, history: myHistory };
 }
 
 /* ═══════════════════════════════════════════════════
@@ -948,7 +977,7 @@ export async function fetchHeadcountAnalytics(): Promise<HeadcountAnalytics> {
   ]);
 
   const assignedPosIds = new Set(assignments.map((a) => a.position_id));
-  const uniqueContactIds = new Set(assignments.map((a) => a.contact_id));
+  const uniqueContactIds = new Set(assignments.map((a) => a.person_id));
 
   const filledPositions = positions.filter((p) => assignedPosIds.has(p.id)).length;
   const vacantPositions = positions.length - filledPositions;

@@ -34,7 +34,7 @@ import { APP_REGISTRY } from "@/lib/navigation";
 import {
   fetchRoles, createRole, updateRole, deleteRole, cloneRole,
   fetchPermissions, upsertPermissions,
-  type RoleRow, type PermissionRow,
+  type RoleRow, type PermissionRow, type DataScope,
 } from "@/lib/management-admin";
 
 /* ═══════════════════════════════════════════════════
@@ -176,8 +176,33 @@ function DeleteConfirm({ open, roleName, onClose, onConfirm, deleting }: {
    PERMISSIONS EDITOR
    ═══════════════════════════════════════════════════ */
 
+/** Local permission cell shape for the editor. Mirrors the Supabase row
+ *  minus the id / role_id (those are re-derived when we upsert). */
+type PermCell = {
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  data_scope: DataScope;
+};
+
+const EMPTY_PERM: PermCell = {
+  can_view: false,
+  can_create: false,
+  can_edit: false,
+  can_delete: false,
+  data_scope: "all",
+};
+
+/** Cycle order for the scope button: all → department → own → all. */
+const SCOPE_CYCLE: Record<DataScope, DataScope> = {
+  all: "department",
+  department: "own",
+  own: "all",
+};
+
 function PermissionsEditor({ roleId }: { roleId: string }) {
-  const [perms, setPerms] = useState<Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>>({});
+  const [perms, setPerms] = useState<Record<string, PermCell>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -186,9 +211,19 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
   useEffect(() => {
     setLoading(true);
     fetchPermissions(roleId).then((rows) => {
-      const map: typeof perms = {};
-      PERMISSION_MODULES.forEach((m) => { map[m] = { can_view: false, can_create: false, can_edit: false, can_delete: false }; });
-      rows.forEach((r) => { if (map[r.module_name]) map[r.module_name] = { can_view: r.can_view, can_create: r.can_create, can_edit: r.can_edit, can_delete: r.can_delete }; });
+      const map: Record<string, PermCell> = {};
+      PERMISSION_MODULES.forEach((m) => { map[m] = { ...EMPTY_PERM }; });
+      rows.forEach((r) => {
+        if (map[r.module_name]) {
+          map[r.module_name] = {
+            can_view: r.can_view,
+            can_create: r.can_create,
+            can_edit: r.can_edit,
+            can_delete: r.can_delete,
+            data_scope: (r.data_scope as DataScope) ?? "all",
+          };
+        }
+      });
       setPerms(map); setLoading(false);
     });
   }, [roleId]);
@@ -198,12 +233,27 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     setSaved(false);
   };
 
+  /** Rotate the module's scope through all → department → own → all. */
+  const cycleScope = (mod: string) => {
+    setPerms((prev) => {
+      const current = prev[mod]?.data_scope ?? "all";
+      return { ...prev, [mod]: { ...prev[mod], data_scope: SCOPE_CYCLE[current] } };
+    });
+    setSaved(false);
+  };
+
   const toggleFullAccess = (mod: string) => {
     const p = perms[mod];
     const allOn = p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
     setPerms((prev) => ({
       ...prev,
-      [mod]: { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_delete: !allOn },
+      [mod]: {
+        can_view: !allOn,
+        can_create: !allOn,
+        can_edit: !allOn,
+        can_delete: !allOn,
+        data_scope: prev[mod]?.data_scope ?? "all",
+      },
     }));
     setSaved(false);
   };
@@ -216,7 +266,13 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     setPerms((prev) => {
       const next = { ...prev };
       group.modules.forEach((m) => {
-        next[m] = { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_delete: !allOn };
+        next[m] = {
+          can_view: !allOn,
+          can_create: !allOn,
+          can_edit: !allOn,
+          can_delete: !allOn,
+          data_scope: prev[m]?.data_scope ?? "all",
+        };
       });
       return next;
     });
@@ -233,7 +289,17 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
 
   const handleSave = async () => {
     setSaving(true);
-    await upsertPermissions(roleId, Object.entries(perms).map(([module_name, p]) => ({ module_name, ...p })));
+    await upsertPermissions(
+      roleId,
+      Object.entries(perms).map(([module_name, p]) => ({
+        module_name,
+        can_view: p.can_view,
+        can_create: p.can_create,
+        can_edit: p.can_edit,
+        can_delete: p.can_delete,
+        data_scope: p.data_scope,
+      })),
+    );
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -248,6 +314,35 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
       <CheckIcon size={12} />
     </button>
   );
+
+  /** Compact pill that shows the module's data scope and cycles it on click.
+   *  - All        → emerald (full visibility, the default)
+   *  - Department → blue    (team-level scope)
+   *  - Own        → amber   (personal scope, most restrictive)
+   *
+   *  Dimmed when no V/C/E/D is enabled — the scope then has no effect
+   *  but stays clickable so the admin can still pre-configure it. */
+  const ScopeChip = ({ scope, disabled, onClick }: { scope: DataScope; disabled?: boolean; onClick: () => void }) => {
+    const labels: Record<DataScope, { label: string; cls: string; dot: string }> = {
+      all:        { label: "All",  cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
+      department: { label: "Dept", cls: "bg-blue-500/15 border-blue-500/30 text-blue-300",         dot: "bg-blue-400" },
+      own:        { label: "Own",  cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",      dot: "bg-amber-400" },
+    };
+    const cfg = labels[scope];
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={`Data scope: ${cfg.label}. Click to cycle (All → Dept → Own).`}
+        className={`h-7 px-2 rounded-lg border text-[10px] font-semibold flex items-center gap-1.5 transition-all ${
+          cfg.cls
+        } ${disabled ? "opacity-40" : "hover:brightness-110"}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+        <span>{cfg.label}</span>
+      </button>
+    );
+  };
 
   const getGroupStats = (group: typeof PERMISSION_GROUPS[0]) => {
     let total = 0;
@@ -304,12 +399,14 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                     <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Edit</div>
                     <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Del</div>
                     <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">All</div>
+                    <div className="w-24 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Scope</div>
                   </div>
                   {group.modules.map((mod) => {
                     const AppIcon = getAppIcon(mod);
                     const p = perms[mod];
                     const isFullAccess = p?.can_view && p?.can_create && p?.can_edit && p?.can_delete;
                     const hasAny = p?.can_view || p?.can_create || p?.can_edit || p?.can_delete;
+                    const scope = p?.data_scope ?? "all";
 
                     return (
                       <div key={mod} className="flex items-center px-3 py-1.5 border-t border-[var(--border-faint)] hover:bg-[var(--bg-surface-subtle)] transition-colors">
@@ -328,6 +425,15 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
                             }`}>
                             <ShieldIcon size={10} />
                           </button>
+                        </div>
+                        {/* Scope pill — cycles through All → Department → Own → All on click.
+                            Dimmed when the row has no V/C/E/D permissions (scope is a no-op). */}
+                        <div className="w-24 flex justify-center">
+                          <ScopeChip
+                            scope={scope}
+                            disabled={!hasAny}
+                            onClick={() => cycleScope(mod)}
+                          />
                         </div>
                       </div>
                     );
