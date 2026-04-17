@@ -29,10 +29,18 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 /* Lazy singleton — we defer construction until first use so that
    `next build`'s page-data collection pass doesn't fail on missing
    env vars. Production requests still fail loudly at runtime if the
-   service role key isn't configured. */
+   service role key isn't configured.
+
+   Previously this file exported a Proxy around the client so the
+   client could be created on first access. Turned out the Proxy was
+   interfering with how @supabase/supabase-js carries auth headers
+   between calls — service_role requests were arriving at PostgREST
+   with bad auth and 403'ing. Now we just call getSupabaseServer()
+   explicitly at the top of each route handler. */
+
 let _client: SupabaseClient | null = null;
 
-function getClient(): SupabaseClient {
+export function getSupabaseServer(): SupabaseClient {
   if (_client) return _client;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -40,19 +48,16 @@ function getClient(): SupabaseClient {
 
   if (!supabaseUrl) {
     throw new Error(
-      "[supabase-server] NEXT_PUBLIC_SUPABASE_URL is not set. " +
-        "Add it to .env.local and your Vercel environment variables.",
+      "[supabase-server] NEXT_PUBLIC_SUPABASE_URL is not set.",
     );
   }
 
   if (!supabaseServiceKey) {
     throw new Error(
-      "[supabase-server] SUPABASE_SERVICE_ROLE_KEY is not set.\n\n" +
-        "To fix: copy the service_role key from your Supabase dashboard\n" +
-        "(Project Settings → API → service_role / secret) and add:\n\n" +
-        "  SUPABASE_SERVICE_ROLE_KEY=<the-key>\n\n" +
-        "to .env.local AND to your Vercel project's env vars (Production).\n" +
-        "Do NOT prefix with NEXT_PUBLIC_ — this key must stay server-side.",
+      "[supabase-server] SUPABASE_SERVICE_ROLE_KEY is not set.\n" +
+        "Copy the service_role key from Supabase dashboard → Settings → " +
+        "API Keys (Legacy) → service_role secret, then set it in Vercel + " +
+        ".env.local as SUPABASE_SERVICE_ROLE_KEY (no NEXT_PUBLIC_ prefix).",
     );
   }
 
@@ -61,22 +66,28 @@ function getClient(): SupabaseClient {
       persistSession: false,
       autoRefreshToken: false,
     },
+    global: {
+      // Explicitly set the Authorization + apikey headers. Some runtime
+      // environments strip the auth setup when the client is instantiated
+      // lazily behind a Proxy; forcing the headers here makes every
+      // request carry the service_role bearer token unambiguously.
+      headers: {
+        apikey: supabaseServiceKey,
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+    },
   });
   return _client;
 }
 
 /**
- * Server-side Supabase client with full (service-role) privileges.
- * RLS is bypassed; API route handlers are the security boundary.
- *
- * Exported as a Proxy so call sites can keep writing `supabaseServer.from(...)`
- * — the underlying client is created lazily on first access. This keeps the
- * file's ergonomics identical to the client-side supabaseAdmin while
- * deferring env-var validation to runtime.
+ * Back-compat: keep exporting `supabaseServer` so existing route handlers
+ * don't need to be rewritten. This is now a getter — it calls
+ * getSupabaseServer() on every access to return the singleton.
  */
-export const supabaseServer: SupabaseClient = new Proxy({} as SupabaseClient, {
+export const supabaseServer = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
-    const c = getClient() as unknown as Record<string | symbol, unknown>;
+    const c = getSupabaseServer() as unknown as Record<string | symbol, unknown>;
     const v = c[prop];
     return typeof v === "function" ? v.bind(c) : v;
   },
