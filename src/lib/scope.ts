@@ -175,6 +175,90 @@ export async function getModuleScope(
   return ((data?.data_scope as DataScope) ?? "private") as DataScope;
 }
 
+/**
+ * Decide whether a user is allowed to view another account's records
+ * (e.g. another person's Calendar via the account-picker). Used by
+ * modules that have an "active account" concept distinct from "records
+ * the user created".
+ *
+ * Rules:
+ *   - Super Admin (is_super_admin): yes, any account
+ *   - Viewing own account: yes, always
+ *   - Scope 'all' on this module: yes, any account
+ *   - Scope 'department': yes if the target account is in the same
+ *     department as the viewer (via koleex_employees.department)
+ *   - Scope 'own' or 'private' + different account: no
+ *
+ * Returns { allowed, reason } — the reason is useful for UI hints.
+ */
+export async function canViewAccount(
+  ctx: ScopeContext,
+  module_name: string,
+  target_account_id: string,
+): Promise<{ allowed: boolean; reason: "sa" | "own" | "scope_all" | "scope_dept" | "denied" }> {
+  if (ctx.is_super_admin) return { allowed: true, reason: "sa" };
+  if (target_account_id === ctx.account_id) return { allowed: true, reason: "own" };
+
+  const scope = await getModuleScope(ctx, module_name);
+  if (scope === "all") return { allowed: true, reason: "scope_all" };
+
+  if (scope === "department" && ctx.department) {
+    const { data } = await supabase
+      .from("koleex_employees")
+      .select("department")
+      .eq("account_id", target_account_id)
+      .maybeSingle();
+    if (data?.department && data.department === ctx.department) {
+      return { allowed: true, reason: "scope_dept" };
+    }
+  }
+
+  return { allowed: false, reason: "denied" };
+}
+
+/**
+ * Given a set of candidate account IDs, return only the ones this user is
+ * allowed to view under the given module. Lets pickers (e.g. the Calendar
+ * account dropdown) show only accessible accounts.
+ *
+ * Optimised: resolves scope once and batch-checks departments instead of
+ * per-account round-trips.
+ */
+export async function filterAccessibleAccounts(
+  ctx: ScopeContext,
+  module_name: string,
+  candidate_account_ids: string[],
+): Promise<string[]> {
+  if (candidate_account_ids.length === 0) return [];
+  if (ctx.is_super_admin) return candidate_account_ids;
+
+  const scope = await getModuleScope(ctx, module_name);
+
+  if (scope === "all") return candidate_account_ids;
+  if (scope === "private" || scope === "own") {
+    return candidate_account_ids.filter((id) => id === ctx.account_id);
+  }
+
+  // Department scope — batch-fetch departments for the candidates
+  if (scope === "department" && ctx.department) {
+    const { data } = await supabase
+      .from("koleex_employees")
+      .select("account_id, department")
+      .in("account_id", candidate_account_ids);
+    const sameDept = new Set(
+      ((data ?? []) as { account_id: string; department: string | null }[])
+        .filter((e) => e.department === ctx.department)
+        .map((e) => e.account_id),
+    );
+    // Always include self
+    sameDept.add(ctx.account_id);
+    return candidate_account_ids.filter((id) => sameDept.has(id));
+  }
+
+  // Fallback — only self
+  return candidate_account_ids.filter((id) => id === ctx.account_id);
+}
+
 /* ============================================================================
    Filter composition
    ============================================================================ */

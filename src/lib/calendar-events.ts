@@ -17,6 +17,7 @@ import type {
 } from "@/types/supabase";
 import {
   buildScopeFilter,
+  canViewAccount,
   orClauseForScope,
   privacyClause,
   logPrivateAccess,
@@ -47,37 +48,46 @@ export async function fetchEventsInRange(
   rangeEnd: Date,
   ctx?: ScopeContext | null,
 ): Promise<CalendarEventRow[]> {
+  // Legacy path: no ctx means the caller hasn't migrated to scope yet.
+  // Preserve the old strict per-user behaviour.
+  if (!ctx) {
+    const { data, error } = await supabase
+      .from(EVENTS)
+      .select("*")
+      .eq("account_id", accountId)
+      .lt("start_at", rangeEnd.toISOString())
+      .gte("end_at", rangeStart.toISOString())
+      .order("start_at", { ascending: true });
+    if (error) {
+      console.error("[Calendar] fetchEventsInRange:", error.message);
+      return [];
+    }
+    return (data as CalendarEventRow[]) || [];
+  }
+
+  // Permission gate: can this user view the requested account's calendar?
+  // Delegates to canViewAccount() which respects Scope (All / Dept / Own)
+  // for every role, not just Super Admin. This is what "Scope = All" on
+  // Calendar for a regular employee actually buys them — the ability to
+  // use the account-picker and view teammates' calendars.
+  const access = await canViewAccount(ctx, "Calendar", accountId);
+  if (!access.allowed) return [];
+
   let query = supabase
     .from(EVENTS)
     .select("*")
+    .eq("account_id", accountId)
     .lt("start_at", rangeEnd.toISOString())
     .gte("end_at", rangeStart.toISOString())
     .order("start_at", { ascending: true });
 
-  // Scope enforcement decision tree:
-  //   - No ctx → legacy behaviour, filter to the requested accountId.
-  //   - Super Admin → can view any account's calendar ("view as").
-  //     Keep the accountId filter so they see that account's events only.
-  //   - Regular user viewing their OWN account → apply scope filter
-  //     (own + attending + dept + private-handling).
-  //   - Regular user trying to view a DIFFERENT account → deny (empty result).
-  if (!ctx) {
-    query = query.eq("account_id", accountId);
-  } else if (ctx.is_super_admin) {
-    query = query.eq("account_id", accountId);
-    // Private-record filter still applies unless break-glass
-    const filter = await buildScopeFilter({ ctx, module_name: "Calendar" });
-    const privacyOr = privacyClause(filter, ctx);
-    if (privacyOr) query = query.or(privacyOr);
-  } else if (accountId === ctx.account_id) {
-    const filter = await buildScopeFilter({ ctx, module_name: "Calendar" });
-    const scopeOr = orClauseForScope(filter, ctx);
-    if (scopeOr) query = query.or(scopeOr);
-    const privacyOr = privacyClause(filter, ctx);
-    if (privacyOr) query = query.or(privacyOr);
-  } else {
-    // Regular user attempting to view another account's calendar — denied.
-    return [];
+  // Private-record filter. When viewing own calendar we still see our own
+  // private events. When viewing someone else's calendar we hide their
+  // private events — unless the role has break-glass can_view_private, in
+  // which case we fetch everything and audit-log the private reads.
+  const viewingOwn = accountId === ctx.account_id;
+  if (!viewingOwn && !ctx.can_view_private) {
+    query = query.eq("is_private", false);
   }
 
   const { data, error } = await query;
@@ -87,7 +97,8 @@ export async function fetchEventsInRange(
   }
   const events = (data as CalendarEventRow[]) || [];
 
-  if (ctx?.can_view_private) {
+  // Audit break-glass reads of private records.
+  if (!viewingOwn && ctx.can_view_private) {
     const privateIds = events
       .filter((e) => (e as { is_private?: boolean }).is_private)
       .map((e) => e.id);

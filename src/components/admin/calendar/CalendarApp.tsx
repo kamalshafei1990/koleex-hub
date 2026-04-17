@@ -36,7 +36,11 @@ import {
 } from "@/lib/accounts-admin";
 import { fetchEventsInRange, deleteEvent } from "@/lib/calendar-events";
 import { withDefaults } from "@/lib/access-control";
-import { loadScopeContext, type ScopeContext } from "@/lib/scope";
+import {
+  loadScopeContext,
+  filterAccessibleAccounts,
+  type ScopeContext,
+} from "@/lib/scope";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import {
   addDays,
@@ -102,12 +106,31 @@ export default function CalendarApp() {
     loadScopeContext(loggedInId).then(setScopeCtx);
   }, []);
 
-  /* ── Initial account load ── */
+  /* ── Initial account load ──
+     The picker shows only accounts the current user is allowed to view.
+     This is Scope-gated: Super Admin + Scope=All see everyone,
+     Scope=Department sees their teammates, Scope=Own sees only themselves.
+     Without scopeCtx loaded yet we fetch everything and filter on the
+     next render once ctx arrives. */
   useEffect(() => {
     (async () => {
       setLoadingAccounts(true);
       const list = await fetchAccounts();
-      setAccounts(list);
+
+      // If scope context is already resolved, filter the account list by
+      // what the viewer can access. Otherwise show the full list — the
+      // later effect re-filters once ctx lands.
+      let visible = list;
+      if (scopeCtx) {
+        const visibleIds = await filterAccessibleAccounts(
+          scopeCtx,
+          "Calendar",
+          list.map((a) => a.id),
+        );
+        const allowedSet = new Set(visibleIds);
+        visible = list.filter((a) => allowedSet.has(a.id));
+      }
+      setAccounts(visible);
 
       // URL hint
       let pickId: string | null = null;
@@ -116,14 +139,16 @@ export default function CalendarApp() {
         pickId = params.get("account");
       }
       const chosen =
-        (pickId && list.find((a) => a.id === pickId)?.id) ||
-        list.find((a) => a.user_type === "internal")?.id ||
-        list[0]?.id ||
+        (pickId && visible.find((a) => a.id === pickId)?.id) ||
+        visible.find((a) => a.user_type === "internal")?.id ||
+        visible[0]?.id ||
         null;
       setActiveAccountId(chosen);
       setLoadingAccounts(false);
     })();
-  }, []);
+    // Re-run when scopeCtx arrives so the picker narrows to accessible accounts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeCtx]);
 
   /* ── Load account preferences whenever the active account changes ── */
   useEffect(() => {
