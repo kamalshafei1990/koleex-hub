@@ -31,6 +31,7 @@ import {
   fetchRecent,
   trackAppOpen,
 } from "@/lib/app-launcher";
+import { usePermittedModules } from "@/lib/use-scope";
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
@@ -272,9 +273,27 @@ export default function HomePage() {
     return () => document.removeEventListener("keydown", h);
   }, []);
 
+  /* ── Role-based app visibility ──
+     The app launcher honors the same permitted-modules rule as the
+     sidebar: if the viewer's role has can_view = false on a module (or
+     an account-level override hides it), that app is removed from the
+     Launcher grid, favorites, recents, category groups, and search —
+     not just the sidebar. SA still sees everything.
+
+     While the permission check is still loading we show the full
+     catalogue to avoid a flash of empty grid on first paint; the
+     filter kicks in as soon as permittedModules resolves. */
+  const { modules: permittedModules, loading: permLoading } =
+    usePermittedModules();
+
+  const visibleRegistry = useMemo(() => {
+    if (permLoading) return APP_REGISTRY;
+    return APP_REGISTRY.filter((a) => permittedModules.has(a.name));
+  }, [permLoading, permittedModules]);
+
   /* ── Derived ── */
   const filteredApps = useMemo(() => {
-    let result = APP_REGISTRY;
+    let result = visibleRegistry;
     if (activeCategory !== "all")
       result = result.filter((a) => getAppCategory(a.id) === activeCategory);
     if (search.trim()) {
@@ -287,20 +306,20 @@ export default function HomePage() {
       );
     }
     return result;
-  }, [search, activeCategory, t]);
+  }, [search, activeCategory, t, visibleRegistry]);
 
   const favoriteApps = useMemo(
-    () => favoriteIds.map((id) => APP_REGISTRY.find((a) => a.id === id)).filter((a): a is AppDef => !!a),
-    [favoriteIds],
+    () => favoriteIds.map((id) => visibleRegistry.find((a) => a.id === id)).filter((a): a is AppDef => !!a),
+    [favoriteIds, visibleRegistry],
   );
   const recentApps = useMemo(
     () =>
       recentIds
         .filter((id) => !favoriteIds.includes(id))
-        .map((id) => APP_REGISTRY.find((a) => a.id === id))
+        .map((id) => visibleRegistry.find((a) => a.id === id))
         .filter((a): a is AppDef => !!a)
         .slice(0, 6),
-    [recentIds, favoriteIds],
+    [recentIds, favoriteIds, visibleRegistry],
   );
 
   const isSearching = search.trim() !== "";
@@ -309,14 +328,15 @@ export default function HomePage() {
   const primaryCats = ALL_APPS_CATEGORIES.filter((c) => PRIMARY_CATS.includes(c.id));
   const secondaryCats = ALL_APPS_CATEGORIES.filter((c) => !PRIMARY_CATS.includes(c.id));
 
-  /* Group apps by category for the "All" view */
+  /* Group apps by category for the "All" view. Uses the role-filtered
+     visibleRegistry so categories with no accessible apps disappear. */
   const groupedApps = useMemo(() => {
     if (isSearchOrFilter) return [];
     return ALL_APPS_CATEGORIES.map((cat) => ({
       ...cat,
-      apps: APP_REGISTRY.filter((a) => getAppCategory(a.id) === cat.id),
+      apps: visibleRegistry.filter((a) => getAppCategory(a.id) === cat.id),
     })).filter((g) => g.apps.length > 0);
-  }, [isSearchOrFilter]);
+  }, [isSearchOrFilter, visibleRegistry]);
 
   const dateLocale = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : "en-US";
   const today = new Date().toLocaleDateString(dateLocale, {
