@@ -27,6 +27,11 @@ import {
   verifyMfaChallenge,
   getCurrentSession,
 } from "@/lib/auth-client";
+import {
+  verifyAccountLogin,
+  fetchAccountByLoginEmail,
+} from "@/lib/accounts-admin";
+import { setCurrentAccountId } from "@/lib/identity";
 
 function LoginInner() {
   const router = useRouter();
@@ -61,6 +66,62 @@ function LoginInner() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+
+    // Legacy path: no real Supabase Auth — look up the account by email
+    // (or username), verify the base64 password tag, and set the
+    // client-side current-account-id so useScopeContext picks them up.
+    if (!isSupabaseAuthEnabled()) {
+      try {
+        // The email field accepts either "user@domain" or a bare username
+        // for dev convenience. Try email first, fall back to username.
+        let account = email.includes("@")
+          ? await fetchAccountByLoginEmail(email.trim())
+          : null;
+        const usernameGuess = email.includes("@")
+          ? account?.username ?? email.split("@")[0]
+          : email.trim();
+        if (!account) {
+          const byUsername = await verifyAccountLogin(
+            usernameGuess,
+            password,
+          );
+          setBusy(false);
+          if (byUsername.ok) {
+            setCurrentAccountId(byUsername.account.id);
+            router.replace(next);
+            return;
+          }
+          setError(
+            byUsername.reason === "not_found"
+              ? "No account with that email or username."
+              : byUsername.reason === "disabled"
+                ? "This account is disabled."
+                : "Wrong password.",
+          );
+          return;
+        }
+        const res = await verifyAccountLogin(account.username, password);
+        setBusy(false);
+        if (!res.ok) {
+          setError(
+            res.reason === "wrong_password"
+              ? "Wrong password."
+              : res.reason === "disabled"
+                ? "This account is disabled."
+                : "No account found.",
+          );
+          return;
+        }
+        setCurrentAccountId(res.account.id);
+        router.replace(next);
+      } catch (e) {
+        setBusy(false);
+        setError(e instanceof Error ? e.message : "Sign-in failed");
+      }
+      return;
+    }
+
+    // Real Supabase Auth path (only when NEXT_PUBLIC_USE_SUPABASE_AUTH=true)
     const res = await signInWithPassword(email, password);
     setBusy(false);
     if (!res.ok) {
@@ -88,40 +149,10 @@ function LoginInner() {
     router.replace(next);
   }
 
-  if (!isSupabaseAuthEnabled()) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 flex items-center justify-center">
-              <ExclamationIcon className="h-5 w-5" />
-            </div>
-            <h1 className="text-[17px] font-bold text-[var(--text-primary)]">
-              Supabase Auth not yet enabled
-            </h1>
-          </div>
-          <p className="text-[13px] text-[var(--text-muted)] leading-relaxed mb-4">
-            Koleex HUB is still using the legacy admin password gate. To
-            activate real sign-in, follow the checklist in{" "}
-            <code className="text-[var(--text-primary)]">
-              supabase/SUPABASE_AUTH_SETUP.md
-            </code>{" "}
-            and set{" "}
-            <code className="text-[var(--text-primary)]">
-              NEXT_PUBLIC_USE_SUPABASE_AUTH=true
-            </code>{" "}
-            on the deployment.
-          </p>
-          <a
-            href="/"
-            className="inline-flex h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] items-center gap-2 transition-all"
-          >
-            Back to Hub
-          </a>
-        </div>
-      </div>
-    );
-  }
+  // Legacy mode renders the same form — we wire handlePasswordSubmit to
+  // the legacy verifyAccountLogin path when Supabase Auth is disabled.
+  // The old "not yet enabled" placeholder blocked real testing of roles
+  // and tenancy by locking users out of /login entirely.
 
   if (!hydrated) {
     return (

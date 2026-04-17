@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchAccounts, fetchAccountForHeader } from "./accounts-admin";
 import type { AccountWithLinks } from "@/types/supabase";
+import { clearScopeContextCache } from "./scope";
 
 const CURRENT_ACCOUNT_KEY = "koleex-current-account-id";
 const CURRENT_ACCOUNT_CACHE_KEY = "koleex-current-account-cache";
@@ -99,6 +100,10 @@ export function setCurrentAccountId(id: string | null): void {
     }
     /* Changing who "I am" always invalidates the cached profile. */
     clearCache();
+    /* Also invalidate the scope context cache so the next hook mount
+       picks up the new identity's tenant / role / SA flags instead of
+       the previous user's. */
+    clearScopeContextCache();
     /* Notify listeners in the same tab. The `storage` event only fires in
        *other* tabs, so we dispatch a custom event for in-tab updates. */
     window.dispatchEvent(new CustomEvent(IDENTITY_EVENT, { detail: id }));

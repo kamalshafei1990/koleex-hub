@@ -137,12 +137,77 @@ export const MODULE_CONFIGS: Record<string, ModuleScopeConfig> = {
    Context loading
    ============================================================================ */
 
+/* ============================================================================
+   Module-level cache for ScopeContext
+   ----------------------------------------------------------------------------
+   loadScopeContext is called by every useScopeContext hook mount. Without
+   caching, a single CRM page fires it 3-4 times (CRM component, Sidebar,
+   PermissionGate, each useScopeContext consumer) and each firing hits the
+   accounts + employees tables. Multiplied across the app that's a real
+   performance hit.
+
+   Cache key: accountId + SA tenant override. A 60-second TTL covers the
+   common navigate-around case without getting stale when the admin
+   flips account flags (those typically require a page reload anyway to
+   pick up the new identity).
+   ============================================================================ */
+
+interface CachedCtx {
+  key: string;
+  ctx: ScopeContext;
+  ts: number;
+}
+
+const CTX_CACHE_TTL_MS = 60_000; // 60s — tight enough to pick up role changes
+let cachedCtx: CachedCtx | null = null;
+
+/** Compose the cache key. Includes the SA tenant override so a tenant
+ *  switch invalidates automatically. */
+function ctxCacheKey(accountId: string): string {
+  let override: string | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      override = window.localStorage.getItem("koleex.sa.active_tenant_id");
+    } catch {
+      // ignore
+    }
+  }
+  return `${accountId}::${override ?? ""}`;
+}
+
+/** Invalidate the cached ScopeContext. Call this whenever the current
+ *  identity changes (sign in / out / account switch) or when the tenant
+ *  override changes. */
+export function clearScopeContextCache(): void {
+  cachedCtx = null;
+}
+
 /**
  * Load the ScopeContext for an account. Hits 2 Supabase tables (accounts+role,
  * koleex_employees for department). Run once at the page/API edge and pass
  * the result through to fetch functions.
+ *
+ * Cached for 60s to avoid redundant fetches when multiple hooks consume
+ * the same context on one page render.
  */
 export async function loadScopeContext(
+  accountId: string,
+): Promise<ScopeContext> {
+  const key = ctxCacheKey(accountId);
+  if (
+    cachedCtx &&
+    cachedCtx.key === key &&
+    Date.now() - cachedCtx.ts < CTX_CACHE_TTL_MS
+  ) {
+    return cachedCtx.ctx;
+  }
+
+  const ctx = await loadScopeContextUncached(accountId);
+  cachedCtx = { key, ctx, ts: Date.now() };
+  return ctx;
+}
+
+async function loadScopeContextUncached(
   accountId: string,
 ): Promise<ScopeContext> {
   // Parallel: account+role and employee

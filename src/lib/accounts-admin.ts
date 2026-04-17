@@ -982,6 +982,25 @@ export async function fetchAccountByUsername(
   return (data as AccountRow) || null;
 }
 
+/** Lookup an account by login_email. Used by the legacy /login flow
+ *  where users identify themselves by email rather than username. */
+export async function fetchAccountByLoginEmail(
+  loginEmail: string,
+): Promise<AccountRow | null> {
+  const trimmed = loginEmail.trim();
+  if (!trimmed) return null;
+  const { data, error } = await supabase
+    .from(ACCOUNTS)
+    .select("*")
+    .ilike("login_email", trimmed)
+    .maybeSingle();
+  if (error) {
+    console.error("[Accounts] Lookup by email:", error.message);
+    return null;
+  }
+  return (data as AccountRow) || null;
+}
+
 /**
  * Legacy login: verify a username + plaintext password against the accounts
  * table using the same `tmp$<base64>` tag format that createAccount /
