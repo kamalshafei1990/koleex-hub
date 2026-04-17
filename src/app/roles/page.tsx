@@ -384,9 +384,12 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
     });
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = async () => {
     setSaving(true);
-    await upsertPermissions(
+    setSaveError(null);
+    const res = await upsertPermissions(
       roleId,
       Object.entries(perms).map(([module_name, p]) => ({
         module_name,
@@ -397,7 +400,16 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
         data_scope: p.data_scope,
       })),
     );
-    setSaving(false); setSaved(true);
+    setSaving(false);
+    // Error-check the save so silent DB failures (e.g. a CHECK violation
+    // or RLS block) can't masquerade as "Saved". Before this, any error
+    // from upsertPermissions was swallowed and the UI falsely reported
+    // success — which made hide/show changes appear not to persist.
+    if (!res.ok) {
+      setSaveError(res.error || "Failed to save permissions.");
+      return;
+    }
+    setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -579,6 +591,14 @@ function PermissionsEditor({ roleId }: { roleId: string }) {
           );
         })}
       </div>
+      {saveError && (
+        <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
+          <ExclamationIcon size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Save failed: {saveError}
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-end gap-2 mt-4">
         {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><CheckIcon size={12} /> Saved</span>}
         <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? "Saving..." : "Save Permissions"}</button>
