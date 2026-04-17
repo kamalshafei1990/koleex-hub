@@ -157,6 +157,20 @@ export function usePermissions(): PermissionState {
    ═══════════════════════════════════════════════════ */
 
 async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]> {
+  // API-first: /api/me/permissions returns the caller's perms + depts
+  // via service_role. The anon-key path is blocked by RLS now.
+  try {
+    const res = await fetch("/api/me/permissions", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        permissions: OrgPermissionRow[];
+      };
+      return json.permissions;
+    }
+  } catch (e) {
+    console.error("[permissions] /api/me/permissions failed:", e);
+  }
+  // Legacy fallback
   const { data, error } = await supabaseAdmin
     .from("koleex_permissions")
     .select("*")
@@ -166,6 +180,17 @@ async function fetchRolePermissions(roleId: string): Promise<OrgPermissionRow[]>
 }
 
 async function fetchPersonDepartments(personId: string): Promise<string[]> {
+  // API-first: included in /api/me/permissions response
+  try {
+    const res = await fetch("/api/me/permissions", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as { departments: string[] };
+      return json.departments;
+    }
+  } catch (e) {
+    console.error("[permissions] /api/me/permissions failed:", e);
+  }
+  // Legacy fallback
   const { data, error } = await supabaseAdmin
     .from("koleex_assignments")
     .select("department_id")

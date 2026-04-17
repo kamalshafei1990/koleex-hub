@@ -32,11 +32,51 @@ export function useScopeContext(): ScopeContext | null {
   const [ctx, setCtx] = useState<ScopeContext | null>(null);
 
   useEffect(() => {
-    const id = getCurrentAccountIdSync();
-    if (!id) return;
-    loadScopeContext(id).then(setCtx).catch((e) => {
-      console.error("[useScopeContext]", e);
-    });
+    // API-first: /api/me returns the ServerAuthContext (ScopeContext +
+    // extras) using the session cookie. The anon-key accounts/koleex_*
+    // reads stopped working once RLS was tightened, so this is the
+    // only reliable path.
+    (async () => {
+      try {
+        const res = await fetch("/api/me", { credentials: "include" });
+        if (res.ok) {
+          const json = (await res.json()) as ScopeContext & {
+            // /api/me returns extra fields (username, etc.) — ignored here.
+            [k: string]: unknown;
+          };
+          // Apply the Super-Admin tenant override from localStorage so
+          // switching tenants in the TenantPicker still works.
+          let effectiveTenantId = json.tenant_id ?? "";
+          if (json.is_super_admin && typeof window !== "undefined") {
+            try {
+              const override = window.localStorage.getItem(
+                "koleex.sa.active_tenant_id",
+              );
+              if (override) effectiveTenantId = override;
+            } catch {
+              /* ignore */
+            }
+          }
+          setCtx({
+            account_id: json.account_id,
+            tenant_id: effectiveTenantId,
+            role_id: json.role_id,
+            department: json.department ?? null,
+            is_super_admin: json.is_super_admin,
+            can_view_private: json.can_view_private,
+          });
+          return;
+        }
+      } catch (e) {
+        console.error("[useScopeContext] /api/me failed:", e);
+      }
+      // Legacy fallback — only fires on network error when API is unreachable.
+      const id = getCurrentAccountIdSync();
+      if (!id) return;
+      loadScopeContext(id).then(setCtx).catch((e) => {
+        console.error("[useScopeContext] fallback:", e);
+      });
+    })();
   }, []);
 
   return ctx;
@@ -103,32 +143,48 @@ export function usePermission(module_name: string): PermissionCheck {
       return;
     }
 
-    // Read both the role's can_view AND any account-level override in
-    // parallel. Override (can_view=false) wins — if the admin explicitly
-    // hid this module from this account, nothing the role permits can
-    // override that.
-    Promise.all([
-      supabase
-        .from("koleex_permissions")
-        .select("can_view")
-        .eq("role_id", ctx.role_id)
-        .eq("module_name", module_name)
-        .maybeSingle(),
-      supabase
-        .from("account_permission_overrides")
-        .select("can_view")
-        .eq("account_id", ctx.account_id)
-        .eq("module_key", module_name)
-        .maybeSingle(),
-    ]).then(([roleRes, overrideRes]) => {
-      const roleAllows = Boolean(roleRes.data?.can_view);
-      const overrideHides =
-        overrideRes.data !== null && overrideRes.data.can_view === false;
-      setPermState({
-        allowed: roleAllows && !overrideHides,
-        loading: false,
+    // API-first: fetch the permitted-modules set and check membership.
+    // Same server-side logic (role + overrides + Type C + Dashboard).
+    (async () => {
+      try {
+        const res = await fetch("/api/me/permitted-modules", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { modules: string[] };
+          setPermState({
+            allowed: json.modules.includes(module_name),
+            loading: false,
+          });
+          return;
+        }
+      } catch (e) {
+        console.error("[usePermission] /api/me/permitted-modules failed:", e);
+      }
+      // Legacy fallback — only on network error.
+      Promise.all([
+        supabase
+          .from("koleex_permissions")
+          .select("can_view")
+          .eq("role_id", ctx.role_id!)
+          .eq("module_name", module_name)
+          .maybeSingle(),
+        supabase
+          .from("account_permission_overrides")
+          .select("can_view")
+          .eq("account_id", ctx.account_id)
+          .eq("module_key", module_name)
+          .maybeSingle(),
+      ]).then(([roleRes, overrideRes]) => {
+        const roleAllows = Boolean(roleRes.data?.can_view);
+        const overrideHides =
+          overrideRes.data !== null && overrideRes.data.can_view === false;
+        setPermState({
+          allowed: roleAllows && !overrideHides,
+          loading: false,
+        });
       });
-    });
+    })();
   }, [ctx, module_name]);
 
   return { allowed: permState.allowed, loading: permState.loading, ctx };
@@ -156,69 +212,78 @@ export function usePermittedModules(): {
       return;
     }
 
-    // SA bypass — grants every module AND every app in APP_REGISTRY.
-    // Some apps (like "Roles & Permissions", "Settings", category nav
-    // items) don't have rows in koleex_permissions because they're
-    // administrative surfaces, not role-gated modules. Seed the Set
-    // with every app.name so those still show up for SA.
-    if (ctx.is_super_admin) {
-      supabase
-        .from("koleex_permissions")
-        .select("module_name")
-        .then(({ data }) => {
-          const set = new Set(
-            (data ?? []).map((r: { module_name: string }) => r.module_name),
-          );
-          // Union with the app catalogue so admin-only apps (no permission
-          // rows) are still visible to Super Admin.
-          for (const app of APP_REGISTRY) set.add(app.name);
-          setState({ modules: set, loading: false });
+    // API-first: /api/me/permitted-modules does the SA bypass + role
+    // lookup + overrides subtraction server-side with the session cookie.
+    (async () => {
+      try {
+        const res = await fetch("/api/me/permitted-modules", {
+          credentials: "include",
         });
-      return;
-    }
+        if (res.ok) {
+          const json = (await res.json()) as {
+            modules: string[];
+            is_super_admin: boolean;
+          };
+          const set = new Set(json.modules);
+          // For SA, also union the full APP_REGISTRY so admin-only
+          // surfaces (Roles & Permissions, Settings, etc.) show up
+          // even without a koleex_permissions row.
+          if (json.is_super_admin) {
+            for (const app of APP_REGISTRY) set.add(app.name);
+          }
+          setState({ modules: set, loading: false });
+          return;
+        }
+      } catch (e) {
+        console.error("[usePermittedModules] /api/me/permitted-modules failed:", e);
+      }
 
-    // Regular users: enumerate modules where this role has can_view = true
-    if (!ctx.role_id) {
-      setState({ modules: new Set(), loading: false });
-      return;
-    }
-
-    // Parallel-fetch role permissions AND per-account overrides. The
-    // overrides let an admin hide specific apps from a specific account
-    // on top of the role defaults — "Alex's role allows Products but I
-    // don't want Alex to see Products".
-    Promise.all([
-      supabase
-        .from("koleex_permissions")
-        .select("module_name, can_view")
-        .eq("role_id", ctx.role_id)
-        .eq("can_view", true),
-      supabase
-        .from("account_permission_overrides")
-        .select("module_key, can_view")
-        .eq("account_id", ctx.account_id)
-        .eq("can_view", false),
-    ]).then(([rolePerms, overrides]) => {
-      const allowed = new Set(
-        (rolePerms.data ?? []).map(
-          (r: { module_name: string }) => r.module_name,
-        ),
-      );
-      // Always grant Type C modules — every user has personal productivity.
-      for (const m of TYPE_C_MODULES) allowed.add(m);
-      // Dashboard is the landing page, everyone sees it.
-      allowed.add("Dashboard");
-
-      // Subtract hidden modules (account-level overrides).
-      const hidden = new Set(
-        (overrides.data ?? []).map(
-          (r: { module_key: string }) => r.module_key,
-        ),
-      );
-      for (const m of hidden) allowed.delete(m);
-
-      setState({ modules: allowed, loading: false });
-    });
+      // Legacy fallback — only fires on network error.
+      if (ctx.is_super_admin) {
+        supabase
+          .from("koleex_permissions")
+          .select("module_name")
+          .then(({ data }) => {
+            const set = new Set(
+              (data ?? []).map((r: { module_name: string }) => r.module_name),
+            );
+            for (const app of APP_REGISTRY) set.add(app.name);
+            setState({ modules: set, loading: false });
+          });
+        return;
+      }
+      if (!ctx.role_id) {
+        setState({ modules: new Set(), loading: false });
+        return;
+      }
+      Promise.all([
+        supabase
+          .from("koleex_permissions")
+          .select("module_name, can_view")
+          .eq("role_id", ctx.role_id)
+          .eq("can_view", true),
+        supabase
+          .from("account_permission_overrides")
+          .select("module_key, can_view")
+          .eq("account_id", ctx.account_id)
+          .eq("can_view", false),
+      ]).then(([rolePerms, overrides]) => {
+        const allowed = new Set(
+          (rolePerms.data ?? []).map(
+            (r: { module_name: string }) => r.module_name,
+          ),
+        );
+        for (const m of TYPE_C_MODULES) allowed.add(m);
+        allowed.add("Dashboard");
+        const hidden = new Set(
+          (overrides.data ?? []).map(
+            (r: { module_key: string }) => r.module_key,
+          ),
+        );
+        for (const m of hidden) allowed.delete(m);
+        setState({ modules: allowed, loading: false });
+      });
+    })();
   }, [ctx]);
 
   return { modules: state.modules, loading: state.loading, ctx };
