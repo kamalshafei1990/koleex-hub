@@ -556,6 +556,84 @@ export async function fetchEmployeesWithPerson(
   return mapped.filter((e) => e.account_id === null);
 }
 
+/* ============================================================================
+   Account permission overrides — per-account app hiding
+   ============================================================================
+
+   Lets an admin hide specific apps from a specific account on top of the
+   role's defaults. A User role might grant access to "Products" broadly,
+   but for a particular account the admin can add an override that hides
+   Products just for them.
+
+   Implementation note: the existing account_permission_overrides table
+   uses `module_key` as the column name but we store the koleex_permissions
+   module_name (Proper Case, e.g. "Products") so the override and the
+   role's permission matrix share one naming convention.
+
+   "Hidden" here means `can_view = false` in an override row. When an
+   override exists with can_view=false, usePermittedModules() subtracts
+   that module from the viewer's visible set regardless of what the role
+   allows. Super Admin bypasses overrides.
+   ============================================================================ */
+
+/** Return the set of module names currently hidden for a given account
+ *  (override rows with can_view = false). */
+export async function fetchHiddenModulesForAccount(
+  accountId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from(PERMISSION_OVERRIDES)
+    .select("module_key, can_view")
+    .eq("account_id", accountId)
+    .eq("can_view", false);
+  if (error) {
+    console.error("[Accounts] fetchHiddenModules:", error.message);
+    return [];
+  }
+  return ((data ?? []) as { module_key: string }[]).map((r) => r.module_key);
+}
+
+/** Write the hidden-module set for an account. Diffs against what's
+ *  already stored: inserts new overrides for newly-hidden modules,
+ *  deletes overrides for modules that were previously hidden and now
+ *  aren't. Idempotent — safe to call repeatedly with the same set. */
+export async function saveHiddenModulesForAccount(
+  accountId: string,
+  hidden: string[],
+): Promise<{ ok: boolean; error: string | null }> {
+  const existing = await fetchHiddenModulesForAccount(accountId);
+  const toAdd = hidden.filter((m) => !existing.includes(m));
+  const toRemove = existing.filter((m) => !hidden.includes(m));
+
+  if (toAdd.length > 0) {
+    const rows = toAdd.map((m) => ({
+      account_id: accountId,
+      module_key: m,
+      access_level: "none",
+      can_view: false,
+      can_create: false,
+      can_edit: false,
+      can_delete: false,
+      data_scope: "own",
+    }));
+    const { error: insErr } = await supabase
+      .from(PERMISSION_OVERRIDES)
+      .upsert(rows, { onConflict: "account_id,module_key" });
+    if (insErr) return { ok: false, error: insErr.message };
+  }
+
+  if (toRemove.length > 0) {
+    const { error: delErr } = await supabase
+      .from(PERMISSION_OVERRIDES)
+      .delete()
+      .eq("account_id", accountId)
+      .in("module_key", toRemove);
+    if (delErr) return { ok: false, error: delErr.message };
+  }
+
+  return { ok: true, error: null };
+}
+
 /** Write-through: stamp the new account_id on the employee row. Called
  *  right after the account is created so the HR side knows which login
  *  belongs to which employee. One-shot, idempotent, never throws. */

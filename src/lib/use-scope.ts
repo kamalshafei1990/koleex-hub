@@ -102,19 +102,32 @@ export function usePermission(module_name: string): PermissionCheck {
       return;
     }
 
-    // Otherwise read the module's can_view flag
-    supabase
-      .from("koleex_permissions")
-      .select("can_view")
-      .eq("role_id", ctx.role_id)
-      .eq("module_name", module_name)
-      .maybeSingle()
-      .then(({ data }) => {
-        setPermState({
-          allowed: Boolean(data?.can_view),
-          loading: false,
-        });
+    // Read both the role's can_view AND any account-level override in
+    // parallel. Override (can_view=false) wins — if the admin explicitly
+    // hid this module from this account, nothing the role permits can
+    // override that.
+    Promise.all([
+      supabase
+        .from("koleex_permissions")
+        .select("can_view")
+        .eq("role_id", ctx.role_id)
+        .eq("module_name", module_name)
+        .maybeSingle(),
+      supabase
+        .from("account_permission_overrides")
+        .select("can_view")
+        .eq("account_id", ctx.account_id)
+        .eq("module_key", module_name)
+        .maybeSingle(),
+    ]).then(([roleRes, overrideRes]) => {
+      const roleAllows = Boolean(roleRes.data?.can_view);
+      const overrideHides =
+        overrideRes.data !== null && overrideRes.data.can_view === false;
+      setPermState({
+        allowed: roleAllows && !overrideHides,
+        loading: false,
       });
+    });
   }, [ctx, module_name]);
 
   return { allowed: permState.allowed, loading: permState.loading, ctx };
@@ -164,22 +177,42 @@ export function usePermittedModules(): {
       return;
     }
 
-    supabase
-      .from("koleex_permissions")
-      .select("module_name, can_view")
-      .eq("role_id", ctx.role_id)
-      .eq("can_view", true)
-      .then(({ data }) => {
-        const set = new Set(
-          (data ?? []).map((r: { module_name: string }) => r.module_name),
-        );
-        // Always grant Type C modules (Calendar, To-do, Mail, Inbox) —
-        // every user has personal productivity tools regardless of role config.
-        for (const m of TYPE_C_MODULES) set.add(m);
-        // Dashboard too — it's the landing page, everyone needs it.
-        set.add("Dashboard");
-        setState({ modules: set, loading: false });
-      });
+    // Parallel-fetch role permissions AND per-account overrides. The
+    // overrides let an admin hide specific apps from a specific account
+    // on top of the role defaults — "Alex's role allows Products but I
+    // don't want Alex to see Products".
+    Promise.all([
+      supabase
+        .from("koleex_permissions")
+        .select("module_name, can_view")
+        .eq("role_id", ctx.role_id)
+        .eq("can_view", true),
+      supabase
+        .from("account_permission_overrides")
+        .select("module_key, can_view")
+        .eq("account_id", ctx.account_id)
+        .eq("can_view", false),
+    ]).then(([rolePerms, overrides]) => {
+      const allowed = new Set(
+        (rolePerms.data ?? []).map(
+          (r: { module_name: string }) => r.module_name,
+        ),
+      );
+      // Always grant Type C modules — every user has personal productivity.
+      for (const m of TYPE_C_MODULES) allowed.add(m);
+      // Dashboard is the landing page, everyone sees it.
+      allowed.add("Dashboard");
+
+      // Subtract hidden modules (account-level overrides).
+      const hidden = new Set(
+        (overrides.data ?? []).map(
+          (r: { module_key: string }) => r.module_key,
+        ),
+      );
+      for (const m of hidden) allowed.delete(m);
+
+      setState({ modules: allowed, loading: false });
+    });
   }, [ctx]);
 
   return { modules: state.modules, loading: state.loading, ctx };

@@ -47,11 +47,13 @@ import {
   fetchCompanies, fetchRoles, fetchPeople, fetchAccessPresetByRoleId,
   fetchEmployeesWithPerson, linkEmployeeToAccount,
   fetchCustomerContacts,
+  fetchHiddenModulesForAccount, saveHiddenModulesForAccount,
   createCompany, createPerson,
   isUsernameAvailable, isLoginEmailAvailable,
   generateTemporaryPassword, suggestUsername,
   type EmployeeWithPerson, type ContactLite,
 } from "@/lib/accounts-admin";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
 import type {
@@ -144,6 +146,13 @@ export default function AccountForm({ mode, account }: Props) {
   const [employees, setEmployees] = useState<EmployeeWithPerson[]>([]);
   const [customerContacts, setCustomerContacts] = useState<ContactLite[]>([]);
   const [preset, setPreset] = useState<AccessPresetRow | null>(null);
+  /** All modules the current role grants can_view on. The App Visibility
+   *  section shows these as checkboxes so the admin can hide specific
+   *  apps from this account only. Rebuilds when role_id changes. */
+  const [roleGrantedModules, setRoleGrantedModules] = useState<string[]>([]);
+  /** Modules currently hidden for this account via account_permission_overrides.
+   *  Initialised from DB on edit; empty on create. */
+  const [hiddenModules, setHiddenModules] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -189,10 +198,39 @@ export default function AccountForm({ mode, account }: Props) {
         if (matched) setForm((f) => ({ ...f, employee_id: matched.employee_id }));
       }
 
+      // On edit, load the current hidden-app overrides so the admin can
+      // see / adjust what's already hidden for this account.
+      if (mode === "edit" && account?.id) {
+        const hidden = await fetchHiddenModulesForAccount(account.id);
+        setHiddenModules(new Set(hidden));
+      }
+
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ── Load the role's granted modules whenever role_id changes ──
+     This drives the "App Visibility" section: we only show modules the
+     role actually grants (hiding one the role doesn't grant would be a
+     no-op). When there's no role selected, show no modules. */
+  useEffect(() => {
+    if (!form.role_id) {
+      setRoleGrantedModules([]);
+      return;
+    }
+    (async () => {
+      const { data } = await supabaseAdmin
+        .from("koleex_permissions")
+        .select("module_name, can_view")
+        .eq("role_id", form.role_id)
+        .eq("can_view", true)
+        .order("module_name", { ascending: true });
+      setRoleGrantedModules(
+        ((data ?? []) as { module_name: string }[]).map((r) => r.module_name),
+      );
+    })();
+  }, [form.role_id]);
 
   /* ── Whenever role changes, refresh the preset summary ── */
   useEffect(() => {
@@ -344,6 +382,10 @@ export default function AccountForm({ mode, account }: Props) {
       if (!isCustomer && form.employee_id) {
         await linkEmployeeToAccount(form.employee_id, created.id);
       }
+      // Persist the App Visibility overrides for the new account.
+      if (hiddenModules.size > 0) {
+        await saveHiddenModulesForAccount(created.id, Array.from(hiddenModules));
+      }
       router.push(`/accounts/${created.id}`);
     } else if (account) {
       const ok = await updateAccount(account.id, {
@@ -360,6 +402,10 @@ export default function AccountForm({ mode, account }: Props) {
       if (!isCustomer && form.employee_id) {
         await linkEmployeeToAccount(form.employee_id, account.id);
       }
+      // Diff + persist the App Visibility overrides. saveHiddenModules-
+      // ForAccount handles both additions (newly-hidden apps) and
+      // removals (newly-visible apps) idempotently.
+      await saveHiddenModulesForAccount(account.id, Array.from(hiddenModules));
       router.push(`/accounts/${account.id}`);
     }
   }
@@ -867,6 +913,73 @@ export default function AccountForm({ mode, account }: Props) {
               {selectedCompany && !selectedCompany.customer_level && (
                 <p className="text-[11px] text-amber-400/80 mt-3">
                   {t("acc.hint.noCustomerLevel")}
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* ─── App Visibility — per-account module hiding ────────────────
+              Lists every app the current role grants can_view on, with a
+              checkbox per app. Uncheck = hide this app from THIS account
+              only (the role still grants it, but the account-level
+              override shadows it). Super Admin isn't affected.
+
+              We show role-granted apps only — hiding an app the role
+              doesn't grant would be a no-op. Intentionally rendered for
+              internal + customer accounts alike (customer admins may
+              want to hide admin-only modules from their staff). */}
+          {roleGrantedModules.length > 0 && (
+            <section className={`${sectionWrap} xl:col-span-2`}>
+              <h2 className={sectionHead}>
+                <span className={sectionNumber}>V</span>
+                <GlobeIcon className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+                {t("acc.form.appVisibility", "App Visibility")}
+              </h2>
+              <p className="text-[11px] text-[var(--text-dim)] -mt-3 mb-4">
+                {t(
+                  "acc.hint.appVisibility",
+                  "Apps this account's role grants. Uncheck any you want to hide from this specific account (the role permission is unchanged). Super Admin always sees all apps.",
+                )}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {roleGrantedModules.map((mod) => {
+                  const visible = !hiddenModules.has(mod);
+                  return (
+                    <label
+                      key={mod}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        visible
+                          ? "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-primary)]"
+                          : "border-red-500/25 bg-red-500/[0.06] text-red-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visible}
+                        onChange={(e) => {
+                          setHiddenModules((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.delete(mod);
+                            else next.add(mod);
+                            return next;
+                          });
+                        }}
+                        className="h-3.5 w-3.5 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] accent-emerald-500 cursor-pointer"
+                      />
+                      <span className="text-[12px] font-medium truncate">
+                        {mod}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {hiddenModules.size > 0 && (
+                <p className="text-[11px] text-red-400/90 mt-3">
+                  {hiddenModules.size} app{hiddenModules.size === 1 ? "" : "s"}{" "}
+                  hidden from this account:{" "}
+                  <span className="font-medium">
+                    {Array.from(hiddenModules).join(", ")}
+                  </span>
                 </p>
               )}
             </section>
