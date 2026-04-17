@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import type { ScopeContext } from "./scope";
 import type {
   CrmActivityInsert,
   CrmActivityRow,
@@ -53,12 +54,18 @@ function isMissingTable(message: string): boolean {
    Stages
    ════════════════════════════════════════════════════════════════════════ */
 
-/** All non-folded stages, ordered for kanban + select rendering. */
-export async function fetchStages(): Promise<CrmStageRow[]> {
-  const { data, error } = await supabase
+/** All non-folded stages, ordered for kanban + select rendering.
+ *  When ctx is provided, filtered to the viewer's tenant — each tenant
+ *  maintains their own pipeline stages. */
+export async function fetchStages(
+  ctx?: ScopeContext | null,
+): Promise<CrmStageRow[]> {
+  let q = supabase
     .from(STAGES)
     .select("*")
     .order("sequence", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     if (!isMissingTable(error.message)) {
       console.error("[CRM] Fetch stages:", error.message);
@@ -121,6 +128,12 @@ interface FetchOpportunitiesOptions {
   contactId?: string | null;
   /** Free-text search across name / company / contact / email. */
   search?: string | null;
+  /** Scope context for multi-tenant filtering. When provided, the query
+   *  is automatically scoped to the viewer's tenant_id — a customer-
+   *  tenant account never sees Koleex opportunities and vice versa.
+   *  Legacy callers pass nothing and get the old behaviour (which is safe
+   *  only while Koleex is the only tenant). */
+  ctx?: ScopeContext | null;
   /** Maximum rows. Defaults to 500 (the kanban handles fewer than that
    *  comfortably; the list view paginates client-side). */
   limit?: number;
@@ -148,6 +161,7 @@ export async function fetchOpportunities(
     contactId = null,
     search = null,
     limit = 500,
+    ctx = null,
   } = options;
 
   let q = supabase
@@ -155,6 +169,12 @@ export async function fetchOpportunities(
     .select("*")
     .order("updated_at", { ascending: false })
     .limit(limit);
+
+  // Multi-tenancy: auto-filter to the viewer's tenant when ctx is provided.
+  // Prevents a customer-tenant account from ever seeing Koleex deals and
+  // vice versa. Super Admin views a specific tenant via the top-bar picker
+  // (ctx.tenant_id is set to whichever tenant they're currently browsing).
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
 
   if (!includeArchived) q = q.is("archived_at", null);
   if (ownerAccountId) q = q.eq("owner_account_id", ownerAccountId);
@@ -751,11 +771,15 @@ export interface ActivityFeedRow extends CrmActivityRow {
   } | null;
 }
 
-export async function fetchActivityFeed(): Promise<ActivityFeedRow[]> {
-  const { data: acts, error } = await supabase
+export async function fetchActivityFeed(
+  ctx?: ScopeContext | null,
+): Promise<ActivityFeedRow[]> {
+  let q = supabase
     .from(ACTS)
     .select("*")
     .order("due_at", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data: acts, error } = await q;
   if (error) {
     if (!isMissingTable(error.message)) {
       console.error("[CRM] Fetch activity feed:", error.message);

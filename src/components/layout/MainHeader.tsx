@@ -11,6 +11,7 @@ import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
 import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
+import TenantPicker from "./TenantPicker";
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
 
@@ -239,6 +240,13 @@ export default function MainHeader() {
         >
           {dk ? <SunIcon size={15} className="md:w-4 md:h-4" /> : <MoonIcon size={15} className="md:w-4 md:h-4" />}
         </button>
+
+        {/* Tenant picker — Super Admin only. Lets SA switch between
+            tenants (Koleex host + customer-tenants). Invisible to regular
+            users. Stores the active tenant_id in localStorage; each page
+            load, loadScopeContext() reads the override and scopes every
+            query accordingly. */}
+        <TenantPicker dk={dk} />
 
         {/* Notification bell — system-wide notifications dropdown
             covering Discuss messages and inbox alerts from every app. */}

@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import type { ScopeContext } from "./scope";
 import type {
   AccountRow, AccountInsert, AccountUpdate, AccountStatus, AccountWithLinks,
   CompanyRow, CompanyInsert,
@@ -46,11 +47,18 @@ const PERMISSION_OVERRIDES = "account_permission_overrides";
    Accounts
    ============================================================================ */
 
-export async function fetchAccounts(): Promise<AccountRow[]> {
-  const { data, error } = await supabase
+export async function fetchAccounts(
+  ctx?: ScopeContext | null,
+): Promise<AccountRow[]> {
+  let q = supabase
     .from(ACCOUNTS)
     .select("*")
     .order("created_at", { ascending: false });
+  // Multi-tenancy: scope to current tenant. Customer-tenant admins see
+  // only their own users. SA viewing via the tenant picker sees the
+  // tenant they picked.
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[Accounts] Fetch:", error.message);
     return [];
@@ -328,11 +336,15 @@ export async function isLoginEmailAvailable(
    People (person / contact records)
    ============================================================================ */
 
-export async function fetchPeople(): Promise<PersonRow[]> {
-  const { data, error } = await supabase
+export async function fetchPeople(
+  ctx?: ScopeContext | null,
+): Promise<PersonRow[]> {
+  let q = supabase
     .from(PEOPLE)
     .select("*")
     .order("full_name", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[People] Fetch:", error.message);
     return [];
@@ -415,11 +427,15 @@ export async function updatePerson(
    Companies
    ============================================================================ */
 
-export async function fetchCompanies(): Promise<CompanyRow[]> {
-  const { data, error } = await supabase
+export async function fetchCompanies(
+  ctx?: ScopeContext | null,
+): Promise<CompanyRow[]> {
+  let q = supabase
     .from(COMPANIES)
     .select("*")
     .order("name", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[Companies] Fetch:", error.message);
     return [];
@@ -494,15 +510,20 @@ export interface EmployeeWithPerson {
 }
 
 export async function fetchEmployeesWithPerson(
-  options: { includeAlreadyLinked?: boolean } = {},
+  options: { includeAlreadyLinked?: boolean; ctx?: ScopeContext | null } = {},
 ): Promise<EmployeeWithPerson[]> {
-  const { data, error } = await supabase
+  let q = supabase
     .from(EMPLOYEES)
     .select(
       `id, person_id, account_id, employee_number, department, position, work_email,
        person:people(full_name, email, job_title)`,
     )
     .order("employee_number", { ascending: true, nullsFirst: false });
+  // Multi-tenancy: limit the Employee picker to the current tenant so a
+  // customer-tenant admin can't accidentally link their new account to
+  // a Koleex employee.
+  if (options.ctx?.tenant_id) q = q.eq("tenant_id", options.ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[Employees] Fetch for picker:", error.message);
     return [];

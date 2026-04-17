@@ -180,9 +180,25 @@ export async function loadScopeContext(
   const effectiveSA =
     (accData?.is_super_admin ?? false) || (role?.is_super_admin ?? false);
 
+  // Super Admin tenant override: when SA has used the top-bar TenantPicker
+  // to switch to another tenant, respect that choice. The override lives
+  // in localStorage (koleex.sa.active_tenant_id) and only applies to SA
+  // users — regular accounts are always locked to their own tenant_id.
+  let effectiveTenantId = accData?.tenant_id ?? "";
+  if (effectiveSA && typeof window !== "undefined") {
+    try {
+      const override = window.localStorage.getItem(
+        "koleex.sa.active_tenant_id",
+      );
+      if (override) effectiveTenantId = override;
+    } catch {
+      // localStorage unavailable — fall back to the account's tenant
+    }
+  }
+
   return {
     account_id: accountId,
-    tenant_id: accData?.tenant_id ?? "",
+    tenant_id: effectiveTenantId,
     role_id: accData?.role_id ?? null,
     department: empRes.data?.department ?? null,
     is_super_admin: effectiveSA,

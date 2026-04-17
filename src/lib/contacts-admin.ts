@@ -3,6 +3,7 @@
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import type { ScopeContext } from "./scope";
 
 /* ── Types ── */
 
@@ -231,11 +232,28 @@ export async function checkContactsSetup(): Promise<boolean> {
 
 /* ── CRUD ── */
 
-export async function fetchContacts(): Promise<ContactRow[]> {
-  const { data, error } = await supabase
+/**
+ * Fetch all contacts visible to the current user.
+ *
+ * Multi-tenancy: when ctx is provided, the query is automatically scoped
+ * to the viewer's tenant_id. A customer-tenant account opening the
+ * Customers app sees ONLY their own contacts — Koleex's customer list
+ * is invisible to them. Super Admin viewing via the top-bar tenant
+ * picker sees whichever tenant they selected.
+ *
+ * Legacy callers (no ctx) keep the old wide-open behaviour. That's safe
+ * while Koleex is the only tenant, but migrating the UI to pass ctx is
+ * prerequisite for any customer-tenant provisioning.
+ */
+export async function fetchContacts(
+  ctx?: ScopeContext | null,
+): Promise<ContactRow[]> {
+  let q = supabase
     .from("contacts")
     .select("*")
     .order("first_name", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[Contacts] Fetch:", error.message);
     return [];
@@ -243,12 +261,17 @@ export async function fetchContacts(): Promise<ContactRow[]> {
   return (data as ContactRow[]) || [];
 }
 
-export async function fetchContactsByType(type: string): Promise<ContactRow[]> {
-  const { data, error } = await supabase
+export async function fetchContactsByType(
+  type: string,
+  ctx?: ScopeContext | null,
+): Promise<ContactRow[]> {
+  let q = supabase
     .from("contacts")
     .select("*")
     .eq("contact_type", type)
     .order("first_name", { ascending: true });
+  if (ctx?.tenant_id) q = q.eq("tenant_id", ctx.tenant_id);
+  const { data, error } = await q;
   if (error) {
     console.error("[Contacts] FetchByType:", error.message);
     return [];
