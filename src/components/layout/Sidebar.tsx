@@ -59,18 +59,16 @@ export default function Sidebar() {
   const { expanded, toggle, mobileOpen, setMobileOpen } = useSidebar();
 
   // Role-based filtering: hide apps the viewer's role has no can_view on.
-  // Super Admin sees everything. During loading we treat everything as
-  // permitted so the sidebar doesn't flash empty. For regular users we
-  // filter down to only the modules their role grants.
+  // Super Admin sees everything. While the permission check is
+  // loading we show NO apps (fail-closed) so a user never sees modules
+  // they aren't allowed to — even briefly on first paint. The sidebar
+  // stays empty for a few hundred ms instead.
   const { modules: permittedModules, loading: permLoading } =
     usePermittedModules();
 
-  /** Filter group apps by role permission. Falls back to the full list
-   *  while the permission check is still loading — prevents a flash of
-   *  empty sidebar on first paint. */
   const filterApps = useCallback(
     (apps: AppDef[]): AppDef[] => {
-      if (permLoading) return apps;
+      if (permLoading) return [];
       return apps.filter((a) => permittedModules.has(a.name));
     },
     [permLoading, permittedModules],

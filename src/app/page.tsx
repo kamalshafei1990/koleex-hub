@@ -283,14 +283,16 @@ export default function HomePage() {
      Launcher grid, favorites, recents, category groups, and search —
      not just the sidebar. SA still sees everything.
 
-     While the permission check is still loading we show the full
-     catalogue to avoid a flash of empty grid on first paint; the
-     filter kicks in as soon as permittedModules resolves. */
+     While the permission check is still loading we show NOTHING
+     (returned early by the grid render path below) — never the full
+     catalogue, since that would briefly expose apps a user isn't
+     allowed to see. */
   const { modules: permittedModules, loading: permLoading } =
     usePermittedModules();
 
   const visibleRegistry = useMemo(() => {
-    if (permLoading) return APP_REGISTRY;
+    // Fail-closed: while perms load, show no apps at all.
+    if (permLoading) return [];
     return APP_REGISTRY.filter((a) => permittedModules.has(a.name));
   }, [permLoading, permittedModules]);
 
