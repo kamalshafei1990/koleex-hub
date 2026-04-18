@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
@@ -68,47 +67,26 @@ export default function NotesList({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 pt-3 pb-2">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="min-w-0">
-            <div className="text-[15px] font-bold text-[var(--text-primary)] truncate leading-tight">
-              {selectionLabel}
-            </div>
-            <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
-              {notes.length} {notes.length === 1 ? "note" : "notes"}
-            </div>
+      {/* Pane header — shows the selected folder name + count. The
+          global search + New Note controls live in the page header
+          above, so we don't duplicate them here. */}
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 py-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[13px] font-bold text-[var(--text-primary)] truncate leading-tight">
+            {selectionLabel}
           </div>
-          {!isTrashView ? (
-            <button
-              onClick={onCreate}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all shrink-0"
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-              {t("newNote")}
-            </button>
-          ) : (
-            notes.length > 0 && (
-              <button
-                onClick={onEmptyTrash}
-                className="h-8 px-3 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-[12px] font-semibold hover:bg-red-500/25 transition-all shrink-0"
-              >
-                {t("emptyTrash")}
-              </button>
-            )
-          )}
+          <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+            {notes.length} {notes.length === 1 ? "note" : "notes"}
+          </div>
         </div>
-
-        <div className="relative">
-          <SearchIcon className="h-3.5 w-3.5 absolute top-1/2 start-2.5 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
-          <input
-            type="text"
-            placeholder={t("search")}
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-8 ps-8 pe-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-          />
-        </div>
+        {isTrashView && notes.length > 0 && (
+          <button
+            onClick={onEmptyTrash}
+            className="h-7 px-2.5 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-[11px] font-semibold hover:bg-red-500/25 transition-all shrink-0"
+          >
+            {t("emptyTrash")}
+          </button>
+        )}
       </div>
 
       {/* List body */}

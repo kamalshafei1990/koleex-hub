@@ -7,8 +7,12 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import MainHeader from "@/components/layout/MainHeader";
-import Sidebar from "@/components/layout/Sidebar";
+import Link from "next/link";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import NotesIcon from "@/components/icons/NotesIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
 import {
@@ -299,13 +303,85 @@ export default function NotesApp() {
     return m;
   }, [notes]);
 
-  return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <MainHeader />
-      <Sidebar />
+  const selectionLabel =
+    selection.kind === "folder"
+      ? folders.find((f) => f.id === selection.id)?.name ?? "—"
+      : selection.key === "all"
+        ? t("smart.allNotes")
+        : selection.key === "pinned"
+          ? t("smart.pinned")
+          : selection.key === "none"
+            ? t("smart.none")
+            : t("smart.trash");
 
-      <main className="pt-14 md:ps-[68px] h-screen overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-[260px_320px_1fr] h-[calc(100vh-56px)]">
+  const totalNotes = notes.length;
+
+  // RootShell already renders MainHeader (top) and Sidebar (left). Our
+  // page fills the remaining viewport. Use 100dvh-3.5rem so the three
+  // panes stretch to the bottom without producing a double-scrollbar,
+  // matching the To-do and Calendar apps.
+  return (
+    <div
+      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
+      style={{ height: "calc(100dvh - 3.5rem)" }}
+    >
+      {/* ── PAGE HEADER (matches /todo style) ── */}
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] w-full">
+        <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 min-w-0">
+          <div className="flex flex-wrap items-center gap-3 pt-5 pb-1">
+            <Link
+              href="/"
+              className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
+            </Link>
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+                <NotesIcon size={16} />
+              </div>
+              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+                {t("app.title")}
+              </h1>
+            </div>
+          </div>
+          <p className="text-[12px] text-[var(--text-dim)] mb-3 md:ms-11">
+            {t("app.subtitle")} &middot; {totalNotes} {totalNotes === 1 ? "note" : "notes"}
+          </p>
+
+          {/* Search + quick New Note */}
+          <div className="flex items-center gap-2 pb-3 min-w-0">
+            <div className="flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
+              <SearchIcon className="h-4 w-4 text-[var(--text-dim)] shrink-0" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("search")}
+                className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="p-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                >
+                  <CrossIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={onCreateNote}
+              className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span className="hidden md:inline">{t("newNote")}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── THREE-PANE BODY ── */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="h-full grid grid-cols-1 md:grid-cols-[240px_300px_1fr]">
           {/* Pane 1 — Folders */}
           <div className="hidden md:block border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto">
             <FoldersSidebar
@@ -334,17 +410,7 @@ export default function NotesApp() {
               search={search}
               onSearchChange={setSearch}
               isTrashView={isTrashView}
-              selectionLabel={
-                selection.kind === "folder"
-                  ? folders.find((f) => f.id === selection.id)?.name ?? "—"
-                  : selection.key === "all"
-                    ? t("smart.allNotes")
-                    : selection.key === "pinned"
-                      ? t("smart.pinned")
-                      : selection.key === "none"
-                        ? t("smart.none")
-                        : t("smart.trash")
-              }
+              selectionLabel={selectionLabel}
             />
           </div>
 
@@ -383,7 +449,7 @@ export default function NotesApp() {
             />
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
