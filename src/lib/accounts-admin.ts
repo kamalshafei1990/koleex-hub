@@ -198,6 +198,23 @@ export async function fetchAccountForHeader(
 export async function fetchAccountWithLinks(
   id: string,
 ): Promise<AccountWithLinks | null> {
+  // API-first: /api/accounts/[id] returns the enriched object in one
+  // round-trip via service_role. The individual fetchPersonById /
+  // fetchCompanyById / fetchRoleById / fetchEmployeeByAccountId calls
+  // still use anon-key reads which are blocked by RLS now.
+  try {
+    const res = await fetch("/api/accounts/" + id, { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        account: AccountWithLinks | null;
+      };
+      return json.account;
+    }
+    if (res.status === 401 || res.status === 403 || res.status === 404) return null;
+  } catch (e) {
+    console.error("[Accounts] fetchAccountWithLinks API failed:", e);
+  }
+
   const account = await fetchAccountById(id);
   if (!account) return null;
 
