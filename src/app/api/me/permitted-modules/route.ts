@@ -40,6 +40,9 @@ export async function GET() {
     });
   }
 
+  // Fetch both the role's baseline perms AND every override row for
+  // this account. We handle ADDS (override grants what role denies)
+  // and REMOVES (override hides what role grants) in one pass below.
   const [{ data: rolePerms }, { data: overrides }] = await Promise.all([
     supabaseServer
       .from("koleex_permissions")
@@ -48,9 +51,8 @@ export async function GET() {
       .eq("can_view", true),
     supabaseServer
       .from("account_permission_overrides")
-      .select("module_key")
-      .eq("account_id", auth.account_id)
-      .eq("can_view", false),
+      .select("module_key, can_view")
+      .eq("account_id", auth.account_id),
   ]);
 
   const allowed = new Set<string>(
@@ -60,7 +62,14 @@ export async function GET() {
   allowed.add("Dashboard");
 
   for (const o of overrides ?? []) {
-    allowed.delete((o as { module_key: string }).module_key);
+    const row = o as { module_key: string; can_view: boolean };
+    if (row.can_view) {
+      // Override grants what role doesn't — add it.
+      allowed.add(row.module_key);
+    } else {
+      // Override hides what role grants — remove it.
+      allowed.delete(row.module_key);
+    }
   }
 
   return NextResponse.json({
