@@ -1377,6 +1377,18 @@ export async function verifyAccountLogin(
       };
     }
     if (res.status === 403) return { ok: false, reason: "disabled" };
+    // A 500 with a JSON body describing a real server error (e.g.
+    // SUPABASE_SERVICE_ROLE_KEY missing) — surface it as "network" so
+    // the UI doesn't accuse the user of bad credentials for what is
+    // really an infrastructure problem.
+    if (
+      res.status === 500 &&
+      !("ok" in json ? json.ok : false) &&
+      "error" in json &&
+      json.error === "server_error"
+    ) {
+      return { ok: false, reason: "network" };
+    }
     return { ok: false, reason: "wrong_password" };
   } catch (e) {
     // Pure network/DNS failure. The legacy anon-key fallback used to live

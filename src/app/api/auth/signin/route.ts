@@ -24,87 +24,104 @@ function hashTempPassword(plain: string): string {
 }
 
 export async function POST(req: Request) {
-  let body: { email?: string; username?: string; password?: string };
+  // Outer try/catch so an unexpected throw (missing env var, DB outage,
+  // etc.) never escapes as an HTML error page. The client parses the
+  // body as JSON; if it receives HTML it surfaces a misleading
+  // "service unreachable" error even when the real cause was a 500
+  // we could have described precisely.
   try {
-    body = await req.json();
-  } catch {
+    let body: { email?: string; username?: string; password?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Invalid request body" },
+        { status: 400 },
+      );
+    }
+
+    const password = body.password?.trim();
+    const emailOrUsername = (body.email ?? body.username ?? "").trim();
+    if (!password || !emailOrUsername) {
+      return NextResponse.json(
+        { ok: false, error: "Email/username and password are required" },
+        { status: 400 },
+      );
+    }
+
+    // Look up the account by login_email or username (case-insensitive).
+    // One round-trip either way so login latency is predictable.
+    let account: {
+      id: string;
+      username: string;
+      login_email: string;
+      status: string;
+      password_hash: string | null;
+      user_type: string;
+    } | null = null;
+
+    if (emailOrUsername.includes("@")) {
+      const { data } = await supabaseServer
+        .from("accounts")
+        .select("id, username, login_email, status, password_hash, user_type")
+        .ilike("login_email", emailOrUsername)
+        .maybeSingle();
+      account = data ?? null;
+    } else {
+      const { data } = await supabaseServer
+        .from("accounts")
+        .select("id, username, login_email, status, password_hash, user_type")
+        .ilike("username", emailOrUsername)
+        .maybeSingle();
+      account = data ?? null;
+    }
+
+    // Uniform error messages so attackers can't probe for valid emails.
+    if (!account) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email/username or password" },
+        { status: 401 },
+      );
+    }
+    if (account.status !== "active") {
+      return NextResponse.json(
+        { ok: false, error: "This account is disabled" },
+        { status: 403 },
+      );
+    }
+
+    const expected = hashTempPassword(password);
+    if (!account.password_hash || account.password_hash !== expected) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid email/username or password" },
+        { status: 401 },
+      );
+    }
+
+    // Success — mint the session cookie.
+    await setSessionCookie(account.id);
+
+    return NextResponse.json({
+      ok: true,
+      account: {
+        id: account.id,
+        username: account.username,
+        login_email: account.login_email,
+        user_type: account.user_type,
+      },
+    });
+  } catch (err) {
+    // Must not throw out of this handler — the client parses the
+    // response as JSON and any HTML error page would surface as a
+    // misleading "service unreachable" error. Log the real cause and
+    // return a machine-readable JSON 500 so the client can render a
+    // precise message like "Auth configuration error" instead.
+    const message =
+      err instanceof Error ? err.message : "Unknown sign-in error";
+    console.error("[api/auth/signin]", err);
     return NextResponse.json(
-      { ok: false, error: "Invalid request body" },
-      { status: 400 },
+      { ok: false, error: "server_error", detail: message },
+      { status: 500 },
     );
   }
-
-  const password = body.password?.trim();
-  const emailOrUsername = (body.email ?? body.username ?? "").trim();
-  if (!password || !emailOrUsername) {
-    return NextResponse.json(
-      { ok: false, error: "Email/username and password are required" },
-      { status: 400 },
-    );
-  }
-
-  // Look up the account by login_email or username (case-insensitive).
-  // One round-trip either way so login latency is predictable.
-  let account: {
-    id: string;
-    username: string;
-    login_email: string;
-    status: string;
-    password_hash: string | null;
-    user_type: string;
-  } | null = null;
-
-  if (emailOrUsername.includes("@")) {
-    const { data } = await supabaseServer
-      .from("accounts")
-      .select("id, username, login_email, status, password_hash, user_type")
-      .ilike("login_email", emailOrUsername)
-      .maybeSingle();
-    account = data ?? null;
-  } else {
-    const { data } = await supabaseServer
-      .from("accounts")
-      .select("id, username, login_email, status, password_hash, user_type")
-      .ilike("username", emailOrUsername)
-      .maybeSingle();
-    account = data ?? null;
-  }
-
-  // Uniform error messages so attackers can't probe for valid emails.
-  // Checking timing-equal signatures would be overkill for this gate —
-  // the anon key was public anyway; after RLS rolls out the DB is the
-  // real boundary.
-  if (!account) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid email/username or password" },
-      { status: 401 },
-    );
-  }
-  if (account.status !== "active") {
-    return NextResponse.json(
-      { ok: false, error: "This account is disabled" },
-      { status: 403 },
-    );
-  }
-
-  const expected = hashTempPassword(password);
-  if (!account.password_hash || account.password_hash !== expected) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid email/username or password" },
-      { status: 401 },
-    );
-  }
-
-  // Success — mint the session cookie.
-  await setSessionCookie(account.id);
-
-  return NextResponse.json({
-    ok: true,
-    account: {
-      id: account.id,
-      username: account.username,
-      login_email: account.login_email,
-      user_type: account.user_type,
-    },
-  });
 }
