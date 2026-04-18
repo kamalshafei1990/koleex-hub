@@ -28,6 +28,8 @@ import FlagIcon from "@/components/icons/ui/FlagIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import type {
   AccountWithLinks,
   CustomerLevel,
@@ -41,11 +43,11 @@ const levelColors: Record<CustomerLevel, string> = {
   diamond: "bg-fuchsia-400/15 text-fuchsia-300 border-fuchsia-400/25",
 };
 
-const priceLevelFor: Record<CustomerLevel, string> = {
-  silver: "Price Level 1",
-  gold: "Price Level 2",
-  platinum: "Price Level 3",
-  diamond: "Price Level 4",
+const priceLevelKeyFor: Record<CustomerLevel, string> = {
+  silver: "acc.priceLevel.1",
+  gold: "acc.priceLevel.2",
+  platinum: "acc.priceLevel.3",
+  diamond: "acc.priceLevel.4",
 };
 
 interface Props {
@@ -53,6 +55,7 @@ interface Props {
 }
 
 export default function OverviewTab({ account }: Props) {
+  const { t } = useTranslation(accountsT);
   const { person, company, role, preset, employee } = account;
   const customerLevel = company?.customer_level || null;
 
@@ -62,47 +65,47 @@ export default function OverviewTab({ account }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <KeyIcon className="h-3.5 w-3.5" />
-          Login Identity
+          {t("acc.overview.loginIdentity")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <InfoField
             icon={<AtSignIcon className="h-3.5 w-3.5" />}
-            label="Username"
+            label={t("acc.overview.username")}
             value={<span className="font-mono">@{account.username}</span>}
           />
           <InfoField
             icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
-            label="Login Email"
+            label={t("acc.overview.loginEmail")}
             value={account.login_email}
           />
           <InfoField
             icon={<ClockIcon className="h-3.5 w-3.5" />}
-            label="Last Login"
+            label={t("acc.overview.lastLogin")}
             value={
               account.last_login_at
                 ? new Date(account.last_login_at).toLocaleString()
-                : "Never"
+                : t("acc.overview.never")
             }
           />
           <InfoField
             icon={<ShieldIcon className="h-3.5 w-3.5" />}
-            label="2FA"
-            value={account.two_factor_enabled ? "Enabled" : "Disabled"}
+            label={t("acc.overview.twoFA")}
+            value={account.two_factor_enabled ? t("acc.overview.enabled") : t("acc.overview.disabled")}
           />
         </div>
         <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center gap-2 flex-wrap">
           {account.force_password_change && (
             <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-amber-500/15 text-amber-300 border-amber-500/25">
-              Force Password Change
+              {t("acc.overview.forcePasswordChange")}
             </span>
           )}
           {account.password_hash ? (
             <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]">
-              Temporary Password Set
+              {t("acc.overview.tempPasswordSet")}
             </span>
           ) : (
             <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-red-500/15 text-red-300 border-red-500/25">
-              No Password Set
+              {t("acc.overview.noPasswordSet")}
             </span>
           )}
         </div>
@@ -113,53 +116,53 @@ export default function OverviewTab({ account }: Props) {
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
             <UserCircle2Icon className="h-3.5 w-3.5" />
-            Contact Profile
+            {t("acc.overview.contactProfile")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoField
               icon={<UserCircle2Icon className="h-3.5 w-3.5" />}
-              label="Full Name"
+              label={t("acc.overview.fullName")}
               value={person.full_name}
             />
             {person.display_name && (
               <InfoField
                 icon={<UserCircle2Icon className="h-3.5 w-3.5" />}
-                label="Display Name"
+                label={t("acc.overview.displayName")}
                 value={person.display_name}
               />
             )}
             {person.job_title && (
               <InfoField
                 icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
-                label="Job Title"
+                label={t("acc.overview.jobTitle")}
                 value={person.job_title}
               />
             )}
             {person.email && (
               <InfoField
                 icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
-                label="Email"
+                label={t("acc.overview.email")}
                 value={person.email}
               />
             )}
             {person.phone && (
               <InfoField
                 icon={<PhoneIcon className="h-3.5 w-3.5" />}
-                label="Phone"
+                label={t("acc.overview.phone")}
                 value={person.phone}
               />
             )}
             {person.mobile && (
               <InfoField
                 icon={<SmartphoneIcon className="h-3.5 w-3.5" />}
-                label="Mobile"
+                label={t("acc.overview.mobile")}
                 value={person.mobile}
               />
             )}
             {person.language && (
               <InfoField
                 icon={<LanguagesIcon className="h-3.5 w-3.5" />}
-                label="Language"
+                label={t("acc.overview.language")}
                 value={person.language}
               />
             )}
@@ -168,7 +171,7 @@ export default function OverviewTab({ account }: Props) {
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
               <p className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] font-semibold mb-2 flex items-center gap-1.5">
                 <MapPinIcon className="h-3 w-3" />
-                Address
+                {t("acc.overview.address")}
               </p>
               <p className="text-[13px] text-[var(--text-muted)] whitespace-pre-line">
                 {[
@@ -192,17 +195,17 @@ export default function OverviewTab({ account }: Props) {
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
             <Building2Icon className="h-3.5 w-3.5" />
-            Company
+            {t("acc.overview.company")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoField
               icon={<Building2Icon className="h-3.5 w-3.5" />}
-              label="Name"
+              label={t("acc.overview.companyName")}
               value={company.name}
             />
             <InfoField
               icon={<LayersIcon className="h-3.5 w-3.5" />}
-              label="Type"
+              label={t("acc.overview.companyType")}
               value={
                 <span className="uppercase tracking-wider">{company.type}</span>
               }
@@ -210,14 +213,14 @@ export default function OverviewTab({ account }: Props) {
             {company.country && (
               <InfoField
                 icon={<FlagIcon className="h-3.5 w-3.5" />}
-                label="Country"
+                label={t("acc.overview.companyCountry")}
                 value={company.country}
               />
             )}
             {company.currency && (
               <InfoField
                 icon={<GlobeIcon className="h-3.5 w-3.5" />}
-                label="Currency"
+                label={t("acc.overview.companyCurrency")}
                 value={company.currency}
               />
             )}
@@ -225,7 +228,7 @@ export default function OverviewTab({ account }: Props) {
               <>
                 <InfoField
                   icon={<ShieldIcon className="h-3.5 w-3.5" />}
-                  label="Customer Level"
+                  label={t("acc.overview.customerLevel")}
                   value={
                     <span
                       className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
@@ -236,8 +239,8 @@ export default function OverviewTab({ account }: Props) {
                 />
                 <InfoField
                   icon={<LayersIcon className="h-3.5 w-3.5" />}
-                  label="Price Level"
-                  value={priceLevelFor[customerLevel]}
+                  label={t("acc.overview.priceLevel")}
+                  value={t(priceLevelKeyFor[customerLevel])}
                 />
               </>
             )}
@@ -245,8 +248,7 @@ export default function OverviewTab({ account }: Props) {
           {account.user_type === "customer" && !customerLevel && (
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] text-[12px] text-amber-300/80 flex items-center gap-1.5">
               <ExclamationIcon className="h-3.5 w-3.5" />
-              This company has no customer level set. Set it on the company
-              record to enable pricing.
+              {t("acc.overview.noLevelWarning")}
             </div>
           )}
         </section>
@@ -257,33 +259,33 @@ export default function OverviewTab({ account }: Props) {
         <section className={tabCardClass}>
           <h2 className={tabSectionTitle}>
             <BriefcaseIcon className="h-3.5 w-3.5" />
-            Employee Record
+            {t("acc.overview.employeeRecord")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {employee.employee_number && (
               <InfoField
                 icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
-                label="Employee #"
+                label={t("acc.overview.employeeNumber")}
                 value={employee.employee_number}
               />
             )}
             {employee.department && (
               <InfoField
                 icon={<LayersIcon className="h-3.5 w-3.5" />}
-                label="Department"
+                label={t("acc.overview.department")}
                 value={employee.department}
               />
             )}
             {employee.position && (
               <InfoField
                 icon={<BriefcaseIcon className="h-3.5 w-3.5" />}
-                label="Position"
+                label={t("acc.overview.position")}
                 value={employee.position}
               />
             )}
             <InfoField
               icon={<ShieldIcon className="h-3.5 w-3.5" />}
-              label="Employment"
+              label={t("acc.overview.employment")}
               value={
                 <span className="uppercase tracking-wider">
                   {employee.employment_status}
@@ -293,28 +295,28 @@ export default function OverviewTab({ account }: Props) {
             {employee.hire_date && (
               <InfoField
                 icon={<ClockIcon className="h-3.5 w-3.5" />}
-                label="Hire Date"
+                label={t("acc.overview.hireDate")}
                 value={new Date(employee.hire_date).toLocaleDateString()}
               />
             )}
             {employee.work_email && (
               <InfoField
                 icon={<EnvelopeIcon className="h-3.5 w-3.5" />}
-                label="Work Email"
+                label={t("acc.overview.workEmail")}
                 value={employee.work_email}
               />
             )}
             {employee.work_phone && (
               <InfoField
                 icon={<PhoneIcon className="h-3.5 w-3.5" />}
-                label="Work Phone"
+                label={t("acc.overview.workPhone")}
                 value={employee.work_phone}
               />
             )}
           </div>
           <p className="text-[11px] text-[var(--text-dim)] mt-4 pt-4 border-t border-[var(--border-subtle)]">
-            Private HR data (address, emergency contact, documents) is managed
-            under the <span className="text-[var(--text-muted)] font-medium">Private</span> tab.
+            {t("acc.overview.privateDataHint")}{" "}
+            <span className="text-[var(--text-muted)] font-medium">{t("acc.overview.privateTabRef")}</span> {t("acc.overview.tabSuffix")}
           </p>
         </section>
       )}
@@ -323,7 +325,7 @@ export default function OverviewTab({ account }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <ShieldIcon className="h-3.5 w-3.5" />
-          Role
+          {t("acc.overview.role")}
         </h2>
         {role ? (
           <>
@@ -332,7 +334,7 @@ export default function OverviewTab({ account }: Props) {
                 {role.name}
               </span>
               <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider">
-                Scope: {role.scope}
+                {t("acc.overview.scope")} {role.scope}
               </span>
             </div>
             {role.description && (
@@ -342,23 +344,23 @@ export default function OverviewTab({ account }: Props) {
             )}
             {preset && (
               <p className="text-[11px] text-[var(--text-dim)] mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                Default access comes from preset
+                {t("acc.overview.presetHint")}
                 <span className="text-[var(--text-muted)] font-medium">
                   {" "}
                   {preset.preset_name}
                 </span>
-                . Per-module overrides are managed under the{" "}
+                {t("acc.overview.overridesHint")}{" "}
                 <span className="text-[var(--text-muted)] font-medium">
-                  Access Rights
+                  {t("acc.overview.accessRightsRef")}
                 </span>{" "}
-                tab.
+                {t("acc.overview.tabSuffix")}
               </p>
             )}
           </>
         ) : (
           <p className="text-[12px] text-amber-300/80 flex items-center gap-1.5">
             <ExclamationIcon className="h-3.5 w-3.5" />
-            No role assigned. Edit this account to assign one.
+            {t("acc.overview.noRoleWarning")}
           </p>
         )}
       </section>

@@ -7,6 +7,8 @@
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 
 export const inputClass =
   "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -86,15 +88,15 @@ export function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors ${
+        className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
           checked
-            ? "bg-[var(--bg-inverted)]"
-            : "bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]"
+            ? "bg-emerald-500"
+            : "bg-zinc-600 dark:bg-zinc-600"
         }`}
       >
         <span
-          className={`absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow transition-all ${
-            checked ? "left-[22px]" : "left-[3px]"
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+            checked ? "translate-x-5" : ""
           }`}
         />
       </button>
@@ -114,6 +116,7 @@ export function TabActionBar({
   onSave: () => void;
   onReset: () => void;
 }) {
+  const { t } = useTranslation(accountsT);
   return (
     <div className="flex items-center justify-end gap-2 pt-4 mt-5 border-t border-[var(--border-subtle)]">
       <button
@@ -122,7 +125,7 @@ export function TabActionBar({
         disabled={!dirty || saving}
         className={ghostBtnClass}
       >
-        Reset
+        {t("acc.shared.reset")}
       </button>
       <button
         type="button"
@@ -130,7 +133,7 @@ export function TabActionBar({
         disabled={!dirty || saving}
         className={primaryBtnClass}
       >
-        {saving ? "Saving…" : "Save Changes"}
+        {saving ? t("acc.shared.saving") : t("acc.shared.saveChanges")}
       </button>
     </div>
   );

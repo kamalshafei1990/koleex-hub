@@ -15,6 +15,8 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import KeyIcon from "@/components/icons/ui/KeyIcon";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 
 interface Props {
   token: string;
@@ -24,6 +26,7 @@ interface Props {
 
 export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
   useScrollLock();
+  const { t } = useTranslation(accountsT);
   const [copied, setCopied] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -53,7 +56,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
               <KeyIcon className="h-4 w-4" />
             </div>
             <h2 className="text-[15px] font-bold text-[var(--text-primary)] truncate">
-              API key created
+              {t("acc.apiModal.title")}
             </h2>
           </div>
           <button
@@ -68,25 +71,24 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
         {/* Body */}
         <div className="p-5 space-y-4">
           <p className="text-[13px] text-[var(--text-muted)]">
-            Your key{" "}
+            {t("acc.apiModal.yourKey")}{" "}
             <span className="font-semibold text-[var(--text-primary)]">
               {keyName}
             </span>{" "}
-            is ready. Copy it now — it will not be shown again.
+            {t("acc.apiModal.ready")}
           </p>
 
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] text-amber-200 px-3 py-2.5 text-[12px] flex items-start gap-2">
             <TriangleWarningIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Koleex only stores a hash of this key. If you lose it, create a
-              new one — it cannot be recovered.
+              {t("acc.apiModal.hashWarning")}
             </span>
           </div>
 
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                Secret key
+                {t("acc.apiModal.secretKey")}
               </p>
               <button
                 type="button"
@@ -95,11 +97,11 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
               >
                 {copied ? (
                   <>
-                    <CheckIcon className="h-3 w-3" /> Copied
+                    <CheckIcon className="h-3 w-3" /> {t("acc.apiModal.copied")}
                   </>
                 ) : (
                   <>
-                    <CopyIcon className="h-3 w-3" /> Copy
+                    <CopyIcon className="h-3 w-3" /> {t("acc.apiModal.copy")}
                   </>
                 )}
               </button>
@@ -117,7 +119,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
               className="h-4 w-4 mt-0.5 rounded border-[var(--border-subtle)]"
             />
             <span className="text-[12px] text-[var(--text-muted)]">
-              I&rsquo;ve copied this key and stored it somewhere safe.
+              {t("acc.apiModal.ack")}
             </span>
           </label>
         </div>
@@ -130,7 +132,7 @@ export default function ApiKeyRevealModal({ token, keyName, onClose }: Props) {
             disabled={!acknowledged}
             className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Done
+            {t("acc.apiModal.done")}
           </button>
         </div>
       </div>

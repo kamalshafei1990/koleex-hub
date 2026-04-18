@@ -47,7 +47,7 @@ export const TYPE_C_MODULES = new Set([
   "Calendar",
   "Koleex Mail",
   "Inbox",
-  // "Notes" — add when the Notes app ships
+  "Notes",
   // Discuss is mixed: DMs are Type C, channels are tenant-scoped.
   // Handled in discuss fetch helpers rather than here.
 ]);

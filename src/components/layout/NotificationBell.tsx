@@ -60,8 +60,8 @@ import type {
 } from "@/types/supabase";
 
 /* Refresh inbox unread count every 60s while the tab is open. Discuss
-   updates piggy-back off the realtime subscription so they stay live
-   without polling. */
+   also polls every 15s as a safety net since the WebSocket can drop
+   silently on flaky networks or after mobile Safari kills the tab. */
 const POLL_INTERVAL_MS = 60_000;
 
 function timeAgo(iso: string): string {
@@ -235,31 +235,86 @@ export default function NotificationBell({ dk }: { dk: boolean }) {
   }, []);
 
   /* React to "discuss:unread-changed" (DiscussApp marked a channel as
-     read), "focus" (long idle session resyncs on return), and
-     "inbox:force-recount" (todo-admin / other code that inserts
-     into inbox_messages and wants the bell to update now). */
+     read), "focus" / "visibilitychange" (long idle / mobile-backgrounded
+     session resyncs on return), and "inbox:force-recount" (todo-admin /
+     other code that inserts into inbox_messages and wants the bell to
+     update now).
+
+     MOBILE-CRITICAL: mobile Safari and Chrome fire `visibilitychange`
+     reliably but `focus` only sporadically. We listen to both so the
+     badge / sound update the instant the user switches back to the app,
+     regardless of browser. */
   useEffect(() => {
     if (typeof window === "undefined") return;
     function onDiscussChange() {
       void recountDiscuss();
     }
-    function onFocus() {
+    function onResume() {
       void recountDiscuss();
       void recountInbox();
+    }
+    function onVisibility() {
+      if (document.visibilityState === "visible") onResume();
     }
     function onForceRecount() {
       lastRealtimeBumpRef.current = Date.now();
       void recountInbox();
     }
     window.addEventListener("discuss:unread-changed", onDiscussChange);
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("focus", onResume);
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("inbox:force-recount", onForceRecount);
     return () => {
       window.removeEventListener("discuss:unread-changed", onDiscussChange);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", onResume);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("inbox:force-recount", onForceRecount);
     };
   }, [recountDiscuss, recountInbox]);
+
+  /* ── Discuss: polling fallback ────────────────────────────────────
+     Realtime may silently drop on flaky networks, WebSocket throttling,
+     or mobile Safari background-kill. Poll every 10 s so the badge
+     never goes stale for more than one interval.  The poll is cheap:
+     fetchMyChannels is ~4 small queries and React only re-renders if
+     the aggregate unread count actually changed.
+
+     When the poll discovers new unreads that realtime missed, play the
+     notification chime so the user has an audible alert even without
+     a live WebSocket.
+
+     On mobile browsers, setInterval is frozen while the tab is hidden.
+     The visibilitychange handler above fires an immediate recount on
+     resume, so the badge updates the instant the user returns. */
+  useEffect(() => {
+    if (!accountId) return;
+    async function poll() {
+      if (document.visibilityState !== "visible") return;
+      const aid = accountIdRef.current;
+      if (!aid) return;
+      try {
+        const rows = await fetchMyChannels(aid);
+        const newTotal = rows.reduce(
+          (s, c) => s + (c.unread_count ?? 0),
+          0,
+        );
+        setDiscussChannels((prev) => {
+          const oldTotal = prev.reduce(
+            (s, c) => s + (c.unread_count ?? 0),
+            0,
+          );
+          if (newTotal > oldTotal) {
+            playNotificationSound();
+          }
+          return rows;
+        });
+      } catch {
+        /* Leave prior list in place. */
+      }
+    }
+    const id = window.setInterval(poll, 10_000);
+    return () => window.clearInterval(id);
+  }, [accountId]);
 
   /* ── Inbox: poll unread count + fetch on open ────────────────────── */
   useEffect(() => {

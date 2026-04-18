@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "koleex-hub",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["/Users/kamalshafei/Desktop/Koleex HUB/.claude/start-dev.sh"],
-      "port": 3199,
-      "autoPort": false
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     }
   ]
 }

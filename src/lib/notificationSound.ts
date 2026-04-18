@@ -189,6 +189,25 @@ function attachUnlockListeners() {
   window.addEventListener("click", onGesture, { passive: true });
   window.addEventListener("touchstart", onGesture, { passive: true });
   window.addEventListener("keydown", onGesture);
+
+  /* Mobile browsers (iOS Safari, Chrome Android) suspend the
+     AudioContext when the tab goes to background and do NOT auto-resume
+     it when the user returns. We try to resume on every visibility
+     change so notifications can play the moment the user switches back.
+     The resume() call itself doesn't count as a user gesture on iOS, so
+     if the context was never unlocked this won't help — but once the
+     user has tapped anywhere, subsequent background/foreground cycles
+     will keep the context alive. */
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    const ctx = audioCtx;
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(() => {
+        unlocked = true;
+      });
+    }
+  });
 }
 
 /** Call once on app mount so the audio is preloaded and the unlock

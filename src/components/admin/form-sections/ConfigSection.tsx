@@ -15,9 +15,9 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500/60" : "bg-[var(--bg-surface)]"}`}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500" : "bg-zinc-600"}`}
       >
-        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[var(--bg-inverted)] shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
+        <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-5" : ""}`} />
       </button>
       <span className="text-[13px] text-[var(--text-muted)] group-hover:text-[var(--text-primary)]/80 transition-colors">{label}</span>
     </label>

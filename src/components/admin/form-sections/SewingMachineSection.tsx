@@ -215,7 +215,7 @@ function FieldRenderer({
             aria-checked={!!value}
             onClick={() => onChange(!value)}
             className={`relative h-6 w-11 rounded-full transition-colors duration-200 shrink-0 ${
-              value ? "bg-blue-500/60" : "bg-[var(--bg-surface)]"
+              value ? "bg-emerald-500" : "bg-zinc-600"
             }`}
           >
             <span

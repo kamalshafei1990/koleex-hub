@@ -18,6 +18,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
+import { usePathname } from "next/navigation";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
@@ -81,6 +82,7 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
    ═══════════════════════════════════════════════════ */
 
 export default function FloatingPanel() {
+  const pathname = usePathname();
   const dk = useTheme();
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
@@ -254,6 +256,9 @@ export default function FloatingPanel() {
     }).slice(0, 20),
     [channels],
   );
+
+  /* ── Hide on full Discuss page (the FAB overlaps the composer Send button) ── */
+  if (pathname === "/discuss") return null;
 
   /* ── Token colors ── */
   const bg = dk ? "bg-[#111]" : "bg-white";

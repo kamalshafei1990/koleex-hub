@@ -75,6 +75,8 @@ export interface EmployeeWizardData {
   first_name: string;
   middle_name: string;
   last_name: string;
+  first_name_alt: string;
+  last_name_alt: string;
   gender: string;
   birthday: string;
   nationality: string;
@@ -128,6 +130,44 @@ export interface EmployeeWizardData {
   bank_swift: string;
   bank_currency: string;
 
+  // Salary at Hire
+  initial_salary: string;
+  salary_currency: string;
+
+  // Manager
+  manager_id: string;
+
+  // Insurance
+  insurance_provider: string;
+  insurance_policy_number: string;
+  insurance_class: string;
+  insurance_expiry_date: string;
+
+  // Social Security / Tax
+  social_security_number: string;
+  tax_id: string;
+
+  // Education
+  education_degree: string;
+  education_institution: string;
+  education_field: string;
+  education_graduation_year: string;
+
+  // Driving License
+  driving_license_number: string;
+  driving_license_type: string;
+  driving_license_expiry: string;
+
+  // Extra Personal
+  blood_type: string;
+  religion: string;
+  languages: string;
+
+  // Second Emergency Contact
+  emergency_contact2_name: string;
+  emergency_contact2_phone: string;
+  emergency_contact2_relationship: string;
+
   // Account (optional)
   create_account: boolean;
   username: string;
@@ -143,6 +183,8 @@ export function emptyWizardData(): EmployeeWizardData {
     first_name: "",
     middle_name: "",
     last_name: "",
+    first_name_alt: "",
+    last_name_alt: "",
     gender: "",
     birthday: "",
     nationality: "",
@@ -183,6 +225,28 @@ export function emptyWizardData(): EmployeeWizardData {
     bank_iban: "",
     bank_swift: "",
     bank_currency: "",
+    initial_salary: "",
+    salary_currency: "USD",
+    manager_id: "",
+    insurance_provider: "",
+    insurance_policy_number: "",
+    insurance_class: "",
+    insurance_expiry_date: "",
+    social_security_number: "",
+    tax_id: "",
+    education_degree: "",
+    education_institution: "",
+    education_field: "",
+    education_graduation_year: "",
+    driving_license_number: "",
+    driving_license_type: "",
+    driving_license_expiry: "",
+    blood_type: "",
+    religion: "",
+    languages: "",
+    emergency_contact2_name: "",
+    emergency_contact2_phone: "",
+    emergency_contact2_relationship: "",
     create_account: false,
     username: "",
     login_email: "",
@@ -393,6 +457,8 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
       .filter(Boolean)
       .join(" ");
 
+    const nameAlt = [data.first_name_alt, data.last_name_alt].filter(Boolean).join(" ") || null;
+
     const { data: person, error: personErr } = await supabase
       .from(PEOPLE)
       .insert({
@@ -400,6 +466,9 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         display_name: `${data.first_name} ${data.last_name}`.trim(),
         first_name: data.first_name || null,
         last_name: data.last_name || null,
+        first_name_alt: data.first_name_alt || null,
+        last_name_alt: data.last_name_alt || null,
+        name_alt: nameAlt,
         email: data.personal_email || null,
         phone: data.personal_phone || null,
         avatar_url: data.photo_url || null,
@@ -492,7 +561,7 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         work_email: data.work_email || null,
         work_phone: data.work_phone || null,
         work_location: data.work_location || "office",
-        manager_id: null,
+        manager_id: data.manager_id || null,
         notes: null,
         // Private address
         private_address_line1: data.private_address_line1 || null,
@@ -523,6 +592,34 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         bank_iban: data.bank_iban || null,
         bank_swift: data.bank_swift || null,
         bank_currency: data.bank_currency || null,
+        // Salary at hire
+        initial_salary: data.initial_salary ? Number(data.initial_salary) : null,
+        salary_currency: data.salary_currency || null,
+        // Insurance
+        insurance_provider: data.insurance_provider || null,
+        insurance_policy_number: data.insurance_policy_number || null,
+        insurance_class: data.insurance_class || null,
+        insurance_expiry_date: data.insurance_expiry_date || null,
+        // Social Security / Tax
+        social_security_number: data.social_security_number || null,
+        tax_id: data.tax_id || null,
+        // Education
+        education_degree: data.education_degree || null,
+        education_institution: data.education_institution || null,
+        education_field: data.education_field || null,
+        education_graduation_year: data.education_graduation_year || null,
+        // Driving License
+        driving_license_number: data.driving_license_number || null,
+        driving_license_type: data.driving_license_type || null,
+        driving_license_expiry: data.driving_license_expiry || null,
+        // Extra Personal
+        blood_type: data.blood_type || null,
+        religion: data.religion || null,
+        languages: data.languages || null,
+        // Second Emergency Contact
+        emergency_contact2_name: data.emergency_contact2_name || null,
+        emergency_contact2_phone: data.emergency_contact2_phone || null,
+        emergency_contact2_relationship: data.emergency_contact2_relationship || null,
       })
       .select()
       .single();

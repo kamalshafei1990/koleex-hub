@@ -22,6 +22,8 @@ import type {
 } from "@/types/supabase";
 import { withDefaults } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import {
   tabCardClass,
   tabSectionTitle,
@@ -38,6 +40,7 @@ interface Props {
 }
 
 export default function PreferencesTab({ account, onChanged }: Props) {
+  const { t } = useTranslation(accountsT);
   const initial = useMemo(() => withDefaults(account.preferences), [account.preferences]);
 
   const [prefs, setPrefs] = useState<AccountPreferences>(initial);
@@ -49,8 +52,8 @@ export default function PreferencesTab({ account, onChanged }: Props) {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
   }, [toast]);
 
   const dirty = JSON.stringify(prefs) !== JSON.stringify(initial);
@@ -63,10 +66,10 @@ export default function PreferencesTab({ account, onChanged }: Props) {
     const ok = await updateAccountPreferences(account.id, prefs);
     setSaving(false);
     if (!ok) {
-      setError("Could not save preferences.");
+      setError(t("acc.err.preferencesFailed"));
       return;
     }
-    setToast("Preferences saved.");
+    setToast(t("acc.msg.preferencesSaved"));
     onChanged?.(prefs);
   }
 
@@ -75,12 +78,12 @@ export default function PreferencesTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <Settings2Icon className="h-3.5 w-3.5" />
-          General
+          {t("acc.prefs.general")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>
-              <LanguagesIcon className="h-3 w-3 inline mr-1" /> Language
+              <LanguagesIcon className="h-3 w-3 inline mr-1" /> {t("acc.prefs.language")}
             </label>
             <select
               className={selectClass}
@@ -89,14 +92,14 @@ export default function PreferencesTab({ account, onChanged }: Props) {
                 setPrefs({ ...prefs, language: e.target.value as "en" | "ar" })
               }
             >
-              <option value="en">English</option>
+              <option value="en">{t("acc.prefs.langEnglish")}</option>
               <option value="ar">العربية (Arabic)</option>
             </select>
           </div>
 
           <div>
             <label className={labelClass}>
-              <PaletteIcon className="h-3 w-3 inline mr-1" /> Theme
+              <PaletteIcon className="h-3 w-3 inline mr-1" /> {t("acc.prefs.theme")}
             </label>
             <select
               className={selectClass}
@@ -108,9 +111,9 @@ export default function PreferencesTab({ account, onChanged }: Props) {
                 })
               }
             >
-              <option value="system">Match System</option>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
+              <option value="system">{t("acc.prefs.themeSystem")}</option>
+              <option value="dark">{t("acc.prefs.themeDark")}</option>
+              <option value="light">{t("acc.prefs.themeLight")}</option>
             </select>
           </div>
         </div>
@@ -119,7 +122,7 @@ export default function PreferencesTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <EnvelopeIcon className="h-3.5 w-3.5" />
-          Email Signature
+          {t("acc.prefs.emailSignature")}
         </h2>
         <textarea
           className={textareaClass}
@@ -129,19 +132,19 @@ export default function PreferencesTab({ account, onChanged }: Props) {
           placeholder={`Jane Cooper\nSales Manager · Koleex International Group\njane@koleex.com · +971 50 000 0000`}
         />
         <p className="text-[11px] text-[var(--text-dim)] mt-2">
-          Appended to outgoing emails from the Koleex Hub.
+          {t("acc.prefs.signatureHint")}
         </p>
       </section>
 
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <BellIcon className="h-3.5 w-3.5" />
-          Notifications
+          {t("acc.prefs.notifications")}
         </h2>
         <div className="space-y-4">
           <Toggle
-            label="Email notifications"
-            description="Send activity and mentions to the login email."
+            label={t("acc.prefs.emailNotifications")}
+            description={t("acc.prefs.emailNotifDesc")}
             checked={prefs.notifications?.email ?? true}
             onChange={(v) =>
               setPrefs({
@@ -154,8 +157,8 @@ export default function PreferencesTab({ account, onChanged }: Props) {
             }
           />
           <Toggle
-            label="In-app notifications"
-            description="Show a bell indicator inside the hub."
+            label={t("acc.prefs.inAppNotifications")}
+            description={t("acc.prefs.inAppNotifDesc")}
             checked={prefs.notifications?.in_app ?? true}
             onChange={(v) =>
               setPrefs({

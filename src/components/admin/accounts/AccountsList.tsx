@@ -34,6 +34,7 @@ import KeyIcon from "@/components/icons/ui/KeyIcon";
 import ToggleOffIcon from "@/components/icons/ui/ToggleOffIcon";
 import PowerIcon from "@/components/icons/ui/PowerIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
@@ -41,13 +42,15 @@ import FlagIcon from "@/components/icons/ui/FlagIcon";
 import {
   fetchAccounts, fetchCompanies, fetchRoles, fetchPeople,
   setAccountStatus, resetAccountPassword, setForcePasswordChange,
-  generateTemporaryPassword,
+  generateTemporaryPassword, deleteAccount,
 } from "@/lib/accounts-admin";
 import type {
   AccountRow, CompanyRow, RoleRow, PersonRow,
   AccountStatus, UserType, CustomerLevel,
 } from "@/types/supabase";
 import AccountsIcon from "@/components/icons/AccountsIcon";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 
 const selectClass =
   "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors";
@@ -93,6 +96,8 @@ export default function AccountsList() {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newTempPw, setNewTempPw] = useState<{ id: string; pw: string } | null>(null);
+
+  const { t } = useTranslation(accountsT);
 
   /* Helper: capture the trigger button's viewport rect and toggle the
      row menu. We position the dropdown's top edge a few px below the
@@ -143,8 +148,8 @@ export default function AccountsList() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
+    const tid = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(tid);
   }, [toast]);
 
   const companyMap = useMemo(
@@ -207,7 +212,12 @@ export default function AccountsList() {
           fullName.toLowerCase().includes(q) ||
           a.username.toLowerCase().includes(q) ||
           a.login_email.toLowerCase().includes(q) ||
-          (company?.name || "").toLowerCase().includes(q);
+          (company?.name || "").toLowerCase().includes(q) ||
+          (row.role?.name || "").toLowerCase().includes(q) ||
+          (country || "").toLowerCase().includes(q) ||
+          (row.person?.job_title || "").toLowerCase().includes(q) ||
+          a.status.toLowerCase().includes(q) ||
+          a.user_type.toLowerCase().includes(q);
         if (!hit) return false;
       }
       return true;
@@ -233,9 +243,9 @@ export default function AccountsList() {
     setOpenMenu(null);
     if (ok) {
       setAccounts((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: next } : x)));
-      setToast(next === "active" ? "Account activated." : "Account deactivated.");
+      setToast(next === "active" ? t("acc.msg.activated") : t("acc.msg.deactivated"));
     } else {
-      setError("Could not update account status.");
+      setError(t("acc.err.statusFailed"));
     }
   }
 
@@ -250,9 +260,9 @@ export default function AccountsList() {
       setAccounts((prev) =>
         prev.map((x) => (x.id === a.id ? { ...x, force_password_change: true } : x)),
       );
-      setToast("Temporary password reset. Copy it and share securely.");
+      setToast(t("acc.msg.passwordReset"));
     } else {
-      setError("Could not reset the password.");
+      setError(t("acc.err.passwordFailed"));
     }
   }
 
@@ -268,11 +278,25 @@ export default function AccountsList() {
       );
       setToast(
         next
-          ? "Force password change on next login."
-          : "Force password change cleared.",
+          ? t("acc.msg.forceEnabled")
+          : t("acc.msg.forceCleared"),
       );
     } else {
-      setError("Could not update the flag.");
+      setError(t("acc.err.flagFailed"));
+    }
+  }
+
+  async function actionDelete(a: AccountRow) {
+    if (!window.confirm(t("acc.action.confirmDelete"))) return;
+    setWorking(true);
+    const ok = await deleteAccount(a.id);
+    setWorking(false);
+    setOpenMenu(null);
+    if (ok) {
+      setAccounts((prev) => prev.filter((x) => x.id !== a.id));
+      setToast(t("acc.msg.deleted"));
+    } else {
+      setError(t("acc.err.deleteFailed"));
     }
   }
 
@@ -295,17 +319,17 @@ export default function AccountsList() {
               <AccountsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              Accounts
+              {t("acc.title")}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <PlusIcon className="h-4 w-4" /> New Account
+              <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
             </Link>
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {accounts.length} accounts across Koleex and customer workspaces
+          {accounts.length} {t("acc.subtitle")}
         </p>
 
         {/* Toasts */}
@@ -325,13 +349,13 @@ export default function AccountsList() {
           <div className="mb-4 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface)] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
-                New Temporary Password
+                {t("acc.tempPw.title")}
               </p>
               <p className="text-[14px] font-mono text-[var(--text-primary)] mt-1">
                 {newTempPw.pw}
               </p>
               <p className="text-[11px] text-[var(--text-dim)] mt-1">
-                Copy this and share securely. The user will be forced to change it on next login.
+                {t("acc.tempPw.copyHint")}
               </p>
             </div>
             <div className="flex gap-2">
@@ -339,7 +363,7 @@ export default function AccountsList() {
                 onClick={copyTempPw}
                 className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
               >
-                <CopyIcon className="h-3.5 w-3.5" /> Copy
+                <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
               </button>
               <button
                 onClick={() => setNewTempPw(null)}
@@ -360,7 +384,7 @@ export default function AccountsList() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, username, email, or company…"
+                placeholder={t("acc.searchPlaceholder")}
                 className="w-full h-10 pl-10 pr-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
               />
             </div>
@@ -373,7 +397,7 @@ export default function AccountsList() {
               }`}
             >
               <FilterIcon className="h-3.5 w-3.5" />
-              Filters
+              {t("acc.filters")}
               {activeFilters > 0 && (
                 <span className="h-5 min-w-[20px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold flex items-center justify-center">
                   {activeFilters}
@@ -385,7 +409,7 @@ export default function AccountsList() {
                 onClick={clearFilters}
                 className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-dim)] hover:text-[var(--text-muted)] flex items-center gap-1.5 transition-colors"
               >
-                <CrossIcon className="h-3 w-3" /> Clear
+                <CrossIcon className="h-3 w-3" /> {t("acc.clear")}
               </button>
             )}
           </div>
@@ -394,28 +418,28 @@ export default function AccountsList() {
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  User Type
+                  {t("acc.filter.userType")}
                 </label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value as "" | UserType)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
-                  <option value="internal">Internal</option>
-                  <option value="customer">Customer</option>
+                  <option value="">{t("acc.filterAll")}</option>
+                  <option value="internal">{t("acc.type.internal")}</option>
+                  <option value="customer">{t("acc.type.customer")}</option>
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Role
+                  {t("acc.filter.role")}
                 </label>
                 <select
                   value={filterRole}
                   onChange={(e) => setFilterRole(e.target.value)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
+                  <option value="">{t("acc.filterAll")}</option>
                   {roles.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.name}
@@ -425,14 +449,14 @@ export default function AccountsList() {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Company
+                  {t("acc.filter.company")}
                 </label>
                 <select
                   value={filterCompany}
                   onChange={(e) => setFilterCompany(e.target.value)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
+                  <option value="">{t("acc.filterAll")}</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -442,31 +466,31 @@ export default function AccountsList() {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Status
+                  {t("acc.filter.status")}
                 </label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as "" | AccountStatus)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
-                  <option value="invited">Invited</option>
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
+                  <option value="">{t("acc.filterAll")}</option>
+                  <option value="invited">{t("acc.status.invited")}</option>
+                  <option value="active">{t("acc.status.active")}</option>
+                  <option value="pending">{t("acc.status.pending")}</option>
+                  <option value="inactive">{t("acc.status.inactive")}</option>
+                  <option value="suspended">{t("acc.status.suspended")}</option>
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Country
+                  {t("acc.filter.country")}
                 </label>
                 <select
                   value={filterCountry}
                   onChange={(e) => setFilterCountry(e.target.value)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
+                  <option value="">{t("acc.filterAll")}</option>
                   {countryOptions.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -476,18 +500,18 @@ export default function AccountsList() {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-[var(--text-dim)] mb-1 uppercase tracking-wider">
-                  Customer Level
+                  {t("acc.filter.customerLevel")}
                 </label>
                 <select
                   value={filterLevel}
                   onChange={(e) => setFilterLevel(e.target.value as "" | CustomerLevel)}
                   className={selectClass + " w-full"}
                 >
-                  <option value="">All</option>
-                  <option value="silver">Silver</option>
-                  <option value="gold">Gold</option>
-                  <option value="platinum">Platinum</option>
-                  <option value="diamond">Diamond</option>
+                  <option value="">{t("acc.filterAll")}</option>
+                  <option value="silver">{t("acc.level.silver")}</option>
+                  <option value="gold">{t("acc.level.gold")}</option>
+                  <option value="platinum">{t("acc.level.platinum")}</option>
+                  <option value="diamond">{t("acc.level.diamond")}</option>
                 </select>
               </div>
             </div>
@@ -497,7 +521,7 @@ export default function AccountsList() {
         {/* Results count */}
         {(activeFilters > 0 || search) && (
           <p className="text-[12px] text-[var(--text-dim)] mb-4 px-1">
-            Showing {filtered.length} of {accounts.length} accounts
+            {t("acc.showingOf").replace("{count}", String(filtered.length)).replace("{total}", String(accounts.length))}
           </p>
         )}
 
@@ -519,20 +543,20 @@ export default function AccountsList() {
             <AccountsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-dim)] text-[15px] font-medium">
               {accounts.length === 0
-                ? "No accounts yet"
-                : "No accounts match your filters"}
+                ? t("acc.empty.noAccounts")
+                : t("acc.empty.noMatch")}
             </p>
             <p className="text-[var(--text-ghost)] text-[13px] mt-1">
               {accounts.length === 0
-                ? "Add the first Super Admin to get started."
-                : "Try clearing filters or broadening your search."}
+                ? t("acc.empty.addFirst")
+                : t("acc.empty.broadenSearch")}
             </p>
             {accounts.length === 0 && (
               <Link
                 href="/accounts/new"
                 className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all"
               >
-                <PlusIcon className="h-4 w-4" /> New Account
+                <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
               </Link>
             )}
           </div>
@@ -543,17 +567,17 @@ export default function AccountsList() {
               <table className="w-full text-left text-[12px]">
                 <thead className="bg-[var(--bg-surface-subtle)]/50">
                   <tr className="text-[10px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
-                    <th className="px-4 py-3 w-[280px]">Name</th>
-                    <th className="px-3 py-3 w-[140px]">Username</th>
-                    <th className="px-3 py-3">Login Email</th>
-                    <th className="px-3 py-3 w-[90px]">Type</th>
-                    <th className="px-3 py-3">Company</th>
-                    <th className="px-3 py-3">Role</th>
-                    <th className="px-3 py-3 w-[90px]">Status</th>
-                    <th className="px-3 py-3 w-[100px]">Country</th>
-                    <th className="px-3 py-3 w-[100px]">Level</th>
-                    <th className="px-3 py-3 w-[100px]">Created</th>
-                    <th className="px-3 py-3 w-[60px] text-right">Actions</th>
+                    <th className="px-4 py-3 w-[280px]">{t("acc.col.name")}</th>
+                    <th className="px-3 py-3 w-[140px]">{t("acc.col.username")}</th>
+                    <th className="px-3 py-3">{t("acc.col.loginEmail")}</th>
+                    <th className="px-3 py-3 w-[90px]">{t("acc.col.type")}</th>
+                    <th className="px-3 py-3">{t("acc.col.company")}</th>
+                    <th className="px-3 py-3">{t("acc.col.role")}</th>
+                    <th className="px-3 py-3 w-[90px]">{t("acc.col.status")}</th>
+                    <th className="px-3 py-3 w-[100px]">{t("acc.col.country")}</th>
+                    <th className="px-3 py-3 w-[100px]">{t("acc.col.level")}</th>
+                    <th className="px-3 py-3 w-[100px]">{t("acc.col.created")}</th>
+                    <th className="px-3 py-3 w-[60px] text-right">{t("acc.col.actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -567,10 +591,10 @@ export default function AccountsList() {
                         <td className="px-4 py-3">
                           <Link href={`/accounts/${a.id}`} className="flex items-center gap-3 min-w-0">
                             <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-                              {person?.avatar_url ? (
+                              {(person?.avatar_url || a.avatar_url) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
-                                  src={person.avatar_url}
+                                  src={(person?.avatar_url || a.avatar_url)!}
                                   alt={fullName}
                                   className="h-full w-full object-cover"
                                 />
@@ -601,7 +625,7 @@ export default function AccountsList() {
                         </td>
                         <td className="px-3 py-3">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                            {a.user_type}
+                            {t(`acc.type.${a.user_type}`)}
                           </span>
                         </td>
                         <td className="px-3 py-3 text-[var(--text-muted)]">
@@ -628,7 +652,7 @@ export default function AccountsList() {
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
                           >
-                            {a.status}
+                            {t(`acc.status.${a.status}`)}
                           </span>
                         </td>
                         <td className="px-3 py-3 text-[var(--text-muted)]">
@@ -639,7 +663,7 @@ export default function AccountsList() {
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
                             >
-                              {customerLevel}
+                              {t(`acc.level.${customerLevel}`)}
                             </span>
                           ) : (
                             <span className="text-[var(--text-ghost)]">—</span>
@@ -677,10 +701,10 @@ export default function AccountsList() {
                   <div key={a.id} className="p-4 relative">
                     <Link href={`/accounts/${a.id}`} className="flex items-start gap-3">
                       <div className="h-11 w-11 shrink-0 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
-                        {person?.avatar_url ? (
+                        {(person?.avatar_url || a.avatar_url) ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={person.avatar_url}
+                            src={(person?.avatar_url || a.avatar_url)!}
                             alt={fullName}
                             className="h-full w-full object-cover"
                           />
@@ -725,16 +749,16 @@ export default function AccountsList() {
                           <span
                             className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${statusColors[a.status]}`}
                           >
-                            {a.status}
+                            {t(`acc.status.${a.status}`)}
                           </span>
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border border-[var(--border-subtle)] text-[var(--text-muted)]">
-                            {a.user_type}
+                            {t(`acc.type.${a.user_type}`)}
                           </span>
                           {customerLevel && (
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
                             >
-                              {customerLevel}
+                              {t(`acc.level.${customerLevel}`)}
                             </span>
                           )}
                         </div>
@@ -776,6 +800,7 @@ export default function AccountsList() {
             onToggleStatus={() => actionToggleStatus(active)}
             onResetPassword={() => actionResetPassword(active)}
             onToggleForce={() => actionToggleForce(active)}
+            onDelete={() => actionDelete(active)}
           />
         );
       })()}
@@ -796,6 +821,7 @@ function RowMenu({
   onToggleStatus,
   onResetPassword,
   onToggleForce,
+  onDelete,
 }: {
   account: AccountRow;
   anchor: { top: number; right: number };
@@ -803,7 +829,9 @@ function RowMenu({
   onToggleStatus: () => void;
   onResetPassword: () => void;
   onToggleForce: () => void;
+  onDelete: () => void;
 }) {
+  const { t } = useTranslation(accountsT);
   const isActive = account.status === "active";
   return (
     <>
@@ -817,23 +845,30 @@ function RowMenu({
         style={{ top: anchor.top, right: anchor.right }}
         className="fixed z-[70] w-56 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden"
       >
-        <MenuItem icon={<EyeIcon className="h-4 w-4" />} label="View" href={`/accounts/${account.id}`} />
-        <MenuItem icon={<PencilIcon className="h-4 w-4" />} label="Edit" href={`/accounts/${account.id}/edit`} />
+        <MenuItem icon={<EyeIcon className="h-4 w-4" />} label={t("acc.action.view")} href={`/accounts/${account.id}`} />
+        <MenuItem icon={<PencilIcon className="h-4 w-4" />} label={t("acc.action.edit")} href={`/accounts/${account.id}/edit`} />
         <div className="h-px bg-[var(--border-subtle)]" />
         <MenuItem
           icon={isActive ? <ToggleOffIcon className="h-4 w-4" /> : <PowerIcon className="h-4 w-4" />}
-          label={isActive ? "Deactivate" : "Activate"}
+          label={isActive ? t("acc.action.deactivate") : t("acc.action.activate")}
           onClick={onToggleStatus}
         />
         <MenuItem
           icon={<KeyIcon className="h-4 w-4" />}
-          label="Reset Password"
+          label={t("acc.action.resetPassword")}
           onClick={onResetPassword}
         />
         <MenuItem
           icon={<RefreshCcwIcon className="h-4 w-4" />}
-          label={account.force_password_change ? "Clear Force Reset" : "Force Password Reset"}
+          label={account.force_password_change ? t("acc.action.clearForceReset") : t("acc.action.forcePasswordReset")}
           onClick={onToggleForce}
+        />
+        <div className="h-px bg-[var(--border-subtle)]" />
+        <MenuItem
+          icon={<TrashIcon className="h-4 w-4" />}
+          label={t("acc.action.delete")}
+          onClick={onDelete}
+          destructive
         />
       </div>
     </>
@@ -841,15 +876,17 @@ function RowMenu({
 }
 
 function MenuItem({
-  icon, label, href, onClick,
+  icon, label, href, onClick, destructive,
 }: {
   icon: React.ReactNode;
   label: string;
   href?: string;
   onClick?: () => void;
+  destructive?: boolean;
 }) {
-  const base =
-    "w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors text-left";
+  const base = destructive
+    ? "w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left"
+    : "w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors text-left";
   if (href) {
     return (
       <Link href={href} className={base}>

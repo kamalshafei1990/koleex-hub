@@ -23,13 +23,16 @@ import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import CameraIcon from "@/components/icons/ui/CameraIcon";
 import {
   emptyWizardData,
   generateEmployeeNumber,
   fetchDepartments,
   fetchPositionsByDepartment,
+  fetchEmployeeList,
   createFullEmployee,
   type EmployeeWizardData,
+  type EmployeeListItem,
 } from "@/lib/employees-admin";
 import { generateTemporaryPassword, suggestUsername } from "@/lib/accounts-admin";
 import type { DepartmentRow, PositionRow } from "@/types/supabase";
@@ -65,6 +68,29 @@ const WORK_LOCATIONS = [
   { value: "hybrid", label: "Hybrid" },
 ];
 
+/* ── Image compression ── */
+async function compressImage(file: File, maxWidth = 400, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface Props {
   onClose: () => void;
   onCreated?: (employeeId: string) => void;
@@ -81,6 +107,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
   // Department & Position data
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [positions, setPositions] = useState<PositionRow[]>([]);
+  const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
   const [newDeptName, setNewDeptName] = useState("");
   const [newPosTitle, setNewPosTitle] = useState("");
 
@@ -88,6 +115,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
   useEffect(() => {
     generateEmployeeNumber().then((num) => setForm((f) => ({ ...f, employee_number: num })));
     fetchDepartments().then(setDepartments);
+    fetchEmployeeList().then(setEmployees);
   }, []);
 
   // Fetch positions when department changes
@@ -243,7 +271,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
         {/* ── Step Content ── */}
         <div className="flex-1 overflow-auto px-6 py-5">
           {step === 0 && <Step1Personal form={form} set={set} />}
-          {step === 1 && <Step2Employment form={form} set={set} />}
+          {step === 1 && <Step2Employment form={form} set={set} employees={employees} />}
           {step === 2 && (
             <Step3Department
               form={form}
@@ -293,8 +321,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canProceed()}
-              className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold text-white transition-opacity disabled:opacity-40"
-              style={{ background: "#007AFF" }}
+              className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
             >
               Next
               <ArrowRightIcon className="h-3.5 w-3.5" />
@@ -303,8 +330,7 @@ export default function EmployeeWizard({ onClose, onCreated }: Props) {
             <button
               onClick={handleSubmit}
               disabled={saving || !canProceed()}
-              className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold text-white transition-opacity disabled:opacity-40"
-              style={{ background: "#34C759" }}
+              className="flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity disabled:opacity-40"
             >
               {saving ? "Creating..." : "Create Employee"}
               {!saving && <CheckIcon className="h-3.5 w-3.5" />}
@@ -333,47 +359,111 @@ function Step1Personal({
         Basic personal information for the employee record.
       </p>
 
-      {/* Name row */}
-      <div className="grid grid-cols-4 gap-3">
-        <div>
-          <label className={labelClass}>Title</label>
-          <select
-            className={selectClass}
-            value={form.title}
-            onChange={(e) => set("title", e.target.value)}
+      {/* Photo + Name row */}
+      <div className="flex gap-4">
+        {/* Photo upload */}
+        <label className="block cursor-pointer group shrink-0">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const url = await compressImage(file);
+                set("photo_url", url);
+              } catch { /* ignore */ }
+            }}
+          />
+          <div
+            className="relative h-[88px] w-[88px] rounded-2xl border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors"
+            style={{
+              borderColor: form.photo_url ? "transparent" : "var(--border-subtle)",
+              background: "var(--bg-surface-subtle)",
+            }}
           >
-            <option value="">—</option>
-            {TITLES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+            {form.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.photo_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="text-center">
+                <CameraIcon className="h-5 w-5 mx-auto" style={{ color: "var(--text-dim)" }} />
+                <span className="block text-[9px] mt-0.5" style={{ color: "var(--text-dim)" }}>Photo</span>
+              </div>
+            )}
+          </div>
+        </label>
+
+        {/* Name fields */}
+        <div className="flex-1 grid grid-cols-4 gap-3">
+          <div>
+            <label className={labelClass}>Title</label>
+            <select
+              className={selectClass}
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+            >
+              <option value="">—</option>
+              {TITLES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>First Name *</label>
+            <input
+              className={inputClass}
+              placeholder="First name"
+              value={form.first_name}
+              onChange={(e) => set("first_name", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Middle Name</label>
+            <input
+              className={inputClass}
+              placeholder="Middle name"
+              value={form.middle_name}
+              onChange={(e) => set("middle_name", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Last Name *</label>
+            <input
+              className={inputClass}
+              placeholder="Last name"
+              value={form.last_name}
+              onChange={(e) => set("last_name", e.target.value)}
+            />
+          </div>
         </div>
-        <div>
-          <label className={labelClass}>First Name *</label>
-          <input
-            className={inputClass}
-            placeholder="First name"
-            value={form.first_name}
-            onChange={(e) => set("first_name", e.target.value)}
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Middle Name</label>
-          <input
-            className={inputClass}
-            placeholder="Middle name"
-            value={form.middle_name}
-            onChange={(e) => set("middle_name", e.target.value)}
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Last Name *</label>
-          <input
-            className={inputClass}
-            placeholder="Last name"
-            value={form.last_name}
-            onChange={(e) => set("last_name", e.target.value)}
-          />
+      </div>
+
+      {/* Alternate name (bilingual) */}
+      <div className="rounded-xl px-4 py-3" style={{ background: "var(--bg-surface-subtle)" }}>
+        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-dim)" }}>
+          Alternate Name (Optional) — e.g. Chinese official name
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>First Name (Alt)</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. 明"
+              value={form.first_name_alt}
+              onChange={(e) => set("first_name_alt", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Last Name (Alt)</label>
+            <input
+              className={inputClass}
+              placeholder="e.g. 李"
+              value={form.last_name_alt}
+              onChange={(e) => set("last_name_alt", e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
@@ -434,6 +524,57 @@ function Step1Personal({
           onChange={(e) => set("personal_email", e.target.value)}
         />
       </div>
+
+      {/* Marital Status & Blood Type */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className={labelClass}>Marital Status</label>
+          <select
+            className={selectClass}
+            value={form.marital_status}
+            onChange={(e) => set("marital_status", e.target.value)}
+          >
+            <option value="">—</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Blood Type</label>
+          <select
+            className={selectClass}
+            value={form.blood_type}
+            onChange={(e) => set("blood_type", e.target.value)}
+          >
+            <option value="">—</option>
+            {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Religion</label>
+          <input
+            className={inputClass}
+            placeholder="e.g. Islam"
+            value={form.religion}
+            onChange={(e) => set("religion", e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Languages */}
+      <div>
+        <label className={labelClass}>Languages</label>
+        <input
+          className={inputClass}
+          placeholder="e.g. Arabic, English, French"
+          value={form.languages}
+          onChange={(e) => set("languages", e.target.value)}
+        />
+      </div>
     </div>
   );
 }
@@ -445,9 +586,11 @@ function Step1Personal({
 function Step2Employment({
   form,
   set,
+  employees,
 }: {
   form: EmployeeWizardData;
   set: (k: keyof EmployeeWizardData, v: any) => void;
+  employees: EmployeeListItem[];
 }) {
   return (
     <div className="space-y-5">
@@ -549,6 +692,91 @@ function Step2Employment({
             value={form.work_phone}
             onChange={(e) => set("work_phone", e.target.value)}
           />
+        </div>
+      </div>
+
+      {/* Manager */}
+      <div>
+        <label className={labelClass}>Manager / Supervisor</label>
+        <select
+          className={selectClass}
+          value={form.manager_id}
+          onChange={(e) => set("manager_id", e.target.value)}
+        >
+          <option value="">Select manager...</option>
+          {employees.map((emp) => (
+            <option key={emp.id} value={emp.id}>{emp.person.full_name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Initial Salary */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Initial Salary</label>
+          <input
+            className={inputClass}
+            type="number"
+            placeholder="e.g. 5000"
+            value={form.initial_salary}
+            onChange={(e) => set("initial_salary", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Currency</label>
+          <select
+            className={selectClass}
+            value={form.salary_currency}
+            onChange={(e) => set("salary_currency", e.target.value)}
+          >
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="AED">AED</option>
+            <option value="SAR">SAR</option>
+            <option value="EGP">EGP</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Emergency Contact */}
+      <div className="pt-3 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+        <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-dim)" }}>Emergency Contact</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelClass}>Name</label>
+            <input
+              className={inputClass}
+              placeholder="Full name"
+              value={form.emergency_contact_name}
+              onChange={(e) => set("emergency_contact_name", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Phone</label>
+            <input
+              className={inputClass}
+              placeholder="+1 234 567 890"
+              value={form.emergency_contact_phone}
+              onChange={(e) => set("emergency_contact_phone", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Relationship</label>
+            <select
+              className={selectClass}
+              value={form.emergency_contact_relationship}
+              onChange={(e) => set("emergency_contact_relationship", e.target.value)}
+            >
+              <option value="">—</option>
+              <option value="Spouse">Spouse</option>
+              <option value="Parent">Parent</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Child">Child</option>
+              <option value="Friend">Friend</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -727,15 +955,14 @@ function Step4Account({
           </p>
         </div>
         <div
-          className="h-6 w-11 rounded-full flex items-center px-0.5 transition-colors"
-          style={{
-            background: form.create_account ? "#34C759" : "var(--bg-surface)",
-            border: form.create_account ? "none" : "1px solid var(--border-subtle)",
-          }}
+          className={`relative h-6 w-11 rounded-full shrink-0 transition-colors duration-200 ${
+            form.create_account ? "bg-emerald-500" : "bg-zinc-600"
+          }`}
         >
           <div
-            className="h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
-            style={{ transform: form.create_account ? "translateX(20px)" : "translateX(0)" }}
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+              form.create_account ? "translate-x-5" : ""
+            }`}
           />
         </div>
       </div>

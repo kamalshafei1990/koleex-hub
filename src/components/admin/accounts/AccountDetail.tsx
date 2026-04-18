@@ -68,6 +68,8 @@ import type {
   CustomerLevel,
 } from "@/types/supabase";
 
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import StatusRibbon from "./StatusRibbon";
 import StatButtons from "./StatButtons";
 import OverviewTab from "./tabs/OverviewTab";
@@ -117,6 +119,7 @@ export default function AccountDetail({ accountId }: Props) {
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useTranslation(accountsT);
 
   useEffect(() => {
     (async () => {
@@ -128,22 +131,22 @@ export default function AccountDetail({ accountId }: Props) {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
+    const tid = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(tid);
   }, [toast]);
 
   const tabs: TabDef[] = useMemo(() => {
     const isInternal = data?.user_type === "internal";
     return [
-      { key: "overview", label: "Overview", icon: LayoutGridIcon },
-      { key: "access", label: "Access Rights", icon: ShieldIcon },
-      { key: "preferences", label: "Preferences", icon: Settings2Icon },
-      { key: "calendar", label: "Calendar", icon: CalendarIcon },
-      { key: "private", label: "Private", icon: LockIcon, hidden: !isInternal },
-      { key: "security", label: "Security", icon: KeyIcon },
-      { key: "notes", label: "Notes", icon: DocumentIcon },
+      { key: "overview", label: t("acc.tab.overview"), icon: LayoutGridIcon },
+      { key: "access", label: t("acc.tab.access"), icon: ShieldIcon },
+      { key: "preferences", label: t("acc.tab.preferences"), icon: Settings2Icon },
+      { key: "calendar", label: t("acc.tab.calendar"), icon: CalendarIcon },
+      { key: "private", label: t("acc.tab.private"), icon: LockIcon, hidden: !isInternal },
+      { key: "security", label: t("acc.tab.security"), icon: KeyIcon },
+      { key: "notes", label: t("acc.tab.notes"), icon: DocumentIcon },
     ];
-  }, [data?.user_type]);
+  }, [data?.user_type, t]);
 
   async function handleToggleStatus() {
     if (!data) return;
@@ -155,10 +158,10 @@ export default function AccountDetail({ accountId }: Props) {
     if (ok) {
       setData({ ...data, status: next });
       setToast(
-        next === "active" ? "Account activated." : "Account deactivated.",
+        next === "active" ? t("acc.msg.activated") : t("acc.msg.deactivated"),
       );
     } else {
-      setError("Could not update account status.");
+      setError(t("acc.err.statusFailed"));
     }
   }
 
@@ -171,9 +174,9 @@ export default function AccountDetail({ accountId }: Props) {
     if (ok) {
       setNewTempPw(pw);
       setData({ ...data, force_password_change: true });
-      setToast("Temporary password reset. Copy it and share securely.");
+      setToast(t("acc.msg.passwordReset"));
     } else {
-      setError("Could not reset the password.");
+      setError(t("acc.err.passwordFailed"));
     }
   }
 
@@ -187,11 +190,11 @@ export default function AccountDetail({ accountId }: Props) {
       setData({ ...data, force_password_change: next });
       setToast(
         next
-          ? "Force password change on next login."
-          : "Force password change cleared.",
+          ? t("acc.msg.forceEnabled")
+          : t("acc.msg.forceCleared"),
       );
     } else {
-      setError("Could not update the flag.");
+      setError(t("acc.err.flagFailed"));
     }
   }
 
@@ -211,10 +214,10 @@ export default function AccountDetail({ accountId }: Props) {
   function resizeImageToDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onerror = () => reject(new Error("Could not read file."));
+      reader.onerror = () => reject(new Error(t("acc.err.readFile")));
       reader.onload = () => {
         const img = new Image();
-        img.onerror = () => reject(new Error("Could not decode image."));
+        img.onerror = () => reject(new Error(t("acc.err.decodeImage")));
         img.onload = () => {
           const size = 256;
           const canvas = document.createElement("canvas");
@@ -222,7 +225,7 @@ export default function AccountDetail({ accountId }: Props) {
           canvas.height = size;
           const ctx = canvas.getContext("2d");
           if (!ctx) {
-            reject(new Error("Canvas not available."));
+            reject(new Error(t("acc.err.canvasNotAvailable")));
             return;
           }
           /* center-crop to square then scale */
@@ -241,11 +244,11 @@ export default function AccountDetail({ accountId }: Props) {
   async function handleAvatarChange(file: File) {
     if (!data) return;
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
+      setError(t("acc.err.avatarImage"));
       return;
     }
     if (file.size > 8 * 1024 * 1024) {
-      setError("Image is too large (max 8 MB before resize).");
+      setError(t("acc.err.avatarTooLarge"));
       return;
     }
     setUploadingAvatar(true);
@@ -253,14 +256,14 @@ export default function AccountDetail({ accountId }: Props) {
       const dataUrl = await resizeImageToDataUrl(file);
       const ok = await updateAccountAvatar(data.id, dataUrl);
       if (!ok) {
-        setError("Could not save the new avatar.");
+        setError(t("acc.err.avatarSaveFailed"));
         return;
       }
       setData({ ...data, avatar_url: dataUrl });
-      setToast("Profile picture updated.");
+      setToast(t("acc.msg.avatarUpdated"));
       notifyIdentityChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not process image.");
+      setError(e instanceof Error ? e.message : t("acc.err.avatarProcess"));
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -273,11 +276,11 @@ export default function AccountDetail({ accountId }: Props) {
     const ok = await updateAccountAvatar(data.id, null);
     setUploadingAvatar(false);
     if (!ok) {
-      setError("Could not remove the avatar.");
+      setError(t("acc.err.avatarRemoveFailed"));
       return;
     }
     setData({ ...data, avatar_url: null });
-    setToast("Profile picture removed.");
+    setToast(t("acc.msg.avatarRemoved"));
     notifyIdentityChanged();
   }
 
@@ -302,7 +305,7 @@ export default function AccountDetail({ accountId }: Props) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-        <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-8">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-64 bg-[var(--bg-surface-subtle)] rounded" />
             <div className="h-40 bg-[var(--bg-surface-subtle)] rounded-2xl" />
@@ -317,12 +320,12 @@ export default function AccountDetail({ accountId }: Props) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-[var(--text-dim)] mb-4">Account not found.</p>
+          <p className="text-[var(--text-dim)] mb-4">{t("acc.detail.accountNotFound")}</p>
           <Link
             href="/accounts"
             className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
-            <ArrowLeftIcon className="h-4 w-4" /> Back to accounts
+            <ArrowLeftIcon className="h-4 w-4" /> {t("acc.btn.backToAccounts")}
           </Link>
         </div>
       </div>
@@ -336,7 +339,7 @@ export default function AccountDetail({ accountId }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6 md:mb-8 gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
@@ -361,7 +364,7 @@ export default function AccountDetail({ accountId }: Props) {
               disabled={working}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
             >
-              <KeyIcon className="h-4 w-4" /> Reset Password
+              <KeyIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
             </button>
             <button
               onClick={handleToggleForce}
@@ -369,14 +372,14 @@ export default function AccountDetail({ accountId }: Props) {
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
               title={
                 data.force_password_change
-                  ? "Clear the force-password-change flag"
-                  : "Require user to change password on next login"
+                  ? t("acc.detail.clearForceHint")
+                  : t("acc.detail.forceHint")
               }
             >
               <RefreshCcwIcon className="h-4 w-4" />
               {data.force_password_change
-                ? "Clear Force Reset"
-                : "Force Password Reset"}
+                ? t("acc.action.clearForceReset")
+                : t("acc.action.forcePasswordReset")}
             </button>
             <button
               onClick={handleToggleStatus}
@@ -385,11 +388,11 @@ export default function AccountDetail({ accountId }: Props) {
             >
               {isActive ? (
                 <>
-                  <ToggleOffIcon className="h-4 w-4" /> Deactivate
+                  <ToggleOffIcon className="h-4 w-4" /> {t("acc.action.deactivate")}
                 </>
               ) : (
                 <>
-                  <PowerIcon className="h-4 w-4" /> Activate
+                  <PowerIcon className="h-4 w-4" /> {t("acc.action.activate")}
                 </>
               )}
             </button>
@@ -397,7 +400,7 @@ export default function AccountDetail({ accountId }: Props) {
               href={`/accounts/${data.id}/edit`}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
             >
-              <PencilIcon className="h-4 w-4" /> Edit
+              <PencilIcon className="h-4 w-4" /> {t("acc.action.edit")}
             </Link>
           </div>
         </div>
@@ -419,20 +422,20 @@ export default function AccountDetail({ accountId }: Props) {
           <div className="mb-5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface)] px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">
-                New Temporary Password
+                {t("acc.tempPw.title")}
               </p>
               <p className="text-[14px] font-mono text-[var(--text-primary)] mt-1">
                 {newTempPw}
               </p>
               <p className="text-[11px] text-[var(--text-dim)] mt-1">
-                The user will be forced to change this on their next login.
+                {t("acc.tempPw.hint")}
               </p>
             </div>
             <button
               onClick={copyNewPw}
               className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5"
             >
-              <CopyIcon className="h-3.5 w-3.5" /> Copy
+              <CopyIcon className="h-3.5 w-3.5" /> {t("acc.btn.copy")}
             </button>
           </div>
         )}
@@ -448,8 +451,8 @@ export default function AccountDetail({ accountId }: Props) {
                 className="group relative h-20 w-20 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden hover:border-[var(--border-focus)] transition-colors disabled:opacity-60"
                 title={
                   data.avatar_url || person?.avatar_url
-                    ? "Change profile picture"
-                    : "Upload profile picture"
+                    ? t("acc.detail.changeAvatar")
+                    : t("acc.detail.uploadAvatar")
                 }
               >
                 {data.avatar_url || person?.avatar_url ? (
@@ -492,7 +495,7 @@ export default function AccountDetail({ accountId }: Props) {
                   disabled={uploadingAvatar}
                   className="text-[11px] text-[var(--text-dim)] hover:text-red-300 flex items-center gap-1 disabled:opacity-60"
                 >
-                  <TrashIcon className="h-3 w-3" /> Remove
+                  <TrashIcon className="h-3 w-3" /> {t("acc.btn.remove")}
                 </button>
               )}
             </div>
@@ -500,7 +503,7 @@ export default function AccountDetail({ accountId }: Props) {
               <div className="flex items-center gap-2 flex-wrap">
                 <StatusRibbon status={data.status} />
                 <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]">
-                  {data.user_type}
+                  {t(`acc.type.${data.user_type}`)}
                 </span>
                 {role && (
                   <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)] flex items-center gap-1.5">
@@ -512,7 +515,7 @@ export default function AccountDetail({ accountId }: Props) {
                   <span
                     className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${levelColors[customerLevel]}`}
                   >
-                    {customerLevel}
+                    {t(`acc.level.${customerLevel}`)}
                   </span>
                 )}
               </div>
@@ -530,7 +533,7 @@ export default function AccountDetail({ accountId }: Props) {
               {!person && (
                 <p className="text-[12px] text-amber-300/80 mt-3 flex items-center gap-1.5">
                   <ExclamationIcon className="h-3.5 w-3.5" />
-                  No linked contact record. Edit this account to link one.
+                  {t("acc.detail.noContact")}
                 </p>
               )}
             </div>
@@ -539,22 +542,22 @@ export default function AccountDetail({ accountId }: Props) {
 
         {/* ── Stat buttons row ── */}
         <div className="mb-4">
-          <StatButtons account={data} />
+          <StatButtons account={data} onTabChange={(tab) => setActiveTab(tab as TabKey)} />
         </div>
 
         {/* ── Tab navigation ── */}
         <div className="sticky top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 bg-[var(--bg-primary)]/80 backdrop-blur mb-4">
           <div className="flex items-center gap-1 overflow-x-auto border-b border-[var(--border-subtle)]">
             {tabs
-              .filter((t) => !t.hidden)
-              .map((t) => {
-                const Icon = t.icon;
-                const active = activeTab === t.key;
+              .filter((tab) => !tab.hidden)
+              .map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.key;
                 return (
                   <button
-                    key={t.key}
+                    key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(t.key)}
+                    onClick={() => setActiveTab(tab.key)}
                     className={`shrink-0 h-11 px-4 text-[12px] font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 -mb-px transition-colors ${
                       active
                         ? "border-[var(--text-primary)] text-[var(--text-primary)]"
@@ -562,7 +565,7 @@ export default function AccountDetail({ accountId }: Props) {
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />
-                    {t.label}
+                    {tab.label}
                   </button>
                 );
               })}
@@ -601,8 +604,7 @@ export default function AccountDetail({ accountId }: Props) {
 
         {/* Meta */}
         <p className="text-[11px] text-[var(--text-ghost)] px-1 pb-6">
-          Created {new Date(data.created_at).toLocaleString()} · Updated{" "}
-          {new Date(data.updated_at).toLocaleString()}
+          {t("acc.detail.createdAt")} {new Date(data.created_at).toLocaleString()} · {t("acc.detail.updatedAt")} {new Date(data.updated_at).toLocaleString()}
         </p>
       </div>
     </div>

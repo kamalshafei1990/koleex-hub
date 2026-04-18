@@ -13,6 +13,8 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import type { AccountWithLinks } from "@/types/supabase";
 import { updateAccount } from "@/lib/accounts-admin";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import {
   tabCardClass,
   tabSectionTitle,
@@ -26,6 +28,7 @@ interface Props {
 }
 
 export default function NotesTab({ account, onChanged }: Props) {
+  const { t } = useTranslation(accountsT);
   const initial = account.internal_notes ?? "";
   const [notes, setNotes] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -50,10 +53,10 @@ export default function NotesTab({ account, onChanged }: Props) {
     });
     setSaving(false);
     if (!ok) {
-      setError("Could not save notes.");
+      setError(t("acc.err.notesFailed"));
       return;
     }
-    setToast("Notes saved.");
+    setToast(t("acc.msg.notesSaved"));
     onChanged?.(notes.trim() ? notes : null);
   }
 
@@ -62,18 +65,17 @@ export default function NotesTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <DocumentIcon className="h-3.5 w-3.5" />
-          Internal Notes
+          {t("acc.notes.title")}
         </h2>
         <p className="text-[12px] text-[var(--text-dim)] mb-4">
-          Private notes visible only to admins viewing this account. The account
-          holder never sees these notes.
+          {t("acc.notes.description")}
         </p>
         <textarea
           className={textareaClass}
           rows={12}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Private admin notes: onboarding context, escalations, history, etc."
+          placeholder={t("acc.notes.placeholder")}
         />
       </section>
 

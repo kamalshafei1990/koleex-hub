@@ -14,7 +14,7 @@ import { requireAuth } from "@/lib/server/auth";
    koleex_permissions + account_permission_overrides, which are now
    closed behind RLS. */
 
-const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox"];
+const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox", "Notes"];
 
 export async function GET() {
   const auth = await requireAuth();

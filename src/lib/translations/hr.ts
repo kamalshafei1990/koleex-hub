@@ -251,6 +251,81 @@ export const hrT: Translations = {
 
   /* ── Misc ── */
   "hr.unassigned":               { en: "Unassigned",                      zh: "未分配",                        ar: "غير محدد" },
+  "hr.daysLeft":                 { en: "days left",                       zh: "天剩余",                        ar: "أيام متبقية" },
+  "hr.expired":                  { en: "Expired",                         zh: "已过期",                        ar: "منتهي الصلاحية" },
+
+  /* ── Leave Type Names (by code) ── */
+  "hr.leaveType.annual":         { en: "Annual Leave",                    zh: "年假",                          ar: "إجازة سنوية" },
+  "hr.leaveType.sick":           { en: "Sick Leave",                      zh: "病假",                          ar: "إجازة مرضية" },
+  "hr.leaveType.personal":       { en: "Personal Leave",                  zh: "事假",                          ar: "إجازة شخصية" },
+  "hr.leaveType.maternity":      { en: "Maternity Leave",                 zh: "产假",                          ar: "إجازة أمومة" },
+  "hr.leaveType.paternity":      { en: "Paternity Leave",                 zh: "陪产假",                        ar: "إجازة أبوة" },
+  "hr.leaveType.unpaid":         { en: "Unpaid Leave",                    zh: "无薪假",                        ar: "إجازة بدون راتب" },
+  "hr.leaveType.compassionate":  { en: "Compassionate Leave",             zh: "丧假",                          ar: "إجازة عزاء" },
+  "hr.leaveType.study":          { en: "Study Leave",                     zh: "学习假",                        ar: "إجازة دراسية" },
+
+  /* ── Status Labels ── */
+  "hr.status.pending":           { en: "Pending",                         zh: "待审批",                        ar: "معلق" },
+  "hr.status.approved":          { en: "Approved",                        zh: "已批准",                        ar: "تمت الموافقة" },
+  "hr.status.rejected":          { en: "Rejected",                        zh: "已拒绝",                        ar: "مرفوض" },
+  "hr.status.cancelled":         { en: "Cancelled",                       zh: "已取消",                        ar: "ملغي" },
+  "hr.status.active":            { en: "Active",                          zh: "活跃",                          ar: "نشط" },
+  "hr.status.draft":             { en: "Draft",                           zh: "草稿",                          ar: "مسودة" },
+  "hr.status.open":              { en: "Open",                            zh: "开放",                          ar: "مفتوح" },
+  "hr.status.paused":            { en: "Paused",                          zh: "暂停",                          ar: "متوقف" },
+  "hr.status.closed":            { en: "Closed",                          zh: "已关闭",                        ar: "مغلق" },
+  "hr.status.filled":            { en: "Filled",                          zh: "已满",                          ar: "تم شغلها" },
+  "hr.status.paid":              { en: "Paid",                            zh: "已支付",                        ar: "مدفوع" },
+  "hr.status.in_progress":       { en: "In Progress",                     zh: "进行中",                        ar: "قيد التنفيذ" },
+  "hr.status.completed":         { en: "Completed",                       zh: "已完成",                        ar: "مكتمل" },
+
+  /* ── Attendance Status Labels ── */
+  "hr.status.present":           { en: "Present",                         zh: "出勤",                          ar: "حاضر" },
+  "hr.status.absent":            { en: "Absent",                          zh: "缺勤",                          ar: "غائب" },
+  "hr.status.late":              { en: "Late",                            zh: "迟到",                          ar: "متأخر" },
+  "hr.status.half_day":          { en: "Half Day",                        zh: "半天",                          ar: "نصف يوم" },
+  "hr.status.holiday":           { en: "Holiday",                         zh: "假日",                          ar: "عطلة" },
+  "hr.status.weekend":           { en: "Weekend",                         zh: "周末",                          ar: "عطلة نهاية الأسبوع" },
+
+  /* ── Applicant Stage Labels ── */
+  "hr.stage.new":                { en: "New",                             zh: "新申请",                        ar: "جديد" },
+  "hr.stage.screening":          { en: "Screening",                       zh: "筛选",                          ar: "فرز" },
+  "hr.stage.interview":          { en: "Interview",                       zh: "面试",                          ar: "مقابلة" },
+  "hr.stage.offer":              { en: "Offer",                           zh: "录用",                          ar: "عرض" },
+  "hr.stage.hired":              { en: "Hired",                           zh: "已入职",                        ar: "تم التوظيف" },
+  "hr.stage.rejected":           { en: "Rejected",                        zh: "已拒绝",                        ar: "مرفوض" },
+
+  /* ── Appraisal Status Labels ── */
+  "hr.status.self_review":       { en: "Self Review",                     zh: "自评",                          ar: "تقييم ذاتي" },
+  "hr.status.manager_review":    { en: "Manager Review",                  zh: "主管评审",                      ar: "مراجعة المدير" },
+
+  /* ── Training Status Labels ── */
+  "hr.status.enrolled":          { en: "Enrolled",                        zh: "已报名",                        ar: "مسجل" },
+  "hr.status.failed":            { en: "Failed",                          zh: "未通过",                        ar: "فشل" },
+  "hr.status.expired":           { en: "Expired",                         zh: "已过期",                        ar: "منتهي" },
+
+  /* ── Document Category Labels ── */
+  "hr.cat.identity":             { en: "Identity",                        zh: "身份证件",                      ar: "هوية" },
+  "hr.cat.contract":             { en: "Contract",                        zh: "合同",                          ar: "عقد" },
+  "hr.cat.certification":        { en: "Certification",                   zh: "证书",                          ar: "شهادة" },
+  "hr.cat.medical":              { en: "Medical",                         zh: "医疗",                          ar: "طبي" },
+  "hr.cat.other":                { en: "Other",                           zh: "其他",                          ar: "أخرى" },
+
+  /* ── Employment Type Labels ── */
+  "hr.empType.full_time":        { en: "Full-time",                       zh: "全职",                          ar: "دوام كامل" },
+  "hr.empType.part_time":        { en: "Part-time",                       zh: "兼职",                          ar: "دوام جزئي" },
+  "hr.empType.contract":         { en: "Contract",                        zh: "合同制",                        ar: "عقد" },
+  "hr.empType.intern":           { en: "Intern",                          zh: "实习",                          ar: "متدرب" },
+  "hr.empType.freelance":        { en: "Freelance",                       zh: "自由职业",                      ar: "مستقل" },
+
+  /* ── Pay Frequency Labels ── */
+  "hr.payFreq.monthly":          { en: "Monthly",                         zh: "月付",                          ar: "شهري" },
+  "hr.payFreq.biweekly":         { en: "Bi-weekly",                       zh: "双周付",                        ar: "كل أسبوعين" },
+  "hr.payFreq.weekly":           { en: "Weekly",                          zh: "周付",                          ar: "أسبوعي" },
+
+  /* ── Goal Status Labels ── */
+  "hr.status.not_started":       { en: "Not Started",                     zh: "未开始",                        ar: "لم يبدأ" },
+  "hr.status.deferred":          { en: "Deferred",                        zh: "已延期",                        ar: "مؤجل" },
 
   /* ── Shared / Common ── */
   "hr.back":                     { en: "Back",                            zh: "返回",                          ar: "رجوع" },

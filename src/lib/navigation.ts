@@ -16,6 +16,7 @@ import CalendarCheckIcon from "@/components/icons/ui/CalendarCheckIcon";
 import ManagementIcon from "@/components/icons/ManagementIcon";
 import CrmIcon from "@/components/icons/CrmIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
+import NotesIcon from "@/components/icons/NotesIcon";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import SalesIcon from "@/components/icons/SalesIcon";
 import MarketingIcon from "@/components/icons/MarketingIcon";
@@ -137,6 +138,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "discuss",          tKey: "app.discuss",          name: "Discuss",           icon: DiscussIcon,   route: "/discuss",          active: true  },
   { id: "calendar",         tKey: "app.calendar",         name: "Calendar",          icon: CalendarIcon,  route: "/calendar",         active: true  },
   { id: "todo",             tKey: "app.todo",             name: "To-do",             icon: TodoIcon,      route: "/todo",             active: true  },
+  { id: "notes",            tKey: "app.notes",            name: "Notes",             icon: NotesIcon,     route: "/notes",            active: true  },
 
   /* ── Marketing & Growth ── */
   { id: "website",          tKey: "app.website",          name: "Website",           icon: WebsiteIcon,   route: "/website",          active: true  },
@@ -203,7 +205,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.communication",
     label: "Communication",
     icon: CommunicationSidebarIcon,
-    appIds: ["discuss", "calendar", "todo"],
+    appIds: ["discuss", "calendar", "todo", "notes"],
   },
   {
     id: "marketing",

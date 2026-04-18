@@ -14,6 +14,8 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import LockIcon from "@/components/icons/ui/LockIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
@@ -105,6 +107,7 @@ function pickPrivateFields(emp: EmployeeRow | null): PrivateFields {
 }
 
 export default function PrivateTab({ account, onChanged }: Props) {
+  const { t } = useTranslation(accountsT);
   const initial = useMemo(() => pickPrivateFields(account.employee), [account.employee]);
 
   const [fields, setFields] = useState<PrivateFields>(initial);
@@ -125,8 +128,8 @@ export default function PrivateTab({ account, onChanged }: Props) {
     return (
       <TabEmptyState
         icon={<LockIcon className="h-5 w-5" />}
-        title="Private HR data is internal-only"
-        description="Customer accounts don't have private HR records. Switch the account type to Internal to manage this data."
+        title={t("acc.private.internalOnly")}
+        description={t("acc.private.internalOnlyDesc")}
       />
     );
   }
@@ -151,10 +154,10 @@ export default function PrivateTab({ account, onChanged }: Props) {
     );
     setSaving(false);
     if (!updated) {
-      setError("Could not save private HR data.");
+      setError(t("acc.err.privateFailed"));
       return;
     }
-    setToast("Private HR data saved.");
+    setToast(t("acc.msg.privateSaved"));
     onChanged?.(updated);
   }
 
@@ -175,29 +178,29 @@ export default function PrivateTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
           <MapPinIcon className="h-3.5 w-3.5" />
-          Private Address
+          {t("acc.private.address")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className={labelClass}>Address Line 1</label>
+            <label className={labelClass}>{t("acc.private.addressLine1")}</label>
             <input
               className={inputClass}
               value={fields.private_address_line1 ?? ""}
               onChange={(e) => set("private_address_line1", blank(e.target.value))}
-              placeholder="Street and number"
+              placeholder={t("acc.private.addressPlaceholder1")}
             />
           </div>
           <div className="sm:col-span-2">
-            <label className={labelClass}>Address Line 2</label>
+            <label className={labelClass}>{t("acc.private.addressLine2")}</label>
             <input
               className={inputClass}
               value={fields.private_address_line2 ?? ""}
               onChange={(e) => set("private_address_line2", blank(e.target.value))}
-              placeholder="Apartment, floor, etc."
+              placeholder={t("acc.private.addressPlaceholder2")}
             />
           </div>
           <div>
-            <label className={labelClass}>City</label>
+            <label className={labelClass}>{t("acc.private.city")}</label>
             <input
               className={inputClass}
               value={fields.private_city ?? ""}
@@ -205,7 +208,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>State / Region</label>
+            <label className={labelClass}>{t("acc.private.state")}</label>
             <input
               className={inputClass}
               value={fields.private_state ?? ""}
@@ -213,7 +216,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Country</label>
+            <label className={labelClass}>{t("acc.private.country")}</label>
             <input
               className={inputClass}
               value={fields.private_country ?? ""}
@@ -221,7 +224,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Postal Code</label>
+            <label className={labelClass}>{t("acc.private.postalCode")}</label>
             <input
               className={inputClass}
               value={fields.private_postal_code ?? ""}
@@ -235,11 +238,11 @@ export default function PrivateTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
           <PhoneCallIcon className="h-3.5 w-3.5" />
-          Emergency Contact
+          {t("acc.private.emergencyContact")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={labelClass}>Name</label>
+            <label className={labelClass}>{t("acc.private.ecName")}</label>
             <input
               className={inputClass}
               value={fields.emergency_contact_name ?? ""}
@@ -247,7 +250,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Phone</label>
+            <label className={labelClass}>{t("acc.private.ecPhone")}</label>
             <input
               className={inputClass}
               value={fields.emergency_contact_phone ?? ""}
@@ -255,14 +258,14 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Relationship</label>
+            <label className={labelClass}>{t("acc.private.ecRelationship")}</label>
             <input
               className={inputClass}
               value={fields.emergency_contact_relationship ?? ""}
               onChange={(e) =>
                 set("emergency_contact_relationship", blank(e.target.value))
               }
-              placeholder="Spouse, parent, sibling…"
+              placeholder={t("acc.private.ecRelPlaceholder")}
             />
           </div>
         </div>
@@ -272,11 +275,11 @@ export default function PrivateTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
           <IdCardIcon className="h-3.5 w-3.5" />
-          Personal
+          {t("acc.private.personal")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={labelClass}>Date of Birth</label>
+            <label className={labelClass}>{t("acc.private.dateOfBirth")}</label>
             <input
               type="date"
               className={inputClass}
@@ -285,21 +288,21 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Marital Status</label>
+            <label className={labelClass}>{t("acc.private.maritalStatus")}</label>
             <input
               className={inputClass}
               value={fields.marital_status ?? ""}
               onChange={(e) => set("marital_status", blank(e.target.value))}
-              placeholder="Single, married…"
+              placeholder={t("acc.private.maritalPlaceholder")}
             />
           </div>
           <div>
-            <label className={labelClass}>Nationality</label>
+            <label className={labelClass}>{t("acc.private.nationality")}</label>
             <input
               className={inputClass}
               value={fields.nationality ?? ""}
               onChange={(e) => set("nationality", blank(e.target.value))}
-              placeholder="e.g. AE"
+              placeholder={t("acc.private.nationalityHint")}
             />
           </div>
         </div>
@@ -309,11 +312,11 @@ export default function PrivateTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h3 className={tabSectionTitle}>
           <FileBadge2Icon className="h-3.5 w-3.5" />
-          Documents
+          {t("acc.private.documents")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>ID Number</label>
+            <label className={labelClass}>{t("acc.private.idNumber")}</label>
             <input
               className={inputClass}
               value={fields.identification_id ?? ""}
@@ -321,7 +324,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Passport Number</label>
+            <label className={labelClass}>{t("acc.private.passportNumber")}</label>
             <input
               className={inputClass}
               value={fields.passport_number ?? ""}
@@ -329,7 +332,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Visa Number</label>
+            <label className={labelClass}>{t("acc.private.visaNumber")}</label>
             <input
               className={inputClass}
               value={fields.visa_number ?? ""}
@@ -337,7 +340,7 @@ export default function PrivateTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>Visa Expiry Date</label>
+            <label className={labelClass}>{t("acc.private.visaExpiry")}</label>
             <input
               type="date"
               className={inputClass}

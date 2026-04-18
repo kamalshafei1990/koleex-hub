@@ -137,3 +137,108 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+
+/* ── Notes app / TipTap editor ─────────────────────────────────────────── */
+
+.notes-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: inline-start;
+  color: var(--text-ghost);
+  pointer-events: none;
+  height: 0;
+}
+
+.notes-editor h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 16px 0 8px;
+  color: var(--text-primary);
+}
+.notes-editor h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 14px 0 6px;
+  color: var(--text-primary);
+}
+.notes-editor h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 12px 0 4px;
+  color: var(--text-primary);
+}
+.notes-editor p {
+  margin: 6px 0;
+  line-height: 1.7;
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+.notes-editor ul, .notes-editor ol {
+  padding-inline-start: 20px;
+  margin: 6px 0;
+}
+.notes-editor li { margin: 2px 0; }
+
+.notes-editor blockquote {
+  border-inline-start: 3px solid var(--border-focus);
+  padding-inline-start: 12px;
+  color: var(--text-muted);
+  margin: 10px 0;
+  font-style: italic;
+}
+.notes-editor code {
+  background: var(--bg-surface);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.notes-editor pre {
+  background: var(--bg-surface);
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  margin: 10px 0;
+}
+.notes-editor pre code { background: transparent; padding: 0; }
+
+.notes-editor mark {
+  background: rgba(251, 191, 36, 0.25);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.notes-editor a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+/* Task list (checklists) — click the box to toggle */
+.notes-editor ul[data-type="taskList"] {
+  padding-inline-start: 4px;
+  list-style: none;
+}
+.notes-editor ul[data-type="taskList"] li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.notes-editor ul[data-type="taskList"] li > label {
+  margin-top: 4px;
+  user-select: none;
+}
+.notes-editor ul[data-type="taskList"] li > label > input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #f59e0b;
+  cursor: pointer;
+}
+.notes-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+.notes-editor ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}

@@ -34,6 +34,8 @@ import {
   withDefaults,
 } from "@/lib/access-control";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
+import { useTranslation } from "@/lib/i18n";
+import { accountsT } from "@/lib/translations/accounts";
 import {
   tabCardClass,
   tabSectionTitle,
@@ -51,6 +53,7 @@ interface Props {
 }
 
 export default function CalendarTab({ account, onChanged }: Props) {
+  const { t } = useTranslation(accountsT);
   const initial = useMemo(
     () => withDefaults(account.preferences),
     [account.preferences],
@@ -65,8 +68,8 @@ export default function CalendarTab({ account, onChanged }: Props) {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
   }, [toast]);
 
   const dirty = JSON.stringify(prefs) !== JSON.stringify(initial);
@@ -91,10 +94,10 @@ export default function CalendarTab({ account, onChanged }: Props) {
     const ok = await updateAccountPreferences(account.id, prefs);
     setSaving(false);
     if (!ok) {
-      setError("Could not save calendar preferences.");
+      setError(t("acc.err.calendarFailed"));
       return;
     }
-    setToast("Calendar preferences saved.");
+    setToast(t("acc.msg.calendarSaved"));
     onChanged?.(prefs);
   }
 
@@ -104,7 +107,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <Globe2Icon className="h-3.5 w-3.5" />
-          Timezone
+          {t("acc.cal.timezone")}
         </h2>
         <select
           className={selectClass}
@@ -118,7 +121,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
           ))}
         </select>
         <p className="text-[11px] text-[var(--text-dim)] mt-2">
-          All calendar times are shown in this timezone.
+          {t("acc.cal.timezoneHint")}
         </p>
       </section>
 
@@ -126,11 +129,11 @@ export default function CalendarTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <ClockIcon className="h-3.5 w-3.5" />
-          Working Hours
+          {t("acc.cal.workingHours")}
         </h2>
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelClass}>Start</label>
+            <label className={labelClass}>{t("acc.cal.start")}</label>
             <input
               type="time"
               className={inputClass}
@@ -141,7 +144,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
             />
           </div>
           <div>
-            <label className={labelClass}>End</label>
+            <label className={labelClass}>{t("acc.cal.end")}</label>
             <input
               type="time"
               className={inputClass}
@@ -153,7 +156,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
           </div>
         </div>
         <div>
-          <label className={labelClass}>Active Days</label>
+          <label className={labelClass}>{t("acc.cal.activeDays")}</label>
           <div className="flex gap-2 flex-wrap">
             {WEEKDAYS.map((d) => {
               const on = wh.days.includes(d.iso);
@@ -180,7 +183,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <CalendarIcon className="h-3.5 w-3.5" />
-          Default Meeting Duration
+          {t("acc.cal.defaultMeeting")}
         </h2>
         <select
           className={selectClass}
@@ -189,15 +192,15 @@ export default function CalendarTab({ account, onChanged }: Props) {
             patchCal({ default_meeting_duration_min: Number(e.target.value) })
           }
         >
-          <option value={15}>15 minutes</option>
-          <option value={30}>30 minutes</option>
-          <option value={45}>45 minutes</option>
-          <option value={60}>1 hour</option>
-          <option value={90}>1.5 hours</option>
-          <option value={120}>2 hours</option>
+          <option value={15}>{t("acc.cal.15min")}</option>
+          <option value={30}>{t("acc.cal.30min")}</option>
+          <option value={45}>{t("acc.cal.45min")}</option>
+          <option value={60}>{t("acc.cal.1hr")}</option>
+          <option value={90}>{t("acc.cal.1_5hr")}</option>
+          <option value={120}>{t("acc.cal.2hr")}</option>
         </select>
         <p className="text-[11px] text-[var(--text-dim)] mt-2">
-          When you create a new meeting, this is the pre-filled duration.
+          {t("acc.cal.meetingHint")}
         </p>
       </section>
 
@@ -205,11 +208,11 @@ export default function CalendarTab({ account, onChanged }: Props) {
       <section className={tabCardClass}>
         <h2 className={tabSectionTitle}>
           <PlaneIcon className="h-3.5 w-3.5" />
-          Out of Office
+          {t("acc.cal.outOfOffice")}
         </h2>
         <Toggle
-          label="I'm out of office"
-          description="Shows as unavailable on the calendar during this period."
+          label={t("acc.cal.oooToggle")}
+          description={t("acc.cal.oooDescription")}
           checked={ooo.enabled}
           onChange={(v) => patchCal({ out_of_office: { ...ooo, enabled: v } })}
         />
@@ -217,7 +220,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Start Date</label>
+                <label className={labelClass}>{t("acc.cal.startDate")}</label>
                 <input
                   type="date"
                   className={inputClass}
@@ -228,7 +231,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
                 />
               </div>
               <div>
-                <label className={labelClass}>End Date</label>
+                <label className={labelClass}>{t("acc.cal.endDate")}</label>
                 <input
                   type="date"
                   className={inputClass}
@@ -240,7 +243,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
               </div>
             </div>
             <div>
-              <label className={labelClass}>Auto-reply Message</label>
+              <label className={labelClass}>{t("acc.cal.autoReply")}</label>
               <textarea
                 className={textareaClass}
                 rows={4}
@@ -248,7 +251,7 @@ export default function CalendarTab({ account, onChanged }: Props) {
                 onChange={(e) =>
                   patchCal({ out_of_office: { ...ooo, message: e.target.value } })
                 }
-                placeholder="I'm away from the office until [date] and will respond when I'm back."
+                placeholder={t("acc.cal.autoReplyPlaceholder")}
               />
             </div>
           </div>
