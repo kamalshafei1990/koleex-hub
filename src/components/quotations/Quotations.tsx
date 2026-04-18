@@ -998,6 +998,7 @@ export default function Quotations() {
         <div
           id="quotation-a4-preview"
           className="quot-a4-doc"
+          dir="ltr"
         >
           <div className="quot-doc-inner">
             {/* ═══ (a) HEADER ROW ═══ */}
