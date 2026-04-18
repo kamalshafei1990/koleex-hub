@@ -735,6 +735,32 @@ export default function Quotations() {
           </div>
         </div>
 
+        {/* KPI strip */}
+        <div className="max-w-[1500px] mx-auto px-4 pt-4">
+          {(() => {
+            const drafts = quotations.filter((q) => q.status === "draft").length;
+            const finals = quotations.filter((q) => q.status === "final").length;
+            const total = quotations.reduce((s, q) => s + computeGrandTotal(q), 0);
+            const now = new Date();
+            const soon = new Date(now); soon.setDate(now.getDate() + 7);
+            const expiringSoon = quotations.filter((q) => {
+              if (q.status !== "final") return false;
+              const iso = ddmmyyyyToISO(q.validTill);
+              if (!iso) return false;
+              const d = new Date(iso);
+              return d >= now && d <= soon;
+            }).length;
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KpiCard label="Total" value={String(quotations.length)} accent="text-blue-400" />
+                <KpiCard label="Drafts" value={String(drafts)} accent="text-amber-400" />
+                <KpiCard label="Finalised" value={String(finals)} accent="text-emerald-400" />
+                <KpiCard label="Total value (USD)" value={fmt(total)} accent="text-[var(--text-primary)]" sub={expiringSoon > 0 ? `${expiringSoon} expiring within 7 days` : undefined} />
+              </div>
+            );
+          })()}
+        </div>
+
         {/* List */}
         <div className="max-w-[1500px] mx-auto px-4 py-6">
           {sortedQuotations.length === 0 ? (
@@ -2602,6 +2628,32 @@ export default function Quotations() {
         </div>
         {/* /quot-a4-doc */}
       </div>
+    </div>
+  );
+}
+
+/** Compact Hub-style KPI card, matched to the strip on Planning / Projects
+ *  so all list-view dashboards share one visual language. */
+function KpiCard({
+  label,
+  value,
+  accent,
+  sub,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] mb-2">
+        {label}
+      </div>
+      <div className={`text-[20px] md:text-[24px] font-bold leading-none ${accent ?? "text-[var(--text-primary)]"}`}>
+        {value}
+      </div>
+      {sub && <div className="text-[10px] text-[var(--text-dim)] mt-2">{sub}</div>}
     </div>
   );
 }
