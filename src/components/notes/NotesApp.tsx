@@ -54,6 +54,10 @@ export default function NotesApp() {
     void fetchFolders().then(setFolders);
   }, []);
 
+  /* Reload the list whenever selection or search changes. Does NOT
+     touch activeNoteId — selection is driven by explicit clicks or the
+     create/delete flow below, not by reload side-effects (which caused
+     a race where the editor showed "Select a note" right after create). */
   const reloadNotes = useCallback(async () => {
     const params: Parameters<typeof fetchNotes>[0] = {};
     if (selection.kind === "folder") params.folderId = selection.id;
@@ -61,27 +65,38 @@ export default function NotesApp() {
     if (search.trim()) params.search = search.trim();
     const rows = await fetchNotes(params);
     setNotes(rows);
-    // Ensure the active selection still exists in the new list.
-    if (activeNoteId && !rows.some((n) => n.id === activeNoteId)) {
-      setActiveNoteId(rows[0]?.id ?? null);
-    } else if (!activeNoteId && rows.length > 0) {
-      setActiveNoteId(rows[0].id);
-    }
-  }, [selection, search, activeNoteId]);
+    return rows;
+  }, [selection, search]);
 
   useEffect(() => {
     void reloadNotes();
   }, [reloadNotes]);
 
-  // Whenever the selected note id changes, fetch its full body_json.
+  /* When the selection changes, clear the editor. The user has to
+     either pick a note or hit New Note to see the editor again. */
   useEffect(() => {
-    if (!activeNoteId) {
+    setActiveNoteId(null);
+    setActiveNote(null);
+  }, [selection]);
+
+  /* If the currently selected note disappears from the list (e.g.
+     moved to a different folder, deleted, filtered out by search),
+     clear the editor so we don't show stale content. */
+  useEffect(() => {
+    if (activeNoteId && !notes.some((n) => n.id === activeNoteId)) {
+      setActiveNoteId(null);
       setActiveNote(null);
-      return;
     }
+  }, [notes, activeNoteId]);
+
+  /* Fetch the full note (with body_json) whenever activeNoteId changes.
+     Keeps the previous activeNote visible during the fetch so the
+     editor doesn't flash back to the empty state. */
+  useEffect(() => {
+    if (!activeNoteId) return;
     let cancelled = false;
     void fetchNote(activeNoteId).then((n) => {
-      if (!cancelled) setActiveNote(n);
+      if (!cancelled && n) setActiveNote(n);
     });
     return () => {
       cancelled = true;
@@ -127,19 +142,22 @@ export default function NotesApp() {
   // ── Note actions ───────────────────────────────────────────────────────
 
   const onCreateNote = useCallback(async () => {
-    const folderId =
-      selection.kind === "folder" ? selection.id : null;
+    const folderId = selection.kind === "folder" ? selection.id : null;
     const n = await createNote({
       title: "",
       folder_id: folderId,
       body_json: { type: "doc", content: [{ type: "paragraph" }] },
       body_plain: "",
     });
-    if (n) {
-      await reloadNotes();
-      setActiveNoteId(n.id);
-      setActiveNote(n);
-    }
+    if (!n) return;
+
+    // Make the new note visible + selected IMMEDIATELY so the editor
+    // opens without a round-trip through the server. reloadNotes runs
+    // after — it just refreshes metadata.
+    setNotes((prev) => [n, ...prev.filter((x) => x.id !== n.id)]);
+    setActiveNote(n);
+    setActiveNoteId(n.id);
+    void reloadNotes();
   }, [selection, reloadNotes]);
 
   const onTogglePin = useCallback(

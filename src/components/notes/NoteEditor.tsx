@@ -58,43 +58,42 @@ export default function NoteEditor({
   const { t } = useTranslation(notesT);
   const [titleDraft, setTitleDraft] = useState(note?.title ?? "");
 
-  const editor = useEditor(
-    {
-      extensions: [
-        StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
-        }),
-        Underline,
-        Highlight.configure({ multicolor: false }),
-        Placeholder.configure({
-          placeholder: "Start writing…",
-        }),
-        TaskList,
-        TaskItem.configure({ nested: true }),
-        Link.configure({
-          openOnClick: false,
-          autolink: true,
-        }),
-      ],
-      content: note?.body_json ?? null,
-      editable: !readOnly,
-      autofocus: false,
-      immediatelyRender: false,
-      editorProps: {
-        attributes: {
-          class:
-            "notes-editor prose prose-invert prose-sm md:prose-base max-w-none focus:outline-none min-h-[60vh] text-[var(--text-primary)]",
-        },
-      },
-      onUpdate: ({ editor: ed }) => {
-        const json = ed.getJSON();
-        scheduleSave({ body_json: json });
+  /* Single editor instance for the whole app life. When the user
+     switches notes we swap content imperatively (see effect below) —
+     recreating the editor on every switch was causing UI flicker and
+     losing undo history. */
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+      }),
+      Underline,
+      Highlight.configure({ multicolor: false }),
+      Placeholder.configure({
+        placeholder: "Start writing…",
+      }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+      }),
+    ],
+    content: null,
+    editable: !readOnly,
+    autofocus: false,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class:
+          "notes-editor prose prose-invert prose-sm md:prose-base max-w-none focus:outline-none min-h-[60vh] text-[var(--text-primary)]",
       },
     },
-    // Re-create when we switch to a different note; otherwise just
-    // swap content imperatively below.
-    [note?.id],
-  );
+    onUpdate: ({ editor: ed }) => {
+      const json = ed.getJSON();
+      scheduleSaveRef.current?.({ body_json: json });
+    },
+  });
 
   // Debounced auto-save ────────────────────────────────────────────────────
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,22 +113,37 @@ export default function NoteEditor({
     [onChange, readOnly],
   );
 
-  // Keep local title state in sync when a different note is selected.
+  // Stable ref so the editor instance (created once) can always reach
+  // the latest scheduleSave without re-creating the editor.
+  const scheduleSaveRef = useRef(scheduleSave);
   useEffect(() => {
-    setTitleDraft(note?.title ?? "");
-  }, [note?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    scheduleSaveRef.current = scheduleSave;
+  }, [scheduleSave]);
 
-  // Update editor content when a different note loads without
-  // blowing away the entire editor instance (keeps perf reasonable).
+  // When a DIFFERENT note is selected, sync title + body into the
+  // editor. We only swap on note.id change, not on every note prop
+  // change, so typing doesn't get overwritten by our own saved value
+  // bouncing back through parent state.
+  const loadedNoteIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!editor || !note) return;
-    const current = editor.getJSON();
+    if (loadedNoteIdRef.current === note.id) return;
+    loadedNoteIdRef.current = note.id;
+    setTitleDraft(note.title ?? "");
     const incoming = note.body_json ?? { type: "doc", content: [{ type: "paragraph" }] };
-    if (JSON.stringify(current) !== JSON.stringify(incoming)) {
-      editor.commands.setContent(incoming as never, { emitUpdate: false });
+    // Flush any pending save from the previous note before swapping.
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      pendingRef.current = {};
     }
-    editor.setEditable(!readOnly);
-  }, [editor, note, readOnly]);
+    editor.commands.setContent(incoming as never, { emitUpdate: false });
+  }, [editor, note]);
+
+  // Keep editability in sync with read-only (Trash) mode.
+  useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   const folderOptions = useMemo(() => {
     // Sort for the dropdown: by full path name.
