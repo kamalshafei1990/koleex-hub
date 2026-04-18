@@ -147,7 +147,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "events",           tKey: "app.events",           name: "Events",            icon: EventsIcon,    route: "/events",           active: false },
 
   /* ── Planning ── */
-  { id: "planning",         tKey: "app.planning",         name: "Planning",          icon: PlanningIcon,  route: "/planning",         active: false },
+  { id: "planning",         tKey: "app.planning",         name: "Planning",          icon: PlanningIcon,  route: "/planning",         active: true  },
   { id: "projects",         tKey: "app.projects",         name: "Projects",          icon: ProjectsIcon,  route: "/projects",         active: false },
 
   /* ── Knowledge ── */

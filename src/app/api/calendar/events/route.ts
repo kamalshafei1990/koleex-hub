@@ -95,7 +95,54 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ events: data ?? [] });
+  // Mirror Planning items onto the caller's own Calendar. Read-only
+  // shadow — shows shifts / meetings / production runs / etc. assigned
+  // to the viewer's employee resource so they have a single "today's
+  // day" view. Only for published + completed items; drafts stay in
+  // Planning only.
+  let planningMirror: unknown[] = [];
+  if (viewingOwn && auth.tenant_id) {
+    const { data: res } = await supabaseServer
+      .from("planning_resources")
+      .select("id")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("account_id", auth.account_id)
+      .eq("type", "employee")
+      .maybeSingle();
+    if (res?.id) {
+      const { data: pItems } = await supabaseServer
+        .from("planning_items")
+        .select(
+          "id, type, title, notes, start_at, end_at, status, linked_entity_label, role:role_id ( name, color )",
+        )
+        .eq("tenant_id", auth.tenant_id)
+        .eq("resource_id", res.id)
+        .in("status", ["published", "completed"])
+        .gte("end_at", from)
+        .lt("start_at", to);
+      planningMirror = (pItems ?? []).map((p) => {
+        const r = (p as { role?: { name?: string | null; color?: string | null } | null }).role;
+        return {
+          id: `planning:${p.id}`,
+          account_id: accountId,
+          tenant_id: auth.tenant_id,
+          title: p.title || `[${p.type}]`,
+          description: p.notes ?? null,
+          start_at: p.start_at,
+          end_at: p.end_at,
+          all_day: false,
+          color: r?.color ?? null,
+          is_private: false,
+          source: "planning",
+          source_kind: p.type,
+          role_name: r?.name ?? null,
+          linked_entity_label: (p as { linked_entity_label?: string | null }).linked_entity_label ?? null,
+        };
+      });
+    }
+  }
+
+  return NextResponse.json({ events: [...(data ?? []), ...planningMirror] });
 }
 
 /* POST /api/calendar/events — create a new event.
