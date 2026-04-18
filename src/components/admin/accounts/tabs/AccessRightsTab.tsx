@@ -34,6 +34,7 @@ import type {
   RoleRow,
 } from "@/types/supabase";
 import { replacePermissionOverrides, fetchRoles } from "@/lib/accounts-admin";
+import { createRole, upsertPermissions } from "@/lib/management-admin";
 import { fetchPermissions, type PermissionRow } from "@/lib/management-admin";
 import { APP_REGISTRY } from "@/lib/navigation";
 import { useTranslation } from "@/lib/i18n";
@@ -267,6 +268,50 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
   useEffect(() => {
     fetchRoles().then(setAllRoles);
   }, []);
+
+  // Save the current perm grid as a NEW role template. Prompts for a
+  // name, creates a row in koleex_roles, upserts all the module perms
+  // against that new role, then refreshes the dropdown. The result is
+  // a reusable template other admins can pick from this same dropdown.
+  const saveAsNewTemplate = useCallback(async () => {
+    const name = window.prompt(
+      "Name for the new role template (you can rename later in Roles & Permissions):",
+      "",
+    );
+    const trimmed = name?.trim();
+    if (!trimmed) return;
+
+    setApplyingTemplate(true);
+    const { data: newRole, error: createErr } = await createRole({
+      name: trimmed,
+      description: `Template created from ${account.username}'s access rights`,
+    });
+    if (createErr || !newRole) {
+      setApplyingTemplate(false);
+      setError(createErr || "Couldn't create template");
+      return;
+    }
+
+    // Push the current grid into koleex_permissions for the new role.
+    const rows = ALL_MODULES.map((m) => {
+      const p = perms[m] || EMPTY_PERMS;
+      return {
+        module_name: m,
+        can_view: p.can_view,
+        can_create: p.can_create,
+        can_edit: p.can_edit,
+        can_delete: p.can_delete,
+        data_scope: p.data_scope ?? "own",
+      };
+    });
+    await upsertPermissions(newRole.id, rows);
+
+    // Refresh the dropdown so the new template shows up.
+    const refreshed = await fetchRoles();
+    setAllRoles(refreshed);
+    setApplyingTemplate(false);
+    setToast(`Template "${trimmed}" created. Find it in Roles & Permissions.`);
+  }, [account.username, perms]);
 
   // Apply a role template: load that role's permissions and fill all checkboxes
   const applyRoleTemplate = useCallback(async (roleId: string) => {
@@ -602,6 +647,15 @@ export default function AccessRightsTab({ account, onChanged }: Props) {
               </select>
               <AngleDownIcon size={10} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
             </div>
+            <button
+              type="button"
+              onClick={saveAsNewTemplate}
+              disabled={applyingTemplate}
+              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1.5"
+              title="Save the current access-rights grid as a new role template. Other admins can pick it from this dropdown. Renaming happens in Roles & Permissions."
+            >
+              + Save as new template
+            </button>
             {applyingTemplate && <SpinnerIcon size={14} className="animate-spin text-[var(--text-dim)]" />}
           </div>
         )}
