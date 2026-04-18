@@ -33,6 +33,8 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import { APP_REGISTRY } from "@/lib/navigation";
+import { useTranslation } from "@/lib/i18n";
+import { rolesT } from "@/lib/translations/roles";
 import {
   fetchRoles, createRole, updateRole, deleteRole, cloneRole,
   fetchPermissions, upsertPermissions,
@@ -112,6 +114,7 @@ function ModalShell({ open, onClose, title, width, children, footer }: {
 function RoleModal({ open, onClose, role, onSaved }: {
   open: boolean; onClose: () => void; role: RoleRow | null; onSaved: () => void;
 }) {
+  const { t } = useTranslation(rolesT);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -130,7 +133,7 @@ function RoleModal({ open, onClose, role, onSaved }: {
   }, [open, role]);
 
   const handleSave = async () => {
-    if (!name.trim()) { setError("Role name is required."); return; }
+    if (!name.trim()) { setError(t("err.nameRequired")); return; }
     setSaving(true); setError("");
     const payload = {
       name: name.trim(),
@@ -140,7 +143,7 @@ function RoleModal({ open, onClose, role, onSaved }: {
     };
     if (role) {
       const res = await updateRole(role.id, payload);
-      if (!res.ok) { setError(res.error || "Failed."); setSaving(false); return; }
+      if (!res.ok) { setError(res.error || t("err.generic")); setSaving(false); return; }
     } else {
       const res = await createRole(payload);
       if (res.error) { setError(res.error); setSaving(false); return; }
@@ -149,18 +152,18 @@ function RoleModal({ open, onClose, role, onSaved }: {
   };
 
   return (
-    <ModalShell open={open} onClose={onClose} title={role ? "Edit Role" : "New Role"} width="max-w-[480px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
-      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? "Saving..." : role ? "Save" : "Create Role"}</button></>
+    <ModalShell open={open} onClose={onClose} title={role ? t("modal.editTitle") : t("modal.newTitle")} width="max-w-[480px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("btn.cancel")}</button>
+      <button onClick={handleSave} disabled={saving || !name.trim()} className={primaryBtnCls}>{saving ? t("btn.saving") : role ? t("btn.save") : t("btn.createRole")}</button></>
     }>
       {error && <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] flex items-center gap-2"><ExclamationIcon size={14} /> {error}</div>}
       <div>
-        <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Role Name *</label>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sales Manager" autoFocus className={inputCls} />
+        <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">{t("modal.name")} *</label>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modal.namePlaceholder")} autoFocus className={inputCls} />
       </div>
       <div>
-        <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">Description</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does this role do?" rows={2} className={textareaCls} />
+        <label className="block text-[11px] font-medium uppercase tracking-wider text-[var(--text-dim)] mb-1.5">{t("modal.description")}</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("modal.descPlaceholder")} rows={2} className={textareaCls} />
       </div>
 
       {/* ── Advanced role flags ──
@@ -218,16 +221,17 @@ function RoleModal({ open, onClose, role, onSaved }: {
 function DeleteConfirm({ open, roleName, onClose, onConfirm, deleting }: {
   open: boolean; roleName: string; onClose: () => void; onConfirm: () => void; deleting: boolean;
 }) {
+  const { t } = useTranslation(rolesT);
   if (!open) return null;
   return (
-    <ModalShell open={open} onClose={onClose} title="Delete Role" width="max-w-[400px]" footer={
-      <><button onClick={onClose} className={cancelBtnCls}>Cancel</button>
+    <ModalShell open={open} onClose={onClose} title={t("modal.deleteTitle")} width="max-w-[400px]" footer={
+      <><button onClick={onClose} className={cancelBtnCls}>{t("btn.cancel")}</button>
       <button onClick={onConfirm} disabled={deleting}
         className="h-10 px-5 rounded-xl text-[13px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 transition-all"
-      >{deleting ? "Deleting..." : "Delete"}</button></>
+      >{deleting ? t("btn.deleting") : t("btn.delete")}</button></>
     }>
       <p className="text-[13px] text-[var(--text-secondary)]">
-        Are you sure you want to delete <strong className="text-[var(--text-primary)]">{roleName}</strong>? This will unlink any positions using this role. This action cannot be undone.
+        {t("modal.delete.confirm").replace("this role", roleName || "this role")}
       </p>
     </ModalShell>
   );
@@ -275,6 +279,7 @@ const TYPE_C_MODULE_NAMES = new Set([
 ]);
 
 function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSuperAdminRole?: boolean }) {
+  const { t } = useTranslation(rolesT);
   const [perms, setPerms] = useState<Record<string, PermCell>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -432,24 +437,25 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
    *  Dimmed when no V/C/E/D is enabled — the scope then has no effect
    *  but stays clickable so the admin can still pre-configure it. */
   const ScopeChip = ({ scope, disabled, onClick }: { scope: DataScope; disabled?: boolean; onClick: () => void }) => {
-    const labels: Record<DataScope, { label: string; cls: string; dot: string }> = {
-      all:        { label: "All",     cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
-      department: { label: "Dept",    cls: "bg-blue-500/15 border-blue-500/30 text-blue-300",         dot: "bg-blue-400" },
-      own:        { label: "Own",     cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",      dot: "bg-amber-400" },
-      private:    { label: "Private", cls: "bg-red-500/15 border-red-500/30 text-red-300",            dot: "bg-red-400" },
+    const labels: Record<DataScope, { key: string; cls: string; dot: string }> = {
+      all:        { key: "scope.all",        cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
+      department: { key: "scope.department", cls: "bg-blue-500/15 border-blue-500/30 text-blue-300",         dot: "bg-blue-400" },
+      own:        { key: "scope.own",        cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",      dot: "bg-amber-400" },
+      private:    { key: "scope.private",    cls: "bg-red-500/15 border-red-500/30 text-red-300",            dot: "bg-red-400" },
     };
     const cfg = labels[scope];
+    const label = t(cfg.key);
     return (
       <button
         type="button"
         onClick={onClick}
-        title={`Data scope: ${cfg.label}. Click to cycle (All → Dept → Own → Private).`}
+        title={t("scope.cycle.tip")}
         className={`h-7 px-2 rounded-lg border text-[10px] font-semibold flex items-center gap-1.5 transition-all ${
           cfg.cls
         } ${disabled ? "opacity-40" : "hover:brightness-110"}`}
       >
         <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-        <span>{cfg.label}</span>
+        <span>{label}</span>
       </button>
     );
   };
@@ -479,12 +485,9 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
           <ExclamationIcon className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
           <div className="text-[12px] text-amber-100/90 leading-relaxed">
             <div className="font-semibold text-amber-200 mb-0.5">
-              This is the Super Admin role
+              {t("sa.title")}
             </div>
-            Changes to these permissions <strong>don&apos;t affect</strong>{" "}
-            users with this role — Super Admin always has full access to
-            every module and every record, by design. To test Hide / View
-            restrictions, edit a non-SA role (e.g. User, Data Entry, Assistant).
+            {t("sa.body")}
           </div>
         </div>
       )}
@@ -506,7 +509,9 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
                   className="w-5 h-5 flex items-center justify-center rounded-md shrink-0 hover:bg-[var(--bg-surface)]">
                   {collapsed ? <AngleRightIcon size={12} className="text-[var(--text-dim)]" /> : <AngleDownIcon size={12} className="text-[var(--text-dim)]" />}
                 </button>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">{group.label}</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] flex-1">
+                  {t(`group.${group.label}`, group.label)}
+                </span>
                 <span className="text-[10px] font-medium text-[var(--text-faint)] mr-2">{stats.pct}%</span>
                 <button onClick={() => toggleGroupAll(group)}
                   className={`h-6 px-2 rounded-md text-[10px] font-semibold border transition-all ${
@@ -514,7 +519,7 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
                       ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
                       : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-focus)]"
                   }`}>
-                  {allGroupOn ? "Full" : "All"}
+                  {allGroupOn ? t("perm.full") : t("perm.all")}
                 </button>
               </div>
 
@@ -522,14 +527,14 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
               {!collapsed && (
                 <div>
                   <div className="flex items-center px-3 py-1.5 border-t border-[var(--border-faint)]">
-                    <div className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">App</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">View</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Add</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Edit</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Del</div>
-                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">All</div>
-                    <div className="w-24 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Scope</div>
-                    <div className="w-16 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">Hide</div>
+                    <div className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.app")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.view")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.add")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.edit")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.del")}</div>
+                    <div className="w-12 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.all")}</div>
+                    <div className="w-24 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.scope")}</div>
+                    <div className="w-16 text-center text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">{t("perm.hide")}</div>
                   </div>
                   {group.modules.map((mod) => {
                     const AppIcon = getAppIcon(mod);
@@ -564,11 +569,11 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
                         <div className="w-24 flex justify-center">
                           {TYPE_C_MODULE_NAMES.has(mod) ? (
                             <span
-                              title="Personal productivity data. Always scoped to the owner + explicit sharing. Only Super Admin can view others'."
+                              title={t("scope.personal.tip")}
                               className="h-7 px-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-300 text-[10px] font-semibold flex items-center gap-1.5"
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-                              <span>Personal</span>
+                              <span>{t("scope.personal")}</span>
                             </span>
                           ) : (
                             <ScopeChip
@@ -587,7 +592,7 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
                           <button
                             type="button"
                             onClick={() => toggleHideModule(mod)}
-                            title={hasAny ? "Hide this app from everyone with this role" : "Un-hide (grants view-only)"}
+                            title={hasAny ? t("hide.enable.tip") : t("hide.disable.tip")}
                             className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
                               !hasAny
                                 ? "bg-red-500/15 border-red-500/30 text-red-400"
@@ -614,13 +619,13 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
         <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
           <ExclamationIcon size={14} className="mt-0.5 shrink-0" />
           <span>
-            Save failed: {saveError}
+            {t("err.saveFailed")} {saveError}
           </span>
         </div>
       )}
       <div className="flex items-center justify-end gap-2 mt-4">
-        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><CheckIcon size={12} /> Saved</span>}
-        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? "Saving..." : "Save Permissions"}</button>
+        {saved && <span className="text-[12px] text-emerald-400 font-medium flex items-center gap-1"><CheckIcon size={12} /> {t("btn.saved")}</span>}
+        <button onClick={handleSave} disabled={saving} className={primaryBtnCls}>{saving ? t("btn.saving") : t("btn.save")}</button>
       </div>
     </div>
   );
@@ -631,6 +636,7 @@ function PermissionsEditor({ roleId, isSuperAdminRole }: { roleId: string; isSup
    ═══════════════════════════════════════════════════ */
 
 export default function RolesPage() {
+  const { t } = useTranslation(rolesT);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -656,20 +662,21 @@ export default function RolesPage() {
   /* ── Toast ── */
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(""), 3000);
-    return () => clearTimeout(t);
+    // Named `timer` to avoid shadowing the `t` translation helper.
+    const timer = setTimeout(() => setToast(""), 3000);
+    return () => clearTimeout(timer);
   }, [toast]);
 
   /* ── Handlers ── */
   const handleRoleSaved = async () => {
     await loadRoles();
-    setToast(editRole ? "Role updated" : "Role created");
+    setToast(editRole ? t("toast.roleUpdated") : t("toast.roleCreated"));
   };
 
   const handleCloneRole = async (roleId: string) => {
     await cloneRole(roleId);
     await loadRoles();
-    setToast("Role cloned");
+    setToast(t("toast.roleCloned"));
   };
 
   const handleDeleteConfirm = async () => {
@@ -680,7 +687,7 @@ export default function RolesPage() {
     setDeleteTarget(null);
     if (selectedRoleId === deleteTarget.id) setSelectedRoleId(null);
     await loadRoles();
-    setToast("Role deleted");
+    setToast(t("toast.roleDeleted"));
   };
 
   /* ── Filtering ── */
@@ -705,7 +712,7 @@ export default function RolesPage() {
               <ShieldIcon className="h-4 w-4" />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              Roles & Permissions
+              {t("app.title")}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -713,12 +720,12 @@ export default function RolesPage() {
               onClick={() => { setEditRole(null); setShowRoleModal(true); }}
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
             >
-              <PlusIcon className="h-4 w-4" /> New Role
+              <PlusIcon className="h-4 w-4" /> {t("btn.newRole")}
             </button>
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {totalRoles} {totalRoles === 1 ? "role" : "roles"} configured
+          {totalRoles} {totalRoles === 1 ? t("app.subtitle.one") : t("app.subtitle.many")}
         </p>
 
         {/* Search + Filters */}
@@ -730,7 +737,7 @@ export default function RolesPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search roles..."
+                placeholder={t("search.placeholder")}
                 className="w-full h-10 pl-10 pr-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
               />
               {search && (
@@ -748,7 +755,7 @@ export default function RolesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-violet-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-400"><ShieldIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Total Roles</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("kpi.totalRoles")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalRoles}</div>
           </div>
@@ -756,7 +763,7 @@ export default function RolesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-blue-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400"><LayersIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Module Groups</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("kpi.moduleGroups")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{PERMISSION_GROUPS.length}</div>
           </div>
@@ -764,7 +771,7 @@ export default function RolesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-emerald-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400"><CheckIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Total Modules</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("kpi.totalModules")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{PERMISSION_MODULES.length}</div>
           </div>
@@ -774,7 +781,7 @@ export default function RolesPage() {
         {loading ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin mx-auto" />
-            <p className="text-[13px] mt-3 text-[var(--text-dim)]">Loading roles...</p>
+            <p className="text-[13px] mt-3 text-[var(--text-dim)]">{t("state.loading")}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
@@ -782,20 +789,17 @@ export default function RolesPage() {
               <ShieldIcon size={24} className="text-[var(--text-dim)] opacity-40" />
             </div>
             <p className="text-[14px] font-semibold text-[var(--text-secondary)] mb-1">
-              {roles.length === 0 ? "No roles yet" : "No results found"}
+              {roles.length === 0 ? t("state.noRoles") : t("state.noResults")}
             </p>
             <p className="text-[12px] text-[var(--text-dim)]">
-              {roles.length === 0
-                ? "Create your first role to start managing permissions."
-                : "Try adjusting your search."
-              }
+              {roles.length === 0 ? t("state.createFirst") : t("state.tryAdjust")}
             </p>
             {roles.length === 0 && (
               <button
                 onClick={() => { setEditRole(null); setShowRoleModal(true); }}
                 className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all"
               >
-                <PlusIcon className="h-4 w-4" /> Create Role
+                <PlusIcon className="h-4 w-4" /> {t("btn.createRole")}
               </button>
             )}
           </div>
@@ -818,18 +822,18 @@ export default function RolesPage() {
                         selectedRoleId === role.id ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]" : "hover:bg-[var(--bg-surface)] text-[var(--text-faint)]"
                       }`}>
                       {selectedRoleId === role.id ? <AngleUpIcon size={12} /> : <AngleDownIcon size={12} />}
-                      Permissions
+                      {t("btn.permissions")}
                     </button>
                     <button onClick={() => handleCloneRole(role.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title="Clone role">
+                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title={t("row.cloneTip")}>
                       <CopyIcon size={13} className="text-[var(--text-dim)]" />
                     </button>
                     <button onClick={() => { setEditRole(role); setShowRoleModal(true); }}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all">
+                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-surface-hover)] transition-all" title={t("row.editTip")}>
                       <PencilIcon size={13} className="text-[var(--text-dim)]" />
                     </button>
                     <button onClick={() => setDeleteTarget(role)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-400/10 transition-all">
+                      className="w-8 h-8 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-400/10 transition-all" title={t("row.deleteTip")}>
                       <TrashIcon size={13} className="text-red-400/60" />
                     </button>
                   </div>
