@@ -80,9 +80,16 @@ export async function GET(
         : Promise.resolve({ data: null }),
     ]);
 
+  // Strip password_hash from the response. Every consumer already
+  // uses dedicated endpoints for password reset / force-change — the
+  // account detail view never needs the hash.
+  const { password_hash: _ph, ...safeAcc } = acc as {
+    password_hash?: string;
+  } & Record<string, unknown>;
+
   return NextResponse.json({
     account: {
-      ...acc,
+      ...safeAcc,
       person: personRes.data,
       company: companyRes.data,
       role: roleRes.data,
@@ -124,10 +131,15 @@ export async function PATCH(
   delete patch.password_hash; // use the dedicated reset endpoint
   delete patch.created_at;
 
-  const { error } = await supabaseServer
+  // Belt + braces: filter update by tenant_id too so a race between
+  // existsInTenant() and the UPDATE (or a compromised caller) can't
+  // mutate rows in another tenant.
+  let upd = supabaseServer
     .from("accounts")
     .update(patch)
     .eq("id", id);
+  if (auth.tenant_id) upd = upd.eq("tenant_id", auth.tenant_id);
+  const { error } = await upd;
   if (error) {
     console.error("[api/accounts/[id] PATCH]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -157,10 +169,15 @@ export async function DELETE(
     );
   }
 
-  const { error } = await supabaseServer
+  // Same belt-and-braces — the existsInTenant() check above protects
+  // the happy path, but the DELETE itself must also be tenant-scoped
+  // so a race / crafted request can't wipe another tenant's account.
+  let del = supabaseServer
     .from("accounts")
     .delete()
     .eq("id", id);
+  if (auth.tenant_id) del = del.eq("tenant_id", auth.tenant_id);
+  const { error } = await del;
   if (error) {
     console.error("[api/accounts/[id] DELETE]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });

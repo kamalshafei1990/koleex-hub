@@ -1137,7 +1137,16 @@ export async function upsertPermissionOverride(
         body: JSON.stringify(payload),
       },
     );
-    if (res.ok) return true;
+    if (res.ok) {
+      // Invalidate the client-side /api/me/bootstrap cache so the
+      // sidebar / PermissionGate pick up the new override on the next
+      // render instead of waiting for the 10s TTL to expire.
+      try {
+        const { invalidateMeBootstrap } = await import("./me-bootstrap");
+        invalidateMeBootstrap();
+      } catch { /* bootstrap module not loaded yet — next fetch will be fresh */ }
+      return true;
+    }
     if (res.status === 401 || res.status === 403) return false;
   } catch (e) {
     console.error("[PermissionOverrides] upsert API failed:", e);
@@ -1170,7 +1179,13 @@ export async function deletePermissionOverride(
         body: JSON.stringify({ module_key: moduleKey }),
       },
     );
-    if (res.ok) return true;
+    if (res.ok) {
+      try {
+        const { invalidateMeBootstrap } = await import("./me-bootstrap");
+        invalidateMeBootstrap();
+      } catch { /* ignore */ }
+      return true;
+    }
     if (res.status === 401 || res.status === 403) return false;
   } catch (e) {
     console.error("[PermissionOverrides] delete API failed:", e);

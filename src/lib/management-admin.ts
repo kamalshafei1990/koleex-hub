@@ -701,7 +701,17 @@ export async function upsertPermissions(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role_id: roleId, permissions: perms }),
     });
-    if (res.ok) return { ok: true, error: null };
+    if (res.ok) {
+      // Any role-level permission change affects every account on that
+      // role. Bust the shared bootstrap cache so the sidebar + module
+      // gates don't keep serving a stale permittedModules list for
+      // the rest of the TTL.
+      try {
+        const { invalidateMeBootstrap } = await import("./me-bootstrap");
+        invalidateMeBootstrap();
+      } catch { /* ignore — SSR path has no window cache */ }
+      return { ok: true, error: null };
+    }
     const err = await res.json().catch(() => ({ error: "Failed" }));
     return { ok: false, error: (err as { error?: string }).error ?? "Failed" };
   } catch (e) {

@@ -116,23 +116,46 @@ export async function requireModuleAccess(
     );
   }
 
-  const [{ data: rolePerm }, { data: override }] = await Promise.all([
+  // Case-insensitive match on both sides. Historically some rows were
+  // stored lowercase (e.g. "calendar"), others Pascal-case ("Calendar").
+  // A plain .eq match against one canonical case used to miss either a
+  // legitimate role grant OR a hide-override — both failure modes are
+  // privilege-shaped, so we normalise with ilike and then compare in
+  // code rather than trust the DB representation.
+  const [rolePermRes, overrideRes] = await Promise.all([
     supabaseServer
       .from("koleex_permissions")
-      .select("can_view")
+      .select("can_view, module_name")
       .eq("role_id", auth.role_id)
-      .eq("module_name", moduleName)
+      .ilike("module_name", moduleName)
       .maybeSingle(),
     supabaseServer
       .from("account_permission_overrides")
-      .select("can_view")
+      .select("can_view, module_key")
       .eq("account_id", auth.account_id)
-      .eq("module_key", moduleName)
+      .ilike("module_key", moduleName)
       .maybeSingle(),
   ]);
 
-  const roleAllows = rolePerm?.can_view === true;
-  const overrideHides = override !== null && override?.can_view === false;
+  // Fail-closed on DB errors. Previously a transient error made both
+  // sides fall back to "false" and returned 403, but any unexpected
+  // exception path could have ended up permitting by accident. Be
+  // explicit: if the DB is unreachable, deny with 500 so we don't
+  // accidentally grant access on a query that never returned.
+  if (rolePermRes.error || overrideRes.error) {
+    console.error(
+      "[requireModuleAccess]",
+      rolePermRes.error?.message ?? overrideRes.error?.message,
+    );
+    return NextResponse.json(
+      { error: "Permission check failed" },
+      { status: 500 },
+    );
+  }
+
+  const roleAllows = rolePermRes.data?.can_view === true;
+  const overrideHides =
+    overrideRes.data !== null && overrideRes.data?.can_view === false;
 
   if (!roleAllows || overrideHides) {
     return NextResponse.json(

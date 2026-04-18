@@ -16,7 +16,15 @@ export async function GET() {
 
   const { data, error } = await supabaseServer
     .from("accounts")
-    .select("*")
+    .select(
+      // Explicit allowlist — password_hash (and any future secrets) stay
+      // server-side only. Keeping * here used to leak the hash to every
+      // page that listed accounts.
+      `id, tenant_id, username, login_email, status, user_type,
+       avatar_url, person_id, company_id, contact_id, role_id,
+       is_super_admin, two_factor_enabled, force_password_change,
+       last_login_at, created_at, updated_at, preferences`,
+    )
     .eq("tenant_id", auth.tenant_id)
     .order("created_at", { ascending: false });
 
@@ -24,7 +32,9 @@ export async function GET() {
     console.error("[api/accounts]", error.message);
     return NextResponse.json({ error: "Failed to load accounts" }, { status: 500 });
   }
-  return NextResponse.json({ accounts: data ?? [] });
+  return NextResponse.json({ accounts: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 /* POST /api/accounts — create a new account.
@@ -50,12 +60,23 @@ export async function POST(req: Request) {
   };
   const { temporary_password, preferences, ...rest } = body;
 
+  // Reject empty-string passwords up-front. Previously hashTempPassword("")
+  // produced "tmp$" — a deterministic "empty password" hash that any
+  // attacker who knew the scheme could sign in against. If the admin
+  // wants to create an account without a password they must omit the
+  // field entirely (null password_hash disables sign-in cleanly).
+  const trimmedTmp = temporary_password?.trim();
+  if (temporary_password !== undefined && !trimmedTmp) {
+    return NextResponse.json(
+      { error: "Temporary password must not be empty" },
+      { status: 400 },
+    );
+  }
+
   const payload = {
     ...rest,
     tenant_id: auth.tenant_id, // server-side truth
-    password_hash: temporary_password
-      ? hashTempPassword(temporary_password)
-      : null,
+    password_hash: trimmedTmp ? hashTempPassword(trimmedTmp) : null,
     force_password_change: true,
     preferences: preferences ?? {},
   };
@@ -69,5 +90,8 @@ export async function POST(req: Request) {
     console.error("[api/accounts POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ account: data });
+  // Strip password_hash before returning — callers never need it.
+  const safe: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+  delete safe.password_hash;
+  return NextResponse.json({ account: safe });
 }
