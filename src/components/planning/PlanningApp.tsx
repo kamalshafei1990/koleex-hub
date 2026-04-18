@@ -1256,21 +1256,33 @@ function ItemModal({
 
   if (!open) return null;
 
+  const buildPayload = (overrides: Partial<PlanningItem> = {}) => ({
+    type,
+    title: title.trim(),
+    notes: notes.trim() || null,
+    resource_id: resourceId || null,
+    role_id: roleId || null,
+    start_at: new Date(startAt).toISOString(),
+    end_at: new Date(endAt).toISOString(),
+    linked_entity_type: linkedType || null,
+    linked_entity_id: linkedId,
+    linked_entity_label: linkedLabel.trim() || null,
+    status,
+    ...overrides,
+  });
+
   const save = () => {
     if (!startAt || !endAt) return;
-    onSave({
-      type,
-      title: title.trim(),
-      notes: notes.trim() || null,
-      resource_id: resourceId || null,
-      role_id: roleId || null,
-      start_at: new Date(startAt).toISOString(),
-      end_at: new Date(endAt).toISOString(),
-      linked_entity_type: linkedType || null,
-      linked_entity_id: linkedId,
-      linked_entity_label: linkedLabel.trim() || null,
-      status,
-    });
+    onSave(buildPayload());
+  };
+
+  /** Publish button — save any in-flight edits AND flip the status to
+   *  published in a single round-trip, then close. Previously this only
+   *  hit the /publish endpoint, which meant the modal sat open showing
+   *  the old "draft" state so it looked like the button did nothing. */
+  const saveAndPublish = () => {
+    if (!startAt || !endAt) return;
+    onSave(buildPayload({ status: "published" }));
   };
 
   return (
@@ -1491,7 +1503,7 @@ function ItemModal({
           <div className="flex items-center gap-1.5 sm:gap-2">
             {editing && editing.status === "draft" && (
               <button
-                onClick={() => onPublish(editing.id)}
+                onClick={saveAndPublish}
                 className="h-9 px-2.5 sm:px-3 rounded-lg border border-emerald-500/40 text-emerald-400 text-[12px] font-semibold hover:bg-emerald-500/10"
               >
                 {t("btn.publish")}
