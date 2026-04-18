@@ -24,6 +24,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
 
 import { useTranslation } from "@/lib/i18n";
 import { notesT } from "@/lib/translations/notes";
@@ -45,6 +46,8 @@ import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 import LinkIcon from "@/components/icons/ui/LinkIcon";
 import Undo2Icon from "@/components/icons/ui/Undo2Icon";
 import Redo2Icon from "@/components/icons/ui/Redo2Icon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import { PromptDialog } from "./NotesDialog";
 
 export default function NoteEditor({
   note,
@@ -72,6 +75,12 @@ export default function NoteEditor({
   const { t } = useTranslation(notesT);
   const [titleDraft, setTitleDraft] = useState(note?.title ?? "");
 
+  /* Link prompt + image upload state for the toolbar. */
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkInitial, setLinkInitial] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
   /* Single editor instance for the whole app life. When the user
      switches notes we swap content imperatively (see effect below) —
      recreating the editor on every switch was causing UI flicker and
@@ -91,6 +100,13 @@ export default function NoteEditor({
       Link.configure({
         openOnClick: false,
         autolink: true,
+      }),
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: {
+          class: "notes-image",
+        },
       }),
     ],
     content: null,
@@ -133,6 +149,61 @@ export default function NoteEditor({
   useEffect(() => {
     scheduleSaveRef.current = scheduleSave;
   }, [scheduleSave]);
+
+  /* ── Link dialog + image upload handlers ─────────────────────────── */
+  const openLinkDialog = useCallback(() => {
+    if (!editor) return;
+    setLinkInitial((editor.getAttributes("link").href ?? "") as string);
+    setLinkOpen(true);
+  }, [editor]);
+
+  const applyLink = useCallback(
+    (url: string) => {
+      if (!editor) return;
+      if (!url.trim()) {
+        editor.chain().focus().unsetLink().run();
+        return;
+      }
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: url.trim() })
+        .run();
+    },
+    [editor],
+  );
+
+  const triggerImageUpload = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleImageFile = useCallback(
+    async (file: File) => {
+      if (!editor) return;
+      if (!file.type.startsWith("image/")) return;
+      setUploading(true);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("bucket", "media");
+        const path = `notes/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+        form.append("path", path);
+        const res = await fetch("/api/storage/upload", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as { publicUrl: string };
+        editor.chain().focus().setImage({ src: json.publicUrl }).run();
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [editor],
+  );
 
   // When a DIFFERENT note is selected, sync title + body into the
   // editor. We only swap on note.id change, not on every note prop
@@ -198,7 +269,24 @@ export default function NoteEditor({
     <div className="h-full flex flex-col">
       {/* Toolbar */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-4 md:px-6 py-2 flex items-center gap-2 flex-wrap">
-        <EditorToolbar editor={editor} t={t} readOnly={readOnly} />
+        <EditorToolbar
+          editor={editor}
+          t={t}
+          readOnly={readOnly}
+          onOpenLink={openLinkDialog}
+          onUploadImage={triggerImageUpload}
+          uploading={uploading}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleImageFile(f);
+          }}
+        />
 
         <div className="flex-1" />
 
@@ -295,6 +383,18 @@ export default function NoteEditor({
 
         <EditorContent editor={editor} />
       </div>
+
+      {/* Link prompt — matches Hub dialog style (no native window.prompt) */}
+      <PromptDialog
+        open={linkOpen}
+        title={t("fmt.link")}
+        label="URL"
+        placeholder="https://example.com"
+        initialValue={linkInitial}
+        confirmLabel="Apply"
+        onConfirm={(url) => applyLink(url)}
+        onClose={() => setLinkOpen(false)}
+      />
     </div>
   );
 }
@@ -309,10 +409,16 @@ function EditorToolbar({
   editor,
   t,
   readOnly,
+  onOpenLink,
+  onUploadImage,
+  uploading,
 }: {
   editor: Editor | null;
   t: (k: string) => string;
   readOnly: boolean;
+  onOpenLink: () => void;
+  onUploadImage: () => void;
+  uploading: boolean;
 }) {
   if (!editor) return null;
 
@@ -345,18 +451,6 @@ function EditorToolbar({
   const Divider = () => (
     <span className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
   );
-
-  function promptLink() {
-    if (!editor) return;
-    const current = editor.getAttributes("link").href ?? "";
-    const url = window.prompt(t("linkPrompt"), current);
-    if (url === null) return; // cancelled
-    if (url === "") {
-      editor.chain().focus().unsetLink().run();
-      return;
-    }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-  }
 
   return (
     <>
@@ -478,8 +572,19 @@ function EditorToolbar({
 
       <Divider />
 
-      <TB active={editor.isActive("link")} onClick={promptLink} title={t("fmt.link")}>
+      <TB active={editor.isActive("link")} onClick={onOpenLink} title={t("fmt.link")}>
         <LinkIcon className="h-3.5 w-3.5" />
+      </TB>
+      <TB
+        active={false}
+        onClick={onUploadImage}
+        title="Insert image"
+      >
+        {uploading ? (
+          <span className="h-3.5 w-3.5 rounded-full border-2 border-[var(--text-primary)] border-t-transparent animate-spin" />
+        ) : (
+          <ImageRawIcon className="h-3.5 w-3.5" />
+        )}
       </TB>
 
       <Divider />

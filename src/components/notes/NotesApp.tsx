@@ -38,6 +38,7 @@ import {
 import FoldersSidebar, { type FolderSelection } from "./FoldersSidebar";
 import NotesList from "./NotesList";
 import NoteEditor from "./NoteEditor";
+import { PromptDialog, ConfirmDialog } from "./NotesDialog";
 
 export default function NotesApp() {
   const { t } = useTranslation(notesT);
@@ -52,6 +53,16 @@ export default function NotesApp() {
   const [activeNote, setActiveNote] = useState<NoteFull | null>(null);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
+
+  /* Dialogs — replacements for the native window.prompt / confirm. */
+  const [folderPrompt, setFolderPrompt] = useState<
+    | { open: true; parentId: string | null; initial: string; mode: "create" | "rename"; folderId?: string }
+    | { open: false }
+  >({ open: false });
+  const [deletePrompt, setDeletePrompt] = useState<
+    | { open: true; kind: "trash" | "purge" | "folder" | "emptyTrash"; id?: string; label?: string }
+    | { open: false }
+  >({ open: false });
 
   // Hydrate folders + notes on mount.
   useEffect(() => {
@@ -109,38 +120,62 @@ export default function NotesApp() {
 
   // ── Folder actions ─────────────────────────────────────────────────────
 
-  const onCreateFolder = useCallback(
-    async (name: string, parentId: string | null = null) => {
-      const f = await createFolder({ name, parent_id: parentId });
-      if (f) {
-        setFolders((prev) => [...prev, f]);
-        setSelection({ kind: "folder", id: f.id });
-      }
+  /* These open the PromptDialog rather than doing the work directly.
+     The confirm callback in the dialog calls the low-level helpers. */
+  const onAskCreateFolder = useCallback(
+    (parentId: string | null = null) => {
+      setFolderPrompt({
+        open: true,
+        mode: "create",
+        parentId,
+        initial: "",
+      });
     },
     [],
   );
 
-  const onRenameFolder = useCallback(async (id: string, name: string) => {
-    const ok = await updateFolder(id, { name });
-    if (ok) {
-      setFolders((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, name } : f)),
-      );
-    }
+  const onAskRenameFolder = useCallback((folder: NotesFolderRow) => {
+    setFolderPrompt({
+      open: true,
+      mode: "rename",
+      parentId: folder.parent_id,
+      folderId: folder.id,
+      initial: folder.name,
+    });
   }, []);
 
-  const onDeleteFolder = useCallback(
-    async (id: string) => {
-      if (!window.confirm(t("deleteFolderConfirm"))) return;
-      const ok = await deleteFolder(id);
-      if (ok) {
-        setFolders((prev) => prev.filter((f) => f.id !== id));
-        if (selection.kind === "folder" && selection.id === id) {
-          setSelection({ kind: "smart", key: "all" });
+  const submitFolderPrompt = useCallback(
+    async (name: string) => {
+      if (!folderPrompt.open || !name.trim()) return;
+      if (folderPrompt.mode === "create") {
+        const f = await createFolder({
+          name: name.trim(),
+          parent_id: folderPrompt.parentId,
+        });
+        if (f) {
+          setFolders((prev) => [...prev, f]);
+          setSelection({ kind: "folder", id: f.id });
+        }
+      } else if (folderPrompt.mode === "rename" && folderPrompt.folderId) {
+        const ok = await updateFolder(folderPrompt.folderId, { name: name.trim() });
+        if (ok) {
+          setFolders((prev) =>
+            prev.map((f) =>
+              f.id === folderPrompt.folderId ? { ...f, name: name.trim() } : f,
+            ),
+          );
         }
       }
     },
-    [selection, t],
+    [folderPrompt],
+  );
+
+  const onAskDeleteFolder = useCallback(
+    (id: string) => {
+      const label = folders.find((f) => f.id === id)?.name ?? "";
+      setDeletePrompt({ open: true, kind: "folder", id, label });
+    },
+    [folders],
   );
 
   // ── Note actions ───────────────────────────────────────────────────────
@@ -177,26 +212,12 @@ export default function NotesApp() {
   );
 
   const onDeleteNote = useCallback(
-    async (id: string) => {
-      // Confirm before any delete. The note goes to Recently Deleted
-      // (recoverable), but users asked for an explicit confirm step
-      // so an accidental click can't wipe a note.
+    (id: string) => {
       const target = notes.find((n) => n.id === id);
       const label = target?.title?.trim() || t("untitled");
-      if (
-        !window.confirm(
-          `${t("moveToTrash")} — "${label}"?`,
-        )
-      ) {
-        return;
-      }
-      const ok = await deleteNote(id);
-      if (ok) {
-        setNotes((prev) => prev.filter((n) => n.id !== id));
-        if (activeNoteId === id) setActiveNoteId(null);
-      }
+      setDeletePrompt({ open: true, kind: "trash", id, label });
     },
-    [activeNoteId, notes, t],
+    [notes, t],
   );
 
   const onRestoreNote = useCallback(
@@ -210,36 +231,17 @@ export default function NotesApp() {
   );
 
   const onPurgeNote = useCallback(
-    async (id: string) => {
+    (id: string) => {
       const target = notes.find((n) => n.id === id);
       const label = target?.title?.trim() || t("untitled");
-      if (
-        !window.confirm(
-          `${t("deleteForever")} — "${label}"? This cannot be undone.`,
-        )
-      ) {
-        return;
-      }
-      const ok = await purgeNote(id);
-      if (ok) {
-        setNotes((prev) => prev.filter((n) => n.id !== id));
-        if (activeNoteId === id) setActiveNoteId(null);
-      }
+      setDeletePrompt({ open: true, kind: "purge", id, label });
     },
-    [activeNoteId, notes, t],
+    [notes, t],
   );
 
-  const onEmptyTrash = useCallback(async () => {
-    if (
-      !window.confirm(t("emptyTrashConfirm"))
-    )
-      return;
-    const ok = await emptyTrash();
-    if (ok) {
-      setNotes([]);
-      setActiveNoteId(null);
-    }
-  }, [t]);
+  const onEmptyTrash = useCallback(() => {
+    setDeletePrompt({ open: true, kind: "emptyTrash" });
+  }, []);
 
   const onMoveNote = useCallback(
     async (id: string, folderId: string | null) => {
@@ -248,6 +250,39 @@ export default function NotesApp() {
     },
     [reloadNotes],
   );
+
+  /* Runs when the user clicks "Confirm" in the delete dialog. Dispatches
+     on the stored kind — trash / purge / empty-trash / folder. */
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletePrompt.open) return;
+    if (deletePrompt.kind === "trash" && deletePrompt.id) {
+      const ok = await deleteNote(deletePrompt.id);
+      if (ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== deletePrompt.id));
+        if (activeNoteId === deletePrompt.id) setActiveNoteId(null);
+      }
+    } else if (deletePrompt.kind === "purge" && deletePrompt.id) {
+      const ok = await purgeNote(deletePrompt.id);
+      if (ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== deletePrompt.id));
+        if (activeNoteId === deletePrompt.id) setActiveNoteId(null);
+      }
+    } else if (deletePrompt.kind === "emptyTrash") {
+      const ok = await emptyTrash();
+      if (ok) {
+        setNotes([]);
+        setActiveNoteId(null);
+      }
+    } else if (deletePrompt.kind === "folder" && deletePrompt.id) {
+      const ok = await deleteFolder(deletePrompt.id);
+      if (ok) {
+        setFolders((prev) => prev.filter((f) => f.id !== deletePrompt.id));
+        if (selection.kind === "folder" && selection.id === deletePrompt.id) {
+          setSelection({ kind: "smart", key: "all" });
+        }
+      }
+    }
+  }, [deletePrompt, activeNoteId, selection]);
 
   // ── Editor auto-save ────────────────────────────────────────────────────
 
@@ -409,9 +444,9 @@ export default function NotesApp() {
               folders={folders}
               selection={selection}
               onSelect={setSelection}
-              onCreateFolder={onCreateFolder}
-              onRenameFolder={onRenameFolder}
-              onDeleteFolder={onDeleteFolder}
+              onAskCreateFolder={onAskCreateFolder}
+              onAskRenameFolder={onAskRenameFolder}
+              onAskDeleteFolder={onAskDeleteFolder}
               notesCountByFolder={notesCountByFolder}
             />
           </div>
@@ -471,6 +506,57 @@ export default function NotesApp() {
           </div>
         </div>
       </div>
+
+      {/* ── Dialogs ────────────────────────────────────────────────── */}
+      <PromptDialog
+        open={folderPrompt.open}
+        title={folderPrompt.open && folderPrompt.mode === "rename" ? t("rename") : t("newFolder")}
+        label={t("folderName")}
+        placeholder={t("folderName")}
+        initialValue={folderPrompt.open ? folderPrompt.initial : ""}
+        onConfirm={submitFolderPrompt}
+        onClose={() => setFolderPrompt({ open: false })}
+      />
+
+      <ConfirmDialog
+        open={deletePrompt.open}
+        variant="danger"
+        title={
+          !deletePrompt.open
+            ? ""
+            : deletePrompt.kind === "trash"
+              ? `${t("moveToTrash")} — "${deletePrompt.label ?? ""}"?`
+              : deletePrompt.kind === "purge"
+                ? `${t("deleteForever")} — "${deletePrompt.label ?? ""}"?`
+                : deletePrompt.kind === "emptyTrash"
+                  ? t("emptyTrash")
+                  : t("deleteFolder")
+        }
+        description={
+          !deletePrompt.open
+            ? ""
+            : deletePrompt.kind === "purge"
+              ? "This note will be permanently removed. This cannot be undone."
+              : deletePrompt.kind === "emptyTrash"
+                ? t("emptyTrashConfirm")
+                : deletePrompt.kind === "folder"
+                  ? t("deleteFolderConfirm")
+                  : "The note will be moved to Recently Deleted and can be restored within 30 days."
+        }
+        confirmLabel={
+          !deletePrompt.open
+            ? "OK"
+            : deletePrompt.kind === "trash"
+              ? t("moveToTrash")
+              : deletePrompt.kind === "purge"
+                ? t("deleteForever")
+                : deletePrompt.kind === "emptyTrash"
+                  ? t("emptyTrash")
+                  : t("delete")
+        }
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletePrompt({ open: false })}
+      />
     </div>
   );
 }

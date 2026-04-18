@@ -28,17 +28,19 @@ export default function FoldersSidebar({
   folders,
   selection,
   onSelect,
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
+  onAskCreateFolder,
+  onAskRenameFolder,
+  onAskDeleteFolder,
   notesCountByFolder,
 }: {
   folders: NotesFolderRow[];
   selection: FolderSelection;
   onSelect: (sel: FolderSelection) => void;
-  onCreateFolder: (name: string, parentId: string | null) => void;
-  onRenameFolder: (id: string, name: string) => void;
-  onDeleteFolder: (id: string) => void;
+  /** These open Hub-styled dialogs in the parent instead of doing the
+   *  work inline — keeps the sidebar dumb + visual. */
+  onAskCreateFolder: (parentId: string | null) => void;
+  onAskRenameFolder: (folder: NotesFolderRow) => void;
+  onAskDeleteFolder: (id: string) => void;
   notesCountByFolder: Map<string, number>;
 }) {
   const { t } = useTranslation(notesT);
@@ -59,23 +61,12 @@ export default function FoldersSidebar({
     return children;
   }, [folders]);
 
-  function handleCreateRoot() {
-    const name = window.prompt(t("folderName"), "");
-    if (name?.trim()) onCreateFolder(name.trim(), null);
-  }
-
-  function handleCreateChild(parentId: string) {
-    const name = window.prompt(t("folderName"), "");
-    if (name?.trim()) onCreateFolder(name.trim(), parentId);
+  const handleCreateRoot = () => onAskCreateFolder(null);
+  const handleCreateChild = (parentId: string) => {
+    onAskCreateFolder(parentId);
     setExpanded((prev) => new Set(prev).add(parentId));
-  }
-
-  function handleRename(folder: NotesFolderRow) {
-    const next = window.prompt(t("folderName"), folder.name);
-    if (next?.trim() && next.trim() !== folder.name) {
-      onRenameFolder(folder.id, next.trim());
-    }
-  }
+  };
+  const handleRename = (folder: NotesFolderRow) => onAskRenameFolder(folder);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -137,7 +128,7 @@ export default function FoldersSidebar({
           onSelect={onSelect}
           onCreateChild={handleCreateChild}
           onRename={handleRename}
-          onDelete={onDeleteFolder}
+          onDelete={onAskDeleteFolder}
           notesCountByFolder={notesCountByFolder}
         />
       </div>

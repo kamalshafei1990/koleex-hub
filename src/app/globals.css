@@ -253,3 +253,13 @@ body {
   color: var(--text-dim);
   text-decoration: line-through;
 }
+
+.notes-editor img.notes-image,
+.notes-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  margin: 12px 0;
+  display: block;
+  border: 1px solid var(--border-subtle);
+}
