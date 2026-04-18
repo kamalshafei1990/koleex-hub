@@ -141,6 +141,41 @@ export default function PlanningApp() {
     [reload],
   );
 
+  /** Move a dragged item to a new (resource, day) cell. Keeps the original
+   *  time-of-day and duration — only the date and assignee change. */
+  const handleItemDrop = useCallback(
+    async (itemId: string, targetResourceId: string | null, targetDate: Date) => {
+      const existing = items.find((i) => i.id === itemId);
+      if (!existing) return;
+      const oldStart = new Date(existing.start_at);
+      const oldEnd = new Date(existing.end_at);
+      const durationMs = oldEnd.getTime() - oldStart.getTime();
+      // Stamp targetDate's Y/M/D onto old time-of-day.
+      const newStart = new Date(targetDate);
+      newStart.setHours(
+        oldStart.getHours(),
+        oldStart.getMinutes(),
+        oldStart.getSeconds(),
+        oldStart.getMilliseconds(),
+      );
+      const newEnd = new Date(newStart.getTime() + durationMs);
+      // No-op if nothing changed (e.g. dropped on same cell).
+      if (
+        toLocalDateKey(oldStart.toISOString()) === toLocalDateKey(newStart.toISOString()) &&
+        existing.resource_id === targetResourceId
+      ) {
+        return;
+      }
+      await updateItem(itemId, {
+        start_at: newStart.toISOString(),
+        end_at: newEnd.toISOString(),
+        resource_id: targetResourceId,
+      });
+      await reload();
+    },
+    [items, reload],
+  );
+
   return (
     <div
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
@@ -226,6 +261,7 @@ export default function PlanningApp() {
                 setModal({ open: true, editing: null, preset: { resource_id, date } })
               }
               onItemClick={(item) => setModal({ open: true, editing: item })}
+              onItemDrop={handleItemDrop}
             />
           ) : tab === "open" ? (
             <OpenShiftsView
@@ -310,6 +346,7 @@ function ScheduleView({
   onToday,
   onCellClick,
   onItemClick,
+  onItemDrop,
 }: {
   weekStart: Date;
   items: PlanningItem[];
@@ -320,7 +357,14 @@ function ScheduleView({
   onToday: () => void;
   onCellClick: (resource_id: string | null, date: Date) => void;
   onItemClick: (item: PlanningItem) => void;
+  onItemDrop: (
+    itemId: string,
+    resourceId: string | null,
+    date: Date,
+  ) => void | Promise<void>;
 }) {
+  // Track the cell currently under the dragged pointer so we can style it.
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const { t } = useTranslation(planningT);
   const [groupBy, setGroupBy] = useState<"resource" | "role">("resource");
   const [resourceType, setResourceType] = useState<PlanningResourceType | "all">("all");
@@ -611,19 +655,47 @@ function ScheduleView({
               const key = `${row.id}|${toLocalDateKey(d.toISOString())}`;
               const cellItems = byCell.get(key) ?? [];
               const resourceId = row.id === "__open__" ? null : row.id;
+              const isDragTarget = dragOverKey === key;
+              const droppable = groupBy === "resource";
               return (
                 <button
                   key={i}
+                  type="button"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest("[data-item-pill]"))
                       return;
                     if (groupBy !== "resource") return;
                     onCellClick(resourceId, d);
                   }}
-                  className="min-h-[70px] p-1.5 border-r last:border-r-0 border-[var(--border-subtle)] text-start hover:bg-[var(--bg-surface-subtle)] transition-colors flex flex-col gap-1"
+                  onDragOver={(e) => {
+                    if (!droppable) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverKey !== key) setDragOverKey(key);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverKey === key) setDragOverKey(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!droppable) return;
+                    e.preventDefault();
+                    setDragOverKey(null);
+                    const itemId = e.dataTransfer.getData("text/plain");
+                    if (itemId) onItemDrop(itemId, resourceId, d);
+                  }}
+                  className={`min-h-[70px] p-1.5 border-r last:border-r-0 border-[var(--border-subtle)] text-start transition-colors flex flex-col gap-1 ${
+                    isDragTarget
+                      ? "bg-amber-500/10 ring-1 ring-inset ring-amber-400/40"
+                      : "hover:bg-[var(--bg-surface-subtle)]"
+                  }`}
                 >
                   {cellItems.map((it) => (
-                    <ItemPill key={it.id} item={it} onClick={onItemClick} />
+                    <ItemPill
+                      key={it.id}
+                      item={it}
+                      onClick={onItemClick}
+                      draggable={droppable}
+                    />
                   ))}
                 </button>
               );
@@ -681,9 +753,11 @@ function MobileItemRow({
 function ItemPill({
   item,
   onClick,
+  draggable = false,
 }: {
   item: PlanningItem;
   onClick: (i: PlanningItem) => void;
+  draggable?: boolean;
 }) {
   const { t } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
@@ -695,13 +769,19 @@ function ItemPill({
   return (
     <div
       data-item-pill
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", item.id);
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick(item);
       }}
       className={`rounded-md px-1.5 py-1 text-[10px] leading-tight cursor-pointer hover:opacity-90 transition-opacity ${
         isDraft ? "border border-dashed" : ""
-      }`}
+      } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{
         background: `${color}22`,
         borderColor: isDraft ? color : "transparent",

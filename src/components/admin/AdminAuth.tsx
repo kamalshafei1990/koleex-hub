@@ -146,12 +146,14 @@ export default function AdminAuth({ title, subtitle, children }: Props) {
     setSignInBusy(false);
 
     if (!result.ok) {
-      if (result.reason === "not_found") {
-        setSignInError("No account with that username.");
-      } else if (result.reason === "disabled") {
+      if (result.reason === "disabled") {
         setSignInError("This account is suspended or archived.");
+      } else if (result.reason === "network") {
+        setSignInError("Sign-in service is unreachable — check your connection and try again.");
       } else {
-        setSignInError("Incorrect password.");
+        // Deliberately neutral — covers both "username not found" and
+        // "wrong password" so attackers can't probe for valid usernames.
+        setSignInError("Invalid username or password.");
       }
       return;
     }

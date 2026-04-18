@@ -107,19 +107,27 @@ export interface PermissionCheck {
  */
 export function usePermission(module_name: string): PermissionCheck {
   const ctx = useScopeContext();
+  const { data: bootstrap, loading: bootstrapLoading } = useMeBootstrap();
   const [permState, setPermState] = useState<{
     allowed: boolean;
     loading: boolean;
   }>({ allowed: false, loading: true });
 
   useEffect(() => {
-    if (!ctx) {
+    // Never fall through to a denied state while bootstrap is still
+    // loading — otherwise a race between the legacy loadScopeContext
+    // fallback (which hits RLS-gated tables and can return empty data)
+    // and the real bootstrap payload would briefly flash the "No
+    // access" screen to Super Admins on hard refresh.
+    if (bootstrapLoading) {
       setPermState({ allowed: false, loading: true });
       return;
     }
 
-    // SA bypass — always allowed
-    if (ctx.is_super_admin) {
+    // Super Admin comes straight from the authoritative bootstrap —
+    // takes precedence over ctx because ctx can be stale for a tick
+    // when the page is rehydrating.
+    if (bootstrap?.isSuperAdmin) {
       setPermState({ allowed: true, loading: false });
       return;
     }
@@ -131,27 +139,24 @@ export function usePermission(module_name: string): PermissionCheck {
       return;
     }
 
-    // Fail-closed when no role
-    if (!ctx.role_id) {
-      setPermState({ allowed: false, loading: false });
+    // If we have bootstrap data, use its permittedModules list directly.
+    if (bootstrap) {
+      setPermState({
+        allowed: bootstrap.permittedModules.includes(module_name),
+        loading: false,
+      });
       return;
     }
 
-    // Read from the shared bootstrap — one round-trip for the whole
-    // page, then every usePermission subscribes to the cache.
-    import("./me-bootstrap").then(({ getMeBootstrap }) => {
-      void getMeBootstrap().then((payload) => {
-        if (!payload) {
-          setPermState({ allowed: false, loading: false });
-          return;
-        }
-        setPermState({
-          allowed: payload.permittedModules.includes(module_name),
-          loading: false,
-        });
-      });
-    });
-  }, [ctx, module_name]);
+    // Bootstrap finished with no payload (network error). Fall back to
+    // ctx if available — but only to determine SA status; anything less
+    // certain stays denied.
+    if (ctx?.is_super_admin) {
+      setPermState({ allowed: true, loading: false });
+      return;
+    }
+    setPermState({ allowed: false, loading: false });
+  }, [bootstrap, bootstrapLoading, ctx, module_name]);
 
   return { allowed: permState.allowed, loading: permState.loading, ctx };
 }

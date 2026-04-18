@@ -1344,11 +1344,16 @@ export async function verifyAccountLogin(
   password: string,
 ): Promise<
   | { ok: true; account: AccountRow }
-  | { ok: false; reason: "not_found" | "wrong_password" | "disabled" }
+  | { ok: false; reason: "wrong_password" | "disabled" | "network" }
 > {
   // API-first: /api/auth/signin verifies via the service_role client and
   // mints the HttpOnly session cookie in one round-trip. Required now that
   // the accounts table is no longer readable via the anon key.
+  //
+  // We intentionally do NOT return a separate "not_found" reason — the
+  // API deliberately returns an indistinguishable 401 for both missing
+  // accounts and wrong passwords so attackers can't probe for valid
+  // usernames. Collapsing the client too keeps that invariant honest.
   try {
     const res = await fetch("/api/auth/signin", {
       method: "POST",
@@ -1360,10 +1365,6 @@ export async function verifyAccountLogin(
       | { ok: true; account: { id: string; username: string; login_email: string; user_type: string } }
       | { ok: false; error: string };
     if (res.ok && "ok" in json && json.ok) {
-      // The signin route doesn't return the full AccountRow — it returns
-      // the minimal fields needed to bootstrap the client identity. For
-      // AdminAuth's downstream state (scope ctx, sidebar, etc.) the hard
-      // reload in the caller fetches the full account via /api/me.
       return {
         ok: true,
         account: {
@@ -1376,22 +1377,15 @@ export async function verifyAccountLogin(
       };
     }
     if (res.status === 403) return { ok: false, reason: "disabled" };
-    // 400 / 401 / anything else → indistinguishable bad credentials.
     return { ok: false, reason: "wrong_password" };
   } catch (e) {
+    // Pure network/DNS failure. The legacy anon-key fallback used to live
+    // here but it's useless post-RLS lockdown — it always returned null
+    // and surfaced a misleading "No account with that username" even for
+    // valid users when the real API was just briefly unreachable.
     console.error("[Accounts] verifyAccountLogin API failed:", e);
+    return { ok: false, reason: "network" };
   }
-
-  // Legacy fallback — only reachable on network failure. Kept so the app
-  // still attempts an auth before giving up.
-  const account = await fetchAccountByUsername(username);
-  if (!account) return { ok: false, reason: "not_found" };
-  if (account.status !== "active") return { ok: false, reason: "disabled" };
-  const expected = hashTempPassword(password);
-  if (!account.password_hash || account.password_hash !== expected) {
-    return { ok: false, reason: "wrong_password" };
-  }
-  return { ok: true, account };
 }
 
 /** Generate a short, human-readable temporary password. */
