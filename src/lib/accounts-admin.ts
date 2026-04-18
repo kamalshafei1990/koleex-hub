@@ -1192,7 +1192,43 @@ export async function replacePermissionOverrides(
     data_scope: string;
   }[],
 ): Promise<boolean> {
-  // Delete every existing row for this account first (simple and correct).
+  // Derive legacy access_level from granular flags for backward compat
+  const deriveLevel = (o: typeof nextOverrides[0]) => {
+    if (o.can_delete) return "admin";
+    if (o.can_edit) return "manager";
+    if (o.can_view || o.can_create) return "user";
+    return "none";
+  };
+  const payload = nextOverrides.map((o) => ({
+    account_id: accountId,
+    module_key: o.module_key,
+    can_view: o.can_view,
+    can_create: o.can_create,
+    can_edit: o.can_edit,
+    can_delete: o.can_delete,
+    data_scope: o.data_scope,
+    access_level: deriveLevel(o),
+  }));
+
+  // API-first: POST /api/accounts/[id]/permission-overrides replaces
+  // the whole set server-side via service_role. The anon-key DELETE +
+  // INSERT path below is blocked by RLS now.
+  try {
+    const res = await fetch(
+      "/api/accounts/" + accountId + "/permission-overrides",
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overrides: payload }),
+      },
+    );
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) return false;
+  } catch (e) {
+    console.error("[PermissionOverrides] replace API failed:", e);
+  }
+
   const { error: delErr } = await supabase
     .from(PERMISSION_OVERRIDES)
     .delete()
@@ -1202,25 +1238,6 @@ export async function replacePermissionOverrides(
     return false;
   }
   if (nextOverrides.length === 0) return true;
-
-  // Derive legacy access_level from granular flags for backward compat
-  const deriveLevel = (o: typeof nextOverrides[0]) => {
-    if (o.can_delete) return "admin";
-    if (o.can_edit) return "manager";
-    if (o.can_view || o.can_create) return "user";
-    return "none";
-  };
-
-  const payload = nextOverrides.map((o) => ({
-    account_id: accountId,
-    module_key: o.module_key,
-    can_view: o.can_view,
-    can_create: o.can_create,
-    can_edit: o.can_edit,
-    can_delete: o.can_delete,
-    data_scope: o.data_scope,
-    access_level: deriveLevel(o) as "none" | "user" | "manager" | "admin",
-  }));
   const { error: insErr } = await supabase
     .from(PERMISSION_OVERRIDES)
     .insert(payload);
