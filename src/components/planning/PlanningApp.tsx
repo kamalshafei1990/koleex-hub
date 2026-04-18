@@ -368,73 +368,176 @@ function ScheduleView({
 
   const rangeLabel = `${weekStart.toLocaleDateString("en", { month: "short", day: "numeric" })} – ${addDays(weekStart, 6).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })}`;
 
+  // Mobile-only: which day is currently in focus. Defaults to today if
+  // it's inside the current week, otherwise the first day of the week.
+  const todayKey = toLocalDateKey(new Date().toISOString());
+  const todayIdx = days.findIndex(
+    (d) => toLocalDateKey(d.toISOString()) === todayKey,
+  );
+  const [mobileDayIdx, setMobileDayIdx] = useState(
+    todayIdx >= 0 ? todayIdx : 0,
+  );
+  useEffect(() => {
+    setMobileDayIdx(todayIdx >= 0 ? todayIdx : 0);
+  }, [todayIdx, weekStart]);
+
+  const activeDay = days[mobileDayIdx] ?? days[0];
+
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
+      {/* Toolbar — stacks on mobile so controls don't cramp */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onPrev}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
           >
             <AngleLeftIcon size={14} />
           </button>
           <button
             onClick={onToday}
-            className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
+            className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] shrink-0"
           >
             Today
           </button>
           <button
             onClick={onNext}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
           >
             <AngleRightIcon size={14} />
           </button>
+          <div className="text-[12px] md:text-[13px] font-semibold text-[var(--text-primary)] truncate">
+            {rangeLabel}
+          </div>
         </div>
-        <div className="text-[13px] font-semibold text-[var(--text-primary)]">
-          {rangeLabel}
-        </div>
-        <div className="flex-1" />
 
-        {/* Group by */}
-        <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5">
-          {(["resource", "role"] as const).map((g) => (
-            <button
-              key={g}
-              onClick={() => setGroupBy(g)}
-              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
-                groupBy === g
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-              }`}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5">
+            {(["resource", "role"] as const).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-colors ${
+                  groupBy === g
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                By {g}
+              </button>
+            ))}
+          </div>
+
+          {groupBy === "resource" && (
+            <select
+              value={resourceType}
+              onChange={(e) =>
+                setResourceType(e.target.value as PlanningResourceType | "all")
+              }
+              className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] font-semibold"
             >
-              By {g}
-            </button>
-          ))}
+              <option value="all">All types</option>
+              <option value="employee">Employees</option>
+              <option value="material">Materials</option>
+              <option value="room">Rooms</option>
+              <option value="vehicle">Vehicles</option>
+              <option value="other">Other</option>
+            </select>
+          )}
         </div>
-
-        {/* Resource type filter */}
-        {groupBy === "resource" && (
-          <select
-            value={resourceType}
-            onChange={(e) =>
-              setResourceType(e.target.value as PlanningResourceType | "all")
-            }
-            className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] font-semibold"
-          >
-            <option value="all">All types</option>
-            <option value="employee">Employees</option>
-            <option value="material">Materials</option>
-            <option value="room">Rooms</option>
-            <option value="vehicle">Vehicles</option>
-            <option value="other">Other</option>
-          </select>
-        )}
       </div>
 
-      {/* Grid */}
-      <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
+      {/* ── Mobile: day pager + single-day list ── */}
+      <div className="md:hidden space-y-3">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-1">
+          {days.map((d, i) => {
+            const isToday =
+              toLocalDateKey(d.toISOString()) === todayKey;
+            const isActive = i === mobileDayIdx;
+            return (
+              <button
+                key={i}
+                onClick={() => setMobileDayIdx(i)}
+                className={`shrink-0 min-w-[44px] py-1.5 rounded-lg text-center transition-all ${
+                  isActive
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                    : isToday
+                      ? "text-amber-400"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <div className="text-[9px] font-bold uppercase tracking-wider">
+                  {d.toLocaleDateString("en", { weekday: "short" })}
+                </div>
+                <div className="text-[14px] font-bold leading-tight">
+                  {d.getDate()}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+          {rows.map((row) => {
+            const key = `${row.id}|${toLocalDateKey(activeDay.toISOString())}`;
+            const cellItems = byCell.get(key) ?? [];
+            const resourceId = row.id === "__open__" ? null : row.id;
+            return (
+              <div key={row.id} className="p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-1 h-5 rounded-full shrink-0"
+                    style={{ background: row.color ?? "var(--border-subtle)" }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
+                      {row.name}
+                    </div>
+                    {row.sub && (
+                      <div className="text-[10px] text-[var(--text-dim)] truncate capitalize">
+                        {row.sub}
+                      </div>
+                    )}
+                  </div>
+                  {groupBy === "resource" && (
+                    <button
+                      onClick={() => onCellClick(resourceId, activeDay)}
+                      className="h-7 w-7 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
+                      aria-label="Add item"
+                    >
+                      <PlusIcon size={12} />
+                    </button>
+                  )}
+                </div>
+                {cellItems.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {cellItems.map((it) => (
+                      <MobileItemRow
+                        key={it.id}
+                        item={it}
+                        onClick={onItemClick}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-[var(--text-dim)] pl-3">
+                    Nothing scheduled.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {rows.length === 1 && (
+            <div className="px-6 py-10 text-center text-[12px] text-[var(--text-dim)]">
+              No resources yet. Employees are auto-synced — head to{" "}
+              <b>Configuration</b> to add rooms, vehicles, or equipment.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Desktop: full 7-day grid ── */}
+      <div className="hidden md:block rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
         {/* Header row */}
         <div
           className="grid border-b border-[var(--border-subtle)]"
@@ -445,7 +548,7 @@ function ScheduleView({
           </div>
           {days.map((d, i) => {
             const isToday =
-              toLocalDateKey(d.toISOString()) === toLocalDateKey(new Date().toISOString());
+              toLocalDateKey(d.toISOString()) === todayKey;
             return (
               <div
                 key={i}
@@ -499,7 +602,6 @@ function ScheduleView({
                 <button
                   key={i}
                   onClick={(e) => {
-                    // Only create if the click wasn't on an item pill.
                     if ((e.target as HTMLElement).closest("[data-item-pill]"))
                       return;
                     if (groupBy !== "resource") return;
@@ -523,6 +625,43 @@ function ScheduleView({
         )}
       </div>
     </div>
+  );
+}
+
+/** Mobile list row — fuller info than ItemPill because it has real width. */
+function MobileItemRow({
+  item,
+  onClick,
+}: {
+  item: PlanningItem;
+  onClick: (i: PlanningItem) => void;
+}) {
+  const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
+  const t = (iso: string) =>
+    new Date(iso).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
+  const isDraft = item.status === "draft";
+  return (
+    <button
+      onClick={() => onClick(item)}
+      className={`w-full text-start rounded-lg px-2.5 py-2 flex items-center gap-2 transition-opacity hover:opacity-90 ${
+        isDraft ? "border border-dashed" : ""
+      }`}
+      style={{
+        background: `${color}22`,
+        borderColor: isDraft ? color : "transparent",
+      }}
+    >
+      <div className="w-1 h-8 rounded-full shrink-0" style={{ background: color }} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
+          {item.title || ITEM_TYPE_LABELS[item.type]}
+        </div>
+        <div className="text-[10px] text-[var(--text-dim)] truncate">
+          {t(item.start_at)} – {t(item.end_at)}
+          {item.role?.name ? ` · ${item.role.name}` : ""}
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -599,7 +738,7 @@ function OpenShiftsView({
         return (
           <div
             key={i.id}
-            className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 flex items-center gap-3"
+            className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-3 sm:p-4 flex items-center gap-2 sm:gap-3"
           >
             <div
               className="w-1 h-10 rounded-full shrink-0"
@@ -617,13 +756,13 @@ function OpenShiftsView({
             </div>
             <button
               onClick={() => onEdit(i)}
-              className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+              className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
             >
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => onTake(i.id)}
-              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 shrink-0"
             >
               Take
             </button>
@@ -922,11 +1061,11 @@ function ResourceConfig({
         your company profile — they'll appear on the schedule automatically.
       </p>
 
-      <div className="grid grid-cols-[110px_1fr_auto] gap-2">
+      <div className="grid grid-cols-[90px_1fr_auto] sm:grid-cols-[110px_1fr_auto] gap-1.5 sm:gap-2">
         <select
           value={type}
           onChange={(e) => setType(e.target.value as PlanningResourceType)}
-          className="h-9 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)]"
+          className="h-9 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] min-w-0"
         >
           <option value="room">Room</option>
           <option value="vehicle">Vehicle</option>
@@ -937,7 +1076,7 @@ function ResourceConfig({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Meeting Room B"
-          className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
+          className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none min-w-0"
         />
         <button
           onClick={add}
@@ -1113,10 +1252,10 @@ function ItemModal({
   };
 
   return (
-    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[90vh]">
+    <ScrollLockOverlay className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
           <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
             {editing ? "Edit item" : "New planning item"}
           </h2>
@@ -1129,9 +1268,9 @@ function ItemModal({
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-3 overflow-y-auto">
+        <div className="px-4 sm:px-5 py-4 space-y-3 overflow-y-auto">
           {/* Type + Title */}
-          <div className="grid grid-cols-[140px_1fr] gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2">
             <select
               value={type}
               onChange={(e) => setType(e.target.value as PlanningItemType)}
@@ -1152,7 +1291,7 @@ function ItemModal({
           </div>
 
           {/* Resource + Role */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label="Resource">
               <select
                 value={resourceId}
@@ -1198,7 +1337,7 @@ function ItemModal({
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Field label="Start">
               <input
                 type="datetime-local"
@@ -1218,7 +1357,7 @@ function ItemModal({
           </div>
 
           {/* Linked entity — free-form for now; a picker is easy to add later. */}
-          <div className="grid grid-cols-[140px_1fr] gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2">
             <select
               value={linkedType}
               onChange={(e) => setLinkedType(e.target.value)}
@@ -1253,7 +1392,7 @@ function ItemModal({
 
           {/* Status */}
           <Field label="Status">
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
               {(["draft", "published", "completed", "cancelled"] as const).map(
                 (s) => (
                   <button
@@ -1274,37 +1413,38 @@ function ItemModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-color)] shrink-0">
-          <div>
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-t border-[var(--border-color)] shrink-0">
+          <div className="shrink-0">
             {editing && (
               <button
                 onClick={() => {
                   if (confirm("Delete this item?")) onDelete(editing.id);
                 }}
-                className="h-9 px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5"
+                className="h-9 px-2.5 sm:px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5"
               >
-                <TrashIcon className="h-3.5 w-3.5" /> Delete
+                <TrashIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span>
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {editing && editing.status === "draft" && (
               <button
                 onClick={() => onPublish(editing.id)}
-                className="h-9 px-3 rounded-lg border border-emerald-500/40 text-emerald-400 text-[12px] font-semibold hover:bg-emerald-500/10"
+                className="h-9 px-2.5 sm:px-3 rounded-lg border border-emerald-500/40 text-emerald-400 text-[12px] font-semibold hover:bg-emerald-500/10"
               >
                 Publish
               </button>
             )}
             <button
               onClick={onClose}
-              className="h-9 px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold"
+              className="h-9 px-2.5 sm:px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold"
             >
               Cancel
             </button>
             <button
               onClick={save}
-              className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+              className="h-9 px-3 sm:px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
             >
               {editing ? "Save" : "Create"}
             </button>
