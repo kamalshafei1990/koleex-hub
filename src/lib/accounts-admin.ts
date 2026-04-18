@@ -105,10 +105,21 @@ export async function fetchAccountById(id: string): Promise<AccountRow | null> {
 export async function fetchAccountForHeader(
   id: string,
 ): Promise<AccountWithLinks | null> {
-  // API-first: /api/me/header returns the full enriched account via
-  // service_role. The anon-key read of accounts/people/roles is
-  // blocked by RLS now, so the legacy fallback below won't return data
-  // anyway — it's kept only for network-error resilience.
+  // Consult the shared bootstrap cache first — same response shape
+  // (with person + role joins) is already warm for the page. Saves an
+  // extra /api/me/header round-trip on every navigation.
+  try {
+    const { getMeBootstrap } = await import("./me-bootstrap");
+    const boot = await getMeBootstrap();
+    if (boot?.header && (boot.header as { id?: string }).id === id) {
+      return boot.header as unknown as AccountWithLinks;
+    }
+  } catch {
+    /* fall through to the dedicated endpoint */
+  }
+
+  // Not in cache (e.g. viewing a different account) → hit the
+  // dedicated /api/me/header endpoint. Blocked to service_role.
   try {
     const res = await fetch("/api/me/header", { credentials: "include" });
     if (res.ok) {
@@ -1223,7 +1234,17 @@ export async function replacePermissionOverrides(
         body: JSON.stringify({ overrides: payload }),
       },
     );
-    if (res.ok) return true;
+    if (res.ok) {
+      // Permissions just changed — invalidate the shared bootstrap
+      // cache so the next page nav sees the fresh set.
+      try {
+        const { invalidateMeBootstrap } = await import("./me-bootstrap");
+        invalidateMeBootstrap();
+      } catch {
+        /* ignore */
+      }
+      return true;
+    }
     if (res.status === 401 || res.status === 403) return false;
   } catch (e) {
     console.error("[PermissionOverrides] replace API failed:", e);
