@@ -14,6 +14,10 @@ import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import FolderIcon from "@/components/icons/ui/FolderIcon";
+import FileIcon from "@/components/icons/ui/FileIcon";
+import PinIcon from "@/components/icons/ui/PinIcon";
+import NotesIcon from "@/components/icons/NotesIcon";
 import type { NotesFolderRow } from "@/lib/notes";
 
 export type FolderSelection =
@@ -87,19 +91,22 @@ export default function FoldersSidebar({
       <nav className="px-2 mb-4 space-y-0.5">
         <SmartItem
           label={t("smart.allNotes")}
-          icon="📝"
+          Icon={NotesIcon}
+          tint="text-amber-400"
           active={selection.kind === "smart" && selection.key === "all"}
           onClick={() => onSelect({ kind: "smart", key: "all" })}
         />
         <SmartItem
           label={t("smart.pinned")}
-          icon="📌"
+          Icon={PinIcon}
+          tint="text-amber-400"
           active={selection.kind === "smart" && selection.key === "pinned"}
           onClick={() => onSelect({ kind: "smart", key: "pinned" })}
         />
         <SmartItem
           label={t("smart.none")}
-          icon="📄"
+          Icon={FileIcon}
+          tint="text-[var(--text-muted)]"
           active={selection.kind === "smart" && selection.key === "none"}
           onClick={() => onSelect({ kind: "smart", key: "none" })}
         />
@@ -139,7 +146,8 @@ export default function FoldersSidebar({
       <nav className="px-2 mt-5 pt-3 border-t border-[var(--border-subtle)] space-y-0.5">
         <SmartItem
           label={t("smart.trash")}
-          icon="🗑"
+          Icon={TrashIcon}
+          tint="text-[var(--text-muted)]"
           active={selection.kind === "smart" && selection.key === "trash"}
           onClick={() => onSelect({ kind: "smart", key: "trash" })}
         />
@@ -150,25 +158,27 @@ export default function FoldersSidebar({
 
 function SmartItem({
   label,
-  icon,
+  Icon,
+  tint,
   active,
   onClick,
 }: {
   label: string;
-  icon: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  tint: string;
   active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full h-8 px-2.5 rounded-lg flex items-center gap-2 transition-all text-[13px] ${
+      className={`w-full h-8 px-2.5 rounded-lg flex items-center gap-2.5 transition-all text-[13px] ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)] font-semibold"
           : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <span className="text-[13px] leading-none w-4 text-center">{icon}</span>
+      <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-[var(--text-primary)]" : tint}`} />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -236,15 +246,17 @@ function FolderTree({
 
               <button
                 onClick={() => onSelect({ kind: "folder", id: f.id })}
-                className={`flex-1 min-w-0 h-8 flex items-center gap-1.5 text-[13px] text-start ${
+                className={`flex-1 min-w-0 h-8 flex items-center gap-2 text-[13px] text-start ${
                   isActive
                     ? "text-[var(--text-primary)] font-semibold"
                     : "text-[var(--text-muted)]"
                 }`}
               >
-                <span className="text-[13px] leading-none">
-                  {f.icon ?? "📁"}
-                </span>
+                <FolderIcon
+                  className={`h-3.5 w-3.5 shrink-0 ${
+                    isActive ? "text-amber-400" : "text-[var(--text-faint)]"
+                  }`}
+                />
                 <span className="truncate flex-1">{f.name}</span>
                 {count > 0 && (
                   <span className="text-[10.5px] text-[var(--text-faint)] shrink-0">

@@ -12,6 +12,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import NotesIcon from "@/components/icons/NotesIcon";
 import {
   formatNoteTimestamp,
   groupNotesByDate,
@@ -66,12 +67,12 @@ export default function NotesList({
   }, [notes, isTrashView]);
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-56px)]">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="sticky top-14 z-10 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)] px-3 py-3">
-        <div className="flex items-center justify-between gap-2 mb-2.5">
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-3 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
-            <div className="text-[15px] font-bold text-[var(--text-primary)] truncate">
+            <div className="text-[15px] font-bold text-[var(--text-primary)] truncate leading-tight">
               {selectionLabel}
             </div>
             <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
@@ -111,10 +112,24 @@ export default function NotesList({
       </div>
 
       {/* List body */}
-      <div className="flex-1 py-2">
+      <div className="flex-1 overflow-y-auto py-1">
         {notes.length === 0 && (
-          <div className="px-4 py-10 text-center text-[12px] text-[var(--text-dim)]">
-            {search.trim() ? t("noMatch") : t("nothing")}
+          <div className="h-full min-h-[240px] flex flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-faint)]">
+              <NotesIcon size={22} />
+            </div>
+            <div className="text-[13px] text-[var(--text-muted)]">
+              {search.trim() ? t("noMatch") : t("nothing")}
+            </div>
+            {!search.trim() && !isTrashView && (
+              <button
+                onClick={onCreate}
+                className="mt-1 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-all flex items-center gap-1.5"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                {t("newNote")}
+              </button>
+            )}
           </div>
         )}
 

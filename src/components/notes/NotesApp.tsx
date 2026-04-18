@@ -286,8 +286,8 @@ export default function NotesApp() {
       <MainHeader />
       <Sidebar />
 
-      <main className="pt-14 md:ps-[68px] min-h-screen">
-        <div className="grid grid-cols-1 md:grid-cols-[260px_320px_1fr] min-h-[calc(100vh-56px)]">
+      <main className="pt-14 md:ps-[68px] h-screen overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-[260px_320px_1fr] h-[calc(100vh-56px)]">
           {/* Pane 1 — Folders */}
           <div className="hidden md:block border-e border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 overflow-y-auto">
             <FoldersSidebar
@@ -302,7 +302,7 @@ export default function NotesApp() {
           </div>
 
           {/* Pane 2 — Notes list */}
-          <div className="hidden md:block border-e border-[var(--border-subtle)] overflow-y-auto">
+          <div className="hidden md:block border-e border-[var(--border-subtle)] overflow-hidden">
             <NotesList
               notes={notes}
               activeId={activeNoteId}
@@ -331,7 +331,7 @@ export default function NotesApp() {
           </div>
 
           {/* Pane 3 — Editor */}
-          <div className="overflow-y-auto">
+          <div className="overflow-hidden">
             <NoteEditor
               note={activeNote}
               folders={folders}

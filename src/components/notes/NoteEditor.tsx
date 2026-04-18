@@ -30,6 +30,7 @@ import { notesT } from "@/lib/translations/notes";
 import type { NoteFull, NotesFolderRow } from "@/lib/notes";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import NotesIcon from "@/components/icons/NotesIcon";
 
 export default function NoteEditor({
   note,
@@ -152,8 +153,13 @@ export default function NoteEditor({
   // Empty state
   if (!note) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center text-[13px] text-[var(--text-dim)]">
-        {t("selectOne")}
+      <div className="h-full min-h-[60vh] flex flex-col items-center justify-center gap-3 text-center px-6">
+        <div className="w-14 h-14 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-faint)]">
+          <NotesIcon size={24} />
+        </div>
+        <div className="text-[13px] text-[var(--text-muted)]">
+          {t("selectOne")}
+        </div>
       </div>
     );
   }
@@ -161,9 +167,9 @@ export default function NoteEditor({
   const isTrashed = note.deleted_at !== null;
 
   return (
-    <div className="min-h-[calc(100vh-56px)] flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Toolbar */}
-      <div className="sticky top-14 z-10 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-b border-[var(--border-subtle)] px-4 md:px-6 py-2 flex items-center gap-2 flex-wrap">
+      <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] px-4 md:px-6 py-2 flex items-center gap-2 flex-wrap">
         <EditorToolbar editor={editor} t={t} readOnly={readOnly} />
 
         <div className="flex-1" />
@@ -232,8 +238,8 @@ export default function NoteEditor({
         )}
       </div>
 
-      {/* Title + body */}
-      <div className="flex-1 px-4 md:px-8 lg:px-12 py-6">
+      {/* Title + body — scrollable area */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-6">
         <input
           type="text"
           value={titleDraft}
