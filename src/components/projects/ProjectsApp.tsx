@@ -880,14 +880,10 @@ function TasksListView({ mine, tags }: { mine: boolean; tags: ProjectTag[] }) {
         </div>
       )}
 
-      <TaskFormModal
+      <FlatTaskFormModal
         open={taskModal.open}
         editing={taskModal.editing}
-        projectId={taskModal.editing?.project_id ?? ""}
-        presetStageId={null}
-        stages={[]}
         tags={tags}
-        reloadTags={() => { /* no-op; parent tab reloads on save */ }}
         onClose={() => setTaskModal({ open: false, editing: null })}
         onSaved={() => { setTaskModal({ open: false, editing: null }); reload(); }}
       />
@@ -1178,6 +1174,51 @@ function TagRow({ tag, onReload }: { tag: ProjectTag; onReload: () => void }) {
   );
 }
 
+/** Thin wrapper for opening the task modal from the flat My/All Tasks
+ *  views — loads the editing task's project stages on demand so the
+ *  Stage selector isn't stuck on "—". */
+function FlatTaskFormModal({
+  open,
+  editing,
+  tags,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  editing: TaskRow | null;
+  tags: ProjectTag[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [stages, setStages] = useState<ProjectStage[]>([]);
+
+  useEffect(() => {
+    if (!open || !editing) {
+      setStages([]);
+      return;
+    }
+    let cancelled = false;
+    fetchStages(editing.project_id).then((s) => {
+      if (!cancelled) setStages(s);
+    });
+    return () => { cancelled = true; };
+  }, [open, editing]);
+
+  return (
+    <TaskFormModal
+      open={open}
+      editing={editing}
+      projectId={editing?.project_id ?? ""}
+      presetStageId={null}
+      stages={stages}
+      tags={tags}
+      reloadTags={() => { /* no-op */ }}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════
    PROJECT FORM MODAL
    ══════════════════════════════════════════════════════════════════ */
@@ -1322,7 +1363,7 @@ function ProjectFormModal({
               </label>
             </Field>
           </div>
-          <Field label={t("task.stage")}>
+          <Field label={t("form.status")}>
             <div className="flex gap-1.5 flex-wrap">
               {(["active", "on_hold", "completed", "archived"] as const).map((s) => (
                 <button
@@ -1581,7 +1622,7 @@ function TaskFormModal({
             )}
           </div>
 
-          <Field label={t("task.stage")}>
+          <Field label={t("task.status")}>
             <div className="flex gap-1.5 flex-wrap">
               {(["open", "done", "cancelled"] as const).map((s) => (
                 <button

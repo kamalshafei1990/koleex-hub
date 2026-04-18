@@ -50,6 +50,8 @@ export const projectsT: Translations = {
   "form.plannedStart": { en: "Start",               zh: "开始",              ar: "البداية" },
   "form.plannedEnd":   { en: "End",                 zh: "结束",              ar: "النهاية" },
   "form.budgetHours":  { en: "Budget (hrs)",        zh: "预算（小时）",      ar: "الميزانية (ساعة)" },
+  "form.status":       { en: "Status",              zh: "状态",              ar: "الحالة" },
+  "task.status":       { en: "Status",              zh: "状态",              ar: "الحالة" },
 
   /* Task form */
   "task.title.new":    { en: "New task",            zh: "新建任务",          ar: "مهمة جديدة" },
