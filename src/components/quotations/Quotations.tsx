@@ -670,7 +670,7 @@ export default function Quotations() {
             </div>
             <button
               onClick={handleNew}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-[var(--text-primary)] rounded-xl text-sm font-medium transition active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-xl text-sm font-medium transition active:scale-95"
             >
               <PlusIcon size={18} />
               New Quotation
@@ -800,7 +800,7 @@ export default function Quotations() {
         </button>
         <button
           onClick={() => handleSave("final")}
-          className="px-4 py-2 text-sm text-[var(--text-primary)] bg-emerald-600 hover:bg-emerald-500 rounded-lg font-semibold transition"
+          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
         >
           Save Final
         </button>
