@@ -1,0 +1,175 @@
+import type { Translations } from "@/lib/i18n";
+
+/* ---------------------------------------------------------------------------
+   planning — i18n strings for the Planning app.
+   Keys are grouped by screen (app, tabs, schedule, modal, roles,
+   resources, status, types, linked-entity, empty, actions).
+   --------------------------------------------------------------------------- */
+
+export const planningT: Translations = {
+  /* App shell */
+  "app.title":         { en: "Planning",
+                         zh: "计划",
+                         ar: "التخطيط" },
+  "app.subtitle":      { en: "Plan anything — shifts, meetings, production runs, deliveries, maintenance, project tasks.",
+                         zh: "计划一切——班次、会议、生产运行、交付、维护、项目任务。",
+                         ar: "خطّط لأي شيء — المناوبات، الاجتماعات، عمليات الإنتاج، التوصيل، الصيانة، مهام المشروع." },
+  "action.new":        { en: "New",              zh: "新建",              ar: "جديد" },
+
+  /* Tabs */
+  "tab.schedule":      { en: "Schedule",         zh: "日程",              ar: "الجدول" },
+  "tab.openShifts":    { en: "Open Shifts",      zh: "空闲班次",           ar: "المناوبات المفتوحة" },
+  "tab.myPlanning":    { en: "My Planning",      zh: "我的计划",           ar: "تخطيطي" },
+  "tab.configuration": { en: "Configuration",    zh: "配置",              ar: "الإعدادات" },
+
+  /* Schedule toolbar */
+  "sched.today":       { en: "Today",            zh: "今天",              ar: "اليوم" },
+  "sched.byResource":  { en: "By resource",      zh: "按资源",            ar: "حسب المورد" },
+  "sched.byRole":      { en: "By role",          zh: "按角色",            ar: "حسب الدور" },
+  "sched.allTypes":    { en: "All types",        zh: "所有类型",          ar: "كل الأنواع" },
+  "sched.employees":   { en: "Employees",        zh: "员工",              ar: "الموظفون" },
+  "sched.materials":   { en: "Materials",        zh: "物料",              ar: "المواد" },
+  "sched.rooms":       { en: "Rooms",            zh: "会议室",            ar: "الغرف" },
+  "sched.vehicles":    { en: "Vehicles",         zh: "车辆",              ar: "المركبات" },
+  "sched.other":       { en: "Other",            zh: "其他",              ar: "أخرى" },
+  "sched.resource":    { en: "Resource",         zh: "资源",              ar: "المورد" },
+  "sched.role":        { en: "Role",             zh: "角色",              ar: "الدور" },
+  "sched.addItem":     { en: "Add item",         zh: "添加项目",           ar: "إضافة عنصر" },
+  "sched.openShiftsRow": { en: "Open shifts",    zh: "空闲班次",           ar: "مناوبات مفتوحة" },
+  "sched.unassigned":  { en: "Unassigned",       zh: "未分配",            ar: "غير مُسنَد" },
+  "sched.unrolled":    { en: "Unrolled",         zh: "未分配角色",         ar: "بدون دور" },
+  "sched.noRole":      { en: "No role",          zh: "无角色",            ar: "لا يوجد دور" },
+  "sched.nothing":     { en: "Nothing scheduled.",
+                         zh: "没有安排。",
+                         ar: "لا يوجد جدول." },
+  "sched.noResources": { en: "No resources yet. Employees are auto-synced — head to Configuration to add rooms, vehicles, or equipment.",
+                         zh: "还没有资源。员工会自动同步——请到\"配置\"添加会议室、车辆或设备。",
+                         ar: "لا توجد موارد بعد. تتم مزامنة الموظفين تلقائيًا — اذهب إلى \"الإعدادات\" لإضافة غرف أو مركبات أو معدات." },
+
+  /* Item modal */
+  "modal.new":         { en: "New planning item",
+                         zh: "新建计划项",
+                         ar: "عنصر تخطيط جديد" },
+  "modal.edit":        { en: "Edit item",
+                         zh: "编辑项目",
+                         ar: "تعديل العنصر" },
+  "modal.titlePlaceholder": { en: "Title (optional for shifts)",
+                              zh: "标题（班次可选）",
+                              ar: "العنوان (اختياري للمناوبات)" },
+  "modal.resource":    { en: "Resource",         zh: "资源",              ar: "المورد" },
+  "modal.role":        { en: "Role",             zh: "角色",              ar: "الدور" },
+  "modal.start":       { en: "Start",            zh: "开始",              ar: "البداية" },
+  "modal.end":         { en: "End",              zh: "结束",              ar: "النهاية" },
+  "modal.notes":       { en: "Notes",            zh: "备注",              ar: "ملاحظات" },
+  "modal.status":      { en: "Status",           zh: "状态",              ar: "الحالة" },
+  "modal.unassignedOption": { en: "— Unassigned (open shift) —",
+                              zh: "— 未分配（空闲班次）—",
+                              ar: "— غير مُسنَد (مناوبة مفتوحة) —" },
+  "modal.noneOption":  { en: "— None —",         zh: "— 无 —",            ar: "— لا يوجد —" },
+  "modal.notLinked":   { en: "Not linked",       zh: "未关联",            ar: "غير مرتبط" },
+  "modal.linkedLabelPlaceholder":
+    { en: "Label (e.g. Acme Corp, SO-1042, etc.)",
+      zh: "标签（如 Acme Corp、SO-1042 等）",
+      ar: "التسمية (مثلًا Acme Corp، SO-1042، إلخ)" },
+  "modal.deleteConfirm": { en: "Delete this item?",
+                           zh: "删除此项目？",
+                           ar: "حذف هذا العنصر؟" },
+
+  /* Status pills */
+  "status.draft":      { en: "draft",            zh: "草稿",              ar: "مسودة" },
+  "status.published":  { en: "published",        zh: "已发布",            ar: "منشور" },
+  "status.completed":  { en: "completed",        zh: "已完成",            ar: "مكتمل" },
+  "status.cancelled":  { en: "cancelled",        zh: "已取消",            ar: "ملغى" },
+  "badge.draft":       { en: "Draft",            zh: "草稿",              ar: "مسودة" },
+  "badge.published":   { en: "Published",        zh: "已发布",            ar: "منشور" },
+  "badge.done":        { en: "Done",             zh: "完成",              ar: "منجز" },
+  "badge.cancelled":   { en: "Cancelled",        zh: "已取消",            ar: "ملغى" },
+
+  /* Item types */
+  "type.shift":        { en: "Shift",            zh: "班次",              ar: "مناوبة" },
+  "type.meeting":      { en: "Meeting",          zh: "会议",              ar: "اجتماع" },
+  "type.production":   { en: "Production",       zh: "生产",              ar: "إنتاج" },
+  "type.delivery":     { en: "Delivery",         zh: "交付",              ar: "توصيل" },
+  "type.maintenance":  { en: "Maintenance",      zh: "维护",              ar: "صيانة" },
+  "type.project_task": { en: "Project Task",     zh: "项目任务",          ar: "مهمة مشروع" },
+  "type.room_booking": { en: "Room Booking",     zh: "房间预订",          ar: "حجز غرفة" },
+  "type.other":        { en: "Other",            zh: "其他",              ar: "أخرى" },
+
+  /* Linked entity types */
+  "linked.customer":   { en: "Customer",         zh: "客户",              ar: "عميل" },
+  "linked.supplier":   { en: "Supplier",         zh: "供应商",            ar: "مورد" },
+  "linked.project":    { en: "Project",          zh: "项目",              ar: "مشروع" },
+  "linked.product":    { en: "Product",          zh: "产品",              ar: "منتج" },
+  "linked.quotation":  { en: "Quotation",        zh: "报价单",            ar: "عرض سعر" },
+  "linked.invoice":    { en: "Invoice",          zh: "发票",              ar: "فاتورة" },
+  "linked.other":      { en: "Other",            zh: "其他",              ar: "أخرى" },
+
+  /* Actions / buttons */
+  "btn.cancel":        { en: "Cancel",           zh: "取消",              ar: "إلغاء" },
+  "btn.save":          { en: "Save",             zh: "保存",              ar: "حفظ" },
+  "btn.create":        { en: "Create",           zh: "创建",              ar: "إنشاء" },
+  "btn.delete":        { en: "Delete",           zh: "删除",              ar: "حذف" },
+  "btn.publish":       { en: "Publish",          zh: "发布",              ar: "نشر" },
+  "btn.take":          { en: "Take",             zh: "领取",              ar: "أخذ" },
+  "btn.add":           { en: "Add",              zh: "添加",              ar: "إضافة" },
+
+  /* Open Shifts / My Planning empty states */
+  "empty.noOpen":      { en: "No open shifts right now.",
+                         zh: "当前没有空闲班次。",
+                         ar: "لا توجد مناوبات مفتوحة الآن." },
+  "empty.noMine":      { en: "Nothing on your schedule yet.",
+                         zh: "你的日程还没有安排。",
+                         ar: "لا يوجد شيء في جدولك بعد." },
+
+  /* Configuration — Roles */
+  "cfg.roles.title":   { en: "Planning roles",
+                         zh: "计划角色",
+                         ar: "أدوار التخطيط" },
+  "cfg.roles.help":    { en: "Job types that appear on the schedule. Each shift can be tagged with one role — a coloured line shows on the pill.",
+                         zh: "显示在日程中的职位类型。每个班次可标记一个角色，并在标签上显示彩色条。",
+                         ar: "أنواع الوظائف التي تظهر في الجدول. يمكن وسم كل مناوبة بدور واحد — يظهر خط ملوّن على البطاقة." },
+  "cfg.roles.placeholder": { en: "e.g. Warehouse Lead",
+                             zh: "例如：仓库主管",
+                             ar: "مثلًا: مشرف مستودع" },
+  "cfg.roles.empty":   { en: "No roles yet.",
+                         zh: "还没有角色。",
+                         ar: "لا توجد أدوار بعد." },
+  "cfg.roles.deleteConfirm":
+    { en: "Deactivate this role? Historical shifts keep their label.",
+      zh: "停用此角色？历史班次将保留其标签。",
+      ar: "تعطيل هذا الدور؟ ستحتفظ المناوبات السابقة بتسميتها." },
+
+  /* Configuration — Resources */
+  "cfg.resources.title": { en: "Non-employee resources",
+                           zh: "非员工资源",
+                           ar: "الموارد من غير الموظفين" },
+  "cfg.resources.help":  { en: "Rooms, vehicles, materials, equipment. Employees are auto-synced from your company profile — they'll appear on the schedule automatically.",
+                           zh: "会议室、车辆、物料、设备。员工会从公司资料自动同步，会自动出现在日程中。",
+                           ar: "الغرف والمركبات والمواد والمعدات. تتم مزامنة الموظفين تلقائيًا من ملف شركتك وسيظهرون في الجدول تلقائيًا." },
+  "cfg.resources.placeholder": { en: "e.g. Meeting Room B",
+                                 zh: "例如：会议室 B",
+                                 ar: "مثلًا: غرفة الاجتماعات B" },
+  "cfg.resources.empty": { en: "No resources yet.",
+                           zh: "还没有资源。",
+                           ar: "لا توجد موارد بعد." },
+  "cfg.resources.syncedLabel": { en: "Employees synced from this tenant",
+                                 zh: "从此租户同步的员工",
+                                 ar: "الموظفون المزامنون من هذه المؤسسة" },
+  "cfg.resources.syncedEmpty": { en: "None yet — internal accounts will appear after their first sign-in.",
+                                 zh: "还没有——内部帐户在首次登录后才会出现。",
+                                 ar: "لا يوجد بعد — ستظهر الحسابات الداخلية بعد أول تسجيل دخول لها." },
+  "cfg.resources.type.room":    { en: "Room",     zh: "会议室",          ar: "غرفة" },
+  "cfg.resources.type.vehicle": { en: "Vehicle",  zh: "车辆",            ar: "مركبة" },
+  "cfg.resources.type.material":{ en: "Material", zh: "物料",            ar: "مادة" },
+  "cfg.resources.type.other":   { en: "Other",    zh: "其他",            ar: "أخرى" },
+  "cfg.resources.deleteConfirm":{ en: "Deactivate this resource?",
+                                  zh: "停用此资源？",
+                                  ar: "تعطيل هذا المورد؟" },
+  "cfg.resources.renamePrompt": { en: "New name",
+                                  zh: "新名称",
+                                  ar: "الاسم الجديد" },
+
+  /* Tooltips */
+  "tip.rename":        { en: "Rename",           zh: "重命名",            ar: "إعادة تسمية" },
+  "tip.pin":           { en: "Pin",              zh: "置顶",              ar: "تثبيت" },
+};

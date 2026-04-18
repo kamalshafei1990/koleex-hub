@@ -14,6 +14,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
+import { planningT } from "@/lib/translations/planning";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
@@ -61,6 +63,7 @@ import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 type TabId = "schedule" | "open" | "mine" | "config";
 
 export default function PlanningApp() {
+  const { t } = useTranslation(planningT);
   const [tab, setTab] = useState<TabId>("schedule");
 
   // Shared data — the schedule tab consumes everything, so load it up front.
@@ -157,7 +160,7 @@ export default function PlanningApp() {
                 <PlanningIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Planning
+                {t("app.title")}
               </h1>
             </div>
             <button
@@ -165,12 +168,11 @@ export default function PlanningApp() {
               className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0"
             >
               <PlusIcon size={16} />
-              <span className="hidden md:inline">New</span>
+              <span className="hidden md:inline">{t("action.new")}</span>
             </button>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
-            Plan anything — shifts, meetings, production runs, deliveries,
-            maintenance, project tasks.
+            {t("app.subtitle")}
           </p>
 
           {/* Tabs */}
@@ -179,25 +181,25 @@ export default function PlanningApp() {
               active={tab === "schedule"}
               onClick={() => setTab("schedule")}
               icon={<CalendarRawIcon size={13} />}
-              label="Schedule"
+              label={t("tab.schedule")}
             />
             <TabButton
               active={tab === "open"}
               onClick={() => setTab("open")}
               icon={<PaperPlaneIcon size={13} />}
-              label="Open Shifts"
+              label={t("tab.openShifts")}
             />
             <TabButton
               active={tab === "mine"}
               onClick={() => setTab("mine")}
               icon={<ClockIcon size={13} />}
-              label="My Planning"
+              label={t("tab.myPlanning")}
             />
             <TabButton
               active={tab === "config"}
               onClick={() => setTab("config")}
               icon={<CogIcon size={13} />}
-              label="Configuration"
+              label={t("tab.configuration")}
             />
           </div>
         </div>
@@ -318,6 +320,7 @@ function ScheduleView({
   onCellClick: (resource_id: string | null, date: Date) => void;
   onItemClick: (item: PlanningItem) => void;
 }) {
+  const { t } = useTranslation(planningT);
   const [groupBy, setGroupBy] = useState<"resource" | "role">("resource");
   const [resourceType, setResourceType] = useState<PlanningResourceType | "all">("all");
 
@@ -351,7 +354,12 @@ function ScheduleView({
   const rows =
     groupBy === "resource"
       ? [
-          { id: "__open__", name: "Open shifts", sub: "Unassigned", color: null },
+          {
+            id: "__open__",
+            name: t("sched.openShiftsRow"),
+            sub: t("sched.unassigned"),
+            color: null,
+          },
           ...visibleResources.map((r) => ({
             id: r.id,
             name: r.name,
@@ -360,7 +368,12 @@ function ScheduleView({
           })),
         ]
       : [
-          { id: "__none__", name: "Unrolled", sub: "No role", color: null },
+          {
+            id: "__none__",
+            name: t("sched.unrolled"),
+            sub: t("sched.noRole"),
+            color: null,
+          },
           ...roles
             .filter((r) => r.is_active)
             .map((r) => ({ id: r.id, name: r.name, sub: null, color: r.color })),
@@ -398,7 +411,7 @@ function ScheduleView({
             onClick={onToday}
             className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] shrink-0"
           >
-            Today
+            {t("sched.today")}
           </button>
           <button
             onClick={onNext}
@@ -423,7 +436,7 @@ function ScheduleView({
                     : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                By {g}
+                {t(g === "resource" ? "sched.byResource" : "sched.byRole")}
               </button>
             ))}
           </div>
@@ -436,12 +449,12 @@ function ScheduleView({
               }
               className="h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] font-semibold"
             >
-              <option value="all">All types</option>
-              <option value="employee">Employees</option>
-              <option value="material">Materials</option>
-              <option value="room">Rooms</option>
-              <option value="vehicle">Vehicles</option>
-              <option value="other">Other</option>
+              <option value="all">{t("sched.allTypes")}</option>
+              <option value="employee">{t("sched.employees")}</option>
+              <option value="material">{t("sched.materials")}</option>
+              <option value="room">{t("sched.rooms")}</option>
+              <option value="vehicle">{t("sched.vehicles")}</option>
+              <option value="other">{t("sched.other")}</option>
             </select>
           )}
         </div>
@@ -503,7 +516,7 @@ function ScheduleView({
                     <button
                       onClick={() => onCellClick(resourceId, activeDay)}
                       className="h-7 w-7 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
-                      aria-label="Add item"
+                      aria-label={t("sched.addItem")}
                     >
                       <PlusIcon size={12} />
                     </button>
@@ -521,7 +534,7 @@ function ScheduleView({
                   </div>
                 ) : (
                   <div className="text-[11px] text-[var(--text-dim)] pl-3">
-                    Nothing scheduled.
+                    {t("sched.nothing")}
                   </div>
                 )}
               </div>
@@ -529,8 +542,7 @@ function ScheduleView({
           })}
           {rows.length === 1 && (
             <div className="px-6 py-10 text-center text-[12px] text-[var(--text-dim)]">
-              No resources yet. Employees are auto-synced — head to{" "}
-              <b>Configuration</b> to add rooms, vehicles, or equipment.
+              {t("sched.noResources")}
             </div>
           )}
         </div>
@@ -544,7 +556,7 @@ function ScheduleView({
           style={{ gridTemplateColumns: "220px repeat(7, 1fr)" }}
         >
           <div className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)] border-r border-[var(--border-subtle)]">
-            {groupBy === "resource" ? "Resource" : "Role"}
+            {groupBy === "resource" ? t("sched.resource") : t("sched.role")}
           </div>
           {days.map((d, i) => {
             const isToday =
@@ -619,8 +631,7 @@ function ScheduleView({
         ))}
         {rows.length === 1 && (
           <div className="px-6 py-10 text-center text-[12px] text-[var(--text-dim)]">
-            No resources yet. Employees are auto-synced from your company —
-            head to <b>Configuration</b> to add rooms, vehicles, or equipment.
+            {t("sched.noResources")}
           </div>
         )}
       </div>
@@ -636,8 +647,9 @@ function MobileItemRow({
   item: PlanningItem;
   onClick: (i: PlanningItem) => void;
 }) {
+  const { t } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
-  const t = (iso: string) =>
+  const fmt = (iso: string) =>
     new Date(iso).toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
   const isDraft = item.status === "draft";
   return (
@@ -654,10 +666,10 @@ function MobileItemRow({
       <div className="w-1 h-8 rounded-full shrink-0" style={{ background: color }} />
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
-          {item.title || ITEM_TYPE_LABELS[item.type]}
+          {item.title || t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
         </div>
         <div className="text-[10px] text-[var(--text-dim)] truncate">
-          {t(item.start_at)} – {t(item.end_at)}
+          {fmt(item.start_at)} – {fmt(item.end_at)}
           {item.role?.name ? ` · ${item.role.name}` : ""}
         </div>
       </div>
@@ -672,10 +684,11 @@ function ItemPill({
   item: PlanningItem;
   onClick: (i: PlanningItem) => void;
 }) {
+  const { t } = useTranslation(planningT);
   const color = item.role?.color ?? ITEM_TYPE_COLOR[item.type];
   const start = new Date(item.start_at);
   const end = new Date(item.end_at);
-  const t = (d: Date) =>
+  const fmt = (d: Date) =>
     d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
   const isDraft = item.status === "draft";
   return (
@@ -695,10 +708,10 @@ function ItemPill({
       }}
     >
       <div className="font-bold text-[10px] text-[var(--text-primary)] truncate">
-        {item.title || ITEM_TYPE_LABELS[item.type]}
+        {item.title || t(`type.${item.type}`, ITEM_TYPE_LABELS[item.type])}
       </div>
       <div className="text-[9px] opacity-80">
-        {t(start)}–{t(end)}
+        {fmt(start)}–{fmt(end)}
       </div>
     </div>
   );
@@ -719,13 +732,14 @@ function OpenShiftsView({
   onTake: (id: string) => void;
   onEdit: (i: PlanningItem) => void;
 }) {
+  const { t } = useTranslation(planningT);
   const published = items.filter((i) => i.status === "published");
 
   if (published.length === 0) {
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center">
         <div className="text-[13px] text-[var(--text-dim)]">
-          No open shifts right now.
+          {t("empty.noOpen")}
         </div>
       </div>
     );
@@ -746,7 +760,7 @@ function OpenShiftsView({
             />
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                {i.title || ITEM_TYPE_LABELS[i.type]}
+                {i.title || t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
                 {formatRange(i.start_at, i.end_at)} ·{" "}
@@ -764,7 +778,7 @@ function OpenShiftsView({
               onClick={() => onTake(i.id)}
               className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 shrink-0"
             >
-              Take
+              {t("btn.take")}
             </button>
           </div>
         );
@@ -778,7 +792,7 @@ function OpenShiftsView({
    ══════════════════════════════════════════════════════════════════ */
 
 function MyPlanningView({
-  resources,
+  resources: _resources,
   roles,
   onEdit,
 }: {
@@ -786,6 +800,7 @@ function MyPlanningView({
   roles: PlanningRole[];
   onEdit: (i: PlanningItem) => void;
 }) {
+  const { t } = useTranslation(planningT);
   const [mine, setMine] = useState<PlanningItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -809,7 +824,7 @@ function MyPlanningView({
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center">
         <div className="text-[13px] text-[var(--text-dim)]">
-          Nothing on your schedule yet.
+          {t("empty.noMine")}
         </div>
       </div>
     );
@@ -831,7 +846,7 @@ function MyPlanningView({
             />
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                {i.title || ITEM_TYPE_LABELS[i.type]}
+                {i.title || t(`type.${i.type}`, ITEM_TYPE_LABELS[i.type])}
               </div>
               <div className="text-[11px] text-[var(--text-dim)] truncate">
                 {formatRange(i.start_at, i.end_at)} ·{" "}
@@ -848,18 +863,19 @@ function MyPlanningView({
 }
 
 function StatusBadge({ status }: { status: PlanningItem["status"] }) {
-  const map: Record<PlanningItem["status"], { label: string; bg: string; fg: string }> = {
-    draft: { label: "Draft", bg: "bg-amber-500/15", fg: "text-amber-400" },
-    published: { label: "Published", bg: "bg-emerald-500/15", fg: "text-emerald-400" },
-    completed: { label: "Done", bg: "bg-blue-500/15", fg: "text-blue-400" },
-    cancelled: { label: "Cancelled", bg: "bg-rose-500/15", fg: "text-rose-400" },
+  const { t } = useTranslation(planningT);
+  const map: Record<PlanningItem["status"], { key: string; bg: string; fg: string }> = {
+    draft: { key: "badge.draft", bg: "bg-amber-500/15", fg: "text-amber-400" },
+    published: { key: "badge.published", bg: "bg-emerald-500/15", fg: "text-emerald-400" },
+    completed: { key: "badge.done", bg: "bg-blue-500/15", fg: "text-blue-400" },
+    cancelled: { key: "badge.cancelled", bg: "bg-rose-500/15", fg: "text-rose-400" },
   };
   const m = map[status];
   return (
     <span
       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${m.bg} ${m.fg}`}
     >
-      {m.label}
+      {t(m.key)}
     </span>
   );
 }
@@ -892,6 +908,7 @@ function RoleConfig({
   roles: PlanningRole[];
   onReload: () => Promise<void>;
 }) {
+  const { t } = useTranslation(planningT);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#60a5fa");
 
@@ -907,13 +924,10 @@ function RoleConfig({
       <div className="flex items-center gap-2">
         <UsersIcon size={14} className="text-[var(--text-dim)]" />
         <h3 className="text-[13px] font-bold text-[var(--text-primary)]">
-          Planning roles
+          {t("cfg.roles.title")}
         </h3>
       </div>
-      <p className="text-[11px] text-[var(--text-dim)]">
-        Job types that appear on the schedule. Each shift can be tagged with
-        one role — a coloured line shows on the pill.
-      </p>
+      <p className="text-[11px] text-[var(--text-dim)]">{t("cfg.roles.help")}</p>
 
       <div className="flex items-center gap-2">
         <input
@@ -925,14 +939,14 @@ function RoleConfig({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Warehouse Lead"
+          placeholder={t("cfg.roles.placeholder")}
           className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
         />
         <button
           onClick={add}
           className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
         >
-          Add
+          {t("btn.add")}
         </button>
       </div>
 
@@ -942,7 +956,7 @@ function RoleConfig({
         ))}
         {roles.length === 0 && (
           <div className="text-[12px] text-[var(--text-dim)] py-3">
-            No roles yet.
+            {t("cfg.roles.empty")}
           </div>
         )}
       </div>
@@ -957,6 +971,7 @@ function RoleRow({
   role: PlanningRole;
   onReload: () => Promise<void>;
 }) {
+  const { t } = useTranslation(planningT);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(role.name);
   const [color, setColor] = useState(role.color ?? "#60a5fa");
@@ -967,7 +982,7 @@ function RoleRow({
     await onReload();
   };
   const remove = async () => {
-    if (!confirm("Deactivate this role? Historical shifts keep their label.")) return;
+    if (!confirm(t("cfg.roles.deleteConfirm"))) return;
     await deleteRole(role.id);
     await onReload();
   };
@@ -991,7 +1006,7 @@ function RoleRow({
             onClick={save}
             className="h-7 px-2.5 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold"
           >
-            Save
+            {t("btn.save")}
           </button>
           <button
             onClick={() => setEditing(false)}
@@ -1034,6 +1049,7 @@ function ResourceConfig({
   resources: PlanningResource[];
   onReload: () => Promise<void>;
 }) {
+  const { t } = useTranslation(planningT);
   const [type, setType] = useState<PlanningResourceType>("room");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -1053,12 +1069,11 @@ function ResourceConfig({
       <div className="flex items-center gap-2">
         <CogIcon size={14} className="text-[var(--text-dim)]" />
         <h3 className="text-[13px] font-bold text-[var(--text-primary)]">
-          Non-employee resources
+          {t("cfg.resources.title")}
         </h3>
       </div>
       <p className="text-[11px] text-[var(--text-dim)]">
-        Rooms, vehicles, materials, equipment. Employees are auto-synced from
-        your company profile — they'll appear on the schedule automatically.
+        {t("cfg.resources.help")}
       </p>
 
       <div className="grid grid-cols-[90px_1fr_auto] sm:grid-cols-[110px_1fr_auto] gap-1.5 sm:gap-2">
@@ -1067,22 +1082,22 @@ function ResourceConfig({
           onChange={(e) => setType(e.target.value as PlanningResourceType)}
           className="h-9 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] min-w-0"
         >
-          <option value="room">Room</option>
-          <option value="vehicle">Vehicle</option>
-          <option value="material">Material</option>
-          <option value="other">Other</option>
+          <option value="room">{t("cfg.resources.type.room")}</option>
+          <option value="vehicle">{t("cfg.resources.type.vehicle")}</option>
+          <option value="material">{t("cfg.resources.type.material")}</option>
+          <option value="other">{t("cfg.resources.type.other")}</option>
         </select>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Meeting Room B"
+          placeholder={t("cfg.resources.placeholder")}
           className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none min-w-0"
         />
         <button
           onClick={add}
           className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
         >
-          Add
+          {t("btn.add")}
         </button>
       </div>
 
@@ -1092,14 +1107,14 @@ function ResourceConfig({
         ))}
         {nonEmployeeRes.length === 0 && (
           <div className="text-[12px] text-[var(--text-dim)] py-3">
-            No resources yet.
+            {t("cfg.resources.empty")}
           </div>
         )}
       </div>
 
       <div className="pt-3 border-t border-[var(--border-subtle)]">
         <div className="text-[11px] text-[var(--text-dim)] mb-1">
-          Employees synced from this tenant
+          {t("cfg.resources.syncedLabel")}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {resources
@@ -1114,7 +1129,7 @@ function ResourceConfig({
             ))}
           {resources.filter((r) => r.type === "employee").length === 0 && (
             <span className="text-[11px] text-[var(--text-dim)]">
-              None yet — internal accounts will appear after their first sign-in.
+              {t("cfg.resources.syncedEmpty")}
             </span>
           )}
         </div>
@@ -1130,13 +1145,14 @@ function ResourceRow({
   resource: PlanningResource;
   onReload: () => Promise<void>;
 }) {
+  const { t } = useTranslation(planningT);
   const remove = async () => {
-    if (!confirm("Deactivate this resource?")) return;
+    if (!confirm(t("cfg.resources.deleteConfirm"))) return;
     await deleteResource(resource.id);
     await onReload();
   };
   const rename = async () => {
-    const next = prompt("New name", resource.name);
+    const next = prompt(t("cfg.resources.renamePrompt"), resource.name);
     if (!next || next === resource.name) return;
     await updateResource(resource.id, { name: next });
     await onReload();
@@ -1190,6 +1206,7 @@ function ItemModal({
   onDelete: (id: string) => void | Promise<void>;
   onPublish: (id: string) => void | Promise<void>;
 }) {
+  const { t } = useTranslation(planningT);
   const [type, setType] = useState<PlanningItemType>("shift");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -1257,7 +1274,7 @@ function ItemModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[var(--border-color)] shrink-0">
           <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
-            {editing ? "Edit item" : "New planning item"}
+            {editing ? t("modal.edit") : t("modal.new")}
           </h2>
           <button
             onClick={onClose}
@@ -1278,35 +1295,45 @@ function ItemModal({
             >
               {(Object.keys(ITEM_TYPE_LABELS) as PlanningItemType[]).map((k) => (
                 <option key={k} value={k}>
-                  {ITEM_TYPE_LABELS[k]}
+                  {t(`type.${k}`, ITEM_TYPE_LABELS[k])}
                 </option>
               ))}
             </select>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title (optional for shifts)"
+              placeholder={t("modal.titlePlaceholder")}
               className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
             />
           </div>
 
           {/* Resource + Role */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Field label="Resource">
+            <Field label={t("modal.resource")}>
               <select
                 value={resourceId}
                 onChange={(e) => setResourceId(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)]"
               >
-                <option value="">— Unassigned (open shift) —</option>
+                <option value="">{t("modal.unassignedOption")}</option>
                 {(["employee", "room", "vehicle", "material", "other"] as const).map(
                   (typ) => {
                     const rs = resources.filter(
                       (r) => r.is_active && r.type === typ,
                     );
                     if (!rs.length) return null;
+                    const labelKey =
+                      typ === "employee"
+                        ? "sched.employees"
+                        : typ === "room"
+                          ? "cfg.resources.type.room"
+                          : typ === "vehicle"
+                            ? "cfg.resources.type.vehicle"
+                            : typ === "material"
+                              ? "cfg.resources.type.material"
+                              : "cfg.resources.type.other";
                     return (
-                      <optgroup key={typ} label={typ.toUpperCase()}>
+                      <optgroup key={typ} label={t(labelKey).toUpperCase()}>
                         {rs.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.name}
@@ -1318,13 +1345,13 @@ function ItemModal({
                 )}
               </select>
             </Field>
-            <Field label="Role">
+            <Field label={t("modal.role")}>
               <select
                 value={roleId}
                 onChange={(e) => setRoleId(e.target.value)}
                 className="w-full h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)]"
               >
-                <option value="">— None —</option>
+                <option value="">{t("modal.noneOption")}</option>
                 {roles
                   .filter((r) => r.is_active)
                   .map((r) => (
@@ -1338,7 +1365,7 @@ function ItemModal({
 
           {/* Dates */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Field label="Start">
+            <Field label={t("modal.start")}>
               <input
                 type="datetime-local"
                 value={startAt}
@@ -1346,7 +1373,7 @@ function ItemModal({
                 className="w-full h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
               />
             </Field>
-            <Field label="End">
+            <Field label={t("modal.end")}>
               <input
                 type="datetime-local"
                 value={endAt}
@@ -1363,25 +1390,25 @@ function ItemModal({
               onChange={(e) => setLinkedType(e.target.value)}
               className="h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)]"
             >
-              <option value="">Not linked</option>
-              <option value="customer">Customer</option>
-              <option value="supplier">Supplier</option>
-              <option value="project">Project</option>
-              <option value="product">Product</option>
-              <option value="quotation">Quotation</option>
-              <option value="invoice">Invoice</option>
-              <option value="other">Other</option>
+              <option value="">{t("modal.notLinked")}</option>
+              <option value="customer">{t("linked.customer")}</option>
+              <option value="supplier">{t("linked.supplier")}</option>
+              <option value="project">{t("linked.project")}</option>
+              <option value="product">{t("linked.product")}</option>
+              <option value="quotation">{t("linked.quotation")}</option>
+              <option value="invoice">{t("linked.invoice")}</option>
+              <option value="other">{t("linked.other")}</option>
             </select>
             <input
               value={linkedLabel}
               onChange={(e) => setLinkedLabel(e.target.value)}
-              placeholder="Label (e.g. Acme Corp, SO-1042, etc.)"
+              placeholder={t("modal.linkedLabelPlaceholder")}
               className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
             />
           </div>
 
           {/* Notes */}
-          <Field label="Notes">
+          <Field label={t("modal.notes")}>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -1391,7 +1418,7 @@ function ItemModal({
           </Field>
 
           {/* Status */}
-          <Field label="Status">
+          <Field label={t("modal.status")}>
             <div className="flex gap-1.5 flex-wrap">
               {(["draft", "published", "completed", "cancelled"] as const).map(
                 (s) => (
@@ -1404,7 +1431,7 @@ function ItemModal({
                         : "bg-[var(--bg-surface)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    {s}
+                    {t(`status.${s}`)}
                   </button>
                 ),
               )}
@@ -1418,12 +1445,12 @@ function ItemModal({
             {editing && (
               <button
                 onClick={() => {
-                  if (confirm("Delete this item?")) onDelete(editing.id);
+                  if (confirm(t("modal.deleteConfirm"))) onDelete(editing.id);
                 }}
                 className="h-9 px-2.5 sm:px-3 rounded-lg text-rose-400 hover:bg-rose-500/10 text-[12px] font-semibold flex items-center gap-1.5"
               >
                 <TrashIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Delete</span>
+                <span className="hidden sm:inline">{t("btn.delete")}</span>
               </button>
             )}
           </div>
@@ -1433,20 +1460,20 @@ function ItemModal({
                 onClick={() => onPublish(editing.id)}
                 className="h-9 px-2.5 sm:px-3 rounded-lg border border-emerald-500/40 text-emerald-400 text-[12px] font-semibold hover:bg-emerald-500/10"
               >
-                Publish
+                {t("btn.publish")}
               </button>
             )}
             <button
               onClick={onClose}
               className="h-9 px-2.5 sm:px-3 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] text-[12px] font-semibold"
             >
-              Cancel
+              {t("btn.cancel")}
             </button>
             <button
               onClick={save}
               className="h-9 px-3 sm:px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
             >
-              {editing ? "Save" : "Create"}
+              {editing ? t("btn.save") : t("btn.create")}
             </button>
           </div>
         </div>
