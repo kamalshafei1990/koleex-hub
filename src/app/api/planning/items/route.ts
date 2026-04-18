@@ -83,7 +83,9 @@ export async function GET(req: Request) {
     console.error("[api/planning/items GET]", error.message);
     return NextResponse.json({ error: "Failed to load items" }, { status: 500 });
   }
-  return NextResponse.json({ items: data ?? [] });
+  return NextResponse.json({ items: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(req: Request) {

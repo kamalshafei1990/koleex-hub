@@ -186,7 +186,9 @@ export async function GET(req: Request) {
     };
   });
 
-  return NextResponse.json({ opportunities: enriched });
+  return NextResponse.json({ opportunities: enriched }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 /* POST /api/crm/opportunities

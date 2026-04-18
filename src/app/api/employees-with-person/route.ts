@@ -78,5 +78,7 @@ export async function GET(req: Request) {
     ? mapped
     : mapped.filter((e) => e.account_id === null);
 
-  return NextResponse.json({ employees: filtered });
+  return NextResponse.json({ employees: filtered }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }

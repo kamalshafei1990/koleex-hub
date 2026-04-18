@@ -57,7 +57,21 @@ export async function GET(req: Request) {
     console.error("[api/invoices/doc GET]", error.message);
     return NextResponse.json({ error: "Failed to load invoices" }, { status: 500 });
   }
-  return NextResponse.json({ invoices: data ?? [] });
+
+  /* Strip the heavy doc.items array (carries base64 image data) for
+     the list view — easily 99% of the payload on invoice lists with
+     image-rich lines. /:id still returns the full doc. */
+  const slim = (data ?? []).map((row) => {
+    const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
+    const { items: _items, ...rest } = full;
+    return { ...(row as Record<string, unknown>), doc: rest };
+  });
+
+  return NextResponse.json({ invoices: slim }, {
+    headers: {
+      "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+    },
+  });
 }
 
 export async function POST(req: Request) {

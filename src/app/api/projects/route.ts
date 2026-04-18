@@ -52,7 +52,9 @@ export async function GET(req: Request) {
     console.error("[api/projects GET]", error.message);
     return NextResponse.json({ error: "Failed to load projects" }, { status: 500 });
   }
-  return NextResponse.json({ projects: data ?? [] });
+  return NextResponse.json({ projects: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(req: Request) {

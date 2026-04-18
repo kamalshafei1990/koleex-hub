@@ -50,7 +50,9 @@ export async function GET(req: Request) {
     );
   }
 
-  return NextResponse.json({ contacts: data ?? [] });
+  return NextResponse.json({ contacts: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 /* POST /api/contacts — Create a new contact (tenant_id enforced from session). */

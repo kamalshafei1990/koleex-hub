@@ -40,7 +40,9 @@ export async function GET(req: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ resources: data ?? [] });
+  return NextResponse.json({ resources: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(req: Request) {

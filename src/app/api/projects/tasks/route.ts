@@ -62,7 +62,9 @@ export async function GET(req: Request) {
     console.error("[api/projects/tasks GET]", error.message);
     return NextResponse.json({ error: "Failed to load tasks" }, { status: 500 });
   }
-  return NextResponse.json({ tasks: data ?? [] });
+  return NextResponse.json({ tasks: data ?? [] }, {
+    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(req: Request) {

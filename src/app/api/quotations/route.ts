@@ -68,7 +68,24 @@ export async function GET(req: Request) {
     console.error("[api/quotations GET]", error.message);
     return NextResponse.json({ error: "Failed to load quotations" }, { status: 500 });
   }
-  return NextResponse.json({ quotations: data ?? [] });
+
+  /* Strip the heavy `items` array (with base64 images) before
+     shipping to the browser. Items can account for 99% of the list
+     payload and are only needed when the user opens the editor —
+     the /:id GET still returns the complete doc. */
+  const slim = (data ?? []).map((row) => {
+    const full = (row as { doc?: Record<string, unknown> }).doc ?? {};
+    const { items: _items, ...rest } = full;
+    return { ...(row as Record<string, unknown>), doc: rest };
+  });
+
+  return NextResponse.json({ quotations: slim }, {
+    headers: {
+      // Private + short max-age so rapid back/forward navigation
+      // doesn't re-fetch, but any write invalidates quickly.
+      "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+    },
+  });
 }
 
 export async function POST(req: Request) {

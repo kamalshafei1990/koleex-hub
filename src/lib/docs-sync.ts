@@ -52,13 +52,19 @@ export const INVOICES_DOC_SYNC: DocBindings<"invoices", "invoice"> = {
   listKey: "invoices",
 };
 
+import { cachedFetchJson, invalidateFetchCache } from "@/lib/fetch-cache";
+
 export async function fetchDocList<T = Record<string, unknown>>(
   b: DocBindings<string, string>,
 ): Promise<RemoteDocRow<T>[]> {
-  const res = await fetch(b.listPath, { credentials: "include" });
-  if (!res.ok) return [];
-  const json = (await res.json()) as Record<string, RemoteDocRow<T>[]>;
-  return json[b.listKey] ?? [];
+  // 3 s client cache + in-flight dedup. The server also sends
+  // Cache-Control: max-age=5 so rapid navigation is instant.
+  try {
+    const json = await cachedFetchJson<Record<string, RemoteDocRow<T>[]>>(b.listPath);
+    return json[b.listKey] ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchDocOne<T = Record<string, unknown>>(
@@ -82,6 +88,8 @@ export async function upsertDoc<T = Record<string, unknown>>(
     body: JSON.stringify(body),
   });
   if (!res.ok) return null;
+  // Bust any cached list/detail responses so the next read is fresh.
+  invalidateFetchCache(b.listPath);
   const json = (await res.json()) as Record<string, RemoteDocRow<T>>;
   return json[b.oneKey] ?? null;
 }
@@ -94,6 +102,7 @@ export async function deleteDoc(
     method: "DELETE",
     credentials: "include",
   });
+  if (res.ok) invalidateFetchCache(b.listPath);
   return res.ok;
 }
 
