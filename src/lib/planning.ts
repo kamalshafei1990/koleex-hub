@@ -376,3 +376,49 @@ export function durationHours(startISO: string, endISO: string): number {
   const ms = new Date(endISO).getTime() - new Date(startISO).getTime();
   return Math.round((ms / 3600000) * 10) / 10;
 }
+
+/* ── Linked-entity search ── */
+
+export interface EntitySearchResult {
+  id: string;
+  label: string;
+  subtitle?: string | null;
+}
+
+export async function searchEntities(
+  type: "customer" | "supplier" | "contact" | "product",
+  q: string,
+): Promise<EntitySearchResult[]> {
+  const params = new URLSearchParams({ type, q });
+  const res = await fetch(`/api/planning/entity-search?${params.toString()}`, {
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const { results } = (await res.json()) as { results: EntitySearchResult[] };
+  return results ?? [];
+}
+
+/**
+ * Fetch planning items attached to a specific Hub entity. Used by the
+ * "Scheduled" strip on Customer / Supplier / Contact / Product detail pages.
+ */
+export async function fetchLinkedItems(
+  entityType: string,
+  entityId: string,
+  opts: { upcomingOnly?: boolean } = {},
+): Promise<PlanningItem[]> {
+  const q = new URLSearchParams({
+    linked_entity_type: entityType,
+    linked_entity_id: entityId,
+  });
+  if (opts.upcomingOnly) {
+    // Only items ending in the future.
+    q.set("start", new Date().toISOString());
+  }
+  const res = await fetch(`/api/planning/items?${q.toString()}`, {
+    credentials: "include",
+  });
+  if (!res.ok) return [];
+  const { items } = (await res.json()) as { items: PlanningItem[] };
+  return items ?? [];
+}

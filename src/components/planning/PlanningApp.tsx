@@ -30,6 +30,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlanningIcon from "@/components/icons/PlanningIcon";
+import EntityPicker from "@/components/planning/EntityPicker";
 import {
   addDays,
   createItem,
@@ -1215,6 +1216,7 @@ function ItemModal({
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [linkedType, setLinkedType] = useState<string>("");
+  const [linkedId, setLinkedId] = useState<string | null>(null);
   const [linkedLabel, setLinkedLabel] = useState<string>("");
   const [status, setStatus] = useState<PlanningItem["status"]>("draft");
 
@@ -1229,6 +1231,7 @@ function ItemModal({
       setStartAt(toDTLocal(editing.start_at));
       setEndAt(toDTLocal(editing.end_at));
       setLinkedType(editing.linked_entity_type ?? "");
+      setLinkedId(editing.linked_entity_id ?? null);
       setLinkedLabel(editing.linked_entity_label ?? "");
       setStatus(editing.status);
     } else {
@@ -1245,6 +1248,7 @@ function ItemModal({
       setStartAt(toDTLocal(startD.toISOString()));
       setEndAt(toDTLocal(endD.toISOString()));
       setLinkedType("");
+      setLinkedId(null);
       setLinkedLabel("");
       setStatus("draft");
     }
@@ -1263,6 +1267,7 @@ function ItemModal({
       start_at: new Date(startAt).toISOString(),
       end_at: new Date(endAt).toISOString(),
       linked_entity_type: linkedType || null,
+      linked_entity_id: linkedId,
       linked_entity_label: linkedLabel.trim() || null,
       status,
     });
@@ -1383,28 +1388,57 @@ function ItemModal({
             </Field>
           </div>
 
-          {/* Linked entity — free-form for now; a picker is easy to add later. */}
+          {/* Linked entity — real picker when type is searchable; free-text
+              fallback for project/quotation/invoice/other which don't have
+              typed pickers yet. */}
           <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-2">
             <select
               value={linkedType}
-              onChange={(e) => setLinkedType(e.target.value)}
+              onChange={(e) => {
+                setLinkedType(e.target.value);
+                // Clear the id/label when the type switches so the old
+                // selection doesn't carry over to a mismatched kind.
+                setLinkedId(null);
+                setLinkedLabel("");
+              }}
               className="h-10 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)]"
             >
               <option value="">{t("modal.notLinked")}</option>
               <option value="customer">{t("linked.customer")}</option>
               <option value="supplier">{t("linked.supplier")}</option>
-              <option value="project">{t("linked.project")}</option>
+              <option value="contact">{t("linked.customer")} / {t("linked.supplier")}</option>
               <option value="product">{t("linked.product")}</option>
+              <option value="project">{t("linked.project")}</option>
               <option value="quotation">{t("linked.quotation")}</option>
               <option value="invoice">{t("linked.invoice")}</option>
               <option value="other">{t("linked.other")}</option>
             </select>
-            <input
-              value={linkedLabel}
-              onChange={(e) => setLinkedLabel(e.target.value)}
-              placeholder={t("modal.linkedLabelPlaceholder")}
-              className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
-            />
+            {linkedType === "customer" ||
+            linkedType === "supplier" ||
+            linkedType === "contact" ||
+            linkedType === "product" ? (
+              <EntityPicker
+                entityType={linkedType as "customer" | "supplier" | "contact" | "product"}
+                entityId={linkedId}
+                entityLabel={linkedLabel || null}
+                onChange={(id, label) => {
+                  setLinkedId(id);
+                  setLinkedLabel(label ?? "");
+                }}
+                placeholder={t("modal.linkedLabelPlaceholder")}
+              />
+            ) : linkedType ? (
+              <input
+                value={linkedLabel}
+                onChange={(e) => setLinkedLabel(e.target.value)}
+                placeholder={t("modal.linkedLabelPlaceholder")}
+                className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none"
+              />
+            ) : (
+              <div className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center text-[12px] text-[var(--text-ghost)]">
+                —
+              </div>
+            )}
           </div>
 
           {/* Notes */}

@@ -91,6 +91,7 @@ import type { CrmOpportunityWithRelations } from "@/types/supabase";
 import { Country, State, City } from "country-state-city";
 import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
+import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -3200,6 +3201,22 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
               <TrashIcon size={14} /> {t("btn.delete")}
             </button>
           </div>
+        </div>
+
+        {/* Planning strip — upcoming items linked to this contact.
+            Renders for every contact type (customer / supplier / other); Planning
+            stores the contact's id against whichever role fits. */}
+        <div className="px-4 md:px-6 py-3 border-b border-[var(--border-color)]">
+          <EntityPlanningStrip
+            entityType={
+              c.contact_type === "customer"
+                ? "customer"
+                : c.contact_type === "supplier"
+                  ? "supplier"
+                  : "contact"
+            }
+            entityId={c.id}
+          />
         </div>
 
         {/* Premium tabs (Customer only) */}

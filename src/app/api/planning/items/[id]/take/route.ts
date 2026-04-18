@@ -58,5 +58,23 @@ export async function POST(_req: Request, { params }: RouteCtx) {
       { status: 409 },
     );
   }
+
+  // Notify the item's creator that the shift was claimed (fire-and-forget).
+  if (data.created_by_account_id && data.created_by_account_id !== auth.account_id) {
+    const start = new Date(data.start_at);
+    const fmt = (d: Date) =>
+      `${d.toLocaleDateString("en", { month: "short", day: "numeric" })} ${d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}`;
+    void supabaseServer.from("inbox_messages").insert({
+      recipient_account_id: data.created_by_account_id,
+      sender_account_id: auth.account_id,
+      tenant_id: auth.tenant_id,
+      category: "system",
+      subject: `Open shift taken: ${data.title || data.type}`,
+      body: `${auth.username} claimed the ${data.type} starting ${fmt(start)}.`,
+      link: "/planning",
+      metadata: { source: "planning", planning_item_id: data.id, type: data.type },
+    });
+  }
+
   return NextResponse.json({ item: data });
 }
