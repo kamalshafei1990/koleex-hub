@@ -11,6 +11,7 @@ import { notesT } from "@/lib/translations/notes";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
 import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -26,6 +27,7 @@ export default function NotesList({
   onSelect,
   onCreate,
   onTogglePin,
+  onRename,
   onDelete,
   onRestore,
   onPurge,
@@ -40,6 +42,7 @@ export default function NotesList({
   onSelect: (id: string) => void;
   onCreate: () => void;
   onTogglePin: (id: string, nextPinned: boolean) => void;
+  onRename: (id: string) => void;
   onDelete: (id: string) => void;
   onRestore: (id: string) => void;
   onPurge: (id: string) => void;
@@ -123,6 +126,7 @@ export default function NotesList({
             active={n.id === activeId}
             onSelect={onSelect}
             onTogglePin={onTogglePin}
+            onRename={onRename}
             onDelete={onDelete}
             onRestore={onRestore}
             onPurge={onPurge}
@@ -140,6 +144,7 @@ export default function NotesList({
                 active={n.id === activeId}
                 onSelect={onSelect}
                 onTogglePin={onTogglePin}
+                onRename={onRename}
                 onDelete={onDelete}
                 onRestore={onRestore}
                 onPurge={onPurge}
@@ -176,6 +181,7 @@ function NoteRowItem({
   active,
   onSelect,
   onTogglePin,
+  onRename,
   onDelete,
   onRestore,
   onPurge,
@@ -185,6 +191,7 @@ function NoteRowItem({
   active: boolean;
   onSelect: (id: string) => void;
   onTogglePin: (id: string, next: boolean) => void;
+  onRename: (id: string) => void;
   onDelete: (id: string) => void;
   onRestore: (id: string) => void;
   onPurge: (id: string) => void;
@@ -246,6 +253,16 @@ function NoteRowItem({
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
           {!isTrashView ? (
             <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRename(note.id);
+                }}
+                title="Rename"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+              >
+                <PencilIcon className="h-3 w-3" />
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

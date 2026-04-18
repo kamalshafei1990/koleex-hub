@@ -63,6 +63,10 @@ export default function NotesApp() {
     | { open: true; kind: "trash" | "purge" | "folder" | "emptyTrash"; id?: string; label?: string }
     | { open: false }
   >({ open: false });
+  const [notePrompt, setNotePrompt] = useState<
+    | { open: true; id: string; initial: string }
+    | { open: false }
+  >({ open: false });
 
   // Hydrate folders + notes on mount.
   useEffect(() => {
@@ -218,6 +222,37 @@ export default function NotesApp() {
       setDeletePrompt({ open: true, kind: "trash", id, label });
     },
     [notes, t],
+  );
+
+  const onAskRenameNote = useCallback(
+    (id: string) => {
+      const target = notes.find((n) => n.id === id);
+      if (!target) return;
+      setNotePrompt({
+        open: true,
+        id,
+        initial: target.title ?? "",
+      });
+    },
+    [notes],
+  );
+
+  const submitRenameNote = useCallback(
+    async (name: string) => {
+      if (!notePrompt.open) return;
+      const id = notePrompt.id;
+      const next = name.trim();
+      const ok = await updateNote(id, { title: next });
+      if (ok) {
+        setNotes((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, title: next } : n)),
+        );
+        if (activeNote?.id === id) {
+          setActiveNote({ ...activeNote, title: next });
+        }
+      }
+    },
+    [notePrompt, activeNote],
   );
 
   const onRestoreNote = useCallback(
@@ -472,6 +507,7 @@ export default function NotesApp() {
               onSelect={setActiveNoteId}
               onCreate={onCreateNote}
               onTogglePin={onTogglePin}
+              onRename={onAskRenameNote}
               onDelete={onDeleteNote}
               onRestore={onRestoreNote}
               onPurge={onPurgeNote}
@@ -529,6 +565,16 @@ export default function NotesApp() {
         initialValue={folderPrompt.open ? folderPrompt.initial : ""}
         onConfirm={submitFolderPrompt}
         onClose={() => setFolderPrompt({ open: false })}
+      />
+
+      <PromptDialog
+        open={notePrompt.open}
+        title={t("rename")}
+        label={t("noteName")}
+        placeholder={t("untitled")}
+        initialValue={notePrompt.open ? notePrompt.initial : ""}
+        onConfirm={submitRenameNote}
+        onClose={() => setNotePrompt({ open: false })}
       />
 
       <ConfirmDialog

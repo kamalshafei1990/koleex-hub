@@ -16,6 +16,7 @@ export const notesT: Translations = {
   "newFolder":         { en: "New Folder",           zh: "新建文件夹",         ar: "مجلد جديد" },
   "newSubfolder":      { en: "New Subfolder",        zh: "新建子文件夹",       ar: "مجلد فرعي جديد" },
   "folderName":        { en: "Folder name",          zh: "文件夹名称",         ar: "اسم المجلد" },
+  "noteName":          { en: "Note name",            zh: "笔记名称",           ar: "اسم الملاحظة" },
   "rename":            { en: "Rename",               zh: "重命名",             ar: "إعادة تسمية" },
   "delete":            { en: "Delete",               zh: "删除",               ar: "حذف" },
   "deleteFolder":      { en: "Delete Folder",        zh: "删除文件夹",         ar: "حذف المجلد" },
