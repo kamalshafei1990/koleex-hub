@@ -34,12 +34,23 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getSecret(): string {
-  const s = process.env.SESSION_SECRET;
+  // Match the defensive reader in supabase-server.ts — same failure
+  // mode (stray quotes / trailing newline from `vercel env pull`)
+  // would silently invalidate every cookie signature if we didn't
+  // clean it up here.
+  let s = (process.env.SESSION_SECRET ?? "").trim();
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  if (s.endsWith("\\n")) s = s.slice(0, -2).trim();
   if (!s || s.length < 32) {
     throw new Error(
-      "[session] SESSION_SECRET env var missing or too short.\n\n" +
+      "[session] SESSION_SECRET env var missing or too short (after trimming quotes/whitespace).\n\n" +
         "Generate one with: openssl rand -base64 32\n" +
-        "Add it to .env.local AND to your Vercel project env vars.\n" +
+        "Add it to .env.local AND to your Vercel project env vars — no surrounding quotes.\n" +
         "This secret signs every user session — never commit it and " +
         "never put NEXT_PUBLIC_ in front of it.",
     );

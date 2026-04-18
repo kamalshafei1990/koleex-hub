@@ -40,24 +40,51 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let _client: SupabaseClient | null = null;
 
+/**
+ * Defensively normalise an env-var value. `vercel env pull` and some
+ * shells occasionally leave wrapping double-quotes or a trailing `\n`
+ * in place, which then pass through `process.env` unchanged and poison
+ * every downstream URL / JWT string. Stripping them here means a dirty
+ * .env.local won't take the whole auth layer down — we fail loudly on
+ * truly-empty values instead of mysteriously 500'ing on sign-in.
+ */
+function readEnv(name: string): string | null {
+  const raw = process.env[name];
+  if (raw == null) return null;
+  let v = raw.trim();
+  // Strip a single pair of surrounding single- or double-quotes.
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  // Strip an escaped trailing newline that `vercel env pull` sometimes
+  // writes ("\n" literal inside quotes).
+  if (v.endsWith("\\n")) v = v.slice(0, -2).trim();
+  // And strip a real trailing newline just in case.
+  if (v.endsWith("\n")) v = v.slice(0, -1).trim();
+  return v === "" ? null : v;
+}
+
 export function getSupabaseServer(): SupabaseClient {
   if (_client) return _client;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const supabaseServiceKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl) {
     throw new Error(
-      "[supabase-server] NEXT_PUBLIC_SUPABASE_URL is not set.",
+      "[supabase-server] NEXT_PUBLIC_SUPABASE_URL is not set (or is empty after trimming quotes/whitespace).",
     );
   }
 
   if (!supabaseServiceKey) {
     throw new Error(
-      "[supabase-server] SUPABASE_SERVICE_ROLE_KEY is not set.\n" +
+      "[supabase-server] SUPABASE_SERVICE_ROLE_KEY is not set (or is empty after trimming quotes/whitespace).\n" +
         "Copy the service_role key from Supabase dashboard → Settings → " +
         "API Keys (Legacy) → service_role secret, then set it in Vercel + " +
-        ".env.local as SUPABASE_SERVICE_ROLE_KEY (no NEXT_PUBLIC_ prefix).",
+        ".env.local as SUPABASE_SERVICE_ROLE_KEY=<key> — no quotes, no trailing newline, no NEXT_PUBLIC_ prefix.",
     );
   }
 
