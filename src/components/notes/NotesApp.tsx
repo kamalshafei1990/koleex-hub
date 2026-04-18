@@ -296,12 +296,25 @@ export default function NotesApp() {
         updates.body_json !== undefined
           ? extractPlainText(updates.body_json)
           : undefined;
-      const title =
-        updates.title !== undefined
-          ? updates.title
-          : updates.body_json !== undefined
-            ? deriveAutoTitle(updates.body_json)
-            : undefined;
+
+      // Title rules (match Apple Notes):
+      //  1. If the user explicitly typed in the title input, save that
+      //     verbatim — even if it's empty (clearing is allowed).
+      //  2. Otherwise, if the body changed AND the current saved title
+      //     is empty, derive a title from the first line of the body.
+      //     Never overwrite a title the user already set.
+      const currentTitle =
+        activeNote?.id === id ? (activeNote.title ?? "") : "";
+      let title: string | undefined = undefined;
+      if (updates.title !== undefined) {
+        title = updates.title;
+      } else if (
+        updates.body_json !== undefined &&
+        !currentTitle.trim()
+      ) {
+        title = deriveAutoTitle(updates.body_json);
+      }
+
       const patch: Record<string, unknown> = {};
       if (title !== undefined) patch.title = title;
       if (updates.body_json !== undefined) patch.body_json = updates.body_json;

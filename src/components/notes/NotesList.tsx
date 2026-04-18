@@ -190,8 +190,33 @@ function NoteRowItem({
   onPurge: (id: string) => void;
   isTrashView: boolean;
 }) {
-  const preview = (note.body_plain || "").slice(0, 80);
-  const displayTitle = note.title?.trim() || preview.split(/[.?!]/)[0] || "New Note";
+  const plain = (note.body_plain || "").replace(/\s+/g, " ").trim();
+  // List preview — title line if the user typed one, otherwise first
+  // line/sentence of the body. Apple Notes uses the same rule.
+  const displayTitle = (() => {
+    const explicit = note.title?.trim();
+    if (explicit) return explicit;
+    if (plain) {
+      const firstSentence = plain.split(/(?<=[.?!])\s+/)[0];
+      const take = firstSentence || plain;
+      return take.length > 60 ? take.slice(0, 60) + "…" : take;
+    }
+    return "New Note";
+  })();
+  // Second line — whatever comes after the title in the body, truncated.
+  const preview = (() => {
+    const explicit = note.title?.trim();
+    if (!explicit) {
+      // Title is derived from body; preview is the REMAINING body.
+      const sentences = plain.split(/(?<=[.?!])\s+/);
+      if (sentences.length > 1) {
+        const rest = sentences.slice(1).join(" ");
+        return rest.length > 80 ? rest.slice(0, 80) + "…" : rest;
+      }
+      return "";
+    }
+    return plain.length > 80 ? plain.slice(0, 80) + "…" : plain;
+  })();
   return (
     <button
       onClick={() => onSelect(note.id)}
