@@ -10,6 +10,8 @@ import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import { useTranslation } from "@/lib/i18n";
+import { docsT } from "@/lib/translations/docs";
 import {
   INVOICES_DOC_SYNC,
   fetchDocList,
@@ -523,6 +525,7 @@ interface InvPayment {
 }
 
 export default function InvoicesDoc() {
+  const { t } = useTranslation(docsT);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Invoice | null>(null);
@@ -563,18 +566,18 @@ export default function InvoicesDoc() {
 
   const handleRecordPayment = useCallback(async () => {
     if (!current || current.id.length !== 36) {
-      alert("Save the invoice first, then record a payment.");
+      alert(t("alert.saveFirstPayment"));
       return;
     }
     const grand = current.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0)
       + (Number(current.tax) || 0) + (Number(current.shipping) || 0) + (Number(current.others) || 0);
     const defaultAmt = Math.max(0, grand - amountPaid);
-    const amt = prompt(`Payment amount (USD). Open balance: ${defaultAmt.toFixed(2)}`, defaultAmt.toFixed(2));
+    const amt = prompt(`${t("prompt.payAmount")} ${defaultAmt.toFixed(2)}`, defaultAmt.toFixed(2));
     if (!amt) return;
     const amount = Number(amt);
     if (!amount || amount <= 0) return;
-    const method = prompt("Method (bank_transfer / cash / card / cheque / other)", "bank_transfer") ?? "other";
-    const reference = prompt("Reference (optional)") ?? "";
+    const method = prompt(t("prompt.payMethod"), "bank_transfer") ?? "other";
+    const reference = prompt(t("prompt.payRef")) ?? "";
     await fetch(`/api/invoices/${current.id}/payments`, {
       method: "POST",
       credentials: "include",
@@ -582,7 +585,7 @@ export default function InvoicesDoc() {
       body: JSON.stringify({ amount, method, reference: reference || null }),
     });
     await reloadPayments(current.id);
-  }, [current, amountPaid, reloadPayments]);
+  }, [current, amountPaid, reloadPayments, t]);
 
   /* ── Load from Supabase on mount ── */
   useEffect(() => {
@@ -631,7 +634,7 @@ export default function InvoicesDoc() {
   /* ── Delete from list ── */
   const handleDeleteFromList = useCallback(
     async (id: string) => {
-      if (!confirm("Delete this invoice?")) return;
+      if (!confirm(t("inv.deleteConfirm"))) return;
       await deleteInvoiceRemote(id);
       const list = await loadInvoicesRemote();
       setInvoices(list);
@@ -642,7 +645,7 @@ export default function InvoicesDoc() {
   /* ── Delete current (from editor) ── */
   const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
-    if (!confirm("Delete this invoice?")) return;
+    if (!confirm(t("inv.deleteConfirm"))) return;
     await deleteInvoiceRemote(current.id);
     const list = await loadInvoicesRemote();
     setInvoices(list);
@@ -756,11 +759,10 @@ export default function InvoicesDoc() {
               </div>
               <div className="flex items-center gap-2.5 min-w-0">
                 <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
-                  Invoices
+                  {t("inv.title")}
                 </h1>
                 <p className="text-[12px] text-[var(--text-dim)]">
-                  {invoices.length} invoice
-                  {invoices.length !== 1 ? "s" : ""}
+                  {invoices.length} {invoices.length === 1 ? t("inv.singular") : t("inv.plural")}
                 </p>
               </div>
             </div>
@@ -769,7 +771,7 @@ export default function InvoicesDoc() {
               className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-xl text-sm font-medium transition active:scale-95"
             >
               <PlusIcon size={18} />
-              New Invoice
+              {t("inv.new")}
             </button>
           </div>
         </div>
@@ -789,14 +791,14 @@ export default function InvoicesDoc() {
             }).length;
             return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KpiCard label="Total" value={String(invoices.length)} accent="text-blue-400" />
-                <KpiCard label="Drafts" value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label="Finalised" value={String(finals)} accent="text-emerald-400" />
+                <KpiCard label={t("kpi.total")} value={String(invoices.length)} accent="text-blue-400" />
+                <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
+                <KpiCard label={t("kpi.finalised")} value={String(finals)} accent="text-emerald-400" />
                 <KpiCard
-                  label="Total billed (USD)"
+                  label={t("kpi.totalBilled")}
                   value={fmt(total)}
                   accent="text-[var(--text-primary)]"
-                  sub={overdueCount > 0 ? `${overdueCount} past due date` : undefined}
+                  sub={overdueCount > 0 ? t("kpi.pastDue").replace("{n}", String(overdueCount)) : undefined}
                 />
               </div>
             );
@@ -808,9 +810,9 @@ export default function InvoicesDoc() {
           {sortedInvoices.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
               <DocumentIcon size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium">No invoices yet</p>
+              <p className="text-lg font-medium">{t("inv.none")}</p>
               <p className="text-sm mt-1">
-                Create your first invoice to get started.
+                {t("inv.createFirst")}
               </p>
             </div>
           ) : (
@@ -844,7 +846,7 @@ export default function InvoicesDoc() {
                           </span>
                         </div>
                         <p className="text-[var(--text-primary)] font-medium truncate">
-                          {q.customerName || "Unnamed Customer"}
+                          {q.customerName || t("list.unnamedCustomer")}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
@@ -861,7 +863,7 @@ export default function InvoicesDoc() {
                             handleDeleteFromList(q.id);
                           }}
                           className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100"
-                          title="Delete"
+                          title={t("list.delete")}
                         >
                           <TrashIcon size={16} />
                         </button>
@@ -904,7 +906,7 @@ export default function InvoicesDoc() {
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <ArrowLeftIcon size={15} />
-          Back
+          {t("btn.back")}
         </button>
         <div style={{ flex: 1 }} />
         <span
@@ -915,33 +917,33 @@ export default function InvoicesDoc() {
           }`}
           style={{ letterSpacing: "0.03em" }}
         >
-          {current.status}
+          {current.status === "final" ? t("status.final") : t("status.draft")}
         </span>
         <button
           onClick={() => handleSave("draft")}
           className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
-          Save Draft
+          {t("btn.saveDraft")}
         </button>
         <button
           onClick={() => handleSave("final")}
           className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
         >
-          Save Final
+          {t("btn.saveFinal")}
         </button>
         <button
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <DownloadIcon size={14} />
-          Export PDF
+          {t("btn.exportPDF")}
         </button>
         <button
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <PrintIcon size={14} />
-          Print
+          {t("btn.print")}
         </button>
 
         {/* Payments chip + record button — only appears once the
@@ -960,14 +962,14 @@ export default function InvoicesDoc() {
               title={`${payments.length} payment(s) recorded`}
             >
               <CheckCircleIcon size={12} />
-              Paid ${amountPaid.toFixed(2)} / Balance ${Math.max(0, balance).toFixed(2)}
+              {t("paid.paid")} ${amountPaid.toFixed(2)} / {t("paid.balance")} ${Math.max(0, balance).toFixed(2)}
             </div>
             <button
               onClick={handleRecordPayment}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
             >
               <CheckCircleIcon size={14} />
-              Record Payment
+              {t("btn.recordPayment")}
             </button>
           </>
         )}
@@ -1004,7 +1006,7 @@ export default function InvoicesDoc() {
               display: "block",
             }}
           >
-            Customer Name (optional)
+            {t("field.customerName")}
           </label>
           <input
             type="text"
@@ -1028,7 +1030,7 @@ export default function InvoicesDoc() {
               display: "block",
             }}
           >
-            Company Name (optional)
+            {t("field.companyName")}
           </label>
           <input
             type="text"

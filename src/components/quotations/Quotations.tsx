@@ -9,6 +9,8 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import { useTranslation } from "@/lib/i18n";
+import { docsT } from "@/lib/translations/docs";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
@@ -514,6 +516,7 @@ const PRINT_AND_DOC_STYLES = `
    ══════════════════════════════════════════════════════════ */
 
 export default function Quotations() {
+  const { t } = useTranslation(docsT);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Quotation | null>(null);
@@ -568,18 +571,18 @@ export default function Quotations() {
   /* ── Delete from list ── */
   const handleDeleteFromList = useCallback(
     async (id: string) => {
-      if (!confirm("Delete this quotation?")) return;
+      if (!confirm(t("quot.deleteConfirm"))) return;
       await deleteQuotationRemote(id);
       const list = await loadQuotationsRemote();
       setQuotations(list);
     },
-    []
+    [t]
   );
 
   /* ── Delete current (from editor) ── */
   const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
-    if (!confirm("Delete this quotation?")) return;
+    if (!confirm(t("quot.deleteConfirm"))) return;
     await deleteQuotationRemote(current.id);
     const list = await loadQuotationsRemote();
     setQuotations(list);
@@ -617,7 +620,7 @@ export default function Quotations() {
     );
     const quotationId = match?.id ?? current.id;
     if (quotationId.length !== 36) {
-      alert("Save the quotation before converting.");
+      alert(t("alert.saveFirstConvert"));
       return;
     }
     const invoice = await convertQuotationToInvoice(quotationId);
@@ -717,11 +720,10 @@ export default function Quotations() {
               </div>
               <div className="flex items-center gap-2.5 min-w-0">
                 <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
-                  Quotations
+                  {t("quot.title")}
                 </h1>
                 <p className="text-[12px] text-[var(--text-dim)]">
-                  {quotations.length} quotation
-                  {quotations.length !== 1 ? "s" : ""}
+                  {quotations.length} {quotations.length === 1 ? t("quot.singular") : t("quot.plural")}
                 </p>
               </div>
             </div>
@@ -730,7 +732,7 @@ export default function Quotations() {
               className="flex items-center gap-2 px-5 py-2.5 bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-xl text-sm font-medium transition active:scale-95"
             >
               <PlusIcon size={18} />
-              New Quotation
+              {t("quot.new")}
             </button>
           </div>
         </div>
@@ -752,10 +754,15 @@ export default function Quotations() {
             }).length;
             return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KpiCard label="Total" value={String(quotations.length)} accent="text-blue-400" />
-                <KpiCard label="Drafts" value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label="Finalised" value={String(finals)} accent="text-emerald-400" />
-                <KpiCard label="Total value (USD)" value={fmt(total)} accent="text-[var(--text-primary)]" sub={expiringSoon > 0 ? `${expiringSoon} expiring within 7 days` : undefined} />
+                <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
+                <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
+                <KpiCard label={t("kpi.finalised")} value={String(finals)} accent="text-emerald-400" />
+                <KpiCard
+                  label={t("kpi.totalValue")}
+                  value={fmt(total)}
+                  accent="text-[var(--text-primary)]"
+                  sub={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
+                />
               </div>
             );
           })()}
@@ -766,9 +773,9 @@ export default function Quotations() {
           {sortedQuotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
               <DocumentIcon size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium">No quotations yet</p>
+              <p className="text-lg font-medium">{t("quot.none")}</p>
               <p className="text-sm mt-1">
-                Create your first quotation to get started.
+                {t("quot.createFirst")}
               </p>
             </div>
           ) : (
@@ -802,7 +809,7 @@ export default function Quotations() {
                           </span>
                         </div>
                         <p className="text-[var(--text-primary)] font-medium truncate">
-                          {q.customerName || "Unnamed Customer"}
+                          {q.customerName || t("list.unnamedCustomer")}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
@@ -819,7 +826,7 @@ export default function Quotations() {
                             handleDeleteFromList(q.id);
                           }}
                           className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition opacity-0 group-hover:opacity-100"
-                          title="Delete"
+                          title={t("list.delete")}
                         >
                           <TrashIcon size={16} />
                         </button>
@@ -862,7 +869,7 @@ export default function Quotations() {
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <ArrowLeftIcon size={15} />
-          Back
+          {t("btn.back")}
         </button>
         <div style={{ flex: 1 }} />
         <span
@@ -873,41 +880,41 @@ export default function Quotations() {
           }`}
           style={{ letterSpacing: "0.03em" }}
         >
-          {current.status}
+          {current.status === "final" ? t("status.final") : t("status.draft")}
         </span>
         <button
           onClick={() => handleSave("draft")}
           className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
-          Save Draft
+          {t("btn.saveDraft")}
         </button>
         <button
           onClick={() => handleSave("final")}
           className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
         >
-          Save Final
+          {t("btn.saveFinal")}
         </button>
         <button
           onClick={handleConvertToInvoice}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-          title="Create an invoice from this quotation"
+          title={t("tip.convert")}
         >
           <DocumentIcon size={14} />
-          Convert to Invoice
+          {t("btn.convertToInvoice")}
         </button>
         <button
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <DownloadIcon size={14} />
-          Export PDF
+          {t("btn.exportPDF")}
         </button>
         <button
           onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <PrintIcon size={14} />
-          Print
+          {t("btn.print")}
         </button>
         <button
           onClick={handleDeleteCurrent}
@@ -941,7 +948,7 @@ export default function Quotations() {
               display: "block",
             }}
           >
-            Customer Name (optional)
+            {t("field.customerName")}
           </label>
           <input
             type="text"
@@ -965,7 +972,7 @@ export default function Quotations() {
               display: "block",
             }}
           >
-            Company Name (optional)
+            {t("field.companyName")}
           </label>
           <input
             type="text"
