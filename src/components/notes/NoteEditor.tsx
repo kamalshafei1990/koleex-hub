@@ -31,6 +31,20 @@ import type { NoteFull, NotesFolderRow } from "@/lib/notes";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
+import BoldIcon from "@/components/icons/ui/BoldIcon";
+import ItalicIcon from "@/components/icons/ui/ItalicIcon";
+import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
+import StrikethroughIcon from "@/components/icons/ui/StrikethroughIcon";
+import HighlighterIcon from "@/components/icons/ui/HighlighterIcon";
+import ListIcon from "@/components/icons/ui/ListIcon";
+import ListOrderedIcon from "@/components/icons/ui/ListOrderedIcon";
+import CheckSquareIcon from "@/components/icons/ui/CheckSquareIcon";
+import QuoteIcon from "@/components/icons/ui/QuoteIcon";
+import CodeIcon from "@/components/icons/ui/CodeIcon";
+import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
+import LinkIcon from "@/components/icons/ui/LinkIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import Redo2Icon from "@/components/icons/ui/Redo2Icon";
 
 export default function NoteEditor({
   note,
@@ -188,13 +202,26 @@ export default function NoteEditor({
 
         <div className="flex-1" />
 
-        {/* Save indicator */}
-        <span className="text-[11px] text-[var(--text-dim)] w-16 text-end tabular-nums">
-          {saving === "saving"
-            ? t("saving")
-            : saving === "saved"
-              ? t("saved")
-              : ""}
+        {/* Save indicator — subtle dot + label. Stays quiet until the
+            user actually edits something; clears back to invisible
+            after the "Saved" flash fades. */}
+        <span
+          className={`text-[10.5px] font-medium tabular-nums flex items-center gap-1.5 transition-opacity duration-300 ${
+            saving === "idle" ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              saving === "saving"
+                ? "bg-amber-400 animate-pulse"
+                : saving === "saved"
+                  ? "bg-emerald-400"
+                  : "bg-transparent"
+            }`}
+          />
+          <span className="text-[var(--text-dim)]">
+            {saving === "saving" ? t("saving") : saving === "saved" ? t("saved") : ""}
+          </span>
         </span>
 
         {/* Folder selector */}
@@ -370,35 +397,35 @@ function EditorToolbar({
         onClick={() => editor.chain().focus().toggleBold().run()}
         title={t("fmt.bold")}
       >
-        <span className="font-bold">B</span>
+        <BoldIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
         title={t("fmt.italic")}
       >
-        <span className="italic">I</span>
+        <ItalicIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("underline")}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         title={t("fmt.underline")}
       >
-        <span className="underline">U</span>
+        <UnderlineIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
         title={t("fmt.strike")}
       >
-        <span className="line-through">S</span>
+        <StrikethroughIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("highlight")}
         onClick={() => editor.chain().focus().toggleHighlight().run()}
         title={t("fmt.highlight")}
       >
-        <span className="px-1 rounded-sm bg-amber-300/40 text-amber-200">Hl</span>
+        <HighlighterIcon className="h-3.5 w-3.5" />
       </TB>
 
       <Divider />
@@ -408,21 +435,21 @@ function EditorToolbar({
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         title={t("fmt.bulletList")}
       >
-        •
+        <ListIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("orderedList")}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         title={t("fmt.numberedList")}
       >
-        1.
+        <ListOrderedIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("taskList")}
         onClick={() => editor.chain().focus().toggleTaskList().run()}
         title={t("fmt.checklist")}
       >
-        ✓
+        <CheckSquareIcon className="h-3.5 w-3.5" />
       </TB>
 
       <Divider />
@@ -432,27 +459,27 @@ function EditorToolbar({
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         title={t("fmt.quote")}
       >
-        ❝
+        <QuoteIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("code")}
         onClick={() => editor.chain().focus().toggleCode().run()}
         title={t("fmt.code")}
       >
-        &lt;/&gt;
+        <CodeIcon className="h-3.5 w-3.5" />
       </TB>
       <TB
         active={editor.isActive("codeBlock")}
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         title={t("fmt.codeBlock")}
       >
-        {"{}"}
+        <FileCode2Icon className="h-3.5 w-3.5" />
       </TB>
 
       <Divider />
 
       <TB active={editor.isActive("link")} onClick={promptLink} title={t("fmt.link")}>
-        🔗
+        <LinkIcon className="h-3.5 w-3.5" />
       </TB>
 
       <Divider />
@@ -461,13 +488,13 @@ function EditorToolbar({
         onClick={() => editor.chain().focus().undo().run()}
         title={t("fmt.undo")}
       >
-        ↶
+        <Undo2Icon className="h-3.5 w-3.5" />
       </TB>
       <TB
         onClick={() => editor.chain().focus().redo().run()}
         title={t("fmt.redo")}
       >
-        ↷
+        <Redo2Icon className="h-3.5 w-3.5" />
       </TB>
     </>
   );

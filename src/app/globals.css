@@ -172,11 +172,22 @@ body {
   font-size: 14.5px;
   color: var(--text-primary);
 }
-.notes-editor ul, .notes-editor ol {
-  padding-inline-start: 20px;
+.notes-editor ul {
+  padding-inline-start: 22px;
   margin: 6px 0;
+  list-style-type: disc;
 }
+.notes-editor ol {
+  padding-inline-start: 24px;
+  margin: 6px 0;
+  list-style-type: decimal;
+}
+.notes-editor ul ul { list-style-type: circle; }
+.notes-editor ul ul ul { list-style-type: square; }
+.notes-editor ol ol { list-style-type: lower-alpha; }
+.notes-editor ol ol ol { list-style-type: lower-roman; }
 .notes-editor li { margin: 2px 0; }
+.notes-editor li::marker { color: var(--text-muted); }
 
 .notes-editor blockquote {
   border-inline-start: 3px solid var(--border-focus);

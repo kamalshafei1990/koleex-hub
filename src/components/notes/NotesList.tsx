@@ -12,6 +12,8 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import NotesIcon from "@/components/icons/NotesIcon";
+import RefreshCcwIcon from "@/components/icons/ui/RefreshCcwIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import {
   formatNoteTimestamp,
   groupNotesByDate,
@@ -250,7 +252,7 @@ function NoteRowItem({
                 title="Restore"
                 className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-emerald-400 hover:bg-[var(--bg-surface-subtle)]"
               >
-                ↺
+                <RefreshCcwIcon className="h-3 w-3" />
               </button>
               <button
                 onClick={(e) => {
@@ -260,7 +262,7 @@ function NoteRowItem({
                 title="Delete forever"
                 className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 hover:bg-[var(--bg-surface-subtle)]"
               >
-                ✕
+                <CrossIcon className="h-3 w-3" />
               </button>
             </>
           )}

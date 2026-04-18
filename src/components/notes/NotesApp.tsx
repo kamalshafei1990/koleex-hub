@@ -178,13 +178,25 @@ export default function NotesApp() {
 
   const onDeleteNote = useCallback(
     async (id: string) => {
+      // Confirm before any delete. The note goes to Recently Deleted
+      // (recoverable), but users asked for an explicit confirm step
+      // so an accidental click can't wipe a note.
+      const target = notes.find((n) => n.id === id);
+      const label = target?.title?.trim() || t("untitled");
+      if (
+        !window.confirm(
+          `${t("moveToTrash")} — "${label}"?`,
+        )
+      ) {
+        return;
+      }
       const ok = await deleteNote(id);
       if (ok) {
         setNotes((prev) => prev.filter((n) => n.id !== id));
         if (activeNoteId === id) setActiveNoteId(null);
       }
     },
-    [activeNoteId],
+    [activeNoteId, notes, t],
   );
 
   const onRestoreNote = useCallback(
@@ -199,13 +211,22 @@ export default function NotesApp() {
 
   const onPurgeNote = useCallback(
     async (id: string) => {
+      const target = notes.find((n) => n.id === id);
+      const label = target?.title?.trim() || t("untitled");
+      if (
+        !window.confirm(
+          `${t("deleteForever")} — "${label}"? This cannot be undone.`,
+        )
+      ) {
+        return;
+      }
       const ok = await purgeNote(id);
       if (ok) {
         setNotes((prev) => prev.filter((n) => n.id !== id));
         if (activeNoteId === id) setActiveNoteId(null);
       }
     },
-    [activeNoteId],
+    [activeNoteId, notes, t],
   );
 
   const onEmptyTrash = useCallback(async () => {
