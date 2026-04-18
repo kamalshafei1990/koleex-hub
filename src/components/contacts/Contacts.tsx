@@ -93,6 +93,7 @@ import { useTranslation } from "@/lib/i18n";
 import { contactsT } from "@/lib/translations/contacts";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityTasksStrip from "@/components/projects/EntityTasksStrip";
+import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPES
@@ -3228,6 +3229,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
             }
             entityId={c.id}
           />
+          {c.contact_type === "customer" && <EntityInvoicesStrip customerId={c.id} />}
         </div>
 
         {/* Premium tabs (Customer only) */}
