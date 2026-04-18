@@ -263,3 +263,19 @@ body {
   display: block;
   border: 1px solid var(--border-subtle);
 }
+
+/* ── Utility: hide scrollbars on horizontally-scrollable rows ────
+   Used by tab strips, day pickers, filter pills — anywhere we want
+   swipe/drag scrolling without the chunky browser scrollbar taking
+   vertical space. Previously referenced from app pages but never
+   defined, which caused a grey bar to appear under the Planning
+   tabs on mobile. */
+.scrollbar-none {
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* old IE / Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;                 /* Chrome, Safari, new Edge */
+  width: 0;
+  height: 0;
+}
