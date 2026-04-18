@@ -9,6 +9,14 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import {
+  INVOICES_DOC_SYNC,
+  fetchDocList,
+  upsertDoc,
+  deleteDoc,
+  type RemoteDocRow,
+} from "@/lib/docs-sync";
 
 /* ══════════════════════════════════════════════════════════
    Types
@@ -87,48 +95,71 @@ function addDays(dateStr: string, days: number): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-function loadInvoices(): Invoice[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+/** Map a server row into the Invoice UI shape. `doc` holds the full UI
+ *  snapshot; the normalized columns (inv_no, customer_id, total,
+ *  issue_date, status) stay authoritative. */
+function fromRow(row: RemoteDocRow): Invoice {
+  const doc = row.doc as Partial<Invoice>;
+  return {
+    id: row.id,
+    customerName: doc.customerName ?? "",
+    companyName: doc.companyName ?? "",
+    invoiceNo: (row.inv_no as string | null) ?? doc.invoiceNo ?? "",
+    date: doc.date ?? todayDDMMYYYY(),
+    clientNo: doc.clientNo ?? "",
+    validTill: doc.validTill ?? addDays(todayDDMMYYYY(), 30),
+    quotTo: doc.quotTo ?? "",
+    items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
+    tax: Number(doc.tax ?? 0),
+    shipping: Number(doc.shipping ?? 0),
+    others: Number(doc.others ?? 0),
+    terms: doc.terms ?? DEFAULT_TERMS,
+    // Invoices use a richer enum server-side but the doc builder only
+    // cares about draft vs final for the UI button state.
+    status: (row.status === "draft" ? "draft" : "final") as "draft" | "final",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
-function saveInvoices(list: Invoice[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+function computeGrandTotal(q: Invoice): number {
+  const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
+  return +(subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0)).toFixed(2);
 }
 
-function loadCounter(): number {
-  if (typeof window === "undefined") return 1;
-  try {
-    const raw = localStorage.getItem(COUNTER_KEY);
-    return raw ? parseInt(raw, 10) : 1;
-  } catch {
-    return 1;
-  }
+function ddmmyyyyToISO(s: string): string | null {
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
-function saveCounter(c: number): void {
-  localStorage.setItem(COUNTER_KEY, String(c));
+async function loadInvoicesRemote(): Promise<Invoice[]> {
+  const rows = await fetchDocList(INVOICES_DOC_SYNC);
+  return rows.map(fromRow);
 }
 
-function generateInvoiceNo(existingList: Invoice[]): {
-  invoiceNo: string;
-  nextCounter: number;
-} {
-  let counter = loadCounter();
-  const year = new Date().getFullYear();
-  const existing = new Set(existingList.map((q) => q.invoiceNo));
-  let invoiceNo = "";
-  for (let i = 0; i < 9999; i++) {
-    invoiceNo = `INV${year}-${counter.toString().padStart(4, "0")}`;
-    if (!existing.has(invoiceNo)) break;
-    counter++;
-  }
-  return { invoiceNo, nextCounter: counter + 1 };
+async function saveInvoiceRemote(q: Invoice): Promise<Invoice | null> {
+  const row = await upsertDoc(INVOICES_DOC_SYNC, {
+    id: q.id.length === 36 ? q.id : undefined,
+    inv_no: q.invoiceNo || undefined,
+    // The server's invoice_status enum uses draft/sent/paid/… — map the
+    // doc builder's "final" → "sent" so overdue detection + AR reports
+    // still make sense against the enum.
+    status: q.status === "final" ? "sent" : "draft",
+    currency: "USD",
+    issue_date: ddmmyyyyToISO(q.date),
+    due_date: ddmmyyyyToISO(q.validTill),
+    total: computeGrandTotal(q),
+    doc: q,
+  });
+  return row ? fromRow(row) : null;
+}
+
+async function deleteInvoiceRemote(id: string): Promise<boolean> {
+  if (id.length !== 36) return true;
+  return deleteDoc(INVOICES_DOC_SYNC, id);
 }
 
 function fmt(n: number): string {
@@ -480,6 +511,17 @@ const PRINT_AND_DOC_STYLES = `
    COMPONENT
    ══════════════════════════════════════════════════════════ */
 
+/** Lightweight payment shape matching /api/invoices/[id]/payments. */
+interface InvPayment {
+  id: string;
+  amount: number;
+  currency: string;
+  method: string | null;
+  reference: string | null;
+  received_at: string;
+  notes: string | null;
+}
+
 export default function InvoicesDoc() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
@@ -487,23 +529,82 @@ export default function InvoicesDoc() {
   const [loaded, setLoaded] = useState(false);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
-  /* ── Load from localStorage on mount ── */
-  useEffect(() => {
-    setInvoices(loadInvoices());
-    setLoaded(true);
+  /* ── Payments sidecar — only populated when the current invoice
+        has a real server UUID (i.e. has been saved at least once). */
+  const [payments, setPayments] = useState<InvPayment[]>([]);
+  const [amountPaid, setAmountPaid] = useState(0);
+  const [balance, setBalance] = useState(0);
+
+  const reloadPayments = useCallback(async (invoiceId: string | null) => {
+    if (!invoiceId || invoiceId.length !== 36) {
+      setPayments([]);
+      setAmountPaid(0);
+      setBalance(0);
+      return;
+    }
+    const [pRes, iRes] = await Promise.all([
+      fetch(`/api/invoices/${invoiceId}/payments`, { credentials: "include" }),
+      fetch(`/api/invoices/${invoiceId}`, { credentials: "include" }),
+    ]);
+    if (pRes.ok) {
+      const json = (await pRes.json()) as { payments: InvPayment[] };
+      setPayments(json.payments ?? []);
+    }
+    if (iRes.ok) {
+      const json = (await iRes.json()) as { invoice: { amount_paid?: number; balance?: number } };
+      setAmountPaid(Number(json.invoice?.amount_paid ?? 0));
+      setBalance(Number(json.invoice?.balance ?? 0));
+    }
   }, []);
 
-  /* ── Create new invoice ── */
+  useEffect(() => {
+    reloadPayments(current?.id ?? null);
+  }, [current?.id, reloadPayments]);
+
+  const handleRecordPayment = useCallback(async () => {
+    if (!current || current.id.length !== 36) {
+      alert("Save the invoice first, then record a payment.");
+      return;
+    }
+    const grand = current.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0)
+      + (Number(current.tax) || 0) + (Number(current.shipping) || 0) + (Number(current.others) || 0);
+    const defaultAmt = Math.max(0, grand - amountPaid);
+    const amt = prompt(`Payment amount (USD). Open balance: ${defaultAmt.toFixed(2)}`, defaultAmt.toFixed(2));
+    if (!amt) return;
+    const amount = Number(amt);
+    if (!amount || amount <= 0) return;
+    const method = prompt("Method (bank_transfer / cash / card / cheque / other)", "bank_transfer") ?? "other";
+    const reference = prompt("Reference (optional)") ?? "";
+    await fetch(`/api/invoices/${current.id}/payments`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, method, reference: reference || null }),
+    });
+    await reloadPayments(current.id);
+  }, [current, amountPaid, reloadPayments]);
+
+  /* ── Load from Supabase on mount ── */
+  useEffect(() => {
+    let cancelled = false;
+    loadInvoicesRemote().then((list) => {
+      if (!cancelled) {
+        setInvoices(list);
+        setLoaded(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ── Create new invoice. Kept optimistic until first save — server
+        mints the real UUID + INV number on upsert. */
   const handleNew = useCallback(() => {
-    const list = loadInvoices();
-    const { invoiceNo, nextCounter } = generateInvoiceNo(list);
-    saveCounter(nextCounter);
     const today = todayDDMMYYYY();
     const q: Invoice = {
       id: generateId(),
       customerName: "",
       companyName: "",
-      invoiceNo,
+      invoiceNo: "",
       date: today,
       clientNo: "",
       validTill: addDays(today, 30),
@@ -529,21 +630,21 @@ export default function InvoicesDoc() {
 
   /* ── Delete from list ── */
   const handleDeleteFromList = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (!confirm("Delete this invoice?")) return;
-      const updated = invoices.filter((q) => q.id !== id);
-      setInvoices(updated);
-      saveInvoices(updated);
+      await deleteInvoiceRemote(id);
+      const list = await loadInvoicesRemote();
+      setInvoices(list);
     },
-    [invoices]
+    []
   );
 
   /* ── Delete current (from editor) ── */
-  const handleDeleteCurrent = useCallback(() => {
+  const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
     if (!confirm("Delete this invoice?")) return;
-    const list = loadInvoices().filter((q) => q.id !== current.id);
-    saveInvoices(list);
+    await deleteInvoiceRemote(current.id);
+    const list = await loadInvoicesRemote();
     setInvoices(list);
     setCurrent(null);
     setView("list");
@@ -551,20 +652,15 @@ export default function InvoicesDoc() {
 
   /* ── Save current ── */
   const handleSave = useCallback(
-    (status: "draft" | "final") => {
+    async (status: "draft" | "final") => {
       if (!current) return;
-      const now = new Date().toISOString();
-      const updated = { ...current, status, updatedAt: now };
-      const list = loadInvoices();
-      const idx = list.findIndex((q) => q.id === updated.id);
-      if (idx >= 0) {
-        list[idx] = updated;
-      } else {
-        list.push(updated);
+      const intent = { ...current, status, updatedAt: new Date().toISOString() };
+      const saved = await saveInvoiceRemote(intent);
+      if (saved) {
+        setCurrent(saved);
+        const list = await loadInvoicesRemote();
+        setInvoices(list);
       }
-      saveInvoices(list);
-      setInvoices(list);
-      setCurrent(updated);
     },
     [current]
   );
@@ -818,6 +914,35 @@ export default function InvoicesDoc() {
           <PrintIcon size={14} />
           Print
         </button>
+
+        {/* Payments chip + record button — only appears once the
+            invoice has a server UUID (balance/amount_paid are
+            authoritative for saved records). */}
+        {current.id.length === 36 && (
+          <>
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border ${
+                balance <= 0
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : amountPaid > 0
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    : "bg-[var(--bg-surface)] border-white/[0.06] text-gray-400"
+              }`}
+              title={`${payments.length} payment(s) recorded`}
+            >
+              <CheckCircleIcon size={12} />
+              Paid ${amountPaid.toFixed(2)} / Balance ${Math.max(0, balance).toFixed(2)}
+            </div>
+            <button
+              onClick={handleRecordPayment}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+            >
+              <CheckCircleIcon size={14} />
+              Record Payment
+            </button>
+          </>
+        )}
+
         <button
           onClick={handleDeleteCurrent}
           className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"

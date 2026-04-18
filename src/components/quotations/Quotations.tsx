@@ -9,6 +9,14 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import {
+  QUOTATIONS_SYNC,
+  fetchDocList,
+  upsertDoc,
+  deleteDoc,
+  convertQuotationToInvoice,
+  type RemoteDocRow,
+} from "@/lib/docs-sync";
 
 /* ══════════════════════════════════════════════════════════
    Types
@@ -87,48 +95,73 @@ function addDays(dateStr: string, days: number): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-function loadQuotations(): Quotation[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+/**
+ * Map a server row back into the Quotation shape the UI uses. The
+ * server treats `doc` as an opaque JSON blob — that's our UI snapshot.
+ */
+function fromRow(row: RemoteDocRow): Quotation {
+  const doc = row.doc as Partial<Quotation>;
+  return {
+    id: row.id,
+    customerName: doc.customerName ?? "",
+    companyName: doc.companyName ?? "",
+    invoiceNo: (row.quote_no as string | null) ?? doc.invoiceNo ?? "",
+    date: doc.date ?? todayDDMMYYYY(),
+    clientNo: doc.clientNo ?? "",
+    validTill: doc.validTill ?? addDays(todayDDMMYYYY(), 30),
+    quotTo: doc.quotTo ?? "",
+    items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
+    tax: Number(doc.tax ?? 0),
+    shipping: Number(doc.shipping ?? 0),
+    others: Number(doc.others ?? 0),
+    terms: doc.terms ?? DEFAULT_TERMS,
+    status: (row.status === "final" ? "final" : "draft") as "draft" | "final",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
-function saveQuotations(list: Quotation[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+/** Compute the grand total the same way the UI renders it. Mirrors the
+ *  GRAND TOTAL row so the list can show totals without re-rendering. */
+function computeGrandTotal(q: Quotation): number {
+  const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
+  return +(subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0)).toFixed(2);
 }
 
-function loadCounter(): number {
-  if (typeof window === "undefined") return 1;
-  try {
-    const raw = localStorage.getItem(COUNTER_KEY);
-    return raw ? parseInt(raw, 10) : 1;
-  } catch {
-    return 1;
-  }
+/** Parse a DD/MM/YYYY (or DD-MM-YYYY) string into ISO. Best-effort. */
+function ddmmyyyyToISO(s: string): string | null {
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
-function saveCounter(c: number): void {
-  localStorage.setItem(COUNTER_KEY, String(c));
+async function loadQuotationsRemote(): Promise<Quotation[]> {
+  const rows = await fetchDocList(QUOTATIONS_SYNC);
+  return rows.map(fromRow);
 }
 
-function generateInvoiceNo(existingList: Quotation[]): {
-  invoiceNo: string;
-  nextCounter: number;
-} {
-  let counter = loadCounter();
-  const year = new Date().getFullYear();
-  const existing = new Set(existingList.map((q) => q.invoiceNo));
-  let invoiceNo = "";
-  for (let i = 0; i < 9999; i++) {
-    invoiceNo = `KL${year}-${counter.toString().padStart(4, "0")}`;
-    if (!existing.has(invoiceNo)) break;
-    counter++;
-  }
-  return { invoiceNo, nextCounter: counter + 1 };
+/** Upsert a single quotation. Returns the server echo (canonical
+ *  id + updatedAt) so the UI can reconcile optimistic state. */
+async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
+  const row = await upsertDoc(QUOTATIONS_SYNC, {
+    id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
+    quote_no: q.invoiceNo || undefined,
+    status: q.status,
+    currency: "USD",
+    issue_date: ddmmyyyyToISO(q.date),
+    valid_till: ddmmyyyyToISO(q.validTill),
+    total: computeGrandTotal(q),
+    doc: q, // stash the whole UI snapshot
+  });
+  return row ? fromRow(row) : null;
+}
+
+async function deleteQuotationRemote(id: string): Promise<boolean> {
+  // Skip server call if the id isn't a real UUID (local-only legacy row).
+  if (id.length !== 36) return true;
+  return deleteDoc(QUOTATIONS_SYNC, id);
 }
 
 function fmt(n: number): string {
@@ -487,23 +520,28 @@ export default function Quotations() {
   const [loaded, setLoaded] = useState(false);
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
-  /* ── Load from localStorage on mount ── */
+  /* ── Load from Supabase on mount ── */
   useEffect(() => {
-    setQuotations(loadQuotations());
-    setLoaded(true);
+    let cancelled = false;
+    loadQuotationsRemote().then((list) => {
+      if (!cancelled) {
+        setQuotations(list);
+        setLoaded(true);
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
-  /* ── Create new quotation ── */
+  /* ── Create new quotation. Kept as optimistic local-only until the
+        user hits Save; the server mints the real UUID + quote_no at
+        that point. This keeps "New" instant even on slow connections. */
   const handleNew = useCallback(() => {
-    const list = loadQuotations();
-    const { invoiceNo, nextCounter } = generateInvoiceNo(list);
-    saveCounter(nextCounter);
     const today = todayDDMMYYYY();
     const q: Quotation = {
-      id: generateId(),
+      id: generateId(),          // temp; replaced by UUID on first save
       customerName: "",
       companyName: "",
-      invoiceNo,
+      invoiceNo: "",             // server assigns when first saved
       date: today,
       clientNo: "",
       validTill: addDays(today, 30),
@@ -529,21 +567,21 @@ export default function Quotations() {
 
   /* ── Delete from list ── */
   const handleDeleteFromList = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (!confirm("Delete this quotation?")) return;
-      const updated = quotations.filter((q) => q.id !== id);
-      setQuotations(updated);
-      saveQuotations(updated);
+      await deleteQuotationRemote(id);
+      const list = await loadQuotationsRemote();
+      setQuotations(list);
     },
-    [quotations]
+    []
   );
 
   /* ── Delete current (from editor) ── */
-  const handleDeleteCurrent = useCallback(() => {
+  const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
     if (!confirm("Delete this quotation?")) return;
-    const list = loadQuotations().filter((q) => q.id !== current.id);
-    saveQuotations(list);
+    await deleteQuotationRemote(current.id);
+    const list = await loadQuotationsRemote();
     setQuotations(list);
     setCurrent(null);
     setView("list");
@@ -551,23 +589,42 @@ export default function Quotations() {
 
   /* ── Save current ── */
   const handleSave = useCallback(
-    (status: "draft" | "final") => {
+    async (status: "draft" | "final") => {
       if (!current) return;
-      const now = new Date().toISOString();
-      const updated = { ...current, status, updatedAt: now };
-      const list = loadQuotations();
-      const idx = list.findIndex((q) => q.id === updated.id);
-      if (idx >= 0) {
-        list[idx] = updated;
-      } else {
-        list.push(updated);
+      const intent = { ...current, status, updatedAt: new Date().toISOString() };
+      const saved = await saveQuotationRemote(intent);
+      if (saved) {
+        setCurrent(saved);
+        const list = await loadQuotationsRemote();
+        setQuotations(list);
       }
-      saveQuotations(list);
-      setQuotations(list);
-      setCurrent(updated);
     },
     [current]
   );
+
+  /* ── Convert current to invoice. Uses the server-side helper which
+        clones the doc JSON + mints a fresh INV<year>-NNNN number, then
+        takes the user straight to the Invoices app. ── */
+  const handleConvertToInvoice = useCallback(async () => {
+    if (!current) return;
+    // Make sure latest edits are on the server first.
+    if (current.id.length !== 36 || current.status === "draft") {
+      await handleSave("final");
+    }
+    const saved = await loadQuotationsRemote();
+    const match = saved.find(
+      (q) => q.invoiceNo === current.invoiceNo || q.id === current.id,
+    );
+    const quotationId = match?.id ?? current.id;
+    if (quotationId.length !== 36) {
+      alert("Save the quotation before converting.");
+      return;
+    }
+    const invoice = await convertQuotationToInvoice(quotationId);
+    if (invoice) {
+      window.location.href = "/invoices";
+    }
+  }, [current, handleSave]);
 
   /* ── Print ── */
   const handlePrint = useCallback(() => {
@@ -803,6 +860,14 @@ export default function Quotations() {
           className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
         >
           Save Final
+        </button>
+        <button
+          onClick={handleConvertToInvoice}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Create an invoice from this quotation"
+        >
+          <DocumentIcon size={14} />
+          Convert to Invoice
         </button>
         <button
           onClick={handlePrint}
