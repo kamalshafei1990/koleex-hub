@@ -21,6 +21,7 @@ import {
   ALL_APPS_CATEGORIES,
   getAppCategory,
   getActiveAppId,
+  getAppBadge,
   type AppDef,
 } from "@/lib/navigation";
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
@@ -369,6 +370,10 @@ export default function HomePage() {
     const isFav = favoriteIds.includes(app.id);
     const isCurrentApp = currentAppId === app.id;
     const isAi = app.id === "ai";
+    /* NEW / UPDATED badge — rendered as a small pill at the top-left
+       of the tile. getAppBadge auto-expires after APP_BADGE_TTL_MS
+       (3 days) so dev sets newSince / updatedSince once and forgets. */
+    const badge = getAppBadge(app);
 
     return (
       <div
@@ -410,6 +415,20 @@ export default function HomePage() {
             aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
           >
             <StarIcon size={12} style={{ fill: isFav ? "currentColor" : "none" }} />
+          </span>
+        )}
+
+        {badge && (
+          <span
+            className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none ${
+              badge === "new"
+                ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40"
+                : "bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40"
+            }`}
+            aria-label={badge === "new" ? "New app" : "Updated app"}
+            title={badge === "new" ? "New app" : "Recently updated"}
+          >
+            {badge === "new" ? "NEW" : "UPDATED"}
           </span>
         )}
         <span className={`transition-all duration-200 ${

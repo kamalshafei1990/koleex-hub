@@ -88,6 +88,47 @@ export interface AppDef {
    * ["admin","sales"] → only those roles.
    */
   visibleTo?: string[];
+
+  /**
+   * ISO-date (YYYY-MM-DD) marking when the app was first launched.
+   * While `today - newSince <= 3 days`, a "NEW" badge is shown on
+   * the app tile. After that, the badge disappears automatically.
+   * Set once when the app first ships; no need to remove later.
+   */
+  newSince?: string;
+
+  /**
+   * ISO-date (YYYY-MM-DD) marking the most recent notable update to
+   * the app. Renders an "UPDATED" badge on the tile for 3 days.
+   * Bump this value when a user-visible change ships. If both
+   * `newSince` and `updatedSince` are fresh, NEW wins.
+   */
+  updatedSince?: string;
+}
+
+/** How long (in ms) a NEW / UPDATED badge stays visible. Single
+ *  constant so the rule doesn't drift between call sites. */
+export const APP_BADGE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Return the badge kind to render on an app tile, or null.
+ *  - "new"     → app.newSince within the TTL window
+ *  - "updated" → app.updatedSince within the TTL window
+ *  - NEW wins when both would fire on the same day.
+ *  Call sites render the badge visually; this helper keeps the
+ *  time-based logic in one place. `now` is injectable for tests. */
+export function getAppBadge(
+  app: AppDef,
+  now: number = Date.now(),
+): "new" | "updated" | null {
+  const fresh = (iso: string | undefined): boolean => {
+    if (!iso) return false;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return false;
+    return now - t <= APP_BADGE_TTL_MS && now - t >= 0;
+  };
+  if (fresh(app.newSince)) return "new";
+  if (fresh(app.updatedSince)) return "updated";
+  return null;
 }
 
 /** A sidebar navigation group (collapsible section). */
@@ -158,7 +199,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
-  { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true  },
+  { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
   { id: "inbox",            tKey: "app.inbox",            name: "Koleex Mail",       icon: MailIcon,      route: "/inbox",            active: true  },
