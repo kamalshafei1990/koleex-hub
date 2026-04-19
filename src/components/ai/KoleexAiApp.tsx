@@ -75,8 +75,8 @@ const COPY: Record<Lang, {
   en: {
     newChat: "New chat",
     placeholder: "Ask Koleex AI…",
-    welcomeTitle: "Hi, I'm Koleex AI",
-    welcomeSub: "Ask me anything about your business — I'll reply in your language.",
+    welcomeTitle: "Hi",
+    welcomeSub: "What's on your mind? I'm Koleex AI — ask me anything about your business.",
     thinking: "Thinking…",
     noChats: "No chats yet",
     today: "Today",
@@ -100,8 +100,8 @@ const COPY: Record<Lang, {
   zh: {
     newChat: "新建对话",
     placeholder: "向 Koleex AI 提问…",
-    welcomeTitle: "你好，我是 Koleex AI",
-    welcomeSub: "问我关于您业务的任何问题 — 我会用您的语言回答。",
+    welcomeTitle: "你好",
+    welcomeSub: "有什么可以帮您？我是 Koleex AI — 欢迎咨询您业务的任何问题。",
     thinking: "思考中…",
     noChats: "还没有对话",
     today: "今天",
@@ -125,8 +125,8 @@ const COPY: Record<Lang, {
   ar: {
     newChat: "محادثة جديدة",
     placeholder: "اسأل Koleex AI…",
-    welcomeTitle: "مرحبًا، أنا Koleex AI",
-    welcomeSub: "اسألني عن أي شيء يخص أعمالك — سأردّ بلغتك.",
+    welcomeTitle: "مرحبًا",
+    welcomeSub: "كيف يمكنني مساعدتك؟ أنا Koleex AI — اسألني عن أي شيء يخص أعمالك.",
     thinking: "جارٍ التفكير…",
     noChats: "لا توجد محادثات بعد",
     today: "اليوم",
@@ -162,6 +162,16 @@ export default function KoleexAiApp() {
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
+  /* Desktop sidebar collapse — persisted so it stays open/closed
+     between refreshes the same way the user left it. */
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("koleex-ai-sidebar-collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("koleex-ai-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
@@ -372,9 +382,16 @@ export default function KoleexAiApp() {
   /* ── Group sidebar entries by relative date ── */
   const groups = useMemo(() => groupByDate(conversations, copy), [conversations, copy]);
 
-  /* ── Autoscroll messages to bottom on change ── */
+  /* ── Autoscroll messages to bottom on change.
+     Earlier this used bottomRef.scrollIntoView(), which walks up the
+     ancestor chain and can yank the *whole page* — causing the
+     "message sent → page jumps" bug Kamal reported. Writing scrollTop
+     directly on the messages container keeps the scroll local to this
+     pane without perturbing the surrounding app chrome. */
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
 
   const active = useMemo(
@@ -387,11 +404,20 @@ export default function KoleexAiApp() {
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden w-full"
       style={{ height: "calc(100dvh - 3.5rem)" }}
     >
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar ──
+          Desktop: width morphs between 280px (expanded) and 0px
+          (collapsed) on a spring curve. Mobile: overlay that slides in
+          via the burger button in the top bar (sidebarOpen state). */}
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex flex-col w-[280px] shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)]`}
+        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden`}
+        style={{
+          width: sidebarCollapsed ? 0 : 280,
+          minWidth: sidebarCollapsed ? 0 : 280,
+          transition: "width 0.35s cubic-bezier(0.34,1.56,0.64,1), min-width 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+        aria-hidden={sidebarCollapsed}
       >
         <div className="p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
           <Link
@@ -407,6 +433,15 @@ export default function KoleexAiApp() {
           >
             <PlusIcon size={14} />
             {copy.newChat}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(true)}
+            className="hidden md:flex h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+          >
+            <MenuBurgerIcon size={14} />
           </button>
         </div>
 
@@ -450,7 +485,7 @@ export default function KoleexAiApp() {
       </aside>
 
       {/* ── Main pane ── */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 relative">
         {/* Mobile top bar */}
         <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 flex items-center gap-2">
           <button
@@ -470,54 +505,58 @@ export default function KoleexAiApp() {
           </button>
         </div>
 
+        {/* Desktop expand-sidebar button — only shown when the sidebar
+            is collapsed, so the user always has a way back. Floats in the
+            top-left corner of the main pane, styled like the rest of the
+            Hub iconography. */}
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(false)}
+            className="hidden md:flex absolute top-3 start-3 z-[3] h-9 w-9 rounded-xl bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shadow-lg"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            <MenuBurgerIcon size={14} />
+          </button>
+        )}
+
         {/* Messages — relative wrapper hosts the animated aurora layer */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
           className="relative flex-1 overflow-y-auto koleex-ai-stage"
         >
-          {/* Aurora backdrop: two slowly drifting radial-gradient layers
-              in opposite directions give the "deep space that breathes"
-              feel. Keeps the conversation area distinct from the rest of
-              the Hub without being distracting. Declared inside a style
-              block so we can own the keyframes without a global CSS file
-              edit. */}
+          {/* Gemini-style backdrop: pure black base with a single soft
+              dark-blue glow anchored to the bottom of the viewport, the
+              way Gemini's macOS app does it. No busy aurora. A very slow
+              breathing pulse keeps it alive without stealing attention. */}
           <style>{`
-            @keyframes koleex-aurora-a {
-              0%   { transform: translate(0, 0) scale(1); }
-              50%  { transform: translate(-4%, 3%) scale(1.05); }
-              100% { transform: translate(2%, -2%) scale(1); }
+            @keyframes koleex-glow-breathe {
+              0%, 100% { opacity: 0.85; transform: translate(-50%, 0) scale(1); }
+              50%      { opacity: 1;    transform: translate(-50%, -2%) scale(1.05); }
             }
-            @keyframes koleex-aurora-b {
-              0%   { transform: translate(0, 0) scale(1); }
-              50%  { transform: translate(4%, -3%) scale(1.08); }
-              100% { transform: translate(-3%, 2%) scale(1); }
-            }
-            .koleex-ai-stage::before,
-            .koleex-ai-stage::after {
+            .koleex-ai-stage { background: #050510; }
+            html[data-theme="light"] .koleex-ai-stage { background: var(--bg-primary); }
+            .koleex-ai-stage::before {
               content: "";
               position: absolute;
-              inset: -10%;
+              left: 50%;
+              bottom: -35%;
+              width: 140%;
+              height: 90%;
+              transform: translate(-50%, 0);
               pointer-events: none;
               z-index: 0;
-              opacity: 0.55;
-              will-change: transform;
-            }
-            .koleex-ai-stage::before {
               background:
-                radial-gradient(60% 50% at 20% 25%, rgba(0, 145, 255, 0.18), transparent 60%),
-                radial-gradient(50% 40% at 80% 70%, rgba(123, 97, 255, 0.14), transparent 60%);
-              animation: koleex-aurora-a 40s ease-in-out infinite alternate;
+                radial-gradient(50% 60% at 50% 50%, rgba(32, 64, 160, 0.55), rgba(18, 30, 90, 0.25) 45%, transparent 75%);
+              animation: koleex-glow-breathe 10s ease-in-out infinite;
+              filter: blur(40px);
+              will-change: transform, opacity;
             }
-            .koleex-ai-stage::after {
+            html[data-theme="light"] .koleex-ai-stage::before {
               background:
-                radial-gradient(40% 35% at 70% 20%, rgba(255, 110, 199, 0.08), transparent 60%),
-                radial-gradient(55% 45% at 30% 85%, rgba(0, 212, 255, 0.12), transparent 60%);
-              animation: koleex-aurora-b 55s ease-in-out infinite alternate;
-            }
-            html[data-theme="light"] .koleex-ai-stage::before,
-            html[data-theme="light"] .koleex-ai-stage::after {
-              opacity: 0.35;
+                radial-gradient(50% 60% at 50% 50%, rgba(120, 150, 255, 0.25), rgba(150, 170, 230, 0.08) 45%, transparent 75%);
             }
           `}</style>
 
@@ -530,6 +569,9 @@ export default function KoleexAiApp() {
               <WelcomeCard
                 copy={copy}
                 onPick={(p) => send(p)}
+                firstName={(account?.person?.full_name || account?.username || "")
+                  .trim()
+                  .split(/\s+/)[0] || ""}
               />
             ) : (
               messages.map((m) => (
@@ -576,7 +618,10 @@ export default function KoleexAiApp() {
           {showJumpToBottom && (
             <button
               type="button"
-              onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+              onClick={() => {
+                const el = scrollRef.current;
+                if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+              }}
               aria-label="Jump to latest"
               className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-9 px-3 rounded-full bg-[var(--bg-surface)]/90 backdrop-blur-md border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] shadow-lg hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
             >
@@ -585,45 +630,53 @@ export default function KoleexAiApp() {
           )}
         </div>
 
-        {/* Composer */}
-        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-          <div className="max-w-[820px] mx-auto px-4 md:px-6 py-3">
+        {/* Composer — single unified pill (Gemini-style).
+            Input textarea sits in a big rounded container with the Send
+            button tucked inside the right edge. Borderless on the parent
+            div so the pill floats over the aurora background instead of
+            sitting on a hard horizontal line. */}
+        <div className="shrink-0 bg-transparent">
+          <div className="max-w-[820px] mx-auto px-4 md:px-6 pt-2 pb-3">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 send();
               }}
-              className="flex items-end gap-2"
+              className="relative"
             >
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-                placeholder={copy.placeholder}
-                rows={1}
-                dir={isRtl(input) ? "rtl" : "auto"}
-                className="flex-1 px-4 py-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none max-h-40"
-                style={{ minHeight: "46px" }}
-              />
-              <button
-                type="submit"
-                disabled={sending || !input.trim()}
-                className="h-11 w-11 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-40 shrink-0 transition-opacity"
-                aria-label="Send"
+              <div
+                className="relative flex items-end rounded-[26px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] focus-within:border-[var(--border-focus)] transition-colors"
               >
-                {sending ? (
-                  <SpinnerIcon className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PaperPlaneIcon className="h-4 w-4" />
-                )}
-              </button>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                  placeholder={copy.placeholder}
+                  rows={1}
+                  dir={isRtl(input) ? "rtl" : "auto"}
+                  className="flex-1 px-5 py-4 bg-transparent text-[15px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  style={{ minHeight: "54px" }}
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
+                  aria-label="Send"
+                >
+                  {sending ? (
+                    <SpinnerIcon className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PaperPlaneIcon className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </form>
-            <div className="text-[10px] text-[var(--text-dim)] mt-2 text-center">
+            <div className="text-[10px] text-[var(--text-dim)] mt-2.5 text-center">
               {copy.footer}
             </div>
           </div>
@@ -765,36 +818,42 @@ function SidebarRow({
 function WelcomeCard({
   copy,
   onPick,
+  firstName,
 }: {
   copy: typeof COPY["en"];
   onPick: (prompt: string) => void;
+  firstName: string;
 }) {
-  /* Frameless, large, animated AI face — matches the Gemini-style hero
-     feel Kamal asked for. The icon itself ships its own neon-gradient
-     animation, so dropping the rounded-square gradient backdrop shows
-     that off instead of muting it behind a solid frame. */
+  /* Gemini-style hero: large personalised greeting centered in the
+     available space, a compact AI mark above, and the suggested
+     prompts tucked underneath in a minimal single-row strip so they
+     feel like chips not cards — matches the less-is-more direction
+     Kamal asked for. */
+  const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
-    <div className="pt-10 md:pt-14 pb-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
       <div
-        className="inline-flex items-center justify-center mb-5"
+        className="inline-flex items-center justify-center mb-6"
         style={{
           filter:
-            "drop-shadow(0 0 12px rgba(0,212,255,0.35)) drop-shadow(0 0 24px rgba(123,97,255,0.25))",
+            "drop-shadow(0 0 12px rgba(0,145,255,0.40)) drop-shadow(0 0 28px rgba(123,97,255,0.30))",
         }}
       >
-        <AiFaceIcon size={88} animated />
+        <AiFaceIcon size={64} animated />
       </div>
-      <h2 className="text-[22px] md:text-[26px] font-bold text-[var(--text-primary)] mb-2">
-        {copy.welcomeTitle}
+      <h2 className="text-[28px] md:text-[36px] font-semibold tracking-tight text-[var(--text-primary)] mb-3 leading-tight">
+        {greeting}
       </h2>
-      <p className="text-[13px] text-[var(--text-dim)] mb-8">{copy.welcomeSub}</p>
+      <p className="text-[14px] text-[var(--text-dim)] mb-10 max-w-lg">
+        {copy.welcomeSub}
+      </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl mx-auto">
+      <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
         {copy.prompts.map((p, i) => (
           <button
             key={i}
             onClick={() => onPick(p)}
-            className="text-start p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] text-[12px] text-[var(--text-muted)] transition-all"
+            className="px-3.5 py-2 rounded-full bg-[var(--bg-secondary)]/70 backdrop-blur-md border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] text-[12.5px] text-[var(--text-muted)] transition-all"
           >
             {p}
           </button>
