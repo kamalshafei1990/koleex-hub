@@ -163,11 +163,22 @@ export default function KoleexAiApp() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   /* ── Synchronous lock against double-submit races.
      The `sending` react-state updates are async, so two fast clicks can both
      pass `if (sending) return` before either re-render happens. A ref flips
      synchronously inside the same event loop tick, closing that gap. */
   const sendingRef = useRef(false);
+
+  /* Show the "jump to latest" chip when the user has scrolled up more
+     than 120px from the bottom of the messages container. */
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
+    setShowJumpToBottom(distance > 120);
+  }, []);
 
   /* ── Initial sidebar load ── */
   const loadConversations = useCallback(async () => {
@@ -401,8 +412,18 @@ export default function KoleexAiApp() {
 
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
-            <div className="p-6 text-center text-[12px] text-[var(--text-dim)]">
-              {copy.noChats}
+            <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
+              <div
+                className="h-10 w-10 rounded-full flex items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.12) 50%, rgba(255,110,199,0.08))",
+                  border: "1px solid rgba(123,97,255,0.2)",
+                }}
+              >
+                <AiFaceIcon size={20} animated />
+              </div>
+              <div className="text-[12px]">{copy.noChats}</div>
             </div>
           ) : (
             groups.map((g) => (
@@ -449,9 +470,58 @@ export default function KoleexAiApp() {
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
+        {/* Messages — relative wrapper hosts the animated aurora layer */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="relative flex-1 overflow-y-auto koleex-ai-stage"
+        >
+          {/* Aurora backdrop: two slowly drifting radial-gradient layers
+              in opposite directions give the "deep space that breathes"
+              feel. Keeps the conversation area distinct from the rest of
+              the Hub without being distracting. Declared inside a style
+              block so we can own the keyframes without a global CSS file
+              edit. */}
+          <style>{`
+            @keyframes koleex-aurora-a {
+              0%   { transform: translate(0, 0) scale(1); }
+              50%  { transform: translate(-4%, 3%) scale(1.05); }
+              100% { transform: translate(2%, -2%) scale(1); }
+            }
+            @keyframes koleex-aurora-b {
+              0%   { transform: translate(0, 0) scale(1); }
+              50%  { transform: translate(4%, -3%) scale(1.08); }
+              100% { transform: translate(-3%, 2%) scale(1); }
+            }
+            .koleex-ai-stage::before,
+            .koleex-ai-stage::after {
+              content: "";
+              position: absolute;
+              inset: -10%;
+              pointer-events: none;
+              z-index: 0;
+              opacity: 0.55;
+              will-change: transform;
+            }
+            .koleex-ai-stage::before {
+              background:
+                radial-gradient(60% 50% at 20% 25%, rgba(0, 145, 255, 0.18), transparent 60%),
+                radial-gradient(50% 40% at 80% 70%, rgba(123, 97, 255, 0.14), transparent 60%);
+              animation: koleex-aurora-a 40s ease-in-out infinite alternate;
+            }
+            .koleex-ai-stage::after {
+              background:
+                radial-gradient(40% 35% at 70% 20%, rgba(255, 110, 199, 0.08), transparent 60%),
+                radial-gradient(55% 45% at 30% 85%, rgba(0, 212, 255, 0.12), transparent 60%);
+              animation: koleex-aurora-b 55s ease-in-out infinite alternate;
+            }
+            html[data-theme="light"] .koleex-ai-stage::before,
+            html[data-theme="light"] .koleex-ai-stage::after {
+              opacity: 0.35;
+            }
+          `}</style>
+
+          <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
             {loadingConv ? (
               <div className="flex items-center justify-center py-20">
                 <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
@@ -486,7 +556,7 @@ export default function KoleexAiApp() {
                 >
                   <AiFaceIcon size={18} animated />
                 </div>
-                <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-4 py-2.5 text-[13px] text-[var(--text-dim)] flex items-center gap-2">
+                <div className="rounded-2xl bg-[var(--bg-secondary)]/80 backdrop-blur-md border border-[var(--border-subtle)] px-4 py-2.5 text-[14px] text-[var(--text-dim)] flex items-center gap-2">
                   <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
                   {copy.thinking}
                 </div>
@@ -499,6 +569,20 @@ export default function KoleexAiApp() {
             )}
             <div ref={bottomRef} />
           </div>
+
+          {/* Floating "jump to latest" button — only shown when user has
+              scrolled up more than ~120px from the bottom of a populated
+              conversation. Clicking smooths back down. */}
+          {showJumpToBottom && (
+            <button
+              type="button"
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+              aria-label="Jump to latest"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-9 px-3 rounded-full bg-[var(--bg-surface)]/90 backdrop-blur-md border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] shadow-lg hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
+            >
+              ↓ Latest
+            </button>
+          )}
         </div>
 
         {/* Composer */}
@@ -522,16 +606,21 @@ export default function KoleexAiApp() {
                 }}
                 placeholder={copy.placeholder}
                 rows={1}
-                className="flex-1 px-4 py-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none max-h-40"
+                dir={isRtl(input) ? "rtl" : "auto"}
+                className="flex-1 px-4 py-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] resize-none max-h-40"
                 style={{ minHeight: "46px" }}
               />
               <button
                 type="submit"
                 disabled={sending || !input.trim()}
-                className="h-11 w-11 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-40 shrink-0"
+                className="h-11 w-11 rounded-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-40 shrink-0 transition-opacity"
                 aria-label="Send"
               >
-                <PaperPlaneIcon className="h-4 w-4" />
+                {sending ? (
+                  <SpinnerIcon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <PaperPlaneIcon className="h-4 w-4" />
+                )}
               </button>
             </form>
             <div className="text-[10px] text-[var(--text-dim)] mt-2 text-center">
@@ -546,6 +635,16 @@ export default function KoleexAiApp() {
 
 /* ── Bubble ── */
 
+/** Arabic / Persian / Hebrew scripts → force RTL direction + slightly
+ *  larger type (Arabic glyphs read smaller than Latin at the same px
+ *  because of their narrower x-height). Works per-bubble so a Chinese
+ *  user can still get an Arabic translation reply rendered correctly
+ *  regardless of the surrounding UI language. */
+const RTL_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+function isRtl(text: string): boolean {
+  return RTL_RE.test(text);
+}
+
 function Bubble({
   msg,
   userAvatar,
@@ -556,12 +655,16 @@ function Bubble({
   userInitial: string;
 }) {
   const isUser = msg.role === "user";
+  const rtl = isRtl(msg.content);
   /* Both sides now get an avatar so the transcript reads like a real
      conversation — matches the ChatGPT / Gemini visual pattern Kamal
      referenced. User side: real profile photo (or initial fallback).
      AI side: the animated AI face icon with its neon gradient. */
   return (
-    <div className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      dir="ltr" /* Keep the row's gap order stable regardless of content */
+      className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
+    >
       {!isUser && (
         <div
           className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
@@ -575,11 +678,15 @@ function Bubble({
         </div>
       )}
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap ${
+        dir={rtl ? "rtl" : "ltr"}
+        className={`max-w-[85%] rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
+          rtl ? "text-[15px]" : "text-[14px]"
+        } ${
           isUser
             ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-            : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+            : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
         }`}
+        style={rtl ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' } : undefined}
       >
         {msg.content}
       </div>
