@@ -30,6 +30,7 @@ import { customerTools } from "./tools/customers";
 import { productTools } from "./tools/products";
 import { inventoryTools } from "./tools/inventory";
 import { permissionTools } from "./tools/permissions-tool";
+import { quotationTools } from "./tools/quotations";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -39,6 +40,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...productTools,
       ...inventoryTools,
       ...permissionTools,
+      ...quotationTools,
     ].map((t) => [t.name, t]),
   ),
 );

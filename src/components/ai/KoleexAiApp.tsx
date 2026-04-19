@@ -820,6 +820,65 @@ export default function KoleexAiApp() {
   );
 }
 
+/* ── Draft quotation card ──
+   Rendered when an assistant message has a tool-result step with
+   tool="createQuotationDraft". Shows the draft id, customer, total,
+   and a prominent "Review in Quotations" button that deep-links into
+   the existing Quotations app for the human to finalise. Never
+   surfaces cost / margin side — those never reach the client. */
+interface QuotationDraftPayload {
+  id: string;
+  quote_no: string;
+  customer_id: string;
+  total: number;
+  currency: string;
+  status: "draft";
+  line_count: number;
+  approval_required: boolean;
+  review_url: string;
+}
+function DraftCard({ payload }: { payload: QuotationDraftPayload }) {
+  const needsApproval = payload.approval_required;
+  return (
+    <div
+      className={`rounded-2xl border backdrop-blur-md px-4 py-3.5 ${
+        needsApproval
+          ? "border-amber-500/40 bg-amber-500/5"
+          : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]/75"
+      }`}
+      style={{ maxWidth: 460 }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+          needsApproval
+            ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
+            : "bg-[var(--bg-surface)]/80 text-[var(--text-muted)] border border-[var(--border-subtle)]"
+        }`}>
+          {needsApproval ? "Draft · needs approval" : "Draft"}
+        </span>
+        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+          {payload.quote_no}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-[22px] font-bold tracking-tight text-[var(--text-primary)]">
+          {payload.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="text-[12px] text-[var(--text-muted)]">{payload.currency}</span>
+        <span className="text-[11px] text-[var(--text-dim)] ms-auto">
+          {payload.line_count} line{payload.line_count === 1 ? "" : "s"}
+        </span>
+      </div>
+      <Link
+        href={payload.review_url}
+        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90"
+      >
+        Review in Quotations →
+      </Link>
+    </div>
+  );
+}
+
 /* ── Agent step chip ──
    Renders one tool-call or tool-result as a small pill above the
    assistant bubble. Colour-coded by permission status so a denied or
@@ -895,6 +954,18 @@ function Bubble({
   const hasToolSteps = !isUser && steps.some((s) =>
     s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied",
   );
+  /* Surface any draft-quotation tool result as a full-sized branded
+     card instead of a tiny chip — the user's most important action is
+     "review the draft", so it deserves its own UI. */
+  const draftStep = !isUser
+    ? steps.find(
+        (s) =>
+          s.kind === "tool-result" &&
+          s.tool === "createQuotationDraft" &&
+          s.payload &&
+          typeof (s.payload as { review_url?: unknown }).review_url === "string",
+      )
+    : undefined;
   /* Both sides now get an avatar so the transcript reads like a real
      conversation — matches the ChatGPT / Gemini visual pattern Kamal
      referenced. User side: real profile photo (or initial fallback).
@@ -928,6 +999,9 @@ function Bubble({
                 <AgentStepChip key={i} step={s} />
               ))}
           </div>
+        )}
+        {draftStep && (
+          <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
         )}
         <div
           /* dir="auto" + unicode-bidi: plaintext together make the browser
