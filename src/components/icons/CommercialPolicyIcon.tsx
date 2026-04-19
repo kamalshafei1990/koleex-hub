@@ -1,14 +1,32 @@
 import { forwardRef } from "react";
 
-const CommercialPolicyIcon = forwardRef<SVGSVGElement, { size?: number | string; className?: string; style?: React.CSSProperties; strokeWidth?: number }>(
-  ({ size = 24, className, style, ...rest }, ref) => {
-    const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
-    return (
-      <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={s} height={s} fill="currentColor" className={className} style={style} {...rest}>
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm2-9h8v1.5H8V11zm0 3h8v1.5H8V14zm0 3h5v1.5H8V17z" />
-      </svg>
-    );
-  },
-);
+/* Custom Koleex icon — sourced from Icons/Commercial Policy.svg.
+   A single-path mark combining a shield/document, a protective
+   ring, and a linked edit-arm — the cue for "editable policy
+   governance". Uses currentColor so it inherits the tile state
+   (faded/normal/active) driven by the home grid's opacity rules. */
+
+const CommercialPolicyIcon = forwardRef<
+  SVGSVGElement,
+  { size?: number | string; className?: string; style?: React.CSSProperties; strokeWidth?: number }
+>(({ size = 24, className, style, ...rest }, ref) => {
+  const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={s}
+      height={s}
+      fill="currentColor"
+      className={className}
+      style={style}
+      {...rest}
+    >
+      <path d="m2.877 4.968c.538.14 1.081-.184 1.217-.719.341-1.324 1.536-2.249 2.906-2.249h4.515c.163 0 .325.008.485.023v4.977c0 1.654 1.346 3 3 3h6c.553 0 1-.448 1-1 0-.886-1.02-2.62-1.882-3.482l-3.653-3.468c-1.323-1.322-3.081-2.05-4.95-2.05h-4.515c-2.283 0-4.274 1.542-4.842 3.751-.138.535.184 1.08.719 1.217zm11.123-2.307c.385.221.743.496 1.069.821l3.653 3.467c.29.29.567.683.789 1.05h-4.512c-.552 0-1-.449-1-1v-4.338zm2 8.339c.553 0 1 .448 1 1s-.447 1-1 1h-4c-.552 0-1-.448-1-1s.448-1 1-1zm-11.499 6c3.362-.92 4.569-3.707 4.499-5.261v-3.019c0-.767-.489-1.444-1.218-1.686l-2.968-.984c-.204-.067-.424-.067-.629 0l-2.966.984c-.729.241-1.219.918-1.219 1.686v3.041c.045 2.057 1.407 3.783 4.046 5.13.143.073.298.109.455.109zm-2.501-5.261v-2.856l2.5-.829 2.5.829v2.836c-.027 1.36-.832 2.4-2.458 3.17-1.684-.942-2.517-1.981-2.542-3.15zm21.121 1.14c-1.17-1.17-3.072-1.17-4.242 0l-5.707 5.707c-.756.755-1.172 1.76-1.172 2.828v1.586c0 .552.448 1 1 1h1.586c1.068 0 2.073-.417 2.828-1.172l5.707-5.707c.566-.567.879-1.32.879-2.122s-.313-1.555-.879-2.121zm-1.414 2.828-5.707 5.707c-.378.378-.88.586-1.414.586h-.586v-.586c0-.526.214-1.042.586-1.414l5.707-5.707c.391-.39 1.023-.39 1.414 0 .189.188.293.439.293.707s-.104.518-.293.707zm-11.707 7.293c0 .552-.448 1-1 1h-2c-2.757 0-5-2.243-5-5 0-.552.448-1 1-1s1 .448 1 1c0 1.654 1.346 3 3 3h2c.552 0 1 .448 1 1zm2-6h-1.5c-.552 0-1-.448-1-1s.448-1 1-1h1.5c.552 0 1 .448 1 1s-.448 1-1 1z" />
+    </svg>
+  );
+});
+
 CommercialPolicyIcon.displayName = "CommercialPolicyIcon";
 export default CommercialPolicyIcon;
