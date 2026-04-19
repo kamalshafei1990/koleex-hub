@@ -805,7 +805,13 @@ function Bubble({
         </div>
       )}
       <div
-        dir={rtl ? "rtl" : "ltr"}
+        /* dir="auto" + unicode-bidi: plaintext together make the browser
+           apply the first-strong-character algorithm per paragraph AND
+           isolate embedded segments properly. That's what fixes Arabic
+           replies that also contain English words like "Koleex Hub" —
+           without this the hard dir="rtl" can flip the embedded English
+           into the wrong visual position. */
+        dir="auto"
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
           rtl ? "text-[15px]" : "text-[14px]"
         } ${
@@ -813,7 +819,12 @@ function Bubble({
             ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
             : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
         }`}
-        style={rtl ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' } : undefined}
+        style={{
+          unicodeBidi: "plaintext",
+          ...(rtl
+            ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
+            : {}),
+        }}
       >
         {msg.content}
       </div>
