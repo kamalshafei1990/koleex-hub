@@ -1,14 +1,32 @@
 import { forwardRef } from "react";
 
-const HrIcon = forwardRef<SVGSVGElement, { size?: number | string; className?: string; style?: React.CSSProperties }>(
-  ({ size = 24, className, style, ...rest }, ref) => {
-    const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
-    return (
-      <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={s} height={s} fill="currentColor" className={className} style={style} {...rest}>
-        <path d="M12,0A12,12,0,1,0,24,12,12.013,12.013,0,0,0,12,0Zm0,4a3,3,0,1,1-3,3A3,3,0,0,1,12,4Zm5,14.5a.5.5,0,0,1-.5.5h-9a.5.5,0,0,1-.5-.5v-1A3.5,3.5,0,0,1,10.5,14h3A3.5,3.5,0,0,1,17,17.5ZM19.91,17A5.508,5.508,0,0,0,15,13H14a4.977,4.977,0,0,0,2-4A5,5,0,0,0,8,7.05,4.977,4.977,0,0,0,10,13H9a5.508,5.508,0,0,0-4.91,4,9.97,9.97,0,1,1,15.82,0Z" />
-      </svg>
-    );
-  },
-);
+/* Custom Koleex icon — sourced from Icons/hr.svg.
+   Person silhouette (employee) + the letters "HR" in a rounded
+   plate — unambiguous cue for the Human Resources app.
+   Uses currentColor so it follows the tile's opacity / colour state. */
+
+const HrIcon = forwardRef<
+  SVGSVGElement,
+  { size?: number | string; className?: string; style?: React.CSSProperties }
+>(({ size = 24, className, style, ...rest }, ref) => {
+  const s = typeof size === "string" ? parseInt(size, 10) || 24 : size;
+  return (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width={s}
+      height={s}
+      fill="currentColor"
+      className={className}
+      style={style}
+      {...rest}
+    >
+      <path d="m14,6c0-3.309-2.691-6-6-6S2,2.691,2,6s2.691,6,6,6,6-2.691,6-6Zm-6,4c-2.206,0-4-1.794-4-4s1.794-4,4-4,4,1.794,4,4-1.794,4-4,4Zm-1.042,5.005c.158.529-.144,1.086-.673,1.244-2.523.75-4.285,3.116-4.285,5.751v1c0,.552-.448,1-1,1s-1-.448-1-1v-1c0-3.514,2.35-6.667,5.715-7.668.528-.157,1.086.144,1.244.673Z" />
+      <path d="m19.5,17.4h-.9v-1.8h.9c.496,0,.9.404.9.9s-.404.9-.9.9Zm4.5-2.4v6c0,1.657-1.343,3-3,3h-9c-1.657,0-3-1.343-3-3v-6c0-1.657,1.343-3,3-3h9c1.657,0,3,1.343,3,3Zm-8.8-1h0c-.442,0-.8.358-.8.8v2.395h-1.8v-2.395c0-.442-.358-.8-.8-.8h0c-.442,0-.8.358-.8.8v6.4c0,.442.358.8.8.8h0c.442,0,.8-.358.8-.8v-2.405h1.8v2.405c0,.442.358.8.8.8h0c.442,0,.8-.358.8-.8v-6.4c0-.442-.358-.8-.8-.8Zm5.733,4.544c.723-.508,1.168-1.386,1.047-2.362-.158-1.274-1.33-2.182-2.613-2.182h-1.567c-.442,0-.8.358-.8.8v6.4c0,.442.358.8.8.8h0c.442,0,.8-.358.8-.8v-2.2h.784l.705,2.423c.099.342.412.577.768.577h.063c.537,0,.922-.519.765-1.033l-.739-2.43c.023-.017.024-.016.042-.029-.019.012-.031.021-.055.035Z" />
+    </svg>
+  );
+});
+
 HrIcon.displayName = "HrIcon";
 export default HrIcon;
