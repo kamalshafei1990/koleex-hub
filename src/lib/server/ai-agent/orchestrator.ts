@@ -106,6 +106,27 @@ function isSmallTalk(msg: string): boolean {
  *  schemas). Routing these to the no-tools fast-path keeps the agent
  *  request under Groq's payload limit (413) while still giving full
  *  brand answers. Covers EN / AR / ZH keywords. */
+/** Post-process any model reply to enforce the brand-name rule:
+ *  "Koleex" (and its sub-brand names) must appear in Latin letters in
+ *  every language. Small models drift here — they echo the user's
+ *  Arabic/Chinese transliteration even when the system prompt forbids
+ *  it. A deterministic string-replace is the simplest guarantee. */
+const BRAND_NAME_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/كوليكس/g, "Koleex"],
+  [/كوليكس جروب/g, "Koleex Group"],
+  [/مجموعة كوليكس/g, "Koleex Group"],
+  [/柯莱克斯/g, "Koleex"],
+  [/科莱克斯/g, "Koleex"],
+  [/كوليكس هاب/g, "Koleex Hub"],
+];
+function normaliseBrandName(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of BRAND_NAME_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 function isBrandQuestion(msg: string): boolean {
   const s = msg.trim().toLowerCase();
   if (!s) return false;
@@ -186,7 +207,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const json = (await res.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
-      const reply = (json.choices?.[0]?.message?.content ?? "").trim();
+      const rawReply = (json.choices?.[0]?.message?.content ?? "").trim();
+      const reply = normaliseBrandName(rawReply);
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         return {
@@ -247,7 +269,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     // If the model asked for tool calls we execute them all, otherwise
     // this is the final assistant turn.
     if (toolCalls.length === 0) {
-      finalReply = content.trim();
+      finalReply = normaliseBrandName(content.trim());
       if (finalReply) {
         steps.push({
           kind: "answer",
@@ -394,7 +416,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   // short message from the last tool result so the UI gets *something*.
   if (!finalReply) {
     const lastText = [...steps].reverse().find((s) => s.text)?.text ?? "";
-    finalReply = lastText || "I couldn't complete that request.";
+    finalReply = normaliseBrandName(lastText || "I couldn't complete that request.");
     steps.push({
       kind: "answer",
       text: finalReply,
