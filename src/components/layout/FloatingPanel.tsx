@@ -18,7 +18,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
@@ -83,6 +83,7 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
 
 export default function FloatingPanel() {
   const pathname = usePathname();
+  const router = useRouter();
   const dk = useTheme();
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
@@ -104,7 +105,10 @@ export default function FloatingPanel() {
   /* ── State ── */
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [tab, setTab] = useState<"ai" | "discuss">("ai");
+  /* The panel now only opens for Discuss — the AI side of the FAB
+     routes to /ai instead of opening the in-panel chat. So default
+     the tab to "discuss" to match what users actually see. */
+  const [tab, setTab] = useState<"ai" | "discuss">("discuss");
 
   /* ── Auto-switch tab when the current one becomes hidden.
      Keeps the sliding highlight behind whatever side is visible. */
@@ -849,18 +853,25 @@ export default function FloatingPanel() {
                   <button
                     onClick={() => {
                       if (!showAi) return;
-                      if (tab === "ai") { setOpen(true); }
-                      else { setTab("ai"); }
+                      /* AI side of the FAB is a shortcut into the full
+                         Koleex AI app at /ai — the panel used to open a
+                         second, stateless chat (separate conversations,
+                         no history persistence) which confused users.
+                         Clicking AI navigates; clicking Discuss still
+                         opens the inline panel. */
+                      router.push("/ai");
                     }}
                     aria-hidden={!showAi}
                     tabIndex={showAi ? 0 : -1}
+                    aria-label="Open Koleex AI"
+                    title="Open Koleex AI"
                     className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
-                      tab !== "ai" ? dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55" : ""
+                      dk ? "text-white/90 hover:text-white" : "text-black/90 hover:text-black"
                     }`}
                     style={{ pointerEvents: showAi ? "auto" : "none" }}
                   >
-                    <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-30"} animated={tab === "ai"} />
-                    <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
+                    <AiFaceIcon size={16} className="ai-lottie-glow" animated />
+                    <span className="hidden md:inline text-[11px] font-bold tracking-wide ai-neon-text">
                       AI
                     </span>
                   </button>
