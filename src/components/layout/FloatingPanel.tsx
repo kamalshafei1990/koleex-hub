@@ -382,20 +382,24 @@ export default function FloatingPanel() {
                 }}
               >
                 <button
-                  onClick={() => setTab("ai")}
+                  onClick={() => {
+                    /* The in-panel AI tab used to switch the body to
+                       the legacy, stateless floating chat. Now it acts
+                       the same as the AI side of the FAB: close the
+                       panel and route to the full /ai app so all AI
+                       interactions land in one place (same
+                       conversations, same sidebar). */
+                    handleClose();
+                    router.push("/ai");
+                  }}
+                  aria-label="Open Koleex AI"
+                  title="Open Koleex AI"
                   className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
-                    tab === "ai"
-                      ? "shadow-sm"
-                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
+                    dk ? "text-white/90 hover:text-white" : "text-black/90 hover:text-black"
                   }`}
-                  style={tab === "ai" ? {
-                    background: dk
-                      ? "linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.12), rgba(255,110,199,0.06))"
-                      : "linear-gradient(135deg, rgba(0,212,255,0.10), rgba(123,97,255,0.08))",
-                  } : undefined}
                 >
-                  <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-40"} animated={tab === "ai"} />
-                  <span className={tab === "ai" ? "ai-neon-text" : ""}>AI</span>
+                  <AiFaceIcon size={16} className="ai-lottie-glow" animated />
+                  <span className="ai-neon-text">AI</span>
                 </button>
                 <button
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
