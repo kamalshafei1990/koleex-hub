@@ -50,6 +50,7 @@ import ProjectsIcon from "@/components/icons/ProjectsIcon";
 import KnowledgeIcon from "@/components/icons/KnowledgeIcon";
 import DatabaseIcon from "@/components/icons/DatabaseIcon";
 import SettingsIcon from "@/components/icons/SettingsIcon";
+import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import MailIcon from "@/components/icons/MailIcon";
 import BrandIcon from "@/components/icons/BrandIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
@@ -199,6 +200,7 @@ export const APP_REGISTRY: AppDef[] = [
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
   { id: "roles",            tKey: "app.roles",            name: "Roles & Permissions", icon: RolesPermissionsIcon, route: "/roles",   active: true  },
+  { id: "commercial-policy", tKey: "app.commercial-policy", name: "Commercial Policy", icon: CommercialPolicyIcon, route: "/commercial-policy", active: true, newSince: "2026-04-20" },
   { id: "settings",         tKey: "app.settings",         name: "Settings",          icon: SettingsIcon,  route: "/settings",         active: true,  newSince: "2026-04-19" },
 
   /* ── Not in sidebar — accessible via All Apps or direct URL ── */
@@ -274,7 +276,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.system",
     label: "System",
     icon: SystemSidebarIcon,
-    appIds: ["accounts", "roles", "settings"],
+    appIds: ["accounts", "roles", "commercial-policy", "settings"],
   },
 ];
 
