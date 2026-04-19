@@ -34,6 +34,7 @@ import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import { useCurrentAccount } from "@/lib/identity";
+import { ConfirmDialog } from "@/components/notes/NotesDialog";
 
 type MsgRole = "user" | "assistant" | "system";
 interface ChatMsg {
@@ -344,22 +345,29 @@ export default function KoleexAiApp() {
     [input, activeId, lang],
   );
 
-  const deleteConversation = useCallback(
-    async (id: string) => {
-      if (!confirm(copy.confirmDelete)) return;
-      const res = await fetch(`/api/ai/conversations/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) return;
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeId === id) {
-        setActiveId(null);
-        setMessages([]);
-      }
-    },
-    [activeId, copy.confirmDelete],
-  );
+  /* Two-step delete using the Hub's ConfirmDialog component. The old
+     flow called window.confirm() — that's the white-on-black native
+     browser dialog that doesn't match the Hub's design language. Now we
+     stash the pending id in state and render a branded confirmation
+     modal instead. */
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const requestDeleteConversation = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+  const confirmDeleteConversation = useCallback(async () => {
+    const id = pendingDeleteId;
+    if (!id) return;
+    const res = await fetch(`/api/ai/conversations/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) return;
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeId === id) {
+      setActiveId(null);
+      setMessages([]);
+    }
+  }, [activeId, pendingDeleteId]);
 
   const renameConversation = useCallback(
     async (id: string, currentTitle: string) => {
@@ -399,10 +407,48 @@ export default function KoleexAiApp() {
     [conversations, activeId],
   );
 
+  /* ── Mobile viewport stabilisation ──
+     iOS Safari / Android Chrome show and hide their url/toolbar chrome
+     on scroll, and `100dvh` chases that — so the messages pane grows
+     and shrinks by ~80 px mid-scroll, which is exactly what Kamal saw
+     as the page "shaking". Snapshotting the initial `innerHeight` and
+     only updating it on orientationchange (and significant width
+     changes that imply a real layout shift, not chrome slide) locks the
+     chat in place while the browser chrome animates. Desktop keeps
+     100dvh because it has no such chrome. */
+  const [stageHeight, setStageHeight] = useState<string>("calc(100dvh - 3.5rem)");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = () => window.matchMedia("(max-width: 767px)").matches;
+    const apply = () => {
+      if (isMobile()) {
+        // 56 px = height of the Hub top chrome above the AI app shell.
+        setStageHeight(`${window.innerHeight - 56}px`);
+      } else {
+        setStageHeight("calc(100dvh - 3.5rem)");
+      }
+    };
+    apply();
+    let lastWidth = window.innerWidth;
+    const onResize = () => {
+      // Ignore pure-height changes on mobile (browser chrome show/hide);
+      // only react when the viewport width actually changes.
+      if (isMobile() && window.innerWidth === lastWidth) return;
+      lastWidth = window.innerWidth;
+      apply();
+    };
+    window.addEventListener("orientationchange", apply);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("orientationchange", apply);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
   return (
     <div
       className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden w-full"
-      style={{ height: "calc(100dvh - 3.5rem)" }}
+      style={{ height: stageHeight }}
     >
       {/* ── Sidebar ──
           Desktop: width morphs between 280px (expanded) and 0px
@@ -473,7 +519,7 @@ export default function KoleexAiApp() {
                     active={c.id === activeId}
                     onOpen={() => openConversation(c.id)}
                     onRename={() => renameConversation(c.id, c.title)}
-                    onDelete={() => deleteConversation(c.id)}
+                    onDelete={() => requestDeleteConversation(c.id)}
                     renameLabel={copy.rename}
                     deleteLabel={copy.delete}
                   />
@@ -682,6 +728,16 @@ export default function KoleexAiApp() {
           </div>
         </div>
       </main>
+
+      {/* Hub-branded delete confirmation dialog (replaces window.confirm) */}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title={copy.confirmDelete}
+        variant="danger"
+        confirmLabel={copy.delete}
+        onConfirm={confirmDeleteConversation}
+        onClose={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }
