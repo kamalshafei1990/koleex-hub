@@ -435,9 +435,11 @@ export default function HomePage() {
           isAi
             ? "opacity-100"
             : app.active
-              ? isCurrentApp
-                ? dk ? "text-white opacity-100" : "text-black opacity-100"
-                : dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
+              /* Active app icons are now full-opacity by default
+                 (user: "apps color white not gray"). AI keeps its
+                 custom neon/drop-shadow treatment above — untouched.
+                 Coming-soon (inactive) apps stay faded. */
+              ? dk ? "text-white opacity-100" : "text-black opacity-100"
               : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
         }`}
           style={isAi ? {
@@ -462,9 +464,12 @@ export default function HomePage() {
         </span>
         <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active
+            /* Labels track the icon: full colour for active apps,
+               bold for the currently-open app (keeps the "you are
+               here" signal), faded for coming-soon apps. */
             ? isCurrentApp
               ? dk ? "text-white font-semibold" : "text-black font-semibold"
-              : dk ? "text-white/50 group-hover:text-white/90" : "text-black/50 group-hover:text-black/90"
+              : dk ? "text-white/90" : "text-black/90"
             : dk ? "text-white/15" : "text-black/15"
         }`}>
           {label}
@@ -504,14 +509,14 @@ export default function HomePage() {
       >
         <span className={`transition-all duration-200 ${
           app.active
-            ? dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
+            ? dk ? "text-white opacity-100" : "text-black opacity-100"
             : dk ? "text-white opacity-25" : "text-black opacity-25"
         }`}>
           <Icon size={17} />
         </span>
         <span className={`text-[12px] font-medium whitespace-nowrap transition-colors duration-200 ${
           app.active
-            ? dk ? "text-white/55 group-hover:text-white/90" : "text-black/55 group-hover:text-black/90"
+            ? dk ? "text-white/90" : "text-black/90"
             : dk ? "text-white/25" : "text-black/25"
         }`}>
           {label}
