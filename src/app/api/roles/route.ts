@@ -69,6 +69,20 @@ export async function GET() {
   return NextResponse.json({ roles: merged });
 }
 
+/** Slugify a role name: "Sales Rep" → "sales_rep". Roles table
+ *  requires a NOT NULL slug; we derive one when callers don't pass
+ *  it, matching the existing convention in bootstrap_production.sql. */
+function deriveSlug(name: unknown, fallback: string): string {
+  const raw = typeof name === "string" ? name : "";
+  const slug = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return slug || fallback;
+}
+
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -96,5 +110,40 @@ export async function POST(req: Request) {
     console.error("[api/roles POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  /* Mirror the new role into the base `roles` table so that
+     accounts.role_id (FK → roles.id) can reference it. Without this
+     step, any role template created from AccessRightsTab
+     ("Template created from X's access rights") becomes selectable
+     in the Account form dropdown but blows up on save with a FK
+     violation. Do the mirror best-effort — if it fails we still
+     return the koleex_roles row, and we log the error for follow-up
+     (instead of silently leaving an orphan). */
+  const koleexRow = data as Record<string, unknown> & {
+    id: string;
+    name: string;
+    description: string | null;
+    is_super_admin: boolean;
+    can_view_private: boolean;
+  };
+  const mirrorRow = {
+    id: koleexRow.id,
+    slug: deriveSlug(
+      (body as { slug?: unknown }).slug ?? koleexRow.name,
+      `role_${String(koleexRow.id).slice(0, 8)}`,
+    ),
+    name: koleexRow.name,
+    description: koleexRow.description,
+    scope: (body as { scope?: unknown }).scope ?? "internal",
+    is_super_admin: koleexRow.is_super_admin,
+    can_view_private: koleexRow.can_view_private,
+  };
+  const { error: mirrorErr } = await supabaseServer
+    .from("roles")
+    .upsert(mirrorRow, { onConflict: "id" });
+  if (mirrorErr) {
+    console.error("[api/roles POST] roles-mirror failed:", mirrorErr.message);
+  }
+
   return NextResponse.json({ role: data });
 }
