@@ -33,6 +33,7 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import { useCurrentAccount } from "@/lib/identity";
 
 type MsgRole = "user" | "assistant" | "system";
 interface ChatMsg {
@@ -87,7 +88,7 @@ const COPY: Record<Lang, {
     rename: "Rename",
     confirmDelete: "Delete this conversation?",
     renamePrompt: "New title",
-    footer: "Koleex AI · replies in your UI language · tenant-isolated",
+    footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
     prompts: [
       "Draft a polite follow-up email to a customer whose quotation is about to expire.",
@@ -112,7 +113,7 @@ const COPY: Record<Lang, {
     rename: "重命名",
     confirmDelete: "删除这个对话？",
     renamePrompt: "新标题",
-    footer: "Koleex AI · 按您的界面语言回复 · 租户隔离",
+    footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
     prompts: [
       "为一位报价即将到期的客户起草一封礼貌的跟进邮件。",
@@ -137,7 +138,7 @@ const COPY: Record<Lang, {
     rename: "إعادة تسمية",
     confirmDelete: "حذف هذه المحادثة؟",
     renamePrompt: "عنوان جديد",
-    footer: "Koleex AI · يردّ بلغتك · معزول لكل مؤسسة",
+    footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
     prompts: [
       "اكتب بريدًا إلكترونيًا مهذبًا للمتابعة لعميل سينتهي عرض السعر الخاص به قريبًا.",
@@ -151,6 +152,7 @@ const COPY: Record<Lang, {
 export default function KoleexAiApp() {
   const { lang } = useTranslation({}) as unknown as { lang: Lang };
   const copy = COPY[lang] ?? COPY.en;
+  const { account } = useCurrentAccount();
 
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -161,6 +163,11 @@ export default function KoleexAiApp() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   const bottomRef = useRef<HTMLDivElement>(null);
+  /* ── Synchronous lock against double-submit races.
+     The `sending` react-state updates are async, so two fast clicks can both
+     pass `if (sending) return` before either re-render happens. A ref flips
+     synchronously inside the same event loop tick, closing that gap. */
+  const sendingRef = useRef(false);
 
   /* ── Initial sidebar load ── */
   const loadConversations = useCallback(async () => {
@@ -219,7 +226,12 @@ export default function KoleexAiApp() {
   const send = useCallback(
     async (textOverride?: string) => {
       const text = (textOverride ?? input).trim();
-      if (!text || sending) return;
+      if (!text) return;
+      /* Synchronous guard: flip ref BEFORE any await so a rapid second
+         Send click / Enter press can't slip past the state check. */
+      if (sendingRef.current) return;
+      sendingRef.current = true;
+      setSending(true);
 
       // Ensure we have a conversation first
       let conversationId = activeId;
@@ -232,6 +244,8 @@ export default function KoleexAiApp() {
         });
         if (!res.ok) {
           setError("Couldn't start a new chat.");
+          sendingRef.current = false;
+          setSending(false);
           return;
         }
         const { conversation } = (await res.json()) as {
@@ -251,7 +265,6 @@ export default function KoleexAiApp() {
       };
       setMessages((prev) => [...prev, optimistic]);
       setInput("");
-      setSending(true);
 
       try {
         const res = await fetch(
@@ -303,10 +316,11 @@ export default function KoleexAiApp() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Network error");
       } finally {
+        sendingRef.current = false;
         setSending(false);
       }
     },
-    [input, activeId, sending, lang],
+    [input, activeId, lang],
   );
 
   const deleteConversation = useCallback(
@@ -448,12 +462,29 @@ export default function KoleexAiApp() {
                 onPick={(p) => send(p)}
               />
             ) : (
-              messages.map((m) => <Bubble key={m.id} msg={m} />)
+              messages.map((m) => (
+                <Bubble
+                  key={m.id}
+                  msg={m}
+                  userAvatar={account?.avatar_url || account?.person?.avatar_url || null}
+                  userInitial={(account?.username || account?.person?.full_name || "U")
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase()}
+                />
+              ))
             )}
             {sending && (
               <div className="flex items-start gap-3">
-                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center text-white shrink-0">
-                  <AiFaceIcon className="h-3.5 w-3.5" />
+                <div
+                  className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.18) 50%, rgba(255,110,199,0.12))",
+                    border: "1px solid rgba(123,97,255,0.25)",
+                  }}
+                >
+                  <AiFaceIcon size={18} animated />
                 </div>
                 <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] px-4 py-2.5 text-[13px] text-[var(--text-dim)] flex items-center gap-2">
                   <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
@@ -515,13 +546,32 @@ export default function KoleexAiApp() {
 
 /* ── Bubble ── */
 
-function Bubble({ msg }: { msg: ChatMsg }) {
+function Bubble({
+  msg,
+  userAvatar,
+  userInitial,
+}: {
+  msg: ChatMsg;
+  userAvatar?: string | null;
+  userInitial: string;
+}) {
   const isUser = msg.role === "user";
+  /* Both sides now get an avatar so the transcript reads like a real
+     conversation — matches the ChatGPT / Gemini visual pattern Kamal
+     referenced. User side: real profile photo (or initial fallback).
+     AI side: the animated AI face icon with its neon gradient. */
   return (
     <div className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser && (
-        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center text-white shrink-0">
-          <AiFaceIcon className="h-3.5 w-3.5" />
+        <div
+          className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.18) 50%, rgba(255,110,199,0.12))",
+            border: "1px solid rgba(123,97,255,0.25)",
+          }}
+        >
+          <AiFaceIcon size={18} animated />
         </div>
       )}
       <div
@@ -533,6 +583,21 @@ function Bubble({ msg }: { msg: ChatMsg }) {
       >
         {msg.content}
       </div>
+      {isUser && (
+        <div
+          className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+          aria-hidden
+        >
+          {userAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={userAvatar} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-[11px] font-bold text-[var(--text-primary)]">
+              {userInitial}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -597,15 +662,25 @@ function WelcomeCard({
   copy: typeof COPY["en"];
   onPick: (prompt: string) => void;
 }) {
+  /* Frameless, large, animated AI face — matches the Gemini-style hero
+     feel Kamal asked for. The icon itself ships its own neon-gradient
+     animation, so dropping the rounded-square gradient backdrop shows
+     that off instead of muting it behind a solid frame. */
   return (
-    <div className="pt-10 pb-4 text-center">
-      <div className="inline-flex h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 items-center justify-center text-white mb-4">
-        <AiFaceIcon className="h-6 w-6" />
+    <div className="pt-10 md:pt-14 pb-4 text-center">
+      <div
+        className="inline-flex items-center justify-center mb-5"
+        style={{
+          filter:
+            "drop-shadow(0 0 12px rgba(0,212,255,0.35)) drop-shadow(0 0 24px rgba(123,97,255,0.25))",
+        }}
+      >
+        <AiFaceIcon size={88} animated />
       </div>
-      <h2 className="text-[18px] font-bold text-[var(--text-primary)] mb-1">
+      <h2 className="text-[22px] md:text-[26px] font-bold text-[var(--text-primary)] mb-2">
         {copy.welcomeTitle}
       </h2>
-      <p className="text-[12px] text-[var(--text-dim)] mb-6">{copy.welcomeSub}</p>
+      <p className="text-[13px] text-[var(--text-dim)] mb-8">{copy.welcomeSub}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl mx-auto">
         {copy.prompts.map((p, i) => (

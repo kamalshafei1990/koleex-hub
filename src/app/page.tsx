@@ -413,13 +413,33 @@ export default function HomePage() {
           </span>
         )}
         <span className={`transition-all duration-200 ${
-          app.active
-            ? isCurrentApp
-              ? dk ? "text-white opacity-100" : "text-black opacity-100"
-              : dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
-            : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
-        }`}>
-          <Icon size={34} />
+          isAi
+            ? "opacity-100"
+            : app.active
+              ? isCurrentApp
+                ? dk ? "text-white opacity-100" : "text-black opacity-100"
+                : dk ? "text-white opacity-45 group-hover:opacity-100" : "text-black opacity-45 group-hover:opacity-100"
+              : dk ? "text-white opacity-[0.15]" : "text-black opacity-[0.15]"
+        }`}
+          style={isAi ? {
+            filter:
+              "drop-shadow(0 0 10px rgba(0,212,255,0.4)) drop-shadow(0 0 20px rgba(123,97,255,0.25))",
+          } : undefined}
+        >
+          {/* The shared AppIcon type only declares size + className, but
+              AiFaceIcon also accepts `animated`. Render through a widened
+              component reference when isAi so we can pass the animation
+              flag without mutating the shared type. */}
+          {(() => {
+            if (isAi) {
+              const AnimatedIcon = Icon as React.ComponentType<{
+                size?: number;
+                animated?: boolean;
+              }>;
+              return <AnimatedIcon size={44} animated />;
+            }
+            return <Icon size={34} />;
+          })()}
         </span>
         <span className={`text-[12px] font-medium text-center leading-tight transition-all duration-200 ${
           app.active

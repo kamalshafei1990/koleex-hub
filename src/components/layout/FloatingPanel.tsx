@@ -224,19 +224,64 @@ export default function FloatingPanel() {
     setSending(false);
   }, [activeChannel, msgInput]);
 
-  /* ── AI placeholder send ── */
-  const handleAiSend = useCallback(() => {
-    if (!aiInput.trim()) return;
+  /* ── AI send — real call against /api/ai/chat ──
+     Feeds the full in-panel history back so the model gets multi-turn
+     context, adds an optimistic user bubble, and surfaces a graceful
+     error line if the provider returns a problem. Respects the UI
+     language so replies land in the right locale. */
+  const aiSendingRef = useRef(false);
+  const [aiSending, setAiSending] = useState(false);
+  const handleAiSend = useCallback(async () => {
     const text = aiInput.trim();
+    if (!text) return;
+    if (aiSendingRef.current) return;
+    aiSendingRef.current = true;
+    setAiSending(true);
+
     setAiInput("");
     setAiMessages(prev => [...prev, { role: "user", text }]);
-    setTimeout(() => {
+
+    const uiLang = (typeof document !== "undefined"
+      ? (document.documentElement.lang as "en" | "zh" | "ar")
+      : "en") || "en";
+
+    /* Build the message list we send over the wire. We flip our local
+       "ai" role back to "assistant" so it matches the provider contract. */
+    const wireMessages = [
+      ...[...aiMessages, { role: "user", text } as const].map(m => ({
+        role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
+        content: m.text,
+      })),
+    ];
+
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: wireMessages, user_lang: uiLang }),
+      });
+      const json = (await res.json()) as
+        | { reply: string; provider: string }
+        | { error: string; message?: string };
+      if (!res.ok || "error" in json) {
+        const errObj = json as { error?: string; message?: string };
+        const msg = errObj.message || errObj.error || "AI is unavailable right now.";
+        setAiMessages(prev => [...prev, { role: "ai", text: msg }]);
+        return;
+      }
+      const { reply } = json as { reply: string };
+      setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
+    } catch (e) {
       setAiMessages(prev => [
         ...prev,
-        { role: "ai", text: "Hello! I'm Koleex AI 👋\n\nI apologize, but I'm not available at the moment — I'm still under development.\n\nOnce I'm ready, I'll be super smart and able to help you with:\n\n• Answering any question about the Koleex Hub system\n• Providing information about Koleex company and its products\n• Helping you finish your tasks faster — or even doing them for you!\n\nStay tuned, I'll be with you soon!" },
+        { role: "ai", text: e instanceof Error ? e.message : "Network error" },
       ]);
-    }, 1200);
-  }, [aiInput]);
+    } finally {
+      aiSendingRef.current = false;
+      setAiSending(false);
+    }
+  }, [aiInput, aiMessages]);
 
   /* ── Close with animation ── */
   const handleClose = useCallback(() => {
@@ -284,8 +329,16 @@ export default function FloatingPanel() {
   const textG = dk ? "text-white/25" : "text-black/25";
   const hoverBg = dk ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.03]";
 
+  /* ── Position offset ──
+     Inside the AI app on mobile the FAB sits right on top of the
+     composer Send button. Lift it up so both remain tappable. On
+     desktop and elsewhere the default 24px is fine. */
+  const fabBottomClass = isAiApp
+    ? "bottom-24 md:bottom-6"
+    : "bottom-6";
+
   return (
-    <div ref={panelRef} className="fixed bottom-6 end-6 z-[90]">
+    <div ref={panelRef} className={`fixed ${fabBottomClass} end-6 z-[90]`}>
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
@@ -509,6 +562,19 @@ export default function FloatingPanel() {
                       </div>
                     </div>
                   ))}
+                  {aiSending && (
+                    <div className="flex gap-2 flex-row">
+                      <div className="shrink-0 mt-0.5">
+                        <AiFaceIcon size={28} animated />
+                      </div>
+                      <div className={`px-3 py-2 rounded-2xl text-[13px] flex items-center gap-1.5 ${
+                        dk ? "bg-white/[0.05] text-white/60" : "bg-black/[0.04] text-black/60"
+                      }`}>
+                        <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+                        <span>…</span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
               </div>
@@ -538,7 +604,7 @@ export default function FloatingPanel() {
                 />
                 <button
                   onClick={tab === "ai" ? handleAiSend : handleSend}
-                  disabled={tab === "ai" ? !aiInput.trim() : !msgInput.trim() || sending}
+                  disabled={tab === "ai" ? (!aiInput.trim() || aiSending) : (!msgInput.trim() || sending)}
                   className={`p-1.5 rounded-lg transition-all disabled:opacity-20 ${
                     dk ? "text-white/60 hover:text-white hover:bg-white/[0.06]" : "text-black/60 hover:text-black hover:bg-black/[0.06]"
                   }`}

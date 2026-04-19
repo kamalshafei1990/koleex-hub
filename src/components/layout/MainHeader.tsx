@@ -37,6 +37,7 @@ const routeKeys: Record<string, string> = {
   "/crm": "app.crm",
   "/discuss": "app.discuss",
   "/inbox": "app.inbox",
+  "/ai": "app.ai",
   "/categories": "cat.system",
   "/subcategories": "cat.system",
   "/divisions": "cat.system",

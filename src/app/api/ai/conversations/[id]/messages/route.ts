@@ -111,23 +111,39 @@ Current user: ${auth.username} (${auth.user_type}).`;
     .select("*")
     .single();
 
-  /* Auto-generate a title on the first exchange */
+  /* Auto-generate a title on the first exchange.
+     Earlier prompt ("Summarise the user's first message…") confused some
+     open models — Llama replied with literal phrases like "Hello user
+     message" because it latched onto the structural wording. This prompt
+     asks for a short topic label directly, and we scrub any lingering
+     role words defensively. For very short inputs (≤3 words) we just use
+     the input itself so one-word greetings like "Hello" become "Hello"
+     instead of hallucinated titles. */
   let finalTitle = conv.title;
   if ((conv.title === "New chat" || !conv.title) && (conv.message_count ?? 0) === 0) {
-    const titlePrompt: ChatMessage[] = [
-      {
-        role: "system",
-        content:
-          "Summarise the user's first message in at most 4 words, in the same language. Return ONLY the title text, no quotes, no punctuation at the end.",
-      },
-      { role: "user", content },
-    ];
-    const titleRes = await aiChat(titlePrompt);
-    const cleaned = titleRes?.reply
-      .replace(/[\n\r"']/g, "")
-      .trim()
-      .slice(0, 60);
-    if (cleaned) finalTitle = cleaned;
+    const wordCount = content.trim().split(/\s+/).length;
+
+    if (wordCount <= 3) {
+      finalTitle = content.trim().slice(0, 60);
+    } else {
+      const titlePrompt: ChatMessage[] = [
+        {
+          role: "system",
+          content:
+            "Generate a concise 2-4 word title describing the topic of this conversation, in the same language as the input. Reply with ONLY the title. No quotes. No punctuation. Do not include the words 'user', 'message', 'assistant', 'AI', 'chat', 'title', or 'conversation'.",
+        },
+        { role: "user", content },
+      ];
+      const titleRes = await aiChat(titlePrompt);
+      const cleaned = titleRes?.reply
+        .replace(/[\n\r"'`]/g, "")
+        .replace(/^(title|topic)\s*[:\-–—]?\s*/i, "")
+        .replace(/\b(user|assistant|ai|chat|message|conversation)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 60);
+      if (cleaned) finalTitle = cleaned;
+    }
   }
 
   await supabaseServer
