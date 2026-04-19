@@ -101,6 +101,36 @@ function isSmallTalk(msg: string): boolean {
   return patterns.some((p) => p.test(s));
 }
 
+/** Brand / company-profile question detector. Matches requests that can
+ *  be answered from BRAND_KNOWLEDGE alone (no DB lookup, no tool
+ *  schemas). Routing these to the no-tools fast-path keeps the agent
+ *  request under Groq's payload limit (413) while still giving full
+ *  brand answers. Covers EN / AR / ZH keywords. */
+function isBrandQuestion(msg: string): boolean {
+  const s = msg.trim().toLowerCase();
+  if (!s) return false;
+  /* Brand/company triggers — deliberately broad. A false positive here
+     (routing an op question to the brand path) just means the model
+     answers without tools, which surfaces cleanly as "I don't have
+     that data". A false negative (tool path on a brand query) risks
+     a 413. */
+  const brandKeywords = [
+    "koleex", "koleex group", "koleex international",
+    "company", "about us", "who are we", "tell me about",
+    "history", "heritage", "founded", "founder", "ceo", "leadership",
+    "mission", "vision", "values", "core values", "philosophy", "brand",
+    "slogan", "tagline",
+    "headquarters", "hq", "location", "locations", "office", "offices", "hub",
+    "kas", "eskn", "nefertiti", "shafei", "taizhou", "cairo",
+    "business segment", "segments", "partners", "clients", "division",
+    "vision 2035", "2035",
+    "k-o-l-e-e-x", "knowledge operations logic",
+    "شركة", "مقر", "رؤية", "مهمة", "قيم", "تاريخ", "شعار", // Arabic brand keywords
+    "公司", "愿景", "使命", "价值观", "历史", "口号", // Chinese brand keywords
+  ];
+  return brandKeywords.some((k) => s.includes(k));
+}
+
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const { ctx, history, userMessage, userLang, conversationId } = input;
   const key = process.env.GROQ_API_KEY;
@@ -111,7 +141,15 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     );
   }
 
-  const systemPrompt = buildSystemPrompt(ctx, userLang);
+  /* Route on message intent:
+     - Small talk / brand-profile questions → fast-path prompt (has
+       BRAND_KNOWLEDGE, no tool schemas). One Groq call, predictable size.
+     - Everything else → tool-loop prompt (no BRAND_KNOWLEDGE, full
+       tool schemas). Keeps the request body under Groq's 413 limit;
+       the agent calls DB tools to answer business questions.
+     Determined here once so `messages` is built against the right prompt. */
+  const useFastPath = isSmallTalk(userMessage) || isBrandQuestion(userMessage);
+  const systemPrompt = buildSystemPrompt(ctx, userLang, { includeBrandKnowledge: useFastPath });
 
   const messages: WireMsg[] = [
     { role: "system", content: systemPrompt },
@@ -128,11 +166,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   const toolCache = new Map<string, { result: unknown; cached: boolean }>();
   let totalToolRuns = 0;
 
-  /* ── Small-talk fast-path ──
-     For greetings / identity / thanks / small talk, we skip tool
-     schemas entirely. Single Groq call, ~500 tokens of context, no
-     chance to waste a round-trip calling getUserPermissions. */
-  if (isSmallTalk(userMessage)) {
+  /* ── Small-talk / brand fast-path ──
+     For greetings, identity, thanks, or brand/company-profile questions
+     we skip tool schemas entirely. Single Groq call, no chance to waste
+     a round-trip — and crucially the payload fits under Groq's 413
+     limit even with the full BRAND_KNOWLEDGE loaded. */
+  if (useFastPath) {
     const res = await callGroqPlain(key, messages);
     if (res.ok) {
       const json = (await res.json()) as {
@@ -364,11 +403,22 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
 /* ─── Helpers ─────────────────────────────────────────── */
 
-function buildSystemPrompt(ctx: UserContext, userLang: "en" | "zh" | "ar"): string {
+function buildSystemPrompt(
+  ctx: UserContext,
+  userLang: "en" | "zh" | "ar",
+  opts: { includeBrandKnowledge: boolean } = { includeBrandKnowledge: false },
+): string {
   const langName =
     userLang === "zh" ? "Chinese (Simplified)" :
     userLang === "ar" ? "Arabic" :
     "English";
+
+  /* BRAND_KNOWLEDGE is ~2.5k tokens. Loading it alongside tool schemas
+     pushes the request past Groq's payload limit (413). It's only
+     needed on the fast-path, where tool schemas are absent. */
+  const brandBlock = opts.includeBrandKnowledge
+    ? `\n\n${BRAND_KNOWLEDGE}\n`
+    : "";
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
 
@@ -383,9 +433,7 @@ Tool routing:
 
 Do NOT call tools for meta questions. Answer these directly:
 - "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
-- Any question about the Koleex brand itself — company identity, mission, vision, values, the meaning of K-O-L-E-E-X, slogan, tone, personality, visual identity. Use the BRAND FACTS below as the single source of truth; do not invent details that aren't there.
-
-${BRAND_KNOWLEDGE}
+- Any question about the Koleex brand itself — company identity, mission, vision, values, the meaning of K-O-L-E-E-X, slogan, tone, personality, visual identity. Use the BRAND FACTS (when provided below) as the single source of truth; do not invent details that aren't there.${brandBlock}
 
 Never invent data. If a tool returns empty, say so. Never reveal values the permission layer filtered out (status="limited"/"denied" means the user isn't allowed to see them — don't guess around them).
 
