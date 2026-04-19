@@ -27,7 +27,16 @@ import type {
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+/* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
+   minute on Groq's free tier (vs 6k for 3.3 70B) and roughly 3× faster
+   inference. Tool-calling quality is still strong for ERP-style
+   orchestration; we're not asking the model to reason deeply, just to
+   pick the right tool and summarise results. `GROQ_AGENT_MODEL` env
+   overrides, so we can A/B swap to 70B later without a deploy. */
+const GROQ_MODEL =
+  process.env.GROQ_AGENT_MODEL ||
+  process.env.GROQ_MODEL ||
+  "llama-3.1-8b-instant";
 const MAX_ITERATIONS = 6;
 
 /* OpenAI-compatible message shapes — kept loose because the Groq API
@@ -312,10 +321,13 @@ async function callGroqWithRetry(
       max_tokens: 2048,
     }),
   });
-  if ((res.status === 429 || res.status === 503) && attempt < 3) {
+  /* Tight retry budget: 1 extra attempt, waiting at most 2 s. If we
+     still can't serve we surface the friendly message. Large retry
+     windows just make the UI feel frozen — Llama 3.1 8B + higher free-
+     tier throughput should prevent most 429s from reaching here. */
+  if ((res.status === 429 || res.status === 503) && attempt < 1) {
     const ra = Number(res.headers.get("retry-after"));
-    /* Cap the wait so we don't hold a serverless function for 60 s. */
-    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 2) * 1000, 6000);
+    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 1) * 1000, 2000);
     await new Promise((r) => setTimeout(r, waitMs));
     return callGroqWithRetry(key, messages, attempt + 1);
   }
