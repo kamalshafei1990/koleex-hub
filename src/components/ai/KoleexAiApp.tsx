@@ -87,7 +87,7 @@ const COPY: Record<Lang, {
     rename: "Rename",
     confirmDelete: "Delete this conversation?",
     renamePrompt: "New title",
-    footer: "Powered by Gemini · replies in your UI language · tenant-isolated",
+    footer: "Koleex AI · replies in your UI language · tenant-isolated",
     stopped: "Stopped",
     prompts: [
       "Draft a polite follow-up email to a customer whose quotation is about to expire.",
@@ -112,7 +112,7 @@ const COPY: Record<Lang, {
     rename: "重命名",
     confirmDelete: "删除这个对话？",
     renamePrompt: "新标题",
-    footer: "由 Gemini 提供 · 按您的界面语言回复 · 租户隔离",
+    footer: "Koleex AI · 按您的界面语言回复 · 租户隔离",
     stopped: "已停止",
     prompts: [
       "为一位报价即将到期的客户起草一封礼貌的跟进邮件。",
@@ -137,7 +137,7 @@ const COPY: Record<Lang, {
     rename: "إعادة تسمية",
     confirmDelete: "حذف هذه المحادثة؟",
     renamePrompt: "عنوان جديد",
-    footer: "بدعم من Gemini · يردّ بلغتك · معزول لكل مؤسسة",
+    footer: "Koleex AI · يردّ بلغتك · معزول لكل مؤسسة",
     stopped: "تم الإيقاف",
     prompts: [
       "اكتب بريدًا إلكترونيًا مهذبًا للمتابعة لعميل سينتهي عرض السعر الخاص به قريبًا.",

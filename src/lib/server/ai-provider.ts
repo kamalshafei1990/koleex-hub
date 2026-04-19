@@ -44,12 +44,23 @@ export function getLastAiError(): string | null {
   return lastProviderError;
 }
 
-function pickProvider(): "gemini" | "claude" | "openai" | null {
+/* Provider priority:
+   1. Groq (free tier, no billing, works regardless of region — current primary)
+   2. Gemini (kept so we can switch back if billing gets enabled)
+   3. Claude / OpenAI (reserved slots for later)
+   Callers don't know or care which one is behind aiChat() / aiTranslate(). */
+function pickProvider(): "groq" | "gemini" | "claude" | "openai" | null {
+  if (process.env.GROQ_API_KEY) return "groq";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "claude";
   if (process.env.OPENAI_API_KEY) return "openai";
   return null;
 }
+
+/* Default Groq model. Llama 3.3 70B is the best free-tier all-rounder for
+   chat + translation. Override with GROQ_MODEL env if a different model
+   is preferred. */
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 /* ── Gemini Flash (free tier) ────────────────────────────── */
 
@@ -161,6 +172,96 @@ async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
 
 /* ── Public surface ───────────────────────────────────────── */
 
+/* ── Groq (Llama 3.3 70B — free tier, OpenAI-compatible) ── */
+
+/** Strip DeepSeek / reasoning-model `<think>…</think>` blocks so the chat
+ *  UI never shows raw chain-of-thought. Safe to call on any reply since
+ *  models without thinking tags pass through untouched. */
+function stripThinking(text: string): string {
+  return text.replace(/<think[\s\S]*?<\/think>/gi, "").trim();
+}
+
+async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0.6,
+      max_tokens: 2048,
+    }),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.groq.chat]", res.status, bodyText);
+    lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
+    return null;
+  }
+
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const raw = json.choices?.[0]?.message?.content ?? "";
+  const reply = stripThinking(raw);
+  if (!reply) return null;
+  lastProviderError = null;
+  return { reply, provider: `groq:${GROQ_MODEL}` };
+}
+
+async function groqTranslate(input: TranslateInput): Promise<TranslateResult | null> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+
+  const langNames: Record<string, string> = { en: "English", zh: "Chinese (Simplified)", ar: "Arabic" };
+  const targetName = langNames[input.targetLang] ?? input.targetLang;
+
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content:
+        `You are a professional translator for a business ERP system. Translate the user message to ${targetName}. Return ONLY the translated text — no explanations, no quotes, no commentary. Preserve product codes, numbers, proper nouns, and punctuation exactly.`,
+    },
+    { role: "user", content: input.text },
+  ];
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0,
+      max_tokens: 1024,
+    }),
+  });
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.groq.translate]", res.status, bodyText);
+    lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
+    return null;
+  }
+
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const translated = stripThinking(json.choices?.[0]?.message?.content ?? "");
+  if (!translated) return null;
+  lastProviderError = null;
+  return { translated, provider: `groq:${GROQ_MODEL}` };
+}
+
 /**
  * Translate a string to the target language. Returns null if no AI
  * provider is configured OR the call failed — callers should treat
@@ -170,6 +271,7 @@ export async function aiTranslate(input: TranslateInput): Promise<TranslateResul
   const provider = pickProvider();
   if (!provider) return null;
   try {
+    if (provider === "groq") return await groqTranslate(input);
     if (provider === "gemini") return await geminiTranslate(input);
     // Room for Claude / OpenAI to be added later without touching callers.
     return null;
@@ -187,6 +289,7 @@ export async function aiChat(messages: ChatMessage[]): Promise<ChatResult | null
   const provider = pickProvider();
   if (!provider) return null;
   try {
+    if (provider === "groq") return await groqChat(messages);
     if (provider === "gemini") return await geminiChat(messages);
     return null;
   } catch (e) {
