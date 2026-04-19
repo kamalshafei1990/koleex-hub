@@ -34,6 +34,19 @@ interface SectionCfg {
   editableFields: readonly string[];
   /** Validation — throws to produce a 400 with a readable message. */
   validate?: (row: Record<string, unknown>) => void;
+  /** Column that stores the human-derivable unique key (e.g. `code`
+   *  for product levels, `role_slug` for approval authority). Used
+   *  when INSERTing a new row to auto-generate the key from a
+   *  name-like field so the user just types a display name. Settings
+   *  has no insert path, so `null`. */
+  slugColumn: string | null;
+  /** Field the insert path reads to derive the slug. */
+  slugSourceField: string | null;
+  /** Sensible defaults for columns that are NOT NULL in the schema but
+   *  aren't surfaced in the UI when adding a row. Lets a user fire
+   *  "add row" → type a name → save, without the server rejecting
+   *  because `applies_to` was missing. */
+  insertDefaults?: Record<string, unknown>;
 }
 
 const POLICY_ADMIN_ROLES = new Set<string>([
@@ -46,6 +59,8 @@ const SECTIONS: Record<string, SectionCfg> = {
   settings: {
     table: "commercial_settings",
     editableFields: ["fx_cny_per_usd", "sales_sees_cost", "notes"],
+    slugColumn: null,
+    slugSourceField: null,
     validate: (row) => {
       const fx = Number(row.fx_cny_per_usd);
       if (!Number.isFinite(fx) || fx <= 0 || fx > 100) {
@@ -64,6 +79,15 @@ const SECTIONS: Record<string, SectionCfg> = {
       "is_active",
       "sort_order",
     ],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: {
+      is_active: true,
+      min_cost_cny: 0,
+      max_cost_cny: null,
+      margin_percent: 0,
+      min_margin_percent: 0,
+    },
     validate: (row) => {
       requirePercent(row.margin_percent, "margin_percent");
       requirePercent(row.min_margin_percent, "min_margin_percent");
@@ -80,6 +104,7 @@ const SECTIONS: Record<string, SectionCfg> = {
     editableFields: [
       "name",
       "real_name",
+      "level_number",
       "discount_cap_percent",
       "has_credit",
       "credit_multiplier",
@@ -88,6 +113,14 @@ const SECTIONS: Record<string, SectionCfg> = {
       "is_active",
       "sort_order",
     ],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: {
+      is_active: true,
+      has_credit: false,
+      level_number: 0,
+      discount_cap_percent: 0,
+    },
     validate: (row) => {
       requirePercent(row.discount_cap_percent, "discount_cap_percent");
       if (row.credit_days !== null && row.credit_days !== undefined) {
@@ -111,6 +144,13 @@ const SECTIONS: Record<string, SectionCfg> = {
       "is_active",
       "sort_order",
     ],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: {
+      is_active: true,
+      is_flexible: false,
+      adjustment_percent: 0,
+    },
     validate: (row) => {
       requireSignedPercent(row.adjustment_percent, "adjustment_percent");
       if (row.is_flexible) {
@@ -124,6 +164,9 @@ const SECTIONS: Record<string, SectionCfg> = {
   "channel-multipliers": {
     table: "commercial_channel_multipliers",
     editableFields: ["name", "applies_to_tier", "multiplier", "is_active", "sort_order"],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: { is_active: true, multiplier: 1 },
     validate: (row) => {
       const m = Number(row.multiplier);
       if (!Number.isFinite(m) || m <= 0 || m > 10) {
@@ -141,6 +184,9 @@ const SECTIONS: Record<string, SectionCfg> = {
       "is_active",
       "sort_order",
     ],
+    slugColumn: "code",
+    slugSourceField: "label",
+    insertDefaults: { is_active: true, min_percent: 0, approver_role: "salesperson" },
     validate: (row) => {
       requirePercent(row.min_percent, "min_percent");
       if (row.max_percent !== null && row.max_percent !== undefined) {
@@ -154,6 +200,9 @@ const SECTIONS: Record<string, SectionCfg> = {
   "commission-tiers": {
     table: "commercial_commission_tiers",
     editableFields: ["name", "rate_percent", "applies_to", "is_active", "sort_order"],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: { is_active: true, rate_percent: 0, applies_to: "All sales" },
     validate: (row) => {
       requirePercent(row.rate_percent, "rate_percent");
     },
@@ -161,6 +210,9 @@ const SECTIONS: Record<string, SectionCfg> = {
   "approval-authority": {
     table: "commercial_approval_authority",
     editableFields: ["role_label", "level", "can_approve", "is_active", "sort_order"],
+    slugColumn: "role_slug",
+    slugSourceField: "role_label",
+    insertDefaults: { is_active: true, level: 1, can_approve: [] },
     validate: (row) => {
       const n = Number(row.level);
       if (!Number.isInteger(n) || n < 1 || n > 10) {
@@ -172,6 +224,20 @@ const SECTIONS: Record<string, SectionCfg> = {
     },
   },
 };
+
+/** Turn a human string into a safe slug. Used when INSERTing a new row
+ *  so the user only types a display name; the code/slug column is
+ *  derived automatically. Collisions are resolved by the caller. */
+function slugify(raw: unknown): string {
+  const s = typeof raw === "string" ? raw : "";
+  const out = s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return out || `row_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 /* ─── Handler ───────────────────────────────────────────────────── */
 
@@ -192,7 +258,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Not authorised to edit the commercial policy" }, { status: 403 });
   }
 
-  let body: { row?: Record<string, unknown>; rows?: Record<string, unknown>[] };
+  let body: {
+    row?: Record<string, unknown>;
+    rows?: Record<string, unknown>[];
+    deletedIds?: string[];
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -210,16 +280,19 @@ export async function PATCH(
       : Array.isArray(body.rows)
         ? body.rows
         : [];
+  const deletedIds = Array.isArray(body.deletedIds) ? body.deletedIds : [];
 
-  if (inboundRows.length === 0) {
+  if (inboundRows.length === 0 && deletedIds.length === 0) {
     return NextResponse.json({ error: "No rows to update" }, { status: 400 });
   }
 
-  /* Settings upsert keys on tenant_id (unique); other tables match by
-     explicit id. Build the payload with ONLY whitelisted fields + the
-     audit stamp, so a client can't sneak in e.g. tenant_id changes. */
+  /* Partition inbound rows into updates (have id) vs inserts (no id).
+     Build the payload with ONLY whitelisted fields + the audit stamp,
+     so a client can't sneak in e.g. tenant_id changes. */
   const now = new Date().toISOString();
-  const sanitized: Record<string, unknown>[] = [];
+  const updates: Record<string, unknown>[] = [];
+  const inserts: Record<string, unknown>[] = [];
+
   for (const raw of inboundRows) {
     const out: Record<string, unknown> = {
       tenant_id: auth.tenant_id,
@@ -231,39 +304,61 @@ export async function PATCH(
         out[field] = raw[field];
       }
     }
-    if (section !== "settings") {
-      const id = raw.id;
-      if (typeof id !== "string") {
-        return NextResponse.json({ error: "Each row needs an id" }, { status: 400 });
+    const hasId = typeof raw.id === "string" && raw.id.length > 0;
+    if (section === "settings" || hasId) {
+      if (hasId) out.id = raw.id as string;
+      try { cfg.validate?.(out); } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Invalid row" },
+          { status: 400 },
+        );
       }
-      out.id = id;
+      updates.push(out);
+    } else {
+      // INSERT path: fill NOT-NULL defaults the UI didn't surface.
+      for (const [k, v] of Object.entries(cfg.insertDefaults ?? {})) {
+        if (!Object.prototype.hasOwnProperty.call(out, k)) out[k] = v;
+      }
+      try { cfg.validate?.(out); } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Invalid row" },
+          { status: 400 },
+        );
+      }
+      inserts.push(out);
     }
-    try {
-      cfg.validate?.(out);
-    } catch (e) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : "Invalid row" },
-        { status: 400 },
-      );
-    }
-    sanitized.push(out);
   }
 
-  /* For settings, the singleton constraint is (tenant_id) — upsert by
-     that. For all others, rows already exist; we update one by one
-     rather than upsert so the FK (tenant_id) + (id) act as the
-     effective guard and we don't accidentally insert a row with a
-     different tenant_id. */
-  if (section === "settings") {
+  /* Apply deletes first so a user can remove a row and add a new one
+     with the same name in the same save. Scoped to tenant_id at the
+     query level — no accidental cross-tenant deletes. */
+  if (deletedIds.length > 0 && section !== "settings") {
     const { error } = await supabaseServer
       .from(cfg.table)
-      .upsert(sanitized[0], { onConflict: "tenant_id" });
+      .delete()
+      .eq("tenant_id", auth.tenant_id)
+      .in("id", deletedIds);
     if (error) {
-      console.error(`[cp/${section}]`, error.message);
+      console.error(`[cp/${section} delete]`, error.message);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+  }
+
+  /* Settings — singleton upsert. */
+  if (section === "settings") {
+    if (updates[0]) {
+      const { error } = await supabaseServer
+        .from(cfg.table)
+        .upsert(updates[0], { onConflict: "tenant_id" });
+      if (error) {
+        console.error(`[cp/${section}]`, error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
   } else {
-    for (const row of sanitized) {
+    /* Apply updates one by one — tenant_id + id act as the guard so
+       we never leak rows into a different tenant. */
+    for (const row of updates) {
       const { id, tenant_id, ...update } = row;
       const { error } = await supabaseServer
         .from(cfg.table)
@@ -271,9 +366,50 @@ export async function PATCH(
         .eq("tenant_id", tenant_id)
         .eq("id", id);
       if (error) {
-        console.error(`[cp/${section}]`, error.message);
+        console.error(`[cp/${section} update]`, error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+    }
+
+    /* Apply inserts. For each, derive a unique slug from the UI's
+       chosen source field (e.g. name → code, role_label → role_slug).
+       If the derived slug collides with an existing row in this
+       tenant, append -2, -3 … until it's unique. That keeps the
+       caller blissfully unaware of the internal identifier while
+       still enforcing the unique constraint the schema demands. */
+    if (inserts.length > 0 && cfg.slugColumn && cfg.slugSourceField) {
+      const { data: existingRows } = await supabaseServer
+        .from(cfg.table)
+        .select(cfg.slugColumn)
+        .eq("tenant_id", auth.tenant_id);
+      const taken = new Set<string>(
+        ((existingRows ?? []) as unknown as Array<Record<string, unknown>>).map(
+          (r) => String(r[cfg.slugColumn!] ?? ""),
+        ),
+      );
+      for (const row of inserts) {
+        const base = slugify(row[cfg.slugSourceField]);
+        let slug = base;
+        let n = 2;
+        while (taken.has(slug)) {
+          slug = `${base}_${n++}`;
+        }
+        taken.add(slug);
+        row[cfg.slugColumn] = slug;
+      }
+      const { error } = await supabaseServer.from(cfg.table).insert(inserts);
+      if (error) {
+        console.error(`[cp/${section} insert]`, error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else if (inserts.length > 0) {
+      // Section doesn't support inserts (settings singleton, or
+      // someone extended a section without a slug column). Reject
+      // rather than silently dropping rows.
+      return NextResponse.json(
+        { error: `Section '${section}' doesn't support new rows` },
+        { status: 400 },
+      );
     }
   }
 

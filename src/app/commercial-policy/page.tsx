@@ -262,27 +262,46 @@ function SectionShell({
 }
 
 /** Generic hook: holds edit state for a section.
- *  `initial` is the snapshot coming in from the server; `wire` is the
- *  callback that PATCHes and returns the fresh server payload. */
-function useSectionEditor<Row>(
-  initial: Row,
+ *  `initial` is the snapshot coming in from the server; `buildBody`
+ *  turns the local draft (+ any row ids queued for deletion) into the
+ *  PATCH body. deletedIds is only meaningful for list sections; the
+ *  settings singleton ignores it. */
+function useSectionEditor<Draft>(
+  initial: Draft,
   endpoint: string,
-  buildBody: (draft: Row) => unknown,
+  buildBody: (draft: Draft, deletedIds: string[]) => unknown,
 ) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState<Row>(initial);
+  const [draft, setDraft] = useState<Draft>(initial);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset draft whenever the upstream data changes OR we leave edit mode.
+  // Reset draft + pending deletes whenever the upstream data changes
+  // OR we leave edit mode — prevents stale state if the snapshot
+  // refreshes while the user is editing (shouldn't happen, but safe).
   useEffect(() => {
-    if (!editing) setDraft(initial);
+    if (!editing) {
+      setDraft(initial);
+      setDeletedIds([]);
+    }
   }, [initial, editing]);
 
-  const begin = () => { setDraft(initial); setError(null); setEditing(true); };
-  const cancel = () => { setEditing(false); setError(null); };
+  const begin = () => {
+    setDraft(initial);
+    setDeletedIds([]);
+    setError(null);
+    setEditing(true);
+  };
+  const cancel = () => {
+    setEditing(false);
+    setError(null);
+  };
+  const queueDelete = (id: string) => {
+    setDeletedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
 
-  const save = async (): Promise<Row | null> => {
+  const save = async (): Promise<Draft | null> => {
     setSaving(true);
     setError(null);
     try {
@@ -290,7 +309,7 @@ function useSectionEditor<Row>(
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBody(draft)),
+        body: JSON.stringify(buildBody(draft, deletedIds)),
       });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; payload?: unknown; error?: string };
       if (!res.ok || !body.ok) {
@@ -298,7 +317,8 @@ function useSectionEditor<Row>(
         return null;
       }
       setEditing(false);
-      return body.payload as Row;
+      setDeletedIds([]);
+      return body.payload as Draft;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
       return null;
@@ -307,7 +327,19 @@ function useSectionEditor<Row>(
     }
   };
 
-  return { editing, saving, draft, setDraft, error, begin, cancel, save };
+  return { editing, saving, draft, setDraft, deletedIds, queueDelete, error, begin, cancel, save };
+}
+
+/** New-row factory for a list section. Assigns id: null so the server
+ *  knows to INSERT, and sort_order = (max of existing) + 1 so the
+ *  fresh row appears at the bottom. `extras` fills in the required
+ *  non-null fields the UI doesn't always surface. */
+function blankRow<R extends { id: string | null; sort_order: number }>(
+  rows: Array<{ sort_order: number }>,
+  extras: Omit<R, "id" | "sort_order">,
+): R {
+  const maxOrder = rows.length ? Math.max(...rows.map((r) => r.sort_order)) : 0;
+  return { id: null, sort_order: maxOrder + 1, ...extras } as R;
 }
 
 /* ─── Sections ───────────────────────────────────────────── */
@@ -335,6 +367,7 @@ function SettingsSection({
           }
         : { row: null },
   );
+  // Settings has no add/delete — it's a singleton.
 
   const d = ed.draft;
   if (!d) {
@@ -384,6 +417,8 @@ function SettingsSection({
 
 /* ── Product Levels ── */
 
+type DraftProductLevel = Omit<ProductLevelRow, "id"> & { id: string | null };
+
 function ProductLevelsSection({
   rows,
   onPatch,
@@ -391,21 +426,48 @@ function ProductLevelsSection({
   rows: ProductLevelRow[];
   onPatch: (r: ProductLevelRow[]) => void;
 }) {
-  const ed = useSectionEditor<ProductLevelRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftProductLevel[]>(
+    rows as DraftProductLevel[],
     "/api/commercial-policy/product-levels",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        name: r.name,
-        min_cost_cny: Number(r.min_cost_cny),
-        max_cost_cny: r.max_cost_cny === null ? null : Number(r.max_cost_cny),
-        margin_percent: Number(r.margin_percent),
-        min_margin_percent: Number(r.min_margin_percent),
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          min_cost_cny: Number(r.min_cost_cny),
+          max_cost_cny: r.max_cost_cny === null ? null : Number(r.max_cost_cny),
+          margin_percent: Number(r.margin_percent),
+          min_margin_percent: Number(r.min_margin_percent),
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftProductLevel, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        sort_order: maxOrder + 1,
+        min_cost_cny: 0,
+        max_cost_cny: null,
+        margin_percent: 0,
+        min_margin_percent: 0,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -415,28 +477,34 @@ function ProductLevelsSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as ProductLevelRow[]); }}
     >
       <ResponsiveTable
-        head={["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin %", "Min Margin %", "Active"]}
+        head={ed.editing
+          ? ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin %", "Min Margin %", "Active", ""]
+          : ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin %", "Min Margin %", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
-            <Td>{r.code}</Td>
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
+            <Td>{r.code || <span className="text-[var(--text-dim)]">—</span>}</Td>
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td align="right"><NumIn editing={ed.editing} value={r.min_cost_cny} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_cost_cny: v }))} /></Td>
             <Td align="right"><NullableNumIn editing={ed.editing} value={r.max_cost_cny} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { max_cost_cny: v }))} nullLabel="∞" /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.margin_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_percent: v }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.min_margin_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_margin_percent: v }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add level" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Customer Tiers ── */
+
+type DraftCustomerTier = Omit<CustomerTierRow, "id"> & { id: string | null };
 
 function CustomerTiersSection({
   rows,
@@ -445,23 +513,55 @@ function CustomerTiersSection({
   rows: CustomerTierRow[];
   onPatch: (r: CustomerTierRow[]) => void;
 }) {
-  const ed = useSectionEditor<CustomerTierRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftCustomerTier[]>(
+    rows as DraftCustomerTier[],
     "/api/commercial-policy/customer-tiers",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        name: r.name,
-        real_name: r.real_name,
-        discount_cap_percent: Number(r.discount_cap_percent),
-        has_credit: r.has_credit,
-        credit_multiplier: r.credit_multiplier === null ? null : Number(r.credit_multiplier),
-        credit_days: r.credit_days === null ? null : Number(r.credit_days),
-        market_rights: r.market_rights,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          real_name: r.real_name,
+          level_number: r.level_number,
+          discount_cap_percent: Number(r.discount_cap_percent),
+          has_credit: r.has_credit,
+          credit_multiplier: r.credit_multiplier === null ? null : Number(r.credit_multiplier),
+          credit_days: r.credit_days === null ? null : Number(r.credit_days),
+          market_rights: r.market_rights,
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftCustomerTier, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    const maxLevel = ed.draft.length ? Math.max(...ed.draft.map((r) => r.level_number)) : -1;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        real_name: null,
+        level_number: maxLevel + 1,
+        sort_order: maxOrder + 1,
+        has_credit: false,
+        credit_multiplier: null,
+        credit_days: null,
+        discount_cap_percent: 0,
+        market_rights: null,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -471,13 +571,19 @@ function CustomerTiersSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as CustomerTierRow[]); }}
     >
       <ResponsiveTable
-        head={["Level", "Tier", "Commercial Role", "Discount Cap %", "Has Credit", "Credit ×", "Credit Days", "Market Rights", "Active"]}
+        head={ed.editing
+          ? ["Level", "Tier", "Commercial Role", "Discount Cap %", "Has Credit", "Credit ×", "Credit Days", "Market Rights", "Active", ""]
+          : ["Level", "Tier", "Commercial Role", "Discount Cap %", "Has Credit", "Credit ×", "Credit Days", "Market Rights", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
-            <Td align="right">{r.level_number}</Td>
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
+            <Td align="right">
+              {ed.editing
+                ? <NumIn editing value={r.level_number} integer onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { level_number: v ?? 0 }))} />
+                : r.level_number}
+            </Td>
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td><TextIn editing={ed.editing} value={r.real_name ?? ""} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { real_name: v || null }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.discount_cap_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { discount_cap_percent: v }))} /></Td>
@@ -486,15 +592,19 @@ function CustomerTiersSection({
             <Td align="right"><NullableNumIn editing={ed.editing} value={r.credit_days} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { credit_days: v }))} integer nullLabel="—" /></Td>
             <Td><TextIn editing={ed.editing} value={r.market_rights ?? ""} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { market_rights: v || null }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Market Bands (metadata only — country mapping in Phase 3b) ── */
+
+type DraftMarketBand = Omit<MarketBandRow, "id"> & { id: string | null };
 
 function MarketBandsSection({
   bands,
@@ -511,23 +621,52 @@ function MarketBandsSection({
     return m;
   }, [countries]);
 
-  const ed = useSectionEditor<MarketBandRow[]>(
-    bands,
+  const ed = useSectionEditor<DraftMarketBand[]>(
+    bands as DraftMarketBand[],
     "/api/commercial-policy/market-bands",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        name: r.name,
-        label: r.label,
-        adjustment_percent: Number(r.adjustment_percent),
-        is_flexible: r.is_flexible,
-        flex_min_percent: r.flex_min_percent === null ? null : Number(r.flex_min_percent),
-        flex_max_percent: r.flex_max_percent === null ? null : Number(r.flex_max_percent),
-        description: r.description,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          label: r.label,
+          adjustment_percent: Number(r.adjustment_percent),
+          is_flexible: r.is_flexible,
+          flex_min_percent: r.flex_min_percent === null ? null : Number(r.flex_min_percent),
+          flex_max_percent: r.flex_max_percent === null ? null : Number(r.flex_max_percent),
+          description: r.description,
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftMarketBand, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        label: null,
+        adjustment_percent: 0,
+        is_flexible: false,
+        flex_min_percent: null,
+        flex_max_percent: null,
+        description: null,
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -537,29 +676,35 @@ function MarketBandsSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as MarketBandRow[]); }}
     >
       <ResponsiveTable
-        head={["Band", "Label", "Adjustment %", "Flexible", "Flex Min %", "Flex Max %", "Countries", "Active"]}
+        head={ed.editing
+          ? ["Band", "Label", "Adjustment %", "Flexible", "Flex Min %", "Flex Max %", "Countries", "Active", ""]
+          : ["Band", "Label", "Adjustment %", "Flexible", "Flex Min %", "Flex Max %", "Countries", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
-            <Td>{r.code}</Td>
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
+            <Td>{r.code || <span className="text-[var(--text-dim)]">—</span>}</Td>
             <Td><TextIn editing={ed.editing} value={r.label ?? ""} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { label: v || null }))} /></Td>
             <Td align="right"><SignedPctIn editing={ed.editing} value={r.adjustment_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { adjustment_percent: v }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_flexible} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_flexible: v }))} /></Td>
             <Td align="right"><NullableNumIn editing={ed.editing && r.is_flexible} value={r.flex_min_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { flex_min_percent: v }))} nullLabel="—" /></Td>
             <Td align="right"><NullableNumIn editing={ed.editing && r.is_flexible} value={r.flex_max_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { flex_max_percent: v }))} nullLabel="—" /></Td>
-            <Td align="right">{counts.get(r.id) ?? 0}</Td>
+            <Td align="right">{r.id ? (counts.get(r.id) ?? 0) : 0}</Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add band" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Channel Multipliers ── */
+
+type DraftChannelMultiplier = Omit<ChannelMultiplierRow, "id"> & { id: string | null };
 
 function ChannelMultipliersSection({
   rows,
@@ -568,20 +713,44 @@ function ChannelMultipliersSection({
   rows: ChannelMultiplierRow[];
   onPatch: (r: ChannelMultiplierRow[]) => void;
 }) {
-  const ed = useSectionEditor<ChannelMultiplierRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftChannelMultiplier[]>(
+    rows as DraftChannelMultiplier[],
     "/api/commercial-policy/channel-multipliers",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        name: r.name,
-        applies_to_tier: r.applies_to_tier,
-        multiplier: Number(r.multiplier),
-        sort_order: r.sort_order,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          applies_to_tier: r.applies_to_tier,
+          multiplier: Number(r.multiplier),
+          sort_order: r.sort_order,
+          is_active: r.is_active,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftChannelMultiplier, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        applies_to_tier: null,
+        multiplier: 1,
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -591,13 +760,19 @@ function ChannelMultipliersSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as ChannelMultiplierRow[]); }}
     >
       <ResponsiveTable
-        head={["Step", "Channel", "Customer Tier", "Multiplier", "Active"]}
+        head={ed.editing
+          ? ["Step", "Channel", "Customer Tier", "Multiplier", "Active", ""]
+          : ["Step", "Channel", "Customer Tier", "Multiplier", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
-            <Td align="right">{r.sort_order}</Td>
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
+            <Td align="right">
+              {ed.editing
+                ? <NumIn editing value={r.sort_order} integer onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { sort_order: v ?? 0 }))} />
+                : r.sort_order}
+            </Td>
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td><TextIn editing={ed.editing} value={r.applies_to_tier ?? ""} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { applies_to_tier: v || null }))} /></Td>
             <Td align="right">
@@ -608,15 +783,19 @@ function ChannelMultipliersSection({
               )}
             </Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add channel" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Discount Tiers ── */
+
+type DraftDiscountTier = Omit<DiscountTierRow, "id"> & { id: string | null };
 
 function DiscountTiersSection({
   rows,
@@ -625,20 +804,46 @@ function DiscountTiersSection({
   rows: DiscountTierRow[];
   onPatch: (r: DiscountTierRow[]) => void;
 }) {
-  const ed = useSectionEditor<DiscountTierRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftDiscountTier[]>(
+    rows as DraftDiscountTier[],
     "/api/commercial-policy/discount-tiers",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        label: r.label,
-        min_percent: Number(r.min_percent),
-        max_percent: r.max_percent === null ? null : Number(r.max_percent),
-        approver_role: r.approver_role,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          label: r.label,
+          min_percent: Number(r.min_percent),
+          max_percent: r.max_percent === null ? null : Number(r.max_percent),
+          approver_role: r.approver_role,
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftDiscountTier, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        label: "",
+        min_percent: 0,
+        max_percent: null,
+        approver_role: "salesperson",
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -648,26 +853,32 @@ function DiscountTiersSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as DiscountTierRow[]); }}
     >
       <ResponsiveTable
-        head={["Tier", "Min %", "Max %", "Approver Role", "Active"]}
+        head={ed.editing
+          ? ["Tier", "Min %", "Max %", "Approver Role", "Active", ""]
+          : ["Tier", "Min %", "Max %", "Approver Role", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td><TextIn editing={ed.editing} value={r.label} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { label: v }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.min_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_percent: v }))} /></Td>
             <Td align="right"><NullableNumIn editing={ed.editing} value={r.max_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { max_percent: v }))} nullLabel="unlimited" suffix="%" /></Td>
             <Td><TextIn editing={ed.editing} value={r.approver_role} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { approver_role: v }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Commission Tiers ── */
+
+type DraftCommissionTier = Omit<CommissionTierRow, "id"> & { id: string | null };
 
 function CommissionTiersSection({
   rows,
@@ -676,19 +887,44 @@ function CommissionTiersSection({
   rows: CommissionTierRow[];
   onPatch: (r: CommissionTierRow[]) => void;
 }) {
-  const ed = useSectionEditor<CommissionTierRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftCommissionTier[]>(
+    rows as DraftCommissionTier[],
     "/api/commercial-policy/commission-tiers",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        name: r.name,
-        rate_percent: Number(r.rate_percent),
-        applies_to: r.applies_to,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          rate_percent: Number(r.rate_percent),
+          applies_to: r.applies_to,
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftCommissionTier, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        rate_percent: 0,
+        applies_to: "All sales",
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -698,25 +934,31 @@ function CommissionTiersSection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as CommissionTierRow[]); }}
     >
       <ResponsiveTable
-        head={["Tier", "Rate %", "Applies To", "Active"]}
+        head={ed.editing
+          ? ["Tier", "Rate %", "Applies To", "Active", ""]
+          : ["Tier", "Rate %", "Applies To", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.rate_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { rate_percent: v }))} /></Td>
             <Td><TextIn editing={ed.editing} value={r.applies_to} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { applies_to: v }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
 }
 
 /* ── Approval Authority ── */
+
+type DraftApprovalAuthority = Omit<ApprovalAuthorityRow, "id"> & { id: string | null };
 
 function ApprovalAuthoritySection({
   rows,
@@ -725,19 +967,45 @@ function ApprovalAuthoritySection({
   rows: ApprovalAuthorityRow[];
   onPatch: (r: ApprovalAuthorityRow[]) => void;
 }) {
-  const ed = useSectionEditor<ApprovalAuthorityRow[]>(
-    rows,
+  const ed = useSectionEditor<DraftApprovalAuthority[]>(
+    rows as DraftApprovalAuthority[],
     "/api/commercial-policy/approval-authority",
-    (draft) => ({
-      rows: draft.map((r) => ({
-        id: r.id,
-        level: Number(r.level),
-        role_label: r.role_label,
-        can_approve: r.can_approve,
-        is_active: r.is_active,
-      })),
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          level: Number(r.level),
+          role_label: r.role_label,
+          can_approve: r.can_approve,
+          is_active: r.is_active,
+          sort_order: r.sort_order,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
     }),
   );
+
+  const handleDelete = (row: DraftApprovalAuthority, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    const maxLevel = ed.draft.length ? Math.max(...ed.draft.map((r) => r.level)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        level: maxLevel + 1,
+        role_slug: "",
+        role_label: "",
+        can_approve: [],
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
 
   return (
     <SectionShell
@@ -747,12 +1015,14 @@ function ApprovalAuthoritySection({
       saving={ed.saving}
       onEditStart={ed.begin}
       onCancel={ed.cancel}
-      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh); }}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as ApprovalAuthorityRow[]); }}
     >
       <ResponsiveTable
-        head={["Level", "Role", "Can Approve (comma-separated)", "Active"]}
+        head={ed.editing
+          ? ["Level", "Role", "Can Approve (comma-separated)", "Active", ""]
+          : ["Level", "Role", "Can Approve (comma-separated)", "Active"]}
         rows={ed.draft.map((r, i) => (
-          <tr key={r.id} className="border-t border-[var(--border-subtle)]/60">
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td align="right">
               {ed.editing ? (
                 <NumIn editing value={r.level} integer onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { level: v ?? 1 }))} />
@@ -785,9 +1055,11 @@ function ApprovalAuthoritySection({
               )}
             </Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
         ))}
       />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add role" />}
       {ed.error && <ErrorLine message={ed.error} />}
     </SectionShell>
   );
@@ -1055,6 +1327,48 @@ function ErrorLine({ message }: { message: string }) {
 
 function updateAt<T>(arr: T[], i: number, patch: Partial<T>): T[] {
   return arr.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+}
+function removeAt<T>(arr: T[], i: number): T[] {
+  return arr.filter((_, idx) => idx !== i);
+}
+
+/** Small trash icon used inline in the row when editing. Kept as a
+ *  local component to avoid pulling in a second icon library just for
+ *  this one glyph. */
+function DeleteRowBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Delete row"
+      title="Delete row"
+      className="h-7 w-7 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-red-400 hover:border-red-500/30 flex items-center justify-center transition-colors"
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6h18" />
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+      </svg>
+    </button>
+  );
+}
+
+/** "+ Add row" pill below each editable table. Full width, dashed
+ *  border so it's clearly a target; collapses visually when the
+ *  section is read-only (the caller only renders it while editing). */
+function AddRowButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-3 w-full h-9 rounded-xl border border-dashed border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] transition-colors flex items-center justify-center gap-1.5"
+    >
+      <span className="text-[14px] leading-none">+</span>
+      <span>{label}</span>
+    </button>
+  );
 }
 function fmtInt(n: number): string {
   return Number(n).toLocaleString(undefined, { maximumFractionDigits: 4 });
