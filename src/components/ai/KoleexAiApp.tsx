@@ -163,11 +163,13 @@ export default function KoleexAiApp() {
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
-  /* Desktop sidebar collapse — persisted so it stays open/closed
-     between refreshes the same way the user left it. */
+  /* Desktop sidebar collapse — defaults to COLLAPSED on first visit
+     for a cleaner Gemini-like empty state. Persisted after that so the
+     preference stays between refreshes. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("koleex-ai-sidebar-collapsed") === "1";
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("koleex-ai-sidebar-collapsed");
+    return stored === null ? true : stored === "1";
   });
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -390,17 +392,31 @@ export default function KoleexAiApp() {
   /* ── Group sidebar entries by relative date ── */
   const groups = useMemo(() => groupByDate(conversations, copy), [conversations, copy]);
 
-  /* ── Autoscroll messages to bottom on change.
-     Earlier this used bottomRef.scrollIntoView(), which walks up the
-     ancestor chain and can yank the *whole page* — causing the
-     "message sent → page jumps" bug Kamal reported. Writing scrollTop
-     directly on the messages container keeps the scroll local to this
-     pane without perturbing the surrounding app chrome. */
+  /* ── Smart autoscroll ──
+     Only follow to the bottom when the user is *already near the
+     bottom*. If they've scrolled up to read earlier messages, we leave
+     them alone — that was the remaining "scroll jitter" Kamal saw.
+     Also switches the very first scroll to "auto" (instant) instead of
+     "smooth" so there's no animated yank when a conversation opens. */
+  const firstScrollRef = useRef(true);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
+    const wasAtBottom = distance < 140; // within ~1 viewport of the end
+    if (!wasAtBottom && !firstScrollRef.current) return; // user is reading above, don't yank
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: firstScrollRef.current ? "auto" : "smooth",
+    });
+    firstScrollRef.current = false;
   }, [messages, sending]);
+
+  /* Reset the "first scroll" flag when opening a different conversation
+     so the jump-to-bottom behaviour is instant for each fresh load. */
+  useEffect(() => {
+    firstScrollRef.current = true;
+  }, [activeId]);
 
   const active = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
@@ -447,17 +463,51 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex overflow-hidden w-full"
+      className="text-[var(--text-primary)] flex overflow-hidden w-full relative koleex-ai-stage"
       style={{ height: stageHeight }}
     >
+      {/* Full-app Gemini-style background — pure black with one soft
+          dark-blue glow anchored to the bottom-center. Lives on the
+          outermost shell so both the sidebar and the main pane share it
+          rather than sitting on a hard flat panel. */}
+      <style>{`
+        @keyframes koleex-glow-breathe {
+          0%, 100% { opacity: 0.85; transform: translate(-50%, 0) scale(1); }
+          50%      { opacity: 1;    transform: translate(-50%, -2%) scale(1.05); }
+        }
+        .koleex-ai-stage { background: #050510; }
+        html[data-theme="light"] .koleex-ai-stage { background: var(--bg-primary); }
+        .koleex-ai-stage::before {
+          content: "";
+          position: absolute;
+          left: 50%;
+          bottom: -30%;
+          width: 140%;
+          height: 85%;
+          transform: translate(-50%, 0);
+          pointer-events: none;
+          z-index: 0;
+          background:
+            radial-gradient(50% 60% at 50% 50%, rgba(32, 64, 160, 0.50), rgba(18, 30, 90, 0.22) 45%, transparent 75%);
+          animation: koleex-glow-breathe 10s ease-in-out infinite;
+          filter: blur(48px);
+          will-change: transform, opacity;
+        }
+        html[data-theme="light"] .koleex-ai-stage::before {
+          background:
+            radial-gradient(50% 60% at 50% 50%, rgba(120, 150, 255, 0.22), rgba(150, 170, 230, 0.06) 45%, transparent 75%);
+        }
+      `}</style>
+
       {/* ── Sidebar ──
           Desktop: width morphs between 280px (expanded) and 0px
           (collapsed) on a spring curve. Mobile: overlay that slides in
-          via the burger button in the top bar (sidebarOpen state). */}
+          via the burger button in the top bar (sidebarOpen state).
+          Transparent so the shared backdrop shows through. */}
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden`}
+        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)]/60 backdrop-blur-xl border-e border-[var(--border-subtle)] overflow-hidden relative z-[1]`}
         style={{
           width: sidebarCollapsed ? 0 : 280,
           minWidth: sidebarCollapsed ? 0 : 280,
@@ -532,8 +582,8 @@ export default function KoleexAiApp() {
 
       {/* ── Main pane ── */}
       <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile top bar */}
-        <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 flex items-center gap-2">
+        {/* Mobile top bar — translucent so the full-app backdrop shows. */}
+        <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 flex items-center gap-2 bg-[var(--bg-primary)]/40 backdrop-blur-md relative z-[2]">
           <button
             onClick={() => setSidebarOpen((v) => !v)}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] flex items-center justify-center"
@@ -567,44 +617,12 @@ export default function KoleexAiApp() {
           </button>
         )}
 
-        {/* Messages — relative wrapper hosts the animated aurora layer */}
+        {/* Messages — transparent; shared backdrop lives on outer shell. */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="relative flex-1 overflow-y-auto koleex-ai-stage"
+          className="relative flex-1 overflow-y-auto"
         >
-          {/* Gemini-style backdrop: pure black base with a single soft
-              dark-blue glow anchored to the bottom of the viewport, the
-              way Gemini's macOS app does it. No busy aurora. A very slow
-              breathing pulse keeps it alive without stealing attention. */}
-          <style>{`
-            @keyframes koleex-glow-breathe {
-              0%, 100% { opacity: 0.85; transform: translate(-50%, 0) scale(1); }
-              50%      { opacity: 1;    transform: translate(-50%, -2%) scale(1.05); }
-            }
-            .koleex-ai-stage { background: #050510; }
-            html[data-theme="light"] .koleex-ai-stage { background: var(--bg-primary); }
-            .koleex-ai-stage::before {
-              content: "";
-              position: absolute;
-              left: 50%;
-              bottom: -35%;
-              width: 140%;
-              height: 90%;
-              transform: translate(-50%, 0);
-              pointer-events: none;
-              z-index: 0;
-              background:
-                radial-gradient(50% 60% at 50% 50%, rgba(32, 64, 160, 0.55), rgba(18, 30, 90, 0.25) 45%, transparent 75%);
-              animation: koleex-glow-breathe 10s ease-in-out infinite;
-              filter: blur(40px);
-              will-change: transform, opacity;
-            }
-            html[data-theme="light"] .koleex-ai-stage::before {
-              background:
-                radial-gradient(50% 60% at 50% 50%, rgba(120, 150, 255, 0.25), rgba(150, 170, 230, 0.08) 45%, transparent 75%);
-            }
-          `}</style>
 
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
             {loadingConv ? (
