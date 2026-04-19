@@ -18,7 +18,7 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
@@ -83,7 +83,6 @@ function channelAvatar(ch: DiscussChannelWithState): string | null {
 
 export default function FloatingPanel() {
   const pathname = usePathname();
-  const router = useRouter();
   const dk = useTheme();
   const { account } = useCurrentAccount();
   const accountId = account?.id ?? null;
@@ -105,10 +104,7 @@ export default function FloatingPanel() {
   /* ── State ── */
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
-  /* The panel now only opens for Discuss — the AI side of the FAB
-     routes to /ai instead of opening the in-panel chat. So default
-     the tab to "discuss" to match what users actually see. */
-  const [tab, setTab] = useState<"ai" | "discuss">("discuss");
+  const [tab, setTab] = useState<"ai" | "discuss">("ai");
 
   /* ── Auto-switch tab when the current one becomes hidden.
      Keeps the sliding highlight behind whatever side is visible. */
@@ -382,24 +378,20 @@ export default function FloatingPanel() {
                 }}
               >
                 <button
-                  onClick={() => {
-                    /* The in-panel AI tab used to switch the body to
-                       the legacy, stateless floating chat. Now it acts
-                       the same as the AI side of the FAB: close the
-                       panel and route to the full /ai app so all AI
-                       interactions land in one place (same
-                       conversations, same sidebar). */
-                    handleClose();
-                    router.push("/ai");
-                  }}
-                  aria-label="Open Koleex AI"
-                  title="Open Koleex AI"
+                  onClick={() => setTab("ai")}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
-                    dk ? "text-white/90 hover:text-white" : "text-black/90 hover:text-black"
+                    tab === "ai"
+                      ? "shadow-sm"
+                      : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
+                  style={tab === "ai" ? {
+                    background: dk
+                      ? "linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.12), rgba(255,110,199,0.06))"
+                      : "linear-gradient(135deg, rgba(0,212,255,0.10), rgba(123,97,255,0.08))",
+                  } : undefined}
                 >
-                  <AiFaceIcon size={16} className="ai-lottie-glow" animated />
-                  <span className="ai-neon-text">AI</span>
+                  <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-40"} animated={tab === "ai"} />
+                  <span className={tab === "ai" ? "ai-neon-text" : ""}>AI</span>
                 </button>
                 <button
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
@@ -857,25 +849,22 @@ export default function FloatingPanel() {
                   <button
                     onClick={() => {
                       if (!showAi) return;
-                      /* AI side of the FAB is a shortcut into the full
-                         Koleex AI app at /ai — the panel used to open a
-                         second, stateless chat (separate conversations,
-                         no history persistence) which confused users.
-                         Clicking AI navigates; clicking Discuss still
-                         opens the inline panel. */
-                      router.push("/ai");
+                      /* Both sides of the FAB pill open the floating
+                         panel. Two-click UX: first click switches
+                         tab, second click opens the panel. If this
+                         tab is already active, one click opens it. */
+                      if (tab === "ai") { setOpen(true); }
+                      else { setTab("ai"); }
                     }}
                     aria-hidden={!showAi}
                     tabIndex={showAi ? 0 : -1}
-                    aria-label="Open Koleex AI"
-                    title="Open Koleex AI"
                     className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
-                      dk ? "text-white/90 hover:text-white" : "text-black/90 hover:text-black"
+                      tab !== "ai" ? dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55" : ""
                     }`}
                     style={{ pointerEvents: showAi ? "auto" : "none" }}
                   >
-                    <AiFaceIcon size={16} className="ai-lottie-glow" animated />
-                    <span className="hidden md:inline text-[11px] font-bold tracking-wide ai-neon-text">
+                    <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-30"} animated={tab === "ai"} />
+                    <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
                       AI
                     </span>
                   </button>
