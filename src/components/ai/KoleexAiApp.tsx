@@ -170,6 +170,18 @@ export default function KoleexAiApp() {
 
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  /* Remember the last opened chat across refreshes so hitting ⌘R
+     doesn't throw you back to the empty welcome state. Stored per-
+     account-id so if two users share a browser they don't see each
+     other's stale selection. Cleared automatically when the stored
+     conversation no longer exists (deleted from another tab). */
+  const activeIdKey = account?.id ? `koleex-ai-active-chat:${account.id}` : null;
+  useEffect(() => {
+    if (!activeIdKey) return;
+    if (activeId) {
+      window.localStorage.setItem(activeIdKey, activeId);
+    }
+  }, [activeId, activeIdKey]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -219,6 +231,29 @@ export default function KoleexAiApp() {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  /* Auto-restore the previously opened conversation after the sidebar
+     loads. Only fires once per mount (restoredRef) so manually opening
+     another chat later doesn't get overridden. If the stored id no
+     longer exists (deleted elsewhere), clear the key and fall through
+     to the welcome state. */
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    if (!activeIdKey) return;
+    if (conversations.length === 0) return;
+    const stored = window.localStorage.getItem(activeIdKey);
+    if (!stored) { restoredRef.current = true; return; }
+    const exists = conversations.some((c) => c.id === stored);
+    if (exists) {
+      restoredRef.current = true;
+      void openConversation(stored);
+    } else {
+      window.localStorage.removeItem(activeIdKey);
+      restoredRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, activeIdKey]);
 
   /* ── Load a conversation's messages ── */
   const openConversation = useCallback(
@@ -387,8 +422,11 @@ export default function KoleexAiApp() {
     if (activeId === id) {
       setActiveId(null);
       setMessages([]);
+      /* Keep the persisted "last opened" key in sync so a refresh
+         after a delete doesn't try to reopen the now-gone chat. */
+      if (activeIdKey) window.localStorage.removeItem(activeIdKey);
     }
-  }, [activeId, pendingDeleteId]);
+  }, [activeId, pendingDeleteId, activeIdKey]);
 
   const renameConversation = useCallback(
     async (id: string, currentTitle: string) => {
