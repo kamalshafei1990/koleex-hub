@@ -393,18 +393,27 @@ export default function KoleexAiApp() {
   const groups = useMemo(() => groupByDate(conversations, copy), [conversations, copy]);
 
   /* ── Smart autoscroll ──
-     Only follow to the bottom when the user is *already near the
-     bottom*. If they've scrolled up to read earlier messages, we leave
-     them alone — that was the remaining "scroll jitter" Kamal saw.
-     Also switches the very first scroll to "auto" (instant) instead of
-     "smooth" so there's no animated yank when a conversation opens. */
+     Previous version measured "was at bottom" *after* the new message
+     rendered, so a long AI reply would already have expanded
+     scrollHeight and the check failed — users ended up stuck mid-pane.
+     New approach: any time the message *count* grows, we scroll to the
+     end (that's a user-visible event — sent by them or a new reply).
+     For non-count changes (e.g. the thinking spinner toggling) we only
+     auto-follow when the user is already close to the bottom, so we
+     don't yank them up if they've scrolled back to read earlier turns. */
   const firstScrollRef = useRef(true);
+  const lastCountRef = useRef(0);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    const countGrew = messages.length > lastCountRef.current;
+    lastCountRef.current = messages.length;
     const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
-    const wasAtBottom = distance < 140; // within ~1 viewport of the end
-    if (!wasAtBottom && !firstScrollRef.current) return; // user is reading above, don't yank
+    const wasNearBottom = distance < 300;
+
+    const shouldScroll = firstScrollRef.current || countGrew || wasNearBottom;
+    if (!shouldScroll) return;
+
     el.scrollTo({
       top: el.scrollHeight,
       behavior: firstScrollRef.current ? "auto" : "smooth",
@@ -416,6 +425,7 @@ export default function KoleexAiApp() {
      so the jump-to-bottom behaviour is instant for each fresh load. */
   useEffect(() => {
     firstScrollRef.current = true;
+    lastCountRef.current = 0;
   }, [activeId]);
 
   const active = useMemo(
@@ -704,6 +714,18 @@ export default function KoleexAiApp() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                /* Also dismiss the keyboard when the Send button is
+                   tapped on mobile. Without this, hitting Send leaves
+                   the on-screen keyboard up and the chat half-hidden. */
+                if (
+                  typeof window !== "undefined" &&
+                  window.matchMedia("(max-width: 767px)").matches
+                ) {
+                  const ta = (e.currentTarget as HTMLFormElement).querySelector(
+                    "textarea",
+                  );
+                  (ta as HTMLTextAreaElement | null)?.blur();
+                }
                 send();
               }}
               className="relative"
@@ -717,12 +739,31 @@ export default function KoleexAiApp() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
+                      /* On mobile, Enter should send AND dismiss the
+                         on-screen keyboard so the chat is visible
+                         again. Blur the textarea on narrow viewports —
+                         desktop keeps focus like ChatGPT/Gemini so you
+                         can keep typing without re-clicking. */
+                      if (
+                        typeof window !== "undefined" &&
+                        window.matchMedia("(max-width: 767px)").matches
+                      ) {
+                        (e.target as HTMLTextAreaElement).blur();
+                      }
                       send();
                     }
                   }}
                   placeholder={copy.placeholder}
                   rows={1}
                   dir={isRtl(input) ? "rtl" : "auto"}
+                  /* `enterKeyHint="send"` tells iOS Safari / Android
+                     Chrome to render the return key as a coloured Send
+                     button instead of an ambiguous arrow — pairs with
+                     the preventDefault+send handler above. */
+                  enterKeyHint="send"
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCorrect="on"
                   className="flex-1 px-5 py-4 bg-transparent text-[15px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
                   style={{ minHeight: "54px" }}
                 />
