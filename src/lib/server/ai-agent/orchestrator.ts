@@ -25,6 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
+import { BRAND_KNOWLEDGE } from "./brand-knowledge";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 /* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
@@ -382,6 +383,9 @@ Tool routing:
 
 Do NOT call tools for meta questions. Answer these directly:
 - "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
+- Any question about the Koleex brand itself — company identity, mission, vision, values, the meaning of K-O-L-E-E-X, slogan, tone, personality, visual identity. Use the BRAND FACTS below as the single source of truth; do not invent details that aren't there.
+
+${BRAND_KNOWLEDGE}
 
 Never invent data. If a tool returns empty, say so. Never reveal values the permission layer filtered out (status="limited"/"denied" means the user isn't allowed to see them — don't guess around them).
 
