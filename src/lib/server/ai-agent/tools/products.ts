@@ -25,47 +25,51 @@ const PRODUCT_SELECT = `id, product_name, slug, brand, division_slug,
   country_of_origin, status, visible, featured, updated_at`;
 
 const searchProducts: ToolDef<
-  { query: string; limit?: number },
-  Array<Record<string, unknown>>
+  { query?: string; limit?: number },
+  { total: number; products: Array<Record<string, unknown>> }
 > = {
   name: "searchProducts",
-  description: "Search Koleex product catalog by name/slug/brand/family. Returns up to 6.",
+  description: "Search catalog by name/slug/brand/family. Empty query = recent products + total count.",
   parameters: {
     type: "object",
     properties: {
-      query: { type: "string", description: "Search text." },
+      query: { type: "string", description: "Search text. Optional." },
       limit: { type: "integer", description: "Max rows. Default 6, cap 20." },
     },
-    required: ["query"],
   },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
-  handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
+  handler: async (ctx, args): Promise<ToolResult<{ total: number; products: Array<Record<string, unknown>> }>> => {
     const q = String(args.query ?? "").trim();
-    if (!q) {
-      return {
-        ok: false,
-        permissionStatus: "denied",
-        data: null,
-        message: "Please provide a search query.",
-      };
-    }
     const limit = Math.min(Math.max(Number(args.limit ?? 6) || 6, 1), 20);
 
-    /* PostgREST `.or()` uses commas + parens as structural syntax —
-       raw user input has to be sanitised before embedding or Supabase
-       builds an invalid URL and throws "string did not match pattern". */
-    const safeQ = sanitizePostgrestLike(q);
-    const { data, error } = await supabaseServer
+    /* Total visible products — independent of the search term so the
+       AI can answer "how many products do we have?" even if the user
+       phrases it as a search. */
+    const totalRes = await supabaseServer
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("visible", true);
+    const total = totalRes.count ?? 0;
+
+    let rowsQuery = supabaseServer
       .from("products")
       .select(PRODUCT_SELECT)
-      .or(
-        `product_name.ilike.%${safeQ}%,slug.ilike.%${safeQ}%,brand.ilike.%${safeQ}%,family.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
-      )
       .eq("visible", true)
       .order("updated_at", { ascending: false })
       .limit(limit);
 
+    if (q) {
+      /* PostgREST `.or()` uses commas + parens as structural syntax —
+         raw user input has to be sanitised before embedding or Supabase
+         builds an invalid URL and throws "string did not match pattern". */
+      const safeQ = sanitizePostgrestLike(q);
+      rowsQuery = rowsQuery.or(
+        `product_name.ilike.%${safeQ}%,slug.ilike.%${safeQ}%,brand.ilike.%${safeQ}%,family.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
+      );
+    }
+
+    const { data, error } = await rowsQuery;
     if (error) {
       console.error("[tool.searchProducts]", error);
       return {
@@ -82,10 +86,110 @@ const searchProducts: ToolDef<
     return {
       ok: true,
       permissionStatus: stripped.length > 0 ? "limited" : "allowed",
-      data: filtered as Array<Record<string, unknown>>,
-      message: `Found ${filtered.length} product(s) matching "${q}".`,
+      data: {
+        total,
+        products: filtered as Array<Record<string, unknown>>,
+      },
+      message: q
+        ? `Found ${filtered.length} of ${total} visible products matching "${q}".`
+        : `Showing ${filtered.length} most recent of ${total} visible products.`,
       sources: ["products(catalog)"],
       filteredFields: stripped,
+    };
+  },
+};
+
+const countProducts: ToolDef<
+  { brand?: string; family?: string },
+  { total: number; brand?: string; family?: string }
+> = {
+  name: "countProducts",
+  description: "Count visible products in the catalog. Optional filters: brand, family.",
+  parameters: {
+    type: "object",
+    properties: {
+      brand: { type: "string", description: "Optional brand filter." },
+      family: { type: "string", description: "Optional family filter." },
+    },
+  },
+  requiredModule: PRODUCT_MODULE,
+  requiredAction: "view",
+  handler: async (_ctx, args): Promise<ToolResult<{ total: number; brand?: string; family?: string }>> => {
+    let query = supabaseServer
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("visible", true);
+    const brand = (args.brand as string | undefined)?.trim();
+    const family = (args.family as string | undefined)?.trim();
+    if (brand) query = query.ilike("brand", sanitizePostgrestLike(brand));
+    if (family) query = query.ilike("family", sanitizePostgrestLike(family));
+    const { count, error } = await query;
+    if (error) {
+      console.error("[tool.countProducts]", error);
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Couldn't count products right now.",
+      };
+    }
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: { total: count ?? 0, brand, family },
+      message: `${count ?? 0} visible product(s)${brand ? ` (brand: ${brand})` : ""}${family ? ` (family: ${family})` : ""}.`,
+      sources: ["products(count)"],
+    };
+  },
+};
+
+const getCatalogStats: ToolDef<
+  Record<string, never>,
+  { total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }
+> = {
+  name: "getCatalogStats",
+  description: "Catalog overview: total products + breakdown by brand and family.",
+  parameters: { type: "object", properties: {} },
+  requiredModule: PRODUCT_MODULE,
+  requiredAction: "view",
+  handler: async (): Promise<ToolResult<{ total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }>> => {
+    const { data, error } = await supabaseServer
+      .from("products")
+      .select("brand, family")
+      .eq("visible", true);
+    if (error || !data) {
+      console.error("[tool.getCatalogStats]", error);
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Couldn't load catalog stats.",
+      };
+    }
+    const brands = new Map<string, number>();
+    const families = new Map<string, number>();
+    for (const row of data) {
+      if (row.brand) brands.set(row.brand, (brands.get(row.brand) ?? 0) + 1);
+      if (row.family) families.set(row.family, (families.get(row.family) ?? 0) + 1);
+    }
+    const topBrands = [...brands.entries()]
+      .map(([brand, count]) => ({ brand, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    const topFamilies = [...families.entries()]
+      .map(([family, count]) => ({ family, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    return {
+      ok: true,
+      permissionStatus: "allowed",
+      data: {
+        total_products: data.length,
+        brands: topBrands,
+        families: topFamilies,
+      },
+      message: `Catalog: ${data.length} products across ${brands.size} brands and ${families.size} families.`,
+      sources: ["products(stats)"],
     };
   },
 };
@@ -166,6 +270,8 @@ function sanitizePostgrestLike(input: string, maxLen = 80): string {
 }
 
 export const productTools: ToolDef[] = [
-  searchProducts as ToolDef,
+  searchProducts as unknown as ToolDef,
   getProductByCode as ToolDef,
+  countProducts as unknown as ToolDef,
+  getCatalogStats as unknown as ToolDef,
 ];

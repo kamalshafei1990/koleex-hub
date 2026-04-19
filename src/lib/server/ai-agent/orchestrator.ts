@@ -63,6 +63,34 @@ export interface OrchestrateInput {
   conversationId: string;
 }
 
+/** Small-talk / meta detector. Short greetings, identity questions,
+ *  thanks, etc. never need a business-data lookup — we reply in one
+ *  tool-less Groq call which uses ~500 tokens instead of ~4 000 (the
+ *  tool schemas alone are most of the cost). Keeps the free-tier
+ *  RPM/TPM allowance intact for the requests that actually need it. */
+function isSmallTalk(msg: string): boolean {
+  const s = msg.trim().toLowerCase();
+  if (!s) return true;
+  if (s.length < 3) return true;
+  const patterns: RegExp[] = [
+    /^(hi|hello|hey|yo|hola|salam|salaam|مرحبا|اهلا|أهلا|السلام|你好|hi there)[\s,!.?؟]*$/i,
+    /^(good\s*(morning|afternoon|evening|night))[\s,!.?؟]*$/i,
+    /who\s+(are|r)\s+you\s*\??$/i,
+    /what\s+(are|r)\s+you\s*\??$/i,
+    /what\s+can\s+you\s+do\s*\??$/i,
+    /what\s+do\s+you\s+know\s*\??$/i,
+    /how\s+do\s+you\s+work\s*\??$/i,
+    /what\s+kind\s+of\s+ai\s+are\s+you\s*\??$/i,
+    /how\s+are\s+you[\s,!.?؟]*$/i,
+    /^(thanks|thank\s+you|thx|ty|شكرا|谢谢)[\s!.؟]*$/i,
+    /^(ok|okay|good|great|nice|cool|got\s+it|understood)[\s!.؟]*$/i,
+    /^(bye|goodbye|see\s+you|مع السلامة|再见)[\s!.؟]*$/i,
+    /من\s+أنت\s*\??$/, // Arabic: "who are you?"
+    /你\s*是\s*谁/,        // Chinese: "who are you?"
+  ];
+  return patterns.some((p) => p.test(s));
+}
+
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const { ctx, history, userMessage, userLang, conversationId } = input;
   const key = process.env.GROQ_API_KEY;
@@ -83,6 +111,30 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
   const steps: AgentStep[] = [];
   let finalReply = "";
+
+  /* ── Small-talk fast-path ──
+     For greetings / identity / thanks / small talk, we skip tool
+     schemas entirely. Single Groq call, ~500 tokens of context, no
+     chance to waste a round-trip calling getUserPermissions. */
+  if (isSmallTalk(userMessage)) {
+    const res = await callGroqPlain(key, messages);
+    if (res.ok) {
+      const json = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const reply = (json.choices?.[0]?.message?.content ?? "").trim();
+      if (reply) {
+        steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
+        return {
+          steps,
+          finalReply: reply,
+          provider: `groq:${GROQ_MODEL}`,
+          conversationId,
+        };
+      }
+    }
+    /* Fall through to the full agent loop on any failure. */
+  }
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     const res = await callGroqWithRetry(key, messages);
@@ -244,12 +296,15 @@ function buildSystemPrompt(ctx: UserContext, userLang: "en" | "zh" | "ar"): stri
 
 Reply in ${langName}. Be concise.
 
-When to call tools — ONLY for real Koleex data:
-- customer / product / inventory lookups → call the matching tool.
-- quotation drafting → follow the workflow below.
+Tool routing:
+- "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
+- "what brands / categories / families exist" → getCatalogStats.
+- "find / search products about Y" → searchProducts(query=Y).
+- "find customer Z" → getCustomerByName / getCustomerByCode.
+- Quotation drafting → follow the workflow below.
 
-Do NOT call tools for meta questions. Answer these directly from this prompt, no tool call needed:
-- "who are you", "what are you", "what can you do", "hello", "hi", greetings, thanks, small talk, language/identity questions.
+Do NOT call tools for meta questions. Answer these directly:
+- "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
 
 Never invent data. If a tool returns empty, say so. Never reveal values the permission layer filtered out (status="limited"/"denied" means the user isn't allowed to see them — don't guess around them).
 
@@ -298,6 +353,36 @@ function fallback(msg: string, conversationId: string): AgentResponse {
    on normal use. When that happens Groq returns a `retry-after`
    header (seconds). We honour it up to 3 times before giving up so a
    brief rate-limit doesn't surface as a scary error. */
+/** Same retry semantics as callGroqWithRetry but the model call does
+ *  NOT include tools. Used for the small-talk fast-path so chit-chat
+ *  doesn't burn the tool-schema token overhead on every turn. */
+async function callGroqPlain(
+  key: string,
+  messages: WireMsg[],
+  attempt = 0,
+): Promise<Response> {
+  const res = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      temperature: 0.4,
+      max_tokens: 512,
+    }),
+  });
+  if ((res.status === 429 || res.status === 503) && attempt < 1) {
+    const ra = Number(res.headers.get("retry-after"));
+    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 1) * 1000, 2000);
+    await new Promise((r) => setTimeout(r, waitMs));
+    return callGroqPlain(key, messages, attempt + 1);
+  }
+  return res;
+}
+
 async function callGroqWithRetry(
   key: string,
   messages: WireMsg[],
