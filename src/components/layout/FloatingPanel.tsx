@@ -89,10 +89,29 @@ export default function FloatingPanel() {
   const accountIdRef = useRef(accountId);
   useEffect(() => { accountIdRef.current = accountId; }, [accountId]);
 
+  /* ── Context-aware visibility ──
+     · On /ai  → hide the AI side of the pill (only Discuss stays).
+     · On /discuss → hide the Discuss side (only AI stays).
+     · Elsewhere → both sides show as normal.
+     Width/opacity animate so it feels smooth when you navigate. */
+  const isAiApp = pathname === "/ai" || !!pathname?.startsWith("/ai/");
+  const isDiscussApp = pathname === "/discuss" || !!pathname?.startsWith("/discuss/");
+  const showAi = !isAiApp;
+  const showDiscuss = !isDiscussApp;
+  const showDivider = showAi && showDiscuss;
+  const soloMode = !showDivider; // exactly one side visible
+
   /* ── State ── */
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [tab, setTab] = useState<"ai" | "discuss">("ai");
+
+  /* ── Auto-switch tab when the current one becomes hidden.
+     Keeps the sliding highlight behind whatever side is visible. */
+  useEffect(() => {
+    if (!showAi && tab === "ai") setTab("discuss");
+    if (!showDiscuss && tab === "discuss") setTab("ai");
+  }, [showAi, showDiscuss, tab]);
   const [channels, setChannels] = useState<DiscussChannelWithState[]>([]);
   const [activeChannel, setActiveChannel] = useState<DiscussChannelWithState | null>(null);
   const [messages, setMessages] = useState<DiscussMessageWithAuthor[]>([]);
@@ -256,9 +275,6 @@ export default function FloatingPanel() {
     }).slice(0, 20),
     [channels],
   );
-
-  /* ── Hide on full Discuss page (the FAB overlaps the composer Send button) ── */
-  if (pathname === "/discuss") return null;
 
   /* ── Token colors ── */
   const bg = dk ? "bg-[#111]" : "bg-white";
@@ -731,14 +747,18 @@ export default function FloatingPanel() {
                 <CrossIcon size={16} className={`fab-x-enter ${dk ? "text-white/60" : "text-black/60"}`} />
               </button>
             ) : (
-              /* ── Expanded: pill with AI | Discuss ── */
+              /* ── Expanded: pill with AI | Discuss (solo-aware) ── */
               <div className="relative flex items-center z-[2]">
-                {/* Sliding selection indicator */}
+                {/* Sliding selection indicator.
+                    In solo mode it stretches to fill the whole (single) button;
+                    in dual mode it snaps under the active tab. */}
                 <div
-                  className="absolute top-[4px] bottom-[4px] rounded-full"
+                  className="absolute top-[4px] bottom-[4px] rounded-full pointer-events-none"
                   style={{
-                    width: "calc(50% - 5px)",
-                    insetInlineStart: tab === "ai" ? "4px" : "calc(50% + 1px)",
+                    width: soloMode ? "calc(100% - 8px)" : "calc(50% - 5px)",
+                    insetInlineStart: soloMode
+                      ? "4px"
+                      : tab === "ai" ? "4px" : "calc(50% + 1px)",
                     background: tab === "ai"
                       ? dk
                         ? "linear-gradient(135deg, rgba(0,212,255,0.10) 0%, rgba(123,97,255,0.10) 50%, rgba(255,110,199,0.06) 100%)"
@@ -747,40 +767,80 @@ export default function FloatingPanel() {
                     transition: "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   }}
                 />
-                {/* AI side */}
-                <button
-                  onClick={() => {
-                    if (tab === "ai") { setOpen(true); }
-                    else { setTab("ai"); }
+                {/* AI side — wrapper animates width to 0 when hidden (in /ai app).
+                    Responsive size (40px mobile / 88px desktop) is handled by tailwind
+                    classes; the hidden state overrides with inline max-width: 0. */}
+                <div
+                  className="overflow-hidden"
+                  style={{
+                    maxWidth: showAi ? 200 : 0,
+                    opacity: showAi ? 1 : 0,
+                    transform: showAi ? "scale(1)" : "scale(0.85)",
+                    transition:
+                      "max-width 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)",
                   }}
-                  className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
-                    tab !== "ai" ? dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55" : ""
-                  }`}
                 >
-                  <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-30"} animated={tab === "ai"} />
-                  <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
-                    AI
-                  </span>
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!showAi) return;
+                      if (tab === "ai") { setOpen(true); }
+                      else { setTab("ai"); }
+                    }}
+                    aria-hidden={!showAi}
+                    tabIndex={showAi ? 0 : -1}
+                    className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
+                      tab !== "ai" ? dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55" : ""
+                    }`}
+                    style={{ pointerEvents: showAi ? "auto" : "none" }}
+                  >
+                    <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-30"} animated={tab === "ai"} />
+                    <span className={`hidden md:inline text-[11px] font-bold tracking-wide ${tab === "ai" ? "ai-neon-text" : ""}`}>
+                      AI
+                    </span>
+                  </button>
+                </div>
 
-                {/* Divider */}
-                <div className={`w-px h-5 md:h-6 ${dk ? "bg-white/[0.06]" : "bg-black/[0.05]"}`} />
-
-                {/* Discuss side */}
-                <button
-                  onClick={() => {
-                    if (tab === "discuss") { setOpen(true); setActiveChannel(null); }
-                    else { setTab("discuss"); }
+                {/* Divider — only when both sides visible */}
+                <div
+                  className={`${dk ? "bg-white/[0.06]" : "bg-black/[0.05]"}`}
+                  style={{
+                    width: showDivider ? 1 : 0,
+                    height: 24,
+                    opacity: showDivider ? 1 : 0,
+                    transition: "width 0.35s ease, opacity 0.25s ease",
                   }}
-                  className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
-                    tab === "discuss"
-                      ? dk ? "text-white/90" : "text-black/90"
-                      : dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55"
-                  }`}
+                />
+
+                {/* Discuss side — wrapper animates width to 0 when hidden (in /discuss app) */}
+                <div
+                  className="overflow-hidden"
+                  style={{
+                    maxWidth: showDiscuss ? 200 : 0,
+                    opacity: showDiscuss ? 1 : 0,
+                    transform: showDiscuss ? "scale(1)" : "scale(0.85)",
+                    transition:
+                      "max-width 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+                  }}
                 >
-                  <DiscussIcon size={14} />
-                  <span className="hidden md:inline text-[11px] font-semibold tracking-wide">Discuss</span>
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!showDiscuss) return;
+                      if (tab === "discuss") { setOpen(true); setActiveChannel(null); }
+                      else { setTab("discuss"); }
+                    }}
+                    aria-hidden={!showDiscuss}
+                    tabIndex={showDiscuss ? 0 : -1}
+                    className={`relative flex items-center justify-center gap-1.5 w-10 md:w-[88px] py-2.5 md:py-3 transition-all duration-300 ${
+                      tab === "discuss"
+                        ? dk ? "text-white/90" : "text-black/90"
+                        : dk ? "text-white/30 hover:text-white/55" : "text-black/30 hover:text-black/55"
+                    }`}
+                    style={{ pointerEvents: showDiscuss ? "auto" : "none" }}
+                  >
+                    <DiscussIcon size={14} />
+                    <span className="hidden md:inline text-[11px] font-semibold tracking-wide">Discuss</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
