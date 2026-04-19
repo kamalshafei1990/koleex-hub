@@ -81,6 +81,56 @@ export async function POST(req: Request) {
     preferences: preferences ?? {},
   };
 
+  /* Defensive: accounts.role_id has a FK → `roles.id`, but role
+     templates (e.g. the ones saved from AccessRightsTab) historically
+     only land in `koleex_roles`. If the admin picked a role that
+     exists in koleex_roles but not roles, the insert below fails with
+     a FK violation ("accounts_role_id_fkey"). Detect that and mirror
+     the row into `roles` first. Matches the same mirror that POST
+     /api/roles now does on creation — this covers older orphans. */
+  const roleId = (payload as { role_id?: unknown }).role_id;
+  if (typeof roleId === "string" && roleId) {
+    const [{ data: rolesHit }, { data: koleexHit }] = await Promise.all([
+      supabaseServer.from("roles").select("id").eq("id", roleId).maybeSingle(),
+      supabaseServer
+        .from("koleex_roles")
+        .select("id, name, description, is_super_admin, can_view_private")
+        .eq("id", roleId)
+        .maybeSingle(),
+    ]);
+    if (!rolesHit && koleexHit) {
+      const k = koleexHit as {
+        id: string;
+        name: string;
+        description: string | null;
+        is_super_admin: boolean;
+        can_view_private: boolean;
+      };
+      const slug =
+        (k.name || `role_${k.id.slice(0, 8)}`)
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 48) || `role_${k.id.slice(0, 8)}`;
+      const { error: syncErr } = await supabaseServer.from("roles").upsert(
+        {
+          id: k.id,
+          slug,
+          name: k.name,
+          description: k.description,
+          scope: "internal",
+          is_super_admin: k.is_super_admin,
+          can_view_private: k.can_view_private,
+        },
+        { onConflict: "id" },
+      );
+      if (syncErr) {
+        console.error("[api/accounts POST] roles-sync failed:", syncErr.message);
+      }
+    }
+  }
+
   const { data, error } = await supabaseServer
     .from("accounts")
     .insert(payload)
