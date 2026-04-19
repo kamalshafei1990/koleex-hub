@@ -188,13 +188,14 @@ export default function KoleexAiApp() {
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
-  /* Desktop sidebar collapse — defaults to COLLAPSED on first visit
-     for a cleaner Gemini-like empty state. Persisted after that so the
-     preference stays between refreshes. */
+  /* Desktop sidebar collapse — defaults to EXPANDED on first visit
+     (the sidebar is the primary nav into chat history; hiding it by
+     default was confusing — users couldn't find it). Persisted after
+     that so an explicit collapse sticks between refreshes. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
+    if (typeof window === "undefined") return false;
     const stored = window.localStorage.getItem("koleex-ai-sidebar-collapsed");
-    return stored === null ? true : stored === "1";
+    return stored === "1";
   });
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -567,20 +568,25 @@ export default function KoleexAiApp() {
       `}</style>
 
       {/* ── Sidebar ──
-          Desktop: width morphs between 280px (expanded) and 0px
-          (collapsed) on a spring curve. Mobile: overlay that slides in
-          via the burger button in the top bar (sidebarOpen state).
+          Desktop: inline flex sibling; width morphs between 280px
+          (expanded) and 0px (collapsed) on a spring curve.
+          Mobile: fixed overlay drawer that slides in via the burger
+          in the top bar (sidebarOpen). Crucially on mobile the
+          desktop collapse flag is ignored — otherwise the drawer
+          would render at width:0 and look broken.
           Transparent so the shared backdrop shows through. */}
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)]/60 backdrop-blur-xl border-e border-[var(--border-subtle)] overflow-hidden relative z-[1]`}
+        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)]/95 md:bg-[var(--bg-secondary)]/60 backdrop-blur-xl border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
         style={{
-          width: sidebarCollapsed ? 0 : 280,
-          minWidth: sidebarCollapsed ? 0 : 280,
+          /* On mobile we ignore sidebarCollapsed (desktop-only concept).
+             On desktop, width morphs 0 ↔ 280 based on collapsed state. */
+          width: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
+          minWidth: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
           transition: "width 0.35s cubic-bezier(0.34,1.56,0.64,1), min-width 0.35s cubic-bezier(0.34,1.56,0.64,1)",
         }}
-        aria-hidden={sidebarCollapsed}
+        aria-hidden={!sidebarOpen && sidebarCollapsed}
       >
         <div className="p-3 flex items-center gap-2 border-b border-[var(--border-subtle)]">
           <Link
