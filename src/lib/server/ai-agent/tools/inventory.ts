@@ -20,14 +20,11 @@ const inventoryNotAvailable: ToolDef<
   null
 > = {
   name: "getInventoryStatus",
-  description:
-    "Check stock / inventory status for a product. Returns live stock " +
-    "levels and warehouse breakdown when available. Use this whenever the " +
-    "user asks about stock availability.",
+  description: "Stock / inventory check for a product.",
   parameters: {
     type: "object",
     properties: {
-      query: { type: "string", description: "Product slug or name to check." },
+      query: { type: "string", description: "Product slug or name." },
     },
   },
   requiredModule: "Inventory",

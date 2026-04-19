@@ -55,10 +55,7 @@ const getProductDetails: ToolDef<
   ProductDetails | null
 > = {
   name: "getProductDetails",
-  description:
-    "Fetch a single product by id with richer info (supplier, optional cost). " +
-    "Use this AFTER searchProducts / getProductByCode when you need more " +
-    "than the catalog summary — for example before calling calculateQuotationPricing.",
+  description: "One product by id with full details (supplier, optional cost).",
   parameters: {
     type: "object",
     properties: {
@@ -149,15 +146,12 @@ const getPricingRules: ToolDef<
   PricingRulesResult
 > = {
   name: "getPricingRules",
-  description:
-    "Look up the pricing rules (margin + discount limits) that apply to a " +
-    "given customer type in a given market. Use before calculating a " +
-    "quotation so you know which policies will apply.",
+  description: "Pricing rules (margin/discount caps) for a customer type in a market.",
   parameters: {
     type: "object",
     properties: {
-      customerType: { type: "string", description: "Customer type tag (e.g. 'wholesale', 'retail')." },
-      market: { type: "string", description: "Market id (uuid) or market name." },
+      customerType: { type: "string", description: "e.g. 'wholesale', 'retail'." },
+      market: { type: "string", description: "Market id or name." },
     },
     required: ["customerType"],
   },
@@ -252,22 +246,18 @@ const calculateQuotationPricing: ToolDef<
   PricingEngineResult
 > = {
   name: "calculateQuotationPricing",
-  description:
-    "Calculate quotation pricing for one customer and a set of product " +
-    "lines. Returns unit prices, discounts, subtotal, total, currency, " +
-    "and an approval flag. This is the ONLY way to compute prices — do " +
-    "not try to multiply numbers yourself; use this tool.",
+  description: "Compute quotation totals for a customer + line list. ONLY way to price — never multiply yourself.",
   parameters: {
     type: "object",
     properties: {
       customerId: { type: "string", description: "Customer UUID." },
       lines: {
         type: "array",
-        description: "List of { productId, qty } pairs.",
+        description: "[{ productId, qty }].",
         items: { type: "object" },
       },
-      headerDiscountPercent: { type: "number", description: "Optional header-level discount percent." },
-      currencyOverride: { type: "string", description: "Optional ISO currency override." },
+      headerDiscountPercent: { type: "number", description: "Optional header discount %." },
+      currencyOverride: { type: "string", description: "Optional ISO currency." },
     },
     required: ["customerId", "lines"],
   },
@@ -343,24 +333,20 @@ interface QuotationDraftResult {
 
 const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> = {
   name: "createQuotationDraft",
-  description:
-    "Create a DRAFT quotation for a customer. Always created with " +
-    "status='draft' — the user must review and finalise it in the " +
-    "Quotations app. Use only after calculateQuotationPricing and only " +
-    "after the user has confirmed the intent to create the quote.",
+  description: "Create a DRAFT quotation. Only after user confirms. Never final/sent.",
   parameters: {
     type: "object",
     properties: {
       customerId: { type: "string", description: "Customer UUID." },
       lines: {
         type: "array",
-        description: "List of { productId, qty } pairs.",
+        description: "[{ productId, qty }].",
         items: { type: "object" },
       },
-      headerDiscountPercent: { type: "number", description: "Optional header-level discount percent." },
-      currencyOverride: { type: "string", description: "Optional ISO currency override." },
-      notes: { type: "string", description: "Optional internal notes for the draft." },
-      validTill: { type: "string", description: "Optional ISO date (YYYY-MM-DD) for validity." },
+      headerDiscountPercent: { type: "number", description: "Optional %." },
+      currencyOverride: { type: "string", description: "Optional ISO currency." },
+      notes: { type: "string", description: "Optional notes." },
+      validTill: { type: "string", description: "Optional YYYY-MM-DD." },
     },
     required: ["customerId", "lines"],
   },

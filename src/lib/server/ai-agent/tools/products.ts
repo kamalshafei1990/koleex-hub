@@ -29,16 +29,12 @@ const searchProducts: ToolDef<
   Array<Record<string, unknown>>
 > = {
   name: "searchProducts",
-  description:
-    "Search the Koleex product catalog by name, slug, brand, or family. " +
-    "Returns a short list of matching products with specs. Use this when " +
-    "the user asks 'what products do we have for X', 'find the X lamp', or " +
-    "before drafting a quotation so you know the real catalog entries.",
+  description: "Search Koleex product catalog by name/slug/brand/family. Returns up to 6.",
   parameters: {
     type: "object",
     properties: {
-      query: { type: "string", description: "Free-text search across name, slug, brand, family, description." },
-      limit: { type: "integer", description: "Max rows to return. Default 6, max 20." },
+      query: { type: "string", description: "Search text." },
+      limit: { type: "integer", description: "Max rows. Default 6, cap 20." },
     },
     required: ["query"],
   },
@@ -99,9 +95,7 @@ const getProductByCode: ToolDef<
   Record<string, unknown> | null
 > = {
   name: "getProductByCode",
-  description:
-    "Fetch one product by exact slug or product name. Returns null if not " +
-    "found. Use when the user references a specific product like 'KX-9000'.",
+  description: "Fetch one product by exact slug/name (e.g. KX-9000). Null if no match.",
   parameters: {
     type: "object",
     properties: {

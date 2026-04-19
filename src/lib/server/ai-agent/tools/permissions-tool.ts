@@ -33,15 +33,8 @@ interface PermissionsSummary {
 
 const getUserPermissions: ToolDef<Record<string, never>, PermissionsSummary> = {
   name: "getUserPermissions",
-  description:
-    "Return a structured summary of the current user's permissions — their " +
-    "role, module access grid, and which sensitive fields they are allowed " +
-    "to see. Use this when the user asks about their own access, what apps " +
-    "they can use, or whether they can view a specific kind of information.",
-  parameters: {
-    type: "object",
-    properties: {},
-  },
+  description: "Return the caller's permission grid (modules + field access). Only call when the user explicitly asks about their OWN ACCESS — e.g. 'what apps can I use', 'can I see salaries'. NEVER call for 'who are you' or general greetings.",
+  parameters: { type: "object", properties: {} },
   minRole: "any",
   handler: async (ctx): Promise<ToolResult<PermissionsSummary>> => {
     const summary: PermissionsSummary = {

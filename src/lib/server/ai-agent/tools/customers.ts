@@ -31,16 +31,12 @@ const getCustomerByName: ToolDef<
   Array<Record<string, unknown>>
 > = {
   name: "getCustomerByName",
-  description:
-    "Search for Koleex customers by name, company name, or customer code. " +
-    "Returns a short list of matches with contact info. Use this when the " +
-    "user asks 'find customer X', 'who is customer Y', or needs to look up " +
-    "a customer before doing anything else.",
+  description: "Find Koleex customers by name/company/code. Returns up to 5 matches.",
   parameters: {
     type: "object",
     properties: {
-      query: { type: "string", description: "Search text (partial name, company, or code)." },
-      limit: { type: "integer", description: "Max rows to return. Default 5, max 20." },
+      query: { type: "string", description: "Search text." },
+      limit: { type: "integer", description: "Max rows. Default 5, cap 20." },
     },
     required: ["query"],
   },
@@ -104,14 +100,11 @@ const getCustomerByCode: ToolDef<
   Record<string, unknown> | null
 > = {
   name: "getCustomerByCode",
-  description:
-    "Fetch a single Koleex customer by exact customer code. Returns null " +
-    "if no match. Prefer this over getCustomerByName when the user has " +
-    "provided a code like CUS-0012.",
+  description: "Fetch one customer by exact code (e.g. CUS-0012). Returns null if no match.",
   parameters: {
     type: "object",
     properties: {
-      code: { type: "string", description: "Exact customer code to fetch." },
+      code: { type: "string", description: "Exact customer code." },
     },
     required: ["code"],
   },
