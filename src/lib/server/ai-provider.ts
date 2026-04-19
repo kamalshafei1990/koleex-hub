@@ -35,6 +35,15 @@ export interface ChatResult {
   provider: string;
 }
 
+/** Last detailed error from a provider call — surfaces through the
+ *  /api/ai/chat response so the UI can show "quota exceeded" etc.
+ *  instead of a generic "unreachable". Module-level lets us avoid
+ *  threading it through every call signature. */
+let lastProviderError: string | null = null;
+export function getLastAiError(): string | null {
+  return lastProviderError;
+}
+
 function pickProvider(): "gemini" | "claude" | "openai" | null {
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "claude";
@@ -57,7 +66,7 @@ Text to translate:
 ${input.text}`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,7 +81,9 @@ ${input.text}`;
   );
 
   if (!res.ok) {
-    console.error("[ai.gemini.translate]", res.status, await res.text().catch(() => ""));
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.gemini.translate]", res.status, bodyText);
+    lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
   const json = (await res.json()) as {
@@ -80,7 +91,19 @@ ${input.text}`;
   };
   const translated = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   if (!translated) return null;
+  lastProviderError = null;
   return { translated, provider: "gemini" };
+}
+
+/** Pull the human-readable `.error.message` out of a Gemini error body
+ *  — falls back to the first 200 chars if the JSON shape is different
+ *  from what we expected. */
+function extractErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    if (parsed?.error?.message) return parsed.error.message;
+  } catch { /* non-JSON */ }
+  return body.slice(0, 200);
 }
 
 async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
@@ -113,7 +136,7 @@ async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
   }
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -122,7 +145,9 @@ async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
   );
 
   if (!res.ok) {
-    console.error("[ai.gemini.chat]", res.status, await res.text().catch(() => ""));
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.gemini.chat]", res.status, bodyText);
+    lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
   const json = (await res.json()) as {
@@ -130,6 +155,7 @@ async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
   };
   const reply = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   if (!reply) return null;
+  lastProviderError = null;
   return { reply, provider: "gemini" };
 }
 

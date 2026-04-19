@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { aiChat, aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
+import { aiChat, aiProviderConfigured, getLastAiError, type ChatMessage } from "@/lib/server/ai-provider";
 
 /* POST /api/ai/conversations/:id/messages
      body: { content: string, user_lang?: 'en'|'zh'|'ar' }
@@ -90,7 +90,10 @@ Current user: ${auth.username} (${auth.user_type}).`;
   const result = await aiChat(messages);
   if (!result) {
     return NextResponse.json(
-      { error: "provider_error", message: "AI provider is unreachable right now." },
+      {
+        error: "provider_error",
+        message: getLastAiError() ?? "AI provider is unreachable right now.",
+      },
       { status: 502 },
     );
   }
