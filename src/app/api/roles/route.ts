@@ -16,27 +16,57 @@ export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  // Roles are GLOBAL (no tenant_id column) — role templates are shared
-  // across all tenants. Try koleex_roles first (richer fields for the
-  // Roles admin), fall back to "roles".
-  let { data, error } = await supabaseServer
-    .from("koleex_roles")
-    .select("*")
-    .order("name", { ascending: true });
-  if (error || !data || data.length === 0) {
-    const res = await supabaseServer
-      .from("roles")
-      .select("*")
-      .order("name", { ascending: true });
-    data = res.data;
-    error = res.error;
-  }
+  /* Roles are GLOBAL (no tenant_id column) — role templates are shared
+     across all tenants.
 
-  if (error) {
-    console.error("[api/roles GET]", error.message);
+     The data is split across two tables for historical reasons:
+       - `koleex_roles` has the richer admin fields (description,
+         is_super_admin, can_view_private) used by the Roles admin page.
+       - `roles` has the authoritative `scope` column ("internal" /
+         "customer" / "all") that account pickers filter on.
+     Returning only koleex_roles was producing an EMPTY dropdown in the
+     Account form because the client filters by `scope` and no row had
+     one. Merge here: koleex_roles rows + scope from `roles` matched by
+     id, defaulting to "internal" when not found. */
+  const [koleexRes, baseRes] = await Promise.all([
+    supabaseServer
+      .from("koleex_roles")
+      .select("*")
+      .order("name", { ascending: true }),
+    supabaseServer
+      .from("roles")
+      .select("id, slug, scope")
+      .order("name", { ascending: true }),
+  ]);
+
+  if (koleexRes.error && baseRes.error) {
+    console.error("[api/roles GET]", koleexRes.error.message, baseRes.error.message);
     return NextResponse.json({ error: "Failed to load roles" }, { status: 500 });
   }
-  return NextResponse.json({ roles: data ?? [] });
+
+  type BaseRole = { id: string; slug: string | null; scope: string | null };
+  const scopeById = new Map<string, string>();
+  const slugById = new Map<string, string>();
+  for (const r of ((baseRes.data ?? []) as BaseRole[])) {
+    if (r.scope) scopeById.set(r.id, r.scope);
+    if (r.slug) slugById.set(r.id, r.slug);
+  }
+
+  const koleexRows = (koleexRes.data ?? []) as Array<Record<string, unknown> & { id: string; name: string }>;
+
+  // If koleex_roles is empty, fall back to returning roles as-is so the
+  // dropdown still has options in a clean environment.
+  if (koleexRows.length === 0) {
+    return NextResponse.json({ roles: baseRes.data ?? [] });
+  }
+
+  const merged = koleexRows.map((row) => ({
+    ...row,
+    scope: (row.scope as string | null | undefined) ?? scopeById.get(row.id) ?? "internal",
+    slug: (row.slug as string | null | undefined) ?? slugById.get(row.id) ?? null,
+  }));
+
+  return NextResponse.json({ roles: merged });
 }
 
 export async function POST(req: Request) {

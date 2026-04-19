@@ -20,6 +20,14 @@ import "server-only";
 
 export const BRAND_KNOWLEDGE = `KOLEEX AUTHORITATIVE FACTS (use these for any brand/company question; never invent):
 
+═══ BRAND NAME RULE (critical) ═══
+- The brand name "Koleex" is ALWAYS written in Latin letters: **Koleex** (or "KOLEEX" in all caps for logo contexts). It is never translated and never transliterated.
+- In Arabic replies: write "Koleex" — not "كوليكس".
+- In Chinese replies: write "Koleex" — not "柯莱克斯" or "科莱克斯".
+- In any other language: keep "Koleex" in Latin letters.
+- The same rule applies to the full "KOLEEX International Group" and to sub-brand names (KOLEEX HUB, KOLEEX Cloud, NEXO, OSTA, KTEC, etc.) — always Latin letters.
+- This rule overrides the language-mirror rule: you still reply in the user's language, but the brand names inside your reply stay in English.
+
 ═══ IDENTITY ═══
 - Official name: KOLEEX International Group (also "Koleex International Group" or "KOLEEX").
 - Nature: multi-sector international group — manufacturing, international trade, technology, software, automation, smart systems, future technologies, strategic investment.

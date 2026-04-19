@@ -85,6 +85,17 @@ export default function SecurityTab({ account }: Props) {
     name: string;
   } | null>(null);
 
+  /* ── Password change form state ──
+     Admin-facing reset (the account owner is admin-managed). Two
+     modes: manual typing or server-generated temporary password.
+     When generated, the plain text is revealed inline so the admin
+     can copy it once; it's never stored beyond the hash. */
+  const [pwFormOpen, setPwFormOpen] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [pwForceReset, setPwForceReset] = useState(true);
+  const [pwGenerated, setPwGenerated] = useState<string | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
   async function reload() {
     const [k, s, h] = await Promise.all([
       fetchApiKeys(account.id),
@@ -155,6 +166,43 @@ export default function SecurityTab({ account }: Props) {
     await reload();
   }
 
+  async function handleChangePassword(mode: "manual" | "generate") {
+    if (mode === "manual" && pwInput.trim().length < 8) {
+      setError(t("acc.err.passwordTooShort") || "Password must be at least 8 characters");
+      return;
+    }
+    setPwSaving(true);
+    setError(null);
+    try {
+      const body =
+        mode === "generate"
+          ? { generate: true, forceReset: pwForceReset }
+          : { password: pwInput, forceReset: pwForceReset };
+      const res = await fetch(`/api/accounts/${account.id}/password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as { ok?: boolean; password?: string; error?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error || "Failed to change password");
+        return;
+      }
+      if (mode === "generate" && json.password) {
+        setPwGenerated(json.password);
+      } else {
+        setToast(t("acc.msg.passwordChanged") || "Password changed");
+        setPwFormOpen(false);
+        setPwInput("");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   async function handleRevokeSession(id: string) {
     setBusy(true);
     const ok = await revokeSession(id);
@@ -202,6 +250,118 @@ export default function SecurityTab({ account }: Props) {
         <p className="text-[11px] text-[var(--text-dim)] mt-4 leading-relaxed">
           {t("acc.security.authNote")}
         </p>
+
+        {/* ── Change password action ──
+            Admin-facing reset. Two flows:
+              1. Generate a temp password server-side (revealed once).
+              2. Set a manual password provided by the admin.
+            Hidden behind a toggle so the section stays tidy until
+            needed. */}
+        <div className="mt-5 pt-4 border-t border-[var(--border-subtle)]">
+          {!pwFormOpen && !pwGenerated && (
+            <button
+              type="button"
+              onClick={() => { setPwFormOpen(true); setError(null); }}
+              className={primaryBtnClass + " text-[12px]"}
+            >
+              <KeyIcon className="h-3.5 w-3.5" />
+              {t("acc.security.changePassword") || "Change password"}
+            </button>
+          )}
+
+          {pwFormOpen && !pwGenerated && (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">
+                  {t("acc.security.changePassword") || "Change password"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => { setPwFormOpen(false); setPwInput(""); setError(null); }}
+                  className="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                >
+                  {t("common.cancel") || "Cancel"}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="text"
+                  value={pwInput}
+                  onChange={(e) => setPwInput(e.target.value)}
+                  placeholder={t("acc.security.newPasswordPlaceholder") || "Enter a new password (min 8 chars)"}
+                  className={inputClass}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleChangePassword("generate")}
+                  disabled={pwSaving}
+                  className={ghostBtnClass + " text-[12px] whitespace-nowrap disabled:opacity-50"}
+                >
+                  {pwSaving ? "…" : (t("acc.security.generate") || "Auto-generate")}
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2 text-[11px] text-[var(--text-dim)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={pwForceReset}
+                  onChange={(e) => setPwForceReset(e.target.checked)}
+                  className="accent-[var(--bg-inverted)]"
+                />
+                {t("acc.security.forceResetOnNextLogin") || "Require user to change password on next sign-in"}
+              </label>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleChangePassword("manual")}
+                  disabled={pwSaving || pwInput.trim().length < 8}
+                  className={primaryBtnClass + " text-[12px] disabled:opacity-50"}
+                >
+                  {pwSaving ? "Saving…" : (t("acc.security.savePassword") || "Save password")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pwGenerated && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-emerald-300 text-[12px] font-semibold">
+                <CheckCircleIcon className="h-4 w-4" />
+                {t("acc.security.generatedTitle") || "Temporary password generated"}
+              </div>
+              <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
+                {t("acc.security.generatedNote") || "Copy it now — it won't be shown again. Share it with the user through a secure channel."}
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 font-mono text-[13px] text-[var(--text-primary)] bg-[var(--bg-primary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)] break-all">
+                  {pwGenerated}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(pwGenerated);
+                    setToast(t("common.copied") || "Copied");
+                  }}
+                  className={ghostBtnClass + " text-[12px]"}
+                >
+                  {t("common.copy") || "Copy"}
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setPwGenerated(null); setPwFormOpen(false); setPwInput(""); }}
+                  className={primaryBtnClass + " text-[12px]"}
+                >
+                  {t("common.done") || "Done"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {toast && (
