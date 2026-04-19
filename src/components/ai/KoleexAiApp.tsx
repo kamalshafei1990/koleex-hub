@@ -37,11 +37,24 @@ import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 
 type MsgRole = "user" | "assistant" | "system";
+interface AgentStep {
+  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied";
+  text?: string;
+  tool?: string;
+  payload?: unknown;
+  permissionStatus?: "allowed" | "limited" | "denied" | "approval_required";
+  sources?: string[];
+  filteredFields?: string[];
+}
 interface ChatMsg {
   id: string;
   role: MsgRole;
   content: string;
   created_at: string;
+  /** Set only on assistant messages from the live agent turn —
+   *  renders the tool-call / tool-result chips inline. Not persisted;
+   *  audit table is the permanent record. */
+  steps?: AgentStep[];
 }
 interface ConversationRow {
   id: string;
@@ -291,17 +304,25 @@ export default function KoleexAiApp() {
       setInput("");
 
       try {
-        const res = await fetch(
-          `/api/ai/conversations/${conversationId}/messages`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: text, user_lang: lang }),
-          },
-        );
+        /* Switched to /api/ai/agent — the new orchestrator that runs
+           tool calls with permission + audit enforcement. Falls back
+           to the classic response shape on errors so the UI behaves. */
+        const res = await fetch(`/api/ai/agent`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId,
+            content: text,
+            user_lang: lang,
+          }),
+        });
         const json = (await res.json()) as
-          | { message: ChatMsg; conversation: { id: string; title: string } }
+          | {
+              agent: { steps: AgentStep[]; finalReply: string; provider: string };
+              message: ChatMsg;
+              conversation: { id: string; title: string };
+            }
           | { error: string; message?: string };
         if (!res.ok || "error" in json) {
           const errObj = json as { error?: string; message?: string };
@@ -312,11 +333,9 @@ export default function KoleexAiApp() {
           setError(msg);
           return;
         }
-        const { message, conversation: convUpdate } = json as {
-          message: ChatMsg;
-          conversation: { id: string; title: string };
-        };
-        setMessages((prev) => [...prev, message]);
+        const { message, conversation: convUpdate, agent } = json;
+        const assistantWithSteps: ChatMsg = { ...message, steps: agent.steps };
+        setMessages((prev) => [...prev, assistantWithSteps]);
         // Sidebar: bump title + move to top + update preview.
         setConversations((prev) => {
           const next = prev.map((c) =>
@@ -801,6 +820,54 @@ export default function KoleexAiApp() {
   );
 }
 
+/* ── Agent step chip ──
+   Renders one tool-call or tool-result as a small pill above the
+   assistant bubble. Colour-coded by permission status so a denied or
+   limited call is visually obvious (users deserve to see WHY data is
+   missing). Clicking/hovering reveals sources + filtered fields. */
+function AgentStepChip({ step }: {
+  step: {
+    kind: string;
+    text?: string;
+    tool?: string;
+    permissionStatus?: "allowed" | "limited" | "denied" | "approval_required";
+    sources?: string[];
+    filteredFields?: string[];
+  };
+}) {
+  const status = step.permissionStatus;
+  const colour =
+    status === "denied"          ? "border-rose-500/40   text-rose-300 bg-rose-500/10" :
+    status === "limited"         ? "border-amber-500/40  text-amber-200 bg-amber-500/10" :
+    status === "approval_required" ? "border-sky-500/40  text-sky-200  bg-sky-500/10" :
+                                     "border-[var(--border-subtle)] text-[var(--text-muted)] bg-[var(--bg-surface)]/60";
+  const icon =
+    step.kind === "tool-call"   ? "🔍" :
+    step.kind === "tool-result" ? (status === "limited" ? "⚠️" : "📋") :
+    step.kind === "denied"      ? "🔒" :
+                                  "•";
+  const label = step.text ?? step.tool ?? step.kind;
+  const sourcesTitle = [
+    step.sources && step.sources.length
+      ? `Sources: ${step.sources.join(", ")}`
+      : null,
+    step.filteredFields && step.filteredFields.length
+      ? `Hidden fields: ${step.filteredFields.join(", ")}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <span
+      title={sourcesTitle || undefined}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border backdrop-blur-md ${colour}`}
+    >
+      <span className="text-[12px] leading-none">{icon}</span>
+      <span className="truncate max-w-[260px]">{label}</span>
+    </span>
+  );
+}
+
 /* ── Bubble ── */
 
 /** Arabic / Persian / Hebrew scripts → force RTL direction + slightly
@@ -824,6 +891,10 @@ function Bubble({
 }) {
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
+  const steps = msg.steps ?? [];
+  const hasToolSteps = !isUser && steps.some((s) =>
+    s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied",
+  );
   /* Both sides now get an avatar so the transcript reads like a real
      conversation — matches the ChatGPT / Gemini visual pattern Kamal
      referenced. User side: real profile photo (or initial fallback).
@@ -845,29 +916,43 @@ function Bubble({
           <AiFaceIcon size={18} animated />
         </div>
       )}
-      <div
-        /* dir="auto" + unicode-bidi: plaintext together make the browser
-           apply the first-strong-character algorithm per paragraph AND
-           isolate embedded segments properly. That's what fixes Arabic
-           replies that also contain English words like "Koleex Hub" —
-           without this the hard dir="rtl" can flip the embedded English
-           into the wrong visual position. */
-        dir="auto"
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
-          rtl ? "text-[15px]" : "text-[14px]"
-        } ${
-          isUser
-            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-            : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
-        }`}
-        style={{
-          unicodeBidi: "plaintext",
-          ...(rtl
-            ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
-            : {}),
-        }}
-      >
-        {msg.content}
+      <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
+        {/* Tool-call / tool-result chips render ABOVE the final assistant
+            text so the user can see WHAT Koleex AI looked up before
+            reading the answer. Permission status drives the colour. */}
+        {hasToolSteps && (
+          <div className="flex flex-wrap gap-1.5">
+            {steps
+              .filter((s) => s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied")
+              .map((s, i) => (
+                <AgentStepChip key={i} step={s} />
+              ))}
+          </div>
+        )}
+        <div
+          /* dir="auto" + unicode-bidi: plaintext together make the browser
+             apply the first-strong-character algorithm per paragraph AND
+             isolate embedded segments properly. That's what fixes Arabic
+             replies that also contain English words like "Koleex Hub" —
+             without this the hard dir="rtl" can flip the embedded English
+             into the wrong visual position. */
+          dir="auto"
+          className={`rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
+            rtl ? "text-[15px]" : "text-[14px]"
+          } ${
+            isUser
+              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+              : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
+          }`}
+          style={{
+            unicodeBidi: "plaintext",
+            ...(rtl
+              ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
+              : {}),
+          }}
+        >
+          {msg.content}
+        </div>
       </div>
       {isUser && (
         <div

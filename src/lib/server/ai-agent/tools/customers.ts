@@ -1,0 +1,166 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   Customer tools — agent-facing read operations on the customers table.
+
+   Every tool:
+   - checks module permission ("Customers" + view)
+   - filters to the caller's tenant_id
+   - strips sensitive fields (credit_limit, payment_terms, internal notes)
+     via filterFields before returning
+   - returns a typed ToolResult — the LLM gets permissionStatus +
+     filteredFields so it can explain the shape of the data honestly
+   --------------------------------------------------------------------------- */
+
+import { supabaseServer } from "../../supabase-server";
+import type { ToolDef, ToolResult } from "../types";
+import { filterFieldsMany } from "../permissions";
+
+const CUSTOMER_MODULE = "Customers";
+
+/* Fields returned to the agent/UI. Sensitive ones (notes, payment_terms)
+   are included in the select but stripped via filterFields when the
+   caller lacks can_view_private — so the AI never even receives them. */
+const CUSTOMER_SELECT = `id, name, customer_code, customer_type, country, city,
+  email, phone, whatsapp, status, is_active, assigned_salesperson,
+  preferred_pricing_tier, currency_code, last_contact_date, next_followup_date,
+  payment_terms, notes, updated_at`;
+
+const getCustomerByName: ToolDef<
+  { query: string; limit?: number },
+  Array<Record<string, unknown>>
+> = {
+  name: "getCustomerByName",
+  description:
+    "Search for Koleex customers by name, company name, or customer code. " +
+    "Returns a short list of matches with contact info. Use this when the " +
+    "user asks 'find customer X', 'who is customer Y', or needs to look up " +
+    "a customer before doing anything else.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Search text (partial name, company, or code)." },
+      limit: { type: "integer", description: "Max rows to return. Default 5, max 20." },
+    },
+    required: ["query"],
+  },
+  requiredModule: CUSTOMER_MODULE,
+  requiredAction: "view",
+  handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
+    const q = String(args.query ?? "").trim();
+    if (!q) {
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Please provide a search query.",
+      };
+    }
+    const limit = Math.min(Math.max(Number(args.limit ?? 5) || 5, 1), 20);
+
+    // Case-insensitive partial match across name, company_name, customer_code.
+    // `%` characters in user input are escaped by supabase-js ilike helper.
+    const { data, error } = await supabaseServer
+      .from("customers")
+      .select(CUSTOMER_SELECT)
+      .eq("tenant_id", ctx.auth.tenant_id)
+      .or(
+        `name.ilike.%${q}%,company_name.ilike.%${q}%,customer_code.ilike.%${q}%`,
+      )
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error("[tool.getCustomerByName]", error);
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Couldn't search customers right now.",
+      };
+    }
+
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    const { filtered, stripped } = filterFieldsMany(ctx, "customers", rows);
+
+    return {
+      ok: true,
+      permissionStatus: stripped.length > 0 ? "limited" : "allowed",
+      data: filtered as Array<Record<string, unknown>>,
+      message: `Found ${filtered.length} customer(s) matching "${q}".`,
+      sources: [`customers(tenant=${ctx.auth.tenant_id.slice(0, 8)}…)`],
+      filteredFields: stripped,
+    };
+  },
+};
+
+const getCustomerByCode: ToolDef<
+  { code: string },
+  Record<string, unknown> | null
+> = {
+  name: "getCustomerByCode",
+  description:
+    "Fetch a single Koleex customer by exact customer code. Returns null " +
+    "if no match. Prefer this over getCustomerByName when the user has " +
+    "provided a code like CUS-0012.",
+  parameters: {
+    type: "object",
+    properties: {
+      code: { type: "string", description: "Exact customer code to fetch." },
+    },
+    required: ["code"],
+  },
+  requiredModule: CUSTOMER_MODULE,
+  requiredAction: "view",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | null>> => {
+    const code = String(args.code ?? "").trim();
+    if (!code) {
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Please provide a customer code.",
+      };
+    }
+    const { data, error } = await supabaseServer
+      .from("customers")
+      .select(CUSTOMER_SELECT)
+      .eq("tenant_id", ctx.auth.tenant_id)
+      .eq("customer_code", code)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[tool.getCustomerByCode]", error);
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "Couldn't fetch that customer right now.",
+      };
+    }
+    if (!data) {
+      return {
+        ok: true,
+        permissionStatus: "allowed",
+        data: null,
+        message: `No customer found with code "${code}".`,
+      };
+    }
+    const { filtered, stripped } = filterFieldsMany(ctx, "customers", [
+      data as Record<string, unknown>,
+    ]);
+    return {
+      ok: true,
+      permissionStatus: stripped.length > 0 ? "limited" : "allowed",
+      data: filtered[0] as Record<string, unknown>,
+      message: `Customer "${code}" found.`,
+      sources: [`customers(code=${code})`],
+      filteredFields: stripped,
+    };
+  },
+};
+
+export const customerTools: ToolDef[] = [
+  getCustomerByName as ToolDef,
+  getCustomerByCode as ToolDef,
+];
