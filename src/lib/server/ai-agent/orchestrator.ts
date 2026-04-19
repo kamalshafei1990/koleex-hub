@@ -115,6 +115,7 @@ function isBrandQuestion(msg: string): boolean {
      that data". A false negative (tool path on a brand query) risks
      a 413. */
   const brandKeywords = [
+    // English
     "koleex", "koleex group", "koleex international",
     "company", "about us", "who are we", "tell me about",
     "history", "heritage", "founded", "founder", "ceo", "leadership",
@@ -125,8 +126,16 @@ function isBrandQuestion(msg: string): boolean {
     "business segment", "segments", "partners", "clients", "division",
     "vision 2035", "2035",
     "k-o-l-e-e-x", "knowledge operations logic",
-    "شركة", "مقر", "رؤية", "مهمة", "قيم", "تاريخ", "شعار", // Arabic brand keywords
-    "公司", "愿景", "使命", "价值观", "历史", "口号", // Chinese brand keywords
+    // Arabic — brand name + common brand-topic words
+    "كوليكس", "كوليكس جروب", "شافعي", "طايتشو", "القاهرة",
+    "شركة", "مؤسس", "المؤسس", "الرئيس", "المدير التنفيذي",
+    "مقر", "المقر", "مكتب", "فرع", "فروع",
+    "رؤية", "مهمة", "رسالة", "قيم", "القيم", "تاريخ", "تراث",
+    "شعار", "فلسفة", "أقسام", "شركاء", "عملاء",
+    // Chinese — brand name + common brand-topic words
+    "柯莱克斯", "科莱克斯", "公司", "集团",
+    "愿景", "使命", "价值观", "历史", "口号", "总部",
+    "创始人", "首席执行官", "ceo",
   ];
   return brandKeywords.some((k) => s.includes(k));
 }
