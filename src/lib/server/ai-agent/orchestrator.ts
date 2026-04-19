@@ -37,7 +37,16 @@ const GROQ_MODEL =
   process.env.GROQ_AGENT_MODEL ||
   process.env.GROQ_MODEL ||
   "llama-3.1-8b-instant";
-const MAX_ITERATIONS = 6;
+const MAX_ITERATIONS = 4;
+/* Hard ceiling on total tool executions per user turn. Prevents small
+   models from loop-calling the same tool 50 times and blowing past
+   Groq's 413 request-size limit. Unique (tool,args) pairs are cached
+   inside a single turn so a model that re-asks for the same data just
+   gets the cached result without another DB hit. */
+const MAX_TOOLS_PER_TURN = 6;
+/* Cap on parallel tool_calls in a single iteration — 8B will sometimes
+   emit the same call three times in one step. */
+const MAX_PARALLEL_TOOLS = 3;
 
 /* OpenAI-compatible message shapes — kept loose because the Groq API
    accepts the whole family (system/user/assistant/tool). */
@@ -111,6 +120,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
   const steps: AgentStep[] = [];
   let finalReply = "";
+  /* Per-turn cache of tool results keyed by `${name}|${argsJson}`. If
+     the model re-emits the same call we serve it from cache instead of
+     letting it spiral. Also a running count so we stop the loop when
+     the model has had enough chances. */
+  const toolCache = new Map<string, { result: unknown; cached: boolean }>();
+  let totalToolRuns = 0;
 
   /* ── Small-talk fast-path ──
      For greetings / identity / thanks / small talk, we skip tool
@@ -137,7 +152,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   }
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    const res = await callGroqWithRetry(key, messages);
+    /* After the per-turn tool budget is spent, disable tools so the
+       model can only produce a final answer. */
+    const toolChoice: "auto" | "none" = totalToolRuns >= MAX_TOOLS_PER_TURN ? "none" : "auto";
+    const res = await callGroqWithRetry(key, messages, { toolChoice });
 
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
@@ -191,18 +209,39 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       break;
     }
 
-    // Push the assistant turn (with the tool_calls array) so the tool
-    // results we append next reference the right call_ids.
+    /* Dedupe + cap parallel tool calls.
+       Small models sometimes emit the same tool call 3× in one
+       iteration. Without guarding we'd hit the DB and chat transcript
+       with duplicates and, if the loop recurs, hit Groq's 413 payload
+       limit. Strategy:
+         · dedupe within this iteration by (name + argsJson)
+         · cap at MAX_PARALLEL_TOOLS per iteration
+         · cap at MAX_TOOLS_PER_TURN across all iterations (serve
+           previously-run calls from toolCache, still appear as
+           tool-role messages so the model sees its own data). */
+    const seenThisIter = new Set<string>();
+    const dedupedCalls: typeof toolCalls = [];
+    for (const tc of toolCalls) {
+      const argsRaw = tc.function.arguments ?? "{}";
+      const cacheKey = `${tc.function.name}|${argsRaw}`;
+      if (seenThisIter.has(cacheKey)) continue;
+      seenThisIter.add(cacheKey);
+      dedupedCalls.push(tc);
+      if (dedupedCalls.length >= MAX_PARALLEL_TOOLS) break;
+    }
+
+    // Push the assistant turn (with the deduped tool_calls array) so the
+    // tool results we append next reference the right call_ids.
     messages.push({
       role: "assistant",
       content: content || null,
-      tool_calls: toolCalls,
+      tool_calls: dedupedCalls,
     });
 
     // Execute tool calls in parallel. Each dispatched through the registry,
     // which runs permission + audit + error isolation.
     const toolRuns = await Promise.all(
-      toolCalls.map(async (tc) => {
+      dedupedCalls.map(async (tc) => {
         let parsedArgs: Record<string, unknown> = {};
         try {
           parsedArgs = tc.function.arguments
@@ -211,6 +250,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         } catch {
           parsedArgs = {};
         }
+        const cacheKey = `${tc.function.name}|${JSON.stringify(parsedArgs)}`;
+
         steps.push({
           kind: "tool-call",
           tool: tc.function.name,
@@ -218,9 +259,34 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
           payload: parsedArgs,
         });
 
+        /* Serve cached result when the model asks for the same thing
+           twice in one turn. Counts against MAX_TOOLS_PER_TURN but
+           doesn't hit the DB or produce a new audit entry. */
+        const hit = toolCache.get(cacheKey);
+        if (hit) {
+          steps.push({
+            kind: "tool-result",
+            tool: tc.function.name,
+            text: "(cached)",
+            payload: hit.result,
+            permissionStatus: "allowed",
+          });
+          return {
+            tc,
+            result: {
+              ok: true,
+              permissionStatus: "allowed" as const,
+              data: hit.result,
+              message: "(cached)",
+            },
+          };
+        }
+
+        totalToolRuns++;
         const result = await dispatchTool(ctx, tc.function.name, parsedArgs, {
           conversationId,
         });
+        toolCache.set(cacheKey, { result: result.data, cached: false });
 
         steps.push({
           kind: "tool-result",
@@ -235,6 +301,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return { tc, result };
       }),
     );
+
+    /* Hit the hard ceiling — force the next iteration to produce a
+       final answer instead of calling more tools. We signal the model
+       by appending a synthetic system message and disabling tools on
+       the next call (set tool_choice="none"). */
+    if (totalToolRuns >= MAX_TOOLS_PER_TURN) {
+      messages.push({
+        role: "system",
+        content: "Tool-call budget reached. Summarise what you have with no further tool calls.",
+      });
+    }
 
     // Feed tool outputs back as tool-role messages. We only send a
     // minimal, LLM-safe projection — never the full raw object if it
@@ -386,22 +463,27 @@ async function callGroqPlain(
 async function callGroqWithRetry(
   key: string,
   messages: WireMsg[],
+  opts: { toolChoice?: "auto" | "none" } = {},
   attempt = 0,
 ): Promise<Response> {
+  const toolChoice = opts.toolChoice ?? "auto";
+  const body: Record<string, unknown> = {
+    model: GROQ_MODEL,
+    messages,
+    temperature: 0.3,
+    max_tokens: 2048,
+  };
+  if (toolChoice !== "none") {
+    body.tools = openAiToolSchemas();
+    body.tool_choice = "auto";
+  }
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages,
-      tools: openAiToolSchemas(),
-      tool_choice: "auto",
-      temperature: 0.3,
-      max_tokens: 2048,
-    }),
+    body: JSON.stringify(body),
   });
   /* Tight retry budget: 1 extra attempt, waiting at most 2 s. If we
      still can't serve we surface the friendly message. Large retry
@@ -411,7 +493,7 @@ async function callGroqWithRetry(
     const ra = Number(res.headers.get("retry-after"));
     const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 1) * 1000, 2000);
     await new Promise((r) => setTimeout(r, waitMs));
-    return callGroqWithRetry(key, messages, attempt + 1);
+    return callGroqWithRetry(key, messages, opts, attempt + 1);
   }
   return res;
 }
