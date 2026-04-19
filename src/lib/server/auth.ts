@@ -35,16 +35,32 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   const accountId = await getSessionAccountId();
   if (!accountId) return null;
 
-  const { data, error } = await supabaseServer
-    .from("accounts")
-    .select(
-      `id, username, login_email, status, user_type,
-       tenant_id, role_id, is_super_admin,
-       roles:role_id(is_super_admin, can_view_private)`,
-    )
-    .eq("id", accountId)
-    .maybeSingle();
+  /* Two Supabase lookups are needed to build the auth context:
+     - `accounts` row (with joined role)
+     - `koleex_employees` department (optional — only if the account
+       maps to an employee record).
+     Previously these ran sequentially, adding one unnecessary round-
+     trip (~150–300ms) to EVERY authenticated request. Run them in
+     parallel: both keys are known up front (accountId), so there's
+     no dependency between the two queries. */
+  const [accountRes, empRes] = await Promise.all([
+    supabaseServer
+      .from("accounts")
+      .select(
+        `id, username, login_email, status, user_type,
+         tenant_id, role_id, is_super_admin,
+         roles:role_id(is_super_admin, can_view_private)`,
+      )
+      .eq("id", accountId)
+      .maybeSingle(),
+    supabaseServer
+      .from("koleex_employees")
+      .select("department")
+      .eq("account_id", accountId)
+      .maybeSingle(),
+  ]);
 
+  const { data, error } = accountRes;
   if (error || !data) return null;
   if (data.status !== "active") return null;
 
@@ -56,19 +72,11 @@ export async function getServerAuth(): Promise<ServerAuthContext | null> {
   const effectiveSA =
     (data.is_super_admin ?? false) || (role?.is_super_admin ?? false);
 
-  // Department (for scope=department) — resolved from koleex_employees when
-  // the account has one. Optional — not every account is an employee.
-  const { data: emp } = await supabaseServer
-    .from("koleex_employees")
-    .select("department")
-    .eq("account_id", data.id)
-    .maybeSingle();
-
   return {
     account_id: data.id,
     tenant_id: data.tenant_id,
     role_id: data.role_id,
-    department: emp?.department ?? null,
+    department: empRes.data?.department ?? null,
     is_super_admin: effectiveSA,
     can_view_private: role?.can_view_private ?? false,
     username: data.username,
