@@ -76,28 +76,18 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   let finalReply = "";
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages,
-        tools: openAiToolSchemas(),
-        tool_choice: "auto",
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    });
+    const res = await callGroqWithRetry(key, messages);
 
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
       console.error("[ai.agent.groq]", res.status, bodyText.slice(0, 500));
-      const msg =
-        "Koleex AI couldn't reach the language model. " +
-        `Provider returned ${res.status}.`;
+      /* Rate limits (429) and overloaded (503) deserve a friendly
+         message — they're recoverable; a 5xx/400 family error is
+         different and can surface the raw status. */
+      const isRateLimited = res.status === 429 || res.status === 503;
+      const msg = isRateLimited
+        ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
+        : `Koleex AI couldn't reach the language model (provider error ${res.status}).`;
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
       return {
         steps,
@@ -293,4 +283,41 @@ function fallback(msg: string, conversationId: string): AgentResponse {
     provider: `groq:${GROQ_MODEL}`,
     conversationId,
   };
+}
+
+/* ─── Groq call with retry-after aware backoff ────────────────────────
+   Groq's free tier is ~6k tokens / minute on Llama 3.3 70B. With the
+   agent loop invoking the model several times per user turn (tool
+   schemas alone cost 2-3k tokens each call), bursts can hit 429 even
+   on normal use. When that happens Groq returns a `retry-after`
+   header (seconds). We honour it up to 3 times before giving up so a
+   brief rate-limit doesn't surface as a scary error. */
+async function callGroqWithRetry(
+  key: string,
+  messages: WireMsg[],
+  attempt = 0,
+): Promise<Response> {
+  const res = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      tools: openAiToolSchemas(),
+      tool_choice: "auto",
+      temperature: 0.3,
+      max_tokens: 2048,
+    }),
+  });
+  if ((res.status === 429 || res.status === 503) && attempt < 3) {
+    const ra = Number(res.headers.get("retry-after"));
+    /* Cap the wait so we don't hold a serverless function for 60 s. */
+    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 2) * 1000, 6000);
+    await new Promise((r) => setTimeout(r, waitMs));
+    return callGroqWithRetry(key, messages, attempt + 1);
+  }
+  return res;
 }

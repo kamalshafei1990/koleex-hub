@@ -56,11 +56,15 @@ const searchProducts: ToolDef<
     }
     const limit = Math.min(Math.max(Number(args.limit ?? 6) || 6, 1), 20);
 
+    /* PostgREST `.or()` uses commas + parens as structural syntax —
+       raw user input has to be sanitised before embedding or Supabase
+       builds an invalid URL and throws "string did not match pattern". */
+    const safeQ = sanitizePostgrestLike(q);
     const { data, error } = await supabaseServer
       .from("products")
       .select(PRODUCT_SELECT)
       .or(
-        `product_name.ilike.%${q}%,slug.ilike.%${q}%,brand.ilike.%${q}%,family.ilike.%${q}%,description.ilike.%${q}%`,
+        `product_name.ilike.%${safeQ}%,slug.ilike.%${safeQ}%,brand.ilike.%${safeQ}%,family.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
       )
       .eq("visible", true)
       .order("updated_at", { ascending: false })
@@ -118,10 +122,11 @@ const getProductByCode: ToolDef<
       };
     }
 
+    const safeCode = sanitizePostgrestLike(code);
     const { data, error } = await supabaseServer
       .from("products")
       .select(PRODUCT_SELECT)
-      .or(`slug.eq.${code},product_name.ilike.${code}`)
+      .or(`slug.eq.${safeCode},product_name.ilike.${safeCode}`)
       .limit(1)
       .maybeSingle();
 
@@ -155,6 +160,16 @@ const getProductByCode: ToolDef<
     };
   },
 };
+
+/** Strip PostgREST metacharacters before embedding user input into a
+ *  .or() filter — see customers.ts for the full rationale. */
+function sanitizePostgrestLike(input: string, maxLen = 80): string {
+  return input
+    .replace(/[,()"'?#]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
 
 export const productTools: ToolDef[] = [
   searchProducts as ToolDef,

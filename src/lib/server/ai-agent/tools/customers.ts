@@ -58,14 +58,19 @@ const getCustomerByName: ToolDef<
     }
     const limit = Math.min(Math.max(Number(args.limit ?? 5) || 5, 1), 20);
 
-    // Case-insensitive partial match across name, company_name, customer_code.
-    // `%` characters in user input are escaped by supabase-js ilike helper.
+    /* PostgREST `.or()` uses `,` as the separator and parentheses for
+       grouping. If the raw query text contains any of those Supabase
+       builds a malformed URL and the browser throws
+       "The string did not match the expected pattern" — looks like a
+       generic error but the root cause is injection into the filter
+       string. Strip the problem characters before embedding. */
+    const safeQ = sanitizePostgrestLike(q);
     const { data, error } = await supabaseServer
       .from("customers")
       .select(CUSTOMER_SELECT)
       .eq("tenant_id", ctx.auth.tenant_id)
       .or(
-        `name.ilike.%${q}%,company_name.ilike.%${q}%,customer_code.ilike.%${q}%`,
+        `name.ilike.%${safeQ}%,company_name.ilike.%${safeQ}%,customer_code.ilike.%${safeQ}%`,
       )
       .order("updated_at", { ascending: false })
       .limit(limit);
@@ -159,6 +164,19 @@ const getCustomerByCode: ToolDef<
     };
   },
 };
+
+/** Strip PostgREST metacharacters before embedding user input into a
+ *  .or() filter. Comma / parens / quotes are structural in PostgREST
+ *  syntax; `?` and `#` can confuse URL parsers. Replaces them with
+ *  spaces, collapses whitespace, and caps length so a model that
+ *  pastes a paragraph as the "query" never blows the URL up. */
+function sanitizePostgrestLike(input: string, maxLen = 80): string {
+  return input
+    .replace(/[,()"'?#]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
 
 export const customerTools: ToolDef[] = [
   getCustomerByName as ToolDef,
