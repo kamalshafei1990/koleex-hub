@@ -408,7 +408,12 @@ function buildSystemPrompt(
   userLang: "en" | "zh" | "ar",
   opts: { includeBrandKnowledge: boolean } = { includeBrandKnowledge: false },
 ): string {
-  const langName =
+  /* Hint from the client about the UI language. Not a hard rule — the
+     model is instructed to MIRROR the user's message language per turn,
+     which is what users actually expect. `userLang` is only used as a
+     fallback tiebreaker when a turn is too short to language-detect
+     (e.g. "ok", "thanks"). */
+  const uiLangHint =
     userLang === "zh" ? "Chinese (Simplified)" :
     userLang === "ar" ? "Arabic" :
     "English";
@@ -422,7 +427,14 @@ function buildSystemPrompt(
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
 
-Reply in ${langName}. Be concise.
+Language rules (critical):
+- Detect the language of the user's latest message and REPLY IN THAT SAME LANGUAGE.
+- If the user writes in Arabic, reply in Arabic. If they write in Chinese, reply in Chinese. If they write in English, reply in English. Same for any other language.
+- Keep the language stable across the whole conversation — if the user opened in Arabic, keep replying in Arabic even if the system's UI language hint differs.
+- Only switch languages when the user explicitly asks ("answer in English from now on", "رد بالعربية", "请用中文回答"). Mirror the language they switched to, and keep using it until they switch again.
+- If the user's message is too short to classify (like "ok" or "thanks"), fall back to ${uiLangHint}.
+
+Be concise.
 
 Tool routing:
 - "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
@@ -485,6 +497,20 @@ function fallback(msg: string, conversationId: string): AgentResponse {
 /** Same retry semantics as callGroqWithRetry but the model call does
  *  NOT include tools. Used for the small-talk fast-path so chit-chat
  *  doesn't burn the tool-schema token overhead on every turn. */
+/* Retry budget: up to 3 extra attempts with exponential backoff,
+   capped by Groq's `retry-after` when provided. Total wait stays
+   under ~10s so the UI doesn't feel frozen, but it's enough for a
+   typical Groq free-tier rate-limit window to clear. */
+const MAX_RETRIES = 3;
+const BACKOFF_CAP_MS = 8000;
+
+function backoffWaitMs(res: Response, attempt: number): number {
+  const ra = Number(res.headers.get("retry-after"));
+  if (Number.isFinite(ra) && ra > 0) return Math.min(ra * 1000, BACKOFF_CAP_MS);
+  // 1s, 2s, 4s, …
+  return Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS);
+}
+
 async function callGroqPlain(
   key: string,
   messages: WireMsg[],
@@ -503,10 +529,8 @@ async function callGroqPlain(
       max_tokens: 512,
     }),
   });
-  if ((res.status === 429 || res.status === 503) && attempt < 1) {
-    const ra = Number(res.headers.get("retry-after"));
-    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 1) * 1000, 2000);
-    await new Promise((r) => setTimeout(r, waitMs));
+  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
+    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
     return callGroqPlain(key, messages, attempt + 1);
   }
   return res;
@@ -537,14 +561,12 @@ async function callGroqWithRetry(
     },
     body: JSON.stringify(body),
   });
-  /* Tight retry budget: 1 extra attempt, waiting at most 2 s. If we
-     still can't serve we surface the friendly message. Large retry
-     windows just make the UI feel frozen — Llama 3.1 8B + higher free-
-     tier throughput should prevent most 429s from reaching here. */
-  if ((res.status === 429 || res.status === 503) && attempt < 1) {
-    const ra = Number(res.headers.get("retry-after"));
-    const waitMs = Math.min((Number.isFinite(ra) && ra > 0 ? ra : 1) * 1000, 2000);
-    await new Promise((r) => setTimeout(r, waitMs));
+  /* Retry budget: up to MAX_RETRIES with exponential backoff, capped
+     by Groq's `retry-after` and BACKOFF_CAP_MS. Gives a brief Groq
+     free-tier rate-limit window time to clear before we surface the
+     friendly "handling a lot of requests" message. */
+  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
+    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
     return callGroqWithRetry(key, messages, opts, attempt + 1);
   }
   return res;
