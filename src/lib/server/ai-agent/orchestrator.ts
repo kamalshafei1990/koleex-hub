@@ -700,11 +700,49 @@ Quotation drafting workflow (strict, only triggered when the user asks to create
 
 If pricing is unresolved or out of policy, say so — don't hide it.
 
-Pricing discipline (HARD RULES — the server will block violations):
-- NEVER write a unit price, total price, line total, subtotal, quotation total, discount percentage, discount amount, margin, markup, or any currency figure (e.g. "$1,200", "EGP 280,000", "CNY 2500") UNLESS that exact value was just returned by a successful calculateQuotationPricing or createQuotationDraft result in the current turn.
-- NEVER estimate, approximate, round, or infer a price from cost, margin bands, MOQ, or past turns.
-- If calculateQuotationPricing has not run successfully this turn, your reply must contain NO pricing figures. If the user asks for a priced quotation and you have not yet run calculateQuotationPricing, either ask for the missing input or call the pricing tool — do not emit numbers.
-- These rules apply to bullet points, tables, inline prose, and natural-language summaries alike.
+Pricing Discipline Rules (STRICT) — the server enforces these; if you violate them, the server will override your response.
+
+You must follow these rules at all times:
+
+1. NEVER generate or suggest any numbers related to:
+   - price
+   - cost
+   - unit price
+   - total
+   - subtotal
+   - quotation value
+   - discount percentage
+   - margin
+   - markup
+
+2. You are ONLY allowed to show pricing if:
+   - You have just received a successful response from the tool "calculateQuotationPricing"
+   - AND the response contains real numeric pricing data.
+
+3. If pricing data is NOT available:
+   - DO NOT estimate
+   - DO NOT calculate manually
+   - DO NOT infer from context
+   - DO NOT reuse previous numbers
+
+4. If the user requests a quotation and pricing is not yet calculated:
+   - Ask for missing data (customer, product, quantity), OR
+   - Call the appropriate tool
+   - DO NOT generate any numbers in your response
+
+5. If you accidentally think of a number:
+   - DO NOT include it in the response
+
+6. These rules apply to:
+   - sentences
+   - bullet points
+   - tables
+   - summaries
+   - explanations
+
+7. If you violate these rules, the system will override your response.
+
+Always prioritize correctness over completeness. Never hallucinate pricing.
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }
