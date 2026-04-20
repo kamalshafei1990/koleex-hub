@@ -168,69 +168,114 @@ function classifyBrandSection(msg: string): "none" | "company" | "ai" | "both" {
   const s = msg.trim().toLowerCase();
   if (!s) return "none";
 
-  /* AI-identity triggers — Section 2. Narrow phrases that
-     unambiguously ask about the assistant itself. */
-  const aiKeywords = [
-    "koleex ai",
-    // Broad identity asks (previously canned; now route to Section 2)
-    "who are you", "who r u", "what are you", "what r u", "what can you do",
-    "what do you know", "what kind of ai",
-    "your name", "what's your name", "whats your name",
-    "who created you", "who made you", "who built you",
-    "a real person", "are you real", "are you human", "are you a human",
-    "trust your answer", "trust your answers", "trust your replies",
-    "replace human", "replace humans", "replace human support",
-    "access my data", "access my order", "access my orders",
-    "access my account", "see my order", "see my orders",
+  /* Regex-based matchers — tolerant to common typos, missing
+     punctuation, verb-tense variations, and word-order differences.
+     Rigid substring lists missed real user turns like "who create
+     you" (no 'd'), "whats ur name", etc. Each regex is tight to its
+     intent to avoid false positives on unrelated chat. */
+
+  /* AI-identity triggers — Section 2. */
+  const aiPatterns: RegExp[] = [
+    // The brand-AI product name (strongest signal for Section 2)
+    /\bkoleex\s+ai\b/i,
+
+    // "who are you" / "who r u" / "who you are"
+    /\bwho\s+(?:are|r|u|is)\s+(?:you|u)\b/i,
+    // "what are you" / "what r u" / "what kind of ai"
+    /\bwhat\s+(?:are|r)\s+(?:you|u)\b/i,
+    /\bwhat\s+kind\s+of\s+ai\b/i,
+    // "what can you do" / "what do you know" / "what you can do"
+    /\bwhat\s+(?:can|do)\s+you\s+(?:do|know)\b/i,
+    /\bwhat\s+you\s+can\s+do\b/i,
+
+    // Name questions — tolerate missing apostrophe, extra spaces
+    /\bwhat('?s| is| are)?\s+your\s+name\b/i,
+    /\byour\s+name\b/i,
+
+    // Who created/made/built you — present OR past tense (fixes "who create you")
+    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?)\s+(?:you|u)\b/i,
+
+    // "Are you a real person" / "are you human" / "are you real"
+    /\bare\s+you\s+(?:a\s+)?(?:real|human)(?:\s+person)?\b/i,
+    /\bare\s+you\s+real\b/i,
+
+    // Trust / reliability of answers
+    /\b(?:can\s+i\s+)?trust\s+your\s+(?:answer|reply|response)/i,
+
+    // Replace human support
+    /\breplace\s+humans?(?:\s+support)?\b/i,
+
+    // Data/order access
+    /\baccess\s+my\s+(?:data|order|orders|account|record)/i,
+    /\bsee\s+my\s+(?:order|orders|account|record)/i,
+
+    // Open "can I talk to you"
+    /\bcan\s+i\s+talk\s+to\s+you\b/i,
+
     // Arabic
-    "ما اسمك", "ما هو اسمك", "اسمك",
-    "من أنت", "من انت", "مين أنت", "مين انت",
-    "من صنعك", "من طورك",
-    "هل أنت إنسان", "هل انت انسان",
+    /\bما\s+اسمك\b/,
+    /\bما\s+هو\s+اسمك\b/,
+    /\bاسمك\b/,
+    /\bمن\s+(?:أنت|انت)\b/,
+    /\bمين\s+(?:أنت|انت)\b/,
+    /\bمن\s+(?:صنعك|طورك|بناك|أنشأك|انشأك)\b/,
+    /\bهل\s+(?:أنت|انت)\s+إنسان\b/,
+    /\bهل\s+(?:أنت|انت)\s+انسان\b/,
+
     // Chinese
-    "你叫什么名字", "你的名字", "你是谁创造",
-    "你是谁", "你是真人吗", "你是人类吗",
-    "你能做什么", "你可以做什么",
+    /你叫什么名字/,
+    /你的名字/,
+    /你是谁/,
+    /你是(?:真人|人类)吗/,
+    /你(?:能|可以)做什么/,
   ];
 
   /* Company-brand triggers — Section 1. Explicit brand / company
      facts (history, mission, vision, CEO, founders, official brand
-     material). Vague prompts like "tell me something" or bare
-     "company" don't count. */
-  const companyKeywords = [
+     material). Word-boundary matching on "koleex" prevents stray
+     matches inside URLs or file paths. */
+  const companyPatterns: RegExp[] = [
     // English
-    "koleex",
-    "koleex group", "koleex international",
-    "koleex story", "koleex history",
-    "company history", "history", "heritage",
-    "founded", "founder", "founders",
-    "ceo",
-    "mission", "vision", "core values",
-    "vision 2035",
-    "official brand", "brand guidelines", "brand story",
-    "kas", "eskn", "nefertiti", "shafei",
-    "k-o-l-e-e-x",
+    /\bkoleex\b/i,
+    /\bkoleex\s+(?:group|international|story|history)\b/i,
+    /\bcompany\s+history\b/i,
+    /\b(?:history|heritage|founded|founder|founders)\b/i,
+    /\bceo\b/i,
+    /\b(?:mission|vision|core\s+values)\b/i,
+    /\bvision\s+2035\b/i,
+    /\b(?:official\s+brand|brand\s+guidelines|brand\s+story)\b/i,
+    /\b(?:kas|eskn|nefertiti|shafei)\b/i,
+    /\bk-o-l-e-e-x\b/i,
+
+    // Where / when / what / who for the company
+    /\bwhere\s+is\s+koleex\b/i,
+    /\bwhere\s+(?:are|is)\s+you\s+based\b/i,
+    /\bheadquarters\b/i,
+    /\bwhen\s+(?:was|did)\s+koleex\b/i,
+    /\bwhat\s+(?:is|does|industries)\s+koleex\b/i,
+
     // Arabic
-    "كوليكس", "شافعي",
-    "مؤسس", "المؤسس",
-    "الرئيس التنفيذي", "المدير التنفيذي",
-    "رؤية", "مهمة", "رسالة",
-    "القيم", "القيم الأساسية",
-    "تاريخ", "تراث",
+    /\bكوليكس\b/,
+    /\bشافعي\b/,
+    /\b(?:مؤسس|المؤسس)\b/,
+    /\bالرئيس\s+التنفيذي\b/,
+    /\bالمدير\s+التنفيذي\b/,
+    /\b(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)\b/,
+
     // Chinese
-    "柯莱克斯", "科莱克斯",
-    "创始人", "首席执行官",
-    "愿景", "使命", "价值观", "历史",
+    /柯莱克斯/,
+    /科莱克斯/,
+    /创始人/,
+    /首席执行官/,
+    /(?:愿景|使命|价值观|历史)/,
   ];
 
-  const hitsAi = aiKeywords.some((k) => s.includes(k));
-  const hitsCompany = companyKeywords.some((k) => s.includes(k));
+  const hitsAi = aiPatterns.some((re) => re.test(s));
+  const hitsCompany = companyPatterns.some((re) => re.test(s));
 
-  if (hitsAi && hitsCompany) {
-    /* "What is Koleex AI?" hits both (contains "koleex" + "koleex ai").
-       AI-identity wins — the user is asking about the assistant. */
-    return "ai";
-  }
+  /* AI-identity wins when both match — e.g. "What is Koleex AI?"
+     matches both koleex-ai (ai) and koleex (company) but is
+     unambiguously a Section 2 question. */
   if (hitsAi) return "ai";
   if (hitsCompany) return "company";
   return "none";
