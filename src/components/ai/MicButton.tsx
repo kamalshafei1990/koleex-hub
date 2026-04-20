@@ -37,6 +37,13 @@ import StopIcon from "@/components/icons/ui/StopIcon";
 
 export type MicState = "idle" | "listening" | "processing" | "speaking";
 
+function formatDuration(s: number): string {
+  if (s < 0) s = 0;
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${m.toString().padStart(1, "0")}:${ss.toString().padStart(2, "0")}`;
+}
+
 interface Props {
   /** Called with the transcribed text (trimmed, non-empty). */
   onTranscript: (text: string) => void;
@@ -74,8 +81,24 @@ export default function MicButton({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  /* Seconds since recording started. Tracked only while the listening
+     state is active; resets to 0 on every new recording. Used to show
+     a live mm:ss badge next to the button so the user has concrete
+     feedback that the mic is actually capturing audio — a pulsing
+     red circle alone was not enough. */
+  const [elapsed, setElapsed] = useState(0);
 
   const computedState: MicState = speaking ? "speaking" : state;
+
+  useEffect(() => {
+    if (state !== "listening") {
+      setElapsed(0);
+      return;
+    }
+    setElapsed(0);
+    const tick = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(tick);
+  }, [state]);
 
   /* Release the mic stream cleanly so Safari/Chrome stop showing the
      recording indicator after we're done. Idempotent. */
@@ -249,7 +272,6 @@ export default function MicButton({
           ? "bg-sky-500 text-white"
           : "bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]";
 
-  const pulse = computedState === "listening" ? "animate-pulse" : "";
   const ariaLabel =
     computedState === "listening"
       ? "Stop recording"
@@ -259,18 +281,87 @@ export default function MicButton({
           ? "Stop speaking"
           : label;
 
+  const isListening = computedState === "listening";
+  const isSpeaking = computedState === "speaking";
+  const showRing = isListening || isSpeaking;
+  const ringColor = isListening
+    ? "rgba(244,63,94,0.55)"   // rose-500
+    : "rgba(14,165,233,0.55)"; // sky-500
+
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled || computedState === "processing"}
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      className={`rounded-full flex items-center justify-center shrink-0 transition-colors disabled:opacity-40 ${color} ${pulse} ${className}`}
-      style={{ width: sizePx, height: sizePx }}
+    <span
+      className={`relative inline-flex items-center shrink-0 ${className}`}
+      style={{ height: sizePx }}
     >
-      {icon}
-    </button>
+      {/* Pulsing halo — two stacked rings animate at different delays
+          so the ripple feels continuous. Pure CSS via Tailwind's
+          animate-ping; absolutely positioned behind the button so
+          layout never shifts between states. */}
+      {showRing && (
+        <>
+          <span
+            aria-hidden
+            className="absolute inline-flex rounded-full animate-ping"
+            style={{
+              inset: 0,
+              width: sizePx,
+              height: sizePx,
+              backgroundColor: ringColor,
+              opacity: 0.55,
+            }}
+          />
+          <span
+            aria-hidden
+            className="absolute inline-flex rounded-full animate-ping"
+            style={{
+              inset: 0,
+              width: sizePx,
+              height: sizePx,
+              backgroundColor: ringColor,
+              opacity: 0.35,
+              animationDelay: "0.35s",
+            }}
+          />
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled || computedState === "processing"}
+        aria-label={ariaLabel}
+        title={ariaLabel}
+        className={`relative rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40 ${color} ${
+          isListening ? "scale-110 shadow-[0_0_0_4px_rgba(244,63,94,0.18)]" : ""
+        } ${isSpeaking ? "shadow-[0_0_0_4px_rgba(14,165,233,0.18)]" : ""}`}
+        style={{ width: sizePx, height: sizePx }}
+      >
+        {icon}
+      </button>
+
+      {/* Live recording duration. Positioned above the button as a
+          floating pill so it never fights for horizontal space in a
+          cramped composer. Only rendered while actively listening. */}
+      {isListening && (
+        <span
+          aria-live="polite"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tracking-wider text-rose-300 bg-rose-500/15 border border-rose-500/30 rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
+        >
+          ● REC · {formatDuration(elapsed)}
+        </span>
+      )}
+
+      {/* Transcribing indicator — small but visible so the user knows
+          their clip is being processed and hasn't been lost. */}
+      {computedState === "processing" && (
+        <span
+          aria-live="polite"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-surface)]/90 border border-[var(--border-subtle)] rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
+        >
+          Transcribing…
+        </span>
+      )}
+    </span>
   );
 }
 
