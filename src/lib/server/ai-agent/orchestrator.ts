@@ -239,9 +239,20 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     ? buildMinimalSystemPrompt(ctx, userLang)
     : buildSystemPrompt(ctx, userLang, { includeBrandKnowledge: isBrand });
 
+  /* Drop deprecated assistant phrases from history before forwarding
+     it to the model. Older turns still live in ai_messages; without
+     this filter the model can echo them on the current turn and the
+     user sees strings the current code no longer produces. User
+     turns are always preserved. */
+  const sanitisedHistory = history.filter((m) => {
+    if (m.role !== "assistant") return true;
+    const content = m.content ?? "";
+    return !BANNED_ECHOES.some((re) => re.test(content));
+  });
+
   const messages: WireMsg[] = [
     { role: "system", content: systemPrompt },
-    ...history.map((m) => ({ role: m.role, content: m.content })),
+    ...sanitisedHistory.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
   ];
 
@@ -297,14 +308,28 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
       console.error("[ai.agent.groq]", res.status, bodyText.slice(0, 500));
-      /* Rate limits (429) and overloaded (503) deserve a friendly
-         message — they're recoverable; a 5xx/400 family error is
-         different and can surface the raw status. */
+
+      /* Rescue-first: if tools already produced valid data this turn,
+         don't discard that work because a secondary Groq call failed.
+         Surface the freshest tool-result text as the final answer so
+         the user sees the data they asked for — no "handling a lot of
+         requests" banner over a successful search. */
+      const rescued = rescueFromToolResults(steps);
+      if (rescued) {
+        steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
+        return {
+          steps,
+          finalReply: rescued,
+          provider: `groq:${GROQ_MODEL}`,
+          conversationId,
+        };
+      }
+
+      /* No rescue available — fall back to the generic error copy.
+         Rate limits (429) and overloaded (503) get the friendly
+         "handling a lot of requests" line; everything else gets the
+         clean generic retry prompt. Raw status stays in the log. */
       const isRateLimited = res.status === 429 || res.status === 503;
-      /* Only rate-limit / overloaded cases get the "handling a lot of
-         requests" copy. Everything else is a clean generic retry
-         prompt — the raw status code is logged server-side but not
-         surfaced to end users. */
       const msg = isRateLimited
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
@@ -330,7 +355,22 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
     const choice = json.choices?.[0]?.message;
     if (!choice) {
-      return fallback("Empty model response.", conversationId);
+      /* Rescue-first on malformed/empty response too. If tools ran
+         earlier this turn, prefer their output over a generic error. */
+      const rescued = rescueFromToolResults(steps);
+      if (rescued) {
+        steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
+        return {
+          steps,
+          finalReply: rescued,
+          provider: `groq:${GROQ_MODEL}`,
+          conversationId,
+        };
+      }
+      return fallback(
+        "I couldn't complete that request. Please try again.",
+        conversationId,
+      );
     }
 
     const toolCalls = choice.tool_calls ?? [];
@@ -343,10 +383,16 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          final reply. Models sometimes verbalise their own tool-call
          syntax when they mis-parse the tool schema; cleanAssistantText
          strips those markers so nothing raw ever reaches the UI.
-         If the sanitiser leaves nothing, substitute a clean generic
-         follow-up instead of an empty bubble. */
+
+         Rescue-first precedence when the model's content is empty
+         after tools ran: prefer the latest successful tool-result
+         text over GENERIC_FOLLOWUP, so a valid search/lookup answer
+         isn't replaced with "Could you share a bit more so I can
+         help?" just because the summariser returned nothing. */
       const cleaned = cleanAssistantText(content);
-      finalReply = normaliseBrandName(cleaned) || GENERIC_FOLLOWUP;
+      const attempted = normaliseBrandName(cleaned);
+      finalReply =
+        attempted || rescueFromToolResults(steps) || GENERIC_FOLLOWUP;
       steps.push({
         kind: "answer",
         text: finalReply,
@@ -702,6 +748,49 @@ function looksLikeDebug(s: string): boolean {
 /** Picked when we have nothing clean to surface — keeps the tone
  *  conversational rather than exposing internals. */
 const GENERIC_FOLLOWUP = "Could you share a bit more so I can help?";
+
+/** Best-effort rescue when the post-tool Groq call fails (429, 5xx,
+ *  empty response). Scans steps[] from newest to oldest and returns
+ *  the most recent successful tool-result text so the user sees the
+ *  data the tools already fetched instead of a generic error banner.
+ *
+ *  Returns "" when nothing usable is in steps[] — the caller then
+ *  falls back to its original error/follow-up message. */
+function rescueFromToolResults(steps: AgentStep[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (
+      s.kind === "tool-result" &&
+      s.permissionStatus !== "denied" &&
+      s.text
+    ) {
+      const cleaned = cleanAssistantText(s.text);
+      if (cleaned && !looksLikeDebug(cleaned)) {
+        return normaliseBrandName(cleaned);
+      }
+    }
+  }
+  return "";
+}
+
+/** Deprecated phrasings that older builds of the agent used to emit.
+ *  They were removed from the code but still live inside ai_messages
+ *  rows from past conversations. If we forward those turns to Groq
+ *  as history, the model can quote them verbatim on the next turn —
+ *  users then see "Need a customerId and at least one valid line"
+ *  even though the code no longer produces that string anywhere.
+ *
+ *  The history sanitiser (applied before building the Groq message
+ *  list) drops any ASSISTANT history row whose content matches one
+ *  of these patterns. User turns are always preserved. */
+const BANNED_ECHOES: RegExp[] = [
+  /Need a customer[Ii]d and at least one valid line/i,
+  /productId required\.?$/i,
+  /customerId required\.?$/i,
+  /Please provide a search query\.?$/i,
+  /Please provide a customer code\.?$/i,
+  /\bUnknown tool\b/i,
+];
 
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
