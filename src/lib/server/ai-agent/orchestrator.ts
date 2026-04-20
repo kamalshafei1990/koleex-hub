@@ -1025,7 +1025,7 @@ function hasValidPricingEvidence(steps: AgentStep[]): boolean {
  *  "Customer and product" is slightly optimistic in the edge case
  *  where neither was resolved, but the guard's intent is to stop
  *  fabricated pricing, not to narrate flow state. */
-const PRICING_GUARD_MESSAGE =
+export const PRICING_GUARD_MESSAGE =
   "I found the customer and product, but I cannot provide pricing until the pricing calculation completes successfully.";
 
 /** Single gate every orchestrate-return path calls. Returns the
@@ -1033,7 +1033,7 @@ const PRICING_GUARD_MESSAGE =
  *  place so the UI matches. No-op when either (a) the reply has no
  *  pricing-like content or (b) a pricing tool ran successfully this
  *  turn. */
-function sealPricingSafety(finalReply: string, steps: AgentStep[]): string {
+export function sealPricingSafety(finalReply: string, steps: AgentStep[]): string {
   if (!containsPricingOutput(finalReply)) return finalReply;
   if (hasValidPricingEvidence(steps)) return finalReply;
 
