@@ -27,6 +27,11 @@ import { requireAuth } from "@/lib/server/auth";
 
 const GROQ_WHISPER_URL =
   "https://api.groq.com/openai/v1/audio/transcriptions";
+/* Default to `whisper-large-v3-turbo` — Groq's faster Whisper variant
+   that's already rate-limit-configured on our project. The project's
+   "Allowed Models" list must include this model or requests 403 with
+   `model_permission_blocked_project`. Env override still honoured if
+   a project admin later prefers the non-turbo variant. */
 const GROQ_WHISPER_MODEL =
   process.env.GROQ_WHISPER_MODEL || "whisper-large-v3-turbo";
 
@@ -115,7 +120,7 @@ export async function POST(req: Request) {
           message:
             res.status === 429
               ? "Voice service is busy — please try again in a moment."
-              : `Debug: Groq ${res.status} · model ${GROQ_WHISPER_MODEL} · ${body.slice(0, 400)}`,
+              : "Couldn't transcribe that clip. Please try again.",
         },
         { status: 502 },
       );

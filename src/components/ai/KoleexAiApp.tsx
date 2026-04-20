@@ -195,10 +195,10 @@ export default function KoleexAiApp() {
                    conversation persistence.
      Defaults to chat so common prompts stay fast; users explicitly
      opt in to agent mode when they need to take action. */
-  const [mode, setMode] = useState<"chat" | "agent">("chat");
-  /* Voice-chat state (Phase 1, Chat mode only). The mic button is
-     rendered only when mode === "chat"; TTS speaks on voice-initiated
-     replies. Typed chats stay silent. */
+  /* Voice-chat state. Chat and Agent are unified — every turn runs
+     through the orchestrator (/api/ai/agent) which may or may not
+     call tools. Voice in, voice out works on every turn. TTS speaks
+     only on voice-initiated replies; typed turns stay silent. */
   const [aiSpeaking, setAiSpeaking] = useState(false);
   const ttsHandleRef = useRef<TtsHandle | null>(null);
   const stopTts = useCallback(() => {
@@ -206,15 +206,6 @@ export default function KoleexAiApp() {
     ttsHandleRef.current = null;
     setAiSpeaking(false);
   }, []);
-  /* When the user leaves Chat mode, immediately stop any TTS playback
-     that started in Chat mode. Without this the mic button unmounts
-     (it lives inside {mode === "chat" && …}) but speechSynthesis keeps
-     reading the previous reply — audio persists with no UI surface to
-     stop it. This effect closes that loop. Fires only on a real
-     transition (not on initial "chat" mount). */
-  useEffect(() => {
-    if (mode !== "chat") stopTts();
-  }, [mode, stopTts]);
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
@@ -339,9 +330,14 @@ export default function KoleexAiApp() {
   }, []);
 
   /* ── Send a message ──
-     `viaVoice` — when true the Chat-mode branch reads the reply aloud
-     via speechSynthesis (Phase 1 voice chat). Agent mode is unaffected;
-     it doesn't support voice yet. */
+     Unified path: every turn runs through /api/ai/agent (the
+     orchestrator). The model can either reply naturally for
+     conversational turns or call tools for data/action turns — it
+     picks per prompt. All server-side guards (execution v1/v2/v3,
+     pricing, quotation hard mode) run every time.
+
+     `viaVoice` — when true the assistant reply is also read aloud
+     via speechSynthesis. Typed turns stay silent. */
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
@@ -351,74 +347,8 @@ export default function KoleexAiApp() {
       if (sendingRef.current) return;
       sendingRef.current = true;
       setSending(true);
-
-      /* ── Chat mode: ephemeral, router-only, no DB ──
-         Bypasses the conversation create + orchestrator entirely so
-         "hello" is instant and business questions go straight through
-         the hybrid router (Groq for chat, DeepSeek for business). Per
-         spec: no DB calls, no persistence, no sidebar update. Messages
-         live in local state only for this mode. */
-      if (mode === "chat") {
-        /* New turn cancels any in-flight TTS so we don't stack audio. */
-        stopTts();
-        setError(null);
-        const optimistic: ChatMsg = {
-          id: `tmp-${Date.now()}`,
-          role: "user",
-          content: text,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, optimistic]);
-        setInput("");
-        try {
-          const res = await fetch("/api/ai/chat", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: [{ role: "user", content: text }],
-              user_lang: lang,
-            }),
-          });
-          const json = (await res.json()) as
-            | { reply: string; provider: string }
-            | { error: string; message?: string };
-          if (!res.ok || "error" in json) {
-            const err = json as { error?: string; message?: string };
-            setError(err.message || err.error || "Failed to get a reply.");
-            /* Spec: do not speak anything if the reply failed. */
-            return;
-          }
-          const reply = (json as { reply: string }).reply;
-          const assistantMsg: ChatMsg = {
-            id: `chat-${Date.now()}`,
-            role: "assistant",
-            content: reply,
-            created_at: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-          if (viaVoice) {
-            setAiSpeaking(true);
-            ttsHandleRef.current = speakText(reply, {
-              lang,
-              onEnd: () => {
-                ttsHandleRef.current = null;
-                setAiSpeaking(false);
-              },
-            });
-          }
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "Network error");
-        } finally {
-          sendingRef.current = false;
-          setSending(false);
-        }
-        return;
-      }
-
-      /* ── Agent mode: existing orchestrator flow ──
-         Creates a conversation if needed, runs the full tool loop,
-         persists user + assistant turns, updates the sidebar. */
+      /* New turn cancels any in-flight TTS so audio never stacks. */
+      stopTts();
 
       // Ensure we have a conversation first
       let conversationId = activeId;
@@ -486,6 +416,19 @@ export default function KoleexAiApp() {
         const { message, conversation: convUpdate, agent } = json;
         const assistantWithSteps: ChatMsg = { ...message, steps: agent.steps };
         setMessages((prev) => [...prev, assistantWithSteps]);
+        /* Voice-initiated turn → speak the final reply. Typed turns
+           stay silent. Only the `finalReply` text is spoken; tool
+           chips remain visual. */
+        if (viaVoice && message.content) {
+          setAiSpeaking(true);
+          ttsHandleRef.current = speakText(message.content, {
+            lang,
+            onEnd: () => {
+              ttsHandleRef.current = null;
+              setAiSpeaking(false);
+            },
+          });
+        }
         // Sidebar: bump title + move to top + update preview.
         setConversations((prev) => {
           const next = prev.map((c) =>
@@ -513,7 +456,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, mode, stopTts],
+    [input, activeId, lang, stopTts],
   );
 
   /* Two-step delete using the Hub's ConfirmDialog component. The old
@@ -831,57 +774,6 @@ export default function KoleexAiApp() {
           </button>
         )}
 
-        {/* Mode toggle — Chat vs Agent.
-            Chat = fast router replies, no DB, no tools.
-            Agent = full orchestrator with tool calls + persistence.
-            Kept deliberately small — a pill that matches the rest of
-            the Hub's iconography. A tiny "Agent Mode Active" label is
-            rendered alongside when the heavier mode is engaged so the
-            user knows they're about to trigger DB / tool work. */}
-        <div className="shrink-0 flex items-center justify-center gap-2 px-4 py-2">
-          <div
-            role="tablist"
-            aria-label="AI mode"
-            className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--bg-surface)]/70 backdrop-blur-md border border-[var(--border-subtle)] shadow-sm"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "chat"}
-              onClick={() => setMode("chat")}
-              className={`px-3 h-7 text-[12px] font-medium rounded-full transition-colors ${
-                mode === "chat"
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "agent"}
-              onClick={() => setMode("agent")}
-              className={`px-3 h-7 text-[12px] font-medium rounded-full transition-colors ${
-                mode === "agent"
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              Agent
-            </button>
-          </div>
-          {mode === "agent" && (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-amber-400"
-              title="Agent mode runs permission-checked tools and may read from the database — responses are slower than chat mode."
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Agent Mode Active
-            </span>
-          )}
-        </div>
-
         {/* Messages — transparent; shared backdrop lives on outer shell. */}
         <div
           ref={scrollRef}
@@ -1022,22 +914,22 @@ export default function KoleexAiApp() {
                   className="flex-1 px-5 py-4 bg-transparent text-[15px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
                   style={{ minHeight: "54px" }}
                 />
-                {/* Mic button — Chat mode only (Phase 1 voice input).
-                    Hidden in Agent mode per spec: voice doesn't route
-                    through the orchestrator yet. On transcript we call
-                    send(text, viaVoice=true) which speaks the reply. */}
-                {mode === "chat" && (
-                  <MicButton
-                    className="m-2"
-                    size={40}
-                    onTranscript={(t) => send(t, true)}
-                    onError={(msg) => setError(msg)}
-                    speaking={aiSpeaking}
-                    onStopSpeaking={stopTts}
-                    disabled={sending}
-                    lang={lang}
-                  />
-                )}
+                {/* Mic button — always mounted now that Chat and Agent
+                    are unified. Voice turns route through the same
+                    orchestrator as typed turns. On transcript we call
+                    send(text, viaVoice=true) which both sends the
+                    message and reads the reply aloud. */}
+                <MicButton
+                  className="m-2"
+                  size={40}
+                  onTranscript={(t) => send(t, true)}
+                  onError={(msg) => setError(msg)}
+                  speaking={aiSpeaking}
+                  onStopSpeaking={stopTts}
+                  disabled={sending}
+                  lang={lang}
+                />
+
                 <button
                   type="submit"
                   disabled={sending || !input.trim()}
