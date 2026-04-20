@@ -58,13 +58,19 @@ const POLICY_ADMIN_ROLES = new Set<string>([
 const SECTIONS: Record<string, SectionCfg> = {
   settings: {
     table: "commercial_settings",
-    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "notes"],
+    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "cost_uplift_percent", "notes"],
     slugColumn: null,
     slugSourceField: null,
     validate: (row) => {
       const fx = Number(row.fx_cny_per_usd);
       if (!Number.isFinite(fx) || fx <= 0 || fx > 100) {
         throw new Error("fx_cny_per_usd must be between 0.01 and 100");
+      }
+      if (row.cost_uplift_percent !== undefined) {
+        const u = Number(row.cost_uplift_percent);
+        if (!Number.isFinite(u) || u < 0 || u > 100) {
+          throw new Error("cost_uplift_percent must be between 0 and 100");
+        }
       }
     },
   },
@@ -75,6 +81,8 @@ const SECTIONS: Record<string, SectionCfg> = {
       "min_cost_cny",
       "max_cost_cny",
       "margin_percent",
+      "margin_min_percent",
+      "margin_max_percent",
       "min_margin_percent",
       "is_active",
       "sort_order",
@@ -163,7 +171,15 @@ const SECTIONS: Record<string, SectionCfg> = {
   },
   "channel-multipliers": {
     table: "commercial_channel_multipliers",
-    editableFields: ["name", "applies_to_tier", "multiplier", "is_active", "sort_order"],
+    editableFields: [
+      "name",
+      "applies_to_tier",
+      "multiplier",
+      "margin_min_percent",
+      "margin_max_percent",
+      "is_active",
+      "sort_order",
+    ],
     slugColumn: "code",
     slugSourceField: "name",
     insertDefaults: { is_active: true, multiplier: 1 },
@@ -205,6 +221,41 @@ const SECTIONS: Record<string, SectionCfg> = {
     insertDefaults: { is_active: true, rate_percent: 0, applies_to: "All sales" },
     validate: (row) => {
       requirePercent(row.rate_percent, "rate_percent");
+    },
+  },
+  "volume-discount-tiers": {
+    table: "commercial_volume_discount_tiers",
+    editableFields: [
+      "name",
+      "min_order_usd",
+      "max_order_usd",
+      "discount_min_percent",
+      "discount_max_percent",
+      "is_active",
+      "sort_order",
+    ],
+    slugColumn: "code",
+    slugSourceField: "name",
+    insertDefaults: {
+      is_active: true,
+      min_order_usd: 0,
+      discount_min_percent: 0,
+      discount_max_percent: 0,
+    },
+    validate: (row) => {
+      requirePercent(row.discount_min_percent, "discount_min_percent");
+      requirePercent(row.discount_max_percent, "discount_max_percent");
+      const lo = Number(row.discount_min_percent);
+      const hi = Number(row.discount_max_percent);
+      if (hi < lo) throw new Error("discount_max_percent must be >= discount_min_percent");
+      const omin = Number(row.min_order_usd);
+      if (!Number.isFinite(omin) || omin < 0) throw new Error("min_order_usd must be >= 0");
+      if (row.max_order_usd !== null && row.max_order_usd !== undefined) {
+        const omax = Number(row.max_order_usd);
+        if (!Number.isFinite(omax) || omax <= omin) {
+          throw new Error("max_order_usd must be > min_order_usd or null");
+        }
+      }
     },
   },
   "approval-authority": {

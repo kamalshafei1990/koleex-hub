@@ -24,6 +24,11 @@ export interface CommercialSettingsRow {
   tenant_id: string;
   fx_cny_per_usd: number;
   sales_sees_cost: boolean;
+  /** Aggregate uplift applied to raw KOLEEX cost to approximate the
+   *  Net Internal Cost (export docs, packaging, bank charges, warranty
+   *  reserve − tax refund). Single-knob until the full breakdown is
+   *  modelled. Defaults to 0 so legacy callers keep their numbers. */
+  cost_uplift_percent: number;
   policy_version: string;
   notes: string | null;
   updated_at: string;
@@ -39,6 +44,11 @@ export interface ProductLevelRow {
   min_cost_cny: number;
   max_cost_cny: number | null;
   margin_percent: number;
+  /** Portal-aligned margin range; engine picks a value inside it
+   *  based on customer / region / competition. Falls back to
+   *  margin_percent when null. */
+  margin_min_percent: number | null;
+  margin_max_percent: number | null;
   min_margin_percent: number;
   is_active: boolean;
 }
@@ -88,6 +98,25 @@ export interface ChannelMultiplierRow {
   name: string;
   applies_to_tier: string | null;
   multiplier: number;
+  /** Portal-aligned true-margin range. Engine applies
+   *  Price = Parent / (1 − margin%) using a value inside this range.
+   *  Falls back to `multiplier` when null (terminal channels like
+   *  retail_global typically have null). */
+  margin_min_percent: number | null;
+  margin_max_percent: number | null;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface VolumeDiscountTierRow {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  min_order_usd: number;
+  max_order_usd: number | null;
+  discount_min_percent: number;
+  discount_max_percent: number;
   sort_order: number;
   is_active: boolean;
 }
@@ -139,6 +168,7 @@ export interface CommercialPolicySnapshot {
   discountTiers: DiscountTierRow[];
   commissionTiers: CommissionTierRow[];
   approvalAuthority: ApprovalAuthorityRow[];
+  volumeDiscountTiers: VolumeDiscountTierRow[];
 }
 
 /* ─── Readers ─────────────────────────────────────────────── */
@@ -225,6 +255,15 @@ export async function getApprovalAuthority(tenantId: string): Promise<ApprovalAu
   return (data as ApprovalAuthorityRow[]) ?? [];
 }
 
+export async function getVolumeDiscountTiers(tenantId: string): Promise<VolumeDiscountTierRow[]> {
+  const { data } = await supabaseServer
+    .from("commercial_volume_discount_tiers")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("sort_order", { ascending: true });
+  return (data as VolumeDiscountTierRow[]) ?? [];
+}
+
 /** Load every section in parallel. One network round-trip to Supabase
  *  (supabaseServer uses HTTP keep-alive + pools), ~9 parallel queries.
  *  Admin app uses this to render the whole policy page without a stagger. */
@@ -239,6 +278,7 @@ export async function getPolicySnapshot(tenantId: string): Promise<CommercialPol
     discountTiers,
     commissionTiers,
     approvalAuthority,
+    volumeDiscountTiers,
   ] = await Promise.all([
     getSettings(tenantId),
     getProductLevels(tenantId),
@@ -249,6 +289,7 @@ export async function getPolicySnapshot(tenantId: string): Promise<CommercialPol
     getDiscountTiers(tenantId),
     getCommissionTiers(tenantId),
     getApprovalAuthority(tenantId),
+    getVolumeDiscountTiers(tenantId),
   ]);
 
   return {
@@ -261,6 +302,7 @@ export async function getPolicySnapshot(tenantId: string): Promise<CommercialPol
     discountTiers,
     commissionTiers,
     approvalAuthority,
+    volumeDiscountTiers,
   };
 }
 
