@@ -390,7 +390,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      limit even with the full BRAND_KNOWLEDGE loaded. */
   if (useFastPath) {
     const tPre = Date.now();
-    const res = await callGroqPlain(key, messages);
+    /* Brand answers are structured multi-section prose (Q3 alone is
+       ~200 words); small-talk is one or two sentences. Size the
+       token budget accordingly so brand answers complete instead of
+       truncating. */
+    const res = await callGroqPlain(key, messages, {
+      maxTokens: isBrand ? 1200 : 160,
+    });
     const tPost = Date.now();
     if (res.ok) {
       const json = (await res.json()) as {
@@ -2033,11 +2039,15 @@ function backoffWaitMs(res: Response, attempt: number): number {
 async function callGroqPlain(
   key: string,
   messages: WireMsg[],
+  opts: { maxTokens?: number } = {},
   attempt = 0,
 ): Promise<Response> {
-  /* Tighter params for the no-tool fast-path. Agent-loop params stay
-     in callGroqWithRetry (max_tokens 2048) so tool responses can still
-     reach the full length the model needs. */
+  /* Fast-path parameters. Caller passes maxTokens based on the
+     expected answer length — small-talk needs ~160; brand answers
+     are structured multi-paragraph responses that need ~1200 to
+     complete without truncation. The agent loop uses its own
+     callGroqWithRetry with 2048 tokens. */
+  const maxTokens = opts.maxTokens ?? 160;
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
@@ -2048,12 +2058,12 @@ async function callGroqPlain(
       model: GROQ_MODEL,
       messages,
       temperature: 0.3,
-      max_tokens: 160,
+      max_tokens: maxTokens,
     }),
   });
   if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
     await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqPlain(key, messages, attempt + 1);
+    return callGroqPlain(key, messages, opts, attempt + 1);
   }
   return res;
 }
