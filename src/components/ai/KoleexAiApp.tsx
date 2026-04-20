@@ -185,6 +185,16 @@ export default function KoleexAiApp() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  /* Mode separates the two AI personalities served by this page:
+       · "chat"  → fast, router-driven reply via /api/ai/chat
+                   (Groq for chat / unknown, DeepSeek for business).
+                   No tools, no DB reads, no persistence.
+       · "agent" → the full orchestrator at /api/ai/agent with
+                   permission-aware tool calls, audit logging, and
+                   conversation persistence.
+     Defaults to chat so common prompts stay fast; users explicitly
+     opt in to agent mode when they need to take action. */
+  const [mode, setMode] = useState<"chat" | "agent">("chat");
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
@@ -306,6 +316,60 @@ export default function KoleexAiApp() {
       sendingRef.current = true;
       setSending(true);
 
+      /* ── Chat mode: ephemeral, router-only, no DB ──
+         Bypasses the conversation create + orchestrator entirely so
+         "hello" is instant and business questions go straight through
+         the hybrid router (Groq for chat, DeepSeek for business). Per
+         spec: no DB calls, no persistence, no sidebar update. Messages
+         live in local state only for this mode. */
+      if (mode === "chat") {
+        setError(null);
+        const optimistic: ChatMsg = {
+          id: `tmp-${Date.now()}`,
+          role: "user",
+          content: text,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, optimistic]);
+        setInput("");
+        try {
+          const res = await fetch("/api/ai/chat", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: [{ role: "user", content: text }],
+              user_lang: lang,
+            }),
+          });
+          const json = (await res.json()) as
+            | { reply: string; provider: string }
+            | { error: string; message?: string };
+          if (!res.ok || "error" in json) {
+            const err = json as { error?: string; message?: string };
+            setError(err.message || err.error || "Failed to get a reply.");
+            return;
+          }
+          const assistantMsg: ChatMsg = {
+            id: `chat-${Date.now()}`,
+            role: "assistant",
+            content: (json as { reply: string }).reply,
+            created_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Network error");
+        } finally {
+          sendingRef.current = false;
+          setSending(false);
+        }
+        return;
+      }
+
+      /* ── Agent mode: existing orchestrator flow ──
+         Creates a conversation if needed, runs the full tool loop,
+         persists user + assistant turns, updates the sidebar. */
+
       // Ensure we have a conversation first
       let conversationId = activeId;
       if (!conversationId) {
@@ -399,7 +463,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang],
+    [input, activeId, lang, mode],
   );
 
   /* Two-step delete using the Hub's ConfirmDialog component. The old
@@ -689,6 +753,57 @@ export default function KoleexAiApp() {
             <MenuBurgerIcon size={14} />
           </button>
         )}
+
+        {/* Mode toggle — Chat vs Agent.
+            Chat = fast router replies, no DB, no tools.
+            Agent = full orchestrator with tool calls + persistence.
+            Kept deliberately small — a pill that matches the rest of
+            the Hub's iconography. A tiny "Agent Mode Active" label is
+            rendered alongside when the heavier mode is engaged so the
+            user knows they're about to trigger DB / tool work. */}
+        <div className="shrink-0 flex items-center justify-center gap-2 px-4 py-2">
+          <div
+            role="tablist"
+            aria-label="AI mode"
+            className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-[var(--bg-surface)]/70 backdrop-blur-md border border-[var(--border-subtle)] shadow-sm"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "chat"}
+              onClick={() => setMode("chat")}
+              className={`px-3 h-7 text-[12px] font-medium rounded-full transition-colors ${
+                mode === "chat"
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "agent"}
+              onClick={() => setMode("agent")}
+              className={`px-3 h-7 text-[12px] font-medium rounded-full transition-colors ${
+                mode === "agent"
+                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                  : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Agent
+            </button>
+          </div>
+          {mode === "agent" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-amber-400"
+              title="Agent mode runs permission-checked tools and may read from the database — responses are slower than chat mode."
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Agent Mode Active
+            </span>
+          )}
+        </div>
 
         {/* Messages — transparent; shared backdrop lives on outer shell. */}
         <div
