@@ -216,9 +216,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     console.log(
       `[ai.agent.timing] fast=canned provider=0ms total=${Date.now() - tStart}ms`,
     );
+    const cannedSteps: AgentStep[] = [
+      { kind: "answer", text: fastReply, permissionStatus: "allowed" },
+    ];
+    const sealed = sealPricingSafety(fastReply, cannedSteps);
     return {
-      steps: [{ kind: "answer", text: fastReply, permissionStatus: "allowed" }],
-      finalReply: fastReply,
+      steps: cannedSteps,
+      finalReply: sealed,
       provider: "fast-path",
       conversationId,
     };
@@ -285,12 +289,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
+        const sealed = sealPricingSafety(reply, steps);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
         );
         return {
           steps,
-          finalReply: reply,
+          finalReply: sealed,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -317,9 +322,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
+        const sealed = sealPricingSafety(rescued, steps);
         return {
           steps,
-          finalReply: rescued,
+          finalReply: sealed,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -334,9 +340,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
+      /* Guard the generic error too — defense in depth. The string
+         itself has no pricing patterns so this is effectively a
+         pass-through, but it keeps every return path consistent. */
+      const sealed = sealPricingSafety(msg, steps);
       return {
         steps,
-        finalReply: msg,
+        finalReply: sealed,
         provider: `groq:${GROQ_MODEL}`,
         conversationId,
       };
@@ -360,9 +370,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
+        const sealed = sealPricingSafety(rescued, steps);
         return {
           steps,
-          finalReply: rescued,
+          finalReply: sealed,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -588,6 +599,11 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     });
   }
 
+  /* Pricing safety gate — last line of defence for the main loop's
+     final reply. Replaces any hallucinated pricing with the mandated
+     safe message when no pricing tool ran successfully this turn. */
+  finalReply = sealPricingSafety(finalReply, steps);
+
   return {
     steps,
     finalReply,
@@ -683,6 +699,12 @@ Quotation drafting workflow (strict, only triggered when the user asks to create
   5) Only after confirmation, call createQuotationDraft. Status stays 'draft' — never sent, never final.
 
 If pricing is unresolved or out of policy, say so — don't hide it.
+
+Pricing discipline (HARD RULES — the server will block violations):
+- NEVER write a unit price, total price, line total, subtotal, quotation total, discount percentage, discount amount, margin, markup, or any currency figure (e.g. "$1,200", "EGP 280,000", "CNY 2500") UNLESS that exact value was just returned by a successful calculateQuotationPricing or createQuotationDraft result in the current turn.
+- NEVER estimate, approximate, round, or infer a price from cost, margin bands, MOQ, or past turns.
+- If calculateQuotationPricing has not run successfully this turn, your reply must contain NO pricing figures. If the user asks for a priced quotation and you have not yet run calculateQuotationPricing, either ask for the missing input or call the pricing tool — do not emit numbers.
+- These rules apply to bullet points, tables, inline prose, and natural-language summaries alike.
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }
@@ -791,6 +813,98 @@ const BANNED_ECHOES: RegExp[] = [
   /Please provide a customer code\.?$/i,
   /\bUnknown tool\b/i,
 ];
+
+/* ─── Pricing safety guard ──────────────────────────────────────────
+   The model CAN hallucinate prices — unit price, totals, discount %,
+   margin %, currency amounts. The system prompt tells it not to; this
+   server-side guard enforces it regardless of what the model does.
+
+   Before any finalReply leaves orchestrate(), it passes through
+   sealPricingSafety(). If the text contains pricing-like output AND
+   no pricing tool ran successfully THIS turn, the text is replaced
+   with a fixed safe message and the last "answer" step in steps[]
+   is updated to match so the UI bubble is consistent.
+
+   Only current-turn steps[] counts as evidence — history is NEVER
+   trusted. "denied" pricing-tool results don't count either (the
+   tool didn't actually price anything). "approval_required" DOES
+   count — that's real numbers that just need sign-off.
+   ───────────────────────────────────────────────────────────────── */
+
+/** Tools whose success means "real pricing data exists this turn." */
+const PRICING_TOOLS = new Set<string>([
+  "calculateQuotationPricing",
+  "createQuotationDraft",
+]);
+
+/** Patterns that flag assistant text as containing pricing output.
+ *  Chosen conservatively — prefer false positives (block a valid but
+ *  oddly-phrased reply) to false negatives (let a hallucinated
+ *  number through). Ordered roughly from highest-signal to lowest. */
+const PRICING_PATTERNS: RegExp[] = [
+  // Currency symbol + amount:  $1,200 · €500 · ¥3,400 · £900
+  /[$€£¥]\s?\d[\d,]*(\.\d+)?/,
+  // Amount + currency symbol:  1,200$ · 500 €
+  /\d[\d,]*(\.\d+)?\s?[$€£¥]/,
+  // ISO code + amount:         USD 1,200 · EGP 50,000 · CNY 3400
+  /\b(USD|EGP|CNY|EUR|GBP|SAR|AED|TRY|BRL|IDR|JPY|KRW)\s?\d[\d,]*(\.\d+)?/i,
+  // Amount + ISO code:         1,200 USD · 50000 EGP · 3400CNY
+  /\d[\d,]*(\.\d+)?\s?(USD|EGP|CNY|EUR|GBP|SAR|AED|TRY|BRL|IDR|JPY|KRW)\b/i,
+  // Labelled totals near a number
+  /\b(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|quotation\s+total|quote\s+total|line\s+total|extended\s+price|list\s+price)\b[^.\n]{0,40}\d/i,
+  // Numeric discount / margin / markup
+  /\b(discount|margin|markup)\b[^.\n]{0,20}\d+\s*%/i,
+  /\b\d+\s*%\s*(discount|margin|markup|off)\b/i,
+  // Direct labels with a number right after
+  /\b(price|cost|amount|subtotal|total)\s*[:=]\s*\d/i,
+];
+
+function containsPricingOutput(text: string): boolean {
+  if (!text) return false;
+  return PRICING_PATTERNS.some((re) => re.test(text));
+}
+
+function hasValidPricingEvidence(steps: AgentStep[]): boolean {
+  for (const s of steps) {
+    if (s.kind !== "tool-result") continue;
+    if (!s.tool || !PRICING_TOOLS.has(s.tool)) continue;
+    if (s.permissionStatus === "denied") continue;
+    return true;
+  }
+  return false;
+}
+
+/** Fixed replacement text — the exact wording required by spec.
+ *  "Customer and product" is slightly optimistic in the edge case
+ *  where neither was resolved, but the guard's intent is to stop
+ *  fabricated pricing, not to narrate flow state. */
+const PRICING_GUARD_MESSAGE =
+  "I found the customer and product, but I cannot provide pricing until the pricing calculation completes successfully.";
+
+/** Single gate every orchestrate-return path calls. Returns the
+ *  cleaned finalReply and mutates the last "answer" step's text in
+ *  place so the UI matches. No-op when either (a) the reply has no
+ *  pricing-like content or (b) a pricing tool ran successfully this
+ *  turn. */
+function sealPricingSafety(finalReply: string, steps: AgentStep[]): string {
+  if (!containsPricingOutput(finalReply)) return finalReply;
+  if (hasValidPricingEvidence(steps)) return finalReply;
+
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].kind === "answer") {
+      steps[i] = {
+        ...steps[i],
+        text: PRICING_GUARD_MESSAGE,
+        permissionStatus: "allowed",
+      };
+      break;
+    }
+  }
+  console.warn(
+    "[ai.agent.pricing-guard] replaced hallucinated pricing; no pricing-tool evidence this turn.",
+  );
+  return PRICING_GUARD_MESSAGE;
+}
 
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
@@ -924,9 +1038,16 @@ function preToolGuard(
 }
 
 function fallback(msg: string, conversationId: string): AgentResponse {
+  /* Defense-in-depth: even this helper — which today is only called
+     with fixed server-controlled strings — passes through the
+     pricing-safety gate. Keeps every AgentResponse exit consistent. */
+  const steps: AgentStep[] = [
+    { kind: "answer", text: msg, permissionStatus: "denied" },
+  ];
+  const sealed = sealPricingSafety(msg, steps);
   return {
-    steps: [{ kind: "answer", text: msg, permissionStatus: "denied" }],
-    finalReply: msg,
+    steps,
+    finalReply: sealed,
     provider: `groq:${GROQ_MODEL}`,
     conversationId,
   };
