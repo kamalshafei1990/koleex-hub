@@ -204,6 +204,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     return fallback(
       "Koleex AI isn't configured. Ask an admin to add GROQ_API_KEY.",
       conversationId,
+      userMessage,
     );
   }
 
@@ -220,7 +221,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
     console.warn("[ai.agent.final.before]", fastReply);
-    const safeReply = sealFinalReply(fastReply, cannedSteps);
+    const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage);
     console.warn("[ai.agent.final.after]", safeReply);
     return {
       steps: cannedSteps,
@@ -292,7 +293,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", reply);
-        const safeReply = sealFinalReply(reply, steps);
+        const safeReply = sealFinalReply(reply, steps, userMessage);
         console.warn("[ai.agent.final.after]", safeReply);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
@@ -327,7 +328,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps);
+        const safeReply = sealFinalReply(rescued, steps, userMessage);
         console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
@@ -347,7 +348,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
       console.warn("[ai.agent.final.before]", msg);
-      const safeReply = sealFinalReply(msg, steps);
+      const safeReply = sealFinalReply(msg, steps, userMessage);
       console.warn("[ai.agent.final.after]", safeReply);
       return {
         steps,
@@ -376,7 +377,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps);
+        const safeReply = sealFinalReply(rescued, steps, userMessage);
         console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
@@ -388,6 +389,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       return fallback(
         "I couldn't complete that request. Please try again.",
         conversationId,
+        userMessage,
       );
     }
 
@@ -612,7 +614,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      reply to the route handler (which persists finalReply into
      ai_messages.content → the bubble the user sees). */
   console.warn("[ai.agent.final.before]", finalReply);
-  const safeReply = sealFinalReply(finalReply, steps);
+  const safeReply = sealFinalReply(finalReply, steps, userMessage);
   console.warn("[ai.agent.final.after]", safeReply);
 
   return {
@@ -1499,8 +1501,200 @@ function syncLastAnswerStep(steps: AgentStep[], text: string): void {
   }
 }
 
-function sealFinalReply(finalReply: string, steps: AgentStep[]): string {
+/* ─── Quotation Hard Mode ───────────────────────────────────────────
+   When the user asks for a quotation, we DO NOT trust the model's
+   final text at all. Instead we build the reply deterministically
+   from the tool-result payloads in steps[]. This is the only
+   correctness story for pricing — guards only reduce leak probability;
+   hard mode removes model authorship of the reply entirely.
+
+   Detection is pattern-based on the user's turn. If matched, the
+   orchestrator's final step replaces `finalReply` with
+   `buildSafeQuotationReply(steps)` and the full guard chain still
+   runs on the deterministic text as defence in depth. */
+
+const QUOTATION_REQUEST_PATTERNS: RegExp[] = [
+  /\b(create|make|draft|prepare|generate|issue|send|build|write)\s+(me\s+|us\s+)?(a\s+|the\s+|an\s+)?(quotation|quote)\b/i,
+  /\bquotation\s+for\b/i,
+  /\bquote\s+for\b/i,
+  /\bprice\s+quote\b/i,
+  /\bpricing\s+for\s+\d+\s*(units?|pcs|pieces|sets|boxes|machines)\b/i,
+  /\bquotation\s+draft\b/i,
+  /\bdraft\s+quotation\b/i,
+  /\bI\s+want\s+(a|to\s+(create|make|prepare|draft)\s+a?\s*)\s*(quotation|quote)\b/i,
+];
+
+function isQuotationRequest(userMessage: string): boolean {
+  const m = String(userMessage ?? "").trim();
+  if (!m) return false;
+  return QUOTATION_REQUEST_PATTERNS.some((re) => re.test(m));
+}
+
+/** Pick the most-specific resolved customer row from this turn.
+ *  Priority: getCustomerByCode (single row) > getCustomerByName
+ *  (first of up-to-5 matches). Returns null if no customer lookup
+ *  succeeded with a populated payload. */
+function pickCustomerRow(steps: AgentStep[]): Record<string, unknown> | null {
+  let byNameFirst: Record<string, unknown> | null = null;
+  for (const s of steps) {
+    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
+    if (s.tool === "getCustomerByCode") {
+      const row = readObject(s.payload);
+      if (row) return row;
+    }
+    if (s.tool === "getCustomerByName" && !byNameFirst) {
+      if (Array.isArray(s.payload) && s.payload.length > 0) {
+        const first = readObject(s.payload[0]);
+        if (first) byNameFirst = first;
+      }
+    }
+  }
+  return byNameFirst;
+}
+
+/** Pick the most-specific resolved product row from this turn.
+ *  Priority: getProductByCode / getProductDetails (single row) >
+ *  searchProducts (first of .products[]). */
+function pickProductRow(steps: AgentStep[]): Record<string, unknown> | null {
+  let searchFirst: Record<string, unknown> | null = null;
+  for (const s of steps) {
+    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
+    if (s.tool === "getProductByCode" || s.tool === "getProductDetails") {
+      const row = readObject(s.payload);
+      if (row) return row;
+    }
+    if (s.tool === "searchProducts" && !searchFirst) {
+      const p = readObject(s.payload);
+      if (!p) continue;
+      const products = p.products;
+      if (Array.isArray(products) && products.length > 0) {
+        const first = readObject(products[0]);
+        if (first) searchFirst = first;
+      }
+    }
+  }
+  return searchFirst;
+}
+
+/** Pick the pricing-engine payload from this turn. Only counts when
+ *  payloadHasPricingFields() agrees — empty-payload pricing calls
+ *  (rare but possible) do NOT count as successful pricing. */
+function pickPricingPayload(
+  steps: AgentStep[],
+): Record<string, unknown> | null {
+  for (const s of steps) {
+    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
+    if (s.tool !== "calculateQuotationPricing") continue;
+    const p = readObject(s.payload);
+    if (p && payloadHasPricingFields(p)) return p;
+  }
+  return null;
+}
+
+function firstString(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function firstPositiveNumber(...vals: unknown[]): number | null {
+  for (const v of vals) {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  }
+  return null;
+}
+
+/** Deterministic quotation reply. Builds the text from tool payload
+ *  fields ONLY — never from model prose. Follows the strict rule:
+ *  output a field only if it exists in the payload (and only fields
+ *  explicitly whitelisted here; address / contact / specs / discount
+ *  / margin / markup / description / product_code are never output,
+ *  per spec). Missing pieces fall back to short, fixed questions. */
+function buildSafeQuotationReply(steps: AgentStep[]): string {
+  const customer = pickCustomerRow(steps);
+  if (!customer) {
+    return "Who is this quotation for? Please send the customer name or code.";
+  }
+
+  const product = pickProductRow(steps);
+  if (!product) {
+    return "Which product should I include? You can send a product name or code.";
+  }
+
+  const pricing = pickPricingPayload(steps);
+  if (!pricing) {
+    return PRICING_GUARD_MESSAGE;
+  }
+
+  const customerName = firstString(customer.name, customer.customer_name);
+  const productName = firstString(product.product_name, product.name);
+  const currency = firstString(pricing.currency, pricing.currency_code) ?? "";
+
+  // Whitelisted per-line and aggregate pricing fields.
+  const pricingLines = Array.isArray(pricing.lines) ? pricing.lines : [];
+  const firstLine = pricingLines.length > 0 ? readObject(pricingLines[0]) : null;
+
+  const quantity = firstLine
+    ? firstPositiveNumber(firstLine.quantity, firstLine.qty)
+    : null;
+  const unitPrice = firstLine
+    ? firstPositiveNumber(firstLine.unit_price, firstLine.unitPrice, firstLine.price)
+    : null;
+  const lineTotal = firstLine
+    ? firstPositiveNumber(firstLine.line_total, firstLine.lineTotal)
+    : null;
+  const total = firstPositiveNumber(
+    pricing.total,
+    pricing.grand_total,
+    pricing.grandTotal,
+  );
+
+  const out: string[] = ["Quotation summary:"];
+  if (customerName) out.push(`- Customer: ${customerName}`);
+  if (productName) out.push(`- Product: ${productName}`);
+  if (quantity !== null) out.push(`- Quantity: ${quantity}`);
+  if (unitPrice !== null) {
+    out.push(`- Unit price: ${unitPrice}${currency ? " " + currency : ""}`);
+  }
+  if (lineTotal !== null) {
+    out.push(`- Line total: ${lineTotal}${currency ? " " + currency : ""}`);
+  }
+  if (total !== null) {
+    out.push(`- Total: ${total}${currency ? " " + currency : ""}`);
+  }
+  return out.join("\n");
+}
+
+/* ─── Final-reply sealer ───────────────────────────────────────────
+   Single funnel every orchestrate-return path calls. Two modes:
+
+     · Quotation hard mode: if the user turn was a quotation/pricing
+       request, the model's text is DISCARDED and the reply is built
+       deterministically from tool payloads via
+       buildSafeQuotationReply. The full guard chain still runs on
+       the deterministic output — defense in depth.
+
+     · Normal mode: v1 → v2 → v3 → pricing on the model's text.
+
+   Either way the last "answer" step is force-synced to the returned
+   text so steps[] and finalReply cannot diverge. */
+
+function sealFinalReply(
+  finalReply: string,
+  steps: AgentStep[],
+  userMessage?: string,
+): string {
+  // Start from the model's text. In quotation hard mode we replace
+  // it entirely with a deterministic reply before running the guard
+  // chain. The guards still run as belt-and-braces.
   let sealed = finalReply;
+  if (userMessage && isQuotationRequest(userMessage)) {
+    sealed = buildSafeQuotationReply(steps);
+    console.warn(
+      "[ai.agent.quotation-hard-mode] model reply discarded; deterministic text used.",
+    );
+  }
   sealed = sealExecutionSafety(sealed, steps);
   sealed = sealExecutionSafetyV2(sealed, steps);
   sealed = sealExecutionSafetyV3(sealed, steps);
@@ -1640,7 +1834,11 @@ function preToolGuard(
   }
 }
 
-function fallback(msg: string, conversationId: string): AgentResponse {
+function fallback(
+  msg: string,
+  conversationId: string,
+  userMessage?: string,
+): AgentResponse {
   /* Defense-in-depth: even this helper — which today is only called
      with fixed server-controlled strings — passes through the
      pricing-safety gate. Keeps every AgentResponse exit consistent. */
@@ -1648,7 +1846,7 @@ function fallback(msg: string, conversationId: string): AgentResponse {
     { kind: "answer", text: msg, permissionStatus: "denied" },
   ];
   console.warn("[ai.agent.final.before]", msg);
-  const safeReply = sealFinalReply(msg, steps);
+  const safeReply = sealFinalReply(msg, steps, userMessage);
   console.warn("[ai.agent.final.after]", safeReply);
   return {
     steps,
