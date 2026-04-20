@@ -221,6 +221,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     ];
     let sealed = sealExecutionSafety(fastReply, cannedSteps);
     sealed = sealExecutionSafetyV2(sealed, cannedSteps);
+    sealed = sealExecutionSafetyV3(sealed, cannedSteps);
     sealed = sealPricingSafety(sealed, cannedSteps);
     return {
       steps: cannedSteps,
@@ -293,6 +294,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(reply, steps);
         sealed = sealExecutionSafetyV2(sealed, steps);
+        sealed = sealExecutionSafetyV3(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
@@ -328,6 +330,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(rescued, steps);
         sealed = sealExecutionSafetyV2(sealed, steps);
+        sealed = sealExecutionSafetyV3(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
@@ -351,6 +354,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          pass-through, but it keeps every return path consistent. */
       let sealed = sealExecutionSafety(msg, steps);
       sealed = sealExecutionSafetyV2(sealed, steps);
+      sealed = sealExecutionSafetyV3(sealed, steps);
       sealed = sealPricingSafety(sealed, steps);
       return {
         steps,
@@ -380,6 +384,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(rescued, steps);
         sealed = sealExecutionSafetyV2(sealed, steps);
+        sealed = sealExecutionSafetyV3(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
@@ -613,10 +618,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      reply. Order matters and is fixed across every orchestrate exit:
        1. sealExecutionSafety   (v1 — fake workflow narration)
        2. sealExecutionSafetyV2 (placeholders + fake resolved summaries)
-       3. sealPricingSafety     (hallucinated numeric pricing)
+       3. sealExecutionSafetyV3 (field-level grounding)
+       4. sealPricingSafety     (hallucinated numeric pricing)
      Each layer gets the output of the previous one. */
   finalReply = sealExecutionSafety(finalReply, steps);
   finalReply = sealExecutionSafetyV2(finalReply, steps);
+  finalReply = sealExecutionSafetyV3(finalReply, steps);
   finalReply = sealPricingSafety(finalReply, steps);
 
   return {
@@ -718,6 +725,11 @@ Structured-section discipline (HARD RULES — the server enforces these):
 - If a product has not been resolved by a product lookup tool, do not claim product details.
 - If quotation pricing has not been resolved by a pricing tool, do not write quotation-detail or order-detail sections.
 - Keep the answer short. Do not narrate internal workflow.
+
+Field-level grounding (HARD RULES — the server enforces these):
+- Do NOT output named fields like Customer Name, Customer Code, Address, Contact Person, Phone, Email, Product Name, Product Code, Description, Specifications, Brand, Model, Quantity, Unit Price, Line Total, Subtotal, Total, Grand Total, Discount, Margin, or Markup UNLESS that exact field was returned by a successful tool in the current turn.
+- Partial evidence does NOT justify extra fields. A successful customer lookup does not authorise address/contact/phone/email. A successful product lookup does not authorise code/description/specs/brand/model. A successful pricing call does not authorise every quotation field — only the fields actually returned.
+- Keep the answer short and factual.
 
 Quotation drafting workflow (strict, only triggered when the user asks to create/draft/prepare a quotation):
   1) Resolve the customer → getCustomerByName / getCustomerByCode.
@@ -1295,6 +1307,182 @@ function sealExecutionSafetyV2(
   return finalReply;
 }
 
+/* ─── Execution safety guard v3 ─────────────────────────────────────
+   FIELD-LEVEL grounding guard. v2 gates on tool-family evidence;
+   v3 gates on the exact field. Even if a customer tool ran
+   successfully, the model can only write "Customer Name: X" if
+   `customer_name` (or its alias) was present in that tool's payload.
+   Same for every labelled field across customer / product /
+   quotation families.
+
+   This is strictly stricter than v2. Partial evidence (a succeeded
+   search, an empty customer match, a list of products) does NOT
+   justify field claims — only fields actually returned in the
+   payload do. Address/contact/phone/email on a customer, code/brand/
+   description/model on a product, unit_price/total/discount on a
+   quotation — each must be grounded individually.
+
+   Runs AFTER v2, BEFORE sealPricingSafety at every return site. */
+
+type GroundedFields = {
+  customer: Set<string>;
+  product: Set<string>;
+  quotation: Set<string>;
+};
+
+function readObject(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+function addIfPresent(
+  set: Set<string>,
+  obj: Record<string, unknown>,
+  key: string,
+  alias?: string,
+): void {
+  const v = obj[key];
+  if (
+    v !== null &&
+    v !== undefined &&
+    !(typeof v === "string" && v.trim() === "")
+  ) {
+    set.add(alias ?? key);
+  }
+}
+
+function collectGroundedFields(steps: AgentStep[]): GroundedFields {
+  const grounded: GroundedFields = {
+    customer: new Set<string>(),
+    product: new Set<string>(),
+    quotation: new Set<string>(),
+  };
+
+  for (const s of steps) {
+    if (s.kind !== "tool-result") continue;
+    if (s.permissionStatus === "denied") continue;
+
+    const payload = readObject(s.payload);
+    if (!payload) continue;
+
+    // Customer tools
+    if (s.tool === "getCustomerByName" || s.tool === "getCustomerByCode") {
+      addIfPresent(grounded.customer, payload, "customer_name", "customer_name");
+      addIfPresent(grounded.customer, payload, "name", "customer_name");
+      addIfPresent(grounded.customer, payload, "customer_code", "customer_code");
+      addIfPresent(grounded.customer, payload, "code", "customer_code");
+      addIfPresent(grounded.customer, payload, "address", "address");
+      addIfPresent(grounded.customer, payload, "contact_person", "contact_person");
+      addIfPresent(grounded.customer, payload, "contact_name", "contact_person");
+      addIfPresent(grounded.customer, payload, "phone", "phone");
+      addIfPresent(grounded.customer, payload, "email", "email");
+    }
+
+    // Product tools
+    if (
+      s.tool === "searchProducts" ||
+      s.tool === "getProductByCode" ||
+      s.tool === "getProductDetails"
+    ) {
+      addIfPresent(grounded.product, payload, "product_name", "product_name");
+      addIfPresent(grounded.product, payload, "name", "product_name");
+      addIfPresent(grounded.product, payload, "product_code", "product_code");
+      addIfPresent(grounded.product, payload, "code", "product_code");
+      addIfPresent(grounded.product, payload, "description", "description");
+      addIfPresent(grounded.product, payload, "specifications", "specifications");
+      addIfPresent(grounded.product, payload, "specs", "specifications");
+      addIfPresent(grounded.product, payload, "brand", "brand");
+      addIfPresent(grounded.product, payload, "model", "model");
+    }
+
+    // Quotation / pricing tools
+    if (
+      s.tool === "calculateQuotationPricing" ||
+      s.tool === "createQuotationDraft"
+    ) {
+      addIfPresent(grounded.quotation, payload, "quantity", "quantity");
+      addIfPresent(grounded.quotation, payload, "qty", "quantity");
+      addIfPresent(grounded.quotation, payload, "unit_price", "unit_price");
+      addIfPresent(grounded.quotation, payload, "line_total", "line_total");
+      addIfPresent(grounded.quotation, payload, "subtotal", "subtotal");
+      addIfPresent(grounded.quotation, payload, "total", "total");
+      addIfPresent(grounded.quotation, payload, "grand_total", "grand_total");
+      addIfPresent(grounded.quotation, payload, "discount", "discount");
+      addIfPresent(grounded.quotation, payload, "margin", "margin");
+      addIfPresent(grounded.quotation, payload, "markup", "markup");
+    }
+  }
+
+  return grounded;
+}
+
+/** Labelled field claims the model might write. Each key is the
+ *  canonical grounded-field name; each value is the regex that
+ *  detects the corresponding label in assistant text. */
+const FIELD_CLAIM_PATTERNS: Record<string, RegExp> = {
+  customer_name:   /\bcustomer name\s*:/i,
+  customer_code:   /\bcustomer code\s*:/i,
+  address:         /\baddress\s*:/i,
+  contact_person:  /\bcontact person\s*:/i,
+  phone:           /\bphone\s*:/i,
+  email:           /\bemail\s*:/i,
+
+  product_name:    /\bproduct name\s*:/i,
+  product_code:    /\bproduct code\s*:/i,
+  description:     /\bdescription\s*:/i,
+  specifications:  /\b(specifications|specs)\s*:/i,
+  brand:           /\bbrand\s*:/i,
+  model:           /\bmodel\s*:/i,
+
+  quantity:        /\b(quantity|qty)\s*:/i,
+  unit_price:      /\bunit price\s*:/i,
+  line_total:      /\bline total\s*:/i,
+  subtotal:        /\bsubtotal\s*:/i,
+  total:           /\b(total|grand total)\s*:/i,
+  discount:        /\bdiscount\s*:/i,
+  margin:          /\bmargin\s*:/i,
+  markup:          /\bmarkup\s*:/i,
+};
+
+const EXECUTION_GUARD_V3_MESSAGE =
+  "I can only confirm fields that were returned by verified system results in this turn.";
+
+function sealExecutionSafetyV3(
+  finalReply: string,
+  steps: AgentStep[],
+): string {
+  const text = finalReply || "";
+  const grounded = collectGroundedFields(steps);
+
+  const claimedMissing: string[] = [];
+
+  for (const [field, re] of Object.entries(FIELD_CLAIM_PATTERNS)) {
+    if (!re.test(text)) continue;
+
+    // Field claim is allowed only if the EXACT canonical name is
+    // grounded in at least one of the three family sets.
+    if (
+      grounded.customer.has(field) ||
+      grounded.product.has(field) ||
+      grounded.quotation.has(field)
+    ) {
+      continue;
+    }
+
+    claimedMissing.push(field);
+  }
+
+  if (claimedMissing.length === 0) return finalReply;
+
+  replaceLastAnswerStep(steps, EXECUTION_GUARD_V3_MESSAGE);
+  console.warn(
+    "[ai.agent.execution-guard-v3] replaced field claims without grounding:",
+    claimedMissing.join(", "),
+  );
+  return EXECUTION_GUARD_V3_MESSAGE;
+}
+
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
    Rejects calls that are clearly invalid — missing customer, missing
@@ -1435,6 +1623,7 @@ function fallback(msg: string, conversationId: string): AgentResponse {
   ];
   let sealed = sealExecutionSafety(msg, steps);
   sealed = sealExecutionSafetyV2(sealed, steps);
+  sealed = sealExecutionSafetyV3(sealed, steps);
   sealed = sealPricingSafety(sealed, steps);
   return {
     steps,
