@@ -31,6 +31,7 @@ import type {
   DiscountTierRow,
   CommissionTierRow,
   ApprovalAuthorityRow,
+  VolumeDiscountTierRow,
 } from "@/lib/server/commercial-policy";
 
 export default function CommercialPolicyPage() {
@@ -171,6 +172,7 @@ function PolicyBody({ s, onPatch, onToast }: BodyProps) {
       <CustomerTiersSection rows={s.customerTiers} onPatch={(r) => { onPatch("customerTiers", r); onToast("Customer tiers saved"); }} />
       <MarketBandsSection bands={s.marketBands} countries={s.bandCountries} onPatch={(r) => { onPatch("marketBands", r); onToast("Market bands saved"); }} />
       <ChannelMultipliersSection rows={s.channelMultipliers} onPatch={(r) => { onPatch("channelMultipliers", r); onToast("Channel multipliers saved"); }} />
+      <VolumeDiscountTiersSection rows={s.volumeDiscountTiers} onPatch={(r) => { onPatch("volumeDiscountTiers", r); onToast("Volume discount tiers saved"); }} />
       <DiscountTiersSection rows={s.discountTiers} onPatch={(r) => { onPatch("discountTiers", r); onToast("Discount tiers saved"); }} />
       <CommissionTiersSection rows={s.commissionTiers} onPatch={(r) => { onPatch("commissionTiers", r); onToast("Commission tiers saved"); }} />
       <ApprovalAuthoritySection rows={s.approvalAuthority} onPatch={(r) => { onPatch("approvalAuthority", r); onToast("Approval authority saved"); }} />
@@ -362,6 +364,7 @@ function SettingsSection({
             row: {
               fx_cny_per_usd: Number(draft.fx_cny_per_usd),
               sales_sees_cost: !!draft.sales_sees_cost,
+              cost_uplift_percent: Number(draft.cost_uplift_percent ?? 0),
               notes: draft.notes ?? null,
             },
           }
@@ -408,6 +411,15 @@ function SettingsSection({
           hintTrue="Sales users will see KOLEEX cost — override the policy default."
           hintFalse="Sales users cannot view KOLEEX cost (matches the Commercial Policy)."
         />
+        <KpiEditable
+          label="Cost uplift %"
+          value={d.cost_uplift_percent ?? 0}
+          editing={ed.editing}
+          type="number"
+          step="0.1"
+          onChange={(v) => ed.setDraft({ ...d, cost_uplift_percent: Number(v) })}
+          renderValue={(v) => `${Number(v).toFixed(2)}%`}
+        />
         <KpiReadonly label="Policy version" value={d.policy_version} />
       </KpiGrid>
       {ed.error && <ErrorLine message={ed.error} />}
@@ -436,6 +448,8 @@ function ProductLevelsSection({
           min_cost_cny: Number(r.min_cost_cny),
           max_cost_cny: r.max_cost_cny === null ? null : Number(r.max_cost_cny),
           margin_percent: Number(r.margin_percent),
+          margin_min_percent: r.margin_min_percent === null ? null : Number(r.margin_min_percent),
+          margin_max_percent: r.margin_max_percent === null ? null : Number(r.margin_max_percent),
           min_margin_percent: Number(r.min_margin_percent),
           is_active: r.is_active,
           sort_order: r.sort_order,
@@ -463,6 +477,8 @@ function ProductLevelsSection({
         min_cost_cny: 0,
         max_cost_cny: null,
         margin_percent: 0,
+        margin_min_percent: null,
+        margin_max_percent: null,
         min_margin_percent: 0,
         is_active: true,
       },
@@ -481,14 +497,20 @@ function ProductLevelsSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin %", "Min Margin %", "Active", ""]
-          : ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin %", "Min Margin %", "Active"]}
+          ? ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin Range %", "Default %", "Floor %", "Active", ""]
+          : ["Code", "Name", "Min Cost (CNY)", "Max Cost (CNY)", "Margin Range %", "Default %", "Floor %", "Active"]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td>{r.code || <span className="text-[var(--text-dim)]">—</span>}</Td>
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td align="right"><NumIn editing={ed.editing} value={r.min_cost_cny} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_cost_cny: v }))} /></Td>
             <Td align="right"><NullableNumIn editing={ed.editing} value={r.max_cost_cny} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { max_cost_cny: v }))} nullLabel="∞" /></Td>
+            <Td align="right">
+              <RangeIn editing={ed.editing} lo={r.margin_min_percent} hi={r.margin_max_percent}
+                onLo={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_min_percent: v }))}
+                onHi={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_max_percent: v }))}
+                suffix="%" />
+            </Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.margin_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_percent: v }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.min_margin_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_margin_percent: v }))} /></Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
@@ -722,6 +744,8 @@ function ChannelMultipliersSection({
           name: r.name,
           applies_to_tier: r.applies_to_tier,
           multiplier: Number(r.multiplier),
+          margin_min_percent: r.margin_min_percent === null ? null : Number(r.margin_min_percent),
+          margin_max_percent: r.margin_max_percent === null ? null : Number(r.margin_max_percent),
           sort_order: r.sort_order,
           is_active: r.is_active,
         };
@@ -746,6 +770,8 @@ function ChannelMultipliersSection({
         name: "",
         applies_to_tier: null,
         multiplier: 1,
+        margin_min_percent: null,
+        margin_max_percent: null,
         sort_order: maxOrder + 1,
         is_active: true,
       },
@@ -764,8 +790,8 @@ function ChannelMultipliersSection({
     >
       <ResponsiveTable
         head={ed.editing
-          ? ["Step", "Channel", "Customer Tier", "Multiplier", "Active", ""]
-          : ["Step", "Channel", "Customer Tier", "Multiplier", "Active"]}
+          ? ["Step", "Channel", "Customer Tier", "Margin Range %", "Multiplier (fallback)", "Active", ""]
+          : ["Step", "Channel", "Customer Tier", "Margin Range %", "Multiplier (fallback)", "Active"]}
         rows={ed.draft.map((r, i) => (
           <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
             <Td align="right">
@@ -775,6 +801,12 @@ function ChannelMultipliersSection({
             </Td>
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td><TextIn editing={ed.editing} value={r.applies_to_tier ?? ""} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { applies_to_tier: v || null }))} /></Td>
+            <Td align="right">
+              <RangeIn editing={ed.editing} lo={r.margin_min_percent} hi={r.margin_max_percent}
+                onLo={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_min_percent: v }))}
+                onHi={(v) => ed.setDraft(updateAt(ed.draft, i, { margin_max_percent: v }))}
+                suffix="%" />
+            </Td>
             <Td align="right">
               {ed.editing ? (
                 <NumIn editing value={r.multiplier} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { multiplier: v }))} step="0.0001" />
@@ -945,6 +977,96 @@ function CommissionTiersSection({
             <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
             <Td align="right"><PctIn editing={ed.editing} value={r.rate_percent} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { rate_percent: v }))} /></Td>
             <Td><TextIn editing={ed.editing} value={r.applies_to} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { applies_to: v }))} /></Td>
+            <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
+            {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
+          </tr>
+        ))}
+      />
+      {ed.editing && <AddRowButton onClick={handleAdd} label="Add tier" />}
+      {ed.error && <ErrorLine message={ed.error} />}
+    </SectionShell>
+  );
+}
+
+/* ── Volume Discount Tiers ── */
+
+type DraftVolumeDiscountTier = Omit<VolumeDiscountTierRow, "id"> & { id: string | null };
+
+function VolumeDiscountTiersSection({
+  rows,
+  onPatch,
+}: {
+  rows: VolumeDiscountTierRow[];
+  onPatch: (r: VolumeDiscountTierRow[]) => void;
+}) {
+  const ed = useSectionEditor<DraftVolumeDiscountTier[]>(
+    rows as DraftVolumeDiscountTier[],
+    "/api/commercial-policy/volume-discount-tiers",
+    (draft, deletedIds) => ({
+      rows: draft.map((r) => {
+        const body = {
+          name: r.name,
+          min_order_usd: Number(r.min_order_usd),
+          max_order_usd: r.max_order_usd === null ? null : Number(r.max_order_usd),
+          discount_min_percent: Number(r.discount_min_percent),
+          discount_max_percent: Number(r.discount_max_percent),
+          sort_order: r.sort_order,
+          is_active: r.is_active,
+        };
+        return r.id ? { id: r.id, ...body } : body;
+      }),
+      deletedIds,
+    }),
+  );
+
+  const handleDelete = (row: DraftVolumeDiscountTier, idx: number) => {
+    if (row.id) ed.queueDelete(row.id);
+    ed.setDraft(removeAt(ed.draft, idx));
+  };
+  const handleAdd = () => {
+    const maxOrder = ed.draft.length ? Math.max(...ed.draft.map((r) => r.sort_order)) : 0;
+    ed.setDraft([
+      ...ed.draft,
+      {
+        id: null,
+        tenant_id: "",
+        code: "",
+        name: "",
+        min_order_usd: 0,
+        max_order_usd: null,
+        discount_min_percent: 0,
+        discount_max_percent: 0,
+        sort_order: maxOrder + 1,
+        is_active: true,
+      },
+    ]);
+  };
+
+  return (
+    <SectionShell
+      title="Volume Discount Tiers"
+      description="Auto-applied discount steps based on order size. Separate from the approval-gated discount tiers above."
+      editing={ed.editing}
+      saving={ed.saving}
+      onEditStart={ed.begin}
+      onCancel={ed.cancel}
+      onSave={async () => { const fresh = await ed.save(); if (fresh) onPatch(fresh as VolumeDiscountTierRow[]); }}
+    >
+      <ResponsiveTable
+        head={ed.editing
+          ? ["Tier", "Min Order (USD)", "Max Order (USD)", "Discount Range %", "Active", ""]
+          : ["Tier", "Min Order (USD)", "Max Order (USD)", "Discount Range %", "Active"]}
+        rows={ed.draft.map((r, i) => (
+          <tr key={r.id ?? `new-${i}`} className="border-t border-[var(--border-subtle)]/60">
+            <Td><TextIn editing={ed.editing} value={r.name} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { name: v }))} /></Td>
+            <Td align="right"><NumIn editing={ed.editing} value={r.min_order_usd} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { min_order_usd: v }))} /></Td>
+            <Td align="right"><NullableNumIn editing={ed.editing} value={r.max_order_usd} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { max_order_usd: v }))} nullLabel="∞" /></Td>
+            <Td align="right">
+              <RangeIn editing={ed.editing} lo={r.discount_min_percent} hi={r.discount_max_percent}
+                onLo={(v) => ed.setDraft(updateAt(ed.draft, i, { discount_min_percent: v ?? 0 }))}
+                onHi={(v) => ed.setDraft(updateAt(ed.draft, i, { discount_max_percent: v ?? 0 }))}
+                suffix="%" />
+            </Td>
             <Td><BoolIn editing={ed.editing} value={r.is_active} onChange={(v) => ed.setDraft(updateAt(ed.draft, i, { is_active: v }))} /></Td>
             {ed.editing && <Td align="right"><DeleteRowBtn onClick={() => handleDelete(r, i)} /></Td>}
           </tr>
@@ -1135,6 +1257,58 @@ function SignedPctIn({
         className={inputCls + " text-right max-w-[96px]"}
       />
       <span className="text-[11px] text-[var(--text-dim)]">%</span>
+    </div>
+  );
+}
+
+/** Two-value min/max range editor (e.g. "7 – 12 %"). Both values
+ *  share the same suffix; accepts nulls so a partially-filled row
+ *  shows "—" in read-only mode. */
+function RangeIn({
+  editing, lo, hi, onLo, onHi, suffix,
+}: {
+  editing: boolean;
+  lo: number | null;
+  hi: number | null;
+  onLo: (v: number | null) => void;
+  onHi: (v: number | null) => void;
+  suffix?: string;
+}) {
+  if (!editing) {
+    if (lo === null && hi === null) return <span className="text-[var(--text-dim)]">—</span>;
+    if (lo === null || hi === null) {
+      const val = lo ?? hi ?? 0;
+      return <span className="tabular-nums">{fmtPct(val)}</span>;
+    }
+    if (lo === hi) return <span className="tabular-nums">{fmtPct(lo)}</span>;
+    return <span className="tabular-nums">{fmtInt(lo)}{suffix ?? ""} – {fmtInt(hi)}{suffix ?? ""}</span>;
+  }
+  return (
+    <div className="inline-flex items-center gap-1">
+      <input
+        type="number"
+        value={lo ?? ""}
+        step="0.1"
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          onLo(raw === "" ? null : Number(raw));
+        }}
+        className={inputCls + " text-right max-w-[72px]"}
+        placeholder="min"
+      />
+      <span className="text-[11px] text-[var(--text-dim)]">–</span>
+      <input
+        type="number"
+        value={hi ?? ""}
+        step="0.1"
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          onHi(raw === "" ? null : Number(raw));
+        }}
+        className={inputCls + " text-right max-w-[72px]"}
+        placeholder="max"
+      />
+      {suffix && <span className="text-[11px] text-[var(--text-dim)]">{suffix}</span>}
     </div>
   );
 }
