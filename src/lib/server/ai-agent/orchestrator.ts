@@ -25,7 +25,7 @@ import type {
   ToolResult,
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { BRAND_KNOWLEDGE } from "./brand-knowledge";
+import { brandKnowledgeFor } from "./brand-knowledge";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 /* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
@@ -158,19 +158,48 @@ function normaliseBrandName(text: string): string {
   return out;
 }
 
-function isBrandQuestion(msg: string): boolean {
+/* Classify which brand-knowledge section(s) a message needs.
+   Returns one of "none" | "company" | "ai" | "both". The orchestrator
+   injects only the relevant slice — loading both sections at once
+   exceeds Groq's request-size limit (413). AI-identity triggers win
+   over company triggers when both could match, since phrases like
+   "Koleex AI" are Section-2-specific. */
+function classifyBrandSection(msg: string): "none" | "company" | "ai" | "both" {
   const s = msg.trim().toLowerCase();
-  if (!s) return false;
-  /* Narrow trigger list — only phrases that clearly ask for company /
-     brand facts (history, mission, vision, CEO, founders, official
-     brand material). Vague prompts like "tell me something" or bare
-     "company" no longer count so they don't get the heavy brand-
-     knowledge prompt. Canned small-talk (hello / who are you /
-     thanks) is handled by the canned fast-path above — never reaches
-     this check. */
-  const brandKeywords = [
-    // English — explicit brand / company facts only
-    "koleex",                              // direct brand name
+  if (!s) return "none";
+
+  /* AI-identity triggers — Section 2. Narrow phrases that
+     unambiguously ask about the assistant itself. */
+  const aiKeywords = [
+    "koleex ai",
+    // Broad identity asks (previously canned; now route to Section 2)
+    "who are you", "who r u", "what are you", "what r u", "what can you do",
+    "what do you know", "what kind of ai",
+    "your name", "what's your name", "whats your name",
+    "who created you", "who made you", "who built you",
+    "a real person", "are you real", "are you human", "are you a human",
+    "trust your answer", "trust your answers", "trust your replies",
+    "replace human", "replace humans", "replace human support",
+    "access my data", "access my order", "access my orders",
+    "access my account", "see my order", "see my orders",
+    // Arabic
+    "ما اسمك", "ما هو اسمك", "اسمك",
+    "من أنت", "من انت", "مين أنت", "مين انت",
+    "من صنعك", "من طورك",
+    "هل أنت إنسان", "هل انت انسان",
+    // Chinese
+    "你叫什么名字", "你的名字", "你是谁创造",
+    "你是谁", "你是真人吗", "你是人类吗",
+    "你能做什么", "你可以做什么",
+  ];
+
+  /* Company-brand triggers — Section 1. Explicit brand / company
+     facts (history, mission, vision, CEO, founders, official brand
+     material). Vague prompts like "tell me something" or bare
+     "company" don't count. */
+  const companyKeywords = [
+    // English
+    "koleex",
     "koleex group", "koleex international",
     "koleex story", "koleex history",
     "company history", "history", "heritage",
@@ -181,36 +210,35 @@ function isBrandQuestion(msg: string): boolean {
     "official brand", "brand guidelines", "brand story",
     "kas", "eskn", "nefertiti", "shafei",
     "k-o-l-e-e-x",
-    // English — AI-identity triggers (Section 2). Narrow phrases that
-    // unambiguously ask about the assistant itself; avoids matching
-    // generic chit-chat.
-    "your name", "what's your name", "whats your name",
-    "who created you", "who made you", "who built you",
-    "a real person", "are you real", "are you human", "are you a human",
-    "trust your answer", "trust your answers", "trust your replies",
-    "replace human", "replace humans", "replace human support",
-    "access my data", "access my order", "access my orders",
-    "access my account", "see my order", "see my orders",
-    // Arabic — explicit brand / company terms only
+    // Arabic
     "كوليكس", "شافعي",
     "مؤسس", "المؤسس",
     "الرئيس التنفيذي", "المدير التنفيذي",
     "رؤية", "مهمة", "رسالة",
     "القيم", "القيم الأساسية",
     "تاريخ", "تراث",
-    // Arabic — AI-identity triggers
-    "ما اسمك", "ما هو اسمك", "اسمك",
-    "من صنعك", "من طورك",
-    "هل أنت إنسان", "هل انت انسان",
-    // Chinese — explicit brand / company terms only
+    // Chinese
     "柯莱克斯", "科莱克斯",
     "创始人", "首席执行官",
     "愿景", "使命", "价值观", "历史",
-    // Chinese — AI-identity triggers
-    "你叫什么名字", "你的名字", "你是谁创造",
-    "你是真人吗", "你是人类吗",
   ];
-  return brandKeywords.some((k) => s.includes(k));
+
+  const hitsAi = aiKeywords.some((k) => s.includes(k));
+  const hitsCompany = companyKeywords.some((k) => s.includes(k));
+
+  if (hitsAi && hitsCompany) {
+    /* "What is Koleex AI?" hits both (contains "koleex" + "koleex ai").
+       AI-identity wins — the user is asking about the assistant. */
+    return "ai";
+  }
+  if (hitsAi) return "ai";
+  if (hitsCompany) return "company";
+  return "none";
+}
+
+/** Thin shim kept for callers that only need a bool. */
+function isBrandQuestion(msg: string): boolean {
+  return classifyBrandSection(msg) !== "none";
 }
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
@@ -256,12 +284,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      - Small-talk → fast-path prompt with MINIMAL system text (no
        brand knowledge, no tool routing). Short + fast answers.
      - Everything else → full tool-calling loop. */
-  const isBrand = isBrandQuestion(userMessage);
+  const brandSection = classifyBrandSection(userMessage);
+  const isBrand = brandSection !== "none";
   const isSmall = isSmallTalk(userMessage);
   const useFastPath = isBrand || isSmall;
   const systemPrompt = useFastPath && isSmall && !isBrand
     ? buildMinimalSystemPrompt(ctx, userLang)
-    : buildSystemPrompt(ctx, userLang, { includeBrandKnowledge: isBrand });
+    : buildSystemPrompt(ctx, userLang, {
+        brandSection: isBrand
+          ? (brandSection as "company" | "ai" | "both")
+          : null,
+      });
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without
@@ -672,7 +705,7 @@ Current user: ${ctx.auth.username}.`;
 function buildSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
-  opts: { includeBrandKnowledge: boolean } = { includeBrandKnowledge: false },
+  opts: { brandSection?: "company" | "ai" | "both" | null } = {},
 ): string {
   /* Hint from the client about the UI language. Not a hard rule — the
      model is instructed to MIRROR the user's message language per turn,
@@ -684,11 +717,12 @@ function buildSystemPrompt(
     userLang === "ar" ? "Arabic" :
     "English";
 
-  /* BRAND_KNOWLEDGE is ~2.5k tokens. Loading it alongside tool schemas
-     pushes the request past Groq's payload limit (413). It's only
-     needed on the fast-path, where tool schemas are absent. */
-  const brandBlock = opts.includeBrandKnowledge
-    ? `\n\n${BRAND_KNOWLEDGE}\n`
+  /* Brand knowledge is large (~8k tokens for Section 2 alone). Only
+     inject the section the user is actually asking about — loading
+     both at once exceeds Groq's request-size limit (413). The fast
+     path also has no tool schemas so there's room for the section. */
+  const brandBlock = opts.brandSection
+    ? `\n\n${brandKnowledgeFor(opts.brandSection)}\n`
     : "";
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).

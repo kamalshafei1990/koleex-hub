@@ -752,3 +752,43 @@ Koleex AI enhances human support by improving speed and efficiency, while human 
 
 ### Global Fallback (applies to every section)
 - If a user asks about a topic that is NOT covered in either Section 1 or Section 2 (e.g., specific employee counts, financial figures, stock data, named investors, internal systems), say the information isn't part of the published materials and offer to help with an approved topic instead.`;
+
+/* ─── Section slices ───────────────────────────────────────────────
+   Derived at module load from BRAND_KNOWLEDGE so the approved text
+   stays in one place and splits automatically. The full
+   BRAND_KNOWLEDGE constant is ~33 KB — exceeds Groq's request-size
+   limit when added to the system prompt + history. The orchestrator
+   picks the one section relevant to the user's question, keeping
+   each request well under the 413 threshold. If a caller truly needs
+   both sections (rare), it can still import BRAND_KNOWLEDGE. */
+
+const _S1_START = BRAND_KNOWLEDGE.indexOf("## SECTION 1");
+const _S2_START = BRAND_KNOWLEDGE.indexOf("## SECTION 2");
+const _FALLBACK_START = BRAND_KNOWLEDGE.indexOf("### Global Fallback");
+
+export const BRAND_PREAMBLE = BRAND_KNOWLEDGE.slice(0, _S1_START).trim();
+export const BRAND_SECTION_1_COMPANY = BRAND_KNOWLEDGE.slice(
+  _S1_START,
+  _S2_START,
+).trim();
+export const BRAND_SECTION_2_AI = BRAND_KNOWLEDGE.slice(
+  _S2_START,
+  _FALLBACK_START,
+).trim();
+export const BRAND_GLOBAL_FALLBACK = BRAND_KNOWLEDGE.slice(_FALLBACK_START)
+  .trim();
+
+/** Compose a knowledge block for a specific section — keeps the
+ *  preamble + fallback rules wrapping the requested section so the
+ *  model still has the "single source of truth" framing. */
+export function brandKnowledgeFor(
+  section: "company" | "ai" | "both",
+): string {
+  const core =
+    section === "company"
+      ? BRAND_SECTION_1_COMPANY
+      : section === "ai"
+        ? BRAND_SECTION_2_AI
+        : `${BRAND_SECTION_1_COMPANY}\n\n---\n\n${BRAND_SECTION_2_AI}`;
+  return `${BRAND_PREAMBLE}\n\n${core}\n\n---\n\n${BRAND_GLOBAL_FALLBACK}`;
+}
