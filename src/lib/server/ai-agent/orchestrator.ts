@@ -301,9 +301,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          message — they're recoverable; a 5xx/400 family error is
          different and can surface the raw status. */
       const isRateLimited = res.status === 429 || res.status === 503;
+      /* Only rate-limit / overloaded cases get the "handling a lot of
+         requests" copy. Everything else is a clean generic retry
+         prompt — the raw status code is logged server-side but not
+         surfaced to end users. */
       const msg = isRateLimited
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
-        : `Koleex AI couldn't reach the language model (provider error ${res.status}).`;
+        : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
       return {
         steps,
@@ -392,6 +396,32 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         } catch {
           parsedArgs = {};
         }
+
+        /* Pre-tool guard — runs BEFORE any step is pushed, before
+           any DB hit, before any audit row. A guard failure is
+           surfaced ONLY to the model (via the tool-role message the
+           outer loop emits below); no chip, no "denied" UI state,
+           no user-visible permission pretence. The next iteration
+           lets the model rephrase the rejection as a natural ask. */
+        const guard = preToolGuard(tc.function.name, parsedArgs);
+        if (!guard.ok) {
+          return {
+            tc,
+            result: {
+              ok: false,
+              /* "denied" is the closest match in the ToolResult
+                 union but this object never reaches steps[] — it
+                 only reaches the model via toLlmSafe() so the LLM
+                 sees the guidance and asks the user in natural
+                 language. No UI chip renders. */
+              permissionStatus: "denied" as const,
+              data: null,
+              message: guard.message,
+            },
+            guarded: true as const,
+          };
+        }
+
         const cacheKey = `${tc.function.name}|${JSON.stringify(parsedArgs)}`;
 
         steps.push({
@@ -467,11 +497,21 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       });
     }
 
-    // If every tool call was denied we can short-circuit to avoid
-    // burning another round-trip — tell the user plainly.
-    const allDenied = toolRuns.every((r) => r.result.permissionStatus === "denied");
+    /* Short-circuit only on REAL permission denials — NOT on guard
+       rejections. Guarded calls carry permissionStatus="denied"
+       internally (the union has no neutral option) but they represent
+       missing input, not access refusal. Letting the loop continue
+       means the model will see the guard message via the tool-role
+       feed and rephrase it as a natural question to the user on the
+       next iteration. */
+    const toolExecutions = toolRuns.filter(
+      (r) => !(r as { guarded?: boolean }).guarded,
+    );
+    const allDenied =
+      toolExecutions.length > 0 &&
+      toolExecutions.every((r) => r.result.permissionStatus === "denied");
     if (allDenied) {
-      const lastMsg = toolRuns[toolRuns.length - 1]?.result.message
+      const lastMsg = toolExecutions[toolExecutions.length - 1]?.result.message
         ?? "Access denied.";
       steps.push({
         kind: "denied",
@@ -662,6 +702,137 @@ function looksLikeDebug(s: string): boolean {
 /** Picked when we have nothing clean to surface — keeps the tone
  *  conversational rather than exposing internals. */
 const GENERIC_FOLLOWUP = "Could you share a bit more so I can help?";
+
+/* ─── Pre-tool guard ────────────────────────────────────────────────
+   Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
+   Rejects calls that are clearly invalid — missing customer, missing
+   product, missing quantity — so we never hit the DB with junk and
+   never burn the audit trail on ghost calls.
+
+   Importantly, guard failures are INTERNAL:
+     · no `tool-call` step is pushed (no chip shown)
+     · no `tool-result` step is pushed (no red "denied" chip either)
+     · the rejection is fed only to the model via the tool-role
+       message that the outer loop emits for every toolRuns entry
+     · the next model iteration sees the guard message and rephrases
+       it as a natural question to the user
+
+   Missing input is NOT a permission denial. The user just sees the
+   assistant asking for the info it needs, in the same bubble style
+   as any other reply. No red lock chip, no "denied" state.
+   ───────────────────────────────────────────────────────────────── */
+
+/** Canonical v4 UUID shape. Blocks stub/hallucinated ids like
+ *  "customer-1", "CUSTOMER", "00000000" that small models occasionally
+ *  invent to satisfy a required field. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type GuardResult = { ok: true } | { ok: false; message: string };
+
+function preToolGuard(
+  name: string,
+  args: Record<string, unknown>,
+): GuardResult {
+  switch (name) {
+    /* Whitelisted — "list products" / counts / catalogue stats must
+       keep working with no args. */
+    case "searchProducts":
+    case "countProducts":
+    case "getCatalogStats":
+      return { ok: true };
+
+    case "getCustomerByName": {
+      const q = String(args.query ?? "").trim();
+      if (!q) {
+        return {
+          ok: false,
+          message:
+            "Which customer should I look up? You can send a name or customer code.",
+        };
+      }
+      return { ok: true };
+    }
+
+    case "getCustomerByCode": {
+      const code = String(args.code ?? "").trim();
+      if (!code) {
+        return { ok: false, message: "Which customer code should I use?" };
+      }
+      return { ok: true };
+    }
+
+    case "getProductByCode": {
+      const code = String(args.code ?? "").trim();
+      if (!code) {
+        return {
+          ok: false,
+          message: "Which product code should I look up?",
+        };
+      }
+      return { ok: true };
+    }
+
+    case "getProductDetails": {
+      const id = String(args.productId ?? "").trim();
+      if (!id || !UUID_RE.test(id)) {
+        return {
+          ok: false,
+          message: "I need a product first. Which product should I use?",
+        };
+      }
+      return { ok: true };
+    }
+
+    /* Quotation workflow — strictest gate.
+       Require (a) a syntactically-valid customerId UUID AND
+               (b) at least one line with a valid product UUID + qty > 0.
+       Both tools share the same arg shape, so the guard is identical. */
+    case "calculateQuotationPricing":
+    case "createQuotationDraft": {
+      const customerId = String(args.customerId ?? "").trim();
+      const rawLines = Array.isArray(args.lines) ? args.lines : [];
+      const validLines = rawLines.filter((l) => {
+        const rec = l as { productId?: unknown; qty?: unknown };
+        const pid = String(rec.productId ?? "").trim();
+        const qty = Number(rec.qty ?? 0);
+        return pid && UUID_RE.test(pid) && qty > 0;
+      });
+      const customerOk = customerId && UUID_RE.test(customerId);
+      const linesOk = validLines.length > 0;
+
+      if (!customerOk && !linesOk) {
+        /* Nothing usable at all — fully-generic ask. */
+        return {
+          ok: false,
+          message:
+            "To prepare a quotation, I need the customer name or code, plus the product and quantity.",
+        };
+      }
+      if (!customerOk) {
+        return {
+          ok: false,
+          message:
+            "Who is this quotation for? Please send the customer name or code.",
+        };
+      }
+      if (!linesOk) {
+        return {
+          ok: false,
+          message:
+            "Which product and quantity should I include in the quotation?",
+        };
+      }
+      return { ok: true };
+    }
+
+    default:
+      /* Unknown tool names fall through — the registry dispatcher is
+         still the enforcement point for unknown-tool and permission
+         checks. We only gate the specific arg shapes we know about. */
+      return { ok: true };
+  }
+}
 
 function fallback(msg: string, conversationId: string): AgentResponse {
   return {
