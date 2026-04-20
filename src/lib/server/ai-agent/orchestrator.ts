@@ -219,13 +219,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     const cannedSteps: AgentStep[] = [
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
-    let sealed = sealExecutionSafety(fastReply, cannedSteps);
-    sealed = sealExecutionSafetyV2(sealed, cannedSteps);
-    sealed = sealExecutionSafetyV3(sealed, cannedSteps);
-    sealed = sealPricingSafety(sealed, cannedSteps);
+    console.warn("[ai.agent.final.before]", fastReply);
+    const safeReply = sealFinalReply(fastReply, cannedSteps);
+    console.warn("[ai.agent.final.after]", safeReply);
     return {
       steps: cannedSteps,
-      finalReply: sealed,
+      finalReply: safeReply,
       provider: "fast-path",
       conversationId,
     };
@@ -292,16 +291,15 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
-        let sealed = sealExecutionSafety(reply, steps);
-        sealed = sealExecutionSafetyV2(sealed, steps);
-        sealed = sealExecutionSafetyV3(sealed, steps);
-        sealed = sealPricingSafety(sealed, steps);
+        console.warn("[ai.agent.final.before]", reply);
+        const safeReply = sealFinalReply(reply, steps);
+        console.warn("[ai.agent.final.after]", safeReply);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
         );
         return {
           steps,
-          finalReply: sealed,
+          finalReply: safeReply,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -328,13 +326,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        let sealed = sealExecutionSafety(rescued, steps);
-        sealed = sealExecutionSafetyV2(sealed, steps);
-        sealed = sealExecutionSafetyV3(sealed, steps);
-        sealed = sealPricingSafety(sealed, steps);
+        console.warn("[ai.agent.final.before]", rescued);
+        const safeReply = sealFinalReply(rescued, steps);
+        console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
-          finalReply: sealed,
+          finalReply: safeReply,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -349,16 +346,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
-      /* Guard the generic error too — defense in depth. The string
-         itself has no pricing patterns so this is effectively a
-         pass-through, but it keeps every return path consistent. */
-      let sealed = sealExecutionSafety(msg, steps);
-      sealed = sealExecutionSafetyV2(sealed, steps);
-      sealed = sealExecutionSafetyV3(sealed, steps);
-      sealed = sealPricingSafety(sealed, steps);
+      console.warn("[ai.agent.final.before]", msg);
+      const safeReply = sealFinalReply(msg, steps);
+      console.warn("[ai.agent.final.after]", safeReply);
       return {
         steps,
-        finalReply: sealed,
+        finalReply: safeReply,
         provider: `groq:${GROQ_MODEL}`,
         conversationId,
       };
@@ -382,13 +375,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        let sealed = sealExecutionSafety(rescued, steps);
-        sealed = sealExecutionSafetyV2(sealed, steps);
-        sealed = sealExecutionSafetyV3(sealed, steps);
-        sealed = sealPricingSafety(sealed, steps);
+        console.warn("[ai.agent.final.before]", rescued);
+        const safeReply = sealFinalReply(rescued, steps);
+        console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
-          finalReply: sealed,
+          finalReply: safeReply,
           provider: `groq:${GROQ_MODEL}`,
           conversationId,
         };
@@ -614,21 +606,18 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     });
   }
 
-  /* Safety gates — last line of defence for the main loop's final
-     reply. Order matters and is fixed across every orchestrate exit:
-       1. sealExecutionSafety   (v1 — fake workflow narration)
-       2. sealExecutionSafetyV2 (placeholders + fake resolved summaries)
-       3. sealExecutionSafetyV3 (field-level grounding)
-       4. sealPricingSafety     (hallucinated numeric pricing)
-     Each layer gets the output of the previous one. */
-  finalReply = sealExecutionSafety(finalReply, steps);
-  finalReply = sealExecutionSafetyV2(finalReply, steps);
-  finalReply = sealExecutionSafetyV3(finalReply, steps);
-  finalReply = sealPricingSafety(finalReply, steps);
+  /* Final-reply finalizer — centralises the full guard chain and
+     syncs the last "answer" step. Every return site in orchestrate()
+     funnels through sealFinalReply so no path can leak an unsealed
+     reply to the route handler (which persists finalReply into
+     ai_messages.content → the bubble the user sees). */
+  console.warn("[ai.agent.final.before]", finalReply);
+  const safeReply = sealFinalReply(finalReply, steps);
+  console.warn("[ai.agent.final.after]", safeReply);
 
   return {
     steps,
-    finalReply,
+    finalReply: safeReply,
     provider: `groq:${GROQ_MODEL}`,
     conversationId,
   };
@@ -1483,6 +1472,43 @@ function sealExecutionSafetyV3(
   return EXECUTION_GUARD_V3_MESSAGE;
 }
 
+/* ─── Final-reply finalizer ─────────────────────────────────────────
+   Single entry point every orchestrate-return path must call. Runs
+   all four guards in the required order and then forcibly syncs the
+   last "answer" step in steps[] to match the sealed text — so the
+   chat-bubble text (which the route handler persists via
+   ai_messages.content = finalReply) and any downstream renderer
+   seeing steps[] can never diverge.
+
+   Before this helper, each return site chained the four guards
+   inline. A single site drifting (missing a guard, wrong order,
+   returning the pre-seal variable by mistake) was enough to leak
+   hallucinated output. Centralising in one helper makes drift
+   structurally impossible. */
+
+function syncLastAnswerStep(steps: AgentStep[], text: string): void {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].kind === "answer") {
+      steps[i] = {
+        ...steps[i],
+        text,
+        permissionStatus: "allowed",
+      };
+      return;
+    }
+  }
+}
+
+function sealFinalReply(finalReply: string, steps: AgentStep[]): string {
+  let sealed = finalReply;
+  sealed = sealExecutionSafety(sealed, steps);
+  sealed = sealExecutionSafetyV2(sealed, steps);
+  sealed = sealExecutionSafetyV3(sealed, steps);
+  sealed = sealPricingSafety(sealed, steps);
+  syncLastAnswerStep(steps, sealed);
+  return sealed;
+}
+
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
    Rejects calls that are clearly invalid — missing customer, missing
@@ -1621,13 +1647,12 @@ function fallback(msg: string, conversationId: string): AgentResponse {
   const steps: AgentStep[] = [
     { kind: "answer", text: msg, permissionStatus: "denied" },
   ];
-  let sealed = sealExecutionSafety(msg, steps);
-  sealed = sealExecutionSafetyV2(sealed, steps);
-  sealed = sealExecutionSafetyV3(sealed, steps);
-  sealed = sealPricingSafety(sealed, steps);
+  console.warn("[ai.agent.final.before]", msg);
+  const safeReply = sealFinalReply(msg, steps);
+  console.warn("[ai.agent.final.after]", safeReply);
   return {
     steps,
-    finalReply: sealed,
+    finalReply: safeReply,
     provider: `groq:${GROQ_MODEL}`,
     conversationId,
   };
