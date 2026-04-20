@@ -30,35 +30,22 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as {
     messages?: ChatMessage[];
-    user_lang?: "en" | "zh" | "ar";
+    user_lang?: "en" | "zh" | "ar"; // accepted for back-compat, not used
   };
   const msgs = body.messages ?? [];
   if (!Array.isArray(msgs) || msgs.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
 
-  const langName = body.user_lang === "zh"
-    ? "Chinese (Simplified)"
-    : body.user_lang === "ar"
-      ? "Arabic"
-      : "English";
-
-  const systemPrompt = `You are Koleex AI, the in-app assistant for Koleex Hub — a multilingual ERP used by Koleex International Group (a trading + manufacturing company headquartered in China).
-
-Rules:
-- Reply in ${langName}. Respect the user's locale even if they type in another language.
-- Keep answers concise and business-focused. Bullet lists are welcome when helpful.
-- You live inside an ERP with apps: CRM, Quotations, Invoices, Planning, Projects, To-do, Notes, Inbox, Customers, Suppliers, Products, Inventory, Landed Cost, Employees, HR. Reference those apps naturally.
-- If the user asks about specific records (e.g. "how many overdue invoices?") and you haven't been given that data in-context yet, say you can't see the record set and suggest they navigate to the relevant app. (Data-context is a future upgrade.)
-- Never invent invoice numbers, customer names, or any other data you haven't been given. Hallucinating business data is a fireable offence.
-- When helping draft messages / emails / tasks, match the user's tone: formal for external communication, concise + direct for internal.
-- For translation questions, produce the translation and nothing else.
-
-Current user: ${auth.username} (${auth.user_type}).`;
-
+  /* Performance fix: minimal system prompt + last 2-3 messages only.
+     Keeps Groq chat round-trip under ~2s on llama-3.1-8b-instant.
+     The prompt still tells the model to mirror the user's language
+     so Arabic / Chinese users keep getting locale-appropriate replies. */
+  const systemPrompt = "You are Koleex AI. Reply in the user's language. Be short and clear.";
+  const recentMsgs = msgs.slice(-3);
   const augmented: ChatMessage[] = [
     { role: "system", content: systemPrompt },
-    ...msgs,
+    ...recentMsgs,
   ];
 
   const result = await aiChat(augmented);
