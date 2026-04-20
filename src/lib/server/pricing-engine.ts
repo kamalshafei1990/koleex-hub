@@ -24,6 +24,12 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "./supabase-server";
+import {
+  computePolicyPrice,
+  type PolicyEngineContext,
+  type PolicyEngineBreakdown,
+} from "./pricing-engine-policy";
+import { getPolicySnapshot } from "./commercial-policy";
 
 /* ─── Inputs ─────────────────────────────────────────── */
 
@@ -63,7 +69,11 @@ export interface PricingLineResult {
     | "customer_override"
     | "market_price"
     | "price_list"
+    | "policy_engine"
     | "unresolved";
+  /** Full 12-step breakdown when priceSource="policy_engine". Surface
+   *  for the UI to render "Base → Band → Channel → Discount → Final". */
+  policyBreakdown?: PolicyEngineBreakdown;
   /** True if margin below min_margin_percent or discount above max. */
   approvalRequired: boolean;
   /** Pricing-engine-friendly status. */
@@ -154,6 +164,29 @@ export async function calculatePricing(
   const country = await resolveCountry(customer.id);
   if (country) sources.push(`customer_country(${country})`);
 
+  /* 4b. Policy snapshot — loaded once per call when the tenant has
+     `use_policy_engine` enabled. When disabled, we skip the load to
+     keep legacy callers at their existing perf cost. The snapshot
+     flows into priceOneLine and is used as the last resort before
+     returning "unresolved" — so override / market_price / price_list
+     still win when present, matching the original layered behaviour. */
+  const snapshot = await getPolicySnapshot(tenantId);
+  const policyContext: PolicyEngineContext | null =
+    snapshot.settings?.use_policy_engine && snapshot.settings
+      ? {
+          settings: snapshot.settings,
+          productLevels: snapshot.productLevels,
+          marketBands: snapshot.marketBands,
+          bandCountries: snapshot.bandCountries,
+          channelMultipliers: snapshot.channelMultipliers,
+          customerTiers: snapshot.customerTiers,
+          volumeDiscountTiers: snapshot.volumeDiscountTiers,
+          discountTiers: snapshot.discountTiers,
+          commissionTiers: snapshot.commissionTiers,
+        }
+      : null;
+  if (policyContext) sources.push("commercial_policy(engine)");
+
   /* 5. Build per-line results. */
   const priced: PricingLineResult[] = [];
   for (const line of lines) {
@@ -161,10 +194,13 @@ export async function calculatePricing(
       tenantId,
       customerId: customer.id,
       country,
+      customerType,
       line,
       lineDiscountPercent,
       minMarginPercent: typeRules?.min_margin_percent ?? null,
       maxDiscountPercent: typeRules?.max_discount_percent ?? null,
+      policyContext,
+      headerDiscountPercent: input.headerDiscountPercent ?? 0,
     });
     if (result.status !== "priced") {
       warnings.push(`Line "${result.productName ?? result.productId}" — ${result.explanation}`);
@@ -218,10 +254,16 @@ async function priceOneLine(args: {
   tenantId: string;
   customerId: string;
   country: string | null;
+  customerType: string | null;
   line: PricingLineInput;
   lineDiscountPercent: number;
   minMarginPercent: number | null;
   maxDiscountPercent: number | null;
+  /** Policy-engine context, only present when the tenant has the
+   *  Commercial Policy engine enabled. When null, the legacy
+   *  "unresolved" fallback applies. */
+  policyContext: PolicyEngineContext | null;
+  headerDiscountPercent: number;
 }): Promise<PricingLineResult> {
   const { productId, qty } = args.line;
 
@@ -301,7 +343,52 @@ async function priceOneLine(args: {
     }
   }
 
-  /* 4. Unresolved — no guessing. */
+  /* 4. Policy engine fallback — only when the tenant opted in via
+        commercial_settings.use_policy_engine. Reads the product's
+        primary-supplier cost (CNY), runs the 12-step flow against
+        the policy snapshot, returns a computed price + breakdown.
+        When the tenant hasn't opted in OR no supplier cost exists,
+        we fall through to the legacy "unresolved" path so the
+        engine's contract stays the same as today. */
+  if (args.policyContext) {
+    const { data: supplierCost } = await supabaseServer
+      .from("product_suppliers")
+      .select("unit_cost_cny")
+      .eq("product_id", productId)
+      .eq("is_primary", true)
+      .limit(1)
+      .maybeSingle();
+    const costCny = supplierCost?.unit_cost_cny;
+    if (typeof costCny === "number" && costCny > 0) {
+      const policyResult = computePolicyPrice(
+        {
+          factoryCostCny: costCny,
+          qty,
+          customerCountryCode: args.country,
+          customerTierCode: args.customerType,
+          headerDiscountPercent: 0, // header discount applied at the quote level, not per line
+        },
+        args.policyContext,
+      );
+      if (policyResult.unitPriceUsd !== null) {
+        return {
+          productId,
+          productName,
+          qty,
+          unitPrice: policyResult.unitPriceUsd,
+          lineDiscountPercent: policyResult.breakdown.totalDiscountPercent,
+          lineTotal: policyResult.lineTotalUsd,
+          priceSource: "policy_engine",
+          policyBreakdown: policyResult.breakdown,
+          approvalRequired: policyResult.approvalRequired,
+          status: policyResult.approvalRequired ? "out_of_policy" : "priced",
+          explanation: policyResult.explanation,
+        };
+      }
+    }
+  }
+
+  /* 5. Unresolved — no guessing. */
   return {
     productId,
     productName,
