@@ -115,7 +115,7 @@ export async function POST(req: Request) {
           message:
             res.status === 429
               ? "Voice service is busy — please try again in a moment."
-              : "Couldn't transcribe that clip. Please try again.",
+              : `Debug: Groq ${res.status} · model ${GROQ_WHISPER_MODEL} · ${body.slice(0, 400)}`,
         },
         { status: 502 },
       );
