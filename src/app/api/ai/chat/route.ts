@@ -40,6 +40,88 @@ function tryFastReply(msg: string): string | null {
   return null;
 }
 
+/* Hard caps on the Groq payload — prevents 413 "request too large"
+   when the conversation carries long pastes / long past answers.
+   Groq's free-tier limit bites around 10-20 KB; these are deliberately
+   well under that. Tune via these constants only. */
+const HISTORY_LIMIT     = 2;     // last N prior messages (excluding system)
+const MAX_MESSAGE_CHARS = 2000;  // per-message cap, trailing truncation marker
+const MAX_TOTAL_CHARS   = 6000;  // system prompt + trimmed history, combined
+
+function clamp(str: string, max: number): { text: string; clipped: boolean } {
+  if (str.length <= max) return { text: str, clipped: false };
+  return { text: str.slice(0, max - 20) + " …[trimmed]", clipped: true };
+}
+
+/** Strip to the two fields Groq actually uses, cap each message, then
+ *  cap the combined total by dropping older messages. Returns the
+ *  trimmed list plus stats for the payload log. */
+function prepareMessages(
+  systemPrompt: string,
+  msgs: ChatMessage[],
+): {
+  augmented: ChatMessage[];
+  stats: {
+    incoming: number;
+    sent: number;
+    bytes: number;
+    perMsgTrim: boolean;
+    historyTrim: boolean;
+  };
+} {
+  const incoming = msgs.length;
+
+  /* 1. Keep only the last HISTORY_LIMIT turns. Strip any unexpected
+        fields the client might send — Groq only uses role + content. */
+  let recent: ChatMessage[] = msgs.slice(-HISTORY_LIMIT).map((m) => ({
+    role: m.role,
+    content: String(m.content ?? ""),
+  }));
+
+  /* 2. Per-message cap. Trailing "…[trimmed]" makes it visible to the
+        model so it doesn't confabulate the missing tail. */
+  let perMsgTrim = false;
+  recent = recent.map((m) => {
+    const c = clamp(m.content, MAX_MESSAGE_CHARS);
+    if (c.clipped) perMsgTrim = true;
+    return { role: m.role, content: c.text };
+  });
+
+  /* 3. Total cap. Drop oldest messages first; as a last resort,
+        truncate the newest so we always return something bounded. */
+  let historyTrim = false;
+  const totalLen = () =>
+    systemPrompt.length + recent.reduce((s, m) => s + m.content.length, 0);
+  while (totalLen() > MAX_TOTAL_CHARS && recent.length > 1) {
+    recent.shift();
+    historyTrim = true;
+  }
+  if (totalLen() > MAX_TOTAL_CHARS && recent.length === 1) {
+    const budget = Math.max(
+      200,
+      MAX_TOTAL_CHARS - systemPrompt.length - 20,
+    );
+    recent[0].content = recent[0].content.slice(0, budget) + " …[trimmed]";
+    perMsgTrim = true;
+  }
+
+  const augmented: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...recent,
+  ];
+  const bytes = JSON.stringify(augmented).length;
+  return {
+    augmented,
+    stats: {
+      incoming,
+      sent: augmented.length,
+      bytes,
+      perMsgTrim,
+      historyTrim,
+    },
+  };
+}
+
 /* POST /api/ai/chat
      body: { messages: [{role, content}, ...], user_lang?: 'en'|'zh'|'ar' }
    response: { reply: string, provider: string }
@@ -88,20 +170,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: fast, provider: "fast-path" });
   }
 
-  /* Minimal system prompt + last 2-3 messages only.
-     Explicitly blocks the model from launching into a Koleex company
-     spiel — it was chewing tokens on that. Still tells the model to
-     mirror the user's language so Arabic / Chinese users keep
-     getting locale-appropriate replies. */
+  /* Minimal system prompt. Explicitly blocks the model from launching
+     into a Koleex company spiel — it was chewing tokens on that. The
+     prompt still tells the model to mirror the user's language so
+     Arabic / Chinese users keep getting locale-appropriate replies. */
   const systemPrompt =
     "You are Koleex AI. Reply briefly and clearly in the user's language. " +
     "Never describe Koleex, the company, its services, or its business scope " +
     "unless the user explicitly asks.";
-  const recentMsgs = msgs.slice(-3);
-  const augmented: ChatMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...recentMsgs,
-  ];
+
+  /* Hard payload guard — caps history to last 2, caps each message
+     at 2000 chars, caps combined payload at 6000 chars. Bounded by
+     construction; 413 from Groq becomes structurally impossible on
+     this route. */
+  const { augmented, stats } = prepareMessages(systemPrompt, msgs);
+  console.log(
+    `[ai.chat.payload] in=${stats.incoming} sent=${stats.sent} bytes=${stats.bytes}` +
+      ` perMsgTrim=${stats.perMsgTrim ? 1 : 0} histTrim=${stats.historyTrim ? 1 : 0}`,
+  );
 
   const tPre = Date.now();
   const result = await aiChat(augmented);
