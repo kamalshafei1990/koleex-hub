@@ -831,11 +831,61 @@ const BANNED_ECHOES: RegExp[] = [
    count — that's real numbers that just need sign-off.
    ───────────────────────────────────────────────────────────────── */
 
-/** Tools whose success means "real pricing data exists this turn." */
+/** The ONLY tool whose success counts as real pricing evidence.
+ *  createQuotationDraft is intentionally EXCLUDED — the model was
+ *  using its presence as a cover to emit invented numbers. The draft
+ *  handler internally re-prices, but for the guard's purposes we
+ *  only trust calculateQuotationPricing directly: that tool's
+ *  payload is the authoritative pricing engine output. */
 const PRICING_TOOLS = new Set<string>([
   "calculateQuotationPricing",
-  "createQuotationDraft",
 ]);
+
+/** Numeric fields in a pricing-tool payload that count as "real
+ *  pricing data." Must be a positive finite number — strings that
+ *  happen to look numeric do NOT qualify. The engine returns
+ *  numbers; anything else is either a placeholder or fake. */
+const PRICING_PAYLOAD_KEYS: string[] = [
+  "total",
+  "subtotal",
+  "grand_total",
+  "grandTotal",
+  "unit_price",
+  "unitPrice",
+  "line_total",
+  "lineTotal",
+  "price",
+];
+
+function isPositiveNumber(v: unknown): boolean {
+  return typeof v === "number" && Number.isFinite(v) && v > 0;
+}
+
+/** Verify the pricing-tool payload actually contains pricing fields.
+ *  Looks at top-level keys and then inside each `lines[]` row, so
+ *  both aggregate-level and per-line prices count. Returns false if
+ *  the payload is null, empty, or only has non-pricing metadata. */
+function payloadHasPricingFields(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const root = payload as Record<string, unknown>;
+
+  for (const k of PRICING_PAYLOAD_KEYS) {
+    if (isPositiveNumber(root[k])) return true;
+  }
+
+  const lines = root.lines;
+  if (Array.isArray(lines)) {
+    for (const l of lines) {
+      if (!l || typeof l !== "object") continue;
+      const row = l as Record<string, unknown>;
+      for (const k of PRICING_PAYLOAD_KEYS) {
+        if (isPositiveNumber(row[k])) return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 /** Patterns that flag assistant text as containing pricing output.
  *  Chosen conservatively — prefer false positives (block a valid but
@@ -857,6 +907,24 @@ const PRICING_PATTERNS: RegExp[] = [
   /\b\d+\s*%\s*(discount|margin|markup|off)\b/i,
   // Direct labels with a number right after
   /\b(price|cost|amount|subtotal|total)\s*[:=]\s*\d/i,
+
+  // v2 — bullet / list line starting with a pricing label. Fires on
+  // the LABEL alone so multi-line "* Unit Price\n  $1,200" shapes
+  // are blocked even when label and number are split across lines.
+  // Catches "* Unit Price: …", "- Total Price", "• Grand Total",
+  // "**Unit Price**", etc.
+  /^\s*(?:[*\-•]|\*\*)\s*(?:\*\*)?\s*(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|line\s+total|quote\s+total|quotation\s+total|extended\s+price|list\s+price)\b/im,
+
+  // v2 — markdown table header naming a pricing column. Catches
+  // "| Product | Qty | Unit Price | Total |" where numbers sit in
+  // the row below without any currency adornment.
+  /\|\s*(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|line\s+total|quote\s+total|quotation\s+total|extended\s+price|list\s+price|price|cost)\s*\|/i,
+
+  // v2 — bare pricing label alone on a line. Catches
+  //   Unit Price:
+  //     2,500
+  // where the label sits on its own line and the value on the next.
+  /^\s*(unit\s+price|total\s+price|grand\s+total|quotation\s+total|quote\s+total)\s*[:\-–]?\s*$/im,
 ];
 
 function containsPricingOutput(text: string): boolean {
@@ -864,11 +932,21 @@ function containsPricingOutput(text: string): boolean {
   return PRICING_PATTERNS.some((re) => re.test(text));
 }
 
+/** Evidence gate (v2): requires three ANDed conditions on a single
+ *  step in THIS turn's steps[].
+ *    1. kind === "tool-result"
+ *    2. tool === "calculateQuotationPricing"   (see PRICING_TOOLS)
+ *    3. permissionStatus !== "denied"
+ *    4. payload contains a positive-number pricing field
+ *       (top-level or inside a lines[] row).
+ *  All four must hold on the same step. A pricing-tool row with a
+ *  null/empty payload no longer counts — that was the v1 hole. */
 function hasValidPricingEvidence(steps: AgentStep[]): boolean {
   for (const s of steps) {
     if (s.kind !== "tool-result") continue;
     if (!s.tool || !PRICING_TOOLS.has(s.tool)) continue;
     if (s.permissionStatus === "denied") continue;
+    if (!payloadHasPricingFields(s.payload)) continue;
     return true;
   }
   return false;
