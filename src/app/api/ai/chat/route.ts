@@ -2,13 +2,34 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { aiChat, aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
+import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
+import { routeAi } from "@/lib/server/ai/router";
+
+/* ---------------------------------------------------------------------------
+   POST /api/ai/chat — now powered by the hybrid router.
+
+   Step 5: this route delegates to routeAi() instead of calling Groq
+   directly. Classification happens server-side:
+     · chat     → Groq
+     · business → DeepSeek  (gated behind USE_DEEPSEEK + DEEPSEEK_API_KEY)
+     · unknown  → Groq      (fallback per router spec)
+
+   Response contract is unchanged: { reply, provider }. Callers continue
+   to read `reply`; we translate the router's stable ProviderName
+   ("groq" | "deepseek") into that field. The only previously-visible
+   detail we drop is the ":model-id" suffix on the provider string —
+   no caller in the app uses it, and keeping it out of the public
+   contract keeps the future free to swap models without a UI change.
+
+   /api/ai/agent is untouched by this change. Its orchestrator remains
+   the authoritative agent path with its own tool-loop behaviour.
+   --------------------------------------------------------------------------- */
 
 /* Fast-path canned replies for the handful of prompts we see most.
-   Matched server-side before any Groq call — returns in ~200 ms
-   instead of ~2 s. Replies stay short, neutral, and always in the
-   same language as the trigger. "Koleex" stays in Latin letters in
-   every language per the brand rule. */
+   Matched server-side before any router call — returns in ~auth ms
+   instead of waiting on the classifier + provider. Keep in sync
+   with the orchestrator + /api/ai/agent copies. "Koleex" stays in
+   Latin letters in every language per the brand rule. */
 const FAST_REPLIES: Array<[RegExp, string]> = [
   // Greetings
   [/^(hi|hello|hey|yo|hola)[\s,!.?]*$/i,                      "Hi! How can I help?"],
@@ -40,96 +61,15 @@ function tryFastReply(msg: string): string | null {
   return null;
 }
 
-/* Hard caps on the Groq payload — prevents 413 "request too large"
-   when the conversation carries long pastes / long past answers.
-   Groq's free-tier limit bites around 10-20 KB; these are deliberately
-   well under that. Tune via these constants only. */
-const HISTORY_LIMIT     = 2;     // last N prior messages (excluding system)
-const MAX_MESSAGE_CHARS = 2000;  // per-message cap, trailing truncation marker
-const MAX_TOTAL_CHARS   = 6000;  // system prompt + trimmed history, combined
+/* Hard cap on the user turn we hand to the router. The router is
+   single-turn by design (prompt-builder owns the system prompt), so
+   there's no history concatenation to bound — only the last message.
+   Kept well under Groq's free-tier limit. */
+const MAX_MESSAGE_CHARS = 2000;
 
-function clamp(str: string, max: number): { text: string; clipped: boolean } {
-  if (str.length <= max) return { text: str, clipped: false };
-  return { text: str.slice(0, max - 20) + " …[trimmed]", clipped: true };
+function clamp(str: string, max: number): string {
+  return str.length <= max ? str : str.slice(0, max - 20) + " …[trimmed]";
 }
-
-/** Strip to the two fields Groq actually uses, cap each message, then
- *  cap the combined total by dropping older messages. Returns the
- *  trimmed list plus stats for the payload log. */
-function prepareMessages(
-  systemPrompt: string,
-  msgs: ChatMessage[],
-): {
-  augmented: ChatMessage[];
-  stats: {
-    incoming: number;
-    sent: number;
-    bytes: number;
-    perMsgTrim: boolean;
-    historyTrim: boolean;
-  };
-} {
-  const incoming = msgs.length;
-
-  /* 1. Keep only the last HISTORY_LIMIT turns. Strip any unexpected
-        fields the client might send — Groq only uses role + content. */
-  let recent: ChatMessage[] = msgs.slice(-HISTORY_LIMIT).map((m) => ({
-    role: m.role,
-    content: String(m.content ?? ""),
-  }));
-
-  /* 2. Per-message cap. Trailing "…[trimmed]" makes it visible to the
-        model so it doesn't confabulate the missing tail. */
-  let perMsgTrim = false;
-  recent = recent.map((m) => {
-    const c = clamp(m.content, MAX_MESSAGE_CHARS);
-    if (c.clipped) perMsgTrim = true;
-    return { role: m.role, content: c.text };
-  });
-
-  /* 3. Total cap. Drop oldest messages first; as a last resort,
-        truncate the newest so we always return something bounded. */
-  let historyTrim = false;
-  const totalLen = () =>
-    systemPrompt.length + recent.reduce((s, m) => s + m.content.length, 0);
-  while (totalLen() > MAX_TOTAL_CHARS && recent.length > 1) {
-    recent.shift();
-    historyTrim = true;
-  }
-  if (totalLen() > MAX_TOTAL_CHARS && recent.length === 1) {
-    const budget = Math.max(
-      200,
-      MAX_TOTAL_CHARS - systemPrompt.length - 20,
-    );
-    recent[0].content = recent[0].content.slice(0, budget) + " …[trimmed]";
-    perMsgTrim = true;
-  }
-
-  const augmented: ChatMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...recent,
-  ];
-  const bytes = JSON.stringify(augmented).length;
-  return {
-    augmented,
-    stats: {
-      incoming,
-      sent: augmented.length,
-      bytes,
-      perMsgTrim,
-      historyTrim,
-    },
-  };
-}
-
-/* POST /api/ai/chat
-     body: { messages: [{role, content}, ...], user_lang?: 'en'|'zh'|'ar' }
-   response: { reply: string, provider: string }
-            | { error: 'no_provider' | 'provider_error' }
-
-   Injects a Koleex-aware system prompt so the assistant speaks in the
-   user's language + knows it's living inside an ERP (not a generic
-   chatbot). Later stages add data-context tools. */
 
 export async function POST(req: Request) {
   const t0 = Date.now();
@@ -137,6 +77,10 @@ export async function POST(req: Request) {
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
 
+  /* Keep the "no provider configured at all" guard for backward
+     compat. aiProviderConfigured() checks the legacy chat key; the
+     router additionally gates business mode on its own USE_DEEPSEEK
+     flag, so this 503 only fires when the whole system is cold. */
   if (!aiProviderConfigured()) {
     return NextResponse.json(
       {
@@ -150,61 +94,70 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as {
     messages?: ChatMessage[];
-    user_lang?: "en" | "zh" | "ar"; // accepted for back-compat, not used
+    user_lang?: "en" | "zh" | "ar";
   };
   const msgs = body.messages ?? [];
   if (!Array.isArray(msgs) || msgs.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
 
-  /* Fast-path: short canned reply, no Groq call. Covers greetings,
+  const lastUser = String(msgs[msgs.length - 1]?.content ?? "");
+  const userLang = body.user_lang;
+
+  /* Fast-path: short canned reply, no router call. Covers greetings,
      identity, thanks, etc. across EN/AR/ZH. Cuts latency on these
      prompts to roughly the auth round-trip. */
-  const lastUser = msgs[msgs.length - 1]?.content ?? "";
   const fast = tryFastReply(lastUser);
   if (fast) {
     const tEnd = Date.now();
     console.log(
-      `[ai.chat.timing] auth=${tAuth - t0}ms provider=0ms total=${tEnd - t0}ms fast=1`,
+      `[ai.chat.timing] auth=${tAuth - t0}ms route=0ms total=${tEnd - t0}ms fast=1`,
     );
     return NextResponse.json({ reply: fast, provider: "fast-path" });
   }
 
-  /* Minimal system prompt. Explicitly blocks the model from launching
-     into a Koleex company spiel — it was chewing tokens on that. The
-     prompt still tells the model to mirror the user's language so
-     Arabic / Chinese users keep getting locale-appropriate replies. */
-  const systemPrompt =
-    "You are Koleex AI. Reply briefly and clearly in the user's language. " +
-    "Never describe Koleex, the company, its services, or its business scope " +
-    "unless the user explicitly asks.";
-
-  /* Hard payload guard — caps history to last 2, caps each message
-     at 2000 chars, caps combined payload at 6000 chars. Bounded by
-     construction; 413 from Groq becomes structurally impossible on
-     this route. */
-  const { augmented, stats } = prepareMessages(systemPrompt, msgs);
-  console.log(
-    `[ai.chat.payload] in=${stats.incoming} sent=${stats.sent} bytes=${stats.bytes}` +
-      ` perMsgTrim=${stats.perMsgTrim ? 1 : 0} histTrim=${stats.historyTrim ? 1 : 0}`,
-  );
-
+  /* Delegate to the hybrid router. It classifies intent from the last
+     user turn, builds the right prompt via prompt-builder, and calls
+     Groq or DeepSeek accordingly. Strict failure policy — no cross-
+     provider fallback; the router always returns a stable envelope. */
   const tPre = Date.now();
-  const result = await aiChat(augmented);
+  const result = await routeAi({
+    messages: [{ role: "user", content: clamp(lastUser, MAX_MESSAGE_CHARS) }],
+    context: { userLang },
+  });
   const tPost = Date.now();
-  if (!result) {
-    console.log(
-      `[ai.chat.timing] auth=${tAuth - t0}ms provider=${tPost - tPre}ms total=${tPost - t0}ms status=error`,
+
+  if (result.status === "error") {
+    /* Keep the technical detail in server logs only — user-facing
+       copy is deliberately generic per Step 5 spec. Business (DeepSeek
+       disabled / unreachable) gets a softer phrasing than the Groq
+       path so users don't see "DeepSeek" branding. */
+    console.error(
+      `[ai.chat.error] mode=${result.mode} provider=${result.provider}` +
+        ` routing=${result.meta.routing} detail=${result.message}`,
     );
+    console.log(
+      `[ai.chat.timing] auth=${tAuth - t0}ms route=${tPost - tPre}ms total=${tPost - t0}ms status=error mode=${result.mode}`,
+    );
+
+    const userMessage =
+      result.mode === "business"
+        ? "I'm currently unable to process business requests. Please try again shortly."
+        : "AI provider is unreachable right now.";
     return NextResponse.json(
-      { error: "provider_error", message: "AI provider is unreachable right now." },
+      { error: "provider_error", message: userMessage },
       { status: 502 },
     );
   }
 
   const tEnd = Date.now();
   console.log(
-    `[ai.chat.timing] auth=${tAuth - t0}ms provider=${tPost - tPre}ms total=${tEnd - t0}ms`,
+    `[ai.chat.timing] auth=${tAuth - t0}ms route=${tPost - tPre}ms total=${tEnd - t0}ms` +
+      ` mode=${result.mode} routing=${result.meta.routing}`,
   );
+  /* Backward-compatible response: existing callers only read `reply`
+     and (optionally) `provider`. We expose the stable ProviderName
+     ("groq" | "deepseek") rather than "groq:llama-…" so future model
+     swaps don't change the wire contract. */
   return NextResponse.json({ reply: result.reply, provider: result.provider });
 }
