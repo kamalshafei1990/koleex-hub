@@ -21,6 +21,7 @@ import {
 import { usePathname } from "next/navigation";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
@@ -231,57 +232,91 @@ export default function FloatingPanel() {
      language so replies land in the right locale. */
   const aiSendingRef = useRef(false);
   const [aiSending, setAiSending] = useState(false);
-  const handleAiSend = useCallback(async () => {
-    const text = aiInput.trim();
-    if (!text) return;
-    if (aiSendingRef.current) return;
-    aiSendingRef.current = true;
-    setAiSending(true);
+  /* Voice-chat state. Phase 1: we only track whether TTS is currently
+     speaking so the mic button can swap to a "stop" state. Transcript
+     flows through the normal input → handleAiSend path. */
+  const [aiSpeaking, setAiSpeaking] = useState(false);
+  const ttsHandleRef = useRef<TtsHandle | null>(null);
+  const stopTts = useCallback(() => {
+    ttsHandleRef.current?.cancel();
+    ttsHandleRef.current = null;
+    setAiSpeaking(false);
+  }, []);
+  /* sendAiText: the shared send path for both typed and voice input.
+     Used directly by MicButton (viaVoice=true → speak the reply) and
+     indirectly by handleAiSend for the textarea. Keeping both on one
+     function means voice can never drift from the typed pipeline. */
+  const sendAiText = useCallback(
+    async (textIn: string, viaVoice: boolean) => {
+      const text = textIn.trim();
+      if (!text) return;
+      if (aiSendingRef.current) return;
+      aiSendingRef.current = true;
+      setAiSending(true);
 
-    setAiInput("");
-    setAiMessages(prev => [...prev, { role: "user", text }]);
+      /* A fresh message replaces any in-progress TTS so the user
+         isn't hearing the previous answer while a new one loads. */
+      stopTts();
+      setAiInput("");
+      setAiMessages(prev => [...prev, { role: "user", text }]);
 
-    const uiLang = (typeof document !== "undefined"
-      ? (document.documentElement.lang as "en" | "zh" | "ar")
-      : "en") || "en";
+      const uiLang = (typeof document !== "undefined"
+        ? (document.documentElement.lang as "en" | "zh" | "ar")
+        : "en") || "en";
 
-    /* Build the message list we send over the wire. We flip our local
-       "ai" role back to "assistant" so it matches the provider contract. */
-    const wireMessages = [
-      ...[...aiMessages, { role: "user", text } as const].map(m => ({
-        role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
-        content: m.text,
-      })),
-    ];
+      const wireMessages = [
+        ...[...aiMessages, { role: "user", text } as const].map(m => ({
+          role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
+          content: m.text,
+        })),
+      ];
 
-    try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: wireMessages, user_lang: uiLang }),
-      });
-      const json = (await res.json()) as
-        | { reply: string; provider: string }
-        | { error: string; message?: string };
-      if (!res.ok || "error" in json) {
-        const errObj = json as { error?: string; message?: string };
-        const msg = errObj.message || errObj.error || "AI is unavailable right now.";
-        setAiMessages(prev => [...prev, { role: "ai", text: msg }]);
-        return;
+      try {
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: wireMessages, user_lang: uiLang }),
+        });
+        const json = (await res.json()) as
+          | { reply: string; provider: string }
+          | { error: string; message?: string };
+        if (!res.ok || "error" in json) {
+          const errObj = json as { error?: string; message?: string };
+          const msg = errObj.message || errObj.error || "AI is unavailable right now.";
+          setAiMessages(prev => [...prev, { role: "ai", text: msg }]);
+          /* Spec: never speak anything when the reply path failed. */
+          return;
+        }
+        const { reply } = json as { reply: string };
+        setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
+        /* Only speak on the voice-originated path. Typed chat stays
+           silent so we don't surprise users with audio. */
+        if (viaVoice) {
+          setAiSpeaking(true);
+          ttsHandleRef.current = speakText(reply, {
+            lang: uiLang,
+            onEnd: () => {
+              ttsHandleRef.current = null;
+              setAiSpeaking(false);
+            },
+          });
+        }
+      } catch (e) {
+        setAiMessages(prev => [
+          ...prev,
+          { role: "ai", text: e instanceof Error ? e.message : "Network error" },
+        ]);
+      } finally {
+        aiSendingRef.current = false;
+        setAiSending(false);
       }
-      const { reply } = json as { reply: string };
-      setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
-    } catch (e) {
-      setAiMessages(prev => [
-        ...prev,
-        { role: "ai", text: e instanceof Error ? e.message : "Network error" },
-      ]);
-    } finally {
-      aiSendingRef.current = false;
-      setAiSending(false);
-    }
-  }, [aiInput, aiMessages]);
+    },
+    [aiMessages, stopTts],
+  );
+  const handleAiSend = useCallback(() => {
+    sendAiText(aiInput, false);
+  }, [aiInput, sendAiText]);
 
   /* ── Close with animation ── */
   const handleClose = useCallback(() => {
@@ -602,6 +637,25 @@ export default function FloatingPanel() {
                     dk ? "text-white placeholder:text-white/25" : "text-black placeholder:text-black/25"
                   }`}
                 />
+                {/* Mic button — AI tab only (FloatingPanel is Chat-mode
+                    by design; no Agent mode here). Clicking speaks the
+                    transcript into sendAiText(viaVoice=true) which then
+                    reads the reply aloud via speechSynthesis. */}
+                {tab === "ai" && (
+                  <MicButton
+                    size={28}
+                    onTranscript={(t) => sendAiText(t, true)}
+                    onError={(msg) =>
+                      setAiMessages(prev => [...prev, { role: "ai", text: msg }])
+                    }
+                    speaking={aiSpeaking}
+                    onStopSpeaking={stopTts}
+                    disabled={aiSending}
+                    lang={(typeof document !== "undefined"
+                      ? (document.documentElement.lang as "en" | "zh" | "ar")
+                      : "en")}
+                  />
+                )}
                 <button
                   onClick={tab === "ai" ? handleAiSend : handleSend}
                   disabled={tab === "ai" ? (!aiInput.trim() || aiSending) : (!msgInput.trim() || sending)}
