@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi } from "@/lib/server/ai/router";
+import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
 
 /* ---------------------------------------------------------------------------
    POST /api/ai/chat — now powered by the hybrid router.
@@ -113,7 +114,14 @@ export async function POST(req: Request) {
     console.log(
       `[ai.chat.timing] auth=${tAuth - t0}ms route=0ms total=${tEnd - t0}ms fast=1`,
     );
-    return NextResponse.json({ reply: fast, provider: "fast-path" });
+    /* Belt-and-braces pricing guard on canned replies. The current
+       FAST_REPLIES table has no pricing patterns so this is a no-op
+       today, but keeps the chat-route contract uniform if anyone
+       adds a new canned entry later. Chat mode has no tool steps,
+       so evidence is always absent — any pricing-like content is
+       replaced with PRICING_GUARD_MESSAGE. */
+    const safeFast = sealPricingSafety(fast, []);
+    return NextResponse.json({ reply: safeFast, provider: "fast-path" });
   }
 
   /* Delegate to the hybrid router. It classifies intent from the last
@@ -159,5 +167,19 @@ export async function POST(req: Request) {
      and (optionally) `provider`. We expose the stable ProviderName
      ("groq" | "deepseek") rather than "groq:llama-…" so future model
      swaps don't change the wire contract. */
-  return NextResponse.json({ reply: result.reply, provider: result.provider });
+  /* Chat-mode pricing guard. Chat mode has no tool-call steps, so
+     hasValidPricingEvidence (inside sealPricingSafety) always returns
+     false for this route — effective semantic: chat-mode replies
+     cannot emit pricing. If the model emits any pricing-like text
+     (currency amounts, labelled totals, numeric discount/margin, etc.)
+     the guard replaces it with PRICING_GUARD_MESSAGE before it reaches
+     the client — and therefore before TTS speaks it on the voice
+     path. Non-pricing replies are a pure pass-through. */
+  const safeReply = sealPricingSafety(result.reply, []);
+  if (safeReply !== result.reply) {
+    console.warn(
+      `[ai.chat.pricing-guard] replaced hallucinated pricing mode=${result.mode}`,
+    );
+  }
+  return NextResponse.json({ reply: safeReply, provider: result.provider });
 }
