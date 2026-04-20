@@ -219,7 +219,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     const cannedSteps: AgentStep[] = [
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
-    const sealed = sealPricingSafety(fastReply, cannedSteps);
+    let sealed = sealExecutionSafety(fastReply, cannedSteps);
+    sealed = sealPricingSafety(sealed, cannedSteps);
     return {
       steps: cannedSteps,
       finalReply: sealed,
@@ -289,7 +290,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
-        const sealed = sealPricingSafety(reply, steps);
+        let sealed = sealExecutionSafety(reply, steps);
+        sealed = sealPricingSafety(sealed, steps);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
         );
@@ -322,7 +324,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        const sealed = sealPricingSafety(rescued, steps);
+        let sealed = sealExecutionSafety(rescued, steps);
+        sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
           finalReply: sealed,
@@ -343,7 +346,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       /* Guard the generic error too — defense in depth. The string
          itself has no pricing patterns so this is effectively a
          pass-through, but it keeps every return path consistent. */
-      const sealed = sealPricingSafety(msg, steps);
+      let sealed = sealExecutionSafety(msg, steps);
+      sealed = sealPricingSafety(sealed, steps);
       return {
         steps,
         finalReply: sealed,
@@ -370,7 +374,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        const sealed = sealPricingSafety(rescued, steps);
+        let sealed = sealExecutionSafety(rescued, steps);
+        sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
           finalReply: sealed,
@@ -599,9 +604,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     });
   }
 
-  /* Pricing safety gate — last line of defence for the main loop's
-     final reply. Replaces any hallucinated pricing with the mandated
-     safe message when no pricing tool ran successfully this turn. */
+  /* Safety gates — last line of defence for the main loop's final
+     reply. Execution guard runs FIRST so fabricated workflow
+     narration ("I found the customer…") is replaced before the
+     pricing check sees it. Pricing guard then catches hallucinated
+     numbers. Order matters: execution → pricing. */
+  finalReply = sealExecutionSafety(finalReply, steps);
   finalReply = sealPricingSafety(finalReply, steps);
 
   return {
@@ -690,6 +698,11 @@ Do NOT call tools for meta questions. Answer these directly:
 - Any question about the Koleex brand itself — company identity, mission, vision, values, the meaning of K-O-L-E-E-X, slogan, tone, personality, visual identity. Use the BRAND FACTS (when provided below) as the single source of truth; do not invent details that aren't there.${brandBlock}
 
 Never invent data. If a tool returns empty, say so. Never reveal values the permission layer filtered out (status="limited"/"denied" means the user isn't allowed to see them — don't guess around them).
+
+Execution honesty (HARD RULES — the server enforces these):
+- NEVER claim that you searched the database, found a customer, found a product, resolved an ID, checked the catalog, or calculated anything unless that result was returned by a successful tool in the current turn.
+- If no tool has run yet, ask for input or say you need to use system tools first — do not narrate fake internal workflow.
+- Do not write phrases like "I found the customer", "I found the product", "Product ID is …", "Customer ID is …", "Let me check", "checking the database", "I'll calculate", or "Please wait while I check" without matching tool evidence in this turn.
 
 Quotation drafting workflow (strict, only triggered when the user asks to create/draft/prepare a quotation):
   1) Resolve the customer → getCustomerByName / getCustomerByCode.
@@ -1022,6 +1035,78 @@ function sealPricingSafety(finalReply: string, steps: AgentStep[]): string {
   return PRICING_GUARD_MESSAGE;
 }
 
+/* ─── Execution safety guard ────────────────────────────────────────
+   Sibling of the pricing guard. Catches "fake workflow narration" —
+   the model claiming it searched the database, found a customer or
+   product, resolved an ID, or performed a calculation when no tool
+   has actually run in THIS turn's steps[].
+
+   Independent of the pricing guard: this one looks at execution-
+   claim phrasing ("I found the customer", "Product ID is …",
+   "checking the database") and asks "is there ANY successful tool
+   result in this turn?" If not, the narration is hallucinated and
+   gets replaced with a short "I need to use system tools" message.
+
+   Runs BEFORE sealPricingSafety at every return site so execution
+   hallucinations are caught before the pricing check sees them.
+   ───────────────────────────────────────────────────────────────── */
+
+const FAKE_EXECUTION_PATTERNS: RegExp[] = [
+  /\bI'?ll try to find\b/i,
+  /\bI found .* in (our|the) database\b/i,
+  /\bI found the product\b/i,
+  /\bI found the customer\b/i,
+  /\bProduct ID is\b/i,
+  /\bCustomer ID is\b/i,
+  /\bLet me check\b/i,
+  /\bNow I'?ll calculate\b/i,
+  /\bI'?ll calculate\b/i,
+  /\bchecking the database\b/i,
+  /\bchecking the catalog\b/i,
+  /\bI'?ll try to find .* in our database\b/i,
+  /\bI'?ll try to find .* in our catalog\b/i,
+  /\bPlease wait for a moment while I check\b/i,
+];
+
+function containsFakeExecution(text: string): boolean {
+  if (!text) return false;
+  return FAKE_EXECUTION_PATTERNS.some((re) => re.test(text));
+}
+
+/** Any non-denied tool-result in the current turn counts as real
+ *  execution evidence. Intentionally tool-agnostic: if the agent
+ *  actually ran something, narration is allowed. If no tool fired
+ *  at all, any "I found…" / "Let me check…" phrasing is fabricated
+ *  and gets replaced. */
+function hasRealToolEvidence(steps: AgentStep[]): boolean {
+  return steps.some(
+    (s) => s.kind === "tool-result" && s.permissionStatus !== "denied",
+  );
+}
+
+const EXECUTION_GUARD_MESSAGE =
+  "I need to use system tools to retrieve real data before proceeding.";
+
+function sealExecutionSafety(finalReply: string, steps: AgentStep[]): string {
+  if (!containsFakeExecution(finalReply)) return finalReply;
+  if (hasRealToolEvidence(steps)) return finalReply;
+
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].kind === "answer") {
+      steps[i] = {
+        ...steps[i],
+        text: EXECUTION_GUARD_MESSAGE,
+        permissionStatus: "allowed",
+      };
+      break;
+    }
+  }
+  console.warn(
+    "[ai.agent.execution-guard] replaced hallucinated execution text; no tool evidence this turn.",
+  );
+  return EXECUTION_GUARD_MESSAGE;
+}
+
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
    Rejects calls that are clearly invalid — missing customer, missing
@@ -1160,7 +1245,8 @@ function fallback(msg: string, conversationId: string): AgentResponse {
   const steps: AgentStep[] = [
     { kind: "answer", text: msg, permissionStatus: "denied" },
   ];
-  const sealed = sealPricingSafety(msg, steps);
+  let sealed = sealExecutionSafety(msg, steps);
+  sealed = sealPricingSafety(sealed, steps);
   return {
     steps,
     finalReply: sealed,
