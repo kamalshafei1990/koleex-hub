@@ -24,6 +24,12 @@ import type {
   TaskMode,
 } from "./types";
 import { buildBusinessPrompt, buildChatPrompt } from "./prompt-builder";
+import { groqChat, getLastGroqError } from "./providers/groq";
+import {
+  deepseekChat,
+  getLastDeepseekError,
+  isDeepseekEnabled,
+} from "./providers/deepseek";
 
 /* ─── Intent classification ──────────────────────────────────── */
 
@@ -129,12 +135,41 @@ export function buildPromptFor(
     : buildChatPrompt(userMessage, ctx);
 }
 
-/* ─── Provider dispatch (STEP 1 STUB) ────────────────────────── */
+/* ─── Provider dispatch (STEP 4) ─────────────────────────────── */
 
-/** Real dispatch lands in Step 2 (Groq extract) + Step 3 (DeepSeek).
- *  Leaving this as a structured error instead of `throw` keeps the
- *  router contract stable — a caller hitting the router prematurely
- *  gets a `status: "error"` with a clear message instead of a 500. */
+/** Build the error envelope once so every failure path returns the
+ *  same shape. Keeps the `status: "error"` contract stable and avoids
+ *  sprinkling boilerplate across the branches. No data shape drift. */
+function errorResponse(
+  provider: ProviderName,
+  mode: TaskMode,
+  intent: TaskIntent,
+  t0: number,
+  message: string,
+): AiResponse {
+  return {
+    provider,
+    mode,
+    message,
+    status: "error",
+    meta: { routing: intent, duration_ms: Date.now() - t0 },
+    reply: message,
+  };
+}
+
+/** Route a request to the correct provider and return a stable
+ *  envelope. Wiring rules (per spec):
+ *    · chat       → Groq
+ *    · business   → DeepSeek  (hard-gated behind isDeepseekEnabled)
+ *    · unknown    → Groq      (via modeFor → "chat")
+ *
+ *  STRICT failure policy:
+ *    · never fall back across providers
+ *    · never fabricate a reply
+ *    · every failure returns a structured `status: "error"` envelope
+ *
+ *  The router never constructs prompts itself — it delegates to
+ *  prompt-builder via buildPromptFor(). Providers only execute. */
 export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const t0 = Date.now();
   const last = req.messages[req.messages.length - 1]?.content ?? "";
@@ -146,14 +181,54 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const mode: TaskMode = modeFor(intent);
   const provider: ProviderName = providerFor(mode);
 
-  const message =
-    "AI is warming up. Hybrid router is live; providers wire in the next step.";
+  /* Build prompt messages once. Prompt-builder owns system-prompt
+     shape, language, cost-disclosure rules, etc. Router passes the
+     LAST user turn as the "new" message — prior turns in req.messages
+     are NOT forwarded at this layer; multi-turn memory is the
+     caller's responsibility once the router is wired into an endpoint
+     (Step 5). Keeping it single-turn here preserves isolation and
+     makes the contract identical for both providers. */
+  const messages: AiMessage[] = buildPromptFor(mode, last, req.context ?? {});
+
+  /* ─── Business → DeepSeek (no fallback) ──────────────────────── */
+  if (mode === "business") {
+    if (!isDeepseekEnabled()) {
+      return errorResponse(
+        provider,
+        mode,
+        intent,
+        t0,
+        "Business reasoning is unavailable: DeepSeek is not enabled. " +
+          "Ask a Super Admin to set USE_DEEPSEEK=true and DEEPSEEK_API_KEY.",
+      );
+    }
+    const result = await deepseekChat(messages);
+    if (!result) {
+      const detail = getLastDeepseekError() ?? "DeepSeek is unreachable right now.";
+      return errorResponse(provider, mode, intent, t0, detail);
+    }
+    return {
+      provider,
+      mode,
+      message: result.reply,
+      status: "success",
+      meta: { routing: intent, duration_ms: Date.now() - t0 },
+      reply: result.reply,
+    };
+  }
+
+  /* ─── Chat / unknown → Groq ──────────────────────────────────── */
+  const result = await groqChat(messages);
+  if (!result) {
+    const detail = getLastGroqError() ?? "Groq is unreachable right now.";
+    return errorResponse(provider, mode, intent, t0, detail);
+  }
   return {
     provider,
     mode,
-    message,
-    status: "error",
+    message: result.reply,
+    status: "success",
     meta: { routing: intent, duration_ms: Date.now() - t0 },
-    reply: message,
+    reply: result.reply,
   };
 }
