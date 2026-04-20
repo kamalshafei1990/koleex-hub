@@ -1,39 +1,87 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   MicButton — Phase 1 voice input for AI Chat mode.
+   MicButton — Phase 1 voice input for AI chat.
 
-   Flow:
+   Flow (Web Speech API):
      1. User taps mic → browser prompts for microphone permission
         (first time only).
-     2. MediaRecorder captures audio into an in-memory Blob.
-     3. User taps mic again to stop → the blob is POSTed to
-        /api/ai/transcribe (Groq Whisper).
-     4. The returned transcript is handed to onTranscript(text), which
-        the parent then routes through its normal Chat-mode submit
-        path — so voice and typed messages share the same backend.
+     2. SpeechRecognition captures audio AND transcribes on-device
+        (or via the browser's built-in cloud, depending on browser).
+     3. User taps mic again to stop, or speech pauses → the final
+        transcript is handed to onTranscript(text).
+     4. The parent routes the text through its normal submit path —
+        voice and typed messages share the same backend.
 
-   The component only does STT + state. It does NOT talk to the chat
-   model, does NOT do TTS (speakText is a separate helper below), and
-   does NOT know about Agent mode — the parent is responsible for only
-   mounting MicButton when mode === "chat".
+   Why Web Speech instead of MediaRecorder + Whisper:
+     · Zero backend dependency for STT — no Groq / OpenAI / any API key.
+     · Zero cost per request.
+     · Built into every modern browser (Chrome / Edge / Safari 18+).
+     · Lower latency (no upload round-trip).
+     · Trade-off: accuracy on noisy audio is lower than Whisper. Fine
+       for clear speech in a quiet room; less reliable in cafés.
 
-   Four visible states (all surfaced via the aria-label and an icon):
+   The component only does STT + state. TTS (text→speech) is a separate
+   helper below (speakText) that uses window.speechSynthesis.
+
+   Visible states:
      · idle       — mic outline, tap to start
      · listening  — solid red, pulsing, tap again to stop
-     · processing — spinner, upload + transcribe in flight
-     · speaking   — mic+note, TTS is actively reading the AI reply
+     · processing — spinner, final transcript resolving (brief — usually
+                    skipped since recognition returns instantly)
+     · speaking   — mic+note, TTS is reading the AI reply
                    (caller passes `speaking=true` when speech is live)
 
-   Errors are surfaced via onError(message) — caller typically shows
-   a toast / inline message. We never throw; hooking into a broken
-   browser or denied permission returns a clean user-facing string.
+   Errors are surfaced via onError(message) — caller shows them inline.
+   Feature-detection runs once on first interaction; browsers without
+   SpeechRecognition get a clear "not supported" message.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import MicrophoneIcon from "@/components/icons/ui/MicrophoneIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
+
+/* Minimal typings for the vendor-prefixed Web Speech API. The browser
+   ships this under either `SpeechRecognition` or
+   `webkitSpeechRecognition`. We avoid pulling in the full DOM
+   SpeechRecognition declaration (not present in stock lib.dom.d.ts
+   across all TS configs) by using a thin structural type. */
+interface SRResult {
+  isFinal: boolean;
+  0: { transcript: string; confidence: number };
+}
+interface SREvent {
+  results: ArrayLike<SRResult>;
+  resultIndex: number;
+}
+interface SRErrorEvent {
+  error: string;
+  message?: string;
+}
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((ev: SREvent) => void) | null;
+  onerror: ((ev: SRErrorEvent) => void) | null;
+  onend: ((ev: Event) => void) | null;
+  onstart: ((ev: Event) => void) | null;
+}
+type SRConstructor = new () => SpeechRecognitionLike;
+
+function getSRConstructor(): SRConstructor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SRConstructor;
+    webkitSpeechRecognition?: SRConstructor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
 
 export type MicState = "idle" | "listening" | "processing" | "speaking";
 
@@ -78,14 +126,14 @@ export default function MicButton({
   label = "Voice input",
 }: Props) {
   const [state, setState] = useState<MicState>("idle");
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  /* Accumulates final result segments across one recognition session.
+     SpeechRecognition fires onresult with partial + final chunks; we
+     keep only the finalised ones so short pauses don't drop earlier
+     parts of the user's sentence. */
+  const finalTextRef = useRef<string>("");
   /* Seconds since recording started. Tracked only while the listening
-     state is active; resets to 0 on every new recording. Used to show
-     a live mm:ss badge next to the button so the user has concrete
-     feedback that the mic is actually capturing audio — a pulsing
-     red circle alone was not enough. */
+     state is active; resets to 0 on every new recognition session. */
   const [elapsed, setElapsed] = useState(0);
 
   const computedState: MicState = speaking ? "speaking" : state;
@@ -100,133 +148,125 @@ export default function MicButton({
     return () => clearInterval(tick);
   }, [state]);
 
-  /* Release the mic stream cleanly so Safari/Chrome stop showing the
-     recording indicator after we're done. Idempotent. */
-  const stopStream = useCallback(() => {
-    const s = streamRef.current;
-    if (!s) return;
-    for (const track of s.getTracks()) track.stop();
-    streamRef.current = null;
-  }, []);
-
-  /* Cleanup on unmount — if the component is torn down mid-recording
-     (e.g. user switches to Agent mode) we don't want to keep the mic
-     hot. */
+  /* Cleanup on unmount — abort any live recognition so the mic
+     indicator in the browser tab turns off. */
   useEffect(() => {
     return () => {
       try {
-        recorderRef.current?.stop();
+        recognitionRef.current?.abort();
       } catch {
         // ignore
       }
-      stopStream();
+      recognitionRef.current = null;
     };
-  }, [stopStream]);
+  }, []);
 
   const handleError = useCallback(
     (msg: string) => {
       setState("idle");
-      stopStream();
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
       onError?.(msg);
     },
-    [onError, stopStream],
+    [onError],
   );
 
-  const startRecording = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    if (!navigator.mediaDevices?.getUserMedia) {
-      handleError("Your browser doesn't support voice input.");
-      return;
-    }
-    if (typeof window.MediaRecorder === "undefined") {
-      handleError("Your browser doesn't support voice recording.");
+  /** BCP-47 language tag for SpeechRecognition. Uses the parent's
+   *  lang hint when present; otherwise stays unset so the browser
+   *  picks based on system language. */
+  const bcp47 =
+    lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : lang === "en" ? "en-US" : "";
+
+  const startRecording = useCallback(() => {
+    const SR = getSRConstructor();
+    if (!SR) {
+      handleError(
+        "Your browser doesn't support voice input. Try Chrome or Edge.",
+      );
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      /* Pick the best supported mime: webm/opus on Chrome/Firefox,
-         mp4/aac on Safari. Whisper handles both. Leave undefined if
-         the browser doesn't support either so we use its default. */
-      const mime = pickRecorderMime();
-      const rec = mime
-        ? new MediaRecorder(stream, { mimeType: mime })
-        : new MediaRecorder(stream);
-      chunksRef.current = [];
-      rec.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
-      };
-      rec.onerror = () => handleError("Voice recording failed. Please try again.");
-      rec.onstop = async () => {
-        stopStream();
-        const chunks = chunksRef.current;
-        chunksRef.current = [];
-        if (chunks.length === 0) {
-          setState("idle");
-          return;
-        }
-        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        if (blob.size < 300) {
-          /* Too short to contain speech — don't bother calling STT. */
-          setState("idle");
-          onError?.("That was too short — tap the mic and hold while speaking.");
-          return;
-        }
-        setState("processing");
-        try {
-          const form = new FormData();
-          form.set("file", blob, "clip");
-          if (lang) form.set("lang", lang);
-          const res = await fetch("/api/ai/transcribe", {
-            method: "POST",
-            credentials: "include",
-            body: form,
-          });
-          const json = (await res.json().catch(() => null)) as
-            | { text?: string; error?: string; message?: string }
-            | null;
-          if (!res.ok || !json) {
-            handleError(json?.message || "Couldn't transcribe that clip.");
-            return;
+      const recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      if (bcp47) recognition.lang = bcp47;
+      finalTextRef.current = "";
+
+      recognition.onresult = (ev) => {
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) {
+            const t = r[0]?.transcript ?? "";
+            if (t) finalTextRef.current += (finalTextRef.current ? " " : "") + t.trim();
           }
-          const text = (json.text ?? "").trim();
-          if (!text) {
-            handleError(json.message || "I couldn't hear anything.");
-            return;
-          }
-          setState("idle");
-          onTranscript(text);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : "Network error";
-          handleError(msg);
         }
       };
-      rec.start();
-      recorderRef.current = rec;
-      setState("listening");
+      recognition.onerror = (ev) => {
+        /* Common error codes per the Web Speech API spec:
+             · no-speech   — user didn't say anything audible
+             · aborted     — programmatic abort (we did this; ignore)
+             · audio-capture — no mic available
+             · not-allowed — permission denied
+             · network     — transcription service unreachable (some
+                             browsers route audio to a cloud service) */
+        const code = ev.error ?? "";
+        if (code === "aborted") return; // our own abort, no error
+        if (code === "no-speech") {
+          handleError("I didn't hear anything — please try again.");
+          return;
+        }
+        if (code === "not-allowed" || code === "service-not-allowed") {
+          handleError("Microphone permission was denied.");
+          return;
+        }
+        if (code === "audio-capture") {
+          handleError("Couldn't access your microphone.");
+          return;
+        }
+        if (code === "network") {
+          handleError("Voice service is unreachable — please try again.");
+          return;
+        }
+        handleError("Voice input failed. Please try again.");
+      };
+      recognition.onend = () => {
+        const text = finalTextRef.current.trim();
+        finalTextRef.current = "";
+        recognitionRef.current = null;
+        setState("idle");
+        if (text) onTranscript(text);
+      };
+      recognition.onstart = () => {
+        setState("listening");
+      };
+      recognition.start();
+      recognitionRef.current = recognition;
     } catch (e) {
-      /* Most common path: permission denied. Firefox / Safari throw
-         with slightly different messages — normalise to one string. */
-      const msg = e instanceof Error ? e.message.toLowerCase() : "";
-      if (msg.includes("denied") || msg.includes("not allowed")) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/denied|not allowed/i.test(msg)) {
         handleError("Microphone permission was denied.");
       } else {
-        handleError("Couldn't access your microphone.");
+        handleError("Couldn't start voice input.");
       }
     }
-  }, [handleError, lang, onError, onTranscript, stopStream]);
+  }, [bcp47, handleError, onTranscript]);
 
   const stopRecording = useCallback(() => {
-    const rec = recorderRef.current;
+    const rec = recognitionRef.current;
     if (!rec) return;
     try {
-      if (rec.state !== "inactive") rec.stop();
+      rec.stop(); // triggers onend, which delivers final transcript
     } catch {
-      // ignore — onstop handler takes care of state cleanup
+      // ignore
     }
-    recorderRef.current = null;
-    setState("processing"); // flip UI immediately; onstop resets after fetch
+    /* Don't flip to "processing" — recognition is on-device and
+       instantaneous. Keep the listening halo until onend fires. */
   }, []);
 
   const handleClick = useCallback(() => {
@@ -363,26 +403,6 @@ export default function MicButton({
       )}
     </span>
   );
-}
-
-/* ─── Helpers ──────────────────────────────────────────────────────── */
-
-function pickRecorderMime(): string | undefined {
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/mp4;codecs=mp4a.40.2",
-    "audio/ogg;codecs=opus",
-  ];
-  for (const mime of candidates) {
-    try {
-      if (MediaRecorder.isTypeSupported(mime)) return mime;
-    } catch {
-      // ignore probe errors
-    }
-  }
-  return undefined;
 }
 
 /* ─── TTS helper (browser speechSynthesis) ─────────────────────────── */
