@@ -333,13 +333,23 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   const isBrand = brandSection !== "none";
   const isSmall = isSmallTalk(userMessage);
   const useFastPath = isBrand || isSmall;
-  const systemPrompt = useFastPath && isSmall && !isBrand
-    ? buildMinimalSystemPrompt(ctx, userLang)
-    : buildSystemPrompt(ctx, userLang, {
-        brandSection: isBrand
-          ? (brandSection as "company" | "ai" | "both")
-          : null,
-      });
+  /* Three-way choice:
+      · small-talk → minimal prompt (no brand, no agent rules)
+      · brand question → LEAN brand prompt (~300 chars of framing +
+        the single relevant section). Strips all tool/pricing/agent
+        discipline that bloats buildSystemPrompt by ~4 KB and was
+        pushing brand requests over Groq's 413 threshold.
+      · everything else → full agent buildSystemPrompt. */
+  const systemPrompt =
+    isBrand
+      ? buildBrandSystemPrompt(
+          ctx,
+          userLang,
+          brandSection as "company" | "ai" | "both",
+        )
+      : useFastPath && isSmall
+        ? buildMinimalSystemPrompt(ctx, userLang)
+        : buildSystemPrompt(ctx, userLang);
 
   /* Drop deprecated assistant phrases from history before forwarding
      it to the model. Older turns still live in ai_messages; without
@@ -352,9 +362,15 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     return !BANNED_ECHOES.some((re) => re.test(content));
   });
 
+  /* Brand fast-path: the approved knowledge is self-contained and
+     brand questions are rarely multi-turn, so history just burns
+     payload bytes and risks another 413. Drop history entirely on
+     this path. Other paths keep the full sanitised history. */
+  const effectiveHistory = isBrand ? [] : sanitisedHistory;
+
   const messages: WireMsg[] = [
     { role: "system", content: systemPrompt },
-    ...sanitisedHistory.map((m) => ({ role: m.role, content: m.content })),
+    ...effectiveHistory.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
   ];
 
@@ -745,6 +761,34 @@ Style:
 - Don't pad for length, but don't clip to one sentence either. Treat each question as worth a real answer.
 
 Current user: ${ctx.auth.username}.`;
+}
+
+/** Lean prompt used ONLY on the brand fast-path. Strips all the
+ *  tool-routing / pricing-discipline / execution-honesty /
+ *  field-grounding rules from buildSystemPrompt that would bloat
+ *  the request by ~4 KB and (with Section 2 at ~14 KB) push Groq
+ *  over its 413 payload limit. The approved-knowledge block itself
+ *  already contains the General Rules (third person, don't invent,
+ *  no pricing, etc.) for each section, so repeating them outside
+ *  is redundant. */
+function buildBrandSystemPrompt(
+  ctx: UserContext,
+  userLang: "en" | "zh" | "ar",
+  section: "company" | "ai" | "both",
+): string {
+  const langName =
+    userLang === "zh" ? "Chinese (Simplified)" :
+    userLang === "ar" ? "Arabic" :
+    "English";
+  return `You are Koleex AI.
+
+Answer in ${langName} (mirror the user's language; when the user writes in another language, match it).
+
+Use ONLY the approved knowledge below. Never invent anything beyond it. Follow every rule stated inside the sections (including third-person framing, structure, and no fabricated numbers).
+
+Current user: ${ctx.auth.username}.
+
+${brandKnowledgeFor(section)}`;
 }
 
 function buildSystemPrompt(
