@@ -220,6 +220,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
     let sealed = sealExecutionSafety(fastReply, cannedSteps);
+    sealed = sealExecutionSafetyV2(sealed, cannedSteps);
     sealed = sealPricingSafety(sealed, cannedSteps);
     return {
       steps: cannedSteps,
@@ -291,6 +292,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(reply, steps);
+        sealed = sealExecutionSafetyV2(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
@@ -325,6 +327,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(rescued, steps);
+        sealed = sealExecutionSafetyV2(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
@@ -347,6 +350,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          itself has no pricing patterns so this is effectively a
          pass-through, but it keeps every return path consistent. */
       let sealed = sealExecutionSafety(msg, steps);
+      sealed = sealExecutionSafetyV2(sealed, steps);
       sealed = sealPricingSafety(sealed, steps);
       return {
         steps,
@@ -375,6 +379,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         let sealed = sealExecutionSafety(rescued, steps);
+        sealed = sealExecutionSafetyV2(sealed, steps);
         sealed = sealPricingSafety(sealed, steps);
         return {
           steps,
@@ -605,11 +610,13 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   }
 
   /* Safety gates — last line of defence for the main loop's final
-     reply. Execution guard runs FIRST so fabricated workflow
-     narration ("I found the customer…") is replaced before the
-     pricing check sees it. Pricing guard then catches hallucinated
-     numbers. Order matters: execution → pricing. */
+     reply. Order matters and is fixed across every orchestrate exit:
+       1. sealExecutionSafety   (v1 — fake workflow narration)
+       2. sealExecutionSafetyV2 (placeholders + fake resolved summaries)
+       3. sealPricingSafety     (hallucinated numeric pricing)
+     Each layer gets the output of the previous one. */
   finalReply = sealExecutionSafety(finalReply, steps);
+  finalReply = sealExecutionSafetyV2(finalReply, steps);
   finalReply = sealPricingSafety(finalReply, steps);
 
   return {
@@ -703,6 +710,14 @@ Execution honesty (HARD RULES — the server enforces these):
 - NEVER claim that you searched the database, found a customer, found a product, resolved an ID, checked the catalog, or calculated anything unless that result was returned by a successful tool in the current turn.
 - If no tool has run yet, ask for input or say you need to use system tools first — do not narrate fake internal workflow.
 - Do not write phrases like "I found the customer", "I found the product", "Product ID is …", "Customer ID is …", "Let me check", "checking the database", "I'll calculate", or "Please wait while I check" without matching tool evidence in this turn.
+
+Structured-section discipline (HARD RULES — the server enforces these):
+- NEVER output placeholder fields such as [Insert Price], [Insert Address], [Insert Contact Person], [TBD], [To be confirmed], or similar template text.
+- NEVER write structured sections like "Customer Resolution", "Product Resolution", "Order Details", "Quotation Details", "Customer Name: …", "Customer Code: …", "Product Name: …", "Product Code: …", "Contact Person: …", or "Address: …" unless the matching fields were returned by a successful tool in the current turn.
+- If a customer has not been resolved by a customer lookup tool, do not claim customer details.
+- If a product has not been resolved by a product lookup tool, do not claim product details.
+- If quotation pricing has not been resolved by a pricing tool, do not write quotation-detail or order-detail sections.
+- Keep the answer short. Do not narrate internal workflow.
 
 Quotation drafting workflow (strict, only triggered when the user asks to create/draft/prepare a quotation):
   1) Resolve the customer → getCustomerByName / getCustomerByCode.
@@ -1107,6 +1122,179 @@ function sealExecutionSafety(finalReply: string, steps: AgentStep[]): string {
   return EXECUTION_GUARD_MESSAGE;
 }
 
+/* ─── Execution safety guard v2 ─────────────────────────────────────
+   Sibling of v1. v1 catches fake workflow narration ("I'll check",
+   "Let me search"). v2 catches a different attack vector: fake
+   RESOLVED summaries and placeholder fields.
+
+   Targets:
+     · placeholder tokens like [Insert Price], [TBD], <insert X>
+     · structured sections the model writes as if tools succeeded
+       ("Customer Name: …", "Product Code: …", "Order Details")
+       when the matching tool did not actually run this turn
+
+   Unlike v1 (which allows any successful tool-result to authorise
+   any narration), v2 uses TOOL-FAMILY-SPECIFIC evidence:
+     · customer claims require a customer tool result
+     · product claims require a product tool result
+     · quotation/order-detail claims require a pricing/quotation
+       tool result
+   Placeholders are always blocked, even with evidence — a
+   hallucinated "[Insert Address]" is not legitimised by a
+   successful getCustomerByName call.
+
+   Runs AFTER v1, BEFORE sealPricingSafety at every return site. */
+
+const PLACEHOLDER_PATTERNS: RegExp[] = [
+  /\[Insert [^\]]+\]/i,
+  /\[Enter [^\]]+\]/i,
+  /\[Add [^\]]+\]/i,
+  /\[TBD\]/i,
+  /\[To be [^\]]+\]/i,
+  /<insert [^>]+>/i,
+];
+
+const FAKE_RESOLUTION_PATTERNS: RegExp[] = [
+  /\bwe have found the customer\b/i,
+  /\bwe have found the product\b/i,
+  /\bi found the customer\b/i,
+  /\bi found the product\b/i,
+  /\bcustomer resolution\b/i,
+  /\bproduct resolution\b/i,
+  /\bits details are as follows\b/i,
+  /\bdetails are as follows\b/i,
+  /\bquotation details\b/i,
+  /\border details\b/i,
+  /\bcustomer name\s*:/i,
+  /\bcustomer code\s*:/i,
+  /\bproduct name\s*:/i,
+  /\bproduct code\s*:/i,
+  /\bcontact person\s*:/i,
+  /\baddress\s*:/i,
+];
+
+function containsPlaceholders(text: string): boolean {
+  if (!text) return false;
+  return PLACEHOLDER_PATTERNS.some((re) => re.test(text));
+}
+
+function containsFakeResolvedSummary(text: string): boolean {
+  if (!text) return false;
+  return FAKE_RESOLUTION_PATTERNS.some((re) => re.test(text));
+}
+
+/** Customer-family evidence: a non-denied result from a customer
+ *  lookup tool in the current turn. */
+function hasCustomerEvidence(steps: AgentStep[]): boolean {
+  return steps.some(
+    (s) =>
+      s.kind === "tool-result" &&
+      s.permissionStatus !== "denied" &&
+      (s.tool === "getCustomerByName" || s.tool === "getCustomerByCode"),
+  );
+}
+
+/** Product-family evidence: a non-denied result from any product
+ *  lookup tool in the current turn. */
+function hasProductEvidence(steps: AgentStep[]): boolean {
+  return steps.some(
+    (s) =>
+      s.kind === "tool-result" &&
+      s.permissionStatus !== "denied" &&
+      (s.tool === "searchProducts" ||
+        s.tool === "getProductByCode" ||
+        s.tool === "getProductDetails"),
+  );
+}
+
+/** Quotation-family evidence: a non-denied pricing/draft result in
+ *  the current turn. This is broader than PRICING_TOOLS (which is
+ *  pricing-only); quotation-detail sections are allowed if EITHER
+ *  pricing OR draft succeeded, while actual numeric pricing still
+ *  requires PRICING_TOOLS evidence via the separate pricing guard. */
+function hasQuotationEvidence(steps: AgentStep[]): boolean {
+  return steps.some(
+    (s) =>
+      s.kind === "tool-result" &&
+      s.permissionStatus !== "denied" &&
+      (s.tool === "calculateQuotationPricing" ||
+        s.tool === "createQuotationDraft"),
+  );
+}
+
+const EXECUTION_GUARD_V2_MESSAGE =
+  "I need to use verified system results before I can confirm customer, product, or quotation details.";
+
+/** Helper: swap the text of the most recent "answer" step so the
+ *  UI bubble matches a replaced finalReply. Shared by every branch
+ *  below. */
+function replaceLastAnswerStep(steps: AgentStep[], text: string): void {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].kind === "answer") {
+      steps[i] = {
+        ...steps[i],
+        text,
+        permissionStatus: "allowed",
+      };
+      break;
+    }
+  }
+}
+
+function sealExecutionSafetyV2(
+  finalReply: string,
+  steps: AgentStep[],
+): string {
+  const text = finalReply || "";
+
+  const hasPlaceholder = containsPlaceholders(text);
+  const hasResolvedSummary = containsFakeResolvedSummary(text);
+  if (!hasPlaceholder && !hasResolvedSummary) return finalReply;
+
+  // Placeholders are always blocked, regardless of tool evidence.
+  if (hasPlaceholder) {
+    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
+    console.warn("[ai.agent.execution-guard-v2] replaced placeholder output.");
+    return EXECUTION_GUARD_V2_MESSAGE;
+  }
+
+  const customerOk = hasCustomerEvidence(steps);
+  const productOk = hasProductEvidence(steps);
+  const quotationOk = hasQuotationEvidence(steps);
+
+  // Customer summary without customer-family evidence → block.
+  if (/\bcustomer\b/i.test(text) && !customerOk) {
+    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
+    console.warn(
+      "[ai.agent.execution-guard-v2] replaced customer summary without evidence.",
+    );
+    return EXECUTION_GUARD_V2_MESSAGE;
+  }
+
+  // Product summary without product-family evidence → block.
+  if (/\bproduct\b/i.test(text) && !productOk) {
+    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
+    console.warn(
+      "[ai.agent.execution-guard-v2] replaced product summary without evidence.",
+    );
+    return EXECUTION_GUARD_V2_MESSAGE;
+  }
+
+  // Quotation/order-detail section without quotation-family evidence → block.
+  if (
+    /\b(quotation details|order details|quotation|quote)\b/i.test(text) &&
+    !quotationOk
+  ) {
+    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
+    console.warn(
+      "[ai.agent.execution-guard-v2] replaced quotation summary without evidence.",
+    );
+    return EXECUTION_GUARD_V2_MESSAGE;
+  }
+
+  return finalReply;
+}
+
 /* ─── Pre-tool guard ────────────────────────────────────────────────
    Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
    Rejects calls that are clearly invalid — missing customer, missing
@@ -1246,6 +1434,7 @@ function fallback(msg: string, conversationId: string): AgentResponse {
     { kind: "answer", text: msg, permissionStatus: "denied" },
   ];
   let sealed = sealExecutionSafety(msg, steps);
+  sealed = sealExecutionSafetyV2(sealed, steps);
   sealed = sealPricingSafety(sealed, steps);
   return {
     steps,
