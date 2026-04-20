@@ -268,7 +268,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         choices?: Array<{ message?: { content?: string } }>;
       };
       const rawReply = (json.choices?.[0]?.message?.content ?? "").trim();
-      const reply = normaliseBrandName(rawReply);
+      /* Strip any leaked tool-call markers BEFORE brand-name
+         normalisation so we never ship raw <function=…> syntax to
+         the user even on the fast path. */
+      const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         console.log(
@@ -332,14 +335,19 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     // If the model asked for tool calls we execute them all, otherwise
     // this is the final assistant turn.
     if (toolCalls.length === 0) {
-      finalReply = normaliseBrandName(content.trim());
-      if (finalReply) {
-        steps.push({
-          kind: "answer",
-          text: finalReply,
-          permissionStatus: "allowed",
-        });
-      }
+      /* Sanitise the assistant's content before it becomes the
+         final reply. Models sometimes verbalise their own tool-call
+         syntax when they mis-parse the tool schema; cleanAssistantText
+         strips those markers so nothing raw ever reaches the UI.
+         If the sanitiser leaves nothing, substitute a clean generic
+         follow-up instead of an empty bubble. */
+      const cleaned = cleanAssistantText(content);
+      finalReply = normaliseBrandName(cleaned) || GENERIC_FOLLOWUP;
+      steps.push({
+        kind: "answer",
+        text: finalReply,
+        permissionStatus: "allowed",
+      });
       break;
     }
 
@@ -477,9 +485,16 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
   // Safety: if we hit max iterations without a clean answer, compose a
   // short message from the last tool result so the UI gets *something*.
+  // Skip any step text that reads like internal debug / validation
+  // output ("(cached)", "productId required.", "Please provide …") so
+  // we don't promote engineering-speak into a user-facing reply.
   if (!finalReply) {
-    const lastText = [...steps].reverse().find((s) => s.text)?.text ?? "";
-    finalReply = normaliseBrandName(lastText || "I couldn't complete that request.");
+    const candidate = [...steps]
+      .reverse()
+      .map((s) => cleanAssistantText(s.text ?? ""))
+      .find((t) => t && !looksLikeDebug(t)) ?? "";
+    finalReply = normaliseBrandName(candidate) ||
+      "I couldn't complete that request. Could you rephrase?";
     steps.push({
       kind: "answer",
       text: finalReply,
@@ -553,9 +568,20 @@ Be concise.
 Tool routing:
 - "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
 - "what brands / categories / families exist" → getCatalogStats.
+- "list products" / "show products" / "what products do we have" → searchProducts with NO query (empty args). Do NOT pass the literal word "products" as the query.
 - "find / search products about Y" → searchProducts(query=Y).
 - "find customer Z" → getCustomerByName / getCustomerByCode.
 - Quotation drafting → follow the workflow below.
+
+Ask-first rules (critical — never call a tool with empty or missing required arguments):
+- If the user says "search customer" / "find customer" / "look up a customer" WITHOUT naming one, do NOT call a tool. Ask: "Which customer should I look up? You can send a name or customer code."
+- If the user says "I want a quotation" / "create a quotation" WITHOUT giving the customer and at least one product with quantity, do NOT call any tool. Ask for whatever is missing.
+- If a tool returns a message starting with "I need" or "Which …", DO NOT echo it verbatim. Rephrase it into a natural question addressed to the user.
+- Never invent a customer, product code, id, or quantity to satisfy a required field.
+
+Output rules (critical):
+- NEVER write tool-call syntax like <function=…>, <tool_call>, or [tool:…] in your reply. Use the structured tool_calls field when calling tools.
+- Keep replies short and business-appropriate. No internal field names, no stack traces, no "validation failed" phrasing.
 
 Do NOT call tools for meta questions. Answer these directly:
 - "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
@@ -591,6 +617,51 @@ function humaniseCall(toolName: string, args: Record<string, unknown>): string {
   if (q) return `Running ${toolName}("${q}")…`;
   return `Running ${toolName}…`;
 }
+
+/* ─── Tool-syntax sanitizer ─────────────────────────────────────────
+   Llama 3.x models occasionally emit tool-call syntax inline in the
+   assistant `content` field instead of the structured `tool_calls`
+   array (known quirk on 8B-instant; also seen on 70B under load).
+   When that happens the raw markers flow into the chat bubble and
+   users see something like:
+       <function=searchProducts>{"query":"DD"}</function>
+   This helper strips those markers unconditionally before the reply
+   leaves the server. Three forms are covered:
+     · <function=NAME>…</function>
+     · <tool_call>…</tool_call>
+     · [tool:NAME(…)]
+   After stripping, whitespace is collapsed. If nothing is left we
+   return "" so callers can substitute a clean follow-up instead of
+   showing a blank message. */
+function cleanAssistantText(raw: string): string {
+  if (!raw) return "";
+  const stripped = raw
+    .replace(/<function[=\s][\s\S]*?<\/function>/gi, "")
+    .replace(/<function[=\s][^>]*\/?>/gi, "") // orphan open/self-close
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "")
+    .replace(/<tool_call[^>]*\/?>/gi, "")
+    .replace(/\[tool\s*:[^\]]*\]/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return stripped;
+}
+
+/** Text patterns that look like internal debug/validation strings
+ *  and should NOT be promoted to the user's final reply. Keeps the
+ *  safety-fallback picker from grabbing "(cached)" or a terse tool
+ *  error message like "productId required." and showing it raw. */
+function looksLikeDebug(s: string): boolean {
+  const t = s.trim();
+  if (!t) return true;
+  if (t === "(cached)") return true;
+  if (/^[a-zA-Z_]+\s+(required|missing)\.?$/i.test(t)) return true;
+  if (/^(need|please provide)\b/i.test(t) && t.length < 80) return true;
+  return false;
+}
+
+/** Picked when we have nothing clean to surface — keeps the tone
+ *  conversational rather than exposing internals. */
+const GENERIC_FOLLOWUP = "Could you share a bit more so I can help?";
 
 function fallback(msg: string, conversationId: string): AgentResponse {
   return {

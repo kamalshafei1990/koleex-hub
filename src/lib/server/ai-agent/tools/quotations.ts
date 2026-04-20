@@ -68,7 +68,12 @@ const getProductDetails: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<ProductDetails | null>> => {
     const productId = String(args.productId ?? "").trim();
     if (!productId) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "productId required." };
+      return {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        message: "I need a product first. Which product should I use?",
+      };
     }
     const { data: product, error } = await supabaseServer
       .from("products")
@@ -280,7 +285,7 @@ const calculateQuotationPricing: ToolDef<
         ok: false,
         permissionStatus: "denied",
         data: null,
-        message: "Need a customerId and at least one valid line.",
+        message: "I need a customer and at least one product with quantity before I can prepare a quotation.",
       };
     }
 
@@ -369,7 +374,7 @@ const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> =
         ok: false,
         permissionStatus: "denied",
         data: null,
-        message: "Need a customerId and at least one valid line.",
+        message: "I need a customer and at least one product with quantity before I can prepare a quotation.",
       };
     }
 

@@ -45,11 +45,16 @@ const getCustomerByName: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
     const q = String(args.query ?? "").trim();
     if (!q) {
+      /* User-facing phrasing — reads as a natural follow-up question,
+         not a validation error. The orchestrator's system prompt
+         tells the model to rephrase "I need" / "Which …" messages
+         into a question addressed to the user, so this is both the
+         fallback and a hint for the model. */
       return {
         ok: false,
         permissionStatus: "denied",
         data: null,
-        message: "Please provide a search query.",
+        message: "Which customer should I look up? You can send a name or customer code.",
       };
     }
     const limit = Math.min(Math.max(Number(args.limit ?? 5) || 5, 1), 20);
@@ -117,7 +122,7 @@ const getCustomerByCode: ToolDef<
         ok: false,
         permissionStatus: "denied",
         data: null,
-        message: "Please provide a customer code.",
+        message: "Which customer code should I use?",
       };
     }
     const { data, error } = await supabaseServer
