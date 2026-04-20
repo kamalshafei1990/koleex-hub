@@ -78,6 +78,37 @@ export interface OrchestrateInput {
  *  tool-less Groq call which uses ~500 tokens instead of ~4 000 (the
  *  tool schemas alone are most of the cost). Keeps the free-tier
  *  RPM/TPM allowance intact for the requests that actually need it. */
+/* ── Canned fast-reply table ────────────────────────────────
+   Narrow exact-match list: greetings, identity, "what can you do",
+   thanks — EN / AR / ZH. Hits return instantly without any Groq call.
+   Keep this tight; business prompts must NEVER match here. */
+const FAST_REPLIES: Array<[RegExp, string]> = [
+  // English
+  [/^(hi|hello|hey)[\s,!.?]*$/i,                              "Hi! How can I help?"],
+  [/^who\s+(are|r)\s+you\s*\??$/i,                            "I'm Koleex AI, your assistant inside Koleex Hub."],
+  [/^what\s+can\s+you\s+do\s*\??$/i,                          "I help with quick answers, drafting, and navigating the hub. What do you need?"],
+  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                  "You're welcome."],
+  // Arabic
+  [/^(مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/,                      "مرحبا! كيف أقدر أساعدك؟"],
+  [/^(من\s+(أنت|انت)|مين\s+(أنت|انت))\s*[?؟]?$/,              "أنا Koleex AI، مساعدك داخل Koleex Hub."],
+  [/^(ماذا\s+(تستطيع|يمكنك)|ما\s+الذي\s+(تستطيع|يمكنك)|شو\s+(تقدر|بتقدر)|ايش\s+تقدر).*[?؟]?$/, "أساعدك في إجابات سريعة والصياغة والتنقل داخل Koleex Hub. ما الذي تحتاجه؟"],
+  [/^(شكرا|شكراً)[\s!.؟]*$/,                                   "العفو."],
+  // Chinese
+  [/^(你好|您好|嗨)[\s,!.?]*$/,                                "你好!有什么可以帮您的吗?"],
+  [/^你是谁\s*[?？]?$/,                                        "我是 Koleex AI,您在 Koleex Hub 的助手。"],
+  [/^你(能|可以)(做|干)什么\s*[?？]?$/,                         "我可以帮您快速回答、起草内容和在 Koleex Hub 中导航。需要什么?"],
+  [/^谢谢[\s!。?？]*$/,                                        "不客气。"],
+];
+
+function tryFastReply(msg: string): string | null {
+  const m = msg.trim();
+  if (!m) return null;
+  for (const [pat, reply] of FAST_REPLIES) {
+    if (pat.test(m)) return reply;
+  }
+  return null;
+}
+
 function isSmallTalk(msg: string): boolean {
   const s = msg.trim().toLowerCase();
   if (!s) return true;
@@ -130,38 +161,43 @@ function normaliseBrandName(text: string): string {
 function isBrandQuestion(msg: string): boolean {
   const s = msg.trim().toLowerCase();
   if (!s) return false;
-  /* Brand/company triggers — deliberately broad. A false positive here
-     (routing an op question to the brand path) just means the model
-     answers without tools, which surfaces cleanly as "I don't have
-     that data". A false negative (tool path on a brand query) risks
-     a 413. */
+  /* Narrow trigger list — only phrases that clearly ask for company /
+     brand facts (history, mission, vision, CEO, founders, official
+     brand material). Vague prompts like "tell me something" or bare
+     "company" no longer count so they don't get the heavy brand-
+     knowledge prompt. Canned small-talk (hello / who are you /
+     thanks) is handled by the canned fast-path above — never reaches
+     this check. */
   const brandKeywords = [
-    // English
-    "koleex", "koleex group", "koleex international",
-    "company", "about us", "who are we", "tell me about",
-    "history", "heritage", "founded", "founder", "ceo", "leadership",
-    "mission", "vision", "values", "core values", "philosophy", "brand",
-    "slogan", "tagline",
-    "headquarters", "hq", "location", "locations", "office", "offices", "hub",
-    "kas", "eskn", "nefertiti", "shafei", "taizhou", "cairo",
-    "business segment", "segments", "partners", "clients", "division",
-    "vision 2035", "2035",
-    "k-o-l-e-e-x", "knowledge operations logic",
-    // Arabic — brand name + common brand-topic words
-    "كوليكس", "كوليكس جروب", "شافعي", "طايتشو", "القاهرة",
-    "شركة", "مؤسس", "المؤسس", "الرئيس", "المدير التنفيذي",
-    "مقر", "المقر", "مكتب", "فرع", "فروع",
-    "رؤية", "مهمة", "رسالة", "قيم", "القيم", "تاريخ", "تراث",
-    "شعار", "فلسفة", "أقسام", "شركاء", "عملاء",
-    // Chinese — brand name + common brand-topic words
-    "柯莱克斯", "科莱克斯", "公司", "集团",
-    "愿景", "使命", "价值观", "历史", "口号", "总部",
-    "创始人", "首席执行官", "ceo",
+    // English — explicit brand / company facts only
+    "koleex",                              // direct brand name
+    "koleex group", "koleex international",
+    "koleex story", "koleex history",
+    "company history", "history", "heritage",
+    "founded", "founder", "founders",
+    "ceo",
+    "mission", "vision", "core values",
+    "vision 2035",
+    "official brand", "brand guidelines", "brand story",
+    "kas", "eskn", "nefertiti", "shafei",
+    "k-o-l-e-e-x",
+    // Arabic — explicit brand / company terms only
+    "كوليكس", "شافعي",
+    "مؤسس", "المؤسس",
+    "الرئيس التنفيذي", "المدير التنفيذي",
+    "رؤية", "مهمة", "رسالة",
+    "القيم", "القيم الأساسية",
+    "تاريخ", "تراث",
+    // Chinese — explicit brand / company terms only
+    "柯莱克斯", "科莱克斯",
+    "创始人", "首席执行官",
+    "愿景", "使命", "价值观", "历史",
   ];
   return brandKeywords.some((k) => s.includes(k));
 }
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
+  const tStart = Date.now();
   const { ctx, history, userMessage, userLang, conversationId } = input;
   const key = process.env.GROQ_API_KEY;
   if (!key) {
@@ -171,15 +207,37 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     );
   }
 
+  /* Canned fast-reply — narrow EN/AR/ZH exact-match triggers for
+     greetings / identity / "what can you do" / thanks. Returns
+     instantly without any Groq call. Never matches business prompts
+     (they never look like plain "hello"). */
+  const fastReply = tryFastReply(userMessage);
+  if (fastReply) {
+    console.log(
+      `[ai.agent.timing] fast=canned provider=0ms total=${Date.now() - tStart}ms`,
+    );
+    return {
+      steps: [{ kind: "answer", text: fastReply, permissionStatus: "allowed" }],
+      finalReply: fastReply,
+      provider: "fast-path",
+      conversationId,
+    };
+  }
+
   /* Route on message intent:
-     - Small talk / brand-profile questions → fast-path prompt (has
-       BRAND_KNOWLEDGE, no tool schemas). One Groq call, predictable size.
-     - Everything else → tool-loop prompt (no BRAND_KNOWLEDGE, full
-       tool schemas). Keeps the request body under Groq's 413 limit;
-       the agent calls DB tools to answer business questions.
-     Determined here once so `messages` is built against the right prompt. */
-  const useFastPath = isSmallTalk(userMessage) || isBrandQuestion(userMessage);
-  const systemPrompt = buildSystemPrompt(ctx, userLang, { includeBrandKnowledge: useFastPath });
+     - Brand questions → fast-path prompt WITH BRAND_KNOWLEDGE + no
+       tools. Preserves quality for "who's the CEO", "Vision 2035",
+       "founders", etc. Narrow keyword list (see isBrandQuestion) so
+       vague prompts don't get the heavy brand prompt.
+     - Small-talk → fast-path prompt with MINIMAL system text (no
+       brand knowledge, no tool routing). Short + fast answers.
+     - Everything else → full tool-calling loop. */
+  const isBrand = isBrandQuestion(userMessage);
+  const isSmall = isSmallTalk(userMessage);
+  const useFastPath = isBrand || isSmall;
+  const systemPrompt = useFastPath && isSmall && !isBrand
+    ? buildMinimalSystemPrompt(ctx, userLang)
+    : buildSystemPrompt(ctx, userLang, { includeBrandKnowledge: isBrand });
 
   const messages: WireMsg[] = [
     { role: "system", content: systemPrompt },
@@ -202,7 +260,9 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      a round-trip — and crucially the payload fits under Groq's 413
      limit even with the full BRAND_KNOWLEDGE loaded. */
   if (useFastPath) {
+    const tPre = Date.now();
     const res = await callGroqPlain(key, messages);
+    const tPost = Date.now();
     if (res.ok) {
       const json = (await res.json()) as {
         choices?: Array<{ message?: { content?: string } }>;
@@ -211,6 +271,9 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const reply = normaliseBrandName(rawReply);
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
+        console.log(
+          `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
+        );
         return {
           steps,
           finalReply: reply,
@@ -434,6 +497,26 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
 
 /* ─── Helpers ─────────────────────────────────────────── */
 
+/** Minimal system prompt for small-talk that escaped the canned
+ *  fast-reply table (e.g. "hey Koleex", "hi there Koleex AI"). Skips
+ *  the tool-routing instructions + brand-knowledge block so the
+ *  Groq request stays tiny and fast. Language mirror is kept — it's
+ *  the only rule that matters for small-talk. */
+function buildMinimalSystemPrompt(
+  ctx: UserContext,
+  userLang: "en" | "zh" | "ar",
+): string {
+  const uiLangHint =
+    userLang === "zh" ? "Chinese (Simplified)" :
+    userLang === "ar" ? "Arabic" :
+    "English";
+  return `You are Koleex AI, the assistant inside Koleex Hub.
+
+Reply in the same language the user wrote in. If the message is too short to tell (e.g. "ok", "thanks"), fall back to ${uiLangHint}. Keep answers to one short sentence.
+
+Current user: ${ctx.auth.username}.`;
+}
+
 function buildSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
@@ -547,6 +630,9 @@ async function callGroqPlain(
   messages: WireMsg[],
   attempt = 0,
 ): Promise<Response> {
+  /* Tighter params for the no-tool fast-path. Agent-loop params stay
+     in callGroqWithRetry (max_tokens 2048) so tool responses can still
+     reach the full length the model needs. */
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
@@ -556,8 +642,8 @@ async function callGroqPlain(
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages,
-      temperature: 0.4,
-      max_tokens: 512,
+      temperature: 0.3,
+      max_tokens: 160,
     }),
   });
   if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
