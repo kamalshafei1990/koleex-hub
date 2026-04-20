@@ -206,6 +206,15 @@ export default function KoleexAiApp() {
     ttsHandleRef.current = null;
     setAiSpeaking(false);
   }, []);
+  /* When the user leaves Chat mode, immediately stop any TTS playback
+     that started in Chat mode. Without this the mic button unmounts
+     (it lives inside {mode === "chat" && …}) but speechSynthesis keeps
+     reading the previous reply — audio persists with no UI surface to
+     stop it. This effect closes that loop. Fires only on a real
+     transition (not on initial "chat" mount). */
+  useEffect(() => {
+    if (mode !== "chat") stopTts();
+  }, [mode, stopTts]);
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
