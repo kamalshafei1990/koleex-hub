@@ -58,7 +58,7 @@ const POLICY_ADMIN_ROLES = new Set<string>([
 const SECTIONS: Record<string, SectionCfg> = {
   settings: {
     table: "commercial_settings",
-    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "cost_uplift_percent", "notes"],
+    editableFields: ["fx_cny_per_usd", "sales_sees_cost", "cost_uplift_percent", "use_policy_engine", "notes"],
     slugColumn: null,
     slugSourceField: null,
     validate: (row) => {

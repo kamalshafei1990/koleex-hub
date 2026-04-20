@@ -365,6 +365,7 @@ function SettingsSection({
               fx_cny_per_usd: Number(draft.fx_cny_per_usd),
               sales_sees_cost: !!draft.sales_sees_cost,
               cost_uplift_percent: Number(draft.cost_uplift_percent ?? 0),
+              use_policy_engine: !!draft.use_policy_engine,
               notes: draft.notes ?? null,
             },
           }
@@ -419,6 +420,14 @@ function SettingsSection({
           step="0.1"
           onChange={(v) => ed.setDraft({ ...d, cost_uplift_percent: Number(v) })}
           renderValue={(v) => `${Number(v).toFixed(2)}%`}
+        />
+        <KpiBool
+          label="Policy engine active"
+          value={!!d.use_policy_engine}
+          editing={ed.editing}
+          onChange={(v) => ed.setDraft({ ...d, use_policy_engine: v })}
+          hintTrue="Pricing engine falls back to the 12-step Commercial Policy flow when no override / market price matches."
+          hintFalse="Legacy mode — lines without an explicit price stay unresolved. Flip on when you're ready to use the policy as the source of truth."
         />
         <KpiReadonly label="Policy version" value={d.policy_version} />
       </KpiGrid>

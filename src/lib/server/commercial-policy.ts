@@ -29,6 +29,11 @@ export interface CommercialSettingsRow {
    *  reserve − tax refund). Single-knob until the full breakdown is
    *  modelled. Defaults to 0 so legacy callers keep their numbers. */
   cost_uplift_percent: number;
+  /** Feature flag for the policy-driven pricing engine (Phase 4).
+   *  When true, the engine falls back to computing from the
+   *  commercial_* tables (12-step flow) for lines without an explicit
+   *  override or market price. Defaults to false — legacy behaviour. */
+  use_policy_engine: boolean;
   policy_version: string;
   notes: string | null;
   updated_at: string;
