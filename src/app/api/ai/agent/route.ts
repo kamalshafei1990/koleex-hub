@@ -50,16 +50,8 @@ const FAST_REPLIES: Array<[RegExp, string]> = [
   [/^(good\s+(morning|afternoon|evening|night))[\s,!.?]*$/i,  "Hello! How can I help?"],
   [/^(salam|salaam|مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/i,        "مرحبا! كيف أقدر أساعدك؟"],
   [/^(你好|您好|嗨)[\s,!.?]*$/,                                "你好!有什么可以帮您的吗?"],
-  // Identity — English
-  [/^who\s+(are|r)\s+you\s*\??$/i,                            "I'm Koleex AI, your assistant inside Koleex Hub."],
-  [/^what\s+(are|r)\s+you\s*\??$/i,                           "I'm Koleex AI, your in-app assistant."],
-  [/^what\s+can\s+you\s+do\s*\??$/i,                          "I help with quick answers, drafting, and navigating the hub. What do you need?"],
-  // Identity — Arabic
-  [/^(من\s+(أنت|انت)|مين\s+(أنت|انت))\s*[?؟]?$/,              "أنا Koleex AI، مساعدك داخل Koleex Hub."],
-  [/^(ماذا\s+(تستطيع|يمكنك)|ما\s+الذي\s+(تستطيع|يمكنك)|شو\s+(تقدر|بتقدر)|ايش\s+تقدر).*[?؟]?$/, "أساعدك في إجابات سريعة والصياغة والتنقل داخل Koleex Hub. ما الذي تحتاجه؟"],
-  // Identity — Chinese
-  [/^你是谁\s*[?？]?$/,                                        "我是 Koleex AI,您在 Koleex Hub 的助手。"],
-  [/^你(能|可以)(做|干)什么\s*[?？]?$/,                         "我可以帮您快速回答、起草内容和在 Koleex Hub 中导航。需要什么?"],
+  /* Identity questions DROPPED from fast-path — they flow through the
+     orchestrator so the approved Section 2 brand knowledge answers. */
   // Acks
   [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                  "You're welcome."],
   [/^(ok|okay|cool|got\s+it|understood)[\s!.?]*$/i,           "Okay."],
