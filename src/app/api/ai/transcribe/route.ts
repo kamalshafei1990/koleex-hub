@@ -100,7 +100,15 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("[ai.transcribe]", res.status, body.slice(0, 300));
+      /* Diagnostic: log full body + resolved model so 403/404 from
+         Groq reveals the exact cause. Slice at 1500 — enough for the
+         full Groq error envelope. */
+      console.error(
+        "[ai.transcribe]",
+        res.status,
+        `model=${GROQ_WHISPER_MODEL}`,
+        body.slice(0, 1500),
+      );
       return NextResponse.json(
         {
           error: "transcribe_failed",
