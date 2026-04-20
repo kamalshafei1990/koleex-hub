@@ -15,8 +15,11 @@ import * as tus from "tus-js-client";
 
 const BUCKET = "media";
 const CONFIG_PATH = "config/catalogs.json";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+/* Env reads are INSIDE uploadResumable (see below) rather than at
+   module load, so importing this file never triggers a crash when
+   NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY aren't present in the build
+   environment (e.g. prerender of /accounts/new). */
 
 export interface CatalogEntry {
   id: string;
@@ -80,14 +83,26 @@ function uploadResumable(
   onProgress?: (pct: number) => void,
   upsert = false,
 ): Promise<boolean> {
+  /* Runtime env access — fails clearly at the first upload call if
+     vars are absent, never at module import time. */
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return Promise.reject(
+      new Error(
+        "[catalogs-admin] Supabase env variables are missing " +
+          "(NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY).",
+      ),
+    );
+  }
   return new Promise((resolve) => {
     const upload = new tus.Upload(file, {
-      endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
+      endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
       retryDelays: [0, 1000, 3000, 5000],
       chunkSize: 6 * 1024 * 1024, // 6MB chunks
       headers: {
-        authorization: `Bearer ${SUPABASE_KEY}`,
-        apikey: SUPABASE_KEY,
+        authorization: `Bearer ${supabaseKey}`,
+        apikey: supabaseKey,
         "x-upsert": upsert ? "true" : "false",
       },
       uploadDataDuringCreation: true,
