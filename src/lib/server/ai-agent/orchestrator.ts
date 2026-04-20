@@ -82,22 +82,22 @@ export interface OrchestrateInput {
    Narrow exact-match list: greetings, identity, "what can you do",
    thanks — EN / AR / ZH. Hits return instantly without any Groq call.
    Keep this tight; business prompts must NEVER match here. */
+/* Narrow canned fast-replies: only the truly trivial phrases
+   ("hi", "thanks") where a longer answer would feel performative.
+   Identity / capability questions ("who are you", "what can you do")
+   are deliberately NOT in this table anymore — they now hit the model
+   which gives a proper, substantive answer about what the assistant
+   can actually help with. */
 const FAST_REPLIES: Array<[RegExp, string]> = [
   // English
-  [/^(hi|hello|hey)[\s,!.?]*$/i,                              "Hi! How can I help?"],
-  [/^who\s+(are|r)\s+you\s*\??$/i,                            "I'm Koleex AI, your assistant inside Koleex Hub."],
-  [/^what\s+can\s+you\s+do\s*\??$/i,                          "I help with quick answers, drafting, and navigating the hub. What do you need?"],
-  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                  "You're welcome."],
+  [/^(hi|hello|hey)[\s,!.?]*$/i,              "Hi! How can I help?"],
+  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,  "You're welcome."],
   // Arabic
-  [/^(مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/,                      "مرحبا! كيف أقدر أساعدك؟"],
-  [/^(من\s+(أنت|انت)|مين\s+(أنت|انت))\s*[?؟]?$/,              "أنا Koleex AI، مساعدك داخل Koleex Hub."],
-  [/^(ماذا\s+(تستطيع|يمكنك)|ما\s+الذي\s+(تستطيع|يمكنك)|شو\s+(تقدر|بتقدر)|ايش\s+تقدر).*[?؟]?$/, "أساعدك في إجابات سريعة والصياغة والتنقل داخل Koleex Hub. ما الذي تحتاجه؟"],
-  [/^(شكرا|شكراً)[\s!.؟]*$/,                                   "العفو."],
+  [/^(مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/,      "مرحبا! كيف أقدر أساعدك؟"],
+  [/^(شكرا|شكراً)[\s!.؟]*$/,                   "العفو."],
   // Chinese
-  [/^(你好|您好|嗨)[\s,!.?]*$/,                                "你好!有什么可以帮您的吗?"],
-  [/^你是谁\s*[?？]?$/,                                        "我是 Koleex AI,您在 Koleex Hub 的助手。"],
-  [/^你(能|可以)(做|干)什么\s*[?？]?$/,                         "我可以帮您快速回答、起草内容和在 Koleex Hub 中导航。需要什么?"],
-  [/^谢谢[\s!。?？]*$/,                                        "不客气。"],
+  [/^(你好|您好|嗨)[\s,!.?]*$/,                "你好!有什么可以帮您的吗?"],
+  [/^谢谢[\s!。?？]*$/,                        "不客气。"],
 ];
 
 function tryFastReply(msg: string): string | null {
@@ -640,9 +640,14 @@ function buildMinimalSystemPrompt(
     userLang === "zh" ? "Chinese (Simplified)" :
     userLang === "ar" ? "Arabic" :
     "English";
-  return `You are Koleex AI, the assistant inside Koleex Hub.
+  return `You are Koleex AI, a friendly general-purpose assistant inside Koleex Hub.
 
-Reply in the same language the user wrote in. If the message is too short to tell (e.g. "ok", "thanks"), fall back to ${uiLangHint}. Keep answers to one short sentence.
+Reply in the same language the user wrote in. If the message is too short to tell (e.g. "ok"), fall back to ${uiLangHint}.
+
+Style:
+- Be warm and personable. Match the user's tone.
+- Give substantive answers. For questions, a couple of paragraphs or a short list is usually right — explain context, give examples, anticipate follow-up. For small talk, a few natural sentences that invite more conversation work well.
+- Don't pad for length, but don't clip to one sentence either. Treat each question as worth a real answer.
 
 Current user: ${ctx.auth.username}.`;
 }
@@ -678,7 +683,12 @@ Language rules (critical):
 - Only switch languages when the user explicitly asks ("answer in English from now on", "رد بالعربية", "请用中文回答"). Mirror the language they switched to, and keep using it until they switch again.
 - If the user's message is too short to classify (like "ok" or "thanks"), fall back to ${uiLangHint}.
 
-Be concise.
+Answer style:
+- Give real, substantive answers. A couple of paragraphs, a short list, or an explanation with an example is usually the right length for a question.
+- For small talk, a few friendly sentences that continue the conversation work well — not a one-liner.
+- For tool results (a product list, a price, a customer lookup), summarise the data clearly and then add one line of useful context: what it means, what the user might want to do next.
+- Don't pad for length and don't clip to one sentence. Match length to the question.
+- Use headings, bullets, or numbered steps when they genuinely help; otherwise prose is fine.
 
 Tool routing:
 - "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
@@ -696,7 +706,7 @@ Ask-first rules (critical — never call a tool with empty or missing required a
 
 Output rules (critical):
 - NEVER write tool-call syntax like <function=…>, <tool_call>, or [tool:…] in your reply. Use the structured tool_calls field when calling tools.
-- Keep replies short and business-appropriate. No internal field names, no stack traces, no "validation failed" phrasing.
+- Keep the tone business-appropriate. No internal field names, no stack traces, no "validation failed" phrasing. Length should match the question — see the Answer style section above.
 
 Do NOT call tools for meta questions. Answer these directly:
 - "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
