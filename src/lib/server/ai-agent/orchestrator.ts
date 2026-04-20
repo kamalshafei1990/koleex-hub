@@ -181,6 +181,16 @@ function isBrandQuestion(msg: string): boolean {
     "official brand", "brand guidelines", "brand story",
     "kas", "eskn", "nefertiti", "shafei",
     "k-o-l-e-e-x",
+    // English — AI-identity triggers (Section 2). Narrow phrases that
+    // unambiguously ask about the assistant itself; avoids matching
+    // generic chit-chat.
+    "your name", "what's your name", "whats your name",
+    "who created you", "who made you", "who built you",
+    "a real person", "are you real", "are you human", "are you a human",
+    "trust your answer", "trust your answers", "trust your replies",
+    "replace human", "replace humans", "replace human support",
+    "access my data", "access my order", "access my orders",
+    "access my account", "see my order", "see my orders",
     // Arabic — explicit brand / company terms only
     "كوليكس", "شافعي",
     "مؤسس", "المؤسس",
@@ -188,10 +198,17 @@ function isBrandQuestion(msg: string): boolean {
     "رؤية", "مهمة", "رسالة",
     "القيم", "القيم الأساسية",
     "تاريخ", "تراث",
+    // Arabic — AI-identity triggers
+    "ما اسمك", "ما هو اسمك", "اسمك",
+    "من صنعك", "من طورك",
+    "هل أنت إنسان", "هل انت انسان",
     // Chinese — explicit brand / company terms only
     "柯莱克斯", "科莱克斯",
     "创始人", "首席执行官",
     "愿景", "使命", "价值观", "历史",
+    // Chinese — AI-identity triggers
+    "你叫什么名字", "你的名字", "你是谁创造",
+    "你是真人吗", "你是人类吗",
   ];
   return brandKeywords.some((k) => s.includes(k));
 }
