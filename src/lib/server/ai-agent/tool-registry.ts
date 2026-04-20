@@ -91,7 +91,10 @@ export async function dispatchTool(
       ok: false,
       permissionStatus: "denied",
       data: null,
-      message: `Unknown tool "${name}".`,
+      /* User-facing copy. The raw tool name is intentionally omitted
+         so we don't expose internal identifiers if the model
+         hallucinates one. The real name is still in the audit log. */
+      message: "I can't do that action here.",
     };
     return result;
   }
@@ -140,7 +143,10 @@ export async function dispatchTool(
         ok: false,
         permissionStatus: "denied",
         data: null,
-        message: `This action requires a higher role (${tool.minRole}).`,
+        /* Don't leak role-tier naming (super_admin, admin, internal)
+           to end users. The audit record still captures the real
+           reason. */
+        message: "You do not have access to that action.",
       };
       await logToolCall({
         ctx,
