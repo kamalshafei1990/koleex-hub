@@ -27,6 +27,7 @@ import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
+import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -195,6 +196,16 @@ export default function KoleexAiApp() {
      Defaults to chat so common prompts stay fast; users explicitly
      opt in to agent mode when they need to take action. */
   const [mode, setMode] = useState<"chat" | "agent">("chat");
+  /* Voice-chat state (Phase 1, Chat mode only). The mic button is
+     rendered only when mode === "chat"; TTS speaks on voice-initiated
+     replies. Typed chats stay silent. */
+  const [aiSpeaking, setAiSpeaking] = useState(false);
+  const ttsHandleRef = useRef<TtsHandle | null>(null);
+  const stopTts = useCallback(() => {
+    ttsHandleRef.current?.cancel();
+    ttsHandleRef.current = null;
+    setAiSpeaking(false);
+  }, []);
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
@@ -305,9 +316,12 @@ export default function KoleexAiApp() {
     setSidebarOpen(false);
   }, []);
 
-  /* ── Send a message ── */
+  /* ── Send a message ──
+     `viaVoice` — when true the Chat-mode branch reads the reply aloud
+     via speechSynthesis (Phase 1 voice chat). Agent mode is unaffected;
+     it doesn't support voice yet. */
   const send = useCallback(
-    async (textOverride?: string) => {
+    async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
       if (!text) return;
       /* Synchronous guard: flip ref BEFORE any await so a rapid second
@@ -323,6 +337,8 @@ export default function KoleexAiApp() {
          spec: no DB calls, no persistence, no sidebar update. Messages
          live in local state only for this mode. */
       if (mode === "chat") {
+        /* New turn cancels any in-flight TTS so we don't stack audio. */
+        stopTts();
         setError(null);
         const optimistic: ChatMsg = {
           id: `tmp-${Date.now()}`,
@@ -348,15 +364,27 @@ export default function KoleexAiApp() {
           if (!res.ok || "error" in json) {
             const err = json as { error?: string; message?: string };
             setError(err.message || err.error || "Failed to get a reply.");
+            /* Spec: do not speak anything if the reply failed. */
             return;
           }
+          const reply = (json as { reply: string }).reply;
           const assistantMsg: ChatMsg = {
             id: `chat-${Date.now()}`,
             role: "assistant",
-            content: (json as { reply: string }).reply,
+            content: reply,
             created_at: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, assistantMsg]);
+          if (viaVoice) {
+            setAiSpeaking(true);
+            ttsHandleRef.current = speakText(reply, {
+              lang,
+              onEnd: () => {
+                ttsHandleRef.current = null;
+                setAiSpeaking(false);
+              },
+            });
+          }
         } catch (e) {
           setError(e instanceof Error ? e.message : "Network error");
         } finally {
@@ -463,7 +491,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, mode],
+    [input, activeId, lang, mode, stopTts],
   );
 
   /* Two-step delete using the Hub's ConfirmDialog component. The old
@@ -945,6 +973,22 @@ export default function KoleexAiApp() {
                   className="flex-1 px-5 py-4 bg-transparent text-[15px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
                   style={{ minHeight: "54px" }}
                 />
+                {/* Mic button — Chat mode only (Phase 1 voice input).
+                    Hidden in Agent mode per spec: voice doesn't route
+                    through the orchestrator yet. On transcript we call
+                    send(text, viaVoice=true) which speaks the reply. */}
+                {mode === "chat" && (
+                  <MicButton
+                    className="m-2"
+                    size={40}
+                    onTranscript={(t) => send(t, true)}
+                    onError={(msg) => setError(msg)}
+                    speaking={aiSpeaking}
+                    onStopSpeaking={stopTts}
+                    disabled={sending}
+                    lang={lang}
+                  />
+                )}
                 <button
                   type="submit"
                   disabled={sending || !input.trim()}
