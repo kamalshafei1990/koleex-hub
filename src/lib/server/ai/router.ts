@@ -27,14 +27,23 @@ import { buildBusinessPrompt, buildChatPrompt } from "./prompt-builder";
 
 /* ─── Intent classification ──────────────────────────────────── */
 
-/** Short small-talk / meta phrases. Ordered short-circuit-wise with
- *  the most common variants first. */
+/** Chat / meta phrases. Greeting patterns are anchored at the START
+ *  of the string (not $-ended) so "hello Koleex AI" or "hi there" still
+ *  matches. The classifier runs business patterns FIRST — so greetings
+ *  followed by a business phrase (e.g. "hi make me a quote") correctly
+ *  route to business. Chat only wins when no business intent is present.
+ *  System-info lookups ("list products", "what customers do we have")
+ *  also land here — the chat model deflects "I can't see live data,
+ *  open the X app" which is the right behaviour for those. */
 const CHAT_PATTERNS: RegExp[] = [
-  /^(hi|hello|hey|yo|hola|salam|salaam)[\s,!.?]*$/i,
-  /^(good\s*(morning|afternoon|evening|night))[\s,!.?]*$/i,
+  // Short standalone replies.
   /^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,
   /^(ok|okay|cool|got\s+it|understood)[\s!.?]*$/i,
   /^(bye|goodbye|see\s+you)[\s!.?]*$/i,
+  // Greetings — match at start, allow trailing words (e.g. "hello Koleex AI").
+  /^(hi|hello|hey|yo|hola|salam|salaam)\b/i,
+  /^(good\s*(morning|afternoon|evening|night))\b/i,
+  // Identity / help meta-questions.
   /who\s+(are|r)\s+you\s*\??/i,
   /what\s+(are|r)\s+you\s*\??/i,
   /what\s+can\s+you\s+do\s*\??/i,
@@ -42,7 +51,10 @@ const CHAT_PATTERNS: RegExp[] = [
   /how\s+do\s+you\s+work\s*\??/i,
   /how\s+are\s+you[\s,!.?]*/i,
   /what\s+kind\s+of\s+ai\s+are\s+you\s*\??/i,
-  // Arabic / Chinese basics
+  // System-info lookups — "list / show / display / tell me about X".
+  /^(list|show|display|tell\s+me\s+about)\b/i,
+  /^what\s+(products?|customers?|suppliers?|items?|orders?|accounts?|users?|apps?|features?|modules?|categories|brands?)\b/i,
+  // Arabic / Chinese basics.
   /مرحبا|اهلا|أهلا|السلام/,
   /من\s+أنت/,
   /你好|你是谁|您好/,
@@ -85,8 +97,12 @@ export function classifyIntent(message: string): TaskIntent {
   if (!m) return "chat";
   if (m.length <= 2) return "chat";
 
-  for (const p of CHAT_PATTERNS) if (p.test(m)) return "chat";
+  /* Business wins when both match — so greetings followed by a real
+     business phrase ("hi, make me a quote for 10 units") route
+     correctly. Chat patterns are looser now (greeting can have
+     trailing words) which is only safe with this order. */
   for (const p of BUSINESS_PATTERNS) if (p.test(m)) return "business";
+  for (const p of CHAT_PATTERNS) if (p.test(m)) return "chat";
   return "unknown";
 }
 
