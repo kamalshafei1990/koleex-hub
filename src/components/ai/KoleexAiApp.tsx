@@ -240,6 +240,19 @@ export default function KoleexAiApp() {
      synchronously inside the same event loop tick, closing that gap. */
   const sendingRef = useRef(false);
 
+  /* Close the mobile sidebar on Escape. Keeps the close paths
+     redundant (button + scrim + key) so the user always has a way
+     back out on small screens. No-op on desktop — the sidebar there
+     is a non-overlay pane. */
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
   /* Show the "jump to latest" chip when the user has scrolled up more
      than 120px from the bottom of the messages container. */
   const handleScroll = useCallback(() => {
@@ -676,6 +689,20 @@ export default function KoleexAiApp() {
           desktop collapse flag is ignored — otherwise the drawer
           would render at width:0 and look broken.
           Transparent so the shared backdrop shows through. */}
+
+      {/* Mobile backdrop scrim. Tap to dismiss. Only rendered on
+          mobile (md:hidden) and only when the drawer is open — the
+          sidebar sits at z-[40], the scrim at z-[39], so the scrim
+          covers the rest of the app but not the drawer. */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-[39] bg-black/50 backdrop-blur-sm"
+        />
+      )}
+
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
@@ -703,6 +730,19 @@ export default function KoleexAiApp() {
           >
             <PlusIcon size={14} />
             {copy.newChat}
+          </button>
+          {/* Mobile-only close button. On mobile the sidebar is a
+              z-[40] overlay that covers the top-bar burger, so users
+              need a close control INSIDE the drawer. Hidden on
+              desktop where the collapse button next door handles it. */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0 flex"
+            title="Close sidebar"
+            aria-label="Close sidebar"
+          >
+            <CrossIcon size={14} />
           </button>
           <button
             type="button"
