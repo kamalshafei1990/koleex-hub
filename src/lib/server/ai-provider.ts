@@ -57,10 +57,11 @@ function pickProvider(): "groq" | "gemini" | "claude" | "openai" | null {
   return null;
 }
 
-/* Default Groq model. Llama 3.3 70B is the best free-tier all-rounder for
-   chat + translation. Override with GROQ_MODEL env if a different model
-   is preferred. */
+/* Translate uses the bigger 70B model for accuracy; chat swapped to
+   the fast 8B Instant model for sub-2s latency. Both env-overridable. */
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_CHAT_MODEL =
+  process.env.GROQ_CHAT_MODEL || "llama-3.1-8b-instant";
 
 /* ── Gemini Flash (free tier) ────────────────────────────── */
 
@@ -192,10 +193,10 @@ async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: GROQ_CHAT_MODEL,
       messages,
-      temperature: 0.6,
-      max_tokens: 2048,
+      temperature: 0.3,
+      max_tokens: 120,
     }),
   });
 
@@ -213,7 +214,7 @@ async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
   const reply = stripThinking(raw);
   if (!reply) return null;
   lastProviderError = null;
-  return { reply, provider: `groq:${GROQ_MODEL}` };
+  return { reply, provider: `groq:${GROQ_CHAT_MODEL}` };
 }
 
 async function groqTranslate(input: TranslateInput): Promise<TranslateResult | null> {

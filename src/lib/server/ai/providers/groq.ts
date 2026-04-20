@@ -30,10 +30,11 @@ import type {
   TranslateResult,
 } from "../../ai-provider";
 
-/* Default Groq model. Llama 3.3 70B is the best free-tier all-rounder for
-   chat + translation. Override with GROQ_MODEL env if a different model
-   is preferred. */
+/* Chat uses the fast 8B Instant model for sub-2s latency; translate
+   keeps the 70B model for accuracy. Both env-overridable. */
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_CHAT_MODEL =
+  process.env.GROQ_CHAT_MODEL || "llama-3.1-8b-instant";
 
 /** Last detailed error from a Groq call. Scoped to this module so the
  *  extraction stays isolated from ai-provider.ts's state. Callers that
@@ -72,10 +73,10 @@ export async function groqChat(messages: ChatMessage[]): Promise<ChatResult | nu
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: GROQ_CHAT_MODEL,
       messages,
-      temperature: 0.6,
-      max_tokens: 2048,
+      temperature: 0.3,
+      max_tokens: 120,
     }),
   });
 
@@ -93,7 +94,7 @@ export async function groqChat(messages: ChatMessage[]): Promise<ChatResult | nu
   const reply = stripThinking(raw);
   if (!reply) return null;
   lastGroqError = null;
-  return { reply, provider: `groq:${GROQ_MODEL}` };
+  return { reply, provider: `groq:${GROQ_CHAT_MODEL}` };
 }
 
 export async function groqTranslate(input: TranslateInput): Promise<TranslateResult | null> {
@@ -142,7 +143,7 @@ export async function groqTranslate(input: TranslateInput): Promise<TranslateRes
   return { translated, provider: `groq:${GROQ_MODEL}` };
 }
 
-/** The resolved model id — exposed so later callers (router, voice)
- *  can report it in logs without re-reading the env var. Not used
- *  today. */
-export const GROQ_MODEL_ID = GROQ_MODEL;
+/** The resolved CHAT model id — exposed so later callers (router,
+ *  voice) can report it in logs / provider badges without re-reading
+ *  the env var. Not used today. */
+export const GROQ_MODEL_ID = GROQ_CHAT_MODEL;
