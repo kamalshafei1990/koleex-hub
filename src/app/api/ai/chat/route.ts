@@ -31,22 +31,67 @@ import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
    instead of waiting on the classifier + provider. Keep in sync
    with the orchestrator + /api/ai/agent copies. "Koleex" stays in
    Latin letters in every language per the brand rule. */
+/* Canned fast-path replies using the APPROVED Section 3 (Basic
+   Conversation) text verbatim. Exact-match regexes — so variations
+   still flow through the model and get a natural response. Q9
+   "What are you?" intentionally NOT here — it overlaps with Section
+   2 AI-identity answers and routes through brand knowledge. */
+const Q1_GREETING =
+  "Hello.\n\nKoleex AI is here and ready to help.\n\nFeel free to ask anything — about Koleex, business topics, or general questions — or to request assistance with tasks.\n\nHow can I help you today?";
+const Q2_HOW_ARE_YOU =
+  "I'm doing well, thank you for asking.\n\nEverything is running smoothly, and I'm ready to help with anything you need — whether it's a question, a task, or just a quick conversation.\n\nHow can I help you today?";
+const Q3_HOW_OLD =
+  "I don't have an age like a human.\n\nI'm a digital system, so I don't grow older, but I'm continuously updated and improved to provide better support and performance over time.\n\nYou can think of me as always up to date and evolving to serve you better.";
+const Q4_WHAT_DOING =
+  "I'm here with you and ready to help.\n\nRight now, I'm just waiting for your next question or anything you'd like me to do — whether it's answering something, helping with a task, or just having a quick chat.";
+const Q5_WHERE_ARE_YOU =
+  "I'm not in a physical place like a person.\n\nI exist digitally, so you can access me from anywhere — whether you're using a computer, a phone, or any connected device.\n\nSo in a way, I'm right here with you.";
+const Q7_CAN_YOU_HELP =
+  "Of course, I'd be happy to help.\n\nJust tell me what you need, and I'll do my best to assist — whether it's answering a question, helping with a task, or guiding you through something step by step.\n\nYou can keep it simple and just say what's on your mind. I'm here for you.";
+const Q8_ARE_YOU_BUSY =
+  "Not at all.\n\nI'm always available and ready to help you whenever you need.\n\nYou can ask anything or request any task, and I'll be here to support you. Take your time — I'm here.";
+const Q10_PURPOSE =
+  "My purpose is to make things easier for you.\n\nI'm here to help you find information, complete tasks, and communicate more smoothly — whether it's related to Koleex, business needs, or general questions.\n\nI'm designed to save you time, simplify processes, and support you whenever you need assistance.";
+
 const FAST_REPLIES: Array<[RegExp, string]> = [
-  // Greetings
-  [/^(hi|hello|hey|yo|hola)[\s,!.?]*$/i,                      "Hi! How can I help?"],
-  [/^(good\s+(morning|afternoon|evening|night))[\s,!.?]*$/i,  "Hello! How can I help?"],
-  [/^(salam|salaam|مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/i,        "مرحبا! كيف أقدر أساعدك؟"],
-  [/^(你好|您好|嗨)[\s,!.?]*$/,                                "你好!有什么可以帮您的吗?"],
-  /* Identity questions (who are you / what are you / what can you do
-     and their Arabic / Chinese equivalents) intentionally DROPPED
-     from the fast-path so they flow through the full prompt pipeline
-     and can be answered from the approved Section 2 brand knowledge
-     (About Koleex AI). The short canned reply was overriding the
-     richer answer the user actually wants. */
+  // Q1 — greetings (EN)
+  [/^(hi|hello|hey|yo|hola)[\s,!.?]*$/i,                       Q1_GREETING],
+  [/^(good\s+(morning|afternoon|evening|night))[\s,!.?]*$/i,   Q1_GREETING],
+  // Q1 — greetings (AR / ZH — approved English translated to language context kept short; full paragraph uses EN since user only provided EN for Section 3)
+  [/^(salam|salaam|مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/i,         "مرحبا! أنا Koleex AI، جاهز لمساعدتك. اسأل عن أي شيء يخص Koleex أو أي موضوع آخر، أو اطلب مساعدة في أي مهمة."],
+  [/^(你好|您好|嗨)[\s,!.?]*$/,                                 "你好!我是 Koleex AI,随时为您提供帮助。您可以问关于 Koleex、业务或任何其他话题的问题。"],
+
+  // Q2 — how are you
+  [/^how\s+(are|r)\s+(you|u)\s*[?!.]*$/i,                      Q2_HOW_ARE_YOU],
+  [/^how's\s+it\s+going\s*[?!.]*$/i,                           Q2_HOW_ARE_YOU],
+
+  // Q3 — how old are you
+  [/^how\s+old\s+(are|r)\s+(you|u)\s*[?!.]*$/i,                Q3_HOW_OLD],
+
+  // Q4 — what are you doing
+  [/^what\s+(are|r)\s+(you|u)\s+doing(\s+now)?\s*[?!.]*$/i,    Q4_WHAT_DOING],
+
+  // Q5 — where are you
+  [/^where\s+(are|r)\s+(you|u)(\s+now)?\s*[?!.]*$/i,           Q5_WHERE_ARE_YOU],
+
+  // Q7 — can you help / help me
+  [/^(can\s+you\s+help\s+(me|us)|help\s+me)(\s+with\s+something)?\s*[?!.]*$/i, Q7_CAN_YOU_HELP],
+
+  // Q8 — are you busy
+  [/^(are|r)\s+(you|u)\s+busy(\s+right\s+now)?\s*[?!.]*$/i,    Q8_ARE_YOU_BUSY],
+
+  // Q10 — what is your purpose
+  [/^what('?s|\s+is)\s+your\s+purpose\s*[?!.]*$/i,             Q10_PURPOSE],
+
+  /* Q9 "what are you?" + other identity questions (who are you /
+     what can you do / etc.) intentionally DROPPED — they flow
+     through the brand-knowledge pipeline to get Section 2 AI-identity
+     answers with the approved structure. */
+
   // Acks
-  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                  "You're welcome."],
-  [/^(ok|okay|cool|got\s+it|understood)[\s!.?]*$/i,           "Okay."],
-  [/^(bye|goodbye|see\s+you)[\s!.?]*$/i,                      "See you!"],
+  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,                   "You're welcome."],
+  [/^(ok|okay|cool|got\s+it|understood)[\s!.?]*$/i,            "Okay."],
+  [/^(bye|goodbye|see\s+you)[\s!.?]*$/i,                       "See you!"],
 ];
 
 function tryFastReply(msg: string): string | null {
