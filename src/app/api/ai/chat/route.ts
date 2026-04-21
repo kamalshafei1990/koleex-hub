@@ -8,6 +8,8 @@ import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
 import { findLocalAnswer, pickLocalAnswer } from "@/lib/server/ai/local-knowledge";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { preprocessUserQuery } from "@/lib/server/ai/preprocess";
+import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
+import { buildEgyptianResponse } from "@/lib/language/rewrite-egyptian";
 
 /* ---------------------------------------------------------------------------
    POST /api/ai/chat — now powered by the hybrid router.
@@ -311,11 +313,27 @@ export async function POST(req: Request) {
                  has no tool evidence so any pricing-like text is
                  replaced with PRICING_GUARD_MESSAGE before the UI ever
                  persists the final text. */
-              const sealed = sealPricingSafety(ev.reply, []);
+              let sealed = sealPricingSafety(ev.reply, []);
               if (sealed !== ev.reply) {
                 console.warn(
                   `[ai.chat.pricing-guard] replaced hallucinated pricing lane=${lane}`,
                 );
+              }
+              /* Phase 11 L2: Egyptian dialect builder. When the user
+                 wrote EGY or FRANCO, run the intent-aware Level 2
+                 builder on the canonical reply so the client sees
+                 natural Egyptian phrasing with the right opener. */
+              if (msgLang === "EGY" || msgLang === "FRANCO") {
+                const rebuilt = buildEgyptianResponse(sealed, {
+                  intentType: analyzeIntent(lastUser).type,
+                  seed: lastUser,
+                });
+                if (rebuilt !== sealed) {
+                  console.log(
+                    `[ai.chat.egy] rewrote for msg_lang=${msgLang}`,
+                  );
+                  sealed = rebuilt;
+                }
               }
               controller.enqueue(
                 send({
