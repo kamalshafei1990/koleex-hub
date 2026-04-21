@@ -34,6 +34,7 @@ import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
+import TypingIndicator from "@/components/ai/TypingIndicator";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 
@@ -383,73 +384,186 @@ export default function KoleexAiApp() {
       setMessages((prev) => [...prev, optimistic]);
       setInput("");
 
+      /* Placeholder assistant bubble that mutates as deltas arrive.
+         We append it immediately so the TypingIndicator (keyed off
+         messages[last].role === "assistant" && empty content) can
+         appear without waiting for the first byte. */
+      const placeholderId = `tmp-ai-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: placeholderId,
+          role: "assistant",
+          content: "",
+          created_at: new Date().toISOString(),
+          steps: [],
+        },
+      ]);
+
       try {
-        /* Switched to /api/ai/agent — the new orchestrator that runs
-           tool calls with permission + audit enforcement. Falls back
-           to the classic response shape on errors so the UI behaves. */
+        /* Phase 6: SSE streaming. Emits start → (steps) → delta* → end.
+           The client mutates the placeholder bubble as deltas arrive so
+           the reply reveals progressively; the TypingIndicator shows
+           while the content is still empty. */
         const res = await fetch(`/api/ai/agent`, {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
           body: JSON.stringify({
             conversationId,
             content: text,
             user_lang: lang,
+            stream: true,
           }),
         });
-        const json = (await res.json()) as
-          | {
-              agent: { steps: AgentStep[]; finalReply: string; provider: string };
-              message: ChatMsg;
-              conversation: { id: string; title: string };
-            }
-          | { error: string; message?: string };
-        if (!res.ok || "error" in json) {
-          const errObj = json as { error?: string; message?: string };
+
+        if (!res.ok || !res.body) {
           const msg =
-            (typeof errObj.message === "string" && errObj.message) ||
-            errObj.error ||
-            "Failed to get a reply.";
+            res.status === 503
+              ? "AI is not configured yet."
+              : `Failed to get a reply. (${res.status})`;
           setError(msg);
+          /* Drop the placeholder so the UI doesn't show an empty bubble. */
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
           return;
         }
-        const { message, conversation: convUpdate, agent } = json;
-        const assistantWithSteps: ChatMsg = { ...message, steps: agent.steps };
-        setMessages((prev) => [...prev, assistantWithSteps]);
-        /* Voice-initiated turn → speak the final reply. Typed turns
-           stay silent. Only the `finalReply` text is spoken; tool
-           chips remain visual. */
-        if (viaVoice && message.content) {
-          setAiSpeaking(true);
-          ttsHandleRef.current = speakText(message.content, {
-            lang,
-            onEnd: () => {
-              ttsHandleRef.current = null;
-              setAiSpeaking(false);
-            },
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let accumulated = "";
+        let finalMessage: ChatMsg | null = null;
+        let finalSteps: AgentStep[] = [];
+        let convUpdateId: string | null = null;
+        let convUpdateTitle: string | null = null;
+
+        const pushPatch = (patch: Partial<ChatMsg>) => {
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === placeholderId);
+            if (idx < 0) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx], ...patch };
+            return next;
           });
-        }
-        // Sidebar: bump title + move to top + update preview.
-        setConversations((prev) => {
-          const next = prev.map((c) =>
-            c.id === convUpdate.id
-              ? {
-                  ...c,
-                  title: convUpdate.title,
-                  last_preview: message.content.slice(0, 180),
-                  message_count: c.message_count + 2,
-                  updated_at: new Date().toISOString(),
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const events = buf.split("\n\n");
+          buf = events.pop() ?? "";
+          for (const ev of events) {
+            for (const line of ev.split("\n")) {
+              if (!line.startsWith("data:")) continue;
+              const payload = line.slice(5).trim();
+              if (!payload) continue;
+              try {
+                const json = JSON.parse(payload) as
+                  | { type: "start" }
+                  | { type: "steps"; steps: AgentStep[] }
+                  | { type: "delta"; text: string }
+                  | {
+                      type: "end";
+                      agent: {
+                        steps: AgentStep[];
+                        finalReply: string;
+                        provider: string;
+                      };
+                      message: ChatMsg;
+                      conversation: { id: string; title: string };
+                    }
+                  | { type: "error"; message?: string };
+
+                if (json.type === "steps") {
+                  finalSteps = json.steps;
+                  pushPatch({ steps: json.steps });
+                } else if (json.type === "delta") {
+                  accumulated += json.text;
+                  pushPatch({ content: accumulated });
+                } else if (json.type === "end") {
+                  finalMessage = json.message;
+                  finalSteps = json.agent.steps;
+                  convUpdateId = json.conversation.id;
+                  convUpdateTitle = json.conversation.title;
+                } else if (json.type === "error") {
+                  setError(json.message || "AI is unavailable right now.");
                 }
-              : c,
-          );
-          next.sort(
-            (a, b) =>
-              new Date(b.updated_at).getTime() -
-              new Date(a.updated_at).getTime(),
-          );
-          return next;
-        });
+              } catch {
+                /* Malformed frame — skip, keep streaming. */
+              }
+            }
+          }
+        }
+
+        /* Swap the placeholder bubble with the persisted message +
+           final steps (id/created_at now come from Supabase, not the
+           temporary placeholder). */
+        if (finalMessage) {
+          const persistedId = finalMessage.id;
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === placeholderId);
+            if (idx < 0) return prev;
+            const next = prev.slice();
+            next[idx] = {
+              ...finalMessage!,
+              steps: finalSteps,
+            };
+            return next;
+          });
+          /* Voice-initiated turn speaks the FINAL sealed reply only —
+             never the mid-stream deltas — so TTS can't say pricing
+             that the server later redacted. */
+          if (viaVoice && finalMessage.content) {
+            setAiSpeaking(true);
+            ttsHandleRef.current = speakText(finalMessage.content, {
+              lang,
+              onEnd: () => {
+                ttsHandleRef.current = null;
+                setAiSpeaking(false);
+              },
+            });
+          }
+          // Sidebar update once everything's in.
+          if (convUpdateId && convUpdateTitle && finalMessage) {
+            const previewText = finalMessage.content;
+            const bumpId = convUpdateId;
+            const bumpTitle = convUpdateTitle;
+            setConversations((prev) => {
+              const next = prev.map((c) =>
+                c.id === bumpId
+                  ? {
+                      ...c,
+                      title: bumpTitle,
+                      last_preview: previewText.slice(0, 180),
+                      message_count: c.message_count + 2,
+                      updated_at: new Date().toISOString(),
+                    }
+                  : c,
+              );
+              next.sort(
+                (a, b) =>
+                  new Date(b.updated_at).getTime() -
+                  new Date(a.updated_at).getTime(),
+              );
+              return next;
+            });
+          }
+          void persistedId;
+        } else if (accumulated) {
+          /* Stream closed without an `end` event but we got text —
+             keep what we have so the user at least sees the reply. */
+          pushPatch({ content: accumulated });
+        } else {
+          /* Nothing useful came through — drop the placeholder. */
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+          setError((prev) => prev ?? "No reply was received.");
+        }
       } catch (e) {
+        setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
         setError(e instanceof Error ? e.message : "Network error");
       } finally {
         sendingRef.current = false;
@@ -1147,30 +1261,36 @@ function Bubble({
         {draftStep && (
           <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
         )}
-        <div
-          /* dir="auto" + unicode-bidi: plaintext together make the browser
-             apply the first-strong-character algorithm per paragraph AND
-             isolate embedded segments properly. That's what fixes Arabic
-             replies that also contain English words like "Koleex Hub" —
-             without this the hard dir="rtl" can flip the embedded English
-             into the wrong visual position. */
-          dir="auto"
-          className={`rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
-            rtl ? "text-[15px]" : "text-[14px]"
-          } ${
-            isUser
-              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-              : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
-          }`}
-          style={{
-            unicodeBidi: "plaintext",
-            ...(rtl
-              ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
-              : {}),
-          }}
-        >
-          {msg.content}
-        </div>
+        {/* Assistant bubble with no content yet → show typing indicator
+            (Phase 6). Replaced by the streamed text as deltas arrive. */}
+        {!isUser && !msg.content ? (
+          <TypingIndicator />
+        ) : (
+          <div
+            /* dir="auto" + unicode-bidi: plaintext together make the browser
+               apply the first-strong-character algorithm per paragraph AND
+               isolate embedded segments properly. That's what fixes Arabic
+               replies that also contain English words like "Koleex Hub" —
+               without this the hard dir="rtl" can flip the embedded English
+               into the wrong visual position. */
+            dir="auto"
+            className={`rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
+              rtl ? "text-[15px]" : "text-[14px]"
+            } ${
+              isUser
+                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
+            }`}
+            style={{
+              unicodeBidi: "plaintext",
+              ...(rtl
+                ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
+                : {}),
+            }}
+          >
+            {msg.content}
+          </div>
+        )}
       </div>
       {isUser && (
         <div

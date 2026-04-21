@@ -31,7 +31,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
-import type { AgentResponse } from "@/lib/server/ai-agent/types";
+import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
    user+assistant pairs; enough for short-term multi-turn context,
@@ -141,10 +141,13 @@ export async function POST(req: Request) {
     conversationId?: string;
     content?: string;
     user_lang?: "en" | "zh" | "ar";
+    stream?: boolean;
   };
 
   const content = body.content?.trim();
   const conversationId = body.conversationId;
+  const wantsStream =
+    body.stream === true || req.headers.get("accept") === "text/event-stream";
   if (!content) {
     return NextResponse.json({ error: "content required" }, { status: 400 });
   }
@@ -230,6 +233,175 @@ export async function POST(req: Request) {
       agent,
       message: assistantInsert.data,
       conversation: { id: conversationId, title: finalTitle },
+    });
+  }
+
+  /* ─── Streaming branch (Phase 6) ────────────────────────────
+     SSE response. Runs the exact same orchestrator as the JSON path,
+     then pseudo-streams the finalReply in small chunks so the UI
+     can show progressive reveal + typing indicator.
+
+     Events:
+       start — turn kicked off; UI shows typing dots
+       steps — tool-call / tool-result chips for the turn (if any)
+       delta — a chunk of the finalReply text
+       end   — persisted message + conversation update
+
+     DB persistence runs in parallel with the text stream so the user
+     never waits on the write — the end event includes the persisted
+     row once it's available. */
+  if (wantsStream) {
+    const encoder = new TextEncoder();
+    const send = (obj: unknown) =>
+      encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          controller.enqueue(send({ type: "start", conversationId }));
+
+          /* Load history + ctx + insert user turn in parallel, same
+             as the JSON path — but emit a keepalive comment every
+             ~1.5s so intermediate proxies don't close the connection
+             and the client sees activity even when orchestrate is slow. */
+          const [historyRes, ctx] = await Promise.all([
+            supabaseServer
+              .from("ai_messages")
+              .select("role, content, created_at")
+              .eq("conversation_id", conversationId)
+              .order("created_at", { ascending: false })
+              .limit(HISTORY_LIMIT),
+            buildUserContext(auth),
+            supabaseServer.from("ai_messages").insert({
+              tenant_id: auth.tenant_id,
+              conversation_id: conversationId,
+              role: "user",
+              content,
+            }),
+          ]);
+
+          const history = (historyRes.data ?? [])
+            .slice()
+            .reverse()
+            .map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content as string,
+            }));
+
+          /* Keepalive comments while orchestrate runs. SSE treats
+             lines starting with ":" as comments — they keep the
+             connection warm without triggering client events. */
+          let alive = true;
+          const keepalive = setInterval(() => {
+            if (!alive) return;
+            try {
+              controller.enqueue(encoder.encode(": ping\n\n"));
+            } catch {
+              /* Controller closed — nothing to do. */
+            }
+          }, 1500);
+
+          const agent = await orchestrate({
+            ctx,
+            history,
+            userMessage: content,
+            userLang,
+            conversationId: conversationId!,
+          });
+
+          alive = false;
+          clearInterval(keepalive);
+
+          /* Emit tool-chip steps up front so the UI can render them
+             above the streamed answer — mirrors how ChatGPT shows
+             "Used tool: X" chips while the answer is still typing. */
+          const toolSteps: AgentStep[] = agent.steps.filter(
+            (s) => s.kind !== "answer",
+          );
+          if (toolSteps.length > 0) {
+            controller.enqueue(send({ type: "steps", steps: toolSteps }));
+          }
+
+          /* Pseudo-stream the finalReply. Chunk size + delay calibrated
+             to feel natural without dragging the total time out:
+               · ~28 chars/chunk
+               · 12 ms between chunks → ~2 200 chars/sec visible rate
+             A 200-word (≈1 200 char) brand answer streams in ~520 ms. */
+          const full = agent.finalReply ?? "";
+          const CHUNK = 28;
+          for (let i = 0; i < full.length; i += CHUNK) {
+            const text = full.slice(i, i + CHUNK);
+            controller.enqueue(send({ type: "delta", text }));
+            /* Don't delay after the final chunk. */
+            if (i + CHUNK < full.length) {
+              await new Promise((r) => setTimeout(r, 12));
+            }
+          }
+
+          /* Persist in parallel with the stream close. The user sees
+             the full text by now; the DB write can finish after the
+             controller closes without affecting UX. */
+          const finalTitle = computeTitle(conv, content);
+          const [assistantInsert] = await Promise.all([
+            supabaseServer
+              .from("ai_messages")
+              .insert({
+                tenant_id: auth.tenant_id,
+                conversation_id: conversationId,
+                role: "assistant",
+                content: agent.finalReply,
+                provider: agent.provider,
+              })
+              .select("*")
+              .single(),
+            supabaseServer
+              .from("ai_conversations")
+              .update({
+                title: finalTitle,
+                last_preview: agent.finalReply.slice(0, 180),
+                message_count: (conv.message_count ?? 0) + 2,
+              })
+              .eq("id", conversationId)
+              .eq("tenant_id", auth.tenant_id)
+              .eq("account_id", auth.account_id),
+          ]);
+
+          const tEnd = Date.now();
+          controller.enqueue(
+            send({
+              type: "end",
+              agent,
+              message: assistantInsert.data,
+              conversation: { id: conversationId, title: finalTitle },
+              total_ms: tEnd - t0,
+            }),
+          );
+          console.log(
+            `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
+              ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
+              ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
+              ` stream=1 reply_bytes=${full.length}`,
+          );
+        } catch (e) {
+          controller.enqueue(
+            send({
+              type: "error",
+              message: e instanceof Error ? e.message : String(e),
+            }),
+          );
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
     });
   }
 
