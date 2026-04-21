@@ -429,6 +429,88 @@ export default function KoleexAiApp() {
           }),
         });
 
+        /* Phase 9 resilience: if the server returned a JSON body
+           despite our Accept: text/event-stream header (e.g. an old
+           canned fast-path, an upstream 4xx envelope), parse it as
+           JSON instead of fruitlessly scanning for SSE frames. This
+           keeps legacy JSON clients working and stops the bug where
+           a plain-JSON response would result in "No reply was
+           received." because the SSE parser found nothing. */
+        const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+        if (res.ok && res.body && !ct.includes("text/event-stream")) {
+          const json = (await res.json().catch(() => null)) as
+            | {
+                agent?: { steps: AgentStep[]; finalReply: string; provider: string };
+                message?: ChatMsg;
+                conversation?: { id: string; title: string };
+                error?: string;
+                reply?: string;
+              }
+            | null;
+          const fallbackReply =
+            json?.message?.content ||
+            json?.agent?.finalReply ||
+            json?.reply ||
+            "";
+          if (fallbackReply) {
+            const persisted = json?.message ?? {
+              id: `tmp-ai-${Date.now()}`,
+              role: "assistant" as const,
+              content: fallbackReply,
+              created_at: new Date().toISOString(),
+            };
+            setMessages((prev) => {
+              const idx = prev.findIndex((m) => m.id === placeholderId);
+              if (idx < 0) return prev;
+              const next = prev.slice();
+              next[idx] = {
+                ...persisted,
+                steps: json?.agent?.steps ?? [],
+              };
+              return next;
+            });
+            /* Voice TTS on the sealed reply, same semantics as streamed path. */
+            if (viaVoice && fallbackReply) {
+              setAiSpeaking(true);
+              ttsHandleRef.current = speakText(fallbackReply, {
+                lang,
+                onEnd: () => {
+                  ttsHandleRef.current = null;
+                  setAiSpeaking(false);
+                },
+              });
+            }
+            if (json?.conversation) {
+              const bumpId = json.conversation.id;
+              const bumpTitle = json.conversation.title;
+              setConversations((prev) => {
+                const next = prev.map((c) =>
+                  c.id === bumpId
+                    ? {
+                        ...c,
+                        title: bumpTitle,
+                        last_preview: fallbackReply.slice(0, 180),
+                        message_count: c.message_count + 2,
+                        updated_at: new Date().toISOString(),
+                      }
+                    : c,
+                );
+                next.sort(
+                  (a, b) =>
+                    new Date(b.updated_at).getTime() -
+                    new Date(a.updated_at).getTime(),
+                );
+                return next;
+              });
+            }
+            return;
+          }
+          /* JSON with no usable reply — fall through to the error path. */
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+          setError(json?.error || "No reply was received.");
+          return;
+        }
+
         if (!res.ok || !res.body) {
           const msg =
             res.status === 503
