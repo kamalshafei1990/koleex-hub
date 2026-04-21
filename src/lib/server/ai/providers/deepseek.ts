@@ -148,3 +148,101 @@ export async function deepseekChat(
 /** Resolved model id — exposed for telemetry / logs, matching
  *  GROQ_MODEL_ID in providers/groq.ts. */
 export const DEEPSEEK_MODEL_ID = DEEPSEEK_MODEL;
+
+/* ─── Streaming chat (Phase 2) ──────────────────────────────────
+   OpenAI-compatible SSE, identical shape to providers/groq.ts. The
+   two implementations stay separate (no shared helper) to preserve
+   the provider-isolation pattern already established in Phase 1. */
+export interface DeepseekStreamChunk {
+  type: "delta" | "done" | "error";
+  text?: string;
+  provider?: string;
+  error?: string;
+}
+
+export async function* deepseekChatStream(
+  messages: ChatMessage[],
+  opts: { maxTokens?: number; temperature?: number } = {},
+): AsyncGenerator<DeepseekStreamChunk> {
+  if (process.env.USE_DEEPSEEK !== "true") {
+    lastDeepseekError = "DeepSeek disabled (USE_DEEPSEEK flag not set)";
+    yield { type: "error", error: lastDeepseekError };
+    return;
+  }
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) {
+    lastDeepseekError = "DEEPSEEK_API_KEY is not configured";
+    yield { type: "error", error: lastDeepseekError };
+    return;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(DEEPSEEK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages,
+        stream: true,
+        temperature: opts.temperature ?? 0.3,
+        max_tokens: opts.maxTokens ?? 2048,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastDeepseekError = `DeepSeek network error: ${msg}`;
+    yield { type: "error", error: msg };
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.deepseek.stream]", res.status, bodyText);
+    lastDeepseekError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
+    yield { type: "error", error: lastDeepseekError };
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let full = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop() ?? "";
+    for (const ev of events) {
+      for (const line of ev.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+          };
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length > 0) {
+            full += delta;
+            yield { type: "delta", text: delta };
+          }
+        } catch {
+          /* Malformed JSON in one frame — skip, keep streaming. */
+        }
+      }
+    }
+  }
+
+  const cleaned = stripThinking(full);
+  lastDeepseekError = null;
+  yield {
+    type: "done",
+    text: cleaned,
+    provider: `deepseek:${DEEPSEEK_MODEL}`,
+  };
+}

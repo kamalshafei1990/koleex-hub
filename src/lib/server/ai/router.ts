@@ -19,15 +19,27 @@ import type {
   AiMessage,
   AiRequest,
   AiResponse,
+  Lane,
   ProviderName,
   TaskIntent,
   TaskMode,
 } from "./types";
-import { buildBusinessPrompt, buildChatPrompt } from "./prompt-builder";
-import { groqChat, getLastGroqError } from "./providers/groq";
+import {
+  buildBusinessPrompt,
+  buildChatPrompt,
+  buildFastPrompt,
+  buildSmartPrompt,
+} from "./prompt-builder";
+import {
+  groqChat,
+  groqChatStream,
+  getLastGroqError,
+  type StreamChunk,
+} from "./providers/groq";
 import { geminiChat } from "../ai-provider";
 import {
   deepseekChat,
+  deepseekChatStream,
   getLastDeepseekError,
   isDeepseekEnabled,
 } from "./providers/deepseek";
@@ -190,6 +202,64 @@ export function buildPromptFor(
     : buildChatPrompt(userMessage, ctx);
 }
 
+/* ─── Phase 2: 3-lane architecture ───────────────────────────────
+   Authoritative routing entry point. Given an intent + optional
+   forceMode, returns the lane that decides everything downstream
+   (provider selection, prompt shape, fallback behaviour).
+
+   Lane detection rules — deliberately simple so ops can predict
+   routing from reading the last user message:
+     · forceMode === "business" (admin "Create quote" button etc.) → SMART
+       (chat route has no tools; reasoning provider is the right
+       fit. PROTECTED lane is exclusively served by /api/ai/agent.)
+     · intent ∈ {knowledge, business} → SMART (explanation /
+       reasoning / commercial framing in chat mode)
+     · intent ∈ {chat, unknown}       → FAST (speed wins) */
+export function detectLane(
+  intent: TaskIntent,
+  forceMode?: TaskMode,
+): Lane {
+  if (forceMode === "business") return "SMART";
+  if (intent === "knowledge" || intent === "business") return "SMART";
+  return "FAST";
+}
+
+/** Provider chain for each lane. Fallback stays inside the same
+ *  lane — FAST never crosses into DeepSeek/Gemini; SMART never
+ *  falls back to Groq's 8B model. */
+export function providersForLane(lane: Lane): Array<"groq" | "deepseek" | "gemini"> {
+  if (lane === "FAST") return ["groq"];
+  if (lane === "SMART") return ["deepseek", "gemini"];
+  return []; // PROTECTED handled by orchestrator, not this router
+}
+
+/** Lane-aware prompt builder. FAST gets the slim <2KB prompt;
+ *  SMART gets the <4KB reasoning prompt; PROTECTED/business force
+ *  uses the existing commercial prompt.
+ *
+ *  Returns `{full, slim}` so the router can retry a failed provider
+ *  with a reduced prompt before moving to the next one. */
+export function buildLanePrompt(
+  lane: Lane,
+  userMessage: string,
+  ctx: AiRequest["context"] = {},
+  forceMode?: TaskMode,
+): { full: AiMessage[]; slim: AiMessage[] } {
+  if (forceMode === "business") {
+    const full = buildBusinessPrompt(userMessage, ctx);
+    return { full, slim: buildFastPrompt(userMessage, ctx) };
+  }
+  if (lane === "SMART") {
+    return {
+      full: buildSmartPrompt(userMessage, ctx),
+      slim: buildFastPrompt(userMessage, ctx),
+    };
+  }
+  /* FAST */
+  const fast = buildFastPrompt(userMessage, ctx);
+  return { full: fast, slim: fast };
+}
+
 /* ─── Provider dispatch (STEP 4) ─────────────────────────────── */
 
 /** Build the error envelope once so every failure path returns the
@@ -212,37 +282,25 @@ function errorResponse(
   };
 }
 
-/** Ordered cascade for each mode. Chat-first questions prefer Groq
- *  (fast, high rate limits). Business-reasoning questions prefer
- *  DeepSeek (stronger commercial reasoning). Both fall back through
- *  every configured provider and finally to a synthetic answer.
- *
- *  Each item is `[providerName, callerFn, lastErrorFn?]`. caller
- *  returns `{reply, provider}` on success, `null` on failure. */
+/** Legacy ordered cascade — retained for the non-streaming routeAi()
+ *  back-compat path. New lane-based routing (providersForLane) is
+ *  the authoritative source for streaming + primary chat calls. */
 type ProviderStep = [
   name: "groq" | "deepseek" | "gemini",
   call: (messages: AiMessage[]) => Promise<{ reply: string; provider: string } | null>,
   lastError?: () => string | null,
 ];
 
-function chainFor(mode: TaskMode, intent: TaskIntent): ProviderStep[] {
-  /* Reasoning-heavy intents prefer DeepSeek's deeper model over
-     Groq's speed. Commercial (business) and general-knowledge
-     (knowledge) both go to DeepSeek first. Fast-chat stays on Groq
-     first for snappy response times. */
-  const reasoningFirst = mode === "business" || intent === "knowledge";
-  if (reasoningFirst) {
-    return [
-      ["deepseek", deepseekChat, getLastDeepseekError],
-      ["groq", groqChat, getLastGroqError],
-      ["gemini", geminiChat],
-    ];
-  }
-  return [
-    ["groq", groqChat, getLastGroqError],
-    ["deepseek", deepseekChat, getLastDeepseekError],
-    ["gemini", geminiChat],
-  ];
+/** Build the non-streaming caller chain for a lane. Same provider
+ *  order as providersForLane(), but resolved to callable functions
+ *  with their last-error accessors. */
+function callersForLane(lane: Lane): ProviderStep[] {
+  const names = providersForLane(lane);
+  return names.map((name) => {
+    if (name === "deepseek") return ["deepseek", deepseekChat, getLastDeepseekError] as ProviderStep;
+    if (name === "groq") return ["groq", groqChat, getLastGroqError] as ProviderStep;
+    return ["gemini", geminiChat] as ProviderStep;
+  });
 }
 
 /** Synthetic last-resort answer when every provider fails. Brief
@@ -312,91 +370,84 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
       : "chat"
     : classifyIntent(last);
   const mode: TaskMode = modeFor(intent);
+  const lane: Lane = detectLane(intent, req.forceMode);
 
-  /* Build prompt messages once. Prompt-builder owns system-prompt
-     shape, language, cost-disclosure rules, etc. */
-  const messages: AiMessage[] = buildPromptFor(mode, last, req.context ?? {});
+  /* Lane-aware prompt. {full, slim} is used by the intelligent-retry
+     path below — the first attempt at each provider uses `full`, a
+     failed attempt retries with `slim` (the minimal FAST prompt) on
+     the same provider before moving to the next one. */
+  const { full, slim } = buildLanePrompt(lane, last, req.context ?? {}, req.forceMode);
 
-  /* Oversized-prompt regression detector (Phase 1 observability).
-     Chat-path prompts should stay well under 16KB — if a future edit
-     to prompt-builder or a runaway context injection pushes the system
-     prompt past that threshold we want a warn line in the logs, not a
-     silent latency / 413 regression. Does not alter behaviour. */
-  const promptBytes = messages.reduce(
-    (n, m) => n + (m.content?.length ?? 0),
-    0,
-  );
+  /* Oversized-prompt regression detector. Chat-path prompts should
+     stay well under 16KB — if a future edit to prompt-builder pushes
+     the system prompt past that threshold we want a warn line, not a
+     silent latency / 413 regression. */
+  const promptBytes = full.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   if (promptBytes > 16_000) {
     console.warn(
-      `[ai.warn] oversize_prompt bytes=${promptBytes} intent=${intent} mode=${mode}`,
+      `[ai.warn] oversize_prompt bytes=${promptBytes} lane=${lane} intent=${intent}`,
     );
   }
 
-  /* Walk the cascade. First provider whose call returns non-null
-     wins. DeepSeek's gate (isDeepseekEnabled) is applied before its
-     call so a disabled DeepSeek doesn't count as a real attempt.
-     `errors` accumulates diagnostic detail on every skip/failure
-     so the [ai.router] final log tells ops exactly which providers
-     were tried and why each didn't serve.
-
-     Per-provider timeout (Phase 1 stability): if a provider hangs,
-     we abort and move to the next one instead of blocking the user
-     for 30+ seconds. Reasoning-heavy providers get a longer budget
-     (DeepSeek/Gemini can legitimately take several seconds for
-     complex turns); fast-chat providers (Groq) get a tighter one. */
   const timeoutFor = (name: "groq" | "deepseek" | "gemini"): number =>
     name === "groq" ? 12_000 : 25_000;
 
   const errors: string[] = [];
-  const chain = chainFor(mode, intent);
+  const chain = callersForLane(lane);
   for (const [name, call, lastErr] of chain) {
     if (name === "deepseek" && !isDeepseekEnabled()) {
       errors.push("deepseek: disabled");
       continue;
     }
-    try {
-      const budget = timeoutFor(name);
-      const result = await Promise.race<
-        { reply: string; provider: string } | null
-      >([
-        call(messages),
-        new Promise<never>((_r, reject) =>
-          setTimeout(
-            () => reject(new Error(`timeout ${budget}ms`)),
-            budget,
+
+    /* Intelligent retry: try full prompt, then slim prompt, before
+       giving up on this provider and moving to the next one in the
+       lane. For FAST lane full === slim so this collapses to one
+       attempt. */
+    const attempts: AiMessage[][] = full === slim ? [full] : [full, slim];
+    let served = false;
+    for (let i = 0; i < attempts.length && !served; i++) {
+      const messages = attempts[i];
+      try {
+        const budget = timeoutFor(name);
+        const result = await Promise.race<
+          { reply: string; provider: string } | null
+        >([
+          call(messages),
+          new Promise<never>((_r, reject) =>
+            setTimeout(
+              () => reject(new Error(`timeout ${budget}ms`)),
+              budget,
+            ),
           ),
-        ),
-      ]);
-      if (result) {
-        /* Success log — tells ops which provider served each turn,
-           what intent drove the routing choice, and whether we
-           fell back off the preferred provider. Cheap (one line
-           per successful turn) and invaluable during incidents. */
-        const fellBack = chain[0]?.[0] !== name;
-        console.log(
-          `[ai.router] provider=${name} intent=${intent} mode=${mode}` +
-            ` fallback=${fellBack ? 1 : 0} ms=${Date.now() - t0}` +
-            (errors.length ? ` skipped=${errors.join(";")}` : ""),
-        );
-        return {
-          provider: name as ProviderName,
-          mode,
-          message: result.reply,
-          status: "success",
-          meta: { routing: intent, duration_ms: Date.now() - t0 },
-          reply: result.reply,
-        };
+        ]);
+        if (result) {
+          const fellBack = chain[0]?.[0] !== name;
+          console.log(
+            `[ai.router] lane=${lane} provider=${name} intent=${intent}` +
+              ` fallback=${fellBack ? 1 : 0} retry=${i} ms=${Date.now() - t0}` +
+              (errors.length ? ` skipped=${errors.join(";")}` : ""),
+          );
+          return {
+            provider: name as ProviderName,
+            mode,
+            message: result.reply,
+            status: "success",
+            meta: { routing: intent, duration_ms: Date.now() - t0 },
+            reply: result.reply,
+          };
+        }
+        errors.push(`${name}#${i}: ${(lastErr?.() ?? "failed")}`);
+      } catch (e) {
+        errors.push(`${name}#${i}: ${e instanceof Error ? e.message : String(e)}`);
       }
-      errors.push(`${name}: ${(lastErr?.() ?? "failed")}`);
-    } catch (e) {
-      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  /* Every provider failed — return a synthetic fallback. The user
-     never sees an empty or error-looking reply; the real errors are
-     logged so operations can see what went wrong. */
-  console.error("[ai.router] all providers failed:", errors.join(" | "));
+  console.error(
+    `[ai.router] lane=${lane} all providers failed:`,
+    errors.join(" | "),
+  );
   const synthetic = generateFallbackAnswer(last, req.context?.userLang);
   return {
     provider: "fallback" as ProviderName,
@@ -406,6 +457,262 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
     meta: { routing: intent, duration_ms: Date.now() - t0 },
     reply: synthetic,
   };
+}
+
+/* ─── Streaming (Phase 2) ──────────────────────────────────────── */
+
+/** Metadata yielded at the start of every stream. The client uses
+ *  this to show lane/provider badges while tokens arrive. */
+export interface RouteStreamStart {
+  type: "start";
+  lane: Lane;
+  intent: TaskIntent;
+  mode: TaskMode;
+  promptBytes: number;
+}
+
+/** Final event at the end of a stream. `reply` is the full text the
+ *  client should persist (supersedes accumulated deltas — this is
+ *  the canonical, post-processed version). `fallback:1` means the
+ *  synthetic generator served because every provider failed. */
+export interface RouteStreamEnd {
+  type: "end";
+  provider: ProviderName;
+  lane: Lane;
+  intent: TaskIntent;
+  reply: string;
+  fallback: 0 | 1;
+  ttfbMs: number | null;
+  totalMs: number;
+}
+
+/** Per-token delta. */
+export interface RouteStreamDelta {
+  type: "delta";
+  text: string;
+}
+
+export type RouteStreamEvent =
+  | RouteStreamStart
+  | RouteStreamDelta
+  | RouteStreamEnd;
+
+/** Stream a reply token-by-token using lane-scoped provider selection
+ *  and intelligent retry. Rules (Phase 2):
+ *    · FAST lane  → Groq only. On failure, retry with slim prompt,
+ *                   then synthetic.
+ *    · SMART lane → DeepSeek primary → Gemini fallback. Each provider
+ *                   gets a full-prompt attempt then a slim-prompt
+ *                   retry before we move to the next one.
+ *    · Providers are attempted one at a time. First provider whose
+ *      stream opens AND emits a first chunk within TTFB_BUDGET wins;
+ *      we commit to it and pass tokens through unchanged.
+ *    · If no provider can stream a first chunk, we yield one synthetic
+ *      delta + end with provider="fallback".
+ *
+ *  The yielded reply is NOT sealed against the pricing guard here —
+ *  the chat route applies sealPricingSafety on the final `end.reply`
+ *  before persisting / sending the final SSE event, so consumers
+ *  should trust `end.reply` as the canonical text. */
+const TTFB_BUDGET_MS = 6_000;
+
+export async function* streamRouteAi(
+  req: AiRequest,
+): AsyncGenerator<RouteStreamEvent> {
+  const t0 = Date.now();
+  const last = req.messages[req.messages.length - 1]?.content ?? "";
+  const intent: TaskIntent = req.forceMode
+    ? req.forceMode === "business"
+      ? "business"
+      : "chat"
+    : classifyIntent(last);
+  const mode: TaskMode = modeFor(intent);
+  const lane: Lane = detectLane(intent, req.forceMode);
+  const { full, slim } = buildLanePrompt(
+    lane,
+    last,
+    req.context ?? {},
+    req.forceMode,
+  );
+
+  const promptBytes = full.reduce((n, m) => n + (m.content?.length ?? 0), 0);
+  if (promptBytes > 16_000) {
+    console.warn(
+      `[ai.warn] oversize_prompt bytes=${promptBytes} lane=${lane} intent=${intent}`,
+    );
+  }
+
+  yield { type: "start", lane, intent, mode, promptBytes };
+
+  const providers = providersForLane(lane);
+  const errors: string[] = [];
+  let ttfbMs: number | null = null;
+
+  for (const provider of providers) {
+    if (provider === "deepseek" && !isDeepseekEnabled()) {
+      errors.push("deepseek: disabled");
+      continue;
+    }
+
+    const attempts: AiMessage[][] = full === slim ? [full] : [full, slim];
+    for (let i = 0; i < attempts.length; i++) {
+      const messages = attempts[i];
+      const attemptStart = Date.now();
+      try {
+        const served = yield* tryStreamProvider(
+          provider,
+          messages,
+          attemptStart,
+        );
+        if (served) {
+          ttfbMs = served.ttfbMs;
+          const totalMs = Date.now() - t0;
+          console.log(
+            `[ai.router.stream] lane=${lane} provider=${served.providerLabel}` +
+              ` intent=${intent} retry=${i} ttfb_ms=${ttfbMs}` +
+              ` total_ms=${totalMs}` +
+              (errors.length ? ` skipped=${errors.join(";")}` : ""),
+          );
+          yield {
+            type: "end",
+            provider: provider as ProviderName,
+            lane,
+            intent,
+            reply: served.reply,
+            fallback: 0,
+            ttfbMs,
+            totalMs,
+          };
+          return;
+        }
+        errors.push(`${provider}#${i}: no first chunk`);
+      } catch (e) {
+        errors.push(
+          `${provider}#${i}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+  }
+
+  /* All providers failed → emit synthetic as a single delta so the
+     UI still progresses, then end. */
+  console.error(
+    `[ai.router.stream] lane=${lane} all providers failed:`,
+    errors.join(" | "),
+  );
+  const synthetic = generateFallbackAnswer(last, req.context?.userLang);
+  yield { type: "delta", text: synthetic };
+  yield {
+    type: "end",
+    provider: "fallback",
+    lane,
+    intent,
+    reply: synthetic,
+    fallback: 1,
+    ttfbMs: null,
+    totalMs: Date.now() - t0,
+  };
+}
+
+/** Try one provider with one prompt. Opens its stream, races the
+ *  first chunk against TTFB_BUDGET_MS. If the first chunk arrives in
+ *  time, yields all deltas and returns `{reply, providerLabel, ttfbMs}`
+ *  on completion. If the first chunk never arrives in time (or the
+ *  provider errors before then), aborts and returns null so the
+ *  caller moves to the next attempt. */
+async function* tryStreamProvider(
+  provider: "groq" | "deepseek" | "gemini",
+  messages: AiMessage[],
+  attemptStart: number,
+): AsyncGenerator<
+  RouteStreamDelta,
+  { reply: string; providerLabel: string; ttfbMs: number } | null
+> {
+  /* Gemini has no streaming wrapper — fall back to a single-shot
+     call and synthesise a one-chunk stream so the lane contract
+     (always streams) holds. */
+  if (provider === "gemini") {
+    const timed = await Promise.race([
+      geminiChat(messages),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), TTFB_BUDGET_MS + 20_000),
+      ),
+    ]);
+    if (!timed) return null;
+    const ttfbMs = Date.now() - attemptStart;
+    yield { type: "delta", text: timed.reply };
+    return { reply: timed.reply, providerLabel: timed.provider, ttfbMs };
+  }
+
+  const gen = provider === "groq"
+    ? groqChatStream(messages)
+    : deepseekChatStream(messages);
+
+  /* Race the first chunk against TTFB_BUDGET_MS. If the generator
+     emits a delta in time, commit; otherwise abort and return null. */
+  let gotFirst = false;
+  let ttfbMs = 0;
+  let assembled = "";
+  let providerLabel = provider;
+
+  const firstResult = await Promise.race([
+    gen.next(),
+    new Promise<IteratorResult<StreamChunk>>((resolve) =>
+      setTimeout(
+        () =>
+          resolve({
+            value: { type: "error", error: "ttfb_timeout" } as StreamChunk,
+            done: false,
+          }),
+        TTFB_BUDGET_MS,
+      ),
+    ),
+  ]);
+
+  if (firstResult.done) return null;
+  const firstChunk = firstResult.value;
+  if (firstChunk.type === "error") {
+    /* Ensure the underlying stream is cleaned up. */
+    try { await gen.return?.(undefined); } catch { /* noop */ }
+    return null;
+  }
+  if (firstChunk.type === "delta" && firstChunk.text) {
+    gotFirst = true;
+    ttfbMs = Date.now() - attemptStart;
+    assembled += firstChunk.text;
+    yield { type: "delta", text: firstChunk.text };
+  }
+  if (firstChunk.type === "done") {
+    /* Empty stream — treat as failure, retry next. */
+    return null;
+  }
+
+  /* Drain the rest. Each subsequent chunk is yielded to the caller
+     unchanged. `done` delivers the cleaned full reply for telemetry
+     / post-processing; we prefer that over our accumulated `assembled`
+     because providers may strip thinking tags at close. */
+  while (true) {
+    const { value, done } = await gen.next();
+    if (done) break;
+    if (value.type === "delta" && value.text) {
+      assembled += value.text;
+      yield { type: "delta", text: value.text };
+    } else if (value.type === "done") {
+      if (value.provider) providerLabel = value.provider as typeof provider;
+      return {
+        reply: value.text ?? assembled,
+        providerLabel,
+        ttfbMs,
+      };
+    } else if (value.type === "error") {
+      /* Mid-stream error: return what we have so the caller can
+         decide (chat route will seal + persist if gotFirst). */
+      break;
+    }
+  }
+
+  if (!gotFirst) return null;
+  return { reply: assembled, providerLabel, ttfbMs };
 }
 
 // errorResponse helper is retained but no longer used at runtime —
