@@ -272,29 +272,99 @@ export default function FloatingPanel() {
       ];
 
       try {
+        /* Streaming fetch (Phase 2). The server emits SSE events:
+             start | delta | end
+           We append a placeholder AI bubble, mutate it as deltas
+           arrive, then replace its text with the canonical sealed
+           `end.reply` at stream close. Voice-originated turns speak
+           only the final sealed reply (NOT mid-stream deltas) so
+           TTS can't say pricing that the server later redacted. */
         const res = await fetch("/api/ai/chat", {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: wireMessages, user_lang: uiLang }),
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({
+            messages: wireMessages,
+            user_lang: uiLang,
+            stream: true,
+          }),
         });
-        const json = (await res.json()) as
-          | { reply: string; provider: string }
-          | { error: string; message?: string };
-        if (!res.ok || "error" in json) {
-          const errObj = json as { error?: string; message?: string };
-          const msg = errObj.message || errObj.error || "AI is unavailable right now.";
+
+        if (!res.ok || !res.body) {
+          const msg = `AI is unavailable right now. (${res.status})`;
           setAiMessages(prev => [...prev, { role: "ai", text: msg }]);
-          /* Spec: never speak anything when the reply path failed. */
           return;
         }
-        const { reply } = json as { reply: string };
-        setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
-        /* Only speak on the voice-originated path. Typed chat stays
-           silent so we don't surprise users with audio. */
-        if (viaVoice) {
+
+        /* Insert placeholder assistant bubble so deltas visibly
+           stream. Track its index for in-place mutation. */
+        let bubbleIndex = -1;
+        setAiMessages(prev => {
+          bubbleIndex = prev.length;
+          return [...prev, { role: "ai", text: "" }];
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let accumulated = "";
+        let finalReply = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const events = buf.split("\n\n");
+          buf = events.pop() ?? "";
+          for (const ev of events) {
+            for (const line of ev.split("\n")) {
+              if (!line.startsWith("data:")) continue;
+              const payload = line.slice(5).trim();
+              if (!payload) continue;
+              try {
+                const json = JSON.parse(payload) as
+                  | { type: "start" }
+                  | { type: "delta"; text: string }
+                  | { type: "end"; reply: string }
+                  | { type: "error"; message?: string };
+                if (json.type === "delta") {
+                  accumulated += json.text;
+                  setAiMessages(prev => {
+                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
+                    const next = prev.slice();
+                    next[bubbleIndex] = { role: "ai", text: accumulated };
+                    return next;
+                  });
+                } else if (json.type === "end") {
+                  finalReply = json.reply;
+                  setAiMessages(prev => {
+                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
+                    const next = prev.slice();
+                    next[bubbleIndex] = { role: "ai", text: finalReply };
+                    return next;
+                  });
+                } else if (json.type === "error") {
+                  const msg = json.message || "AI is unavailable right now.";
+                  setAiMessages(prev => {
+                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
+                    const next = prev.slice();
+                    next[bubbleIndex] = { role: "ai", text: msg };
+                    return next;
+                  });
+                }
+              } catch {
+                /* Malformed frame — skip, keep streaming. */
+              }
+            }
+          }
+        }
+
+        const spokenText = finalReply || accumulated;
+        if (viaVoice && spokenText) {
           setAiSpeaking(true);
-          ttsHandleRef.current = speakText(reply, {
+          ttsHandleRef.current = speakText(spokenText, {
             lang: uiLang,
             onEnd: () => {
               ttsHandleRef.current = null;

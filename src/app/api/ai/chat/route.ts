@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
-import { routeAi } from "@/lib/server/ai/router";
+import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
 import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
 
 /* ---------------------------------------------------------------------------
@@ -137,6 +137,7 @@ export async function POST(req: Request) {
   const body = (await req.json()) as {
     messages?: ChatMessage[];
     user_lang?: "en" | "zh" | "ar";
+    stream?: boolean;
   };
   const msgs = body.messages ?? [];
   if (!Array.isArray(msgs) || msgs.length === 0) {
@@ -145,6 +146,8 @@ export async function POST(req: Request) {
 
   const lastUser = String(msgs[msgs.length - 1]?.content ?? "");
   const userLang = body.user_lang;
+  const wantsStream =
+    body.stream === true || req.headers.get("accept") === "text/event-stream";
 
   /* Fast-path: short canned reply, no router call. Covers greetings,
      identity, thanks, etc. across EN/AR/ZH. Cuts latency on these
@@ -168,6 +171,105 @@ export async function POST(req: Request) {
        replaced with PRICING_GUARD_MESSAGE. */
     const safeFast = sealPricingSafety(fast, []);
     return NextResponse.json({ reply: safeFast, provider: "fast-path" });
+  }
+
+  /* ─── Streaming branch (Phase 2) ─────────────────────────────────
+     SSE response. Lane is decided by the router (FAST for chat/unknown,
+     SMART for knowledge/business-in-chat). Events:
+       · start — lane/intent/prompt size (for UI badges)
+       · delta — a token chunk (append to assistant bubble)
+       · end   — canonical sealed reply + provider + timings
+     The client MUST replace its accumulated deltas with `end.reply`
+     so the post-hoc pricing guard wins over streamed raw tokens. */
+  if (wantsStream) {
+    const clampedUser = clamp(lastUser, MAX_MESSAGE_CHARS);
+    const encoder = new TextEncoder();
+    const send = (obj: unknown) =>
+      encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const tStreamStart = Date.now();
+        let ttfbMs: number | null = null;
+        let rawReply = "";
+        let providerName = "fallback";
+        let lane = "FAST";
+        let intent = "unknown";
+        let fallback: 0 | 1 = 1;
+        try {
+          for await (const ev of streamRouteAi({
+            messages: [{ role: "user", content: clampedUser }],
+            context: { userLang },
+          })) {
+            if (ev.type === "start") {
+              lane = ev.lane;
+              intent = ev.intent;
+              controller.enqueue(send(ev));
+            } else if (ev.type === "delta") {
+              if (ttfbMs === null) ttfbMs = Date.now() - tStreamStart;
+              rawReply += ev.text;
+              controller.enqueue(send(ev));
+            } else if (ev.type === "end") {
+              providerName = ev.provider;
+              fallback = ev.fallback;
+              /* Post-hoc pricing seal on the canonical reply. Chat mode
+                 has no tool evidence so any pricing-like text is
+                 replaced with PRICING_GUARD_MESSAGE before the UI ever
+                 persists the final text. */
+              const sealed = sealPricingSafety(ev.reply, []);
+              if (sealed !== ev.reply) {
+                console.warn(
+                  `[ai.chat.pricing-guard] replaced hallucinated pricing lane=${lane}`,
+                );
+              }
+              controller.enqueue(
+                send({
+                  type: "end",
+                  provider: ev.provider,
+                  lane: ev.lane,
+                  intent: ev.intent,
+                  reply: sealed,
+                  fallback: ev.fallback,
+                  ttfb_ms: ev.ttfbMs,
+                  total_ms: ev.totalMs,
+                }),
+              );
+              rawReply = sealed;
+            }
+          }
+        } catch (e) {
+          controller.enqueue(
+            send({
+              type: "error",
+              message: e instanceof Error ? e.message : String(e),
+            }),
+          );
+        } finally {
+          const tEnd = Date.now();
+          /* Unified per-request log (Phase 2). lane, ttfb, prompt size,
+             fallback flag — everything ops needs in one grep prefix. */
+          const laneLabel =
+            lane === "SMART" ? "smart" : lane === "FAST" ? "fast" : "protected";
+          console.log(
+            `[ai] lane=${laneLabel} ep=chat provider=${providerName}` +
+              ` intent=${intent} fallback=${fallback}` +
+              ` in_bytes=${lastUser.length} hist=0` +
+              ` ttfb_ms=${ttfbMs ?? "-"} ms=${tEnd - t0}` +
+              ` stream=1 reply_bytes=${rawReply.length}`,
+          );
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
   }
 
   /* Delegate to the hybrid router. It classifies intent from the last

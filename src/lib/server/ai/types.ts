@@ -15,6 +15,21 @@ export type TaskMode = "chat" | "business";
  *  routing rule; metadata still reports the original `unknown`. */
 export type TaskIntent = "chat" | "business" | "knowledge" | "unknown";
 
+/** Explicit 3-lane architecture (Phase 2). Every AI request belongs
+ *  to exactly one lane; the lane decides provider, prompt shape, and
+ *  fallback behaviour.
+ *
+ *    FAST       Chat / unknown. Groq 8B only, minimal prompt, no
+ *               heavy reasoning. Target: sub-1s first token.
+ *    SMART      Knowledge / reasoning / explanation / chat-mode
+ *               business reasoning. DeepSeek primary, Gemini
+ *               fallback. Target: depth over speed.
+ *    PROTECTED  Tool-loop agent at /api/ai/agent. Owns tools, DB,
+ *               permissions, pricing guards. The chat-route router
+ *               never produces PROTECTED — that lane is served
+ *               exclusively by the orchestrator. */
+export type Lane = "FAST" | "SMART" | "PROTECTED";
+
 /** Provider id exposed to clients (UI badge + telemetry). */
 export type ProviderName = "groq" | "deepseek" | "gemini" | "fallback";
 

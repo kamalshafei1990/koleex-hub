@@ -147,3 +147,105 @@ export async function groqTranslate(input: TranslateInput): Promise<TranslateRes
  *  voice) can report it in logs / provider badges without re-reading
  *  the env var. Not used today. */
 export const GROQ_MODEL_ID = GROQ_CHAT_MODEL;
+
+/* ─── Streaming chat (Phase 2) ──────────────────────────────────
+   OpenAI-compatible SSE. Groq's completions endpoint supports
+   stream:true — we parse `data: ...` frames line-by-line and yield
+   each delta. On completion we emit one final "done" chunk with the
+   full concatenated reply so callers can post-process (pricing
+   guard, persistence) in one place.
+
+   Failure modes mirror the non-streaming path: network/HTTP error
+   before the stream opens → yields {type:"error"} and returns.
+   A mid-stream abort returns whatever was collected so far (caller
+   decides whether to discard or accept a partial). */
+export interface StreamChunk {
+  type: "delta" | "done" | "error";
+  text?: string;
+  provider?: string;
+  error?: string;
+}
+
+export async function* groqChatStream(
+  messages: ChatMessage[],
+  opts: { maxTokens?: number; temperature?: number } = {},
+): AsyncGenerator<StreamChunk> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) {
+    yield { type: "error", error: "GROQ_API_KEY not configured" };
+    return;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_CHAT_MODEL,
+        messages,
+        stream: true,
+        temperature: opts.temperature ?? 0.3,
+        max_tokens: opts.maxTokens ?? 512,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    lastGroqError = `Groq network error: ${msg}`;
+    yield { type: "error", error: msg };
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    const bodyText = await res.text().catch(() => "");
+    console.error("[ai.groq.stream]", res.status, bodyText);
+    lastGroqError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
+    yield { type: "error", error: lastGroqError };
+    return;
+  }
+
+  /* OpenAI-compatible SSE: each event is `data: <json>\n\n`, final
+     event is `data: [DONE]\n\n`. Buffer across reads to handle
+     chunk boundaries that split a single event. */
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let full = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop() ?? "";
+    for (const ev of events) {
+      for (const line of ev.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+          };
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length > 0) {
+            full += delta;
+            yield { type: "delta", text: delta };
+          }
+        } catch {
+          /* Malformed JSON in one frame — skip it, keep streaming. */
+        }
+      }
+    }
+  }
+
+  const cleaned = stripThinking(full);
+  lastGroqError = null;
+  yield {
+    type: "done",
+    text: cleaned,
+    provider: `groq:${GROQ_CHAT_MODEL}`,
+  };
+}
