@@ -196,6 +196,11 @@ export async function POST(req: Request) {
         let lane = "FAST";
         let intent = "unknown";
         let fallback: 0 | 1 = 1;
+        /* Phase 3 preprocessor fields — captured from the `start`
+           event and reported on the unified [ai] log line. */
+        let ppIntent = "unknown";
+        let normBytes = clampedUser.length;
+        let rewrote = 0;
         try {
           for await (const ev of streamRouteAi({
             messages: [{ role: "user", content: clampedUser }],
@@ -204,6 +209,9 @@ export async function POST(req: Request) {
             if (ev.type === "start") {
               lane = ev.lane;
               intent = ev.intent;
+              ppIntent = ev.ppIntent;
+              normBytes = ev.normalizedQuery.length;
+              rewrote = ev.rewrote ? 1 : 0;
               controller.enqueue(send(ev));
             } else if (ev.type === "delta") {
               if (ttfbMs === null) ttfbMs = Date.now() - tStreamStart;
@@ -252,8 +260,9 @@ export async function POST(req: Request) {
             lane === "SMART" ? "smart" : lane === "FAST" ? "fast" : "protected";
           console.log(
             `[ai] lane=${laneLabel} ep=chat provider=${providerName}` +
-              ` intent=${intent} fallback=${fallback}` +
-              ` in_bytes=${lastUser.length} hist=0` +
+              ` intent=${intent} pp_intent=${ppIntent}` +
+              ` rewrote=${rewrote} fallback=${fallback}` +
+              ` in_bytes=${lastUser.length} norm_bytes=${normBytes} hist=0` +
               ` ttfb_ms=${ttfbMs ?? "-"} ms=${tEnd - t0}` +
               ` stream=1 reply_bytes=${rawReply.length}`,
           );

@@ -30,6 +30,7 @@ import {
   buildFastPrompt,
   buildSmartPrompt,
 } from "./prompt-builder";
+import { preprocessUserQuery, type PreprocessResult } from "./preprocess";
 import {
   groqChat,
   groqChatStream,
@@ -237,27 +238,58 @@ export function providersForLane(lane: Lane): Array<"groq" | "deepseek" | "gemin
  *  SMART gets the <4KB reasoning prompt; PROTECTED/business force
  *  uses the existing commercial prompt.
  *
- *  Returns `{full, slim}` so the router can retry a failed provider
- *  with a reduced prompt before moving to the next one. */
+ *  Returns `{full, slim, minimal}` so the router can retry a failed
+ *  provider three ways before moving to the next one:
+ *    · full    — lane's primary prompt
+ *    · slim    — the FAST prompt (lane-neutral, ~1.2KB)
+ *    · minimal — single-sentence system + user query only (~80 B)
+ *
+ *  The minimal attempt is the last-ditch try before a provider swap;
+ *  every model can handle "answer concisely in X. <question>" even
+ *  when a fuller prompt was what triggered the failure. */
 export function buildLanePrompt(
   lane: Lane,
   userMessage: string,
   ctx: AiRequest["context"] = {},
   forceMode?: TaskMode,
-): { full: AiMessage[]; slim: AiMessage[] } {
+): { full: AiMessage[]; slim: AiMessage[]; minimal: AiMessage[] } {
+  const minimal = buildMinimalAttempt(userMessage, ctx);
   if (forceMode === "business") {
     const full = buildBusinessPrompt(userMessage, ctx);
-    return { full, slim: buildFastPrompt(userMessage, ctx) };
+    return { full, slim: buildFastPrompt(userMessage, ctx), minimal };
   }
   if (lane === "SMART") {
     return {
       full: buildSmartPrompt(userMessage, ctx),
       slim: buildFastPrompt(userMessage, ctx),
+      minimal,
     };
   }
-  /* FAST */
+  /* FAST — full === slim (no middle tier); retry jumps straight to minimal. */
   const fast = buildFastPrompt(userMessage, ctx);
-  return { full: fast, slim: fast };
+  return { full: fast, slim: fast, minimal };
+}
+
+/** Minimal last-ditch prompt. Used as the 3rd retry attempt before
+ *  swapping providers. Target size: ~80 bytes. Deliberately
+ *  content-free — just enough to anchor language + tone. */
+function buildMinimalAttempt(
+  userMessage: string,
+  ctx: AiRequest["context"] = {},
+): AiMessage[] {
+  const lang =
+    ctx.userLang === "ar"
+      ? "Arabic"
+      : ctx.userLang === "zh"
+      ? "Chinese"
+      : "English";
+  return [
+    {
+      role: "system",
+      content: `Answer the user helpfully in ${lang}. Be concise.`,
+    },
+    { role: "user", content: userMessage },
+  ];
 }
 
 /* ─── Provider dispatch (STEP 4) ─────────────────────────────── */
@@ -303,12 +335,20 @@ function callersForLane(lane: Lane): ProviderStep[] {
   });
 }
 
-/** Synthetic last-resort answer when every provider fails. Brief
- *  intent sniff so common turns (greetings, thanks) get a natural
- *  reply even during an outage. Everything else gets a short
- *  "please try again" — the system NEVER returns an empty or
- *  error-looking response. */
-function generateFallbackAnswer(userMsg: string, userLang?: "en" | "zh" | "ar"): string {
+/** Synthetic last-resort answer when every provider fails across
+ *  every retry. Intent-aware (Phase 3): the preprocessor's intent
+ *  bucket drives which helpful message gets served so a definition
+ *  question gets a definition-shaped fallback, a translation
+ *  question gets a translation-shaped fallback, etc.
+ *
+ *  NEVER returns a generic "I couldn't complete that request". The
+ *  system ALWAYS gives the user either a concrete next step or an
+ *  explanation of what failed. */
+function generateFallbackAnswer(
+  userMsg: string,
+  userLang?: "en" | "zh" | "ar",
+  ppIntent?: import("./preprocess").QueryIntent,
+): string {
   const m = (userMsg ?? "").trim().toLowerCase();
   const lang = userLang ?? "en";
 
@@ -328,19 +368,47 @@ function generateFallbackAnswer(userMsg: string, userLang?: "en" | "zh" | "ar"):
     return lang === "ar" ? "العفو." : lang === "zh" ? "不客气。" : "You're welcome.";
   }
 
-  if (/\btranslat/i.test(m)) {
+  /* Intent-aware fallbacks. Each one names what the user asked for
+     and suggests a specific next step — never a generic apology. */
+  if (ppIntent === "translation" || /\btranslat/i.test(m)) {
     return lang === "ar"
-      ? "لا أستطيع معالجة الترجمة الآن. يُرجى إعادة المحاولة خلال لحظات."
+      ? "لا أستطيع معالجة الترجمة الآن — هناك مشكلة مؤقتة في الاتصال بمزود الذكاء الاصطناعي. جرّب مرة أخرى خلال لحظات."
       : lang === "zh"
-      ? "我暂时无法处理翻译请求,请稍后再试。"
-      : "I can't process a translation right now. Please try again in a moment.";
+      ? "我暂时无法处理翻译请求 — AI 服务暂时出现问题,请稍后再试。"
+      : "I can't process a translation right now — the AI provider is temporarily unreachable. Please try again in a moment.";
   }
 
+  if (ppIntent === "definition") {
+    return lang === "ar"
+      ? "كنت سأشرح لك المصطلح بالتفصيل، لكن خدمة الذكاء الاصطناعي غير متاحة حاليًا. جرّب مرة أخرى خلال لحظات، أو اطرح السؤال بصيغة أبسط."
+      : lang === "zh"
+      ? "本来可以详细解释这个术语,但 AI 服务暂时不可用。请稍后再试,或换一种更简单的问法。"
+      : "I'd normally walk you through the meaning of that term, but the AI service is temporarily unavailable. Please try again in a moment, or ask it in a shorter form.";
+  }
+
+  if (ppIntent === "explanation") {
+    return lang === "ar"
+      ? "أردت أن أشرح لك كيف يعمل ذلك، لكن الخدمة غير متاحة مؤقتًا. جرّب مرة أخرى خلال لحظات، أو قسّم السؤال إلى خطوة واحدة."
+      : lang === "zh"
+      ? "我本想解释它的运作方式,但服务暂时不可用。请稍后再试,或把问题拆成一步来问。"
+      : "I'd normally walk you through how that works, but the service is temporarily unavailable. Please try again in a moment, or ask about it one step at a time.";
+  }
+
+  if (ppIntent === "business") {
+    return lang === "ar"
+      ? "هذا سؤال تجاري يحتاج حسابًا دقيقًا، ولن أستطيع الرد الآن بسبب مشكلة مؤقتة في النظام. لأي أرقام حقيقية، افتح تطبيق Koleex المناسب (تسعير، عروض أسعار، فواتير) — لن أختلق أي قيم."
+      : lang === "zh"
+      ? "这是一个需要精确计算的业务问题,但系统暂时无法响应。需要真实数据时,请打开对应的 Koleex 应用(定价、报价、发票)— 我不会编造数字。"
+      : "That's a commercial question that needs precise numbers, and I can't reach my systems right now. For any actual figures, please open the relevant Koleex app (Pricing, Quotations, Invoices) — I won't invent any values.";
+  }
+
+  /* Knowledge / chat / unknown — a concrete "try again or rephrase"
+     still beats a generic apology. */
   return lang === "ar"
-    ? "أواجه مشكلة مؤقتة في الوصول إلى نظامي. هل يمكنك المحاولة مرة أخرى بعد لحظات أو إعادة صياغة السؤال؟"
+    ? "أواجه مشكلة مؤقتة في الوصول إلى نظامي. حاول مرة أخرى خلال لحظات، أو أعد صياغة السؤال بشكل أبسط."
     : lang === "zh"
-    ? "我的系统暂时有些问题。请稍后再试,或换一种方式问我。"
-    : "I'm having a bit of trouble reaching my systems right now. Could you try again in a moment, or rephrase your question?";
+    ? "我暂时无法连接到系统。请稍后再试,或换一种更简单的方式问我。"
+    : "I'm temporarily unable to reach my systems. Please try again in a moment, or rephrase your question in simpler terms.";
 }
 
 /** Route a request to the correct provider and return a stable
@@ -363,7 +431,17 @@ function generateFallbackAnswer(userMsg: string, userLang?: "en" | "zh" | "ar"):
  *  whichever provider's text comes back. */
 export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const t0 = Date.now();
-  const last = req.messages[req.messages.length - 1]?.content ?? "";
+  const rawLast = req.messages[req.messages.length - 1]?.content ?? "";
+
+  /* Phase 3: preprocess the user query BEFORE classification and
+     model call. Fixes common broken-English grammar ("whats mean by
+     X" → "what does X mean?"), normalises whitespace/punctuation,
+     and tags a lightweight intent bucket for logging. The UI keeps
+     showing the user's original text — only the model-facing path
+     sees the normalised version. */
+  const pp: PreprocessResult = preprocessUserQuery(rawLast);
+  const last = pp.normalizedQuery || rawLast;
+
   const intent: TaskIntent = req.forceMode
     ? req.forceMode === "business"
       ? "business"
@@ -372,16 +450,13 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
 
-  /* Lane-aware prompt. {full, slim} is used by the intelligent-retry
-     path below — the first attempt at each provider uses `full`, a
-     failed attempt retries with `slim` (the minimal FAST prompt) on
-     the same provider before moving to the next one. */
-  const { full, slim } = buildLanePrompt(lane, last, req.context ?? {}, req.forceMode);
+  const { full, slim, minimal } = buildLanePrompt(
+    lane,
+    last,
+    req.context ?? {},
+    req.forceMode,
+  );
 
-  /* Oversized-prompt regression detector. Chat-path prompts should
-     stay well under 16KB — if a future edit to prompt-builder pushes
-     the system prompt past that threshold we want a warn line, not a
-     silent latency / 413 regression. */
   const promptBytes = full.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   if (promptBytes > 16_000) {
     console.warn(
@@ -392,6 +467,18 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const timeoutFor = (name: "groq" | "deepseek" | "gemini"): number =>
     name === "groq" ? 12_000 : 25_000;
 
+  /* Phase 3 retry ladder (per provider, in order):
+       0 — full    lane's primary prompt
+       1 — slim    FAST prompt regardless of lane
+       2 — minimal single-line system + user query (~80 B)
+     Only after all three attempts fail do we move to the next
+     provider in the lane. For FAST lane full === slim so the
+     ladder collapses to [full, minimal]. */
+  const buildAttempts = (): AiMessage[][] => {
+    if (full === slim) return [full, minimal];
+    return [full, slim, minimal];
+  };
+
   const errors: string[] = [];
   const chain = callersForLane(lane);
   for (const [name, call, lastErr] of chain) {
@@ -400,13 +487,8 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
       continue;
     }
 
-    /* Intelligent retry: try full prompt, then slim prompt, before
-       giving up on this provider and moving to the next one in the
-       lane. For FAST lane full === slim so this collapses to one
-       attempt. */
-    const attempts: AiMessage[][] = full === slim ? [full] : [full, slim];
-    let served = false;
-    for (let i = 0; i < attempts.length && !served; i++) {
+    const attempts = buildAttempts();
+    for (let i = 0; i < attempts.length; i++) {
       const messages = attempts[i];
       try {
         const budget = timeoutFor(name);
@@ -425,6 +507,7 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
           const fellBack = chain[0]?.[0] !== name;
           console.log(
             `[ai.router] lane=${lane} provider=${name} intent=${intent}` +
+              ` pp_intent=${pp.intent} rewrote=${pp.rewrote ? 1 : 0}` +
               ` fallback=${fellBack ? 1 : 0} retry=${i} ms=${Date.now() - t0}` +
               (errors.length ? ` skipped=${errors.join(";")}` : ""),
           );
@@ -445,10 +528,14 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   }
 
   console.error(
-    `[ai.router] lane=${lane} all providers failed:`,
+    `[ai.router] lane=${lane} pp_intent=${pp.intent} all providers failed:`,
     errors.join(" | "),
   );
-  const synthetic = generateFallbackAnswer(last, req.context?.userLang);
+  const synthetic = generateFallbackAnswer(
+    last,
+    req.context?.userLang,
+    pp.intent,
+  );
   return {
     provider: "fallback" as ProviderName,
     mode,
@@ -462,13 +549,18 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
 /* ─── Streaming (Phase 2) ──────────────────────────────────────── */
 
 /** Metadata yielded at the start of every stream. The client uses
- *  this to show lane/provider badges while tokens arrive. */
+ *  this to show lane/provider badges while tokens arrive. Phase 3
+ *  adds preprocess output so the UI can show "normalised" hints. */
 export interface RouteStreamStart {
   type: "start";
   lane: Lane;
   intent: TaskIntent;
   mode: TaskMode;
   promptBytes: number;
+  originalQuery: string;
+  normalizedQuery: string;
+  ppIntent: import("./preprocess").QueryIntent;
+  rewrote: boolean;
 }
 
 /** Final event at the end of a stream. `reply` is the full text the
@@ -520,7 +612,14 @@ export async function* streamRouteAi(
   req: AiRequest,
 ): AsyncGenerator<RouteStreamEvent> {
   const t0 = Date.now();
-  const last = req.messages[req.messages.length - 1]?.content ?? "";
+  const rawLast = req.messages[req.messages.length - 1]?.content ?? "";
+
+  /* Phase 3 preprocessing — same rules as routeAi(). See that function
+     for rationale. Downstream code uses `last` (normalised); we surface
+     both values in the `start` event + final log for observability. */
+  const pp: PreprocessResult = preprocessUserQuery(rawLast);
+  const last = pp.normalizedQuery || rawLast;
+
   const intent: TaskIntent = req.forceMode
     ? req.forceMode === "business"
       ? "business"
@@ -528,7 +627,7 @@ export async function* streamRouteAi(
     : classifyIntent(last);
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
-  const { full, slim } = buildLanePrompt(
+  const { full, slim, minimal } = buildLanePrompt(
     lane,
     last,
     req.context ?? {},
@@ -542,11 +641,26 @@ export async function* streamRouteAi(
     );
   }
 
-  yield { type: "start", lane, intent, mode, promptBytes };
+  yield {
+    type: "start",
+    lane,
+    intent,
+    mode,
+    promptBytes,
+    originalQuery: pp.originalQuery,
+    normalizedQuery: pp.normalizedQuery,
+    ppIntent: pp.intent,
+    rewrote: pp.rewrote,
+  };
 
   const providers = providersForLane(lane);
   const errors: string[] = [];
   let ttfbMs: number | null = null;
+
+  /* 3-tier retry ladder (see routeAi for details). FAST collapses
+     [full, slim, minimal] to [full, minimal]. */
+  const attemptsForLane: AiMessage[][] =
+    full === slim ? [full, minimal] : [full, slim, minimal];
 
   for (const provider of providers) {
     if (provider === "deepseek" && !isDeepseekEnabled()) {
@@ -554,7 +668,7 @@ export async function* streamRouteAi(
       continue;
     }
 
-    const attempts: AiMessage[][] = full === slim ? [full] : [full, slim];
+    const attempts = attemptsForLane;
     for (let i = 0; i < attempts.length; i++) {
       const messages = attempts[i];
       const attemptStart = Date.now();
@@ -569,7 +683,8 @@ export async function* streamRouteAi(
           const totalMs = Date.now() - t0;
           console.log(
             `[ai.router.stream] lane=${lane} provider=${served.providerLabel}` +
-              ` intent=${intent} retry=${i} ttfb_ms=${ttfbMs}` +
+              ` intent=${intent} pp_intent=${pp.intent}` +
+              ` rewrote=${pp.rewrote ? 1 : 0} retry=${i} ttfb_ms=${ttfbMs}` +
               ` total_ms=${totalMs}` +
               (errors.length ? ` skipped=${errors.join(";")}` : ""),
           );
@@ -595,12 +710,18 @@ export async function* streamRouteAi(
   }
 
   /* All providers failed → emit synthetic as a single delta so the
-     UI still progresses, then end. */
+     UI still progresses, then end. Synthetic is intent-aware (Phase 3)
+     so a definition / translation / business question gets a fallback
+     that names what they asked about. */
   console.error(
-    `[ai.router.stream] lane=${lane} all providers failed:`,
+    `[ai.router.stream] lane=${lane} pp_intent=${pp.intent} all providers failed:`,
     errors.join(" | "),
   );
-  const synthetic = generateFallbackAnswer(last, req.context?.userLang);
+  const synthetic = generateFallbackAnswer(
+    last,
+    req.context?.userLang,
+    pp.intent,
+  );
   yield { type: "delta", text: synthetic };
   yield {
     type: "end",
