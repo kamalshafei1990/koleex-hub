@@ -13,7 +13,7 @@ export type TaskMode = "chat" | "business";
  *  difference between a confident "this is chat" and a fallback
  *  assumption. The router maps `unknown` → chat (Groq) per the
  *  routing rule; metadata still reports the original `unknown`. */
-export type TaskIntent = "chat" | "business" | "unknown";
+export type TaskIntent = "chat" | "business" | "knowledge" | "unknown";
 
 /** Provider id exposed to clients (UI badge + telemetry). */
 export type ProviderName = "groq" | "deepseek" | "gemini" | "fallback";

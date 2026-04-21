@@ -99,21 +99,75 @@ const BUSINESS_PATTERNS: RegExp[] = [
   /报价|价格|成本|发票|折扣|利润|佣金|多少钱|计算|商业/,
 ];
 
+/** Knowledge-intent patterns — general reasoning / explanation /
+ *  learning / translation questions. These benefit from DeepSeek's
+ *  deeper reasoning over Groq's speed. Ordered AFTER business (so
+ *  commercial-specific phrasings win) and AFTER chat-system-info
+ *  lookups (so "list products" stays fast-chat).
+ *
+ *  Narrow patterns — we don't catch bare "why" or "how" without
+ *  context to avoid sending small talk here. */
+const KNOWLEDGE_PATTERNS: RegExp[] = [
+  // English — explanation verbs
+  /^(please\s+)?explain\b/i,
+  /^(please\s+)?define\b/i,
+  /\bmeaning\s+of\b/i,
+  /\bwhat\s+does\s+.+\s+mean\b/i,
+
+  // "what is / what are" — generic conceptual questions. Excludes
+  // identity questions (already in chat) and Koleex-data questions
+  // (already in chat via "what products/customers" etc.) because
+  // those are caught in CHAT_PATTERNS before knowledge.
+  /^what\s+(is|are|was|were)\s+(?!your\b|you\b|koleex\b)/i,
+
+  // "how does X work", "how do I X", "how to X"
+  /^how\s+(does|do\s+i|to)\b/i,
+
+  // Translation / language learning
+  /\btranslate\b/i,
+  /^(teach|help)\s+me\s+(learn|with)\b/i,
+  /^learn\s+(about|how|to)\b/i,
+  /\bhow\s+do\s+you\s+say\b/i,
+
+  // Factual / historical
+  /^why\s+(does|is|do|are|was|were)\b/i,
+  /^when\s+(did|was|were)\b/i,
+  /^where\s+(is|are|was|were)\s+(?!you\b|koleex\b)/i,
+
+  // Arabic equivalents
+  /\bاشرح\b|\bاشرحي\b/,          // explain
+  /\bما\s+معنى\b/,                // what is the meaning of
+  /\bما\s+هو\s+(?!اسمك)/,        // what is X (not "what is your name")
+  /\bترجم\b/,                     // translate
+
+  // Chinese equivalents
+  /解释一下|解释下/,               // explain
+  /什么是/,                        // what is
+  /翻译/,                          // translate
+  /如何/,                          // how
+];
+
 export function classifyIntent(message: string): TaskIntent {
   const m = String(message ?? "").trim();
   if (!m) return "chat";
   if (m.length <= 2) return "chat";
 
-  /* Business wins when both match — so greetings followed by a real
-     business phrase ("hi, make me a quote for 10 units") route
-     correctly. Chat patterns are looser now (greeting can have
-     trailing words) which is only safe with this order. */
+  /* Order matters:
+     1. Business — most specific (commercial artefacts + quantity × commodity).
+     2. Chat — greetings, identity, system-info lookups (specific
+        Koleex data questions stay fast).
+     3. Knowledge — general reasoning / explanation / translation
+        (broader patterns, prefer DeepSeek).
+     4. Unknown — nothing matched. */
   for (const p of BUSINESS_PATTERNS) if (p.test(m)) return "business";
   for (const p of CHAT_PATTERNS) if (p.test(m)) return "chat";
+  for (const p of KNOWLEDGE_PATTERNS) if (p.test(m)) return "knowledge";
   return "unknown";
 }
 
-/** Spec: `unknown` falls back to chat (Groq). */
+/** Both "chat" and "knowledge" use the chat prompt (general-purpose
+ *  assistant tone). They differ only in which provider we try first,
+ *  not in how we prompt the model. Business uses its own prompt. */
 export function modeFor(intent: TaskIntent): TaskMode {
   return intent === "business" ? "business" : "chat";
 }
@@ -171,18 +225,19 @@ type ProviderStep = [
   lastError?: () => string | null,
 ];
 
-function chainFor(mode: TaskMode): ProviderStep[] {
-  /* Business → DeepSeek first (best for commercial reasoning), then
-     Groq, then Gemini. DeepSeek is still gated behind isDeepseekEnabled
-     — if disabled, skip it automatically via the null-guard below. */
-  if (mode === "business") {
+function chainFor(mode: TaskMode, intent: TaskIntent): ProviderStep[] {
+  /* Reasoning-heavy intents prefer DeepSeek's deeper model over
+     Groq's speed. Commercial (business) and general-knowledge
+     (knowledge) both go to DeepSeek first. Fast-chat stays on Groq
+     first for snappy response times. */
+  const reasoningFirst = mode === "business" || intent === "knowledge";
+  if (reasoningFirst) {
     return [
       ["deepseek", deepseekChat, getLastDeepseekError],
       ["groq", groqChat, getLastGroqError],
       ["gemini", geminiChat],
     ];
   }
-  /* Chat / unknown → Groq first (fast), then DeepSeek, then Gemini. */
   return [
     ["groq", groqChat, getLastGroqError],
     ["deepseek", deepseekChat, getLastDeepseekError],
@@ -262,11 +317,15 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
      shape, language, cost-disclosure rules, etc. */
   const messages: AiMessage[] = buildPromptFor(mode, last, req.context ?? {});
 
-  /* Walk the cascade. First provider whose call returns non-null wins.
-     DeepSeek's gate (isDeepseekEnabled) is applied before its call so
-     a disabled DeepSeek doesn't count as a real attempt. */
+  /* Walk the cascade. First provider whose call returns non-null
+     wins. DeepSeek's gate (isDeepseekEnabled) is applied before its
+     call so a disabled DeepSeek doesn't count as a real attempt.
+     `errors` accumulates diagnostic detail on every skip/failure
+     so the [ai.router] final log tells ops exactly which providers
+     were tried and why each didn't serve. */
   const errors: string[] = [];
-  for (const [name, call, lastErr] of chainFor(mode)) {
+  const chain = chainFor(mode, intent);
+  for (const [name, call, lastErr] of chain) {
     if (name === "deepseek" && !isDeepseekEnabled()) {
       errors.push("deepseek: disabled");
       continue;
@@ -274,6 +333,16 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
     try {
       const result = await call(messages);
       if (result) {
+        /* Success log — tells ops which provider served each turn,
+           what intent drove the routing choice, and whether we
+           fell back off the preferred provider. Cheap (one line
+           per successful turn) and invaluable during incidents. */
+        const fellBack = chain[0]?.[0] !== name;
+        console.log(
+          `[ai.router] provider=${name} intent=${intent} mode=${mode}` +
+            ` fallback=${fellBack ? 1 : 0} ms=${Date.now() - t0}` +
+            (errors.length ? ` skipped=${errors.join(";")}` : ""),
+        );
         return {
           provider: name as ProviderName,
           mode,
