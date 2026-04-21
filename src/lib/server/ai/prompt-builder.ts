@@ -57,6 +57,42 @@ function personaLock(ctx: AiContext): string {
   );
 }
 
+/* ─── Phase 5: response format hint per intent ───────────────────
+   Takes analyzeIntent() output and produces a single-line
+   instruction telling the model how long / how structured the
+   reply should be. Missing context (pre-Phase-5 callers) → empty
+   string → model falls back to the lane's default length rule. */
+function formatHint(ctx: AiContext): string {
+  const type = ctx.intentType;
+  const format = ctx.expectedFormat;
+  if (!format) return "";
+
+  /* Each branch names the format + gives concrete constraints so
+     the model has something to snap to. The intentType hint is
+     appended when available so a definition vs an explanation with
+     the same "structured" format still land on different shapes. */
+  if (format === "short") {
+    if (type === "definition") {
+      return ` RESPONSE SHAPE: one short paragraph (≤3 sentences) that defines the term plus one concrete example.`;
+    }
+    if (type === "translation") {
+      return ` RESPONSE SHAPE: output the translation directly, no preamble, no explanation unless the user asked for it.`;
+    }
+    return ` RESPONSE SHAPE: 1–2 sentences, plain prose.`;
+  }
+  if (format === "structured") {
+    if (type === "explanation") {
+      return ` RESPONSE SHAPE: one-sentence summary, then 2–4 short numbered or bulleted steps. No headers.`;
+    }
+    if (type === "business") {
+      return ` RESPONSE SHAPE: one summary sentence, then 2–4 concise bullet points. Actionable, no fluff, no headers.`;
+    }
+    return ` RESPONSE SHAPE: one summary sentence, then 2–4 short bullet points. No headers.`;
+  }
+  /* detailed */
+  return ` RESPONSE SHAPE: thorough answer — summary sentence, 3–5 key points or short paragraphs, an example if useful. Plain prose, no "###" headers, no "**bold**" labels.`;
+}
+
 /* ─── FAST lane prompt (Phase 2) ─────────────────────────────────
    Target: <2KB. Identity, language mirror basics, two boundaries —
    nothing else. FAST is for greetings, small talk, and short
@@ -70,12 +106,14 @@ export function buildFastPrompt(
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
   const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
   const persona = personaLock(ctx);
+  const shape = formatHint(ctx);
   return [
     {
       role: "system",
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
         persona +
+        shape +
         ` Reply in the user's current message language by default (fall back to ${lang}).` +
         ` If they ask you to reply in a specific language, honor that for all following turns.` +
         ` Match the user's tone and length — short casual turns get short casual replies;` +
@@ -102,12 +140,14 @@ export function buildSmartPrompt(
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
   const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
   const persona = personaLock(ctx);
+  const shape = formatHint(ctx);
   return [
     {
       role: "system",
       content:
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}` +
         persona +
+        shape +
         ` Reply in the user's message language by default (fall back to ${lang}).` +
         ` If they explicitly ask you to reply in a specific language ("reply in Arabic",` +
         ` "answer in English", "رد بالعربية", "请用中文回答"), honor that for all subsequent` +
