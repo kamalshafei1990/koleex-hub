@@ -32,6 +32,8 @@ import {
 } from "./prompt-builder";
 import { preprocessUserQuery, type PreprocessResult } from "./preprocess";
 import { detectLanguage, type LanguageDetection } from "./detect-language";
+import { analyzeIntent, type IntentAnalysis } from "./analyze-intent";
+import { findLocalAnswer, pickLocalAnswer } from "./local-knowledge";
 import {
   groqChat,
   groqChatStream,
@@ -336,15 +338,54 @@ function callersForLane(lane: Lane): ProviderStep[] {
   });
 }
 
+/** Phase 5: preambles for local-knowledge fallbacks. When every
+ *  provider fails but the user asked a definition we happen to have
+ *  in our glossary, we lead with a short apology-free line and then
+ *  serve the real local answer — no generic "try again" fluff. */
+const LOCAL_PREAMBLES = {
+  EN:  "The AI service is temporarily slow, but here's a quick take:",
+  AR:  "خدمة الذكاء الاصطناعي بطيئة مؤقتًا، ولكن إليك شرحًا مختصرًا:",
+  EGY: "بص، حصل بطء بسيط في الخدمة دلوقتي، بس خليني أشرحلك الموضوع:",
+  ZH:  "AI 服务暂时较慢,不过这里先给你一个简短说明:",
+} as const;
+
+/** Try to serve a local-knowledge answer instead of a generic
+ *  "try again" fallback. Returns null when we have nothing useful
+ *  in the glossary — caller falls through to generateFallbackAnswer. */
+function localKnowledgeFallback(
+  userMsg: string,
+  msgLang: import("./detect-language").DetectedLang,
+  ppIntent?: import("./preprocess").QueryIntent,
+  intentType?: import("./analyze-intent").IntentType,
+): string | null {
+  /* Only the definition / business types are likely to hit the
+     glossary. Explanations and translations fall through. */
+  const likelyDefinition =
+    intentType === "definition" ||
+    ppIntent === "definition" ||
+    ppIntent === "business";
+  if (!likelyDefinition) return null;
+
+  const ans = findLocalAnswer(userMsg);
+  if (!ans) return null;
+
+  const body = pickLocalAnswer(ans, msgLang);
+  const preambleKey: keyof typeof LOCAL_PREAMBLES =
+    msgLang === "AR"
+      ? "AR"
+      : msgLang === "EGY" || msgLang === "FRANCO"
+      ? "EGY"
+      : msgLang === "ZH"
+      ? "ZH"
+      : "EN";
+  return `${LOCAL_PREAMBLES[preambleKey]}\n\n${body}`;
+}
+
 /** Synthetic last-resort answer when every provider fails across
- *  every retry. Intent-aware (Phase 3): the preprocessor's intent
- *  bucket drives which helpful message gets served so a definition
- *  question gets a definition-shaped fallback, a translation
- *  question gets a translation-shaped fallback, etc.
- *
- *  NEVER returns a generic "I couldn't complete that request". The
- *  system ALWAYS gives the user either a concrete next step or an
- *  explanation of what failed. */
+ *  every retry. Intent-aware (Phase 3) + local-knowledge-aware
+ *  (Phase 5). NEVER returns a generic "I couldn't complete that
+ *  request" — the system always gives the user a concrete next
+ *  step or an actual answer from the local glossary. */
 function generateFallbackAnswer(
   userMsg: string,
   userLang?: "en" | "zh" | "ar",
@@ -457,14 +498,18 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
 
-  /* Enrich context with the detected message language. Only set it
-     above low-confidence threshold so a weak signal doesn't override
-     the UI locale. The prompt builder treats <0.5 confidence as
-     absent. */
+  /* Phase 5: richer intent + response-format hint. Consumed by the
+     prompt builder's formatHint(). Runs on the normalised query so
+     "whats mean by X" already reads as a definition by this point. */
+  const analysis: IntentAnalysis = analyzeIntent(last);
+
   const enrichedCtx: AiRequest["context"] = {
     ...(req.context ?? {}),
     messageLang: detected.language,
     messageLangConfidence: detected.confidence,
+    intentType: analysis.type,
+    complexity: analysis.complexity,
+    expectedFormat: analysis.expectedFormat,
   };
 
   const { full, slim, minimal } = buildLanePrompt(
@@ -549,11 +594,17 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
     `[ai.router] lane=${lane} pp_intent=${pp.intent} all providers failed:`,
     errors.join(" | "),
   );
-  const synthetic = generateFallbackAnswer(
+  /* Phase 5: try local glossary BEFORE generic synthetic — a real
+     definition beats a "try again" message even during an outage. */
+  const local = localKnowledgeFallback(
     last,
-    req.context?.userLang,
+    detected.language,
     pp.intent,
+    analysis.type,
   );
+  const synthetic =
+    local ??
+    generateFallbackAnswer(last, req.context?.userLang, pp.intent);
   return {
     provider: "fallback" as ProviderName,
     mode,
@@ -645,6 +696,9 @@ export async function* streamRouteAi(
   /* Phase 4: detect from original text — see routeAi() for rationale. */
   const detected: LanguageDetection = detectLanguage(rawLast);
 
+  /* Phase 5 intent analysis for prompt shaping + telemetry. */
+  const analysis: IntentAnalysis = analyzeIntent(last);
+
   const intent: TaskIntent = req.forceMode
     ? req.forceMode === "business"
       ? "business"
@@ -656,6 +710,9 @@ export async function* streamRouteAi(
     ...(req.context ?? {}),
     messageLang: detected.language,
     messageLangConfidence: detected.confidence,
+    intentType: analysis.type,
+    complexity: analysis.complexity,
+    expectedFormat: analysis.expectedFormat,
   };
   const { full, slim, minimal } = buildLanePrompt(
     lane,
@@ -743,18 +800,22 @@ export async function* streamRouteAi(
   }
 
   /* All providers failed → emit synthetic as a single delta so the
-     UI still progresses, then end. Synthetic is intent-aware (Phase 3)
-     so a definition / translation / business question gets a fallback
-     that names what they asked about. */
+     UI still progresses, then end. Phase 5: prefer a local-knowledge
+     answer (a real definition) over the generic intent-aware
+     synthetic when the query is a definition we recognise. */
   console.error(
     `[ai.router.stream] lane=${lane} pp_intent=${pp.intent} all providers failed:`,
     errors.join(" | "),
   );
-  const synthetic = generateFallbackAnswer(
+  const local = localKnowledgeFallback(
     last,
-    req.context?.userLang,
+    detected.language,
     pp.intent,
+    analysis.type,
   );
+  const synthetic =
+    local ??
+    generateFallbackAnswer(last, req.context?.userLang, pp.intent);
   yield { type: "delta", text: synthetic };
   yield {
     type: "end",

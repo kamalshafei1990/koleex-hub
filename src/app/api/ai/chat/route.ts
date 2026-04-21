@@ -5,6 +5,9 @@ import { requireAuth } from "@/lib/server/auth";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
 import { sealPricingSafety } from "@/lib/server/ai-agent/orchestrator";
+import { findLocalAnswer, pickLocalAnswer } from "@/lib/server/ai/local-knowledge";
+import { detectLanguage } from "@/lib/server/ai/detect-language";
+import { preprocessUserQuery } from "@/lib/server/ai/preprocess";
 
 /* ---------------------------------------------------------------------------
    POST /api/ai/chat — now powered by the hybrid router.
@@ -119,21 +122,6 @@ export async function POST(req: Request) {
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
 
-  /* Keep the "no provider configured at all" guard for backward
-     compat. aiProviderConfigured() checks the legacy chat key; the
-     router additionally gates business mode on its own USE_DEEPSEEK
-     flag, so this 503 only fires when the whole system is cold. */
-  if (!aiProviderConfigured()) {
-    return NextResponse.json(
-      {
-        error: "no_provider",
-        message:
-          "Koleex AI is not configured yet. Ask a Super Admin to add a GEMINI_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY) in Vercel env vars.",
-      },
-      { status: 503 },
-    );
-  }
-
   const body = (await req.json()) as {
     messages?: ChatMessage[];
     user_lang?: "en" | "zh" | "ar";
@@ -148,6 +136,13 @@ export async function POST(req: Request) {
   const userLang = body.user_lang;
   const wantsStream =
     body.stream === true || req.headers.get("accept") === "text/event-stream";
+
+  /* Provider-configuration guard moved BELOW body parsing + local
+     short-circuits (Phase 5). Canned fast-path + local-knowledge
+     definitions don't need any provider, so we can serve them even
+     when the system is cold — this matters in dev and during full
+     provider outages. Providers-required branches still hit the
+     guard before they call routeAi / streamRouteAi. */
 
   /* Fast-path: short canned reply, no router call. Covers greetings,
      identity, thanks, etc. across EN/AR/ZH. Cuts latency on these
@@ -171,6 +166,93 @@ export async function POST(req: Request) {
        replaced with PRICING_GUARD_MESSAGE. */
     const safeFast = sealPricingSafety(fast, []);
     return NextResponse.json({ reply: safeFast, provider: "fast-path" });
+  }
+
+  /* ─── Phase 5: local-knowledge short-circuit ─────────────────────
+     If the user asked a definition we have in our offline glossary,
+     serve it directly — no provider call, no streaming race, no
+     latency beyond the auth round-trip. Runs AFTER the canned FAST
+     path (so "hi" still beats even this) and BEFORE the streaming
+     branch. Works for both streaming and non-streaming requests. */
+  const ppForLocal = preprocessUserQuery(lastUser);
+  const localAnswer = findLocalAnswer(ppForLocal.normalizedQuery || lastUser);
+  if (localAnswer) {
+    const detectedForLocal = detectLanguage(lastUser);
+    const replyText = pickLocalAnswer(localAnswer, detectedForLocal.language);
+    const tEnd = Date.now();
+    console.log(
+      `[ai] lane=fast ep=chat provider=local intent=definition` +
+        ` pp_intent=${ppForLocal.intent}` +
+        ` msg_lang=${detectedForLocal.language} conf=${detectedForLocal.confidence.toFixed(2)}` +
+        ` rewrote=${ppForLocal.rewrote ? 1 : 0} fallback=0 local=1` +
+        ` in_bytes=${lastUser.length} norm_bytes=${ppForLocal.normalizedQuery.length}` +
+        ` hist=0 ms=${tEnd - t0} reply_bytes=${replyText.length}`,
+    );
+
+    if (wantsStream) {
+      /* Match the streaming contract: emit start → delta (full text,
+         one chunk) → end. Client's SSE reader can't tell the
+         difference from a provider-streamed response. */
+      const encoder = new TextEncoder();
+      const send = (obj: unknown) =>
+        encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            send({
+              type: "start",
+              lane: "FAST",
+              intent: "knowledge",
+              mode: "chat",
+              promptBytes: 0,
+              originalQuery: ppForLocal.originalQuery,
+              normalizedQuery: ppForLocal.normalizedQuery,
+              ppIntent: ppForLocal.intent,
+              rewrote: ppForLocal.rewrote,
+              messageLang: detectedForLocal.language,
+              messageLangConfidence: detectedForLocal.confidence,
+            }),
+          );
+          controller.enqueue(send({ type: "delta", text: replyText }));
+          controller.enqueue(
+            send({
+              type: "end",
+              provider: "local",
+              lane: "FAST",
+              intent: "knowledge",
+              reply: replyText,
+              fallback: 0,
+              ttfb_ms: 0,
+              total_ms: tEnd - t0,
+            }),
+          );
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+    return NextResponse.json({ reply: replyText, provider: "local" });
+  }
+
+  /* Provider-required from here down. The canned FAST_REPLIES and
+     local-knowledge short-circuits above don't need any provider;
+     everything below does. */
+  if (!aiProviderConfigured()) {
+    return NextResponse.json(
+      {
+        error: "no_provider",
+        message:
+          "Koleex AI is not configured yet. Ask a Super Admin to add a GEMINI_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY) in Vercel env vars.",
+      },
+      { status: 503 },
+    );
   }
 
   /* ─── Streaming branch (Phase 2) ─────────────────────────────────
@@ -267,7 +349,7 @@ export async function POST(req: Request) {
             `[ai] lane=${laneLabel} ep=chat provider=${providerName}` +
               ` intent=${intent} pp_intent=${ppIntent}` +
               ` msg_lang=${msgLang} conf=${msgLangConf.toFixed(2)}` +
-              ` rewrote=${rewrote} fallback=${fallback}` +
+              ` rewrote=${rewrote} fallback=${fallback} local=0` +
               ` in_bytes=${lastUser.length} norm_bytes=${normBytes} hist=0` +
               ` ttfb_ms=${ttfbMs ?? "-"} ms=${tEnd - t0}` +
               ` stream=1 reply_bytes=${rawReply.length}`,

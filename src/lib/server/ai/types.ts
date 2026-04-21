@@ -58,6 +58,15 @@ export interface AiContext {
    *  detector wasn't sure — prompt should stay neutral and not lock
    *  aggressively into a persona. */
   messageLangConfidence?: number;
+  /** Phase 5: the intent type analysed from the normalised query.
+   *  Drives which response template the prompt builder injects. */
+  intentType?: "definition" | "explanation" | "translation" | "chat" | "business";
+  /** Phase 5: question complexity. Combined with intentType this
+   *  decides whether the prompt asks for a short / structured /
+   *  detailed reply. */
+  complexity?: "simple" | "medium" | "deep";
+  /** Phase 5: the shape the model should produce. */
+  expectedFormat?: "short" | "structured" | "detailed";
 }
 
 /** Inbound to the router. */
