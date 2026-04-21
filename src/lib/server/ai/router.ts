@@ -317,12 +317,36 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
      shape, language, cost-disclosure rules, etc. */
   const messages: AiMessage[] = buildPromptFor(mode, last, req.context ?? {});
 
+  /* Oversized-prompt regression detector (Phase 1 observability).
+     Chat-path prompts should stay well under 16KB — if a future edit
+     to prompt-builder or a runaway context injection pushes the system
+     prompt past that threshold we want a warn line in the logs, not a
+     silent latency / 413 regression. Does not alter behaviour. */
+  const promptBytes = messages.reduce(
+    (n, m) => n + (m.content?.length ?? 0),
+    0,
+  );
+  if (promptBytes > 16_000) {
+    console.warn(
+      `[ai.warn] oversize_prompt bytes=${promptBytes} intent=${intent} mode=${mode}`,
+    );
+  }
+
   /* Walk the cascade. First provider whose call returns non-null
      wins. DeepSeek's gate (isDeepseekEnabled) is applied before its
      call so a disabled DeepSeek doesn't count as a real attempt.
      `errors` accumulates diagnostic detail on every skip/failure
      so the [ai.router] final log tells ops exactly which providers
-     were tried and why each didn't serve. */
+     were tried and why each didn't serve.
+
+     Per-provider timeout (Phase 1 stability): if a provider hangs,
+     we abort and move to the next one instead of blocking the user
+     for 30+ seconds. Reasoning-heavy providers get a longer budget
+     (DeepSeek/Gemini can legitimately take several seconds for
+     complex turns); fast-chat providers (Groq) get a tighter one. */
+  const timeoutFor = (name: "groq" | "deepseek" | "gemini"): number =>
+    name === "groq" ? 12_000 : 25_000;
+
   const errors: string[] = [];
   const chain = chainFor(mode, intent);
   for (const [name, call, lastErr] of chain) {
@@ -331,7 +355,18 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
       continue;
     }
     try {
-      const result = await call(messages);
+      const budget = timeoutFor(name);
+      const result = await Promise.race<
+        { reply: string; provider: string } | null
+      >([
+        call(messages),
+        new Promise<never>((_r, reject) =>
+          setTimeout(
+            () => reject(new Error(`timeout ${budget}ms`)),
+            budget,
+          ),
+        ),
+      ]);
       if (result) {
         /* Success log — tells ops which provider served each turn,
            what intent drove the routing choice, and whether we

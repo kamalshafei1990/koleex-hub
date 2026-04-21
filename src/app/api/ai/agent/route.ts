@@ -33,11 +33,12 @@ import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
 import type { AgentResponse } from "@/lib/server/ai-agent/types";
 
-/* Hard cap on history we ship to the orchestrator. 10 messages = 5
-   user+assistant pairs; enough for multi-turn context, small enough
-   that the payload stays well under provider limits. Pure performance
-   cap — does not alter tool routing or business behaviour. */
-const HISTORY_LIMIT = 10;
+/* Hard cap on history we ship to the orchestrator. 6 messages = 3
+   user+assistant pairs; enough for short-term multi-turn context,
+   small enough to keep agent payloads tight (30–40% smaller than the
+   old 10-message cap). Pure performance/stability cap — does not
+   alter tool routing or business behaviour. */
+const HISTORY_LIMIT = 6;
 
 /* Canned fast-path mirror. Keep in sync with /api/ai/chat FAST_REPLIES
    and orchestrator.ts. Matched server-side before any provider call —
@@ -211,6 +212,13 @@ export async function POST(req: Request) {
       `[ai.agent.timing] auth=${tAuth - t0}ms conv=${tConv - tAuth}ms` +
         ` writes=${tEnd - tConv}ms total=${tEnd - t0}ms canned=1`,
     );
+    /* Unified per-request log (Phase 1 observability). One line per AI
+       request across chat + agent so ops can grep a single prefix to
+       see lane / endpoint / provider / intent / fallback / sizes / ms. */
+    console.log(
+      `[ai] lane=protected ep=agent provider=fast-path intent=canned` +
+        ` fallback=0 in_bytes=${content.length} hist=0 ms=${tEnd - t0}`,
+    );
 
     const agent: AgentResponse = {
       steps: [{ kind: "answer", text: fast, permissionStatus: "allowed" }],
@@ -298,6 +306,16 @@ export async function POST(req: Request) {
     `[ai.agent.timing] auth=${tAuth - t0}ms conv=${tConv - tAuth}ms` +
       ` deps=${tDeps - tConv}ms orch=${tOrch - tDeps}ms writes=${tEnd - tOrch}ms` +
       ` total=${tEnd - t0}ms canned=0`,
+  );
+  /* Unified per-request log (Phase 1 observability). Mirrors the chat
+     route's [ai] line. `provider` is whatever the orchestrator settled
+     on (groq/deepseek/gemini/fallback); intent is reported as "agent"
+     for tool-loop turns (the orchestrator's own brand fast-path logs
+     its own line separately). */
+  console.log(
+    `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
+      ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
+      ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}`,
   );
 
   return NextResponse.json({

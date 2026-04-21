@@ -155,6 +155,11 @@ export async function POST(req: Request) {
     console.log(
       `[ai.chat.timing] auth=${tAuth - t0}ms route=0ms total=${tEnd - t0}ms fast=1`,
     );
+    /* Unified per-request log (Phase 1 observability). */
+    console.log(
+      `[ai] lane=fast ep=chat provider=fast-path intent=canned` +
+        ` fallback=0 in_bytes=${lastUser.length} hist=0 ms=${tEnd - t0}`,
+    );
     /* Belt-and-braces pricing guard on canned replies. The current
        FAST_REPLIES table has no pricing patterns so this is a no-op
        today, but keeps the chat-route contract uniform if anyone
@@ -204,6 +209,15 @@ export async function POST(req: Request) {
   console.log(
     `[ai.chat.timing] auth=${tAuth - t0}ms route=${tPost - tPre}ms total=${tEnd - t0}ms` +
       ` mode=${result.mode} routing=${result.meta.routing}`,
+  );
+  /* Unified per-request log (Phase 1 observability). Lane = smart when
+     knowledge-intent routes to the reasoning provider first; otherwise
+     fast. fallback=1 flags that the router's synthetic answer served. */
+  const lane = result.meta.routing === "knowledge" ? "smart" : "fast";
+  console.log(
+    `[ai] lane=${lane} ep=chat provider=${result.provider} intent=${result.meta.routing}` +
+      ` fallback=${result.provider === "fallback" ? 1 : 0}` +
+      ` in_bytes=${lastUser.length} hist=0 ms=${tEnd - t0}`,
   );
   /* Backward-compatible response: existing callers only read `reply`
      and (optionally) `provider`. We expose the stable ProviderName
