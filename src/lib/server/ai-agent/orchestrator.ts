@@ -322,7 +322,103 @@ export {
   classifyBrandSection,
   isSmallTalk,
   tryFastReply,
+  isBusinessDataQuery,
 };
+
+/* ─── Phase 10: business-data detector ────────────────────────────
+   Returns true when the question clearly needs Koleex data (the
+   orchestrator's tool loop). Returns false when the question is
+   general — definitions, translations, explanations, history,
+   math, advice, "what's the capital of X", etc. The route uses
+   this to bypass the heavy business-agent prompt for general
+   questions, so the AI answers ANY question instead of trying to
+   route everything through the tool layer.
+
+   Intentionally conservative: when uncertain, return false so the
+   query goes to the open-assistant lane. If a general-looking query
+   actually needs data, the open-assistant prompt will naturally
+   fall back to "I don't have access to that — try opening the X
+   app" which is the right UX. The reverse (routing a general
+   question through the tool loop) is what users are complaining
+   about right now. */
+function isBusinessDataQuery(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s) return false;
+
+  /* Explicit possessives + business nouns: "my customers",
+     "our products", "the invoice", "this quotation". */
+  if (
+    /\b(my|our|the|this|that|these|those)\s+(customer|client|buyer|product|item|inventory|stock|invoice|bill|receipt|quotation|quote|order|po|purchase\s*order|supplier|vendor|catalog|sales)s?\b/.test(
+      s,
+    )
+  )
+    return true;
+
+  /* Imperatives: "list / show / find / search / look up / get" +
+     business noun. Not triggered by "list the benefits of X" etc.
+     because those go to generic nouns. */
+  if (
+    /\b(list|show|display|find|search|look\s*up|get|pull|fetch|retrieve)\s+(all\s+|my\s+|our\s+|the\s+)?(customer|client|buyer|product|item|inventory|stock|invoice|bill|receipt|quotation|quote|order|po|supplier|vendor|catalog|contact)s?\b/.test(
+      s,
+    )
+  )
+    return true;
+
+  /* Commercial action verbs: create / draft / prepare a quotation,
+     invoice, order, RFQ, etc. */
+  if (
+    /\b(create|draft|prepare|generate|make|issue|send|build|raise)\s+(an?\s+|the\s+|a\s+new\s+)?(quotation|quote|invoice|bill|order|po|purchase\s*order|rfq|proposal|offer)\b/.test(
+      s,
+    )
+  )
+    return true;
+
+  /* Count queries over business data: "how many products",
+     "how many customers". Excludes general counts like "how many
+     languages" or "how many planets". */
+  if (
+    /\bhow\s+many\s+(product|item|customer|client|buyer|invoice|quotation|quote|order|supplier|vendor|stock|sale)s?\b/.test(
+      s,
+    )
+  )
+    return true;
+
+  /* Specific-entity lookups: "customer ABC Corp", "product SKU-123",
+     "invoice #42", etc. */
+  if (
+    /\b(customer|client|product|invoice|quotation|order)\s+(?:code\s+|number\s+|id\s+|#|no\.?\s*)?[a-z0-9-]{2,}/i.test(
+      msg,
+    )
+  )
+    return true;
+
+  /* Price / cost / margin / discount OF a specific product or
+     customer. "what's the price of product X" → business.
+     "what's the price of happiness" → NOT business. */
+  if (
+    /\b(price|cost|margin|commission|discount|markup|profit)\s+(for|of)\s+(product|item|customer|client|sku|model)\b/.test(
+      s,
+    )
+  )
+    return true;
+
+  /* Koleex-specific data prefixes. */
+  if (/\bkoleex\s+(product|customer|invoice|quotation|order|inventory|sales|data)/.test(s))
+    return true;
+
+  /* Arabic business terms. */
+  if (
+    /عملاء|عميل|زبون|زبائن|منتج|منتجات|مخزون|فاتورة|فواتير|عرض\s*سعر|عروض\s*أسعار|طلب|طلبات|مورد|موردين/.test(
+      msg,
+    )
+  )
+    return true;
+
+  /* Chinese business terms. */
+  if (/客户|产品|库存|发票|报价|订单|供应商/.test(msg)) return true;
+
+  return false;
+}
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();

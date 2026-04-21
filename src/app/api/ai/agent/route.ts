@@ -34,11 +34,15 @@ import {
   orchestrate,
   classifyBrandSection,
   isSmallTalk,
+  isBusinessDataQuery,
   buildBrandSystemPrompt,
   buildMinimalSystemPrompt,
   sealPricingSafety,
 } from "@/lib/server/ai-agent/orchestrator";
 import { groqChatStream } from "@/lib/server/ai/providers/groq";
+import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
+import { detectLanguage } from "@/lib/server/ai/detect-language";
+import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
@@ -345,43 +349,74 @@ export async function POST(req: Request) {
             }
           }, 1500);
 
-          /* ── Phase 7: real token streaming on fast-paths ────────
-             Brand questions and small-talk are single-Groq-call
-             answers — no tool loop, no orchestrator state needed.
-             Stream tokens directly from Groq instead of waiting for
-             orchestrate() to return the whole reply, then pseudo-
-             streaming it. Drops first-token latency from ~3 s to
-             ~500 ms for the common query shape.
+          /* ── Fast-path streaming (Phase 7 + Phase 10) ────────────
+             Three lanes that bypass the heavy business-agent orchestrator:
 
-             Anything that isn't brand/small-talk (tool-bound business
-             queries, quotations, customer lookups, etc.) falls through
-             to the orchestrate() + pseudo-stream path below, so no
-             guarantees change — the pricing guard, permission
-             enforcement, audit logging all still run on that path. */
+               · brand     — buildBrandSystemPrompt + Groq stream
+               · small     — buildMinimalSystemPrompt + Groq stream
+               · general   — buildSmartPrompt + Groq stream (Phase 10)
+
+             The GENERAL lane handles "any question" — definitions,
+             explanations, translations, history, math, advice, coding
+             help, casual chat — basically everything ChatGPT answers.
+             We decide based on isBusinessDataQuery(): if it looks like
+             a query that needs Koleex data (customers, invoices,
+             products, quotations, order lookup, etc.) we fall through
+             to the orchestrator so tool schemas, permissions, pricing
+             guards all apply. Otherwise the open-assistant SMART
+             prompt takes over and the model is free to answer. */
           const brandSection = classifyBrandSection(content);
           const isBrand = brandSection !== "none";
           const isSmall = isSmallTalk(content);
+          const isBusinessData = isBusinessDataQuery(content);
           const fastPathKey = process.env.GROQ_API_KEY;
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
-          if ((isBrand || isSmall) && fastPathKey) {
-            const systemPrompt = isBrand
-              ? buildBrandSystemPrompt(
-                  ctx,
-                  userLang,
-                  brandSection as "company" | "ai" | "both",
-                )
-              : buildMinimalSystemPrompt(ctx, userLang);
+          let fastLane: "brand" | "small" | "general" | null = null;
+
+          const canFastPath = fastPathKey && (
+            isBrand || isSmall || !isBusinessData
+          );
+
+          if (canFastPath) {
+            fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
+            const detected = detectLanguage(content);
+            const analysis = analyzeIntent(content);
+            const systemPrompt =
+              fastLane === "brand"
+                ? buildBrandSystemPrompt(
+                    ctx,
+                    userLang,
+                    brandSection as "company" | "ai" | "both",
+                  )
+                : fastLane === "small"
+                  ? buildMinimalSystemPrompt(ctx, userLang)
+                  : /* general */
+                    buildSmartPrompt(content, {
+                      userLang,
+                      messageLang: detected.language,
+                      messageLangConfidence: detected.confidence,
+                      intentType: analysis.type,
+                      complexity: analysis.complexity,
+                      expectedFormat: analysis.expectedFormat,
+                    })[0].content;
             const fastMessages = [
               { role: "system" as const, content: systemPrompt },
               ...history,
               { role: "user" as const, content },
             ];
+            /* Token budget per lane. General gets a bigger ceiling
+               than small-talk so explanations can breathe but still
+               bounded so we don't run away on open-ended prompts. */
+            const maxTokens =
+              fastLane === "brand" ? 1200
+              : fastLane === "small" ? 200
+              : 1400;
             let accumulated = "";
             let gotFirst = false;
             try {
               for await (const ch of groqChatStream(fastMessages, {
-                maxTokens: isBrand ? 1200 : 200,
+                maxTokens,
               })) {
                 if (ch.type === "delta" && ch.text) {
                   if (!gotFirst) gotFirst = true;
@@ -506,7 +541,7 @@ export async function POST(req: Request) {
             }),
           );
           console.log(
-            `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
+            `[ai] lane=${fastLane ?? "protected"} ep=agent provider=${agent.provider} intent=agent` +
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
               ` fast_stream=${fastReply !== null ? 1 : 0}` +
               ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
