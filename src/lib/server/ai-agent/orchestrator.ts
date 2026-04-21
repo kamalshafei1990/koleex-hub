@@ -123,11 +123,31 @@ function isSmallTalk(msg: string): boolean {
     /how\s+do\s+you\s+work\s*\??$/i,
     /what\s+kind\s+of\s+ai\s+are\s+you\s*\??$/i,
     /how\s+are\s+you[\s,!.?؟]*$/i,
+    /how's\s+it\s+going\s*[?!.]*$/i,
     /^(thanks|thank\s+you|thx|ty|شكرا|谢谢)[\s!.؟]*$/i,
     /^(ok|okay|good|great|nice|cool|got\s+it|understood)[\s!.؟]*$/i,
     /^(bye|goodbye|see\s+you|مع السلامة|再见)[\s!.؟]*$/i,
     /من\s+أنت\s*\??$/, // Arabic: "who are you?"
     /你\s*是\s*谁/,        // Chinese: "who are you?"
+    /* Phase 9: broader casual check-in phrases that users expect a
+       snappy response to — these were hitting the full tool-loop
+       agent (3–8 s) because they don't match the patterns above.
+       Moving them to the fast-path drops latency to ~500 ms. */
+    /^(are|r)\s+(you|u)\s+(ok|okay|there|good|fine|alright|busy|still\s+there|still\s+here|awake|online|ready)\s*[?!.]*$/i,
+    /^(u|you)\s+(ok|okay|there|busy|still\s+there)\s*[?!.]*$/i,
+    /^(what'?s|wat'?s|wats)\s+up\s*[?!.]*$/i,
+    /^sup\s*[?!.]*$/i,
+    /^am\s+(testing|talking\s+to)\s+you\s*[?!.]*$/i,
+    /^(i'?m|im)\s+(just\s+)?(testing|talking\s+to)\s+you\s*[?!.]*$/i,
+    /^(test|testing|ping|check|hello\s+again)\s*[?!.]*$/i,
+    /^still\s+there\s*[?!.]*$/i,
+    /^you\s+there\s*[?!.]*$/i,
+    /* Arabic casual check-ins */
+    /^(كيف|كيفك|ازيك|إزيك|كيف\s+حالك)\s*[؟?!.]*$/,
+    /^(عامل\s+ايه|عامله\s+ايه|عاملة\s+ايه|تمام|كويس|اخبارك\s+ايه)\s*[؟?!.]*$/,
+    /^(انت\s+فين|انت\s+هنا|انت\s+موجود|شغال|شغالة)\s*[؟?!.]*$/,
+    /* Chinese casual */
+    /^(在吗|在么|还在吗|你在吗|忙吗|你好吗)\s*[?？!]*$/,
   ];
   return patterns.some((p) => p.test(s));
 }

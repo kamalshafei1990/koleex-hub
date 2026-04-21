@@ -237,6 +237,42 @@ export async function POST(req: Request) {
       provider: "fast-path",
       conversationId,
     };
+
+    /* Phase 9 fix: when the client asked for SSE, emit this canned
+       reply AS SSE (start → delta → end) so the uniform stream parser
+       on the client doesn't end up scanning JSON for event frames
+       and crashing to "No reply was received". Non-streaming callers
+       continue to get the legacy JSON shape. */
+    if (wantsStream) {
+      const encoder = new TextEncoder();
+      const send = (obj: unknown) =>
+        encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(send({ type: "start", conversationId }));
+          controller.enqueue(send({ type: "delta", text: fast }));
+          controller.enqueue(
+            send({
+              type: "end",
+              agent,
+              message: assistantInsert.data,
+              conversation: { id: conversationId, title: finalTitle },
+              total_ms: tEnd - t0,
+            }),
+          );
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
     return NextResponse.json({
       agent,
       message: assistantInsert.data,
