@@ -164,7 +164,9 @@ function normaliseBrandName(text: string): string {
    exceeds Groq's request-size limit (413). AI-identity triggers win
    over company triggers when both could match, since phrases like
    "Koleex AI" are Section-2-specific. */
-function classifyBrandSection(msg: string): "none" | "company" | "ai" | "both" {
+export type BrandSection = "none" | "company" | "ai" | "both";
+
+function classifyBrandSection(msg: string): BrandSection {
   const s = msg.trim().toLowerCase();
   if (!s) return "none";
 
@@ -285,6 +287,22 @@ function classifyBrandSection(msg: string): "none" | "company" | "ai" | "both" {
 function isBrandQuestion(msg: string): boolean {
   return classifyBrandSection(msg) !== "none";
 }
+
+/* ─── Phase 7 exports for route-level streaming ───────────────────
+   The /api/ai/agent streaming branch wants to attempt real token
+   streaming for brand + small-talk questions (the majority of turns
+   in production), because those paths only make a single Groq call.
+   Tool-loop turns still fall through to orchestrate() + pseudo-stream.
+
+   We export the detectors + prompt builders + the canned fast-reply
+   table so the route can replicate the fast-path decision without
+   re-implementing any logic here. If this list grows, collapse into
+   a single exported `detectFastPath(msg)` helper. */
+export {
+  classifyBrandSection,
+  isSmallTalk,
+  tryFastReply,
+};
 
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
@@ -749,7 +767,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
  *  the tool-routing instructions + brand-knowledge block so the
  *  Groq request stays tiny and fast. Language mirror is kept — it's
  *  the only rule that matters for small-talk. */
-function buildMinimalSystemPrompt(
+export function buildMinimalSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
 ): string {
@@ -778,7 +796,7 @@ Current user: ${ctx.auth.username}.`;
  *  "### Identity" which the model was dumping verbatim. These rules
  *  tell the model to treat the block as source material and rewrite
  *  into natural prose. */
-function buildBrandSystemPrompt(
+export function buildBrandSystemPrompt(
   ctx: UserContext,
   userLang: "en" | "zh" | "ar",
   section: "company" | "ai" | "both",

@@ -35,6 +35,7 @@ import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import TypingIndicator from "@/components/ai/TypingIndicator";
+import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 
@@ -186,6 +187,9 @@ export default function KoleexAiApp() {
   }, [activeId, activeIdKey]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
+  /* Ref for the composer textarea so autosize can reset height after
+     send clears the value (onChange doesn't fire on programmatic clear). */
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [sending, setSending] = useState(false);
   /* Mode separates the two AI personalities served by this page:
        · "chat"  → fast, router-driven reply via /api/ai/chat
@@ -383,6 +387,11 @@ export default function KoleexAiApp() {
       };
       setMessages((prev) => [...prev, optimistic]);
       setInput("");
+      /* Autosize reset: onChange doesn't fire on programmatic clear,
+         so reset the textarea height manually after sending. */
+      if (composerRef.current) {
+        composerRef.current.style.height = "auto";
+      }
 
       /* Placeholder assistant bubble that mutates as deltas arrive.
          We append it immediately so the TypingIndicator (keyed off
@@ -995,8 +1004,20 @@ export default function KoleexAiApp() {
                 className="relative flex items-end rounded-[26px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] focus-within:border-[var(--border-focus)] transition-colors"
               >
                 <textarea
+                  ref={composerRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    /* Autosize: reset first so shrinking works, then
+                       grow to fit up to maxHeight (enforced via the
+                       Tailwind max-h-40 cap = 160 px). Happens on every
+                       keystroke but is effectively free — scrollHeight
+                       read is ~0.1 ms. */
+                    const ta = e.currentTarget;
+                    ta.style.height = "auto";
+                    const next = Math.min(ta.scrollHeight, 160);
+                    ta.style.height = next + "px";
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -1013,6 +1034,8 @@ export default function KoleexAiApp() {
                       }
                       send();
                     }
+                    /* Shift+Enter inserts a newline via the browser's
+                       default textarea behaviour — no handler needed. */
                   }}
                   placeholder={copy.placeholder}
                   rows={1}
@@ -1025,7 +1048,9 @@ export default function KoleexAiApp() {
                   inputMode="text"
                   autoComplete="off"
                   autoCorrect="on"
-                  className="flex-1 px-5 py-4 bg-transparent text-[15px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  className="flex-1 px-5 py-4 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  /* 16px font-size prevents iOS Safari from zooming in
+                     on focus — a <16px input triggers the zoom. */
                   style={{ minHeight: "54px" }}
                 />
                 {/* Mic button — always mounted now that Chat and Agent
@@ -1272,9 +1297,14 @@ function Bubble({
                isolate embedded segments properly. That's what fixes Arabic
                replies that also contain English words like "Koleex Hub" —
                without this the hard dir="rtl" can flip the embedded English
-               into the wrong visual position. */
+               into the wrong visual position. User bubbles keep the
+               whitespace-pre-wrap path (literal text only). Assistant
+               bubbles render markdown via MessageMarkdown for bullets,
+               headings, code blocks, tables, links. */
             dir="auto"
-            className={`rounded-2xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap backdrop-blur-md ${
+            className={`rounded-2xl px-4 py-2.5 leading-relaxed backdrop-blur-md ${
+              isUser ? "whitespace-pre-wrap" : ""
+            } ${
               rtl ? "text-[15px]" : "text-[14px]"
             } ${
               isUser
@@ -1288,7 +1318,7 @@ function Bubble({
                 : {}),
             }}
           >
-            {msg.content}
+            {isUser ? msg.content : <MessageMarkdown content={msg.content} />}
           </div>
         )}
       </div>
