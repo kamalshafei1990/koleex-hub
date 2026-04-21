@@ -190,6 +190,9 @@ export default function KoleexAiApp() {
   /* Ref for the composer textarea so autosize can reset height after
      send clears the value (onChange doesn't fire on programmatic clear). */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  /* Phase 12: AbortController for the in-flight send. Lets the user
+     cancel a streaming reply mid-answer. Reset per-turn in send(). */
+  const abortRef = useRef<AbortController | null>(null);
   const [sending, setSending] = useState(false);
   /* Mode separates the two AI personalities served by this page:
        · "chat"  → fast, router-driven reply via /api/ai/chat
@@ -414,6 +417,11 @@ export default function KoleexAiApp() {
            The client mutates the placeholder bubble as deltas arrive so
            the reply reveals progressively; the TypingIndicator shows
            while the content is still empty. */
+        /* Phase 12: new AbortController per turn. On user Stop click
+           we call .abort() which closes the fetch + reader, stops
+           the SSE loop, and lets the finally block clean up state. */
+        const aborter = new AbortController();
+        abortRef.current = aborter;
         const res = await fetch(`/api/ai/agent`, {
           method: "POST",
           credentials: "include",
@@ -427,6 +435,7 @@ export default function KoleexAiApp() {
             user_lang: lang,
             stream: true,
           }),
+          signal: aborter.signal,
         });
 
         /* Phase 9 resilience: if the server returned a JSON body
@@ -654,15 +663,91 @@ export default function KoleexAiApp() {
           setError((prev) => prev ?? "No reply was received.");
         }
       } catch (e) {
-        setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-        setError(e instanceof Error ? e.message : "Network error");
+        /* Phase 12: user cancelled via Stop — keep whatever was
+           already streamed; drop the placeholder only if it's still
+           empty (no tokens arrived before abort). No red error for
+           user-initiated cancels. */
+        const isAbort =
+          (e instanceof DOMException && e.name === "AbortError") ||
+          (e instanceof Error && e.name === "AbortError");
+        if (isAbort) {
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === placeholderId);
+            if (idx < 0) return prev;
+            if (!prev[idx].content) {
+              /* No tokens before abort → drop the empty bubble. */
+              return prev.filter((m) => m.id !== placeholderId);
+            }
+            /* Keep the partial text the user already saw. */
+            return prev;
+          });
+        } else {
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+          setError(e instanceof Error ? e.message : "Network error");
+        }
       } finally {
+        abortRef.current = null;
         sendingRef.current = false;
         setSending(false);
       }
     },
     [input, activeId, lang, stopTts],
   );
+
+  /* ── Phase 12: message-level actions ────────────────────────── */
+
+  /** Stop generation — aborts the in-flight fetch. Any text that
+   *  already streamed in stays on screen; the placeholder with
+   *  no content gets dropped (see catch block in send). */
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  /** Copy an assistant message to the clipboard. Shows a tiny
+   *  "Copied" hint by mutating a per-message state (not here — the
+   *  bubble handles its own feedback). */
+  const handleCopy = useCallback(async (content: string): Promise<boolean> => {
+    if (!content) return false;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(content);
+        return true;
+      }
+    } catch {
+      /* Clipboard API denied — fall through to failure. The bubble
+         already offers text selection so there's a manual escape. */
+    }
+    return false;
+  }, []);
+
+  /** Regenerate the last assistant reply. Finds the most recent
+   *  user message, removes any trailing assistant messages, and
+   *  re-runs send() with that same text. Server treats it as a
+   *  fresh turn — new assistant insert, history will show both the
+   *  old and the new reply (so users can see both). */
+  const handleRegenerate = useCallback(() => {
+    if (sendingRef.current) return;
+    /* Walk backwards to find the last user message. */
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx < 0) return;
+    const lastUserText = messages[lastUserIdx].content;
+    /* Trim trailing assistant messages so the visual history
+       doesn't show the old + placeholder + new stacked in the same
+       turn. The server still has both in ai_messages (audit
+       preserved) — we just shorten the client view. */
+    setMessages((prev) => prev.slice(0, lastUserIdx + 1));
+    /* send() appends a new optimistic user bubble — but we already
+       have one. Pass the text as an override AND remove the last
+       user bubble so send can re-add it cleanly. */
+    setMessages((prev) => prev.slice(0, lastUserIdx));
+    void send(lastUserText, false);
+  }, [messages, send]);
 
   /* Two-step delete using the Hub's ConfirmDialog component. The old
      flow called window.confirm() — that's the white-on-black native
@@ -1000,7 +1085,7 @@ export default function KoleexAiApp() {
                   .split(/\s+/)[0] || ""}
               />
             ) : (
-              messages.map((m) => (
+              messages.map((m, i) => (
                 <Bubble
                   key={m.id}
                   msg={m}
@@ -1009,6 +1094,10 @@ export default function KoleexAiApp() {
                     .trim()
                     .charAt(0)
                     .toUpperCase()}
+                  isLast={i === messages.length - 1}
+                  canRegenerate={!sending}
+                  onCopy={handleCopy}
+                  onRegenerate={handleRegenerate}
                 />
               ))
             )}
@@ -1138,18 +1227,34 @@ export default function KoleexAiApp() {
                   lang={lang}
                 />
 
-                <button
-                  type="submit"
-                  disabled={sending || !input.trim()}
-                  className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
-                  aria-label="Send"
-                >
-                  {sending ? (
-                    <SpinnerIcon className="h-4 w-4 animate-spin" />
-                  ) : (
+                {/* Phase 12: swap Send → Stop during streaming. The
+                    Stop button aborts the in-flight fetch; partial
+                    content that already streamed in is kept. Using
+                    type="button" so the form doesn't try to submit
+                    (submit path is disabled + different handler). */}
+                {sending ? (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
+                    aria-label="Stop generating"
+                    title="Stop generating"
+                  >
+                    <span
+                      aria-hidden
+                      className="block h-3 w-3 rounded-[2px] bg-[var(--text-inverted)]"
+                    />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
+                    aria-label="Send"
+                  >
                     <PaperPlaneIcon className="h-4 w-4" />
-                  )}
-                </button>
+                  </button>
+                )}
               </div>
             </form>
             <div className="text-[10px] text-[var(--text-dim)] mt-2.5 text-center">
@@ -1295,10 +1400,21 @@ function Bubble({
   msg,
   userAvatar,
   userInitial,
+  isLast,
+  canRegenerate,
+  onCopy,
+  onRegenerate,
 }: {
   msg: ChatMsg;
   userAvatar?: string | null;
   userInitial: string;
+  /** Is this the final message in the conversation right now?
+   *  Regenerate only offers on the last assistant reply. */
+  isLast?: boolean;
+  /** Disable Regenerate while another send is in-flight. */
+  canRegenerate?: boolean;
+  onCopy?: (text: string) => Promise<boolean> | boolean;
+  onRegenerate?: () => void;
 }) {
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
@@ -1306,6 +1422,19 @@ function Bubble({
   const hasToolSteps = !isUser && steps.some((s) =>
     s.kind === "tool-call" || s.kind === "tool-result" || s.kind === "denied",
   );
+  const [copied, setCopied] = useState(false);
+  const handleCopyClick = useCallback(async () => {
+    if (!onCopy || !msg.content) return;
+    const ok = await onCopy(msg.content);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, [onCopy, msg.content]);
+  /* Show the action row on assistant messages that have real
+     content. Placeholder bubbles (empty content = typing dots)
+     get no actions. */
+  const showActions = !isUser && !!msg.content;
   /* Surface any draft-quotation tool result as a full-sized branded
      card instead of a tiny chip — the user's most important action is
      "review the draft", so it deserves its own UI. */
@@ -1388,6 +1517,33 @@ function Bubble({
             }}
           >
             {isUser ? msg.content : <MessageMarkdown content={msg.content} />}
+          </div>
+        )}
+        {/* Phase 12: assistant action row — Copy + (on last msg)
+            Regenerate. User bubbles get no actions. Rendered outside
+            the bubble div so it doesn't inherit the bubble's padding /
+            background. */}
+        {showActions && (
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+            <button
+              type="button"
+              onClick={handleCopyClick}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label={copied ? "Copied" : "Copy message"}
+            >
+              {copied ? "✓ Copied" : "⎘ Copy"}
+            </button>
+            {isLast && onRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                disabled={!canRegenerate}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Regenerate response"
+              >
+                ↻ Regenerate
+              </button>
+            )}
           </div>
         )}
       </div>
