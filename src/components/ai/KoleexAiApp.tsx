@@ -930,24 +930,11 @@ export default function KoleexAiApp() {
                 />
               ))
             )}
-            {sending && (
-              <div className="flex items-start gap-3">
-                <div
-                  className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.18) 50%, rgba(255,110,199,0.12))",
-                    border: "1px solid rgba(123,97,255,0.25)",
-                  }}
-                >
-                  <AiFaceIcon size={18} animated />
-                </div>
-                <div className="rounded-2xl bg-[var(--bg-secondary)]/80 backdrop-blur-md border border-[var(--border-subtle)] px-4 py-2.5 text-[14px] text-[var(--text-dim)] flex items-center gap-2">
-                  <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
-                  {copy.thinking}
-                </div>
-              </div>
-            )}
+            {/* Legacy global "Thinking…" pill removed in Phase 8.
+                The placeholder assistant bubble added in send() now
+                renders TypingIndicator inline (empty content = dots),
+                which gives the same feedback without stacking two
+                waiting indicators on top of each other. */}
             {error && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
                 {error}
