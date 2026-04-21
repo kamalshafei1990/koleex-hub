@@ -43,6 +43,8 @@ import { groqChatStream } from "@/lib/server/ai/providers/groq";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
+import { convertFrancoToArabic } from "@/lib/language/franco-converter";
+import { buildEgyptianResponse } from "@/lib/language/rewrite-egyptian";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
@@ -365,10 +367,26 @@ export async function POST(req: Request) {
              to the orchestrator so tool schemas, permissions, pricing
              guards all apply. Otherwise the open-assistant SMART
              prompt takes over and the model is free to answer. */
-          const brandSection = classifyBrandSection(content);
+          /* ── Phase 11: Egyptian dialect engine — input normalisation ──
+             If the user wrote Franco Arabic (Arabizi), convert it to
+             proper Arabic script BEFORE sending to the model. Gives
+             the model a cleaner input and lets the persona lock +
+             rewrite layer do the rest. All other detection (brand /
+             small / business) runs on the NORMALISED text so patterns
+             like "عامل ايه" still match for Egyptian speakers who
+             happened to type it in Franco ("3amel eh"). */
+          const detected = detectLanguage(content);
+          const wantsRewrite =
+            detected.language === "EGY" || detected.language === "FRANCO";
+          const normalizedContent =
+            detected.language === "FRANCO"
+              ? convertFrancoToArabic(content)
+              : content;
+
+          const brandSection = classifyBrandSection(normalizedContent);
           const isBrand = brandSection !== "none";
-          const isSmall = isSmallTalk(content);
-          const isBusinessData = isBusinessDataQuery(content);
+          const isSmall = isSmallTalk(normalizedContent);
+          const isBusinessData = isBusinessDataQuery(normalizedContent);
           const fastPathKey = process.env.GROQ_API_KEY;
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
@@ -380,8 +398,7 @@ export async function POST(req: Request) {
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
-            const detected = detectLanguage(content);
-            const analysis = analyzeIntent(content);
+            const analysis = analyzeIntent(normalizedContent);
             const systemPrompt =
               fastLane === "brand"
                 ? buildBrandSystemPrompt(
@@ -392,7 +409,7 @@ export async function POST(req: Request) {
                 : fastLane === "small"
                   ? buildMinimalSystemPrompt(ctx, userLang)
                   : /* general */
-                    buildSmartPrompt(content, {
+                    buildSmartPrompt(normalizedContent, {
                       userLang,
                       messageLang: detected.language,
                       messageLangConfidence: detected.confidence,
@@ -403,7 +420,7 @@ export async function POST(req: Request) {
             const fastMessages = [
               { role: "system" as const, content: systemPrompt },
               ...history,
-              { role: "user" as const, content },
+              { role: "user" as const, content: normalizedContent },
             ];
             /* Token budget per lane. General gets a bigger ceiling
                than small-talk so explanations can breathe but still
@@ -502,6 +519,36 @@ export async function POST(req: Request) {
           alive = false;
           clearInterval(keepalive);
 
+          /* ── Phase 11 L2: Egyptian dialect response builder ───────
+             Replaces the plain rewriter with the intent-aware Level 2
+             builder. When the user wrote EGY or FRANCO, the output
+             gets:
+               · scrubbed of translator notes, MSA "لا أفهم" phrases,
+                 system-text leaks
+               · replaced with a natural clarify phrase if the model
+                 was trying to ask for clarification in MSA/English
+               · phrase-level Egyptian rewrites
+               · an intent-aware opener (بص خليني اشرحلك... for
+                 explanations, ببساطة كده... for definitions) when
+                 the reply is substantive
+             When nothing fires (model already landed in Egyptian
+             with a clean reply) the builder is a no-op. */
+          let rewroteReply = false;
+          if (wantsRewrite && agent.finalReply) {
+            const intentForBuilder =
+              isBrand || isSmall
+                ? "chat"
+                : analyzeIntent(normalizedContent).type;
+            const rebuilt = buildEgyptianResponse(agent.finalReply, {
+              intentType: intentForBuilder,
+              seed: normalizedContent,
+            });
+            if (rebuilt !== agent.finalReply) {
+              agent = { ...agent, finalReply: rebuilt };
+              rewroteReply = true;
+            }
+          }
+
           /* Persist in parallel with the stream close. The user sees
              the full text by now; the DB write can finish after the
              controller closes without affecting UX. */
@@ -544,6 +591,7 @@ export async function POST(req: Request) {
             `[ai] lane=${fastLane ?? "protected"} ep=agent provider=${agent.provider} intent=agent` +
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
               ` fast_stream=${fastReply !== null ? 1 : 0}` +
+              ` msg_lang=${detected.language} rewrote_egy=${rewroteReply ? 1 : 0}` +
               ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
               ` stream=1 reply_bytes=${agent.finalReply.length}`,
           );
