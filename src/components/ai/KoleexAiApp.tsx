@@ -87,6 +87,8 @@ const COPY: Record<Lang, {
   renamePrompt: string;
   footer: string;
   stopped: string;
+  searchChats?: string;
+  noSearchResults?: string;
   prompts: string[];
 }> = {
   en: {
@@ -107,6 +109,8 @@ const COPY: Record<Lang, {
     renamePrompt: "New title",
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
+    searchChats: "Search chats…",
+    noSearchResults: "No chats match your search.",
     prompts: [
       "What's a good way to start my day at work?",
       "Help me write a polite reply to a customer email.",
@@ -132,6 +136,8 @@ const COPY: Record<Lang, {
     renamePrompt: "新标题",
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
+    searchChats: "搜索对话…",
+    noSearchResults: "没有匹配的对话。",
     prompts: [
       "早上开始工作的好方法是什么？",
       "帮我给客户写一封礼貌的回复邮件。",
@@ -157,6 +163,8 @@ const COPY: Record<Lang, {
     renamePrompt: "عنوان جديد",
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
+    searchChats: "ابحث في المحادثات…",
+    noSearchResults: "لا توجد محادثات تطابق بحثك.",
     prompts: [
       "ما طريقة جيدة لبدء يومي في العمل؟",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",
@@ -261,17 +269,48 @@ export default function KoleexAiApp() {
     setShowJumpToBottom(distance > 120);
   }, []);
 
-  /* ── Initial sidebar load ── */
+  /* ── Initial sidebar load with sessionStorage cache ──
+     Phase 13: seed the sidebar from sessionStorage on mount so the
+     panel renders instantly instead of appearing empty for ~300 ms
+     while /api/ai/conversations round-trips. Then fire the network
+     fetch and overwrite with fresh data. Stale-while-revalidate.
+     Cache is session-scoped (not persisted) so a logout / fresh tab
+     still gets a clean load. */
+  const CONV_CACHE_KEY = "koleex-ai-conversations-cache-v1";
   const loadConversations = useCallback(async () => {
     const res = await fetch("/api/ai/conversations", { credentials: "include" });
     if (!res.ok) return;
     const { conversations: rows } = (await res.json()) as {
       conversations: ConversationRow[];
     };
-    setConversations(rows ?? []);
+    const fresh = rows ?? [];
+    setConversations(fresh);
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(CONV_CACHE_KEY, JSON.stringify(fresh));
+      } catch {
+        /* Quota / private-mode — cache is a best-effort optimisation. */
+      }
+    }
   }, []);
 
   useEffect(() => {
+    /* Read cache synchronously BEFORE the network fetch so the UI
+       never paints the empty state. Invalid / expired JSON is just
+       ignored. */
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.sessionStorage.getItem(CONV_CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw) as ConversationRow[];
+          if (Array.isArray(cached) && cached.length > 0) {
+            setConversations(cached);
+          }
+        }
+      } catch {
+        /* Stale / corrupt cache — silently discard. */
+      }
+    }
     loadConversations();
   }, [loadConversations]);
 
@@ -720,6 +759,27 @@ export default function KoleexAiApp() {
     return false;
   }, []);
 
+  /** Phase 13: edit-and-retry on a user message. Given the index of
+   *  the user message and its new text, trim the client view back
+   *  to just before that message and re-send with the edited text.
+   *  Server creates a fresh turn — old user + assistant entries
+   *  stay in ai_messages for audit, the UI just shortens its view. */
+  const handleEditAndRetry = useCallback(
+    (index: number, newText: string) => {
+      const trimmed = newText.trim();
+      if (!trimmed) return;
+      if (sendingRef.current) return;
+      /* Sanity: make sure the indexed message is actually a user turn. */
+      const target = messages[index];
+      if (!target || target.role !== "user") return;
+      /* Slice off everything from this user message forward so
+         send() can re-add the user bubble + placeholder cleanly. */
+      setMessages((prev) => prev.slice(0, index));
+      void send(trimmed, false);
+    },
+    [messages, send],
+  );
+
   /** Regenerate the last assistant reply. Finds the most recent
    *  user message, removes any trailing assistant messages, and
    *  re-runs send() with that same text. Server treats it as a
@@ -794,8 +854,33 @@ export default function KoleexAiApp() {
     [copy.renamePrompt],
   );
 
-  /* ── Group sidebar entries by relative date ── */
-  const groups = useMemo(() => groupByDate(conversations, copy), [conversations, copy]);
+  /* ── Phase 13: sidebar search ──
+     Simple substring filter on title + last_preview. Case-insensitive.
+     Empty query shows everything, matches the original grouped view.
+     When the filter is active, results flatten (no date groups) so
+     scanning is quicker — users who typed a query want hits, not
+     chronology. */
+  const [sidebarQuery, setSidebarQuery] = useState("");
+  const filteredConversations = useMemo(() => {
+    const q = sidebarQuery.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((c) => {
+      const title = (c.title || "").toLowerCase();
+      const preview = (c.last_preview || "").toLowerCase();
+      return title.includes(q) || preview.includes(q);
+    });
+  }, [conversations, sidebarQuery]);
+
+  /* ── Group sidebar entries by relative date ──
+     Only applied when the search box is empty; filtered searches
+     render flat. */
+  const groups = useMemo(
+    () =>
+      sidebarQuery.trim()
+        ? [{ label: "", rows: filteredConversations }]
+        : groupByDate(filteredConversations, copy),
+    [filteredConversations, sidebarQuery, copy],
+  );
 
   /* ── Smart autoscroll ──
      Previous version measured "was at bottom" *after* the new message
@@ -988,6 +1073,21 @@ export default function KoleexAiApp() {
           </button>
         </div>
 
+        {/* Phase 13: sidebar search. Only renders when there are
+            enough conversations to make scanning hard. */}
+        {conversations.length > 3 && (
+          <div className="px-2 pb-1 pt-1">
+            <input
+              type="search"
+              value={sidebarQuery}
+              onChange={(e) => setSidebarQuery(e.target.value)}
+              placeholder={copy.searchChats ?? "Search chats…"}
+              className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+              aria-label="Search conversations"
+            />
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
@@ -1002,6 +1102,10 @@ export default function KoleexAiApp() {
                 <AiFaceIcon size={20} animated />
               </div>
               <div className="text-[12px]">{copy.noChats}</div>
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
+              {copy.noSearchResults ?? "No chats match your search."}
             </div>
           ) : (
             groups.map((g) => (
@@ -1096,8 +1200,10 @@ export default function KoleexAiApp() {
                     .toUpperCase()}
                   isLast={i === messages.length - 1}
                   canRegenerate={!sending}
+                  canEdit={!sending}
                   onCopy={handleCopy}
                   onRegenerate={handleRegenerate}
+                  onEdit={(newText) => handleEditAndRetry(i, newText)}
                 />
               ))
             )}
@@ -1402,8 +1508,10 @@ function Bubble({
   userInitial,
   isLast,
   canRegenerate,
+  canEdit,
   onCopy,
   onRegenerate,
+  onEdit,
 }: {
   msg: ChatMsg;
   userAvatar?: string | null;
@@ -1413,8 +1521,13 @@ function Bubble({
   isLast?: boolean;
   /** Disable Regenerate while another send is in-flight. */
   canRegenerate?: boolean;
+  /** Disable Edit while a send is in-flight. */
+  canEdit?: boolean;
   onCopy?: (text: string) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
+  /** Phase 13: edit-and-retry — called with the new text once the
+   *  user saves their edit. Re-runs the turn with the new content. */
+  onEdit?: (newText: string) => void;
 }) {
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
@@ -1435,6 +1548,27 @@ function Bubble({
      content. Placeholder bubbles (empty content = typing dots)
      get no actions. */
   const showActions = !isUser && !!msg.content;
+
+  /* Phase 13: edit-and-retry state. Only user messages can be
+     edited, and only when the parent allows it (not while another
+     send is in-flight). */
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(msg.content);
+  const showEditButton = isUser && !!onEdit && canEdit !== false;
+  const submitEdit = useCallback(() => {
+    const next = editValue.trim();
+    if (!next || next === msg.content) {
+      setEditing(false);
+      setEditValue(msg.content);
+      return;
+    }
+    setEditing(false);
+    onEdit?.(next);
+  }, [editValue, msg.content, onEdit]);
+  const cancelEdit = useCallback(() => {
+    setEditing(false);
+    setEditValue(msg.content);
+  }, [msg.content]);
   /* Surface any draft-quotation tool result as a full-sized branded
      card instead of a tiny chip — the user's most important action is
      "review the draft", so it deserves its own UI. */
@@ -1516,7 +1650,70 @@ function Bubble({
                 : {}),
             }}
           >
-            {isUser ? msg.content : <MessageMarkdown content={msg.content} />}
+            {isUser ? (
+              editing ? (
+                <textarea
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submitEdit();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEdit();
+                    }
+                  }}
+                  autoFocus
+                  rows={1}
+                  className="w-full bg-transparent outline-none resize-none text-inherit leading-relaxed min-w-[180px]"
+                  style={{ fontFamily: "inherit" }}
+                />
+              ) : (
+                msg.content
+              )
+            ) : (
+              <MessageMarkdown content={msg.content} />
+            )}
+          </div>
+        )}
+        {/* Phase 13: user-side action row — Edit (re-runs the turn
+            with new text) or Save/Cancel while editing. Only shown
+            when the parent supplied onEdit and allowed it. */}
+        {isUser && showEditButton && (
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+            {editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={submitEdit}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-opacity"
+                  aria-label="Save and retry"
+                >
+                  Save & retry
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                  aria-label="Cancel edit"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditValue(msg.content);
+                  setEditing(true);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                aria-label="Edit and retry"
+              >
+                ✎ Edit
+              </button>
+            )}
           </div>
         )}
         {/* Phase 12: assistant action row — Copy + (on last msg)
