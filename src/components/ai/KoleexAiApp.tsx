@@ -36,6 +36,7 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AiFaceIcon from "@/components/icons/AiFaceIcon";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
+import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 
@@ -751,6 +752,36 @@ export default function KoleexAiApp() {
     abortRef.current?.abort();
   }, []);
 
+  /** Insert an emoji at the current cursor position in the composer.
+   *  Preserves selection/typing context so the user can pick several
+   *  emojis in a row without losing their place. Falls back to
+   *  append-to-end when the textarea ref isn't available. */
+  const insertEmoji = useCallback((emoji: string) => {
+    const ta = composerRef.current;
+    if (!ta) {
+      setInput((prev) => prev + emoji);
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const before = ta.value.slice(0, start);
+    const after = ta.value.slice(end);
+    const next = before + emoji + after;
+    setInput(next);
+    /* Restore focus + place caret right after the inserted emoji on
+       the next frame (after React's re-render commits the new
+       value). preventScroll keeps the page stable on iOS. */
+    requestAnimationFrame(() => {
+      try { ta.focus({ preventScroll: true }); } catch { ta.focus(); }
+      const pos = start + emoji.length;
+      ta.setSelectionRange(pos, pos);
+      /* Kick the autosize onChange path so the textarea grows if the
+         added emoji pushed content onto a new line. */
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    });
+  }, []);
+
   /** Copy an assistant message to the clipboard. Shows a tiny
    *  "Copied" hint by mutating a per-message state (not here — the
    *  bubble handles its own feedback). */
@@ -1351,6 +1382,14 @@ export default function KoleexAiApp() {
                      on focus — a <16px input triggers the zoom. */
                   style={{ minHeight: "54px" }}
                 />
+                {/* Phase 14: emoji picker. Sits just inside the
+                    composer pill before the mic, so thumb reach on
+                    mobile hits the three inline actions in order:
+                    emoji → mic → send. The picker popover anchors
+                    to the button and floats above the pill. */}
+                <div className="m-1">
+                  <EmojiButton onSelect={insertEmoji} />
+                </div>
                 {/* Mic button — always mounted now that Chat and Agent
                     are unified. Voice turns route through the same
                     orchestrator as typed turns. On transcript we call
