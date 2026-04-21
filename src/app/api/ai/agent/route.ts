@@ -30,7 +30,15 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
-import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
+import {
+  orchestrate,
+  classifyBrandSection,
+  isSmallTalk,
+  buildBrandSystemPrompt,
+  buildMinimalSystemPrompt,
+  sealPricingSafety,
+} from "@/lib/server/ai-agent/orchestrator";
+import { groqChatStream } from "@/lib/server/ai/providers/groq";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
@@ -288,9 +296,9 @@ export async function POST(req: Request) {
               content: m.content as string,
             }));
 
-          /* Keepalive comments while orchestrate runs. SSE treats
-             lines starting with ":" as comments — they keep the
-             connection warm without triggering client events. */
+          /* Keepalive comments while orchestrate / fast-path runs.
+             SSE treats lines starting with ":" as comments — they
+             keep the connection warm without triggering client events. */
           let alive = true;
           const keepalive = setInterval(() => {
             if (!alive) return;
@@ -301,42 +309,127 @@ export async function POST(req: Request) {
             }
           }, 1500);
 
-          const agent = await orchestrate({
-            ctx,
-            history,
-            userMessage: content,
-            userLang,
-            conversationId: conversationId!,
-          });
+          /* ── Phase 7: real token streaming on fast-paths ────────
+             Brand questions and small-talk are single-Groq-call
+             answers — no tool loop, no orchestrator state needed.
+             Stream tokens directly from Groq instead of waiting for
+             orchestrate() to return the whole reply, then pseudo-
+             streaming it. Drops first-token latency from ~3 s to
+             ~500 ms for the common query shape.
+
+             Anything that isn't brand/small-talk (tool-bound business
+             queries, quotations, customer lookups, etc.) falls through
+             to the orchestrate() + pseudo-stream path below, so no
+             guarantees change — the pricing guard, permission
+             enforcement, audit logging all still run on that path. */
+          const brandSection = classifyBrandSection(content);
+          const isBrand = brandSection !== "none";
+          const isSmall = isSmallTalk(content);
+          const fastPathKey = process.env.GROQ_API_KEY;
+          let fastReply: string | null = null;
+          let fastProvider: string | null = null;
+          if ((isBrand || isSmall) && fastPathKey) {
+            const systemPrompt = isBrand
+              ? buildBrandSystemPrompt(
+                  ctx,
+                  userLang,
+                  brandSection as "company" | "ai" | "both",
+                )
+              : buildMinimalSystemPrompt(ctx, userLang);
+            const fastMessages = [
+              { role: "system" as const, content: systemPrompt },
+              ...history,
+              { role: "user" as const, content },
+            ];
+            let accumulated = "";
+            let gotFirst = false;
+            try {
+              for await (const ch of groqChatStream(fastMessages, {
+                maxTokens: isBrand ? 1200 : 200,
+              })) {
+                if (ch.type === "delta" && ch.text) {
+                  if (!gotFirst) gotFirst = true;
+                  accumulated += ch.text;
+                  controller.enqueue(send({ type: "delta", text: ch.text }));
+                } else if (ch.type === "done") {
+                  fastReply = ch.text ?? accumulated;
+                  fastProvider = ch.provider ?? "groq:stream";
+                } else if (ch.type === "error") {
+                  /* Drop what we have and fall through to orchestrate.
+                     Can't "un-emit" the deltas the client already got —
+                     but gotFirst will be false on TTFB-timeout / auth
+                     errors, which is the only realistic pre-first-
+                     token failure mode. */
+                  if (gotFirst) {
+                    fastReply = accumulated || null;
+                    fastProvider = "groq:stream";
+                  }
+                  break;
+                }
+              }
+            } catch {
+              /* Generator threw — fall through to orchestrate. */
+            }
+          }
+
+          let agent: AgentResponse;
+          if (fastReply !== null) {
+            /* Fast-path served. Build a minimal AgentResponse shape so
+               the persistence + end-event code below stays identical
+               between the two branches. sealPricingSafety runs with no
+               evidence steps — any pricing-like content in a brand /
+               small-talk reply gets replaced with PRICING_GUARD_MESSAGE. */
+            const sealed = sealPricingSafety(fastReply, []);
+            agent = {
+              steps: [
+                { kind: "answer", text: sealed, permissionStatus: "allowed" },
+              ],
+              finalReply: sealed,
+              provider: fastProvider ?? "groq:stream",
+              conversationId: conversationId!,
+            };
+            /* If sealPricingSafety redacted content, the client has
+               already seen raw deltas. The `end` event below carries
+               the sealed reply and the client replaces its buffer
+               with end.agent.finalReply — same contract as chat. */
+          } else {
+            agent = await orchestrate({
+              ctx,
+              history,
+              userMessage: content,
+              userLang,
+              conversationId: conversationId!,
+            });
+
+            /* Emit tool-chip steps up front so the UI can render them
+               above the streamed answer — mirrors how ChatGPT shows
+               "Used tool: X" chips while the answer is still typing. */
+            const toolSteps: AgentStep[] = agent.steps.filter(
+              (s) => s.kind !== "answer",
+            );
+            if (toolSteps.length > 0) {
+              controller.enqueue(send({ type: "steps", steps: toolSteps }));
+            }
+
+            /* Pseudo-stream the finalReply. Chunk size + delay
+               calibrated to feel natural without dragging the total
+               time out:
+                 · ~28 chars/chunk
+                 · 12 ms between chunks → ~2 200 chars/sec visible rate
+               A 200-word (~1 200 char) answer streams in ~520 ms. */
+            const full = agent.finalReply ?? "";
+            const CHUNK = 28;
+            for (let i = 0; i < full.length; i += CHUNK) {
+              const text = full.slice(i, i + CHUNK);
+              controller.enqueue(send({ type: "delta", text }));
+              if (i + CHUNK < full.length) {
+                await new Promise((r) => setTimeout(r, 12));
+              }
+            }
+          }
 
           alive = false;
           clearInterval(keepalive);
-
-          /* Emit tool-chip steps up front so the UI can render them
-             above the streamed answer — mirrors how ChatGPT shows
-             "Used tool: X" chips while the answer is still typing. */
-          const toolSteps: AgentStep[] = agent.steps.filter(
-            (s) => s.kind !== "answer",
-          );
-          if (toolSteps.length > 0) {
-            controller.enqueue(send({ type: "steps", steps: toolSteps }));
-          }
-
-          /* Pseudo-stream the finalReply. Chunk size + delay calibrated
-             to feel natural without dragging the total time out:
-               · ~28 chars/chunk
-               · 12 ms between chunks → ~2 200 chars/sec visible rate
-             A 200-word (≈1 200 char) brand answer streams in ~520 ms. */
-          const full = agent.finalReply ?? "";
-          const CHUNK = 28;
-          for (let i = 0; i < full.length; i += CHUNK) {
-            const text = full.slice(i, i + CHUNK);
-            controller.enqueue(send({ type: "delta", text }));
-            /* Don't delay after the final chunk. */
-            if (i + CHUNK < full.length) {
-              await new Promise((r) => setTimeout(r, 12));
-            }
-          }
 
           /* Persist in parallel with the stream close. The user sees
              the full text by now; the DB write can finish after the
@@ -379,8 +472,9 @@ export async function POST(req: Request) {
           console.log(
             `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
+              ` fast_stream=${fastReply !== null ? 1 : 0}` +
               ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
-              ` stream=1 reply_bytes=${full.length}`,
+              ` stream=1 reply_bytes=${agent.finalReply.length}`,
           );
         } catch (e) {
           controller.enqueue(
