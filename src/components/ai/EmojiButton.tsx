@@ -19,7 +19,8 @@
        motion to feel responsive.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
 
 /** Curated 48-emoji grid (6 × 8). Trimmed from the original 60 so
@@ -60,6 +61,10 @@ export default function EmojiButton({
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  /* Phase 14.3: ref on the portal-rendered popover. Since the
+     popover lives in document.body (outside wrapperRef) we need to
+     check it separately in the outside-click handler. */
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   /* Close on outside click. Using mousedown (not click) so that
      clicking inside an emoji cell still fires the cell's onClick
@@ -67,10 +72,10 @@ export default function EmojiButton({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!wrapperRef.current) return;
-      if (!wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (wrapperRef.current && wrapperRef.current.contains(target)) return;
+      if (popoverRef.current && popoverRef.current.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -101,6 +106,79 @@ export default function EmojiButton({
     [onSelect],
   );
 
+  /* Phase 14.3: render the popover via a React Portal into document.body
+     instead of inline. The composer pill has `backdrop-blur-xl` which
+     creates a new stacking context — any z-index on an absolute-
+     positioned descendant is trapped in that context, so the popover
+     appeared BEHIND the message bubbles above. A portal escapes the
+     ancestor stacking context entirely; combined with position:fixed
+     and rect-based coordinates, the popover lives in the viewport's
+     top-level stacking context and always renders above everything. */
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const popoverW = 252;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (triggerRef.current) {
+        setAnchorRect(triggerRef.current.getBoundingClientRect());
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
+
+  /* Position computed from the trigger rect. Anchors the popover's
+     BOTTOM just above the trigger's TOP (with 8 px gap). Clamps the
+     left edge to stay within the viewport so opening on a narrow
+     screen doesn't push the grid off-screen. */
+  const popoverStyle: React.CSSProperties | null = anchorRect
+    ? {
+        position: "fixed" as const,
+        bottom: typeof window !== "undefined"
+          ? window.innerHeight - anchorRect.top + 8
+          : 0,
+        left: typeof window !== "undefined"
+          ? Math.min(
+              Math.max(8, anchorRect.left),
+              window.innerWidth - popoverW - 8,
+            )
+          : anchorRect.left,
+        width: popoverW,
+        zIndex: 9999,
+      }
+    : null;
+
+  const popoverNode =
+    open && popoverStyle && typeof document !== "undefined" ? (
+      <div
+        ref={popoverRef}
+        role="dialog"
+        aria-label="Emoji picker"
+        style={popoverStyle}
+        className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-2"
+      >
+        <div className="grid grid-cols-6 gap-1">
+          {EMOJIS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => handlePick(e)}
+              className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
+              aria-label={`Insert ${e}`}
+            >
+              <span aria-hidden>{e}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div ref={wrapperRef} className="relative inline-block">
       <button
@@ -115,39 +193,13 @@ export default function EmojiButton({
           "h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
         }
       >
-        {/* Phase 14.1: monochrome SmileIcon (Koleex Hub UI style),
-            not the colored 😊 emoji — matches the mic / send / icon
-            buttons around it. Size 24 matches the mic/send icon
-            visual weight so the composer's three action buttons
-            feel balanced. */}
+        {/* Monochrome SmileIcon (Koleex Hub UI style), size 24 matches
+            the mic / send icon weight. */}
         <SmileIcon size={24} className="text-current" />
       </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Emoji picker"
-          /* left-0 anchors the popover to the LEFT edge of the trigger
-             (the button is now on the left of the composer), so the
-             grid opens rightward into the empty space above the
-             textarea instead of clipping off-screen. bottom-full
-             keeps it above the composer. */
-          className="absolute bottom-full left-0 mb-2 z-[60] rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-2 w-[252px]"
-        >
-          <div className="grid grid-cols-6 gap-1">
-            {EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => handlePick(e)}
-                className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
-                aria-label={`Insert ${e}`}
-              >
-                <span aria-hidden>{e}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {popoverNode && typeof document !== "undefined"
+        ? createPortal(popoverNode, document.body)
+        : null}
     </div>
   );
 }
