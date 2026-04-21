@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import { buildBusinessPrompt, buildChatPrompt } from "./prompt-builder";
 import { groqChat, getLastGroqError } from "./providers/groq";
+import { geminiChat } from "../ai-provider";
 import {
   deepseekChat,
   getLastDeepseekError,
@@ -157,19 +158,96 @@ function errorResponse(
   };
 }
 
+/** Ordered cascade for each mode. Chat-first questions prefer Groq
+ *  (fast, high rate limits). Business-reasoning questions prefer
+ *  DeepSeek (stronger commercial reasoning). Both fall back through
+ *  every configured provider and finally to a synthetic answer.
+ *
+ *  Each item is `[providerName, callerFn, lastErrorFn?]`. caller
+ *  returns `{reply, provider}` on success, `null` on failure. */
+type ProviderStep = [
+  name: "groq" | "deepseek" | "gemini",
+  call: (messages: AiMessage[]) => Promise<{ reply: string; provider: string } | null>,
+  lastError?: () => string | null,
+];
+
+function chainFor(mode: TaskMode): ProviderStep[] {
+  /* Business → DeepSeek first (best for commercial reasoning), then
+     Groq, then Gemini. DeepSeek is still gated behind isDeepseekEnabled
+     — if disabled, skip it automatically via the null-guard below. */
+  if (mode === "business") {
+    return [
+      ["deepseek", deepseekChat, getLastDeepseekError],
+      ["groq", groqChat, getLastGroqError],
+      ["gemini", geminiChat],
+    ];
+  }
+  /* Chat / unknown → Groq first (fast), then DeepSeek, then Gemini. */
+  return [
+    ["groq", groqChat, getLastGroqError],
+    ["deepseek", deepseekChat, getLastDeepseekError],
+    ["gemini", geminiChat],
+  ];
+}
+
+/** Synthetic last-resort answer when every provider fails. Brief
+ *  intent sniff so common turns (greetings, thanks) get a natural
+ *  reply even during an outage. Everything else gets a short
+ *  "please try again" — the system NEVER returns an empty or
+ *  error-looking response. */
+function generateFallbackAnswer(userMsg: string, userLang?: "en" | "zh" | "ar"): string {
+  const m = (userMsg ?? "").trim().toLowerCase();
+  const lang = userLang ?? "en";
+
+  if (
+    /^(hi|hello|hey|yo|hola|salam|salaam)\b/i.test(m) ||
+    /^(مرحبا|اهلا|أهلا|السلام)\b/.test(m) ||
+    /^(你好|您好|嗨)\b/.test(m)
+  ) {
+    return lang === "ar"
+      ? "مرحبًا! أنا هنا — إن كنت لا أرد بوضوح الآن فهناك خلل مؤقت، حاول مجددًا بعد لحظات."
+      : lang === "zh"
+      ? "你好!如果我一时没能顺畅回复,可能是系统临时问题,请稍后再试。"
+      : "Hello! I'm here. If I'm a bit slow right now, it's a temporary hiccup — please try again in a moment.";
+  }
+
+  if (/^(thanks|thank\s+you|thx|ty)\b/i.test(m) || /^(شكرا|شكراً)\b/.test(m) || /^谢谢/.test(m)) {
+    return lang === "ar" ? "العفو." : lang === "zh" ? "不客气。" : "You're welcome.";
+  }
+
+  if (/\btranslat/i.test(m)) {
+    return lang === "ar"
+      ? "لا أستطيع معالجة الترجمة الآن. يُرجى إعادة المحاولة خلال لحظات."
+      : lang === "zh"
+      ? "我暂时无法处理翻译请求,请稍后再试。"
+      : "I can't process a translation right now. Please try again in a moment.";
+  }
+
+  return lang === "ar"
+    ? "أواجه مشكلة مؤقتة في الوصول إلى نظامي. هل يمكنك المحاولة مرة أخرى بعد لحظات أو إعادة صياغة السؤال؟"
+    : lang === "zh"
+    ? "我的系统暂时有些问题。请稍后再试,或换一种方式问我。"
+    : "I'm having a bit of trouble reaching my systems right now. Could you try again in a moment, or rephrase your question?";
+}
+
 /** Route a request to the correct provider and return a stable
- *  envelope. Wiring rules (per spec):
- *    · chat       → Groq
- *    · business   → DeepSeek  (hard-gated behind isDeepseekEnabled)
- *    · unknown    → Groq      (via modeFor → "chat")
+ *  envelope.
  *
- *  STRICT failure policy:
- *    · never fall back across providers
- *    · never fabricate a reply
- *    · every failure returns a structured `status: "error"` envelope
+ *  Multi-provider fallback chain (per spec):
+ *    Chat / unknown → Groq → DeepSeek → Gemini → synthetic fallback
+ *    Business       → DeepSeek → Groq → Gemini → synthetic fallback
  *
- *  The router never constructs prompts itself — it delegates to
- *  prompt-builder via buildPromptFor(). Providers only execute. */
+ *  Guarantees the router ALWAYS returns a usable message. status
+ *  will be "success" even on the synthetic fallback path; the
+ *  `provider` field reports which provider served the reply (or
+ *  "fallback" if every provider failed). Callers should not treat
+ *  status !== "success" as a normal outcome anymore — the only
+ *  time that can happen now is a pre-routing error (e.g. empty
+ *  messages array) which callers already validate.
+ *
+ *  The pricing guard (sealPricingSafety, wired into /api/ai/chat
+ *  in PR #41) still enforces the no-fabricated-pricing rule on
+ *  whichever provider's text comes back. */
 export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const t0 = Date.now();
   const last = req.messages[req.messages.length - 1]?.content ?? "";
@@ -179,56 +257,53 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
       : "chat"
     : classifyIntent(last);
   const mode: TaskMode = modeFor(intent);
-  const provider: ProviderName = providerFor(mode);
 
   /* Build prompt messages once. Prompt-builder owns system-prompt
-     shape, language, cost-disclosure rules, etc. Router passes the
-     LAST user turn as the "new" message — prior turns in req.messages
-     are NOT forwarded at this layer; multi-turn memory is the
-     caller's responsibility once the router is wired into an endpoint
-     (Step 5). Keeping it single-turn here preserves isolation and
-     makes the contract identical for both providers. */
+     shape, language, cost-disclosure rules, etc. */
   const messages: AiMessage[] = buildPromptFor(mode, last, req.context ?? {});
 
-  /* ─── Business → DeepSeek (no fallback) ──────────────────────── */
-  if (mode === "business") {
-    if (!isDeepseekEnabled()) {
-      return errorResponse(
-        provider,
-        mode,
-        intent,
-        t0,
-        "Business reasoning is unavailable: DeepSeek is not enabled. " +
-          "Ask a Super Admin to set USE_DEEPSEEK=true and DEEPSEEK_API_KEY.",
-      );
+  /* Walk the cascade. First provider whose call returns non-null wins.
+     DeepSeek's gate (isDeepseekEnabled) is applied before its call so
+     a disabled DeepSeek doesn't count as a real attempt. */
+  const errors: string[] = [];
+  for (const [name, call, lastErr] of chainFor(mode)) {
+    if (name === "deepseek" && !isDeepseekEnabled()) {
+      errors.push("deepseek: disabled");
+      continue;
     }
-    const result = await deepseekChat(messages);
-    if (!result) {
-      const detail = getLastDeepseekError() ?? "DeepSeek is unreachable right now.";
-      return errorResponse(provider, mode, intent, t0, detail);
+    try {
+      const result = await call(messages);
+      if (result) {
+        return {
+          provider: name as ProviderName,
+          mode,
+          message: result.reply,
+          status: "success",
+          meta: { routing: intent, duration_ms: Date.now() - t0 },
+          reply: result.reply,
+        };
+      }
+      errors.push(`${name}: ${(lastErr?.() ?? "failed")}`);
+    } catch (e) {
+      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
     }
-    return {
-      provider,
-      mode,
-      message: result.reply,
-      status: "success",
-      meta: { routing: intent, duration_ms: Date.now() - t0 },
-      reply: result.reply,
-    };
   }
 
-  /* ─── Chat / unknown → Groq ──────────────────────────────────── */
-  const result = await groqChat(messages);
-  if (!result) {
-    const detail = getLastGroqError() ?? "Groq is unreachable right now.";
-    return errorResponse(provider, mode, intent, t0, detail);
-  }
+  /* Every provider failed — return a synthetic fallback. The user
+     never sees an empty or error-looking reply; the real errors are
+     logged so operations can see what went wrong. */
+  console.error("[ai.router] all providers failed:", errors.join(" | "));
+  const synthetic = generateFallbackAnswer(last, req.context?.userLang);
   return {
-    provider,
+    provider: "fallback" as ProviderName,
     mode,
-    message: result.reply,
+    message: synthetic,
     status: "success",
     meta: { routing: intent, duration_ms: Date.now() - t0 },
-    reply: result.reply,
+    reply: synthetic,
   };
 }
+
+// errorResponse helper is retained but no longer used at runtime —
+// left available for future pre-routing validation paths.
+void errorResponse;

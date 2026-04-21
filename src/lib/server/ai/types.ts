@@ -16,7 +16,7 @@ export type TaskMode = "chat" | "business";
 export type TaskIntent = "chat" | "business" | "unknown";
 
 /** Provider id exposed to clients (UI badge + telemetry). */
-export type ProviderName = "groq" | "deepseek";
+export type ProviderName = "groq" | "deepseek" | "gemini" | "fallback";
 
 /** OpenAI-compatible chat message shape. */
 export interface AiMessage {

@@ -177,10 +177,11 @@ export async function POST(req: Request) {
   const tPost = Date.now();
 
   if (result.status === "error") {
-    /* Keep the technical detail in server logs only — user-facing
-       copy is deliberately generic per Step 5 spec. Business (DeepSeek
-       disabled / unreachable) gets a softer phrasing than the Groq
-       path so users don't see "DeepSeek" branding. */
+    /* Legacy branch — with multi-provider fallback (PR #64) the router
+       now returns status:"success" with provider:"fallback" on total
+       outage, not status:"error". This block only fires on rare
+       pre-routing errors (empty message array, invalid req shape).
+       Kept as defense in depth; logs the detail for debugging. */
     console.error(
       `[ai.chat.error] mode=${result.mode} provider=${result.provider}` +
         ` routing=${result.meta.routing} detail=${result.message}`,

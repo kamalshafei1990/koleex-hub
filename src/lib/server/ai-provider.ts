@@ -118,7 +118,7 @@ function extractErrorMessage(body: string): string {
   return body.slice(0, 200);
 }
 
-async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
+export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
 
