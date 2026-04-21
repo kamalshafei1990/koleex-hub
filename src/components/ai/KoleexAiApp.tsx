@@ -261,12 +261,21 @@ export default function KoleexAiApp() {
   }, [sidebarOpen]);
 
   /* Show the "jump to latest" chip when the user has scrolled up more
-     than 120px from the bottom of the messages container. */
+     than 120 px from the bottom. Phase 13.1: also maintain a sticky
+     "user is following the stream" flag — true until they scroll up
+     a meaningful amount, then false until they re-engage by hitting
+     the chip or by sending a new message. The autoscroll effect
+     reads this to decide whether to snap-track mid-stream. */
+  const userFollowingRef = useRef(true);
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
     setShowJumpToBottom(distance > 120);
+    /* 120 px threshold matches the chip — once the user has clearly
+       moved away we stop tracking; they'll re-engage manually. */
+    if (distance > 120) userFollowingRef.current = false;
+    else if (distance < 24) userFollowingRef.current = true;
   }, []);
 
   /* ── Initial sidebar load with sessionStorage cache ──
@@ -882,15 +891,25 @@ export default function KoleexAiApp() {
     [filteredConversations, sidebarQuery, copy],
   );
 
-  /* ── Smart autoscroll ──
-     Previous version measured "was at bottom" *after* the new message
-     rendered, so a long AI reply would already have expanded
-     scrollHeight and the check failed — users ended up stuck mid-pane.
-     New approach: any time the message *count* grows, we scroll to the
-     end (that's a user-visible event — sent by them or a new reply).
-     For non-count changes (e.g. the thinking spinner toggling) we only
-     auto-follow when the user is already close to the bottom, so we
-     don't yank them up if they've scrolled back to read earlier turns. */
+  /* ── Smart autoscroll (Phase 13.1 rewrite) ──
+     Two problems the previous version had:
+       1. Triggered a SMOOTH scrollTo on every stream delta.
+          Smooth animations overlap — a brand answer streams 40+
+          deltas, so 40 overlapping animations made the list jerk
+          instead of track the bottom cleanly.
+       2. "wasNearBottom" threshold of 300 px was too loose. A user
+          scrolling up to re-read the previous paragraph would stay
+          within 300 px of bottom for a moment — and get yanked back
+          down as soon as the next delta arrived.
+
+     New rules:
+       · Count GROWS (user sent / reply finalised / fresh turn):
+         jump to bottom smoothly. This is a deliberate user event.
+       · Content grows mid-stream AND user is within 60 px of bottom:
+         snap (behavior:auto, no animation). Tracks the stream without
+         jerkiness. 60 px is "effectively at bottom" visually.
+       · User has scrolled up > 60 px: never auto-follow. The "↓ Latest"
+         chip already exists for them to snap back when they want. */
   const firstScrollRef = useRef(true);
   const lastCountRef = useRef(0);
   useEffect(() => {
@@ -898,17 +917,28 @@ export default function KoleexAiApp() {
     if (!el) return;
     const countGrew = messages.length > lastCountRef.current;
     lastCountRef.current = messages.length;
-    const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
-    const wasNearBottom = distance < 300;
 
-    const shouldScroll = firstScrollRef.current || countGrew || wasNearBottom;
-    if (!shouldScroll) return;
-
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: firstScrollRef.current ? "auto" : "smooth",
-    });
-    firstScrollRef.current = false;
+    if (firstScrollRef.current) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+      firstScrollRef.current = false;
+      userFollowingRef.current = true;
+      return;
+    }
+    if (countGrew) {
+      /* New turn (user send or reply finalised). Scroll smoothly to
+         bottom and resume following. */
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      userFollowingRef.current = true;
+      return;
+    }
+    /* Mid-stream delta or other state change. Only snap-track when
+       the user hasn't scrolled away. The sticky flag in handleScroll
+       keeps us tracking even when content grows past the instant
+       threshold — what matters is whether the user touched the
+       scrollbar, not the momentary pixel distance. */
+    if (userFollowingRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages, sending]);
 
   /* Reset the "first scroll" flag when opening a different conversation
@@ -1229,6 +1259,10 @@ export default function KoleexAiApp() {
               onClick={() => {
                 const el = scrollRef.current;
                 if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+                /* Phase 13.1: clicking "↓ Latest" re-engages the
+                   stream-tracker so subsequent deltas follow again. */
+                userFollowingRef.current = true;
+                setShowJumpToBottom(false);
               }}
               aria-label="Jump to latest"
               className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-9 px-3 rounded-full bg-[var(--bg-surface)]/90 backdrop-blur-md border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] shadow-lg hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
@@ -1653,6 +1687,19 @@ function Bubble({
             {isUser ? (
               editing ? (
                 <textarea
+                  /* Phase 13.1: use ref + focus({preventScroll:true})
+                     instead of autoFocus. On iOS Safari autoFocus
+                     triggers the browser's "scroll focused element
+                     into view" which shoves the chat pane up in a
+                     jarring way. preventScroll keeps the scroll
+                     position stable while still taking focus. */
+                  ref={(el) => {
+                    if (el && document.activeElement !== el) {
+                      try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+                      const len = el.value.length;
+                      el.setSelectionRange(len, len);
+                    }
+                  }}
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -1664,7 +1711,6 @@ function Bubble({
                       cancelEdit();
                     }
                   }}
-                  autoFocus
                   rows={1}
                   className="w-full bg-transparent outline-none resize-none text-inherit leading-relaxed min-w-[180px]"
                   style={{ fontFamily: "inherit" }}
