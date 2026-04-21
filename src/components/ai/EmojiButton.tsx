@@ -117,8 +117,10 @@ export default function EmojiButton({
       >
         {/* Phase 14.1: monochrome SmileIcon (Koleex Hub UI style),
             not the colored 😊 emoji — matches the mic / send / icon
-            buttons around it. */}
-        <SmileIcon size={22} className="text-current" />
+            buttons around it. Size 24 matches the mic/send icon
+            visual weight so the composer's three action buttons
+            feel balanced. */}
+        <SmileIcon size={24} className="text-current" />
       </button>
       {open && (
         <div

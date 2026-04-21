@@ -1335,10 +1335,15 @@ export default function KoleexAiApp() {
                 {/* Phase 14.1: emoji picker lives on the LEFT of the
                     composer. Popover anchors to its left edge so the
                     grid opens rightward into empty space above the
-                    pill instead of clipping off the right edge. */}
-                <div className="m-1">
-                  <EmojiButton onSelect={insertEmoji} />
-                </div>
+                    pill instead of clipping off the right edge.
+                    Using m-2 + self-end to match the mic / send
+                    buttons on the right — so all three composer
+                    buttons bottom-align at the exact same y-pixel
+                    regardless of textarea height. */}
+                <EmojiButton
+                  onSelect={insertEmoji}
+                  className="m-2 self-end h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                />
                 <textarea
                   ref={composerRef}
                   value={input}
