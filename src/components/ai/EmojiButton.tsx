@@ -20,25 +20,25 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import SmileIcon from "@/components/icons/ui/SmileIcon";
 
-/** Curated 60-emoji grid. Ordered roughly by frequency of use in
- *  business messaging — smileys first (~20), reactions/gestures next
- *  (~15), hearts + celebrations (~10), office + objects (~15). */
+/** Curated 48-emoji grid (6 × 8). Trimmed from the original 60 so
+ *  the popover fits on a 568 px iPhone SE viewport without needing
+ *  internal scroll — the scrollbar was hiding the top row (smileys)
+ *  in the wild. Still covers ~95% of business-chat reactions. */
 const EMOJIS: string[] = [
-  // Row 1-3: smileys
+  // Row 1-2: smileys (12)
   "😀", "😊", "🙂", "😉", "😎", "😁",
-  "😍", "🥰", "😂", "🤣", "😅", "🤔",
-  "😇", "🙃", "🤩", "😢", "😭", "😡",
-  // Row 4-5: gestures
+  "😍", "😂", "🤣", "🤔", "😅", "🙃",
+  // Row 3-4: gestures (12)
   "👍", "👎", "👌", "🙏", "👋", "💪",
-  "🤝", "👏", "🙌", "✋", "👉", "🤷",
-  // Row 6-7: hearts + celebrations
-  "❤️", "💙", "💚", "💛", "🧡", "💜",
-  "💯", "🔥", "✨", "⭐", "🎉", "🏆",
-  // Row 8-10: office + objects
+  "🤝", "👏", "🙌", "✋", "🤷", "👉",
+  // Row 5-6: hearts + celebrations (12)
+  "❤️", "💙", "💚", "🧡", "💯", "🔥",
+  "✨", "⭐", "🎉", "🏆", "💡", "🚀",
+  // Row 7-8: office + objects (12)
   "✅", "❌", "⚠️", "📌", "📎", "📝",
-  "💼", "📊", "📈", "📉", "📅", "🕐",
-  "💡", "🚀", "📱", "💻", "📧", "☕",
+  "💼", "📊", "📈", "📅", "🕐", "☕",
 ];
 
 interface Props {
@@ -112,16 +112,24 @@ export default function EmojiButton({
         aria-haspopup="dialog"
         className={
           className ??
-          "h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors text-[20px]"
+          "h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
         }
       >
-        <span aria-hidden>😊</span>
+        {/* Phase 14.1: monochrome SmileIcon (Koleex Hub UI style),
+            not the colored 😊 emoji — matches the mic / send / icon
+            buttons around it. */}
+        <SmileIcon size={22} className="text-current" />
       </button>
       {open && (
         <div
           role="dialog"
           aria-label="Emoji picker"
-          className="absolute bottom-full right-0 mb-2 z-[60] rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-2 w-[248px] max-h-[320px] overflow-y-auto"
+          /* left-0 anchors the popover to the LEFT edge of the trigger
+             (the button is now on the left of the composer), so the
+             grid opens rightward into the empty space above the
+             textarea instead of clipping off-screen. bottom-full
+             keeps it above the composer. */
+          className="absolute bottom-full left-0 mb-2 z-[60] rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-2 w-[252px]"
         >
           <div className="grid grid-cols-6 gap-1">
             {EMOJIS.map((e) => (

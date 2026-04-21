@@ -1332,6 +1332,13 @@ export default function KoleexAiApp() {
               <div
                 className="relative flex items-end rounded-[26px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] focus-within:border-[var(--border-focus)] transition-colors"
               >
+                {/* Phase 14.1: emoji picker lives on the LEFT of the
+                    composer. Popover anchors to its left edge so the
+                    grid opens rightward into empty space above the
+                    pill instead of clipping off the right edge. */}
+                <div className="m-1">
+                  <EmojiButton onSelect={insertEmoji} />
+                </div>
                 <textarea
                   ref={composerRef}
                   value={input}
@@ -1382,14 +1389,9 @@ export default function KoleexAiApp() {
                      on focus — a <16px input triggers the zoom. */
                   style={{ minHeight: "54px" }}
                 />
-                {/* Phase 14: emoji picker. Sits just inside the
-                    composer pill before the mic, so thumb reach on
-                    mobile hits the three inline actions in order:
-                    emoji → mic → send. The picker popover anchors
-                    to the button and floats above the pill. */}
-                <div className="m-1">
-                  <EmojiButton onSelect={insertEmoji} />
-                </div>
+                {/* Phase 14.1: emoji button moved to the LEFT of the
+                    composer above. Mic stays adjacent to Send so the
+                    right-edge action group remains "speak | send". */}
                 {/* Mic button — always mounted now that Chat and Agent
                     are unified. Voice turns route through the same
                     orchestrator as typed turns. On transcript we call
