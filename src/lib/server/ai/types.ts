@@ -44,11 +44,20 @@ export interface AiMessage {
 export interface AiContext {
   /** Shown in the system prompt as "Current user: <username>". */
   username?: string | null;
-  /** UI language — drives the "Reply in X" system instruction. */
+  /** UI locale — what the app chrome is rendered in. A fallback for
+   *  when no strong signal is present in the user's message. */
   userLang?: "en" | "zh" | "ar";
   /** When false the business prompt explicitly blocks cost disclosure
    *  and uses the neutral redirect. Defaults to true. */
   canSeeCost?: boolean;
+  /** Phase 4: language detected from the user's message itself (not
+   *  the UI locale). Drives persona / tone in the prompt. When
+   *  undefined, prompt builder falls back to `userLang`. */
+  messageLang?: "EN" | "AR" | "EGY" | "ZH" | "FRANCO";
+  /** Phase 4: 0..1 confidence for `messageLang`. <0.5 means the
+   *  detector wasn't sure — prompt should stay neutral and not lock
+   *  aggressively into a persona. */
+  messageLangConfidence?: number;
 }
 
 /** Inbound to the router. */

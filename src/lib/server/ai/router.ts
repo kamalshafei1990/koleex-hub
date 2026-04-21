@@ -31,6 +31,7 @@ import {
   buildSmartPrompt,
 } from "./prompt-builder";
 import { preprocessUserQuery, type PreprocessResult } from "./preprocess";
+import { detectLanguage, type LanguageDetection } from "./detect-language";
 import {
   groqChat,
   groqChatStream,
@@ -442,6 +443,12 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const pp: PreprocessResult = preprocessUserQuery(rawLast);
   const last = pp.normalizedQuery || rawLast;
 
+  /* Phase 4: detect language from the ORIGINAL user text (not the
+     normalised one) so Franco Arabic / Egyptian dialect markers that
+     preprocess.ts might have reshaped still register. The preprocessor
+     never changes script or dialect, so rawLast is safe here. */
+  const detected: LanguageDetection = detectLanguage(rawLast);
+
   const intent: TaskIntent = req.forceMode
     ? req.forceMode === "business"
       ? "business"
@@ -450,10 +457,20 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
 
+  /* Enrich context with the detected message language. Only set it
+     above low-confidence threshold so a weak signal doesn't override
+     the UI locale. The prompt builder treats <0.5 confidence as
+     absent. */
+  const enrichedCtx: AiRequest["context"] = {
+    ...(req.context ?? {}),
+    messageLang: detected.language,
+    messageLangConfidence: detected.confidence,
+  };
+
   const { full, slim, minimal } = buildLanePrompt(
     lane,
     last,
-    req.context ?? {},
+    enrichedCtx,
     req.forceMode,
   );
 
@@ -508,6 +525,7 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
           console.log(
             `[ai.router] lane=${lane} provider=${name} intent=${intent}` +
               ` pp_intent=${pp.intent} rewrote=${pp.rewrote ? 1 : 0}` +
+              ` msg_lang=${detected.language} conf=${detected.confidence.toFixed(2)}` +
               ` fallback=${fellBack ? 1 : 0} retry=${i} ms=${Date.now() - t0}` +
               (errors.length ? ` skipped=${errors.join(";")}` : ""),
           );
@@ -561,6 +579,10 @@ export interface RouteStreamStart {
   normalizedQuery: string;
   ppIntent: import("./preprocess").QueryIntent;
   rewrote: boolean;
+  /** Phase 4: detected message language + confidence. Client can
+   *  surface a "replying in Egyptian Arabic" hint if desired. */
+  messageLang: import("./detect-language").DetectedLang;
+  messageLangConfidence: number;
 }
 
 /** Final event at the end of a stream. `reply` is the full text the
@@ -620,6 +642,9 @@ export async function* streamRouteAi(
   const pp: PreprocessResult = preprocessUserQuery(rawLast);
   const last = pp.normalizedQuery || rawLast;
 
+  /* Phase 4: detect from original text — see routeAi() for rationale. */
+  const detected: LanguageDetection = detectLanguage(rawLast);
+
   const intent: TaskIntent = req.forceMode
     ? req.forceMode === "business"
       ? "business"
@@ -627,10 +652,15 @@ export async function* streamRouteAi(
     : classifyIntent(last);
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
+  const enrichedCtx: AiRequest["context"] = {
+    ...(req.context ?? {}),
+    messageLang: detected.language,
+    messageLangConfidence: detected.confidence,
+  };
   const { full, slim, minimal } = buildLanePrompt(
     lane,
     last,
-    req.context ?? {},
+    enrichedCtx,
     req.forceMode,
   );
 
@@ -651,6 +681,8 @@ export async function* streamRouteAi(
     normalizedQuery: pp.normalizedQuery,
     ppIntent: pp.intent,
     rewrote: pp.rewrote,
+    messageLang: detected.language,
+    messageLangConfidence: detected.confidence,
   };
 
   const providers = providersForLane(lane);
@@ -684,6 +716,7 @@ export async function* streamRouteAi(
           console.log(
             `[ai.router.stream] lane=${lane} provider=${served.providerLabel}` +
               ` intent=${intent} pp_intent=${pp.intent}` +
+              ` msg_lang=${detected.language} conf=${detected.confidence.toFixed(2)}` +
               ` rewrote=${pp.rewrote ? 1 : 0} retry=${i} ttfb_ms=${ttfbMs}` +
               ` total_ms=${totalMs}` +
               (errors.length ? ` skipped=${errors.join(";")}` : ""),

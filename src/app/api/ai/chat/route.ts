@@ -201,6 +201,9 @@ export async function POST(req: Request) {
         let ppIntent = "unknown";
         let normBytes = clampedUser.length;
         let rewrote = 0;
+        /* Phase 4 language detection fields. */
+        let msgLang = "EN";
+        let msgLangConf = 0;
         try {
           for await (const ev of streamRouteAi({
             messages: [{ role: "user", content: clampedUser }],
@@ -212,6 +215,8 @@ export async function POST(req: Request) {
               ppIntent = ev.ppIntent;
               normBytes = ev.normalizedQuery.length;
               rewrote = ev.rewrote ? 1 : 0;
+              msgLang = ev.messageLang;
+              msgLangConf = ev.messageLangConfidence;
               controller.enqueue(send(ev));
             } else if (ev.type === "delta") {
               if (ttfbMs === null) ttfbMs = Date.now() - tStreamStart;
@@ -261,6 +266,7 @@ export async function POST(req: Request) {
           console.log(
             `[ai] lane=${laneLabel} ep=chat provider=${providerName}` +
               ` intent=${intent} pp_intent=${ppIntent}` +
+              ` msg_lang=${msgLang} conf=${msgLangConf.toFixed(2)}` +
               ` rewrote=${rewrote} fallback=${fallback}` +
               ` in_bytes=${lastUser.length} norm_bytes=${normBytes} hist=0` +
               ` ttfb_ms=${ttfbMs ?? "-"} ms=${tEnd - t0}` +

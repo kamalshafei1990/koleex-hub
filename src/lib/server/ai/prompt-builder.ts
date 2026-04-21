@@ -15,6 +15,48 @@ const LANG_NAME: Record<string, string> = {
   ar: "Arabic",
 };
 
+/* ─── Phase 4: persona / tone lock per detected language ─────────
+   Turns messageLang + confidence into a single line of system
+   instruction that goes at the top of every lane prompt. The line
+   is deliberately terse — the prompt has to stay under 2KB (FAST)
+   or 4KB (SMART) and we don't want to burn budget on a paragraph
+   of persona notes. When confidence is low (<0.5) we emit nothing,
+   so the prompt falls back to the lane's default "mirror the user's
+   language" rule. */
+function personaLock(ctx: AiContext): string {
+  const ml = ctx.messageLang;
+  const conf = ctx.messageLangConfidence ?? 0;
+  if (!ml || conf < 0.5) return "";
+
+  /* Each line ends with a space so it concatenates cleanly into the
+     prompt body. Tone wording is calibrated to the language's
+     register — professional English, formal MSA Arabic, friendly
+     Egyptian, etc. */
+  if (ml === "EN") {
+    return ` REPLY LANGUAGE LOCK: reply in English. Tone: professional, clear, direct.`;
+  }
+  if (ml === "AR") {
+    return ` REPLY LANGUAGE LOCK: رُدّ بالعربية الفصحى (MSA). النبرة: رسمية، واضحة، محترمة.`;
+  }
+  if (ml === "EGY") {
+    return (
+      ` REPLY LANGUAGE LOCK: رُدّ بالعامية المصرية، بنبرة ودّية طبيعية زي اللي بيكلّمك بيها.` +
+      ` استخدم كلمات مصرية فعلية (مثل: "بص"، "خليني"، "دلوقتي"، "يعني"، "عايز"، "حاجة").` +
+      ` اتجنّب الفصحى الرسمية إلا لو المستخدم طلبها صراحة.`
+    );
+  }
+  if (ml === "ZH") {
+    return ` REPLY LANGUAGE LOCK: 请用简体中文回复。语气:专业、清晰、直接。`;
+  }
+  /* FRANCO — the user wrote Arabizi (Latin letters + digits). We
+     understand it, but we ALWAYS reply in proper Egyptian Arabic
+     script with a simple friendly tone. Never echo Franco back. */
+  return (
+    ` REPLY LANGUAGE LOCK: المستخدم كتب بالفرانكو (حروف لاتينية + أرقام 3=ع، 7=ح، 2=ء، 5=خ، 9=ص، 6=ط).` +
+    ` افهم معناه، لكن ردّ دايمًا بالعامية المصرية بالحروف العربية — مش بالفرانكو. خلّي النبرة بسيطة وودّية.`
+  );
+}
+
 /* ─── FAST lane prompt (Phase 2) ─────────────────────────────────
    Target: <2KB. Identity, language mirror basics, two boundaries —
    nothing else. FAST is for greetings, small talk, and short
@@ -27,11 +69,13 @@ export function buildFastPrompt(
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
   const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
+  const persona = personaLock(ctx);
   return [
     {
       role: "system",
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
+        persona +
         ` Reply in the user's current message language by default (fall back to ${lang}).` +
         ` If they ask you to reply in a specific language, honor that for all following turns.` +
         ` Match the user's tone and length — short casual turns get short casual replies;` +
@@ -57,11 +101,13 @@ export function buildSmartPrompt(
 ): AiMessage[] {
   const lang = LANG_NAME[ctx.userLang ?? "en"] ?? "English";
   const whoAmI = ctx.username ? ` Current user: ${ctx.username}.` : "";
+  const persona = personaLock(ctx);
   return [
     {
       role: "system",
       content:
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}` +
+        persona +
         ` Reply in the user's message language by default (fall back to ${lang}).` +
         ` If they explicitly ask you to reply in a specific language ("reply in Arabic",` +
         ` "answer in English", "رد بالعربية", "请用中文回答"), honor that for all subsequent` +
