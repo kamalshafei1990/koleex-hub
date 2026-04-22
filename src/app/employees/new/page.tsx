@@ -397,12 +397,13 @@ export default function AddEmployeePage() {
   /* ── Main render ── */
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Phase 18: narrowed the container from 1400 → 1100 px. Forms
-          don't benefit from ultra-wide layouts — inputs get too long
-          to feel related and cells over 220 px of empty space on
-          1440+ monitors looks sparse. 1100 keeps the widest grids
-          (4 × 260 px inputs) readable and balanced. */}
-      <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* Phase 18.1: let the form fill the viewport width instead of
+          sitting in a narrow column. Horizontal padding scales with
+          the breakpoint so content still has comfortable side gutters
+          on ultra-wide monitors; the grid-column caps below (max 4
+          columns per row) keep individual inputs from stretching out
+          even when the page is 1800 px+ wide. */}
+      <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
         {/* ── Header ──
             Phase 17: removed the duplicate Save button from the
