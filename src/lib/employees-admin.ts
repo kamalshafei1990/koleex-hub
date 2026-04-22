@@ -264,23 +264,27 @@ export function emptyWizardData(): EmployeeWizardData {
    FETCH HELPERS
    ═══════════════════════════════════════════════════ */
 
-/** Generate next employee number (EMP-001, EMP-002, ...) */
+/** Generate next employee number (EMP-001, EMP-002, ...).
+ *
+ *  Goes through /api/employees/next-number so the scan runs on the
+ *  server with the service_role client. The old version queried
+ *  koleex_employees directly from the browser, which RLS blocks —
+ *  so it always returned EMP-001 and every new hire collided with
+ *  the existing first row.
+ *
+ *  Falls back to EMP-001 if the endpoint can't be reached; the
+ *  server-side uniqueness check will still catch the dupe and ask
+ *  the user to pick a different number manually. */
 export async function generateEmployeeNumber(): Promise<string> {
-  const { data } = await supabase
-    .from(EMPLOYEES)
-    .select("employee_number")
-    .not("employee_number", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  let maxNum = 0;
-  if (data) {
-    for (const row of data) {
-      const match = row.employee_number?.match(/EMP-(\d+)/);
-      if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
-    }
+  try {
+    const res = await fetch("/api/employees/next-number", { credentials: "include" });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const json = (await res.json()) as { employeeNumber?: string };
+    return json.employeeNumber || "EMP-001";
+  } catch (e) {
+    console.warn("[generateEmployeeNumber] falling back to EMP-001:", e);
+    return "EMP-001";
   }
-  return `EMP-${String(maxNum + 1).padStart(3, "0")}`;
 }
 
 /** Fetch all departments for picker */

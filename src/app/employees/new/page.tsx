@@ -858,6 +858,16 @@ export default function AddEmployeePage() {
     if (!result.success) {
       setError(result.error || "Failed to create employee.");
       setSaving(false);
+      /* Employee-number collisions are recoverable — auto-fetch a
+         fresh suggestion from the server and point the user at the
+         field so they can just click Save again. */
+      if (result.error?.toLowerCase().includes("employee number")) {
+        const next = await generateEmployeeNumber();
+        if (next !== form.employee_number) {
+          setForm((f) => ({ ...f, employee_number: next }));
+        }
+        focusField("employee_number");
+      }
       return;
     }
     setIsDirty(false);
@@ -1151,7 +1161,36 @@ export default function AddEmployeePage() {
             />
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
-              <TextInput label="Employee Number" value={form.employee_number} onChange={(v) => set("employee_number", v)} placeholder="EMP-001" disabled />
+              {/* Employee Number — auto-generated but editable.
+                  Previously disabled; that left no escape hatch when
+                  the auto-generator misfired (e.g. RLS hid existing
+                  rows from the anon client and every new hire
+                  collided on EMP-001). Now editable + a refresh
+                  button fetches a fresh suggestion from the server. */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <FieldLabel label="Employee Number" />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = await generateEmployeeNumber();
+                      set("employee_number", next);
+                    }}
+                    className="text-[10px] text-[var(--text-dim)] hover:text-[var(--text-primary)] -mt-1 transition-colors"
+                    title="Fetch next available number"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+                <input
+                  name="employee_number"
+                  type="text"
+                  value={form.employee_number}
+                  onChange={(e) => set("employee_number", e.target.value)}
+                  placeholder="EMP-001"
+                  className={`${inputBaseCls} ${borderFor()}`}
+                />
+              </div>
               <SelectInput label="Employment Type" value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
               <DateInput name="hire_date" label="Hire Date" value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
               <SelectInput label="Work Location" value={form.work_location} onChange={(v) => set("work_location", v)} options={WORK_LOCATION_OPTIONS} />
