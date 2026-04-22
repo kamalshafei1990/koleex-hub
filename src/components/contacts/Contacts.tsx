@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -1163,7 +1164,11 @@ function formToRow(f: ContactForm): Record<string, unknown> {
     notes: f.notes || null,
     website: f.websites[0]?.url || f.supplier_website || null,
     is_active: f.is_active,
-    customer_type: f.contact_type === "customer" && f.is_active ? (f.customer_type || null) : null,
+    /* Keep the tier even when the customer is deactivated — we used
+       to null it out on is_active=false, which silently deleted the
+       tier any time the toggle flipped. Deactivation should suspend
+       the record, not wipe its commercial metadata. */
+    customer_type: f.contact_type === "customer" ? (f.customer_type || null) : null,
     phones: f.phones,
     emails: f.emails,
     addresses: f.addresses,
@@ -2105,6 +2110,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
 export default function Contacts({ filterType }: { filterType?: ContactType } = {}) {
   /* ── i18n ── */
   const { t, lang } = useTranslation(contactsT);
+  const router = useRouter();
   /** Translate a dropdown option value. Falls back to the raw value. */
   const tOpt = (val: string) => t("opt." + val, val);
 
@@ -2290,11 +2296,19 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
   /* ── Handlers ── */
   const handleSelectContact = useCallback((c: ContactRow) => {
+    /* On the Customers app, route to the dedicated /customers/[id]
+       profile page. /suppliers, /companies, /people, /contacts keep
+       the legacy in-app side-panel detail view — that flow is
+       unchanged. */
+    if (filterType === "customer" && c.contact_type === "customer") {
+      router.push(`/customers/${c.id}`);
+      return;
+    }
     setSelectedId(c.id);
     setView("detail");
     setMobileShowDetail(true);
     setEditingId(null);
-  }, []);
+  }, [filterType, router]);
 
   const handleAdd = useCallback((type: ContactType, entityType?: "person" | "company") => {
     setForm({ ...EMPTY_FORM, contact_type: type, entity_type: entityType || "" });
@@ -2584,6 +2598,35 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
             {filterType ? (filterType === "company" ? t("tab.companies") : filterType === "people" ? t("tab.people") : filterType === "supplier" ? t("tab.suppliers") : t("tab.customers")) : t("title")}
           </h1>
+          {/* CSV export — customer directory only. Dumps whatever the
+              current filters produce (search, tier filter, active
+              filter) so the download matches what the user sees. */}
+          {filterType === "customer" && (
+            <button
+              onClick={() => {
+                /* Lazy import so the csv string builder doesn't
+                   weigh on the initial render of /contacts or
+                   /suppliers. */
+                import("@/lib/customers-admin").then(({ customersToCsv }) => {
+                  const csv = customersToCsv(filtered as unknown as Array<Record<string, unknown> & { id: string; contact_type: string | null; customer_type: string | null; display_name: string | null; company_name: string | null; first_name: string | null; last_name: string | null }>);
+                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                });
+              }}
+              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors shrink-0"
+              aria-label="Export customers as CSV"
+              title="Export CSV"
+            >
+              <DownloadIcon size={14} />
+            </button>
+          )}
           <button
             onClick={() => {
               /* Phase 20: make the "+" button app-aware so the
