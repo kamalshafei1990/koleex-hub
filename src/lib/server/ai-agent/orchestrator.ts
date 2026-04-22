@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
 import { brandKnowledgeFor } from "./brand-knowledge";
+import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 /* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
@@ -923,6 +924,8 @@ export function buildBrandSystemPrompt(
     "English";
   return `You are Koleex AI.
 
+${ENTITY_GUIDANCE_FULL}
+
 Language rules (read carefully):
 - Default: reply in the user's current message language. If it's too short to tell, fall back to ${langName}.
 - Explicit override: if the user explicitly tells you which language to reply in (e.g. "reply in Arabic", "respond in Chinese", "answer me in English", "رد بالعربية", "请用中文回答"), honor that override for ALL subsequent replies, even if they keep asking you in a different language — until they ask you to switch again. The request-language and the reply-language can be different; this is intentional.
@@ -1046,6 +1049,8 @@ function buildSystemPrompt(
     : "";
 
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
+
+${ENTITY_GUIDANCE_FULL}
 
 Language rules (critical):
 - Detect the language of the user's latest message and REPLY IN THAT SAME LANGUAGE.
