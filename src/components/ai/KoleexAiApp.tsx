@@ -384,6 +384,8 @@ export default function KoleexAiApp() {
     setInput("");
     setError(null);
     setSidebarOpen(false);
+    /* Same race guard as send() — see the comment there for why. */
+    restoredRef.current = true;
   }, []);
 
   /* ── Send a message ──
@@ -428,6 +430,16 @@ export default function KoleexAiApp() {
         setConversations((prev) => [conversation, ...prev]);
         conversationId = conversation.id;
         setActiveId(conversationId);
+        /* Fix: mark auto-restore as done so it doesn't race us on
+           the first-ever send. Without this, the effect that watches
+           `conversations` would fire post-render, read the activeId
+           we just wrote to localStorage, match the brand-new conv,
+           and call openConversation(newId) — which resets messages
+           to [] and fetches server state (empty because we haven't
+           POSTed to /api/ai/agent yet). End result: the user's
+           message + placeholder get wiped, and the SSE stream has
+           no placeholder to update, so the send appears to vanish. */
+        restoredRef.current = true;
       }
 
       setError(null);
@@ -1308,7 +1320,14 @@ export default function KoleexAiApp() {
             button tucked inside the right edge. Borderless on the parent
             div so the pill floats over the aurora background instead of
             sitting on a hard horizontal line. */}
-        <div className="shrink-0 bg-transparent">
+        {/* Phase 15: respect the iOS home-indicator safe area so the
+            composer sits above the bar on iPhones without a notch
+            guard. env(safe-area-inset-bottom) is 34 px on modern
+            devices, 0 on desktops — additive to the existing pb. */}
+        <div
+          className="shrink-0 bg-transparent"
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
           <div className="max-w-[820px] mx-auto px-4 md:px-6 pt-2 pb-3">
             <form
               onSubmit={(e) => {
