@@ -406,19 +406,30 @@ export default function AddEmployeePage() {
       <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-6 md:py-8">
 
         {/* ── Header ──
-            Phase 17: removed the duplicate Save button from the
-            header. Primary Save sits at the bottom bar next to
-            Cancel — one clear action location instead of two
-            identical buttons. */}
-        <div className="flex items-center justify-between mb-6">
+            Phase 18.2: Save button moved UP into the header. User
+            feedback was that the sticky bottom bar felt in the way;
+            the top-right is a more natural "primary action" location
+            on forms of this size. Back arrow on the left doubles as
+            Cancel (takes the user back to /employees). */}
+        <div className="flex items-center justify-between mb-6 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Link href="/employees"
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+              aria-label="Back to employees">
               <ArrowLeftIcon size={16} />
             </Link>
-            <EmployeesIcon size={18} className="text-[var(--text-dim)] shrink-0" />
+            <EmployeesIcon size={18} className="text-[var(--text-dim)] shrink-0 hidden sm:block" />
             <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">Add Employee</h1>
           </div>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            aria-label="Save employee"
+          >
+            {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
+            <span className="hidden xs:inline sm:inline">{saving ? "Saving..." : "Save Employee"}</span>
+          </button>
         </div>
 
         {error && (
@@ -750,26 +761,9 @@ export default function AddEmployeePage() {
             </section>
         </div>
 
-        {/* ── Bottom bar ──
-            Phase 18: sticky to the bottom of the viewport so a long
-            form doesn't force the user to scroll all the way down to
-            save. Semi-opaque blurred panel matches the hub's floating
-            header pattern. Bottom padding respects iOS home-indicator
-            safe area. */}
-        <div
-          className="sticky bottom-0 mt-8 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 bg-[var(--bg-primary)]/85 backdrop-blur-xl border-t border-[var(--border-subtle)] z-[5]"
-          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
-        >
-          <Link href="/employees"
-            className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
-            Cancel
-          </Link>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 sm:flex-none justify-center flex items-center gap-2 h-10 px-6 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
-            {saving ? "Saving..." : "Save Employee"}
-          </button>
-        </div>
+        {/* Phase 18.2: removed the sticky bottom bar entirely. Save
+            lives in the top-right of the header now; the header's
+            back arrow doubles as Cancel (navigates to /employees). */}
 
       </div>
     </div>
