@@ -146,8 +146,15 @@ export default function EmployeesPage() {
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Employees</h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Link href="/employees/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <PlusIcon className="h-4 w-4" /> Add Employee
+            {/* Phase 17: on mobile, show icon-only to give the title
+                room to breathe. Full label returns on sm+. */}
+            <Link
+              href="/employees/new"
+              className="h-10 px-3 sm:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
+              aria-label="Add employee"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Employee</span>
             </Link>
           </div>
         </div>
@@ -293,7 +300,12 @@ export default function EmployeesPage() {
             </div>
             <div className="divide-y divide-[var(--border-subtle)]">
               {filtered.map((emp) => (
-                <div key={emp.id} className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer group">
+                /* Phase 17: dropped cursor-pointer + group — there's no
+                   /employees/[id] detail page yet, so the click
+                   affordance led to nothing. Keep the row highlightable
+                   on hover for visual scanning; re-add the pointer +
+                   Link wrapper when the detail page ships. */
+                <div key={emp.id} className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors">
                   <Avatar src={emp.person.avatar_url} name={emp.person.full_name} size={40} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
