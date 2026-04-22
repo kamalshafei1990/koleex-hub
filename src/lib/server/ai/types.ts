@@ -67,6 +67,11 @@ export interface AiContext {
   complexity?: "simple" | "medium" | "deep";
   /** Phase 5: the shape the model should produce. */
   expectedFormat?: "short" | "structured" | "detailed";
+  /** Phase 19: Koleex entity scope for this turn —
+   *  COMPANY | HUB | PRODUCT | AMBIGUOUS. Prompt builders inject a
+   *  per-turn directive naming the correct entity so the model
+   *  never calls the company "Koleex Hub" or vice-versa. */
+  entityScope?: "COMPANY" | "HUB" | "PRODUCT" | "AMBIGUOUS";
 }
 
 /** Inbound to the router. */

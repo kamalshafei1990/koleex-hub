@@ -34,6 +34,7 @@ import { preprocessUserQuery, type PreprocessResult } from "./preprocess";
 import { detectLanguage, type LanguageDetection } from "./detect-language";
 import { analyzeIntent, type IntentAnalysis } from "./analyze-intent";
 import { findLocalAnswer, pickLocalAnswer } from "./local-knowledge";
+import { detectEntityScope } from "./entity-scope";
 import {
   groqChat,
   groqChatStream,
@@ -503,6 +504,9 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
      "whats mean by X" already reads as a definition by this point. */
   const analysis: IntentAnalysis = analyzeIntent(last);
 
+  /* Phase 19: Koleex entity scope — COMPANY / HUB / PRODUCT. */
+  const entity = detectEntityScope(last);
+
   const enrichedCtx: AiRequest["context"] = {
     ...(req.context ?? {}),
     messageLang: detected.language,
@@ -510,6 +514,7 @@ export async function routeAi(req: AiRequest): Promise<AiResponse> {
     intentType: analysis.type,
     complexity: analysis.complexity,
     expectedFormat: analysis.expectedFormat,
+    entityScope: entity.scope,
   };
 
   const { full, slim, minimal } = buildLanePrompt(
@@ -706,6 +711,8 @@ export async function* streamRouteAi(
     : classifyIntent(last);
   const mode: TaskMode = modeFor(intent);
   const lane: Lane = detectLane(intent, req.forceMode);
+  /* Phase 19: Koleex entity scope. */
+  const entity = detectEntityScope(last);
   const enrichedCtx: AiRequest["context"] = {
     ...(req.context ?? {}),
     messageLang: detected.language,
@@ -713,6 +720,7 @@ export async function* streamRouteAi(
     intentType: analysis.type,
     complexity: analysis.complexity,
     expectedFormat: analysis.expectedFormat,
+    entityScope: entity.scope,
   };
   const { full, slim, minimal } = buildLanePrompt(
     lane,

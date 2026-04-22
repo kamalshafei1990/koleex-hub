@@ -8,6 +8,11 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { AiContext, AiMessage } from "./types";
+import {
+  ENTITY_GUIDANCE_SHORT,
+  ENTITY_GUIDANCE_FULL,
+  buildEntityDirective,
+} from "./entity-scope";
 
 const LANG_NAME: Record<string, string> = {
   en: "English",
@@ -112,6 +117,8 @@ export function buildFastPrompt(
       role: "system",
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
+        ` ${ENTITY_GUIDANCE_SHORT}` +
+        (ctx.entityScope ? ` ${buildEntityDirective(ctx.entityScope)}` : "") +
         persona +
         shape +
         ` Reply in the user's current message language by default (fall back to ${lang}).` +
@@ -145,7 +152,11 @@ export function buildSmartPrompt(
     {
       role: "system",
       content:
-        `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}` +
+        `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
+        `${ENTITY_GUIDANCE_FULL}\n\n` +
+        (ctx.entityScope
+          ? `${buildEntityDirective(ctx.entityScope)}\n\n`
+          : "") +
         persona +
         shape +
         ` Reply in the user's message language by default (fall back to ${lang}).` +
