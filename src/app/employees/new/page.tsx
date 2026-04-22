@@ -239,14 +239,28 @@ function DateInput({
 }
 
 function SectionHeader({
-  icon: Icon, title,
+  icon: Icon, title, description,
 }: {
-  icon: React.ComponentType<{ size?: number | string; className?: string }>; title: string;
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  title: string;
+  description?: string;
 }) {
+  /* Phase 18: more prominent section headers. Bigger title, an
+     optional description line so each section explains itself at a
+     glance, icon inside a rounded tile so the visual hierarchy
+     reads as "icon → title → fields below" instead of a thin
+     uppercase label that got lost in the panel. */
   return (
-    <div className="flex items-center gap-2.5 mb-4 pb-2.5 border-b border-[var(--border-faint)]">
-      <Icon size={16} className="text-[var(--text-dim)]" />
-      <h2 className="text-[13px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">{title}</h2>
+    <div className="flex items-start gap-3 mb-5 pb-4 border-b border-[var(--border-faint)]">
+      <div className="h-9 w-9 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-faint)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+        <Icon size={16} />
+      </div>
+      <div className="min-w-0">
+        <h2 className="text-[14px] font-bold text-[var(--text-primary)] leading-tight">{title}</h2>
+        {description && (
+          <p className="text-[12px] text-[var(--text-dim)] mt-0.5">{description}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -289,8 +303,11 @@ async function compressImage(file: File, maxWidth = 400, quality = 0.8): Promise
    PANEL WRAPPER
    ═══════════════════════════════════════════════════ */
 
+/* Phase 18: bumped panel padding so the many fields inside each
+   section aren't packed edge-to-edge. Matches the wizard modal
+   (p-5 md:p-6) for a consistent form feel across entry points. */
 const panelCls =
-  "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 lg:p-5";
+  "bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5 md:p-6";
 
 /* ═══════════════════════════════════════════════════
    PAGE COMPONENT
@@ -380,7 +397,12 @@ export default function AddEmployeePage() {
   /* ── Main render ── */
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* Phase 18: narrowed the container from 1400 → 1100 px. Forms
+          don't benefit from ultra-wide layouts — inputs get too long
+          to feel related and cells over 220 px of empty space on
+          1440+ monitors looks sparse. 1100 keeps the widest grids
+          (4 × 260 px inputs) readable and balanced. */}
+      <div className="max-w-[1100px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* ── Header ──
             Phase 17: removed the duplicate Save button from the
@@ -409,7 +431,11 @@ export default function AddEmployeePage() {
 
             {/* ── 1. PERSONAL PROFILE ── */}
             <section className={panelCls}>
-              <SectionHeader icon={UserIcon} title="Personal Profile" />
+              <SectionHeader
+                icon={UserIcon}
+                title="Personal Profile"
+                description="Name, photo, and basic details about the person."
+              />
 
               {/* Photo + Name */}
               <div className="flex gap-4 mb-4">
@@ -459,8 +485,9 @@ export default function AddEmployeePage() {
                 </div>
               </div>
 
-              {/* Personal details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+              {/* Personal details — 8 fields, capped at 4 columns
+                  (was xl:grid-cols-8 which squeezed each to ~135 px). */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 <SelectInput label="Gender" value={form.gender} onChange={(v) => set("gender", v)}
                   options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder="Select..." />
                 <DateInput label="Date of Birth" value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} />
@@ -477,7 +504,11 @@ export default function AddEmployeePage() {
 
             {/* ── 2. CONTACT & ADDRESS ── */}
             <section className={panelCls}>
-              <SectionHeader icon={PhoneIcon} title="Contact & Address" />
+              <SectionHeader
+                icon={PhoneIcon}
+                title="Contact & Address"
+                description="How to reach this person — phone, email, and home address."
+              />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <TextInput label="Personal Phone" value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" />
@@ -486,9 +517,10 @@ export default function AddEmployeePage() {
                 <TextInput label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" />
               </div>
 
-              {/* Address */}
+              {/* Address — 6 fields, capped at 3 columns. Line 1 spans
+                  2 since addresses usually want the room. */}
               <SubLabel>Home Address</SubLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                 <TextInput label="Address Line 1" value={form.private_address_line1} onChange={(v) => set("private_address_line1", v)} placeholder="Street address" />
                 <TextInput label="Address Line 2" value={form.private_address_line2} onChange={(v) => set("private_address_line2", v)} placeholder="Apt, suite, unit" />
                 <TextInput label="City" value={form.private_city} onChange={(v) => set("private_city", v)} placeholder="City" />
@@ -500,7 +532,11 @@ export default function AddEmployeePage() {
 
             {/* ── 3. EMERGENCY CONTACTS ── */}
             <section className={panelCls}>
-              <SectionHeader icon={ShieldIcon} title="Emergency Contacts" />
+              <SectionHeader
+                icon={ShieldIcon}
+                title="Emergency Contacts"
+                description="People to contact if something happens on the job."
+              />
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3">
                 <div>
@@ -526,9 +562,13 @@ export default function AddEmployeePage() {
 
             {/* ── 4. EMPLOYMENT & ORGANIZATION ── */}
             <section className={panelCls}>
-              <SectionHeader icon={BriefcaseIcon} title="Employment & Organization" />
+              <SectionHeader
+                icon={BriefcaseIcon}
+                title="Employment & Organization"
+                description="Hire date, role, department, and reporting line."
+              />
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
                 <TextInput label="Employee Number" value={form.employee_number} onChange={(v) => set("employee_number", v)} placeholder="EMP-001" disabled />
                 <SelectInput label="Employment Type" value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
                 <DateInput label="Hire Date" value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required />
@@ -591,18 +631,23 @@ export default function AddEmployeePage() {
 
             {/* ── 5. COMPENSATION & BENEFITS ── */}
             <section className={panelCls}>
-              <SectionHeader icon={CreditCardIcon} title="Compensation & Benefits" />
+              <SectionHeader
+                icon={CreditCardIcon}
+                title="Compensation & Benefits"
+                description="Salary, bank account, and insurance details."
+              />
 
-              {/* Salary */}
+              {/* Salary — only 2 fields, don't stretch them across
+                  the whole panel. Cap at 2 cols on md+. */}
               <SubLabel>Salary</SubLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mt-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4 max-w-md">
                 <TextInput label="Initial Salary" value={form.initial_salary} onChange={(v) => set("initial_salary", v)} placeholder="e.g. 5000" type="number" />
                 <SelectInput label="Currency" value={form.salary_currency} onChange={(v) => set("salary_currency", v)} options={CURRENCY_OPTIONS} />
               </div>
 
-              {/* Bank */}
+              {/* Bank — 6 fields, capped at 3 cols. */}
               <SubLabel>Bank Account</SubLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mt-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3 mb-4">
                 <TextInput label="Bank Name" value={form.bank_name} onChange={(v) => set("bank_name", v)} placeholder="e.g. HSBC" />
                 <TextInput label="Account Holder" value={form.bank_account_holder} onChange={(v) => set("bank_account_holder", v)} placeholder="Name on account" />
                 <TextInput label="Account Number" value={form.bank_account_number} onChange={(v) => set("bank_account_number", v)} placeholder="Account #" />
@@ -611,9 +656,9 @@ export default function AddEmployeePage() {
                 <TextInput label="Currency" value={form.bank_currency} onChange={(v) => set("bank_currency", v)} placeholder="e.g. USD" />
               </div>
 
-              {/* Insurance */}
+              {/* Insurance — 4 fields. */}
               <SubLabel>Insurance</SubLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
                 <TextInput label="Provider" value={form.insurance_provider} onChange={(v) => set("insurance_provider", v)} placeholder="e.g. Bupa" />
                 <TextInput label="Policy Number" value={form.insurance_policy_number} onChange={(v) => set("insurance_policy_number", v)} placeholder="Policy #" />
                 <SelectInput label="Class" value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
@@ -623,11 +668,15 @@ export default function AddEmployeePage() {
 
             {/* ── 6. DOCUMENTS & COMPLIANCE ── */}
             <section className={panelCls}>
-              <SectionHeader icon={DocumentIcon} title="Documents & Compliance" />
+              <SectionHeader
+                icon={DocumentIcon}
+                title="Documents & Compliance"
+                description="IDs, visa, education, and driving license."
+              />
 
-              {/* ID & Passport */}
+              {/* Identification — 4 fields. */}
               <SubLabel>Identification</SubLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3 mb-4">
                 <TextInput label="National ID" value={form.identification_id} onChange={(v) => set("identification_id", v)} placeholder="ID number" />
                 <TextInput label="Passport Number" value={form.passport_number} onChange={(v) => set("passport_number", v)} placeholder="Passport #" />
                 <TextInput label="Social Security #" value={form.social_security_number} onChange={(v) => set("social_security_number", v)} placeholder="SSN" />
@@ -645,7 +694,7 @@ export default function AddEmployeePage() {
                 </div>
                 <div>
                   <SubLabel>Education</SubLabel>
-                  <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                     <SelectInput label="Degree" value={form.education_degree} onChange={(v) => set("education_degree", v)} options={DEGREE_OPTIONS} />
                     <TextInput label="Institution" value={form.education_institution} onChange={(v) => set("education_institution", v)} placeholder="University name" />
                     <TextInput label="Field of Study" value={form.education_field} onChange={(v) => set("education_field", v)} placeholder="e.g. Computer Science" />
@@ -655,7 +704,7 @@ export default function AddEmployeePage() {
               </div>
 
               <SubLabel>Driving License</SubLabel>
-              <div className="grid grid-cols-3 xl:grid-cols-6 gap-3 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                 <TextInput label="License Number" value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
                 <SelectInput label="Type" value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
                 <DateInput label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} />
@@ -664,7 +713,11 @@ export default function AddEmployeePage() {
 
             {/* ── 7. ACCOUNT SETUP — full width ── */}
             <section className={panelCls}>
-          <SectionHeader icon={KeyIcon} title="Account Setup (Optional)" />
+              <SectionHeader
+                icon={KeyIcon}
+                title="Account Setup"
+                description="Optional. Create login credentials so this employee can sign in to Koleex Hub."
+              />
 
           <div className="flex items-center gap-3 mb-4">
             <button type="button" onClick={() => set("create_account", !form.create_account)}
@@ -696,14 +749,22 @@ export default function AddEmployeePage() {
             </section>
         </div>
 
-        {/* ── Bottom bar ── */}
-        <div className="mt-6 mb-4 flex items-center justify-between">
+        {/* ── Bottom bar ──
+            Phase 18: sticky to the bottom of the viewport so a long
+            form doesn't force the user to scroll all the way down to
+            save. Semi-opaque blurred panel matches the hub's floating
+            header pattern. Bottom padding respects iOS home-indicator
+            safe area. */}
+        <div
+          className="sticky bottom-0 mt-8 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 bg-[var(--bg-primary)]/85 backdrop-blur-xl border-t border-[var(--border-subtle)] z-[5]"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           <Link href="/employees"
-            className="flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+            className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
             Cancel
           </Link>
           <button onClick={handleSubmit} disabled={saving}
-            className="flex items-center gap-2 h-10 px-6 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex-1 sm:flex-none justify-center flex items-center gap-2 h-10 px-6 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
             {saving ? "Saving..." : "Save Employee"}
           </button>
