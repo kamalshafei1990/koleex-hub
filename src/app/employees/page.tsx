@@ -26,6 +26,8 @@ import {
   fetchDepartments as fetchDepts,
   type EmployeeListItem,
 } from "@/lib/employees-admin";
+import { useTranslation } from "@/lib/i18n";
+import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow } from "@/types/supabase";
 
 /* ═══════════════════════════════════════════════════
@@ -79,6 +81,7 @@ function Avatar({ src, name, size = 40 }: { src?: string | null; name: string; s
    ═══════════════════════════════════════════════════ */
 
 export default function EmployeesPage() {
+  const { t } = useTranslation(employeesT);
   const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,23 +146,21 @@ export default function EmployeesPage() {
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <EmployeesIcon size={16} />
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">Employees</h1>
+            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("app.title")}</h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Phase 17: on mobile, show icon-only to give the title
-                room to breathe. Full label returns on sm+. */}
             <Link
               href="/employees/new"
               className="h-10 px-3 sm:px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg"
-              aria-label="Add employee"
+              aria-label={t("app.add")}
             >
               <PlusIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Employee</span>
+              <span className="hidden sm:inline">{t("app.add")}</span>
             </Link>
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
-          {employees.length} {employees.length === 1 ? "employee" : "employees"} in directory
+          {t("list.showing", `${employees.length} employees`).replace("{x}", String(employees.length)).replace("{y}", String(employees.length))}
         </p>
 
         {/* Search + Filters */}
@@ -169,7 +170,7 @@ export default function EmployeesPage() {
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, ID, email, department..."
+                placeholder={t("list.search")}
                 className="w-full h-10 pl-10 pr-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
               />
               {search && (
@@ -185,7 +186,7 @@ export default function EmployeesPage() {
               }`}
             >
               <FilterIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Filters</span>
+              <span className="hidden sm:inline">{t("list.filters")}</span>
               {activeFilterCount > 0 && (
                 <span className="w-5 h-5 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>
               )}
@@ -194,35 +195,35 @@ export default function EmployeesPage() {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap gap-3 items-end">
               <div className="flex-1 min-w-[160px]">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">Department</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">{t("list.department")}</label>
                 <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className={selectCls + " w-full"}>
-                  <option value="">All</option>
+                  <option value="">{t("list.all")}</option>
                   {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </div>
               <div className="flex-1 min-w-[130px]">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">Status</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">{t("list.status")}</label>
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectCls + " w-full"}>
-                  <option value="">All</option>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <option value="">{t("list.all")}</option>
+                  {Object.keys(STATUS_LABELS).map((k) => <option key={k} value={k}>{t(`status.${k}`, STATUS_LABELS[k])}</option>)}
                 </select>
               </div>
               <div className="flex-1 min-w-[130px]">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">Type</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">{t("list.type")}</label>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={selectCls + " w-full"}>
-                  <option value="">All</option>
-                  {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <option value="">{t("list.all")}</option>
+                  {Object.keys(TYPE_LABELS).map((k) => <option key={k} value={k}>{t(`type.${k}`, TYPE_LABELS[k])}</option>)}
                 </select>
               </div>
               <div className="flex-1 min-w-[130px]">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">Location</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)] mb-1">{t("list.location")}</label>
                 <select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} className={selectCls + " w-full"}>
-                  <option value="">All</option>
-                  {Object.entries(LOCATION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <option value="">{t("list.all")}</option>
+                  {Object.keys(LOCATION_LABELS).map((k) => <option key={k} value={k}>{t(`loc.${k}`, LOCATION_LABELS[k])}</option>)}
                 </select>
               </div>
               {activeFilterCount > 0 && (
-                <button onClick={clearAllFilters} className="h-10 px-3 rounded-lg text-[12px] text-red-400 hover:bg-red-400/10 font-medium transition-colors">Clear all</button>
+                <button onClick={clearAllFilters} className="h-10 px-3 rounded-lg text-[12px] text-red-400 hover:bg-red-400/10 font-medium transition-colors">{t("list.filters")} · {t("cancel")}</button>
               )}
             </div>
           )}
@@ -234,7 +235,7 @@ export default function EmployeesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-blue-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400"><UsersIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Total</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("list.all", "Total")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{employees.length}</div>
           </div>
@@ -242,7 +243,7 @@ export default function EmployeesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-emerald-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-400"><CheckIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Active</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("status.active")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalActive}</div>
           </div>
@@ -250,7 +251,7 @@ export default function EmployeesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-violet-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-400"><Building2Icon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Departments</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("list.department")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalDepts}</div>
           </div>
@@ -258,7 +259,7 @@ export default function EmployeesPage() {
             <div className="absolute top-0 inset-x-0 h-[2px] bg-amber-400" />
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400"><BriefcaseIcon size={15} /></div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">On Leave</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">{t("status.on_leave")}</span>
             </div>
             <div className="text-[32px] font-extrabold tracking-tight text-[var(--text-primary)] leading-none">{totalOnLeave}</div>
           </div>
@@ -268,7 +269,7 @@ export default function EmployeesPage() {
         {loading ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin mx-auto" />
-            <p className="text-[13px] mt-3 text-[var(--text-dim)]">Loading employees...</p>
+            <p className="text-[13px] mt-3 text-[var(--text-dim)]">{t("loading")}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
@@ -276,14 +277,14 @@ export default function EmployeesPage() {
               <UsersIcon size={24} className="text-[var(--text-dim)] opacity-40" />
             </div>
             <p className="text-[14px] font-semibold text-[var(--text-secondary)] mb-1">
-              {employees.length === 0 ? "No employees yet" : "No results found"}
+              {employees.length === 0 ? t("list.empty.title") : t("list.noResults")}
             </p>
             <p className="text-[12px] text-[var(--text-dim)]">
-              {employees.length === 0 ? "Add your first employee to get started." : "Try adjusting your search or filters."}
+              {employees.length === 0 ? t("list.empty.body") : ""}
             </p>
             {employees.length === 0 && (
               <Link href="/employees/new" className="mt-4 inline-flex items-center gap-2 h-10 px-5 rounded-xl text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition-all">
-                <PlusIcon className="h-4 w-4" /> Add Employee
+                <PlusIcon className="h-4 w-4" /> {t("app.add")}
               </Link>
             )}
           </div>
@@ -292,11 +293,11 @@ export default function EmployeesPage() {
             {/* Table header — desktop */}
             <div className="hidden md:flex items-center gap-4 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-faint)]">
               <div className="w-10 shrink-0" />
-              <div className="flex-1 min-w-0">Employee</div>
-              <div className="w-[180px] shrink-0">Department</div>
-              <div className="w-[160px] shrink-0">Position</div>
-              <div className="w-[100px] shrink-0">Type</div>
-              <div className="w-[90px] shrink-0">Status</div>
+              <div className="flex-1 min-w-0">{t("list.col.employee")}</div>
+              <div className="w-[180px] shrink-0">{t("list.col.dept")}</div>
+              <div className="w-[160px] shrink-0">{t("list.col.position")}</div>
+              <div className="w-[100px] shrink-0">{t("list.col.type")}</div>
+              <div className="w-[90px] shrink-0">{t("list.col.status")}</div>
             </div>
             <div className="divide-y divide-[var(--border-subtle)]">
               {filtered.map((emp) => (
@@ -326,7 +327,7 @@ export default function EmployeesPage() {
                       {emp.department_name && <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-dim)] border border-[var(--border-faint)]">{emp.department_name}</span>}
                       {emp.position_title && <span className="text-[11px] text-[var(--text-dim)]">{emp.position_title}</span>}
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${STATUS_COLORS[emp.employment_status] || STATUS_COLORS.inactive}`}>
-                        {STATUS_LABELS[emp.employment_status] || emp.employment_status}
+                        {t(`status.${emp.employment_status}`, STATUS_LABELS[emp.employment_status] || emp.employment_status)}
                       </span>
                     </div>
                   </div>
@@ -337,7 +338,7 @@ export default function EmployeesPage() {
                     {emp.position_title || <span className="text-[var(--text-faint)]">&mdash;</span>}
                   </div>
                   <div className="hidden md:block w-[100px] shrink-0 text-[12px] text-[var(--text-dim)]">
-                    {TYPE_LABELS[emp.employment_type] || emp.employment_type}
+                    {t(`type.${emp.employment_type}`, TYPE_LABELS[emp.employment_type] || emp.employment_type)}
                   </div>
                   <div className="hidden md:block w-[90px] shrink-0">
                     <span className={`text-[10px] font-semibold px-2 py-1 rounded-md border ${STATUS_COLORS[emp.employment_status] || STATUS_COLORS.inactive}`}>
@@ -352,7 +353,7 @@ export default function EmployeesPage() {
 
         {!loading && filtered.length > 0 && (
           <p className="text-[11px] text-[var(--text-faint)] mt-3 text-center">
-            Showing {filtered.length} of {employees.length} employees
+            {t("list.showing").replace("{x}", String(filtered.length)).replace("{y}", String(employees.length))}
           </p>
         )}
       </div>

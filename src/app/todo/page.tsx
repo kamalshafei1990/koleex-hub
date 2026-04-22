@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
+import { useTranslation } from "@/lib/i18n";
+import { todoT } from "@/lib/translations/todo";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -151,6 +153,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   onClose: () => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation(todoT);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TodoPriority>("medium");
@@ -303,7 +306,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           <div>
             <label className={lbl}>Title *</label>
             <input ref={inputRef} value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs to be done?" className={inp}
+              placeholder={t("f.title.placeholder")} className={inp}
               onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) handleSave(); }} />
           </div>
 
@@ -311,7 +314,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           <div>
             <label className={lbl}>Description <span className="font-normal normal-case">(optional)</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add details..." rows={2} className={inp + " h-auto py-3 resize-none"} />
+              placeholder={t("f.description.placeholder")} rows={2} className={inp + " h-auto py-3 resize-none"} />
           </div>
 
           {/* Assign To */}
@@ -340,7 +343,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
             <div className="relative mb-2">
               <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
               <input type="text" value={empSearch} onChange={(e) => setEmpSearch(e.target.value)}
-                placeholder="Search employees..." className={inp + " pl-9 h-9 text-[12px]"} />
+                placeholder={t("filters.searchEmployees")} className={inp + " pl-9 h-9 text-[12px]"} />
             </div>
 
             {/* Employee avatars grid */}
@@ -474,6 +477,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
   onDeleteNote: (noteId: string) => void;
   currentAccountId: string | null;
 }) {
+  const { t } = useTranslation(todoT);
   const priorityConfig = PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
   const overdue = !task.completed && isOverdue(task.due_date);
   const [expanded, setExpanded] = useState(false);
@@ -598,7 +602,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
           {/* Add note input */}
           <div className="flex items-center gap-2 mt-1">
             <input type="text" value={noteText} onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Write a note..."
+              placeholder={t("notes.placeholder")}
               className="flex-1 h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-all"
               onKeyDown={(e) => { if (e.key === "Enter") handleSubmitNote(); }} />
             <button onClick={handleSubmitNote} disabled={!noteText.trim()}
@@ -616,6 +620,7 @@ function TaskRow({ task, onToggle, onEdit, onDelete, onAddNote, onDeleteNote, cu
    KPI DASHBOARD
    ══════════════════════════════════════════════════════════════ */
 function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
+  const { t } = useTranslation(todoT);
   const total = todos.length;
   const completed = todos.filter((t) => t.completed).length;
   const active = total - completed;
@@ -670,7 +675,7 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
         <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
             <AwardIcon size={14} className="text-yellow-400" />
-            <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Top Performers</span>
+            <span className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("kpi.topPerformers")}</span>
           </div>
           <div className="flex items-center gap-4 flex-wrap min-w-0">
             {topPerformers.map((p, i) => (
@@ -698,6 +703,7 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
    MAIN PAGE
    ══════════════════════════════════════════════════════════════ */
 export default function TodoPage() {
+  const { t } = useTranslation(todoT);
   const [todos, setTodos] = useState<TodoWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -911,7 +917,7 @@ export default function TodoPage() {
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
                 <CheckSquareIcon className="h-4 w-4" />
               </div>
-              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">To-do</h1>
+              <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">{t("app.title")}</h1>
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-3 ml-0 md:ml-11">
@@ -923,7 +929,7 @@ export default function TodoPage() {
             <div className="flex-1 min-w-0 flex items-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 md:px-4 gap-2 md:gap-3 focus-within:border-[var(--border-focus)] transition-all">
               <SearchIcon size={16} className="text-[var(--text-dim)] shrink-0" />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search tasks..."
+                placeholder={t("search")}
                 className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none h-10" />
               {search && (
                 <button onClick={() => setSearch("")} className="p-0.5">
@@ -944,7 +950,7 @@ export default function TodoPage() {
             <button onClick={() => setModal({ open: true, entry: null })}
               className="h-10 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shrink-0">
               <PlusIcon size={16} />
-              <span className="hidden md:inline">Add Task</span>
+              <span className="hidden md:inline">{t("add")}</span>
             </button>
           </div>
 
@@ -1061,7 +1067,7 @@ export default function TodoPage() {
         ) : (
           <div className="space-y-3">
             {grouped.overdue.length > 0 && (
-              <Section title="Overdue" count={grouped.overdue.length} color="text-red-400">
+              <Section title={t("section.overdue")} count={grouped.overdue.length} color="text-red-400">
                 {grouped.overdue.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
@@ -1073,7 +1079,7 @@ export default function TodoPage() {
               </Section>
             )}
             {grouped.today.length > 0 && (
-              <Section title="Today" count={grouped.today.length} color="text-green-400">
+              <Section title={t("section.today")} count={grouped.today.length} color="text-green-400">
                 {grouped.today.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
@@ -1085,7 +1091,7 @@ export default function TodoPage() {
               </Section>
             )}
             {grouped.upcoming.length > 0 && (
-              <Section title="Upcoming" count={grouped.upcoming.length} color="text-blue-400">
+              <Section title={t("section.upcoming")} count={grouped.upcoming.length} color="text-blue-400">
                 {grouped.upcoming.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
@@ -1097,7 +1103,7 @@ export default function TodoPage() {
               </Section>
             )}
             {grouped.noDate.length > 0 && (
-              <Section title="No Due Date" count={grouped.noDate.length} color="text-[var(--text-faint)]">
+              <Section title={t("section.noDate")} count={grouped.noDate.length} color="text-[var(--text-faint)]">
                 {grouped.noDate.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}
@@ -1109,7 +1115,7 @@ export default function TodoPage() {
               </Section>
             )}
             {grouped.completed.length > 0 && (
-              <Section title="Completed" count={grouped.completed.length} color="text-[var(--text-dim)]">
+              <Section title={t("section.completed")} count={grouped.completed.length} color="text-[var(--text-dim)]">
                 {grouped.completed.map((t) => (
                   <TaskRow key={t.id} task={t} currentAccountId={accountId}
                     onToggle={() => handleToggle(t.id)}

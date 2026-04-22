@@ -32,6 +32,8 @@ import {
   type ActivityItem,
   type EmployeeActivity,
 } from "@/lib/employees-admin";
+import { useTranslation } from "@/lib/i18n";
+import { employeesT } from "@/lib/translations/employees";
 import type { EmployeeWithLinks } from "@/types/supabase";
 
 /* ═══════════════════════════════════════════════════
@@ -175,7 +177,7 @@ function ActivityCard({
       </div>
 
       {recent.length === 0 ? (
-        <div className="text-[12px] text-[var(--text-faint)] py-3">Nothing yet.</div>
+        <div className="text-[12px] text-[var(--text-faint)] py-3">—</div>
       ) : (
         <ul className="divide-y divide-[var(--border-faint)]">
           {recent.map((r) => <ActivityRow key={r.id} item={r} />)}
@@ -225,6 +227,7 @@ export default function EmployeeProfilePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = useTranslation(employeesT);
   const { id } = use(params);
   const [profile, setProfile] = useState<EmployeeWithLinks | null>(null);
   const [activity, setActivity] = useState<EmployeeActivity | null>(null);
@@ -268,9 +271,9 @@ export default function EmployeeProfilePage({
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-center">
           <UserIcon size={32} className="mx-auto text-[var(--text-faint)] mb-3" />
-          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">Employee not found</p>
+          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">{t("profile.notFound")}</p>
           <Link href="/employees" className="text-xs text-[var(--text-dim)] hover:text-[var(--text-primary)] underline underline-offset-2">
-            Back to employees
+            {t("back.toList")}
           </Link>
         </div>
       </div>
@@ -297,11 +300,11 @@ export default function EmployeeProfilePage({
           <Link
             href="/employees"
             className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-            aria-label="Back to employees"
+            aria-label={t("back.toList")}
           >
             <ArrowLeftIcon size={16} />
           </Link>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Employee Profile</h1>
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">{t("app.profile")}</h1>
         </div>
 
         {/* ── Header card ── */}
@@ -333,7 +336,7 @@ export default function EmployeeProfilePage({
                   <span className="flex items-center gap-1.5"><PhoneIcon size={12} /> {employee.work_phone}</span>
                 )}
                 {employee.hire_date && (
-                  <span className="flex items-center gap-1.5"><BriefcaseIcon size={12} /> Hired {formatDate(employee.hire_date)}</span>
+                  <span className="flex items-center gap-1.5"><BriefcaseIcon size={12} /> {t("profile.hired").replace("{date}", formatDate(employee.hire_date))}</span>
                 )}
               </div>
             </div>
@@ -344,17 +347,16 @@ export default function EmployeeProfilePage({
             <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
               <KeyIcon size={16} className="text-amber-400 mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] text-amber-300 font-medium">No login account linked</p>
+                <p className="text-[13px] text-amber-300 font-medium">{t("profile.noAccount.title")}</p>
                 <p className="text-[11px] text-amber-300/80 mt-0.5">
-                  Without an account this employee can&apos;t be picked in CRM, Projects, Planning, Todos, or Calendar.
-                  HR records still work, but nothing else connects.
+                  {t("profile.noAccount.body")}
                 </p>
               </div>
               <Link
                 href={`/accounts?person=${person.id}`}
                 className="h-8 px-3 rounded-lg text-[11px] font-medium border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 inline-flex items-center transition-colors shrink-0"
               >
-                Create account
+                {t("profile.noAccount.cta")}
               </Link>
             </div>
           )}
@@ -362,20 +364,21 @@ export default function EmployeeProfilePage({
 
         {/* ── Tabs ── */}
         <div className="flex items-center gap-1 mb-4 overflow-x-auto">
-          {TABS.map((t) => {
-            const label = t === "overview" ? "Overview"
-              : t === "activity" ? `Activity${activity ? ` · ${activityTotal}` : ""}`
-              : "HR Details";
+          {TABS.map((tabKey) => {
+            const base = tabKey === "overview" ? t("tab.overview")
+              : tabKey === "activity" ? t("tab.activity")
+              : t("tab.hr");
+            const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
             return (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className={`h-9 px-4 rounded-lg text-[12px] font-medium transition-colors ${
-                  tab === t
+                  tab === tabKey
                     ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
                     : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                 }`}
-                aria-current={tab === t ? "page" : undefined}
+                aria-current={tab === tabKey ? "page" : undefined}
               >
                 {label}
               </button>
@@ -387,7 +390,7 @@ export default function EmployeeProfilePage({
         {tab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
-              <SectionHeader icon={UserIcon} title="Personal" description="Identity and contact." />
+              <SectionHeader icon={UserIcon} title={t("ov.personal")} description={t("ov.personal.desc")} />
               <div>
                 <InfoRow label="Full name" value={person.full_name} />
                 <InfoRow label="Gender" value={employee.gender} />
@@ -401,7 +404,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={BriefcaseIcon} title="Employment" description="Role and reporting line." />
+              <SectionHeader icon={BriefcaseIcon} title={t("ov.employment")} description={t("ov.employment.desc")} />
               <div>
                 <InfoRow label="Employee #" value={employee.employee_number} />
                 <InfoRow label="Department" value={department?.name} />
@@ -415,7 +418,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={Building2Icon} title="Work Contact" description="How teams reach this person." />
+              <SectionHeader icon={Building2Icon} title={t("ov.workContact")} description={t("ov.workContact.desc")} />
               <div>
                 <InfoRow label="Work email" value={employee.work_email} />
                 <InfoRow label="Work phone" value={employee.work_phone} />
@@ -425,7 +428,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={ShieldIcon} title="Emergency" description="Who to contact if something happens." />
+              <SectionHeader icon={ShieldIcon} title={t("ov.emergency")} description={t("ov.emergency.desc")} />
               <div>
                 <InfoRow label="Primary" value={employee.emergency_contact_name} />
                 <InfoRow label="Phone" value={employee.emergency_contact_phone} />
@@ -526,7 +529,7 @@ export default function EmployeeProfilePage({
         {tab === "hr" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <section className={panelCls}>
-              <SectionHeader icon={CreditCardIcon} title="Compensation" description="Salary and bank details." />
+              <SectionHeader icon={CreditCardIcon} title={t("hr.compensation")} description={t("hr.compensation.desc")} />
               <div>
                 <InfoRow
                   label="Initial salary"
@@ -542,7 +545,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={DocumentIcon} title="Documents" description="IDs, visa, and license." />
+              <SectionHeader icon={DocumentIcon} title={t("hr.documents")} description={t("hr.documents.desc")} />
               <div>
                 <InfoRow label="National ID" value={employee.identification_id} />
                 <InfoRow label="Passport" value={employee.passport_number} />
@@ -556,7 +559,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={ShieldIcon} title="Insurance" description="Coverage and policy." />
+              <SectionHeader icon={ShieldIcon} title={t("hr.insurance")} description={t("hr.insurance.desc")} />
               <div>
                 <InfoRow label="Provider" value={employee.insurance_provider} />
                 <InfoRow label="Policy #" value={employee.insurance_policy_number} />
@@ -566,7 +569,7 @@ export default function EmployeeProfilePage({
             </section>
 
             <section className={panelCls}>
-              <SectionHeader icon={BriefcaseIcon} title="Education" description="Background." />
+              <SectionHeader icon={BriefcaseIcon} title={t("hr.education")} description={t("hr.education.desc")} />
               <div>
                 <InfoRow label="Degree" value={employee.education_degree?.replace(/_/g, " ")} />
                 <InfoRow label="Institution" value={employee.education_institution} />

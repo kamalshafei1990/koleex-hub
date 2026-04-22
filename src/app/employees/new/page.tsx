@@ -49,6 +49,8 @@ import {
 } from "@/lib/accounts-admin";
 import { uploadToStorage } from "@/lib/storage-client";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
+import { useTranslation } from "@/lib/i18n";
+import { employeesT } from "@/lib/translations/employees";
 import type { DepartmentRow, PositionRow, RoleRow } from "@/types/supabase";
 
 /* ═══════════════════════════════════════════════════
@@ -716,6 +718,7 @@ const panelCls =
    ═══════════════════════════════════════════════════ */
 
 export default function AddEmployeePage() {
+  const { t } = useTranslation(employeesT);
   const router = useRouter();
   const [form, setForm] = useState<EmployeeWizardData>(emptyWizardData());
   const [saving, setSaving] = useState(false);
@@ -819,7 +822,7 @@ export default function AddEmployeePage() {
 
   const handleBack = () => {
     if (isDirty && !saved) {
-      if (!window.confirm("You have unsaved changes. Leave this page?")) return;
+      if (!window.confirm(t("unsaved.confirm"))) return;
     }
     router.push("/employees");
   };
@@ -906,8 +909,8 @@ export default function AddEmployeePage() {
             <CheckIcon size={20} className="text-emerald-400" />
           </div>
           <div>
-            <h2 id="saved-title" className="text-base font-semibold text-[var(--text-primary)]">Employee Created</h2>
-            <p className="text-xs text-[var(--text-dim)]">{saved.name || "New employee"} was added.</p>
+            <h2 id="saved-title" className="text-base font-semibold text-[var(--text-primary)]">{t("saved.title")}</h2>
+            <p className="text-xs text-[var(--text-dim)]">{t("saved.body").replace("{name}", saved.name || "")}</p>
           </div>
         </div>
         {saved.partial && (
@@ -920,19 +923,19 @@ export default function AddEmployeePage() {
             href={`/employees/${saved.id}`}
             className="h-10 px-3 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 flex items-center justify-center transition-opacity"
           >
-            View profile
+            {t("saved.view")}
           </Link>
           <button
             onClick={resetForm}
             className="h-10 px-3 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
-            Add another
+            {t("saved.addAnother")}
           </button>
           <Link
             href="/employees"
             className="h-10 px-3 rounded-xl text-sm font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors"
           >
-            Back to list
+            {t("saved.toList")}
           </Link>
         </div>
       </div>
@@ -952,21 +955,21 @@ export default function AddEmployeePage() {
               type="button"
               onClick={handleBack}
               className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
-              aria-label="Back to employees"
+              aria-label={t("back.toList")}
             >
               <ArrowLeftIcon size={16} />
             </button>
             <EmployeesIcon size={18} className="text-[var(--text-dim)] shrink-0 hidden sm:block" />
-            <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">Add Employee</h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">{t("app.add")}</h1>
           </div>
           <button
             onClick={handleSubmit}
             disabled={saving}
             className="flex items-center gap-2 h-10 px-4 sm:px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-            aria-label="Save employee"
+            aria-label={t("save.employee")}
           >
             {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
-            <span className="hidden xs:inline sm:inline">{saving ? "Saving..." : "Save Employee"}</span>
+            <span className="hidden xs:inline sm:inline">{saving ? t("saving") : t("save.employee")}</span>
           </button>
         </div>
 
@@ -977,7 +980,7 @@ export default function AddEmployeePage() {
         {attemptedSubmit && Object.keys(errors).length > 0 && (
           <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/20" role="alert">
             <p className="text-sm font-semibold text-red-400 mb-2">
-              {`Please fix ${Object.keys(errors).length} field${Object.keys(errors).length === 1 ? "" : "s"} before saving:`}
+              {t("val.header").replace("{n}", String(Object.keys(errors).length))}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(errors).map(([key, msg]) => (
@@ -1009,8 +1012,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={UserIcon}
-              title="Personal Profile"
-              description="Name, photo, and basic details about the person."
+              title={t("sec.personal")}
+              description={t("sec.personal.desc")}
             />
 
             {/* Photo + Name */}
@@ -1093,8 +1096,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={PhoneIcon}
-              title="Contact & Address"
-              description="How to reach this person — phone, email, and home address."
+              title={t("sec.contact")}
+              description={t("sec.contact.desc")}
             />
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -1126,8 +1129,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={ShieldIcon}
-              title="Emergency Contacts"
-              description="People to contact if something happens on the job."
+              title={t("sec.emergency")}
+              description={t("sec.emergency.desc")}
             />
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-3">
@@ -1156,8 +1159,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={BriefcaseIcon}
-              title="Employment & Organization"
-              description="Hire date, role, department, and reporting line."
+              title={t("sec.employment")}
+              description={t("sec.employment.desc")}
             />
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
@@ -1320,8 +1323,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={CreditCardIcon}
-              title="Compensation & Benefits"
-              description="Salary, bank account, and insurance details."
+              title={t("sec.compensation")}
+              description={t("sec.compensation.desc")}
             />
 
             <SubLabel>Salary</SubLabel>
@@ -1353,8 +1356,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={DocumentIcon}
-              title="Documents & Compliance"
-              description="IDs, visa, education, and driving license."
+              title={t("sec.docs")}
+              description={t("sec.docs.desc")}
             />
 
             <SubLabel>Identification</SubLabel>
@@ -1396,8 +1399,8 @@ export default function AddEmployeePage() {
           <section className={panelCls}>
             <SectionHeader
               icon={KeyIcon}
-              title="Account Setup"
-              description="Optional. Create login credentials so this employee can sign in to Koleex Hub."
+              title={t("sec.account")}
+              description={t("sec.account.desc")}
             />
 
             <div className="flex items-center gap-3 mb-3">
@@ -1411,16 +1414,14 @@ export default function AddEmployeePage() {
               >
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${form.create_account ? "translate-x-5" : "translate-x-0"}`} />
               </button>
-              <span className="text-sm text-[var(--text-dim)]">Create login account for this employee</span>
+              <span className="text-sm text-[var(--text-dim)]">{t("f.acct.toggle")}</span>
             </div>
 
             {!form.create_account && (
               <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
                 <ShieldIcon size={14} className="text-amber-400 mt-0.5 shrink-0" />
                 <div className="text-[12px] text-amber-300">
-                  Without an account this employee can&apos;t be picked as a project manager, task
-                  assignee, CRM owner, or planning resource. HR records still work, but nothing
-                  else will link to them. You can add an account later from the profile.
+                  {t("f.acct.warn")}
                 </div>
               </div>
             )}

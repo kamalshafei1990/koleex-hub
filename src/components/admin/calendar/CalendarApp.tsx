@@ -36,6 +36,8 @@ import {
 } from "@/lib/accounts-admin";
 import { fetchEventsInRange, deleteEvent } from "@/lib/calendar-events";
 import { withDefaults } from "@/lib/access-control";
+import { useTranslation } from "@/lib/i18n";
+import { calendarT } from "@/lib/translations/calendar";
 import {
   loadScopeContext,
   filterAccessibleAccounts,
@@ -69,6 +71,7 @@ const viewLabels: Record<ViewKey, string> = {
 };
 
 export default function CalendarApp() {
+  const { t } = useTranslation(calendarT);
   // Account selection
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
@@ -317,7 +320,7 @@ export default function CalendarApp() {
                 <CalendarIcon size={16} />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Calendar
+                {t("app.title")}
               </h1>
             </div>
             <div className="flex items-center gap-2 flex-wrap shrink-0">
@@ -330,9 +333,9 @@ export default function CalendarApp() {
                   className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
                   disabled={loadingAccounts}
                 >
-                  {loadingAccounts && <option>Loading accounts…</option>}
+                  {loadingAccounts && <option>{t("accounts.loading")}</option>}
                   {!loadingAccounts && accounts.length === 0 && (
-                    <option value="">No accounts</option>
+                    <option value="">{t("accounts.none")}</option>
                   )}
                   {!loadingAccounts &&
                     accounts.map((a) => (
@@ -347,12 +350,12 @@ export default function CalendarApp() {
                 disabled={!activeAccountId}
                 className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-50"
               >
-                <PlusIcon className="h-4 w-4" /> New Event
+                <PlusIcon className="h-4 w-4" /> {t("newEvent")}
               </button>
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            {timezone} · self-contained scheduling
+            {timezone} · {t("app.subtitle")}
           </p>
         </div>
 
@@ -377,20 +380,20 @@ export default function CalendarApp() {
               onClick={goToday}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              Today
+              {t("today")}
             </button>
             <div className="flex items-center gap-0.5">
               <button
                 onClick={goPrev}
                 className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
-                title="Previous"
+                title={t("prev")}
               >
                 <AngleLeftIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={goNext}
                 className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
-                title="Next"
+                title={t("next")}
               >
                 <AngleRightIcon className="h-4 w-4" />
               </button>
@@ -414,7 +417,7 @@ export default function CalendarApp() {
                       : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  {viewLabels[v]}
+                  {t(`view.${v}`, viewLabels[v])}
                 </button>
               );
             })}

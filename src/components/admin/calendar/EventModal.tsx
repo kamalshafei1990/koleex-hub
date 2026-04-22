@@ -18,6 +18,8 @@
 
 import { useEffect, useState } from "react";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { useTranslation } from "@/lib/i18n";
+import { calendarT } from "@/lib/translations/calendar";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
@@ -68,6 +70,7 @@ export default function EventModal({
   onDelete,
   onError,
 }: Props) {
+  const { t } = useTranslation(calendarT);
   useScrollLock();
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
@@ -185,7 +188,7 @@ export default function EventModal({
               <CalendarPlusIcon className="h-4 w-4" />
             </div>
             <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
-              {existingId ? "Edit Event" : "New Event"}
+              {existingId ? t("modal.edit") : t("modal.new")}
             </h2>
           </div>
           <button
@@ -201,12 +204,12 @@ export default function EventModal({
         <div className="p-5 space-y-4">
           {/* Title */}
           <div>
-            <label className={labelClass}>Title</label>
+            <label className={labelClass}>{t("f.title")}</label>
             <input
               className={inputClass}
               value={form.title}
               onChange={(e) => patch("title", e.target.value)}
-              placeholder="Quick sync with Aisha"
+              placeholder={t("f.title.placeholder")}
               autoFocus
             />
           </div>
@@ -214,7 +217,7 @@ export default function EventModal({
           {/* Type + color swatch */}
           <div className="grid grid-cols-[1fr_auto] gap-3">
             <div>
-              <label className={labelClass}>Type</label>
+              <label className={labelClass}>{t("f.type")}</label>
               <select
                 className={inputClass}
                 value={form.event_type}
@@ -222,22 +225,22 @@ export default function EventModal({
                   patch("event_type", e.target.value as CalendarEventType)
                 }
               >
-                {EVENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {EVENT_TYPE_LABELS[t]}
+                {EVENT_TYPES.map((ev) => (
+                  <option key={ev} value={ev}>
+                    {t(`type.${ev}`, EVENT_TYPE_LABELS[ev])}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={labelClass}>Color</label>
+              <label className={labelClass}>{t("f.color")}</label>
               <div className="h-10 flex items-center gap-2 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
                 <span
                   className="h-4 w-4 rounded-full border border-[var(--border-subtle)]"
                   style={{ backgroundColor: color }}
                 />
                 <span className="text-[11px] text-[var(--text-dim)]">
-                  {form.color ? form.color : "Default"}
+                  {form.color ? form.color : "—"}
                 </span>
               </div>
             </div>
@@ -251,13 +254,13 @@ export default function EventModal({
               onChange={(e) => toggleAllDay(e.target.checked)}
               className="h-4 w-4 rounded border-[var(--border-subtle)]"
             />
-            <span className="text-[13px] text-[var(--text-muted)]">All day</span>
+            <span className="text-[13px] text-[var(--text-muted)]">{t("f.allDay")}</span>
           </label>
 
           {/* Start / End */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>Start</label>
+              <label className={labelClass}>{t("f.start")}</label>
               {form.all_day ? (
                 <input
                   type="date"
@@ -282,7 +285,7 @@ export default function EventModal({
               )}
             </div>
             <div>
-              <label className={labelClass}>End</label>
+              <label className={labelClass}>{t("f.end")}</label>
               {form.all_day ? (
                 <input
                   type="date"
@@ -310,24 +313,24 @@ export default function EventModal({
 
           {/* Location */}
           <div>
-            <label className={labelClass}>Location</label>
+            <label className={labelClass}>{t("f.location")}</label>
             <input
               className={inputClass}
               value={form.location ?? ""}
               onChange={(e) => patch("location", e.target.value || null)}
-              placeholder="Office, Zoom, ..."
+              placeholder={t("f.location.placeholder")}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className={labelClass}>Description</label>
+            <label className={labelClass}>{t("f.description")}</label>
             <textarea
               className={textareaClass}
               rows={3}
               value={form.description ?? ""}
               onChange={(e) => patch("description", e.target.value || null)}
-              placeholder="Notes, agenda, links…"
+              placeholder={t("f.description.placeholder")}
             />
           </div>
 
@@ -347,7 +350,7 @@ export default function EventModal({
               disabled={saving}
               className="h-10 px-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-[13px] font-medium flex items-center gap-2 hover:bg-red-500/15 transition-all disabled:opacity-60"
             >
-              <TrashIcon className="h-4 w-4" /> Delete
+              <TrashIcon className="h-4 w-4" /> {t("modal.delete")}
             </button>
           ) : (
             <span />
@@ -359,7 +362,7 @@ export default function EventModal({
               disabled={saving}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
             >
-              Cancel
+              {t("modal.cancel")}
             </button>
             <button
               type="button"
@@ -368,7 +371,7 @@ export default function EventModal({
               className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg disabled:opacity-60"
             >
               <DiskIcon className="h-4 w-4" />
-              {saving ? "Saving…" : existingId ? "Save" : "Create"}
+              {saving ? t("modal.saving") : t("modal.save")}
             </button>
           </div>
         </div>
