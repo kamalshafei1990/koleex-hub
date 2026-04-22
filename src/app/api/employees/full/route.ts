@@ -341,11 +341,15 @@ export async function POST(req: Request) {
         ? usernameRaw.trim()
         : `${firstName ?? ""}.${lastName ?? ""}`.toLowerCase().replace(/[^a-z0-9._-]/g, "");
 
-    /* Lightweight base64 tag for temp password (same pattern used
-       elsewhere in the codebase). This is not a hash. Buffer is
-       server-side so atob/btoa aren't available; use node Buffer. */
+    /* Lightweight base64 tag for temp password — MUST use `tmp$` to
+       match accounts-admin.ts::hashTempPassword. /api/auth/signin
+       compares against exactly that prefix; a mismatch makes the
+       freshly-created account unable to log in ("Invalid username or
+       password"). Base64 body only, no cryptographic hashing — a
+       real hash is set the first time the user changes their
+       password. */
     const tempPassword = str(body, "temp_password") || "changeme";
-    const hashTag = `tmp:${Buffer.from(tempPassword, "utf8").toString("base64")}`;
+    const hashTag = `tmp$${Buffer.from(tempPassword, "utf8").toString("base64")}`;
 
     const { data: account, error: accErr } = await supabaseServer
       .from(ACCOUNTS)
@@ -357,7 +361,12 @@ export async function POST(req: Request) {
         two_factor_enabled: false,
         last_login_at: null,
         user_type: "internal",
-        status: "invited",
+        /* Must be "active" — /api/auth/signin returns 403 "disabled"
+           for anything else, so an "invited" account can't sign in
+           even with correct credentials. The force_password_change
+           flag below already covers the "user should set their own
+           password on first login" intent. */
+        status: "active",
         role_id: str(body, "role_id"),
         person_id: person.id,
         company_id: null,
