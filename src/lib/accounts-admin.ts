@@ -81,16 +81,28 @@ export async function fetchAccounts(
 }
 
 export async function fetchAccountById(id: string): Promise<AccountRow | null> {
-  const { data, error } = await supabase
-    .from(ACCOUNTS)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) {
-    console.error("[Accounts] Fetch by id:", error.message);
+  if (!id) return null;
+  /* Goes through the authenticated server route (service_role under
+     the hood). The old browser query against the anon client was
+     blocked by RLS on the `accounts` table, so the edit page
+     rendered "Account not found" for rows that obviously exist.
+     The endpoint returns { account: AccountRow + joins }; we peel
+     off the joins to keep the return type identical. */
+  try {
+    const res = await fetch(`/api/accounts/${id}`, { credentials: "include" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { account?: Record<string, unknown> };
+    if (!json.account) return null;
+    const {
+      person: _p, company: _c, role: _r, employee: _e, overrides: _o, preset: _pr,
+      ...row
+    } = json.account;
+    void _p; void _c; void _r; void _e; void _o; void _pr;
+    return row as unknown as AccountRow;
+  } catch (e) {
+    console.error("[Accounts] Fetch by id:", e);
     return null;
   }
-  return (data as AccountRow) || null;
 }
 
 /**
