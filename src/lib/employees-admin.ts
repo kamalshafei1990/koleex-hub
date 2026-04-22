@@ -399,54 +399,25 @@ export async function fetchEmployeeList(
     });
 }
 
-/** Fetch a single employee with all linked data */
+/** Fetch a single employee with all linked data.
+ *
+ *  Goes through /api/employees/[id] so the joins run with the
+ *  service_role client. The old browser version read koleex_employees
+ *  directly with the anon key and got an empty result (RLS hides the
+ *  row), which made the profile page show "Employee not found" for
+ *  records that were saved successfully seconds earlier. */
 export async function fetchEmployeeProfile(employeeId: string): Promise<EmployeeWithLinks | null> {
-  const { data: emp } = await supabase
-    .from(EMPLOYEES)
-    .select("*")
-    .eq("id", employeeId)
-    .maybeSingle();
-
-  if (!emp || !emp.person_id) return null;
-
-  const [
-    { data: person },
-    { data: account },
-    { data: assignment },
-  ] = await Promise.all([
-    supabase.from(PEOPLE).select("*").eq("id", emp.person_id).maybeSingle(),
-    emp.account_id
-      ? supabase.from(ACCOUNTS).select("*").eq("id", emp.account_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase.from(ASSIGNMENTS).select("*")
-      .eq("person_id", emp.person_id)
-      .eq("is_active", true)
-      .eq("is_primary", true)
-      .maybeSingle(),
-  ]);
-
-  if (!person) return null;
-
-  let department: DepartmentRow | null = null;
-  let position: PositionRow | null = null;
-
-  if (assignment) {
-    const [{ data: dept }, { data: pos }] = await Promise.all([
-      supabase.from(DEPARTMENTS).select("*").eq("id", assignment.department_id).maybeSingle(),
-      supabase.from(POSITIONS).select("*").eq("id", assignment.position_id).maybeSingle(),
-    ]);
-    department = dept as DepartmentRow | null;
-    position = pos as PositionRow | null;
+  if (!employeeId) return null;
+  try {
+    const res = await fetch(`/api/employees/${employeeId}`, { credentials: "include" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as EmployeeWithLinks | { error: string };
+    if ("error" in json) return null;
+    return json;
+  } catch (e) {
+    console.error("[fetchEmployeeProfile]", e);
+    return null;
   }
-
-  return {
-    person: person as PersonRow,
-    employee: emp as EmployeeRow,
-    account: account as AccountRow | null,
-    assignment: assignment as AssignmentRow | null,
-    department,
-    position,
-  };
 }
 
 /* ═══════════════════════════════════════════════════
