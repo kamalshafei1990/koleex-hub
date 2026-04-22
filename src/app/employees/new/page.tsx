@@ -120,11 +120,15 @@ function daysInMonth(month: number, year: number) {
    REUSABLE INPUT COMPONENTS
    ═══════════════════════════════════════════════════ */
 
+/* Phase 17: bumped inputs from h-9 → h-10 to match the employee
+   wizard + the rest of the hub's form patterns. Also gives mobile
+   touch targets a 4 px larger hit area, which matters on the dense
+   multi-column grids below. */
 const inputCls =
-  "w-full h-9 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full h-10 px-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 const selectCls =
-  "w-full h-9 px-3 pr-9 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none focus:border-[var(--border-focus)] transition-colors";
+  "w-full h-10 px-3 pr-9 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none focus:border-[var(--border-focus)] transition-colors";
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
@@ -188,8 +192,9 @@ function DateInput({
     else onChange("");
   };
 
+  /* Phase 17: matches the h-10 inputs above. */
   const sCls =
-    "h-9 px-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none focus:border-[var(--border-focus)] transition-colors w-full pr-6";
+    "h-10 px-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none focus:border-[var(--border-focus)] transition-colors w-full pr-6";
 
   return (
     <div>
@@ -249,7 +254,7 @@ function SectionHeader({
 /** Divider label inside a panel */
 function SubLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="col-span-full text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest mt-2 mb--1">
+    <p className="col-span-full text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest mt-2 -mb-1">
       {children}
     </p>
   );
@@ -377,21 +382,20 @@ export default function AddEmployeePage() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* ── Header ── */}
+        {/* ── Header ──
+            Phase 17: removed the duplicate Save button from the
+            header. Primary Save sits at the bottom bar next to
+            Cancel — one clear action location instead of two
+            identical buttons. */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Link href="/employees"
-              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors">
+              className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
               <ArrowLeftIcon size={16} />
             </Link>
-            <EmployeesIcon size={18} className="text-[var(--text-dim)]" />
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">Add Employee</h1>
+            <EmployeesIcon size={18} className="text-[var(--text-dim)] shrink-0" />
+            <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">Add Employee</h1>
           </div>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-medium bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            {saving ? <SpinnerIcon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
-            {saving ? "Saving..." : "Save Employee"}
-          </button>
         </div>
 
         {error && (
@@ -560,7 +564,7 @@ export default function AddEmployeePage() {
                         )}
                       </div>
                       <button type="button" onClick={() => { set("create_new_department", !form.create_new_department); if (!form.create_new_department) { set("department_id", ""); set("position_id", ""); } }}
-                        className="flex items-center gap-1 h-9 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                        className="flex items-center gap-1 h-10 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
                         <PlusIcon size={12} />{form.create_new_department ? "Existing" : "New"}
                       </button>
                     </div>
@@ -576,7 +580,7 @@ export default function AddEmployeePage() {
                         )}
                       </div>
                       <button type="button" onClick={() => { set("create_new_position", !form.create_new_position); if (!form.create_new_position) set("position_id", ""); }}
-                        className="flex items-center gap-1 h-9 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                        className="flex items-center gap-1 h-10 px-3 rounded-xl text-[11px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
                         <PlusIcon size={12} />{form.create_new_position ? "Existing" : "New"}
                       </button>
                     </div>
