@@ -783,335 +783,42 @@ interface CreateEmployeeResult {
   accountId?: string;
 }
 
-/** RFC-ish email sanity check. Good enough for form validation;
- *  the DB / auth layer does the strict one. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Parse a string into a non-negative integer, or null if invalid /
- *  empty. Used instead of `parseInt(x, 10)` which happily returns
- *  NaN for garbage input and blows up the insert. */
-function toIntOrNull(v: string | null | undefined): number | null {
-  if (!v) return null;
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-/** Same for decimals (salaries). Empty string → null, not 0. */
-function toNumOrNull(v: string | null | undefined): number | null {
-  if (!v) return null;
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
+/* EMAIL_RE / toIntOrNull / toNumOrNull used to live here for the old
+   in-browser createFullEmployee flow. They moved to
+   /api/employees/full/route.ts along with the rest of the insert
+   chain — the helpers below are intentionally not duplicated. */
 
 export async function createFullEmployee(data: EmployeeWizardData): Promise<CreateEmployeeResult> {
+  /* ── Moved to server route ──
+     The full wizard flow now runs on the server at
+     POST /api/employees/full with the service_role client. That fixes
+     the RLS block the user hit on the `people` table (the browser anon
+     key is blocked from INSERTing people rows on purpose), and the
+     sensitive HR inserts (salary, bank, visa, passport) no longer
+     travel through the anon client at all.
+
+     Kept the same return shape + error semantics so the page doesn't
+     need to change. */
   try {
-    /* ── Step 0: Pre-flight uniqueness checks ──
-       Cheap Supabase round-trips that save us from FK explosions
-       halfway through the multi-step insert below. */
-    if (data.employee_number) {
-      const { data: dup } = await supabase
-        .from(EMPLOYEES)
-        .select("id")
-        .eq("employee_number", data.employee_number)
-        .maybeSingle();
-      if (dup) {
-        return { success: false, error: `Employee number ${data.employee_number} already exists.` };
-      }
-    }
-    const primaryEmail = data.work_email || data.personal_email;
-    if (primaryEmail) {
-      const { data: dupP } = await supabase
-        .from(PEOPLE)
-        .select("id")
-        .eq("email", primaryEmail)
-        .maybeSingle();
-      if (dupP) {
-        return { success: false, error: `A person with email ${primaryEmail} already exists.` };
-      }
-    }
-
-    /* ── Step 1: Create Person ── */
-    const fullName = [data.title, data.first_name, data.middle_name, data.last_name]
-      .filter(Boolean)
-      .join(" ");
-
-    const nameAlt = [data.first_name_alt, data.last_name_alt].filter(Boolean).join(" ") || null;
-
-    const { data: person, error: personErr } = await supabase
-      .from(PEOPLE)
-      .insert({
-        full_name: fullName,
-        display_name: `${data.first_name} ${data.last_name}`.trim(),
-        first_name: data.first_name || null,
-        last_name: data.last_name || null,
-        first_name_alt: data.first_name_alt || null,
-        last_name_alt: data.last_name_alt || null,
-        name_alt: nameAlt,
-        email: data.personal_email || null,
-        phone: data.personal_phone || null,
-        avatar_url: data.photo_url || null,
-        language: null,
-        notes: null,
-        company_id: null,
-        job_title: null,
-        mobile: null,
-        address_line1: null, address_line2: null,
-        city: null, state: null, country: null, postal_code: null,
-        created_by: null,
-      })
-      .select()
-      .single();
-
-    if (personErr || !person) {
-      return { success: false, error: `Failed to create person: ${personErr?.message}` };
-    }
-
-    /* ── Step 2: Create/Get Department & Position ── */
-    let departmentId = data.department_id;
-    let positionId = data.position_id;
-
-    // Create new department if requested
-    if (data.create_new_department && data.department_name) {
-      const { data: dept, error: deptErr } = await supabase
-        .from(DEPARTMENTS)
-        .insert({
-          name: data.department_name,
-          description: null,
-          icon: "building2",
-          icon_type: "icon",
-          icon_value: null,
-          parent_id: null,
-          sort_order: 0,
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (deptErr || !dept) {
-        return { success: false, error: `Failed to create department: ${deptErr?.message}` };
-      }
-      departmentId = dept.id;
-    }
-
-    // Create new position if requested
-    if (data.create_new_position && data.position_title && departmentId) {
-      const { data: pos, error: posErr } = await supabase
-        .from(POSITIONS)
-        .insert({
-          title: data.position_title,
-          department_id: departmentId,
-          reports_to_position_id: null,
-          level: 4,
-          description: null,
-          role_id: null,
-          responsibilities: null,
-          requirements: null,
-          is_active: true,
-          sort_order: 0,
-        })
-        .select()
-        .single();
-
-      if (posErr || !pos) {
-        return { success: false, error: `Failed to create position: ${posErr?.message}` };
-      }
-      positionId = pos.id;
-    }
-
-    if (!departmentId || !positionId) {
-      return { success: false, error: "Department and position are required." };
-    }
-
-    /* ── Step 3: Create Employee Record ── */
-    const { data: employee, error: empErr } = await supabase
-      .from(EMPLOYEES)
-      .insert({
-        person_id: person.id,
-        account_id: null, // will be set if account is created
-        employee_number: data.employee_number || null,
-        department: null,   // denormalized field (legacy), use assignments instead
-        position: null,     // denormalized field (legacy), use assignments instead
-        hire_date: data.hire_date || null,
-        employment_status: "active",
-        employment_type: data.employment_type || "full_time",
-        contract_end_date: data.contract_end_date || null,
-        probation_end_date: data.probation_end_date || null,
-        work_email: data.work_email || null,
-        work_phone: data.work_phone || null,
-        work_location: data.work_location || "office",
-        manager_id: data.manager_id || null,
-        notes: null,
-        // Private address
-        private_address_line1: data.private_address_line1 || null,
-        private_address_line2: data.private_address_line2 || null,
-        private_city: data.private_city || null,
-        private_state: data.private_state || null,
-        private_country: data.private_country || null,
-        private_postal_code: data.private_postal_code || null,
-        // Emergency contact
-        emergency_contact_name: data.emergency_contact_name || null,
-        emergency_contact_phone: data.emergency_contact_phone || null,
-        emergency_contact_relationship: data.emergency_contact_relationship || null,
-        // Personal
-        birth_date: data.birthday || null,
-        marital_status: data.marital_status || null,
-        nationality: data.nationality || null,
-        gender: data.gender || null,
-        number_of_children: toIntOrNull(data.number_of_children),
-        // Documents / Visa
-        identification_id: data.identification_id || null,
-        passport_number: data.passport_number || null,
-        visa_number: data.visa_number || null,
-        visa_expiry_date: data.visa_expiry_date || null,
-        // Bank
-        bank_name: data.bank_name || null,
-        bank_account_holder: data.bank_account_holder || null,
-        bank_account_number: data.bank_account_number || null,
-        bank_iban: data.bank_iban || null,
-        bank_swift: data.bank_swift || null,
-        bank_currency: data.bank_currency || null,
-        // Salary at hire
-        initial_salary: toNumOrNull(data.initial_salary),
-        salary_currency: data.salary_currency || null,
-        // Insurance
-        insurance_provider: data.insurance_provider || null,
-        insurance_policy_number: data.insurance_policy_number || null,
-        insurance_class: data.insurance_class || null,
-        insurance_expiry_date: data.insurance_expiry_date || null,
-        // Social Security / Tax
-        social_security_number: data.social_security_number || null,
-        tax_id: data.tax_id || null,
-        // Education
-        education_degree: data.education_degree || null,
-        education_institution: data.education_institution || null,
-        education_field: data.education_field || null,
-        education_graduation_year: toIntOrNull(data.education_graduation_year),
-        // Driving License
-        driving_license_number: data.driving_license_number || null,
-        driving_license_type: data.driving_license_type || null,
-        driving_license_expiry: data.driving_license_expiry || null,
-        // Extra Personal
-        blood_type: data.blood_type || null,
-        religion: data.religion || null,
-        languages: data.languages || null,
-        // Second Emergency Contact
-        emergency_contact2_name: data.emergency_contact2_name || null,
-        emergency_contact2_phone: data.emergency_contact2_phone || null,
-        emergency_contact2_relationship: data.emergency_contact2_relationship || null,
-      })
-      .select()
-      .single();
-
-    if (empErr || !employee) {
-      return { success: false, error: `Failed to create employee: ${empErr?.message}` };
-    }
-
-    /* ── Step 4: Create Assignment ── */
-    const { error: assignErr } = await supabase
-      .from(ASSIGNMENTS)
-      .insert({
-        person_id: person.id,
-        position_id: positionId,
-        department_id: departmentId,
-        is_primary: true,
-        start_date: data.hire_date || null,
-        end_date: null,
-        is_active: true,
-      });
-
-    if (assignErr) {
-      /* Not just a console warning: without an assignment the employee
-         has no department/position, which breaks every downstream
-         query (search, org chart, permissions). Surface it so the
-         user can retry instead of walking away thinking the employee
-         is fully set up. */
-      console.error("[Assignment] Create:", assignErr.message);
-      return {
-        success: false,
-        error: `Employee created but org assignment failed: ${assignErr.message}. Edit the employee to re-assign.`,
-        personId: person.id,
-        employeeId: employee.id,
-      };
-    }
-
-    /* ── Step 5: Create Position History entry ── */
-    await supabase.from(HISTORY).insert({
-      position_id: positionId,
-      person_id: person.id,
-      department_id: departmentId,
-      action: "assigned",
-      from_position_id: null,
-      to_position_id: positionId,
-      notes: `Initial assignment on hire`,
+    const res = await fetch("/api/employees/full", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
-
-    /* ── Step 6 (Optional): Create Account ── */
-    let accountId: string | null = null;
-
-    if (data.create_account) {
-      const loginEmail = data.login_email || data.work_email || data.personal_email;
-      /* Hard-fail if no real email. The old code fell back to
-         "<username>@koleex.local" — a fake address the user can't
-         receive invites at, which silently breaks account setup. */
-      if (!loginEmail || !EMAIL_RE.test(loginEmail)) {
-        return {
-          success: true,
-          personId: person.id,
-          employeeId: employee.id,
-          error: "Employee created. Account was skipped — a valid login email is required.",
-        };
-      }
-      const username = data.username || suggestUsername(`${data.first_name} ${data.last_name}`);
-
-      // Lightweight base64 tag for temp password (matches accounts-admin pattern)
-      const hashTag = `tmp:${btoa(data.temp_password)}`;
-
-      const { data: account, error: accErr } = await supabase
-        .from(ACCOUNTS)
-        .insert({
-          username,
-          login_email: loginEmail || `${username}@koleex.local`,
-          password_hash: hashTag,
-          force_password_change: true,
-          two_factor_enabled: false,
-          last_login_at: null,
-          user_type: "internal",
-          status: "invited",
-          role_id: data.role_id || null,
-          person_id: person.id,
-          company_id: null,
-          avatar_url: data.photo_url || null,
-          internal_notes: null,
-          preferences: {},
-          auth_user_id: null,
-          created_by: null,
-        })
-        .select()
-        .single();
-
-      if (accErr || !account) {
-        console.error("[Account] Create:", accErr?.message);
-        // Non-fatal — employee is created, account can be added later
-      } else {
-        accountId = account.id;
-        // Link account to employee
-        await supabase
-          .from(EMPLOYEES)
-          .update({ account_id: account.id })
-          .eq("id", employee.id);
-      }
+    let json: CreateEmployeeResult;
+    try {
+      json = (await res.json()) as CreateEmployeeResult;
+    } catch {
+      return { success: false, error: `Server returned ${res.status}.` };
     }
-
-    return {
-      success: true,
-      personId: person.id,
-      employeeId: employee.id,
-      accountId: accountId || undefined,
-    };
-  } catch (err: any) {
-    return { success: false, error: err.message || "Unknown error" };
+    return json;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Network error";
+    return { success: false, error: msg };
   }
 }
+
 
 /* ═══════════════════════════════════════════════════
    UPDATE / DELETE
