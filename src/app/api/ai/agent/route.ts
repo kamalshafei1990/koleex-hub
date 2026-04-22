@@ -45,6 +45,7 @@ import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
 import { convertFrancoToArabic } from "@/lib/language/franco-converter";
 import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-egyptian";
+import { detectEntityScope } from "@/lib/server/ai/entity-scope";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
@@ -383,6 +384,13 @@ export async function POST(req: Request) {
               ? convertFrancoToArabic(content)
               : content;
 
+          /* Phase 19: Koleex entity-scope detection. Feeds a per-turn
+             directive into the prompt so the model says
+             "Koleex International Group" for company questions,
+             "Koleex Hub" for platform questions, "Koleex machines"
+             for product questions — never mixes them up. */
+          const entity = detectEntityScope(normalizedContent, history);
+
           const brandSection = classifyBrandSection(normalizedContent);
           const isBrand = brandSection !== "none";
           const isSmall = isSmallTalk(normalizedContent);
@@ -416,6 +424,7 @@ export async function POST(req: Request) {
                       intentType: analysis.type,
                       complexity: analysis.complexity,
                       expectedFormat: analysis.expectedFormat,
+                      entityScope: entity.scope,
                     })[0].content;
             const fastMessages = [
               { role: "system" as const, content: systemPrompt },
