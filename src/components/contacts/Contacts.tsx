@@ -2565,7 +2565,20 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           <Link href="/" className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ArrowLeftIcon size={16} className="rtl:rotate-180" />
           </Link>
-          <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+          {/* Phase 20: tint the icon tile per filterType so /customers,
+              /suppliers, /contacts each get a visually distinct header.
+              Previously all three looked identical — same neutral tile,
+              same icon style — which made /customers feel like a
+              filtered Contacts view instead of its own app. */}
+          <div
+            className={`h-8 w-8 rounded-xl border flex items-center justify-center shrink-0 ${
+              filterType === "customer"
+                ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                : filterType === "supplier"
+                  ? "bg-sky-500/10 border-sky-500/25 text-sky-400"
+                  : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)]"
+            }`}
+          >
             {filterType === "supplier" ? <SuppliersIcon size={16} /> : filterType === "customer" ? <CustomersIcon size={16} /> : <ContactsIcon size={16} />}
           </div>
           <h1 className="text-[16px] font-bold text-[var(--text-primary)] truncate flex-1">
@@ -2573,9 +2586,25 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </h1>
           <button
             onClick={() => {
-              if (filterType && filterType !== "customer") {
+              /* Phase 20: make the "+" button app-aware so the
+                 Customers page doesn't re-ask "what type of contact?"
+                 when the user is already in the Customers directory.
+                   · on /customers (filterType==='customer')
+                       → skip step 1 of the chooser, go straight to
+                         the step-2 "person or company" picker so the
+                         first click lands on a customer-specific form
+                   · on /contacts (no filterType)
+                       → show the full 4-way chooser (Customer /
+                         Supplier / Company / People)
+                   · on other filtered views (suppliers, companies,
+                     people) → direct-add of that type, no chooser */
+              if (filterType === "customer") {
+                setTypeChooserStep(2);
+                setShowTypeChooser(true);
+              } else if (filterType) {
                 handleAdd(filterType);
               } else {
+                setTypeChooserStep(1);
                 setShowTypeChooser(true);
               }
             }}
