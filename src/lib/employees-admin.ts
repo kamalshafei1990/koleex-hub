@@ -311,92 +311,27 @@ export async function fetchPositionsByDepartment(departmentId: string): Promise<
 }
 
 /** Fetch all employees as list items (joined across tables).
- *  Pass `{ activeOnly: true }` for things like the Manager picker —
+ *
+ *  Runs through /api/employees so the joins execute under the
+ *  service_role client. The old browser version was blocked by RLS
+ *  on koleex_employees and returned an empty list, making every
+ *  newly-created employee look like it disappeared.
+ *
+ *  Pass `{ activeOnly: true }` for the Manager / Supervisor picker —
  *  we don't want to offer terminated employees as supervisors. */
 export async function fetchEmployeeList(
   opts: { activeOnly?: boolean } = {},
 ): Promise<EmployeeListItem[]> {
-  let query = supabase.from(EMPLOYEES).select("*").order("created_at", { ascending: false });
-  if (opts.activeOnly) query = query.eq("employment_status", "active");
-  const { data: employees, error: empErr } = await query;
-
-  if (empErr || !employees) {
-    console.error("[Employees] Fetch:", empErr?.message);
+  try {
+    const url = opts.activeOnly ? "/api/employees?activeOnly=1" : "/api/employees";
+    const res = await fetch(url, { credentials: "include" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { employees: EmployeeListItem[] };
+    return json.employees ?? [];
+  } catch (e) {
+    console.error("[Employees] Fetch:", e);
     return [];
   }
-
-  // Gather person IDs
-  const personIds = employees
-    .map((e: EmployeeRow) => e.person_id)
-    .filter(Boolean) as string[];
-
-  if (personIds.length === 0) return [];
-
-  // Fetch linked people
-  const { data: people } = await supabase
-    .from(PEOPLE)
-    .select("*")
-    .in("id", personIds);
-
-  // Fetch active assignments
-  const { data: assignments } = await supabase
-    .from(ASSIGNMENTS)
-    .select("*")
-    .in("person_id", personIds)
-    .eq("is_active", true)
-    .eq("is_primary", true);
-
-  // Fetch departments and positions for labels
-  const deptIds = [...new Set((assignments || []).map((a: AssignmentRow) => a.department_id))];
-  const posIds = [...new Set((assignments || []).map((a: AssignmentRow) => a.position_id))];
-
-  const { data: departments } = deptIds.length
-    ? await supabase.from(DEPARTMENTS).select("id, name").in("id", deptIds)
-    : { data: [] };
-
-  const { data: positions } = posIds.length
-    ? await supabase.from(POSITIONS).select("id, title").in("id", posIds)
-    : { data: [] };
-
-  // Build maps
-  const personMap = new Map((people || []).map((p: PersonRow) => [p.id, p]));
-  const assignMap = new Map((assignments || []).map((a: AssignmentRow) => [a.person_id, a]));
-  const deptMap = new Map((departments || []).map((d: any) => [d.id, d.name]));
-  const posMap = new Map((positions || []).map((p: any) => [p.id, p.title]));
-
-  return employees
-    .filter((e: EmployeeRow) => e.person_id && personMap.has(e.person_id))
-    .map((e: EmployeeRow) => {
-      const person = personMap.get(e.person_id!)!;
-      const assignment = assignMap.get(e.person_id!) as AssignmentRow | undefined;
-
-      return {
-        id: e.id,
-        person_id: e.person_id!,
-        person: {
-          full_name: person.full_name,
-          first_name: person.first_name,
-          last_name: person.last_name,
-          email: person.email,
-          phone: person.phone,
-          mobile: person.mobile,
-          avatar_url: person.avatar_url,
-        },
-        employee_number: e.employee_number,
-        hire_date: e.hire_date,
-        employment_status: e.employment_status,
-        employment_type: (e as any).employment_type || "full_time",
-        work_email: e.work_email,
-        work_phone: e.work_phone,
-        work_location: (e as any).work_location || "office",
-        department_name: assignment ? deptMap.get(assignment.department_id) || null : null,
-        position_title: assignment ? posMap.get(assignment.position_id) || null : null,
-        department_id: assignment?.department_id || null,
-        position_id: assignment?.position_id || null,
-        has_account: !!e.account_id,
-        account_id: e.account_id,
-      } as EmployeeListItem;
-    });
 }
 
 /** Fetch a single employee with all linked data.

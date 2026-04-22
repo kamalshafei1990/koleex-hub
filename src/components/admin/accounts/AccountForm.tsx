@@ -162,6 +162,12 @@ export default function AccountForm({ mode, account }: Props) {
   const [showCompanyPanel, setShowCompanyPanel] = useState(false);
   const [showPersonPanel, setShowPersonPanel] = useState(false);
 
+  /* Standalone "Reset password" panel in edit mode (separate from the
+     regular Save button so the admin can change a password without
+     re-saving the rest of the form). */
+  const [pwResetBusy, setPwResetBusy] = useState(false);
+  const [pwResetMsg, setPwResetMsg] = useState<{ ok: boolean; msg: string } | null>(null);
+
   /* ── Initial load ──
      We fetch in parallel:
        • companies + roles + people  (legacy data, kept for backward compat)
@@ -633,7 +639,105 @@ export default function AccountForm({ mode, account }: Props) {
             )}
 
             {mode === "edit" && (
-              <div className="mt-4">
+              <div className="mt-4 space-y-3">
+                {/* Manual password reset. Previously edit mode had ONLY
+                    the force-change toggle, with no way to actually
+                    set a password for an existing account — admins
+                    couldn't recover a locked-out user without going
+                    to the DB. Now the admin can type a new password
+                    or click Generate + Apply, which POSTs to
+                    /api/accounts/[id]/password (min 8 chars, forces
+                    the user to change it on next login). */}
+                <details className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
+                  <summary className="cursor-pointer text-[13px] font-medium text-[var(--text-primary)] select-none">
+                    Reset password
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type={showPw ? "text" : "password"}
+                          className={inputClass + " pr-10 font-mono"}
+                          value={form.temporary_password}
+                          onChange={(e) => set("temporary_password", e.target.value)}
+                          placeholder="New password (min 8 chars)"
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPw((s) => !s)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+                        >
+                          {showPw ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => set("temporary_password", generateTemporaryPassword())}
+                        className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                      >
+                        <RefreshCcwIcon className="h-3.5 w-3.5" /> Generate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copyPassword}
+                        className="h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center gap-1.5 transition-all"
+                      >
+                        <CopyIcon className="h-3.5 w-3.5" /> Copy
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const pw = form.temporary_password.trim();
+                          if (pw.length < 8) {
+                            setPwResetMsg({ ok: false, msg: "Password must be at least 8 characters." });
+                            return;
+                          }
+                          if (!account?.id) return;
+                          setPwResetBusy(true);
+                          setPwResetMsg(null);
+                          try {
+                            const res = await fetch(`/api/accounts/${account.id}/password`, {
+                              method: "POST",
+                              credentials: "include",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ password: pw, forceReset: form.force_password_change }),
+                            });
+                            const json = (await res.json().catch(() => ({}))) as { error?: string };
+                            if (!res.ok) {
+                              setPwResetMsg({ ok: false, msg: json.error || `Failed (${res.status})` });
+                            } else {
+                              setPwResetMsg({ ok: true, msg: "Password updated. Share it with the user securely." });
+                            }
+                          } catch (err) {
+                            setPwResetMsg({
+                              ok: false,
+                              msg: err instanceof Error ? err.message : "Network error",
+                            });
+                          } finally {
+                            setPwResetBusy(false);
+                          }
+                        }}
+                        disabled={pwResetBusy || form.temporary_password.trim().length < 8}
+                        className="h-9 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                      >
+                        {pwResetBusy ? "Applying…" : "Apply password"}
+                      </button>
+                      {pwResetMsg && (
+                        <span className={`text-[11px] ${pwResetMsg.ok ? "text-emerald-400" : "text-red-400"}`}>
+                          {pwResetMsg.msg}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--text-dim)]">
+                      Min 8 characters. The user will be asked to set their own password on next sign-in
+                      when &ldquo;Force password change&rdquo; is on.
+                    </p>
+                  </div>
+                </details>
+
                 <Toggle
                   label={t("acc.field.forceChangeOnLogin")}
                   checked={form.force_password_change}
