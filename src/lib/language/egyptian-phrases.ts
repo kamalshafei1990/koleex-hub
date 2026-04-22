@@ -115,6 +115,45 @@ export const BAD_OUTPUT_PATTERNS: Array<{
     replace: "",
     label: "debug_label_leak",
   },
+  /* Phase 16: robotic Arabic patterns that come from literal
+     English→Arabic translation and feel unnatural in Egyptian.
+     JavaScript \b doesn't fire between Arabic letters, so these
+     patterns rely on whitespace / start-of-string / punctuation
+     boundaries instead. */
+  {
+    match: /عايز\s+تعرف\s+إن/g,
+    replace: "خلّي بالك إن",
+    label: "robotic_aayz_taaraf_enn",
+  },
+  {
+    match: /أنت\s+عايز\s+تعرف/g,
+    replace: "إنت بتسأل",
+    label: "robotic_enta_aayz_taaraf",
+  },
+  {
+    match: /من\s+فضلك\s+اسمح\s+لي/g,
+    replace: "خليني",
+    label: "robotic_allow_me",
+  },
+  /* "Yes I can but I can't" contradiction */
+  {
+    match: /(?:أيوه|نعم)\s+أقدر[^.!؟?]{0,40}لكن\s+لا\s+أقدر/g,
+    replace: "أقدر أساعدك",
+    label: "contradiction_yes_no_can",
+  },
+  /* Business-capability refusals — replace with natural affirmation.
+     These are the worst offenders from the user's report: the model
+     literally saying "no, I can't" to simple capability questions. */
+  {
+    match: /^\s*(?:لا\s*،?\s*لا\s+أقدر|أنا\s+لا\s+أستطيع|لا\s+أستطيع\s+ذلك)/,
+    replace: "أيوه أقدر أساعدك،",
+    label: "refusal_cannot_do",
+  },
+  {
+    match: /^\s*(?:I\s+can'?t\s+(?:do|help\s+with)|I'?m\s+sorry\s*,?\s*(?:but\s+)?I\s+can'?t|I\s+am\s+unable)\b/i,
+    replace: "Yes, I can help —",
+    label: "refusal_cannot_do_en",
+  },
 ];
 
 /** Deterministic phrase picker — hashes the seed string and mods

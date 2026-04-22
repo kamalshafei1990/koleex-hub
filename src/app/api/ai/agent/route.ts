@@ -44,7 +44,7 @@ import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
 import { convertFrancoToArabic } from "@/lib/language/franco-converter";
-import { buildEgyptianResponse } from "@/lib/language/rewrite-egyptian";
+import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-egyptian";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
 /* Hard cap on history we ship to the orchestrator. 6 messages = 3
@@ -519,20 +519,12 @@ export async function POST(req: Request) {
           alive = false;
           clearInterval(keepalive);
 
-          /* ── Phase 11 L2: Egyptian dialect response builder ───────
-             Replaces the plain rewriter with the intent-aware Level 2
-             builder. When the user wrote EGY or FRANCO, the output
-             gets:
-               · scrubbed of translator notes, MSA "لا أفهم" phrases,
-                 system-text leaks
-               · replaced with a natural clarify phrase if the model
-                 was trying to ask for clarification in MSA/English
-               · phrase-level Egyptian rewrites
-               · an intent-aware opener (بص خليني اشرحلك... for
-                 explanations, ببساطة كده... for definitions) when
-                 the reply is substantive
-             When nothing fires (model already landed in Egyptian
-             with a clean reply) the builder is a no-op. */
+          /* ── Phase 11 L2 + Phase 16: response polish ──────────────
+             Apply the Egyptian dialect builder for EGY / FRANCO users
+             (scrub bad patterns, add natural openers, dedupe repeats).
+             For every other language, still run removeRepetition as a
+             safety net — repetition loops are a model failure mode
+             that's language-agnostic. */
           let rewroteReply = false;
           if (wantsRewrite && agent.finalReply) {
             const intentForBuilder =
@@ -545,6 +537,13 @@ export async function POST(req: Request) {
             });
             if (rebuilt !== agent.finalReply) {
               agent = { ...agent, finalReply: rebuilt };
+              rewroteReply = true;
+            }
+          } else if (agent.finalReply) {
+            /* Non-Egyptian: just dedupe. */
+            const deduped = removeRepetition(agent.finalReply);
+            if (deduped !== agent.finalReply) {
+              agent = { ...agent, finalReply: deduped };
               rewroteReply = true;
             }
           }

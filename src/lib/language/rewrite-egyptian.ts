@@ -180,6 +180,49 @@ export interface RewriteTrace {
   output: string;
 }
 
+/* ─── Phase 16: repetition stripper ───────────────────────────────
+   Model replies sometimes loop — the same sentence or paragraph
+   shows up twice back-to-back, usually the last two tokens of the
+   thought bleeding into a rewrite attempt. Remove exact duplicates
+   at sentence + paragraph granularity before the reply reaches the
+   user. Case-insensitive comparison; whitespace-normalised. */
+
+export function removeRepetition(text: string): string {
+  if (!text) return text;
+  /* Split on blank-line boundaries first so we can dedupe at the
+     paragraph level (a repeated full paragraph is the loudest
+     failure mode). */
+  const paragraphs = text.split(/\n{2,}/);
+  const seenParas = new Set<string>();
+  const keptParas: string[] = [];
+  for (const p of paragraphs) {
+    const norm = p.replace(/\s+/g, " ").trim().toLowerCase();
+    if (!norm) continue;
+    if (seenParas.has(norm)) continue;
+    seenParas.add(norm);
+    keptParas.push(p);
+  }
+
+  /* Within each paragraph, dedupe sentences. Sentence boundary = any
+     of .,!,?,؟ followed by whitespace or newline. Keeps the first
+     occurrence of each unique sentence. */
+  const dedupeSentencesIn = (para: string): string => {
+    const sentences = para.split(/(?<=[.!؟?])\s+/);
+    const seen = new Set<string>();
+    const kept: string[] = [];
+    for (const s of sentences) {
+      const norm = s.replace(/\s+/g, " ").trim().toLowerCase();
+      if (!norm) continue;
+      if (seen.has(norm)) continue;
+      seen.add(norm);
+      kept.push(s.trim());
+    }
+    return kept.join(" ");
+  };
+
+  return keptParas.map(dedupeSentencesIn).join("\n\n");
+}
+
 /* ─── Phase 11 Level 2: smart Egyptian response builder ───────────
 
    Takes raw model output + user intent and returns a reply that
@@ -324,6 +367,13 @@ export function buildEgyptianTrace(
       actions.push(`opener:${pool}`);
     }
   }
+
+  /* 5. DEDUPE — kill repeated sentences / paragraphs the model
+     sometimes loops on. Runs last so the opener + rewrites stay
+     intact but trailing duplicates get collapsed. */
+  const deduped = removeRepetition(rewritten);
+  if (deduped !== rewritten) actions.push("dedupe");
+  rewritten = deduped;
 
   return {
     actions,

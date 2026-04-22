@@ -9,7 +9,7 @@ import { findLocalAnswer, pickLocalAnswer } from "@/lib/server/ai/local-knowledg
 import { detectLanguage } from "@/lib/server/ai/detect-language";
 import { preprocessUserQuery } from "@/lib/server/ai/preprocess";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
-import { buildEgyptianResponse } from "@/lib/language/rewrite-egyptian";
+import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-egyptian";
 
 /* ---------------------------------------------------------------------------
    POST /api/ai/chat — now powered by the hybrid router.
@@ -322,7 +322,8 @@ export async function POST(req: Request) {
               /* Phase 11 L2: Egyptian dialect builder. When the user
                  wrote EGY or FRANCO, run the intent-aware Level 2
                  builder on the canonical reply so the client sees
-                 natural Egyptian phrasing with the right opener. */
+                 natural Egyptian phrasing with the right opener.
+                 Phase 16: for non-EGY replies, still dedupe. */
               if (msgLang === "EGY" || msgLang === "FRANCO") {
                 const rebuilt = buildEgyptianResponse(sealed, {
                   intentType: analyzeIntent(lastUser).type,
@@ -333,6 +334,12 @@ export async function POST(req: Request) {
                     `[ai.chat.egy] rewrote for msg_lang=${msgLang}`,
                   );
                   sealed = rebuilt;
+                }
+              } else {
+                const deduped = removeRepetition(sealed);
+                if (deduped !== sealed) {
+                  console.log(`[ai.chat.dedupe] removed repetitions`);
+                  sealed = deduped;
                 }
               }
               controller.enqueue(
