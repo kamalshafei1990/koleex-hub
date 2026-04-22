@@ -130,6 +130,32 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;    // 5 MB raw before compression
 const STORAGE_BUCKET = "media";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/* Human-readable labels for the validation banner. Keys match the
+   field keys returned by validateForm() below. The banner shows the
+   labels as clickable chips; clicking scrolls to + focuses the
+   matching input (we target `[data-field="<key>"]`). */
+const FIELD_LABELS: Record<string, string> = {
+  first_name: "First Name",
+  last_name: "Last Name",
+  hire_date: "Hire Date",
+  department_id: "Department",
+  department_name: "New Department Name",
+  position_id: "Position",
+  position_title: "New Position Title",
+  personal_email: "Personal Email",
+  work_email: "Work Email",
+  login_email: "Login Email",
+  birthday: "Date of Birth",
+  contract_end_date: "Contract End",
+  probation_end_date: "Probation End",
+  visa_expiry_date: "Visa Expiry",
+  insurance_expiry_date: "Insurance Expiry",
+  driving_license_expiry: "License Expiry",
+  number_of_children: "Children",
+  initial_salary: "Initial Salary",
+  education_graduation_year: "Graduation Year",
+};
+
 function daysInMonth(month: number, year: number) {
   /* When the year is unknown we default to a non-leap year so the
      form doesn't let users pick Feb 29 before they've set a year.
@@ -177,7 +203,7 @@ function FieldError({ msg }: { msg?: string }) {
 
 function TextInput({
   label, value, onChange, placeholder, type = "text", required, disabled,
-  error, min, max, onBlur, inputMode,
+  error, min, max, onBlur, inputMode, name,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string; required?: boolean; disabled?: boolean;
@@ -185,11 +211,15 @@ function TextInput({
   min?: number; max?: number;
   onBlur?: () => void;
   inputMode?: "numeric" | "decimal" | "email" | "tel" | "text";
+  /** Field key used by the error banner's "jump to field" chips and
+   *  by `aria-invalid` queries when scrolling to the first bad field. */
+  name?: string;
 }) {
   return (
-    <div>
+    <div data-field={name}>
       <FieldLabel label={label} required={required} />
       <input
+        name={name}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -209,17 +239,19 @@ function TextInput({
 }
 
 function SelectInput({
-  label, value, onChange, options, placeholder, required, error,
+  label, value, onChange, options, placeholder, required, error, name,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   options: { value: string; label: string }[]; placeholder?: string;
   required?: boolean; error?: string;
+  name?: string;
 }) {
   return (
-    <div>
+    <div data-field={name}>
       <FieldLabel label={label} required={required} />
       <div className="relative">
         <select
+          name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-required={required || undefined}
@@ -244,7 +276,7 @@ interface ComboOption { value: string; label: string; prefix?: string; suffix?: 
 
 function Combobox({
   label, value, onChange, options, placeholder = "Select...", required, error,
-  searchPlaceholder = "Type to search...", emptyText = "No matches", ariaLabel,
+  searchPlaceholder = "Type to search...", emptyText = "No matches", ariaLabel, name,
 }: {
   label?: string;
   value: string;
@@ -256,6 +288,7 @@ function Combobox({
   searchPlaceholder?: string;
   emptyText?: string;
   ariaLabel?: string;
+  name?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -301,11 +334,12 @@ function Combobox({
   const pick = (v: string) => { onChange(v); setOpen(false); };
 
   return (
-    <div ref={rootRef}>
+    <div ref={rootRef} data-field={name}>
       {label && <FieldLabel label={label} required={required} />}
       <div className="relative">
         <button
           type="button"
+          data-combobox-trigger
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="listbox"
           aria-expanded={open}
@@ -400,11 +434,12 @@ function Combobox({
 }
 
 function DateInput({
-  label, value, onChange, required, yearFrom = 1950, yearTo = 2040, error,
+  label, value, onChange, required, yearFrom = 1950, yearTo = 2040, error, name,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   required?: boolean; yearFrom?: number; yearTo?: number;
   error?: string;
+  name?: string;
 }) {
   const parts = value ? value.split("-") : [];
   const yr = parts[0] || "", mo = parts[1] || "", dy = parts[2] || "";
@@ -428,7 +463,7 @@ function DateInput({
     `h-10 px-2 rounded-xl bg-[var(--bg-primary)] text-[13px] text-[var(--text-primary)] appearance-none focus:outline-none transition-colors w-full pr-6 ${borderFor(error)}`;
 
   return (
-    <div>
+    <div data-field={name}>
       <FieldLabel label={label} required={required} />
       <div className="flex gap-1.5">
         <div className="relative flex-[1]">
@@ -437,6 +472,7 @@ function DateInput({
             onChange={(e) => rebuild(yr, mo, e.target.value)}
             className={sCls}
             aria-label={`${label} day`}
+            aria-invalid={error ? true : undefined}
           >
             <option value="">Day</option>
             {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => (
@@ -788,18 +824,33 @@ export default function AddEmployeePage() {
     router.push("/employees");
   };
 
+  /** Scroll a field into view and focus it. Targets [data-field]
+   *  wrappers set by TextInput / SelectInput / DateInput / Combobox. */
+  const focusField = useCallback((fieldKey: string) => {
+    if (typeof window === "undefined") return;
+    const root = document.querySelector(`[data-field="${fieldKey}"]`) as HTMLElement | null;
+    if (!root) return;
+    root.scrollIntoView({ behavior: "smooth", block: "center" });
+    /* Give the scroll a beat before focusing so the browser doesn't
+       abort the smooth-scroll animation. */
+    setTimeout(() => {
+      const focusable = root.querySelector<HTMLElement>(
+        "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [data-combobox-trigger]",
+      );
+      focusable?.focus();
+    }, 250);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     setAttemptedSubmit(true);
     const errs = validateForm(form);
     if (Object.keys(errs).length > 0) {
-      const count = Object.keys(errs).length;
-      setError(`Please fix ${count} field${count === 1 ? "" : "s"} before saving.`);
-      /* Scroll to the first invalid field so the user doesn't have
-         to hunt for red borders on a long form. */
-      if (typeof window !== "undefined") {
-        const first = document.querySelector('[aria-invalid="true"]');
-        (first as HTMLElement | null)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      /* Clear the plain-text banner; the rich error banner rendered
+         below reads from the `errors` memo. */
+      setError(null);
+      /* Scroll to the first invalid field automatically. */
+      const firstKey = Object.keys(errs)[0];
+      if (firstKey) focusField(firstKey);
       return;
     }
     setSaving(true); setError(null);
@@ -909,6 +960,32 @@ export default function AddEmployeePage() {
           </button>
         </div>
 
+        {/* Validation summary — lists the exact fields that need
+            attention, with click-to-jump chips. Appears only after
+            the user has attempted a save at least once. Lets them
+            see what's blocking without scrolling the whole form. */}
+        {attemptedSubmit && Object.keys(errors).length > 0 && (
+          <div className="mb-5 p-4 rounded-xl bg-red-500/10 border border-red-500/20" role="alert">
+            <p className="text-sm font-semibold text-red-400 mb-2">
+              {`Please fix ${Object.keys(errors).length} field${Object.keys(errors).length === 1 ? "" : "s"} before saving:`}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(errors).map(([key, msg]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => focusField(key)}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 transition-colors cursor-pointer"
+                  title={`Jump to ${FIELD_LABELS[key] || key}`}
+                >
+                  {FIELD_LABELS[key] || key}
+                  <span className="ml-1 text-red-400/80">· {msg}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400" role="alert">{error}</div>
         )}
@@ -953,9 +1030,9 @@ export default function AddEmployeePage() {
               <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
                 <SelectInput label="Title" value={form.title} onChange={(v) => set("title", v)}
                   options={TITLE_OPTIONS.map((t) => ({ value: t, label: t || "—" }))} placeholder="—" />
-                <TextInput label="First Name" value={form.first_name} onChange={(v) => set("first_name", v)} placeholder="First name" required error={errFor("first_name")} />
+                <TextInput name="first_name" label="First Name" value={form.first_name} onChange={(v) => set("first_name", v)} placeholder="First name" required error={errFor("first_name")} />
                 <TextInput label="Middle Name" value={form.middle_name} onChange={(v) => set("middle_name", v)} placeholder="Middle name" />
-                <TextInput label="Last Name" value={form.last_name} onChange={(v) => set("last_name", v)} placeholder="Last name" required error={errFor("last_name")} />
+                <TextInput name="last_name" label="Last Name" value={form.last_name} onChange={(v) => set("last_name", v)} placeholder="Last name" required error={errFor("last_name")} />
               </div>
             </div>
 
@@ -983,7 +1060,7 @@ export default function AddEmployeePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               <SelectInput label="Gender" value={form.gender} onChange={(v) => set("gender", v)}
                 options={GENDER_OPTIONS.map((g) => ({ value: g, label: g || "—" }))} placeholder="Select..." />
-              <DateInput label="Date of Birth" value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} error={errFor("birthday")} />
+              <DateInput name="birthday" label="Date of Birth" value={form.birthday} onChange={(v) => set("birthday", v)} yearFrom={1940} yearTo={2010} error={errFor("birthday")} />
               <Combobox
                 label="Nationality"
                 value={form.nationality}
@@ -994,7 +1071,7 @@ export default function AddEmployeePage() {
               />
               <SelectInput label="Marital Status" value={form.marital_status} onChange={(v) => set("marital_status", v)}
                 options={MARITAL_OPTIONS.map((m) => ({ value: m, label: m || "—" }))} placeholder="Select..." />
-              <TextInput label="Children" value={form.number_of_children} onChange={(v) => set("number_of_children", v)} type="number" placeholder="0" min={0} max={30} inputMode="numeric" error={errFor("number_of_children")} />
+              <TextInput name="number_of_children" label="Children" value={form.number_of_children} onChange={(v) => set("number_of_children", v)} type="number" placeholder="0" min={0} max={30} inputMode="numeric" error={errFor("number_of_children")} />
               <SelectInput label="Blood Type" value={form.blood_type} onChange={(v) => set("blood_type", v)}
                 options={BLOOD_TYPE_OPTIONS.map((b) => ({ value: b, label: b || "—" }))} placeholder="—" />
               <TextInput label="Religion" value={form.religion} onChange={(v) => set("religion", v)} placeholder="e.g. Islam" />
@@ -1012,9 +1089,9 @@ export default function AddEmployeePage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <TextInput label="Personal Phone" value={form.personal_phone} onChange={(v) => set("personal_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-              <TextInput label="Personal Email" value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
+              <TextInput name="personal_email" label="Personal Email" value={form.personal_email} onChange={(v) => set("personal_email", v)} placeholder="personal@email.com" type="email" inputMode="email" error={errFor("personal_email")} />
               <TextInput label="Work Phone" value={form.work_phone} onChange={(v) => set("work_phone", v)} placeholder="+1 234 567 890" type="tel" inputMode="tel" />
-              <TextInput label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")} />
+              <TextInput name="work_email" label="Work Email" value={form.work_email} onChange={(v) => set("work_email", v)} placeholder="name@company.com" type="email" inputMode="email" error={errFor("work_email")} />
             </div>
 
             <SubLabel>Home Address</SubLabel>
@@ -1076,7 +1153,7 @@ export default function AddEmployeePage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
               <TextInput label="Employee Number" value={form.employee_number} onChange={(v) => set("employee_number", v)} placeholder="EMP-001" disabled />
               <SelectInput label="Employment Type" value={form.employment_type} onChange={(v) => set("employment_type", v)} options={EMPLOYMENT_TYPE_OPTIONS} />
-              <DateInput label="Hire Date" value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
+              <DateInput name="hire_date" label="Hire Date" value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
               <SelectInput label="Work Location" value={form.work_location} onChange={(v) => set("work_location", v)} options={WORK_LOCATION_OPTIONS} />
               <Combobox
                 label="Manager / Supervisor"
@@ -1087,8 +1164,8 @@ export default function AddEmployeePage() {
                 searchPlaceholder="Search employees..."
                 emptyText="No employees match"
               />
-              <DateInput label="Contract End" value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />
-              <DateInput label="Probation End" value={form.probation_end_date} onChange={(v) => set("probation_end_date", v)} yearFrom={2024} yearTo={2030} error={errFor("probation_end_date")} />
+              <DateInput name="contract_end_date" label="Contract End" value={form.contract_end_date} onChange={(v) => set("contract_end_date", v)} yearFrom={2024} yearTo={2035} error={errFor("contract_end_date")} />
+              <DateInput name="probation_end_date" label="Probation End" value={form.probation_end_date} onChange={(v) => set("probation_end_date", v)} yearFrom={2024} yearTo={2030} error={errFor("probation_end_date")} />
             </div>
 
             {/* Department & Position */}
@@ -1140,6 +1217,7 @@ export default function AddEmployeePage() {
                     <div className="flex-1">
                       {!form.create_new_department ? (
                         <SelectInput
+                          name="department_id"
                           label="Department"
                           value={form.department_id}
                           onChange={(v) => { set("department_id", v); set("position_id", ""); }}
@@ -1149,7 +1227,7 @@ export default function AddEmployeePage() {
                           error={errFor("department_id")}
                         />
                       ) : (
-                        <TextInput label="New Department" value={form.department_name} onChange={(v) => set("department_name", v)} placeholder="e.g. Engineering" required error={errFor("department_name")} />
+                        <TextInput name="department_name" label="New Department" value={form.department_name} onChange={(v) => set("department_name", v)} placeholder="e.g. Engineering" required error={errFor("department_name")} />
                       )}
                     </div>
                     <button type="button" onClick={() => {
@@ -1166,6 +1244,7 @@ export default function AddEmployeePage() {
                     <div className="flex-1">
                       {!form.create_new_position ? (
                         <SelectInput
+                          name="position_id"
                           label="Position"
                           value={form.position_id}
                           onChange={(v) => set("position_id", v)}
@@ -1181,7 +1260,7 @@ export default function AddEmployeePage() {
                           error={errFor("position_id")}
                         />
                       ) : (
-                        <TextInput label="New Position" value={form.position_title} onChange={(v) => set("position_title", v)} placeholder="e.g. Software Engineer" required error={errFor("position_title")} />
+                        <TextInput name="position_title" label="New Position" value={form.position_title} onChange={(v) => set("position_title", v)} placeholder="e.g. Software Engineer" required error={errFor("position_title")} />
                       )}
                     </div>
                     <button type="button" onClick={() => {
@@ -1208,7 +1287,7 @@ export default function AddEmployeePage() {
 
             <SubLabel>Salary</SubLabel>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 mb-4 max-w-md">
-              <TextInput label="Initial Salary" value={form.initial_salary} onChange={(v) => set("initial_salary", v)} placeholder="e.g. 5000" type="number" min={0} inputMode="decimal" error={errFor("initial_salary")} />
+              <TextInput name="initial_salary" label="Initial Salary" value={form.initial_salary} onChange={(v) => set("initial_salary", v)} placeholder="e.g. 5000" type="number" min={0} inputMode="decimal" error={errFor("initial_salary")} />
               <SelectInput label="Currency" value={form.salary_currency} onChange={(v) => set("salary_currency", v)} options={CURRENCY_OPTIONS} />
             </div>
 
@@ -1227,7 +1306,7 @@ export default function AddEmployeePage() {
               <TextInput label="Provider" value={form.insurance_provider} onChange={(v) => set("insurance_provider", v)} placeholder="e.g. Bupa" />
               <TextInput label="Policy Number" value={form.insurance_policy_number} onChange={(v) => set("insurance_policy_number", v)} placeholder="Policy #" />
               <SelectInput label="Class" value={form.insurance_class} onChange={(v) => set("insurance_class", v)} options={INSURANCE_CLASS_OPTIONS} />
-              <DateInput label="Expiry" value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
+              <DateInput name="insurance_expiry_date" label="Expiry" value={form.insurance_expiry_date} onChange={(v) => set("insurance_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("insurance_expiry_date")} />
             </div>
           </section>
 
@@ -1252,7 +1331,7 @@ export default function AddEmployeePage() {
                 <SubLabel>Visa</SubLabel>
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <TextInput label="Visa Number" value={form.visa_number} onChange={(v) => set("visa_number", v)} placeholder="Visa #" />
-                  <DateInput label="Visa Expiry" value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
+                  <DateInput name="visa_expiry_date" label="Visa Expiry" value={form.visa_expiry_date} onChange={(v) => set("visa_expiry_date", v)} yearFrom={2024} yearTo={2035} error={errFor("visa_expiry_date")} />
                 </div>
               </div>
               <div>
@@ -1261,7 +1340,7 @@ export default function AddEmployeePage() {
                   <SelectInput label="Degree" value={form.education_degree} onChange={(v) => set("education_degree", v)} options={DEGREE_OPTIONS} />
                   <TextInput label="Institution" value={form.education_institution} onChange={(v) => set("education_institution", v)} placeholder="University name" />
                   <TextInput label="Field of Study" value={form.education_field} onChange={(v) => set("education_field", v)} placeholder="e.g. Computer Science" />
-                  <TextInput label="Graduation Year" value={form.education_graduation_year} onChange={(v) => set("education_graduation_year", v)} placeholder="e.g. 2020" type="number" min={1940} max={new Date().getFullYear() + 10} inputMode="numeric" error={errFor("education_graduation_year")} />
+                  <TextInput name="education_graduation_year" label="Graduation Year" value={form.education_graduation_year} onChange={(v) => set("education_graduation_year", v)} placeholder="e.g. 2020" type="number" min={1940} max={new Date().getFullYear() + 10} inputMode="numeric" error={errFor("education_graduation_year")} />
                 </div>
               </div>
             </div>
@@ -1270,7 +1349,7 @@ export default function AddEmployeePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
               <TextInput label="License Number" value={form.driving_license_number} onChange={(v) => set("driving_license_number", v)} placeholder="License #" />
               <SelectInput label="Type" value={form.driving_license_type} onChange={(v) => set("driving_license_type", v)} options={DRIVING_LICENSE_TYPE_OPTIONS} />
-              <DateInput label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
+              <DateInput name="driving_license_expiry" label="Expiry" value={form.driving_license_expiry} onChange={(v) => set("driving_license_expiry", v)} yearFrom={2024} yearTo={2040} error={errFor("driving_license_expiry")} />
             </div>
           </section>
 
@@ -1324,6 +1403,7 @@ export default function AddEmployeePage() {
                   }}
                 />
                 <TextInput
+                  name="login_email"
                   label="Login Email"
                   value={form.login_email}
                   onChange={(v) => set("login_email", v)}
