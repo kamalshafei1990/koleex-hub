@@ -300,12 +300,15 @@ export default function EmployeesPage() {
             </div>
             <div className="divide-y divide-[var(--border-subtle)]">
               {filtered.map((emp) => (
-                /* Phase 17: dropped cursor-pointer + group — there's no
-                   /employees/[id] detail page yet, so the click
-                   affordance led to nothing. Keep the row highlightable
-                   on hover for visual scanning; re-add the pointer +
-                   Link wrapper when the detail page ships. */
-                <div key={emp.id} className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors">
+                /* Row links to the per-employee profile at
+                   /employees/[id]. The profile page aggregates
+                   cross-app activity (CRM, Quotations, Projects,
+                   Todos, HR leave, Notes, Calendar). */
+                <Link
+                  key={emp.id}
+                  href={`/employees/${emp.id}`}
+                  className="flex items-center gap-4 px-4 py-3.5 hover:bg-[var(--bg-surface-subtle)] transition-colors cursor-pointer"
+                >
                   <Avatar src={emp.person.avatar_url} name={emp.person.full_name} size={40} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -341,7 +344,7 @@ export default function EmployeesPage() {
                       {STATUS_LABELS[emp.employment_status] || emp.employment_status}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

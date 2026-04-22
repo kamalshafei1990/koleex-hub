@@ -212,9 +212,18 @@ export async function fetchDepartments(): Promise<DepartmentRow[]> {
 export async function createDepartment(
   obj: Partial<DepartmentRow>,
 ): Promise<{ data: DepartmentRow | null; error: string | null }> {
+  /* Defensively default is_active to true. The employees picker
+     filters on is_active=true — if a caller forgets the flag and
+     the DB default ever drifts, the new department would be
+     invisible in Add Employee. Set it here once. */
+  const payload = {
+    is_active: obj.is_active ?? true,
+    ...obj,
+    updated_at: new Date().toISOString(),
+  };
   const { data, error } = await supabaseAdmin
     .from("koleex_departments")
-    .insert({ ...obj, updated_at: new Date().toISOString() })
+    .insert(payload)
     .select()
     .single();
 
@@ -226,9 +235,13 @@ export async function updateDepartment(
   id: string,
   obj: Partial<DepartmentRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
+  /* Never let a partial update silently clear is_active. If the
+     caller didn't send it, leave it alone. */
+  const payload: Record<string, unknown> = { ...obj, updated_at: new Date().toISOString() };
+  if (obj.is_active === undefined) delete payload.is_active;
   const { error } = await supabaseAdmin
     .from("koleex_departments")
-    .update({ ...obj, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
@@ -312,9 +325,16 @@ export async function fetchPositions(
 export async function createPosition(
   obj: Partial<PositionRow>,
 ): Promise<{ data: PositionRow | null; error: string | null }> {
+  /* Default is_active=true for the same reason as departments —
+     the Add Employee picker filters on it. */
+  const payload = {
+    is_active: obj.is_active ?? true,
+    ...obj,
+    updated_at: new Date().toISOString(),
+  };
   const { data, error } = await supabaseAdmin
     .from("koleex_positions")
-    .insert({ ...obj, updated_at: new Date().toISOString() })
+    .insert(payload)
     .select()
     .single();
 
@@ -326,9 +346,11 @@ export async function updatePosition(
   id: string,
   obj: Partial<PositionRow>,
 ): Promise<{ ok: boolean; error: string | null }> {
+  const payload: Record<string, unknown> = { ...obj, updated_at: new Date().toISOString() };
+  if (obj.is_active === undefined) delete payload.is_active;
   const { error } = await supabaseAdmin
     .from("koleex_positions")
-    .update({ ...obj, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };

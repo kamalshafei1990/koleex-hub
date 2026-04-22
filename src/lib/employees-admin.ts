@@ -247,7 +247,12 @@ export function emptyWizardData(): EmployeeWizardData {
     emergency_contact2_name: "",
     emergency_contact2_phone: "",
     emergency_contact2_relationship: "",
-    create_account: false,
+    /* Default ON. Gap #1 from the connectivity audit: employees
+       without an account are invisible to every app that keys on
+       account_id (CRM, Projects, Todos, Planning, Calendar, Notes).
+       We still let the user turn it off for a back-office-only HR
+       record, but the UI nudges against it. */
+    create_account: true,
     username: "",
     login_email: "",
     temp_password: generateTemporaryPassword(),
@@ -301,13 +306,15 @@ export async function fetchPositionsByDepartment(departmentId: string): Promise<
   return (data as PositionRow[]) || [];
 }
 
-/** Fetch all employees as list items (joined across tables) */
-export async function fetchEmployeeList(): Promise<EmployeeListItem[]> {
-  // Fetch all employees with their person data
-  const { data: employees, error: empErr } = await supabase
-    .from(EMPLOYEES)
-    .select("*")
-    .order("created_at", { ascending: false });
+/** Fetch all employees as list items (joined across tables).
+ *  Pass `{ activeOnly: true }` for things like the Manager picker —
+ *  we don't want to offer terminated employees as supervisors. */
+export async function fetchEmployeeList(
+  opts: { activeOnly?: boolean } = {},
+): Promise<EmployeeListItem[]> {
+  let query = supabase.from(EMPLOYEES).select("*").order("created_at", { ascending: false });
+  if (opts.activeOnly) query = query.eq("employment_status", "active");
+  const { data: employees, error: empErr } = await query;
 
   if (empErr || !employees) {
     console.error("[Employees] Fetch:", empErr?.message);
@@ -439,19 +446,390 @@ export async function fetchEmployeeProfile(employeeId: string): Promise<Employee
 }
 
 /* ═══════════════════════════════════════════════════
+   EMPLOYEE ACTIVITY (cross-app aggregator)
+
+   Gap #3 from the connectivity audit: the employee profile had no
+   "what has this person actually been doing" panel, even though
+   every app (CRM, Quotations, Invoices, Projects, Todos, HR, etc.)
+   is already keyed to the same account_id / employee_id.
+
+   This aggregator pulls the last N rows from each module in parallel
+   and returns counts + a small recent list per bucket. Every query
+   is error-tolerant — if a table or column doesn't exist in a given
+   deployment the bucket silently returns empty counts rather than
+   blowing up the whole page.
+   ═══════════════════════════════════════════════════ */
+
+export interface ActivityItem {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  status?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  href?: string | null;
+  createdAt: string | null;
+}
+
+export interface ActivityBucket {
+  count: number;
+  recent: ActivityItem[];
+}
+
+export interface EmployeeActivity {
+  crmOpportunities: ActivityBucket;
+  quotations: ActivityBucket;
+  invoices: ActivityBucket;
+  projectsManaged: ActivityBucket;
+  tasksAssigned: ActivityBucket;
+  todosAssigned: ActivityBucket;
+  leaveRequests: ActivityBucket;
+  calendarEvents: ActivityBucket;
+  notes: ActivityBucket;
+  /** True when the employee has no account yet — most buckets will
+   *  be empty since they're keyed by account_id. The profile page
+   *  uses this to show a "create an account to enable activity"
+   *  nudge. */
+  missingAccount: boolean;
+}
+
+const EMPTY_BUCKET: ActivityBucket = { count: 0, recent: [] };
+
+function empty(): EmployeeActivity {
+  return {
+    crmOpportunities: EMPTY_BUCKET,
+    quotations: EMPTY_BUCKET,
+    invoices: EMPTY_BUCKET,
+    projectsManaged: EMPTY_BUCKET,
+    tasksAssigned: EMPTY_BUCKET,
+    todosAssigned: EMPTY_BUCKET,
+    leaveRequests: EMPTY_BUCKET,
+    calendarEvents: EMPTY_BUCKET,
+    notes: EMPTY_BUCKET,
+    missingAccount: false,
+  };
+}
+
+/* Generic wrapper — runs a fetcher, swallows errors so one broken
+   module can't take down the whole profile page. */
+async function safeBucket<T>(
+  fetcher: () => Promise<{ rows: T[]; count: number | null }>,
+  map: (r: T) => ActivityItem,
+): Promise<ActivityBucket> {
+  try {
+    const { rows, count } = await fetcher();
+    return {
+      count: count ?? rows.length,
+      recent: rows.map(map),
+    };
+  } catch (e) {
+    console.warn("[EmployeeActivity bucket]", e);
+    return EMPTY_BUCKET;
+  }
+}
+
+/** Fetch a cross-module activity snapshot for one employee. All
+ *  buckets are queried in parallel; a failure in any single bucket
+ *  returns an empty one rather than rejecting. */
+export async function fetchEmployeeActivity(
+  employeeId: string,
+  accountId: string | null,
+): Promise<EmployeeActivity> {
+  if (!employeeId) return empty();
+
+  const limit = 5;
+
+  /* HR bucket — keyed on employee_id, independent of account. */
+  const leavePromise = safeBucket<Record<string, unknown>>(
+    async () => {
+      const { data, count } = await supabase
+        .from("hr_leave_requests")
+        .select("id, leave_type_id, status, start_date, end_date, days, created_at", { count: "exact" })
+        .eq("employee_id", employeeId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { rows: (data || []) as Record<string, unknown>[], count };
+    },
+    (r) => ({
+      id: String(r.id),
+      title: `${r.days ?? "?"} day${Number(r.days) === 1 ? "" : "s"} leave`,
+      subtitle: `${r.start_date ?? ""} → ${r.end_date ?? ""}`,
+      status: (r.status as string) || null,
+      createdAt: (r.created_at as string) || null,
+      href: "/hr",
+    }),
+  );
+
+  /* Everything else is keyed on account_id. If the employee has no
+     account yet, short-circuit with empty buckets + a flag so the
+     UI can prompt. */
+  if (!accountId) {
+    const leave = await leavePromise;
+    return { ...empty(), leaveRequests: leave, missingAccount: true };
+  }
+
+  const [
+    crm,
+    quotations,
+    invoices,
+    projectsManaged,
+    tasksAssigned,
+    todosAssigned,
+    calendarEvents,
+    notes,
+    leave,
+  ] = await Promise.all([
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("crm_opportunities")
+          .select("id, name, stage_id, value, currency, expected_close_date, created_at", { count: "exact" })
+          .eq("owner_account_id", accountId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.name as string) || "Opportunity",
+        subtitle: r.expected_close_date ? `Close ${r.expected_close_date}` : null,
+        amount: r.value as number | null,
+        currency: (r.currency as string) || null,
+        status: null,
+        createdAt: (r.created_at as string) || null,
+        href: "/crm",
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("quotations")
+          .select("id, quote_no, status, total, currency, issue_date, created_at", { count: "exact" })
+          .eq("created_by", accountId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.quote_no as string) || "Quotation",
+        subtitle: (r.issue_date as string) || null,
+        status: (r.status as string) || null,
+        amount: r.total as number | null,
+        currency: (r.currency as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: `/quotations/${r.id}`,
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("invoices")
+          .select("id, invoice_no, status, total, currency, issue_date, created_at", { count: "exact" })
+          .eq("created_by_account_id", accountId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.invoice_no as string) || "Invoice",
+        subtitle: (r.issue_date as string) || null,
+        status: (r.status as string) || null,
+        amount: r.total as number | null,
+        currency: (r.currency as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: `/invoices/${r.id}`,
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("projects")
+          .select("id, name, code, status, planned_end, created_at", { count: "exact" })
+          .eq("manager_account_id", accountId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.name as string) || "Project",
+        subtitle: (r.code as string) || null,
+        status: (r.status as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: `/projects/${r.id}`,
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("project_tasks")
+          .select("id, title, status, priority, due_date, project_id, created_at", { count: "exact" })
+          .eq("assignee_account_id", accountId)
+          .neq("status", "done")
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.title as string) || "Task",
+        subtitle: r.due_date ? `Due ${r.due_date}` : null,
+        status: (r.status as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: `/projects/${r.project_id}`,
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        /* Todos use a Postgres array column for assignees. The `cs`
+           (contains) filter checks membership without pulling all
+           rows to the client. */
+        const { data, count } = await supabase
+          .from("todos")
+          .select("id, title, status, priority, due_date, created_at", { count: "exact" })
+          .contains("assignee_account_ids", [accountId])
+          .neq("status", "done")
+          .order("created_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.title as string) || "Todo",
+        subtitle: r.due_date ? `Due ${r.due_date}` : null,
+        status: (r.status as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: `/todo`,
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("koleex_calendar_events")
+          .select("id, title, starts_at, ends_at, event_type, created_at", { count: "exact" })
+          .eq("account_id", accountId)
+          .gte("starts_at", new Date(Date.now() - 90 * 86400_000).toISOString())
+          .order("starts_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.title as string) || "Event",
+        subtitle: (r.starts_at as string) || null,
+        status: (r.event_type as string) || null,
+        createdAt: (r.created_at as string) || null,
+        href: "/calendar",
+      }),
+    ),
+
+    safeBucket<Record<string, unknown>>(
+      async () => {
+        const { data, count } = await supabase
+          .from("notes")
+          .select("id, title, updated_at, created_at", { count: "exact" })
+          .eq("account_id", accountId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+        return { rows: (data || []) as Record<string, unknown>[], count };
+      },
+      (r) => ({
+        id: String(r.id),
+        title: (r.title as string) || "Untitled note",
+        subtitle: null,
+        status: null,
+        createdAt: (r.updated_at as string) || (r.created_at as string) || null,
+        href: "/notes",
+      }),
+    ),
+
+    leavePromise,
+  ]);
+
+  return {
+    crmOpportunities: crm,
+    quotations,
+    invoices,
+    projectsManaged,
+    tasksAssigned,
+    todosAssigned,
+    leaveRequests: leave,
+    calendarEvents,
+    notes,
+    missingAccount: false,
+  };
+}
+
+/* ═══════════════════════════════════════════════════
    CREATE EMPLOYEE (full wizard flow)
    ═══════════════════════════════════════════════════ */
 
 interface CreateEmployeeResult {
   success: boolean;
+  /** Populated on both failure AND partial success (e.g. the
+   *  employee saved but account creation was skipped). Callers
+   *  should show `error` whenever it's set, regardless of `success`. */
   error?: string;
   personId?: string;
   employeeId?: string;
   accountId?: string;
 }
 
+/** RFC-ish email sanity check. Good enough for form validation;
+ *  the DB / auth layer does the strict one. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Parse a string into a non-negative integer, or null if invalid /
+ *  empty. Used instead of `parseInt(x, 10)` which happily returns
+ *  NaN for garbage input and blows up the insert. */
+function toIntOrNull(v: string | null | undefined): number | null {
+  if (!v) return null;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Same for decimals (salaries). Empty string → null, not 0. */
+function toNumOrNull(v: string | null | undefined): number | null {
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export async function createFullEmployee(data: EmployeeWizardData): Promise<CreateEmployeeResult> {
   try {
+    /* ── Step 0: Pre-flight uniqueness checks ──
+       Cheap Supabase round-trips that save us from FK explosions
+       halfway through the multi-step insert below. */
+    if (data.employee_number) {
+      const { data: dup } = await supabase
+        .from(EMPLOYEES)
+        .select("id")
+        .eq("employee_number", data.employee_number)
+        .maybeSingle();
+      if (dup) {
+        return { success: false, error: `Employee number ${data.employee_number} already exists.` };
+      }
+    }
+    const primaryEmail = data.work_email || data.personal_email;
+    if (primaryEmail) {
+      const { data: dupP } = await supabase
+        .from(PEOPLE)
+        .select("id")
+        .eq("email", primaryEmail)
+        .maybeSingle();
+      if (dupP) {
+        return { success: false, error: `A person with email ${primaryEmail} already exists.` };
+      }
+    }
+
     /* ── Step 1: Create Person ── */
     const fullName = [data.title, data.first_name, data.middle_name, data.last_name]
       .filter(Boolean)
@@ -579,7 +957,7 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         marital_status: data.marital_status || null,
         nationality: data.nationality || null,
         gender: data.gender || null,
-        number_of_children: data.number_of_children ? parseInt(data.number_of_children, 10) : null,
+        number_of_children: toIntOrNull(data.number_of_children),
         // Documents / Visa
         identification_id: data.identification_id || null,
         passport_number: data.passport_number || null,
@@ -593,7 +971,7 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         bank_swift: data.bank_swift || null,
         bank_currency: data.bank_currency || null,
         // Salary at hire
-        initial_salary: data.initial_salary ? Number(data.initial_salary) : null,
+        initial_salary: toNumOrNull(data.initial_salary),
         salary_currency: data.salary_currency || null,
         // Insurance
         insurance_provider: data.insurance_provider || null,
@@ -607,7 +985,7 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
         education_degree: data.education_degree || null,
         education_institution: data.education_institution || null,
         education_field: data.education_field || null,
-        education_graduation_year: data.education_graduation_year || null,
+        education_graduation_year: toIntOrNull(data.education_graduation_year),
         // Driving License
         driving_license_number: data.driving_license_number || null,
         driving_license_type: data.driving_license_type || null,
@@ -642,7 +1020,18 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
       });
 
     if (assignErr) {
+      /* Not just a console warning: without an assignment the employee
+         has no department/position, which breaks every downstream
+         query (search, org chart, permissions). Surface it so the
+         user can retry instead of walking away thinking the employee
+         is fully set up. */
       console.error("[Assignment] Create:", assignErr.message);
+      return {
+        success: false,
+        error: `Employee created but org assignment failed: ${assignErr.message}. Edit the employee to re-assign.`,
+        personId: person.id,
+        employeeId: employee.id,
+      };
     }
 
     /* ── Step 5: Create Position History entry ── */
@@ -661,6 +1050,17 @@ export async function createFullEmployee(data: EmployeeWizardData): Promise<Crea
 
     if (data.create_account) {
       const loginEmail = data.login_email || data.work_email || data.personal_email;
+      /* Hard-fail if no real email. The old code fell back to
+         "<username>@koleex.local" — a fake address the user can't
+         receive invites at, which silently breaks account setup. */
+      if (!loginEmail || !EMAIL_RE.test(loginEmail)) {
+        return {
+          success: true,
+          personId: person.id,
+          employeeId: employee.id,
+          error: "Employee created. Account was skipped — a valid login email is required.",
+        };
+      }
       const username = data.username || suggestUsername(`${data.first_name} ${data.last_name}`);
 
       // Lightweight base64 tag for temp password (matches accounts-admin pattern)
