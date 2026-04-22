@@ -160,8 +160,20 @@ export default function EmojiButton({
         ref={popoverRef}
         role="dialog"
         aria-label="Emoji picker"
-        style={popoverStyle}
-        className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-2"
+        /* Phase 14.4: make the popover fully opaque.
+           --bg-surface in the Koleex dark theme is semi-transparent
+           (it's used over the aurora backdrop throughout the hub),
+           so the popover rendered "see-through". Layering an opaque
+           --bg-primary behind a --bg-surface tint + backdrop-blur
+           gives us a solid panel that still matches the theme in
+           both light and dark modes. */
+        style={{
+          ...popoverStyle,
+          backgroundColor: "var(--bg-primary)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+        }}
+        className="rounded-xl border border-[var(--border-subtle)] shadow-2xl p-2"
       >
         <div className="grid grid-cols-6 gap-1">
           {EMOJIS.map((e) => (
