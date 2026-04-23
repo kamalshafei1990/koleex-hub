@@ -682,7 +682,7 @@ export async function fetchEmployeeActivity(
    CREATE EMPLOYEE (full wizard flow)
    ═══════════════════════════════════════════════════ */
 
-interface CreateEmployeeResult {
+export interface CreateEmployeeResult {
   success: boolean;
   /** Populated on both failure AND partial success (e.g. the
    *  employee saved but account creation was skipped). Callers
@@ -691,6 +691,13 @@ interface CreateEmployeeResult {
   personId?: string;
   employeeId?: string;
   accountId?: string;
+  /** Login credentials echoed back once so the Add Employee success
+   *  modal can display them for the admin to copy. Null when no
+   *  account was created. The temp password is base64 in the DB;
+   *  this is the only moment it's retrievable in plain text. */
+  accountUsername?: string;
+  accountLoginEmail?: string;
+  tempPassword?: string;
 }
 
 /* EMAIL_RE / toIntOrNull / toNumOrNull used to live here for the old

@@ -101,6 +101,43 @@ export async function POST(req: Request) {
     }
   }
 
+  /* Account-side pre-checks — only run if the caller is actually
+     creating an account. Surfaces friendly 409s for the two most
+     common collisions (username / login_email) so the client can
+     point the user at the exact field instead of showing a
+     generic Postgres unique-violation. */
+  if (bool(body, "create_account")) {
+    const desiredUsername = str(body, "username");
+    if (desiredUsername) {
+      const { data: dupU } = await supabaseServer
+        .from(ACCOUNTS)
+        .select("id")
+        .ilike("username", desiredUsername)
+        .maybeSingle();
+      if (dupU) {
+        return NextResponse.json(
+          { success: false, error: `Username "${desiredUsername}" is already taken.` },
+          { status: 409 },
+        );
+      }
+    }
+    const desiredLoginEmail =
+      str(body, "login_email") ?? str(body, "work_email") ?? str(body, "personal_email");
+    if (desiredLoginEmail) {
+      const { data: dupL } = await supabaseServer
+        .from(ACCOUNTS)
+        .select("id")
+        .ilike("login_email", desiredLoginEmail)
+        .maybeSingle();
+      if (dupL) {
+        return NextResponse.json(
+          { success: false, error: `Login email "${desiredLoginEmail}" is already in use.` },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
   /* ── Step 1: Create Person ── */
   const title = str(body, "title");
   const firstName = str(body, "first_name");
@@ -318,6 +355,9 @@ export async function POST(req: Request) {
 
   /* ── Step 6 (Optional): Account ── */
   let accountId: string | null = null;
+  let accountUsername: string | null = null;
+  let accountLoginEmail: string | null = null;
+  let tempPasswordOut: string | null = null;
   let partialMsg: string | undefined;
 
   if (bool(body, "create_account")) {
@@ -385,10 +425,33 @@ export async function POST(req: Request) {
       partialMsg = `Employee saved, but account creation failed: ${accErr?.message}`;
     } else {
       accountId = account.id;
+      accountUsername = username;
+      accountLoginEmail = loginEmail;
+      /* Echo the plain-text temp password back to the caller so the
+         admin can copy + share it in the success modal. This is the
+         ONLY moment it's retrievable in plain text — we never store
+         or return it again after this response. */
+      tempPasswordOut = tempPassword;
+
       await supabaseServer
         .from(EMPLOYEES)
         .update({ account_id: account.id })
         .eq("id", employee.id);
+
+      /* Audit trail. account_login_history already records
+         "password_changed" and actual login events; adding a
+         "account_created" row at birth closes the "who provisioned
+         this user and when" gap without a DB dig. Fire-and-forget;
+         a logging failure shouldn't cascade into a failed create. */
+      void supabaseServer.from("account_login_history").insert({
+        account_id: account.id,
+        event_type: "account_created",
+        metadata: {
+          by_account_id: auth.account_id,
+          via: "add_employee_wizard",
+          employee_id: employee.id,
+        },
+      });
     }
   }
 
@@ -397,6 +460,11 @@ export async function POST(req: Request) {
     personId: person.id,
     employeeId: employee.id,
     accountId: accountId ?? undefined,
+    accountUsername: accountUsername ?? undefined,
+    accountLoginEmail: accountLoginEmail ?? undefined,
+    /* Plain-text credentials for the success modal. Null unless the
+       admin actually created an account. */
+    tempPassword: tempPasswordOut ?? undefined,
     error: partialMsg,
   });
 }

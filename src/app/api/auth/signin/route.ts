@@ -58,19 +58,21 @@ export async function POST(req: Request) {
       status: string;
       password_hash: string | null;
       user_type: string;
+      force_password_change: boolean | null;
     } | null = null;
 
+    const SELECT_COLS = "id, username, login_email, status, password_hash, user_type, force_password_change";
     if (emailOrUsername.includes("@")) {
       const { data } = await supabaseServer
         .from("accounts")
-        .select("id, username, login_email, status, password_hash, user_type")
+        .select(SELECT_COLS)
         .ilike("login_email", emailOrUsername)
         .maybeSingle();
       account = data ?? null;
     } else {
       const { data } = await supabaseServer
         .from("accounts")
-        .select("id, username, login_email, status, password_hash, user_type")
+        .select(SELECT_COLS)
         .ilike("username", emailOrUsername)
         .maybeSingle();
       account = data ?? null;
@@ -101,6 +103,22 @@ export async function POST(req: Request) {
     // Success — mint the session cookie.
     await setSessionCookie(account.id);
 
+    /* Stamp last_login_at + write an audit row. Fire-and-forget so a
+       failure to record the event never blocks a legitimate login.
+       Previously the Security tab on every account always showed
+       "Last login: never" because nothing on the signin path ever
+       wrote this column. */
+    const now = new Date().toISOString();
+    void supabaseServer
+      .from("accounts")
+      .update({ last_login_at: now })
+      .eq("id", account.id);
+    void supabaseServer.from("account_login_history").insert({
+      account_id: account.id,
+      event_type: "login_success",
+      metadata: { via: "password" },
+    });
+
     return NextResponse.json({
       ok: true,
       account: {
@@ -108,6 +126,11 @@ export async function POST(req: Request) {
         username: account.username,
         login_email: account.login_email,
         user_type: account.user_type,
+        /* Surface the flag so the client can redirect to
+           /change-password on first login. Enforced server-side by
+           middleware too — this is just the hint that saves an
+           extra round-trip. */
+        force_password_change: !!account.force_password_change,
       },
     });
   } catch (err) {

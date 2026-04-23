@@ -725,7 +725,17 @@ export default function AddEmployeePage() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<{ id: string; name: string; partial?: string } | null>(null);
+  const [saved, setSaved] = useState<{
+    id: string;
+    name: string;
+    partial?: string;
+    /* Credentials shown once in the success modal. The admin copies
+       them to share with the new employee — after the modal closes
+       they're gone (the hashed version stays in the DB). */
+    username?: string;
+    loginEmail?: string;
+    tempPassword?: string;
+  } | null>(null);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [positions, setPositions] = useState<PositionRow[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
@@ -878,6 +888,9 @@ export default function AddEmployeePage() {
       id: result.employeeId!,
       name: `${form.first_name} ${form.last_name}`.trim(),
       partial: result.error,
+      username: result.accountUsername,
+      loginEmail: result.accountLoginEmail,
+      tempPassword: result.tempPassword,
     });
     setSaving(false);
   }, [form]);
@@ -918,6 +931,69 @@ export default function AddEmployeePage() {
             {saved.partial}
           </div>
         )}
+
+        {/* Credentials — shown ONCE. After the modal closes the
+            plain-text temp password is gone (only the base64 version
+            remains in the DB). Each field has its own Copy button so
+            the admin can share username + password via any channel. */}
+        {saved.username && saved.tempPassword && (
+          <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-4">
+            <p className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-2">
+              Login credentials
+            </p>
+            <p className="text-[11px] text-[var(--text-dim)] mb-3">
+              Share these with {saved.name || "the employee"} securely. You won&apos;t see the
+              password again after closing this dialog.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Username</span>
+                <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
+                  {saved.username}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard?.writeText(saved.username!).catch(() => {}); }}
+                  className="h-8 px-2 text-[11px] rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+              {saved.loginEmail && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Email</span>
+                  <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
+                    {saved.loginEmail}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard?.writeText(saved.loginEmail!).catch(() => {}); }}
+                    className="h-8 px-2 text-[11px] rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-dim)] w-16 shrink-0">Password</span>
+                <code className="flex-1 text-[13px] font-mono px-2 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] truncate">
+                  {saved.tempPassword}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard?.writeText(saved.tempPassword!).catch(() => {}); }}
+                  className="h-8 px-2 text-[11px] rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-[var(--text-faint)] mt-3">
+              The employee will be asked to set their own password the first time they sign in.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Link
             href={`/employees/${saved.id}`}
