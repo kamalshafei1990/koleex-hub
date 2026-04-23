@@ -587,40 +587,63 @@ export default function ProductViewPage() {
         fontFeatureSettings: '"kern", "liga", "clig", "calt"',
       }}
     >
-      {/* ── Apple-style sub-nav: slim, solid, centered breadcrumb.
-              Previously used bg-white/80 + backdrop-blur which on
-              large headlines caused the h1 text to bleed through the
-              bar (visually merging "Product Name" with the
-              breadcrumb). Opaque fills fix that plus a higher z-index
-              guarantees the bar stays on top when content scrolls
-              underneath. */}
-      <div className="sticky top-14 z-30 bg-white border-b border-[#D2D2D7] dark:bg-[#0A0A0A] dark:border-white/10">
-        <div className="max-w-[1024px] mx-auto px-6 h-11 flex items-center justify-between">
+      {/* ── Sub-nav: matches the standard detail-page pattern used
+              elsewhere in the hub (/customers/[id], /quotations/[id],
+              /employees/[id]). CSS vars instead of hard-coded Apple
+              greys so the bar blends into the rest of the app in
+              both themes. Sticky because the product page is long —
+              the breadcrumb stays available as the user scrolls the
+              hero / specs / media sections. */}
+      <div className="sticky top-14 z-30 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+        <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-3 max-w-[1200px] flex items-center justify-between gap-3">
           <Link
             href="/products"
-            className="inline-flex items-center gap-1.5 text-[12px] text-[#6E6E73] hover:text-[#1D1D1F] dark:text-white/60 dark:hover:text-white transition"
+            aria-label="Back to products"
+            className="flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
           >
-            <ArrowLeftIcon className="h-3.5 w-3.5" /> All products
+            <ArrowLeftIcon size={16} />
           </Link>
-          <div className="flex items-center gap-3">
-            {divisionName && (
-              <div className="hidden md:flex items-center gap-1.5 text-[12px] text-[#6E6E73] dark:text-white/60">
-                <span>{divisionName}</span>
-                {categoryName && <><span className="text-[#D2D2D7] dark:text-white/20">/</span><span>{categoryName}</span></>}
-                {subcategoryName && <><span className="text-[#D2D2D7] dark:text-white/20">/</span><span className="text-[#1D1D1F] dark:text-white font-medium">{subcategoryName}</span></>}
-              </div>
-            )}
-            {/* Edit only on the internal /product-data view. The
-                public /products detail is read-only. */}
-            {isInternal && (
-              <Link
-                href={`/product-data/${product.id}/edit`}
-                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] dark:border-white/15 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:text-white transition"
-              >
-                <PencilIcon className="h-3 w-3" /> Edit
-              </Link>
-            )}
-          </div>
+
+          {/* Breadcrumb — centered on wide screens, hidden on mobile
+              to avoid crowding the narrow bar. Uses text-dim for
+              ancestors + text-primary for the current subcategory. */}
+          {divisionName && (
+            <nav
+              aria-label="Breadcrumb"
+              className="hidden md:flex items-center gap-1.5 text-[12px] text-[var(--text-dim)] min-w-0 flex-1 justify-center"
+            >
+              <span className="truncate">{divisionName}</span>
+              {categoryName && (
+                <>
+                  <span className="text-[var(--text-faint)]">/</span>
+                  <span className="truncate">{categoryName}</span>
+                </>
+              )}
+              {subcategoryName && (
+                <>
+                  <span className="text-[var(--text-faint)]">/</span>
+                  <span className="truncate text-[var(--text-primary)] font-medium">
+                    {subcategoryName}
+                  </span>
+                </>
+              )}
+            </nav>
+          )}
+
+          {/* Edit only on the internal /product-data view. The
+              public /products detail is read-only. */}
+          {isInternal ? (
+            <Link
+              href={`/product-data/${product.id}/edit`}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-medium bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors shrink-0"
+            >
+              <PencilIcon size={12} /> Edit
+            </Link>
+          ) : (
+            /* Spacer keeps the breadcrumb visually centered on the
+               public view where there's no Edit button. */
+            <span className="h-8 w-8 shrink-0" aria-hidden />
+          )}
         </div>
       </div>
 
