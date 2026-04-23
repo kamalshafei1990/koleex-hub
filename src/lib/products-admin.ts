@@ -117,64 +117,114 @@ export async function fetchSubcategoryCounts(): Promise<Record<string, number>> 
 
 // ── Products ──
 
+/* All four product reads/writes now go through /api/products* so
+   secret fields (cost_price, supplier, hs_code, moq, etc.) are
+   stripped server-side when the caller doesn't have Product Data
+   access. The UI on /products used to just HIDE those fields
+   cosmetically; now they never reach the browser for customer
+   sessions. Mutations are SA/Product-Data-only at the API layer. */
+
 export async function fetchProducts(): Promise<ProductRow[]> {
-  const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-  return (data as ProductRow[]) || [];
+  try {
+    const res = await fetch("/api/products", { credentials: "include" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { products: ProductRow[] };
+    return json.products ?? [];
+  } catch (e) {
+    console.error("[Products] fetchProducts:", e);
+    return [];
+  }
 }
 
 export async function fetchProductById(id: string): Promise<ProductRow | null> {
-  const { data } = await supabase.from("products").select("*").eq("id", id).single();
-  return data as ProductRow | null;
+  if (!id) return null;
+  try {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, { credentials: "include" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { product: ProductRow };
+    return json.product ?? null;
+  } catch (e) {
+    console.error("[Products] fetchProductById:", e);
+    return null;
+  }
 }
 
 /**
  * Fetch a product by slug first, falling back to UUID lookup.
  * Lets routes accept either "/products/my-machine" or "/products/<uuid>".
+ * The API handles the slug/UUID disambiguation server-side.
  */
 export async function fetchProductByIdOrSlug(handle: string): Promise<ProductRow | null> {
-  if (!handle) return null;
-  // Try slug match first (cheaper + more common public URL form)
-  const { data: bySlug } = await supabase
-    .from("products")
-    .select("*")
-    .eq("slug", handle)
-    .maybeSingle();
-  if (bySlug) return bySlug as ProductRow;
-
-  // UUID fallback — only hit this branch if the handle looks like a UUID
-  const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
-  if (!uuidLike) return null;
-  const { data: byId } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", handle)
-    .maybeSingle();
-  return (byId as ProductRow) || null;
+  return fetchProductById(handle);
 }
 
 export async function createProduct(product: Record<string, unknown>): Promise<ProductRow | null> {
-  const { data, error } = await supabase.from("products").insert(product).select().single();
-  if (error) { console.error("[Products] Create error:", error.message); return null; }
-  return data as ProductRow;
+  try {
+    const res = await fetch("/api/products", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(product),
+    });
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      console.error("[Products] Create error:", json.error || res.status);
+      return null;
+    }
+    const json = (await res.json()) as { product: ProductRow };
+    return json.product ?? null;
+  } catch (e) {
+    console.error("[Products] Create error:", e);
+    return null;
+  }
 }
 
 export async function updateProduct(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  const { error } = await supabase.from("products").update(updates).eq("id", id);
-  if (error) { console.error("[Products] Update error:", error.message); return false; }
-  return true;
+  try {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("[Products] Update error:", e);
+    return false;
+  }
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
-  const { error } = await supabase.from("products").delete().eq("id", id);
-  if (error) { console.error("[Products] Delete error:", error.message); return false; }
-  return true;
+  try {
+    const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("[Products] Delete error:", e);
+    return false;
+  }
 }
 
 // ── Models ──
 
 export async function fetchModelsByProductId(productId: string): Promise<ProductModelRow[]> {
-  const { data } = await supabase.from("product_models").select("*").eq("product_id", productId).order("order");
-  return (data as ProductModelRow[]) || [];
+  /* Goes through /api/product-models which strips cost_price and
+     supplier server-side for non-Product-Data callers. */
+  if (!productId) return [];
+  try {
+    const res = await fetch(
+      `/api/product-models?product_id=${encodeURIComponent(productId)}`,
+      { credentials: "include" },
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { models: ProductModelRow[] };
+    return json.models ?? [];
+  } catch (e) {
+    console.error("[Models] fetchByProductId:", e);
+    return [];
+  }
 }
 
 export async function createModel(model: Record<string, unknown>): Promise<ProductModelRow | null> {
@@ -325,19 +375,21 @@ export async function fetchModelSummaries(): Promise<{
   suppliers: Record<string, string[]>;
   allSuppliers: string[];
 }> {
-  const { data } = await supabase.from("product_models").select("product_id,supplier");
-  const counts: Record<string, number> = {};
-  const suppliers: Record<string, string[]> = {};
-  const supplierSet = new Set<string>();
-  for (const row of (data || []) as { product_id: string; supplier: string | null }[]) {
-    counts[row.product_id] = (counts[row.product_id] || 0) + 1;
-    if (row.supplier) {
-      if (!suppliers[row.product_id]) suppliers[row.product_id] = [];
-      if (!suppliers[row.product_id].includes(row.supplier)) suppliers[row.product_id].push(row.supplier);
-      supplierSet.add(row.supplier);
-    }
+  /* Supplier data is stripped server-side when the caller lacks
+     Product Data access — customers get populated counts but
+     empty suppliers + allSuppliers. */
+  try {
+    const res = await fetch("/api/product-models?summary=1", { credentials: "include" });
+    if (!res.ok) return { counts: {}, suppliers: {}, allSuppliers: [] };
+    return (await res.json()) as {
+      counts: Record<string, number>;
+      suppliers: Record<string, string[]>;
+      allSuppliers: string[];
+    };
+  } catch (e) {
+    console.error("[Models] fetchSummaries:", e);
+    return { counts: {}, suppliers: {}, allSuppliers: [] };
   }
-  return { counts, suppliers, allSuppliers: Array.from(supplierSet).sort() };
 }
 
 // ── Fetch main images for all products ──
