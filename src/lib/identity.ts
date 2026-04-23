@@ -211,12 +211,20 @@ export function useCurrentAccount() {
 /**
  * Fire-and-forget: dispatch the change event for anything listening, without
  * changing the stored id. Call this after updating an existing account so the
- * header refetches. Invalidates the cache so the next hook mount hits the
- * network and shows fresh data.
+ * header refetches. Invalidates:
+ *   - the sessionStorage identity cache, and
+ *   - the in-memory me-bootstrap cache, which feeds the header avatar +
+ *     full name directly (the 60 s TTL bump for perf meant avatar
+ *     uploads were invisible for up to a minute without this).
  */
 export function notifyIdentityChanged(): void {
   if (typeof window === "undefined") return;
   clearCache();
+  /* Dynamic import keeps this module free of a direct dependency on
+     me-bootstrap (avoids a cycle). */
+  void import("./me-bootstrap")
+    .then((m) => m.invalidateMeBootstrap())
+    .catch(() => {/* no-op — cache is best-effort */});
   const id = getCurrentAccountIdSync();
   window.dispatchEvent(new CustomEvent(IDENTITY_EVENT, { detail: id }));
 }
