@@ -117,6 +117,13 @@ export default function AccountDetail({ accountId }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /* Inline "Set password" panel — admin types the exact password
+     they want instead of getting a random one. Toggled by the
+     "Set password" button next to Reset Password. */
+  const [showSetPw, setShowSetPw] = useState(false);
+  const [customPw, setCustomPw] = useState("");
+  const [showCustomPw, setShowCustomPw] = useState(false);
+
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { t } = useTranslation(accountsT);
@@ -173,10 +180,51 @@ export default function AccountDetail({ accountId }: Props) {
     setWorking(false);
     if (ok) {
       setNewTempPw(pw);
-      setData({ ...data, force_password_change: true });
+      /* Default OFF globally now — admin resets no longer force a
+         change. The force-toggle button next to this one handles
+         the opt-in case. */
+      setData({ ...data, force_password_change: false });
       setToast(t("acc.msg.passwordReset"));
     } else {
       setError(t("acc.err.passwordFailed"));
+    }
+  }
+
+  /** Set a custom password the admin typed. POSTs to the same route
+   *  that /api/accounts/[id]/password exposes; no `forceReset` flag
+   *  so the password is permanent unless the admin explicitly flips
+   *  the Force toggle separately. */
+  async function handleSetCustomPassword() {
+    if (!data) return;
+    const pw = customPw.trim();
+    if (pw.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setWorking(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/accounts/${data.id}/password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(json.error || `Failed (${res.status})`);
+        setWorking(false);
+        return;
+      }
+      setNewTempPw(pw);
+      setData({ ...data, force_password_change: false });
+      setCustomPw("");
+      setShowSetPw(false);
+      setToast("Password updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setWorking(false);
     }
   }
 
@@ -360,11 +408,20 @@ export default function AccountDetail({ accountId }: Props) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => setShowSetPw((s) => !s)}
+              disabled={working}
+              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+              title="Set a password you choose"
+            >
+              <KeyIcon className="h-4 w-4" /> Set password
+            </button>
+            <button
               onClick={handleResetPassword}
               disabled={working}
               className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+              title="Generate a random password for the admin to share"
             >
-              <KeyIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
+              <RefreshCcwIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
             </button>
             <button
               onClick={handleToggleForce}
@@ -415,6 +472,55 @@ export default function AccountDetail({ accountId }: Props) {
           <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
             <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {/* Inline "Set password" panel — admin types the exact password
+            they want. Clearing the panel hides it again. */}
+        {showSetPw && (
+          <div className="mb-5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface)] p-4">
+            <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold mb-2">
+              Set a password for {data.username}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[220px]">
+                <input
+                  type={showCustomPw ? "text" : "password"}
+                  value={customPw}
+                  onChange={(e) => setCustomPw(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  className="w-full h-10 pl-3 pr-10 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCustomPw((s) => !s)}
+                  aria-label={showCustomPw ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+                >
+                  {showCustomPw ? "🙈" : "👁"}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleSetCustomPassword}
+                disabled={working || customPw.trim().length < 8}
+                className="h-10 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {working ? "Applying…" : "Apply"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSetPw(false); setCustomPw(""); }}
+                className="h-10 px-4 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[12px] font-medium hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-[11px] text-[var(--text-dim)] mt-2">
+              This becomes the user&apos;s real password. Share it with them securely;
+              it won&apos;t be shown again after you close this panel.
+            </p>
           </div>
         )}
 
