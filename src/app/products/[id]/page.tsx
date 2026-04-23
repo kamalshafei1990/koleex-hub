@@ -589,19 +589,12 @@ export default function ProductViewPage() {
     >
       {/* ── Sub-nav: matches the standard detail-page pattern used
               elsewhere in the hub (/customers/[id], /quotations/[id],
-              /employees/[id]). CSS vars instead of hard-coded Apple
-              greys so the bar blends into the rest of the app in
-              both themes. Sticky because the product page is long —
-              the breadcrumb stays available as the user scrolls the
-              hero / specs / media sections.
-
-              IMPORTANT: top-0, NOT top-14. Page content is rendered
-              inside RootShell's inner `overflow-auto` container which
-              already begins flush below the fixed MainHeader. `sticky`
-              is relative to that scroll container, so top-0 pins the
-              bar right at the header's bottom edge. top-14 was the
-              bug that left the bar floating 56px down the page. */}
-      <div className="sticky top-0 z-30 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+              /employees/[id]). Plain top bar — NOT sticky — because
+              the hub scrolls inside a nested container and those
+              other pages scroll their back/breadcrumb away with the
+              rest of the content. Keeping the same behavior here so
+              the product detail feels like the rest of the app. */}
+      <div className="bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
         <div className="mx-auto px-4 md:px-6 lg:px-10 xl:px-16 py-3 max-w-[1200px] flex items-center justify-between gap-3">
           <Link
             href="/products"
