@@ -157,12 +157,19 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/quotations/${encodeURIComponent(id)}`, {
         credentials: "include",
       });
       if (res.status === 404) { setNotFound(true); return; }
-      if (!res.ok) { setError(`Failed (${res.status})`); return; }
+      if (!res.ok) {
+        /* Pull the server-supplied message so the user sees WHY the
+           load failed instead of staring at a spinner. */
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error || `Failed to load quotation (${res.status})`);
+        return;
+      }
       const json = (await res.json()) as { quotation: QuotationRow };
       setQ(json.quotation);
     } catch (e) {
@@ -235,10 +242,45 @@ function QuotationDetail({ params }: { params: Promise<{ id: string }> }) {
     );
   }
 
-  if (loading || !q) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <SpinnerIcon size={28} className="animate-spin text-[var(--text-dim)]" />
+      </div>
+    );
+  }
+
+  /* If the fetch failed (e.g. server error, bad schema, network), show
+     the actual error + a retry button instead of an endless spinner —
+     users were getting stuck on "still loading" with no signal that
+     anything was wrong. */
+  if (!q) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <QuotationIcon size={32} className="mx-auto text-[var(--text-faint)] mb-3" />
+          <p className="text-sm text-[var(--text-primary)] font-medium mb-1">
+            Couldn&apos;t load this quotation
+          </p>
+          <p className="text-xs text-[var(--text-dim)] mb-4">
+            {error || "Unknown error."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="h-8 px-3 rounded-lg text-[12px] font-medium border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+            >
+              Retry
+            </button>
+            <Link
+              href="/quotations"
+              className="h-8 px-3 rounded-lg text-[12px] font-medium border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center"
+            >
+              Back to list
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
