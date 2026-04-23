@@ -33,7 +33,7 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load accounts" }, { status: 500 });
   }
   return NextResponse.json({ accounts: data ?? [] }, {
-    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
 }
 

@@ -195,7 +195,13 @@ export async function GET() {
     return { ...t, assignees: tAssignees, assigner, notes: tNotes };
   });
 
-  return NextResponse.json({ todos: enriched });
+  /* Same caching posture as /api/accounts / /api/employees — the
+     list refreshes on any write via a client-side invalidate, and
+     SWR covers the gap between expiry and background refetch. */
+  return NextResponse.json(
+    { todos: enriched },
+    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+  );
 }
 
 /* POST /api/todos — create a todo.

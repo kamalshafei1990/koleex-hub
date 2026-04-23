@@ -63,7 +63,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to load tasks" }, { status: 500 });
   }
   return NextResponse.json({ tasks: data ?? [] }, {
-    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
 }
 

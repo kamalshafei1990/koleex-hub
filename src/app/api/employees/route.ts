@@ -128,7 +128,17 @@ export async function GET(req: Request) {
       };
     });
 
-  return NextResponse.json({ employees: items });
+  return NextResponse.json(
+    { employees: items },
+    {
+      /* Same cache story as /api/accounts: HR directory changes
+         rarely during a session, but we still need freshness after
+         an admin creates/edits. stale-while-revalidate lets the
+         browser serve instantly from cache while revalidating in
+         the background. */
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
+    },
+  );
 }
 
 /* POST /api/employees — create a koleex_employees row (tenant_id enforced). */

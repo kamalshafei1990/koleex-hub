@@ -57,7 +57,10 @@ export async function GET() {
   // If koleex_roles is empty, fall back to returning roles as-is so the
   // dropdown still has options in a clean environment.
   if (koleexRows.length === 0) {
-    return NextResponse.json({ roles: baseRes.data ?? [] });
+    return NextResponse.json(
+      { roles: baseRes.data ?? [] },
+      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+    );
   }
 
   const merged = koleexRows.map((row) => ({
@@ -66,7 +69,12 @@ export async function GET() {
     slug: (row.slug as string | null | undefined) ?? slugById.get(row.id) ?? null,
   }));
 
-  return NextResponse.json({ roles: merged });
+  /* Roles rarely change during a session — they're admin-edited
+     once in a while. Long cache + long SWR. */
+  return NextResponse.json(
+    { roles: merged },
+    { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+  );
 }
 
 /** Slugify a role name: "Sales Rep" → "sales_rep". Roles table

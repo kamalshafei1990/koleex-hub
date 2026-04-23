@@ -24,7 +24,12 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load stages" }, { status: 500 });
   }
 
-  return NextResponse.json({ stages: data ?? [] });
+  /* Pipeline stages change very rarely (pipeline redesign is a
+     one-time admin task). Long cache is safe. */
+  return NextResponse.json(
+    { stages: data ?? [] },
+    { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=600" } },
+  );
 }
 
 export async function POST(req: Request) {

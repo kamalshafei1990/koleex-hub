@@ -83,7 +83,7 @@ export async function GET(req: Request) {
     headers: {
       // Private + short max-age so rapid back/forward navigation
       // doesn't re-fetch, but any write invalidates quickly.
-      "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=180",
     },
   });
 }

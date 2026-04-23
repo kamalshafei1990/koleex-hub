@@ -30,7 +30,24 @@ export interface MeBootstrapPayload {
   isSuperAdmin: boolean;
 }
 
-const CACHE_TTL_MS = 10_000; // align with the HTTP Cache-Control max-age
+/* Client-side bootstrap cache.
+ *
+ * Was 10s; bumped to 60s. Rationale:
+ *  - The payload is derived from the account row, the role, the
+ *    module permissions, and the tenant — all of which change
+ *    infrequently (role edits, dept changes, etc., are admin actions
+ *    that happen once a week at most).
+ *  - A 10s TTL means any user clicking through 4 apps in a minute
+ *    re-fetches 6 times. At ~200ms RTT to the Tokyo DB, that's
+ *    ~1.2s of waste per minute of active use.
+ *  - invalidateMeBootstrap() is still called after writes that DO
+ *    change the payload (role changes, preferences saves, etc.), so
+ *    stale data after real changes is handled explicitly — bumping
+ *    the idle TTL doesn't hurt freshness in practice.
+ *
+ * HTTP Cache-Control on /api/me/bootstrap was bumped to match so the
+ * browser fetch layer ALSO avoids the round trip. */
+const CACHE_TTL_MS = 60_000;
 
 interface CacheEntry {
   payload: MeBootstrapPayload;

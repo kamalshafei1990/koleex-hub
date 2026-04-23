@@ -80,12 +80,16 @@ export async function GET() {
     isSuperAdmin: auth.is_super_admin,
   };
 
-  // Short-lived cache — browsers can reuse the response for a few
-  // seconds across fast subsequent navigations. Any write that
-  // changes perms explicitly invalidates via the client cache reset.
+  /* Cache aggressively — bootstrap payload barely changes during a
+     session (role / perms / dept / tenant are all admin-edited once
+     in a while). Bumped from max-age=10 to match the 60 s client
+     cache. stale-while-revalidate lets the browser serve the old
+     response instantly while we refresh in the background. Writes
+     that DO change perms call invalidateMeBootstrap() to force a
+     re-fetch. */
   return NextResponse.json(payload, {
     headers: {
-      "Cache-Control": "private, max-age=10, stale-while-revalidate=60",
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
     },
   });
 }

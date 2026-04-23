@@ -70,7 +70,10 @@ export async function GET(req: Request) {
     console.error("[api/invoices GET]", error.message);
     return NextResponse.json({ error: "Failed to load invoices" }, { status: 500 });
   }
-  return NextResponse.json({ invoices: data ?? [] });
+  return NextResponse.json(
+    { invoices: data ?? [] },
+    { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
+  );
 }
 
 export async function POST(req: Request) {

@@ -38,7 +38,7 @@ export async function GET() {
   return NextResponse.json(snapshot, {
     headers: {
       // Short browser cache; the admin app invalidates on save.
-      "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=180",
     },
   });
 }

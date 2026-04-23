@@ -187,7 +187,7 @@ export async function GET(req: Request) {
   });
 
   return NextResponse.json({ opportunities: enriched }, {
-    headers: { "Cache-Control": "private, max-age=5, stale-while-revalidate=60" },
+    headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" },
   });
 }
 
