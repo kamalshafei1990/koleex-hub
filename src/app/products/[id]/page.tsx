@@ -1390,12 +1390,17 @@ export default function ProductViewPage() {
                   Your quote request for <span className="font-medium text-[#1D1D1F] dark:text-white">{product.product_name}</span> has been received.
                   Reference <span className="font-mono text-[#1D1D1F] dark:text-white">{rqResult.quote_no}</span>. Our sales team will follow up.
                 </p>
+                {/* "View quotation" used to deep-link to
+                    /quotations/[id] which isn't implemented yet
+                    (404'd into the UNDER DEVELOPMENT placeholder).
+                    Point at the list instead with a ?ref query so
+                    the admin can find the new draft at the top. */}
                 <div className="flex gap-2 justify-center">
                   <Link
-                    href={`/quotations/${rqResult.quote_id}`}
+                    href={`/quotations?ref=${encodeURIComponent(rqResult.quote_no)}`}
                     className="inline-flex items-center h-9 px-4 rounded-full bg-[#06C] text-white text-[13px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
                   >
-                    View quotation
+                    Open Quotations
                   </Link>
                   <button
                     type="button"
