@@ -28,6 +28,9 @@ import SignInIcon from "@/components/icons/ui/SignInIcon";
 import SignOutIcon from "@/components/icons/ui/SignOutIcon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
+import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";
+import Settings2Icon from "@/components/icons/ui/Settings2Icon";
+import { fetchUnreadCount } from "@/lib/inbox";
 import {
   getCurrentUser,
   isSupabaseAuthEnabled,
@@ -92,6 +95,24 @@ export default function UserMenu({ dk }: { dk: boolean }) {
      name, avatar, role, and user type — not just the stub initials. This
      resolves in both auth modes (see src/lib/identity.ts). */
   const { account } = useCurrentAccount();
+
+  /* Inbox unread count — shown as a badge next to the Inbox menu
+     entry. Refreshes when the menu opens + once per minute in the
+     background. Non-blocking; menu renders fine while this loads. */
+  const [unread, setUnread] = useState<number>(0);
+  useEffect(() => {
+    if (!account?.id) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const n = await fetchUnreadCount(account.id);
+        if (!cancelled) setUnread(n);
+      } catch { /* swallow — badge just stays */ }
+    };
+    void load();
+    const timer = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [account?.id]);
 
   const profile = useMemo(() => {
     if (!account) return null;
@@ -369,8 +390,51 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }
                 >
                   <UserIcon className="h-4 w-4" />
-                  Profile
+                  <span className="flex-1 text-start">Profile</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/inbox");
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                    dk
+                      ? "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                      : "text-black/80 hover:text-black hover:bg-black/[0.04]"
+                  }`}
+                >
+                  <InboxRawIcon className="h-4 w-4" />
+                  <span className="flex-1 text-start">Inbox</span>
+                  {unread > 0 && (
+                    /* Mirrors the sidebar badge style — emerald pill
+                       on the right side of the row. Capped at 99+ so
+                       it stays compact. */
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                      dk
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "bg-emerald-500/15 text-emerald-600"
+                    }`}>
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/settings");
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                    dk
+                      ? "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                      : "text-black/80 hover:text-black hover:bg-black/[0.04]"
+                  }`}
+                >
+                  <Settings2Icon className="h-4 w-4" />
+                  <span className="flex-1 text-start">Account Settings</span>
+                </button>
+                <div className={`my-1 border-t ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`} />
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -381,7 +445,7 @@ export default function UserMenu({ dk }: { dk: boolean }) {
                   }`}
                 >
                   <SignOutIcon className="h-4 w-4" />
-                  Sign out
+                  <span className="flex-1 text-start">Sign out</span>
                 </button>
               </>
             )}

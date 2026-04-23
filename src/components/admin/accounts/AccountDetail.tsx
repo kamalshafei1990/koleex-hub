@@ -59,6 +59,7 @@ import {
   updateAccountAvatar,
 } from "@/lib/accounts-admin";
 import { notifyIdentityChanged } from "@/lib/identity";
+import { useScopeContext } from "@/lib/use-scope";
 import type {
   AccountWithLinks,
   AccountStatus,
@@ -108,6 +109,13 @@ interface Props {
 }
 
 export default function AccountDetail({ accountId }: Props) {
+  /* Super-admin detection for password actions. By policy, only SAs
+     can Set/Reset an account password — regular Accounts-module admins
+     can see and edit every other field but the password UI stays
+     hidden for them. */
+  const scope = useScopeContext();
+  const canChangePassword = Boolean(scope?.is_super_admin);
+
   const [data, setData] = useState<AccountWithLinks | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
@@ -407,22 +415,26 @@ export default function AccountDetail({ accountId }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setShowSetPw((s) => !s)}
-              disabled={working}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
-              title="Set a password you choose"
-            >
-              <KeyIcon className="h-4 w-4" /> Set password
-            </button>
-            <button
-              onClick={handleResetPassword}
-              disabled={working}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
-              title="Generate a random password for the admin to share"
-            >
-              <RefreshCcwIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
-            </button>
+            {canChangePassword && (
+              <>
+                <button
+                  onClick={() => setShowSetPw((s) => !s)}
+                  disabled={working}
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+                  title="Set a password you choose"
+                >
+                  <KeyIcon className="h-4 w-4" /> Set password
+                </button>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={working}
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-60"
+                  title="Generate a random password for the admin to share"
+                >
+                  <RefreshCcwIcon className="h-4 w-4" /> {t("acc.action.resetPassword")}
+                </button>
+              </>
+            )}
             <button
               onClick={handleToggleForce}
               disabled={working}
@@ -476,8 +488,9 @@ export default function AccountDetail({ accountId }: Props) {
         )}
 
         {/* Inline "Set password" panel — admin types the exact password
-            they want. Clearing the panel hides it again. */}
-        {showSetPw && (
+            they want. Only SAs can open this; showSetPw won't be true
+            for non-SAs because the button that toggles it is hidden. */}
+        {showSetPw && canChangePassword && (
           <div className="mb-5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface)] p-4">
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-dim)] font-semibold mb-2">
               Set a password for {data.username}

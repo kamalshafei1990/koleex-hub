@@ -53,6 +53,7 @@ import {
   generateTemporaryPassword, suggestUsername,
   type EmployeeWithPerson, type ContactLite,
 } from "@/lib/accounts-admin";
+import { useScopeContext } from "@/lib/use-scope";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { useTranslation } from "@/lib/i18n";
 import { accountsT } from "@/lib/translations/accounts";
@@ -141,6 +142,12 @@ function initialState(a?: AccountRow): FormState {
 export default function AccountForm({ mode, account }: Props) {
   const { t } = useTranslation(accountsT);
   const router = useRouter();
+  const scope = useScopeContext();
+  /* Only super admins can change passwords — including the inline
+     Reset panel in edit mode. On create, the temp-password field
+     stays visible for everyone since the account row needs SOMETHING
+     to log in with; the API enforces SA-only on subsequent changes. */
+  const canChangePassword = Boolean(scope?.is_super_admin);
 
   const [form, setForm] = useState<FormState>(() => initialState(account));
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -641,16 +648,11 @@ export default function AccountForm({ mode, account }: Props) {
               </div>
             )}
 
-            {mode === "edit" && (
+            {mode === "edit" && canChangePassword && (
               <div className="mt-4 space-y-3">
-                {/* Manual password reset. Previously edit mode had ONLY
-                    the force-change toggle, with no way to actually
-                    set a password for an existing account — admins
-                    couldn't recover a locked-out user without going
-                    to the DB. Now the admin can type a new password
-                    or click Generate + Apply, which POSTs to
-                    /api/accounts/[id]/password (min 8 chars, forces
-                    the user to change it on next login). */}
+                {/* Manual password reset. SA-only per policy; non-SA
+                    viewers see no password UI at all on edit — the
+                    route returns 403 for them regardless. */}
                 <details className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
                   <summary className="cursor-pointer text-[13px] font-medium text-[var(--text-primary)] select-none">
                     Reset password

@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth } from "@/lib/server/auth";
 
 /* POST /api/accounts/[id]/password
    Change an account's password. Two modes:
@@ -43,8 +43,16 @@ export async function POST(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAccess(auth, "Accounts");
-  if (deny) return deny;
+  /* Password changes are super-admin-only by policy. Regular admins
+     with the Accounts module can view/edit every other account field
+     but NOT passwords. Self-service password change isn't offered —
+     users ask a super admin. */
+  if (!auth.is_super_admin) {
+    return NextResponse.json(
+      { error: "Only a super admin can change passwords." },
+      { status: 403 },
+    );
+  }
 
   let body: { password?: string; generate?: boolean; forceReset?: boolean };
   try {

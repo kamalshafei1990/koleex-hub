@@ -8,13 +8,11 @@
    · The sidebar provider gives shared state to both Sidebar and MainHeader.
    --------------------------------------------------------------------------- */
 
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import Sidebar from "./Sidebar";
 import FloatingPanel from "./FloatingPanel";
-import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   SidebarProvider,
   useSidebar,
@@ -22,12 +20,7 @@ import {
   SIDEBAR_COLLAPSED_W,
 } from "./SidebarContext";
 
-/* /change-password is in this list because:
-   1. it MUST render standalone (no sidebar + header chrome while the
-      user is blocked from the rest of the app), and
-   2. if the gate below sent the user to /change-password, we'd loop
-      forever trying to redirect them off it. */
-const BYPASS_PREFIXES = ["/login", "/auth", "/change-password"];
+const BYPASS_PREFIXES = ["/login", "/auth"];
 
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -70,30 +63,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Client-side gate that bounces the signed-in user to /change-password
-   when their account has force_password_change=true. Runs inside the
-   authenticated tree so we know the cookie is valid before firing a
-   bootstrap fetch. Next.js middleware would be cleaner, but this app
-   doesn't have one today; this matches the existing pattern of
-   gating via AuthGate + client hooks. */
-function ForcePasswordChangeGate({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { data } = useMeBootstrap();
-
-  useEffect(() => {
-    if (!data?.header) return;
-    const mustChange = Boolean(
-      (data.header as { force_password_change?: boolean }).force_password_change,
-    );
-    if (mustChange && pathname !== "/change-password") {
-      router.replace("/change-password");
-    }
-  }, [data, pathname, router]);
-
-  return <>{children}</>;
-}
-
 export default function RootShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -103,11 +72,9 @@ export default function RootShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGate title="Koleex Hub" subtitle="Sign in to access the platform">
-      <ForcePasswordChangeGate>
-        <SidebarProvider>
-          <ShellContent>{children}</ShellContent>
-        </SidebarProvider>
-      </ForcePasswordChangeGate>
+      <SidebarProvider>
+        <ShellContent>{children}</ShellContent>
+      </SidebarProvider>
     </AuthGate>
   );
 }
