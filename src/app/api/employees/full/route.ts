@@ -397,7 +397,11 @@ export async function POST(req: Request) {
         username,
         login_email: loginEmail,
         password_hash: hashTag,
-        force_password_change: true,
+        /* Default OFF — whatever password the admin sets is the
+           employee's real password. No forced change on first
+           login. Admins who DO want a forced reset can flip the
+           toggle manually from the Accounts app. */
+        force_password_change: false,
         two_factor_enabled: false,
         last_login_at: null,
         user_type: "internal",

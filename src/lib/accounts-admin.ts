@@ -282,7 +282,10 @@ export async function createAccount(
   const payload: Record<string, unknown> = {
     ...rest,
     password_hash: temporary_password ? hashTempPassword(temporary_password) : null,
-    force_password_change: true,
+    /* Default OFF — the admin's chosen password is the real one.
+       Callers that DO want a forced reset can pass
+       force_password_change: true explicitly via `rest`. */
+    force_password_change: false,
     preferences: preferences ?? {},
   };
 
@@ -354,7 +357,12 @@ export async function resetAccountPassword(
     .from(ACCOUNTS)
     .update({
       password_hash: hashTempPassword(newTemporaryPassword),
-      force_password_change: true,
+      /* Default OFF: admin-driven resets no longer force the user
+         to change the password on next login. If an admin wants
+         that behaviour they can flip the per-account toggle in
+         AccountForm or the /api/accounts/[id]/password endpoint
+         with forceReset: true. */
+      force_password_change: false,
     })
     .eq("id", id);
   if (error) {

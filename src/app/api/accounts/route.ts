@@ -77,7 +77,13 @@ export async function POST(req: Request) {
     ...rest,
     tenant_id: auth.tenant_id, // server-side truth
     password_hash: trimmedTmp ? hashTempPassword(trimmedTmp) : null,
-    force_password_change: true,
+    /* Default OFF — admin's chosen password is the real one. If the
+       caller explicitly included force_password_change in `rest`
+       (AccountForm's toggle for example), that value overrides this
+       default via the spread above actually coming FIRST — keep the
+       ordering intentional here: `...rest` is first so caller's
+       explicit value wins. */
+    force_password_change: (rest as { force_password_change?: boolean }).force_password_change ?? false,
     preferences: preferences ?? {},
   };
 

@@ -123,7 +123,10 @@ function initialState(a?: AccountRow): FormState {
     username: a?.username ?? "",
     login_email: a?.login_email ?? "",
     temporary_password: "",
-    force_password_change: a?.force_password_change ?? true,
+    /* Default OFF for brand-new accounts — the admin's chosen
+       password is the real one. Existing accounts keep their stored
+       value so admins can still see / toggle it per-user. */
+    force_password_change: a?.force_password_change ?? false,
 
     person_id: a?.person_id ?? "",
     company_id: a?.company_id ?? "",
