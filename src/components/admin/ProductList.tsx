@@ -28,6 +28,15 @@ import {
 } from "@/lib/products-admin";
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 
+/* Koleex's flagship division. The hub treats this line as the
+   default view on the public catalog and visually emphasises it
+   everywhere we surface divisions (pill strip, badges). Other
+   divisions are secondary — "extra lines" that customers can
+   discover but aren't the hub's primary story. Keep this constant
+   in one place so a future rename (e.g. "koleex-machinery") is a
+   single-file change. */
+const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
+
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
@@ -73,9 +82,17 @@ export default function ProductList() {
       setProductSuppliers(ms.suppliers);
       setAllSuppliers(ms.allSuppliers);
       setMainImages(imgs);
+      /* Public catalog lands on Garment Machinery by default — it's
+         the flagship. Customers browsing /products should see the
+         primary line first; they can click "All divisions" or any
+         other pill to broaden. Admins (/product-data) still see
+         everything so they don't miss products when filtering. */
+      if (!isInternal && d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
+        setFilterDiv(FLAGSHIP_DIVISION_SLUG);
+      }
       setLoading(false);
     })();
-  }, []);
+  }, [isInternal]);
 
   const allBrands = useMemo(() => {
     const set = new Set<string>();
@@ -90,6 +107,17 @@ export default function ProductList() {
   }, [products]);
 
   const divMap = useMemo(() => Object.fromEntries(divisions.map(d => [d.slug, d.name])), [divisions]);
+
+  /* Divisions re-ordered so the flagship is always first in any
+     UI that iterates over them (pill strip, dropdown, etc.). The
+     raw `divisions` array is alphabetical from the DB; this keeps
+     that ordering for the "rest" but promotes the flagship to the
+     head so brand hierarchy is visible at a glance. */
+  const orderedDivisions = useMemo(() => {
+    const flagship = divisions.filter(d => d.slug === FLAGSHIP_DIVISION_SLUG);
+    const rest = divisions.filter(d => d.slug !== FLAGSHIP_DIVISION_SLUG);
+    return [...flagship, ...rest];
+  }, [divisions]);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.slug, c.name])), [categories]);
 
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === filterDiv)?.id, [divisions, filterDiv]);
@@ -247,7 +275,7 @@ export default function ProductList() {
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Division</label>
                   <select value={filterDiv} onChange={(e) => { setFilterDiv(e.target.value); setFilterCat(""); setFilterSub(""); }} className={selectClass + " w-full"}>
                     <option value="">All</option>
-                    {divisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
+                    {orderedDivisions.map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -318,6 +346,68 @@ export default function ProductList() {
             </div>
           )}
         </div>
+
+        {/* ── Division pill strip ──
+            Koleex's brand hierarchy, surfaced visually. "All" is the
+            opt-out; Garment Machinery is the flagship (always pinned
+            first, always rendered as a filled accent pill even when
+            not selected so it reads as the primary line); the rest
+            are outlined secondary pills. Horizontally scrollable on
+            mobile so long division names don't wrap awkwardly. */}
+        {orderedDivisions.length > 0 && (
+          <div className="mb-6 -mx-1 px-1 overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max pb-1">
+              {/* "All" — clears the division filter. */}
+              <button
+                type="button"
+                onClick={() => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); }}
+                className={`h-8 px-3.5 rounded-full text-[12px] font-medium border transition-all shrink-0 ${
+                  filterDiv === ""
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                All divisions
+              </button>
+
+              {orderedDivisions.map((d) => {
+                const isFlagship = d.slug === FLAGSHIP_DIVISION_SLUG;
+                const isActive = filterDiv === d.slug;
+
+                /* Flagship styling: always filled/accent so customers
+                   see it as the primary tile even when a different
+                   division is active. Other divisions use the hub's
+                   standard ghost-pill treatment and fill up only when
+                   selected. */
+                const cls = isFlagship
+                  ? isActive
+                    ? "bg-[var(--text-primary)] text-[var(--bg-primary)] border-[var(--text-primary)] ring-2 ring-[var(--text-primary)]/30"
+                    : "bg-[var(--text-primary)]/10 text-[var(--text-primary)] border-[var(--text-primary)]/25 hover:bg-[var(--text-primary)]/15"
+                  : isActive
+                    ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+                    : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]";
+
+                return (
+                  <button
+                    key={d.slug}
+                    type="button"
+                    onClick={() => { setFilterDiv(d.slug); setFilterCat(""); setFilterSub(""); }}
+                    className={`h-8 px-3.5 rounded-full text-[12px] font-medium border transition-all shrink-0 ${cls} ${isFlagship ? "font-semibold" : ""}`}
+                    aria-pressed={isActive}
+                  >
+                    {isFlagship && (
+                      <span
+                        aria-hidden
+                        className="inline-block h-1.5 w-1.5 rounded-full bg-current mr-1.5 -translate-y-[1px]"
+                      />
+                    )}
+                    {d.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Results count */}
         {(activeFilterCount > 0 || search) && (
@@ -463,6 +553,16 @@ export default function ProductList() {
                       {catMap[p.category_slug] || p.category_slug}
                     </p>
 
+                    {/* Division label — only for non-flagship products.
+                        Garment Machinery is the default/home line and
+                        gets a clean card; anything else gets tagged so
+                        it's clear at a glance which line it belongs to. */}
+                    {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
+                      <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 uppercase tracking-wider truncate">
+                        {divMap[p.division_slug]}
+                      </p>
+                    )}
+
                     {/* Meta row */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
                       {(() => {
@@ -564,12 +664,19 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Category (desktop only) */}
-                    <div className="hidden md:flex items-center gap-1.5 min-w-0">
-                      <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
-                      <span className="text-[12px] text-[var(--text-muted)] truncate">
+                    {/* Category (desktop only) — show the division
+                        below the category as a subtle caption when
+                        the product is NOT in the flagship line. */}
+                    <div className="hidden md:flex flex-col min-w-0 gap-0.5">
+                      <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] truncate">
+                        <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                         {catMap[p.category_slug] || p.category_slug}
                       </span>
+                      {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
+                        <span className="text-[10px] text-[var(--text-ghost)] uppercase tracking-wider truncate pl-[18px]">
+                          {divMap[p.division_slug]}
+                        </span>
+                      )}
                     </div>
 
                     {/* Brand (desktop only) */}
