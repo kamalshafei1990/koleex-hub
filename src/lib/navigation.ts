@@ -21,6 +21,7 @@ import QuotationIcon from "@/components/icons/QuotationIcon";
 import SalesIcon from "@/components/icons/SalesIcon";
 import MarketingIcon from "@/components/icons/MarketingIcon";
 import ProductsIcon from "@/components/icons/ProductsIcon";
+import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import InventoryIcon from "@/components/icons/InventoryIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
@@ -155,7 +156,7 @@ export const APP_REGISTRY: AppDef[] = [
      supplier, contract terms, internal notes. Guarded by the
      "Product Data" module permission. Customers NEVER see this in
      the sidebar; the /products app (above) is the public catalog. */
-  { id: "product-data",     tKey: "app.product-data",     name: "Product Data",      icon: ProductsIcon,  route: "/product-data",     active: true  },
+  { id: "product-data",     tKey: "app.product-data",     name: "Product Data",      icon: ProductDataIcon, route: "/product-data",   active: true  },
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/products",         active: true  },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: false },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },

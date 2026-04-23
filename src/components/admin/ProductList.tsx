@@ -21,6 +21,7 @@ import ListIcon from "@/components/icons/ui/ListIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ProductsIcon from "@/components/icons/ProductsIcon";
+import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
   fetchProducts, fetchDivisions, fetchCategories, fetchSubcategories,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
@@ -150,7 +151,7 @@ export default function ProductList() {
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-              <ProductsIcon size={16} />
+              {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
               {isInternal ? "Product Data" : "Products"}
