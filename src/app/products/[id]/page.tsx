@@ -381,6 +381,21 @@ export default function ProductViewPage() {
   const toggleModel = (id: string) =>
     setExpandedModels(prev => ({ ...prev, [id]: !prev[id] }));
 
+  /* ── Request Quote modal state ──
+     Customer (or anyone authenticated) clicks the "Request Quote"
+     CTA → modal with qty + optional message → POST to
+     /api/quotations/request-from-product creates a draft quotation
+     the sales team picks up in the Quotations app. */
+  const [rqOpen, setRqOpen] = useState(false);
+  const [rqQty, setRqQty] = useState(1);
+  const [rqNotes, setRqNotes] = useState("");
+  const [rqBusy, setRqBusy] = useState(false);
+  const [rqResult, setRqResult] = useState<
+    | { ok: true; quote_no: string; quote_id: string }
+    | { ok: false; error: string }
+    | null
+  >(null);
+
   /* ── Load ── */
   useEffect(() => {
     let cancelled = false;
@@ -639,12 +654,17 @@ export default function ProductViewPage() {
                 From <span className="font-medium">{fmtMoney(priceFrom)}</span>
               </span>
             )}
-            <a
-              href="#models"
+            {/* "Request Quote" is the primary customer action. On the
+                internal /product-data view we still show it — it's a
+                shortcut for sales to start a draft quote with this
+                product pre-selected. */}
+            <button
+              type="button"
+              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
               className="inline-flex items-center h-[36px] md:h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
             >
-              Buy
-            </a>
+              Request Quote
+            </button>
             <a
               href="#specs"
               className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
@@ -1334,6 +1354,146 @@ export default function ProductViewPage() {
           </div>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════
+          REQUEST QUOTE MODAL
+          Customer (or sales rep) asks for a quote.
+          On submit: POST /api/quotations/request-from-product
+          ══════════════════════════════════════ */}
+      {rqOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rq-title"
+          onClick={() => { if (!rqBusy) setRqOpen(false); }}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-[#1C1C1E] rounded-2xl border border-[#D2D2D7] dark:border-white/[0.08] p-5 md:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {rqResult && rqResult.ok ? (
+              <div className="text-center py-4">
+                <div className="h-12 w-12 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center mx-auto mb-3">
+                  <CheckIcon className="h-6 w-6" />
+                </div>
+                <h2 className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white mb-1">
+                  Request sent
+                </h2>
+                <p className="text-[13px] text-[#86868B] dark:text-white/60 mb-4">
+                  Your quote request for <span className="font-medium text-[#1D1D1F] dark:text-white">{product.product_name}</span> has been received.
+                  Reference <span className="font-mono text-[#1D1D1F] dark:text-white">{rqResult.quote_no}</span>. Our sales team will follow up.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Link
+                    href={`/quotations/${rqResult.quote_id}`}
+                    className="inline-flex items-center h-9 px-4 rounded-full bg-[#06C] text-white text-[13px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
+                  >
+                    View quotation
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { setRqOpen(false); setRqResult(null); }}
+                    className="inline-flex items-center h-9 px-4 rounded-full border border-[#D2D2D7] dark:border-white/15 text-[13px] text-[#1D1D1F] dark:text-white hover:bg-[#F5F5F7] dark:hover:bg-white/[0.04] transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between mb-1">
+                  <h2 id="rq-title" className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white">
+                    Request a quote
+                  </h2>
+                </div>
+                <p className="text-[12px] text-[#86868B] dark:text-white/50 mb-4">
+                  Tell us how many units you&apos;re interested in. Our team will
+                  send you a quotation with pricing, lead time, and shipping terms.
+                </p>
+                <div className="mb-3 px-3 py-2.5 rounded-lg bg-[#F5F5F7] dark:bg-white/[0.04] text-[13px]">
+                  <span className="text-[#86868B] dark:text-white/50">Product · </span>
+                  <span className="text-[#1D1D1F] dark:text-white font-medium">{product.product_name}</span>
+                </div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[#86868B] dark:text-white/50 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={9999}
+                  value={rqQty}
+                  onChange={(e) => setRqQty(Math.max(1, Math.min(9999, Number(e.target.value) || 1)))}
+                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-[#2C2C2E] border border-[#D2D2D7] dark:border-white/[0.08] text-[14px] text-[#1D1D1F] dark:text-white focus:outline-none focus:border-[#06C] dark:focus:border-[#2997FF] mb-3"
+                />
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-[#86868B] dark:text-white/50 mb-1">
+                  Message <span className="normal-case font-normal">(optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={rqNotes}
+                  onChange={(e) => setRqNotes(e.target.value)}
+                  placeholder="Specific requirements, delivery location, timeline…"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-[#2C2C2E] border border-[#D2D2D7] dark:border-white/[0.08] text-[13px] text-[#1D1D1F] dark:text-white placeholder:text-[#86868B] dark:placeholder:text-white/30 focus:outline-none focus:border-[#06C] dark:focus:border-[#2997FF] resize-none mb-4"
+                />
+                {rqResult && !rqResult.ok && (
+                  <p className="text-[12px] text-red-500 mb-3">{rqResult.error}</p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setRqOpen(false)}
+                    disabled={rqBusy}
+                    className="inline-flex items-center h-9 px-4 rounded-full border border-[#D2D2D7] dark:border-white/15 text-[13px] text-[#1D1D1F] dark:text-white hover:bg-[#F5F5F7] dark:hover:bg-white/[0.04] transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={rqBusy}
+                    onClick={async () => {
+                      setRqBusy(true);
+                      setRqResult(null);
+                      try {
+                        const res = await fetch("/api/quotations/request-from-product", {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            product_id: product.id,
+                            qty: rqQty,
+                            notes: rqNotes.trim() || undefined,
+                          }),
+                        });
+                        const json = (await res.json().catch(() => ({}))) as {
+                          quote_id?: string;
+                          quote_no?: string;
+                          error?: string;
+                        };
+                        if (!res.ok || !json.quote_id || !json.quote_no) {
+                          setRqResult({ ok: false, error: json.error || `Failed (${res.status})` });
+                        } else {
+                          setRqResult({ ok: true, quote_id: json.quote_id, quote_no: json.quote_no });
+                        }
+                      } catch (err) {
+                        setRqResult({
+                          ok: false,
+                          error: err instanceof Error ? err.message : "Network error",
+                        });
+                      } finally {
+                        setRqBusy(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 h-9 px-5 rounded-full bg-[#06C] text-white text-[13px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors disabled:opacity-60"
+                  >
+                    {rqBusy ? "Sending…" : "Send request"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
