@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -29,6 +29,13 @@ import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/typ
 
 export default function ProductList() {
   const router = useRouter();
+  const pathname = usePathname();
+  /* "internal" when the same component is rendered under /product-data.
+     Under /products the view is the PUBLIC catalog: no supplier
+     column, no Add button, no Edit/Delete actions, no cost hints. */
+  const isInternal = (pathname || "").startsWith("/product-data");
+  const baseRoute = isInternal ? "/product-data" : "/products";
+
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -146,17 +153,24 @@ export default function ProductList() {
               <ProductsIcon size={16} />
             </div>
             <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              Products
+              {isInternal ? "Product Data" : "Products"}
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Link href="/products/settings" className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
-              <SettingsIcon2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Control Panel</span>
-            </Link>
-            <Link href="/products/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
-              <PlusIcon className="h-4 w-4" /> Add Product
-            </Link>
+            {/* Settings + Add are admin tools — only surface them on
+                the internal /product-data path. The public /products
+                catalog is read-only for customers. */}
+            {isInternal && (
+              <>
+                <Link href={`${baseRoute}/settings`} className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-medium flex items-center gap-2 hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all">
+                  <SettingsIcon2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Control Panel</span>
+                </Link>
+                <Link href={`${baseRoute}/new`} className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg">
+                  <PlusIcon className="h-4 w-4" /> Add Product
+                </Link>
+              </>
+            )}
           </div>
         </div>
         <p className="text-[12px] text-[var(--text-dim)] mb-6 md:mb-8 ml-0 md:ml-11">
@@ -249,13 +263,17 @@ export default function ProductList() {
                     {filteredSubs.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Supplier</label>
-                  <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} className={selectClass + " w-full"}>
-                    <option value="">All</option>
-                    {allSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
+                {/* Supplier filter is an internal concept — hide on
+                    the public /products catalog. */}
+                {isInternal && (
+                  <div>
+                    <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Supplier</label>
+                    <select value={filterSupplier} onChange={(e) => setFilterSupplier(e.target.value)} className={selectClass + " w-full"}>
+                      <option value="">All</option>
+                      {allSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">Brand</label>
                   <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={selectClass + " w-full"}>
@@ -344,8 +362,8 @@ export default function ProductList() {
             <p className="text-[var(--text-ghost)] text-[13px] mt-1">
               {products.length === 0 ? "Add your first product to get started." : "Try adjusting your search or filters."}
             </p>
-            {products.length === 0 && (
-              <Link href="/products/new" className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all">
+            {products.length === 0 && isInternal && (
+              <Link href={`${baseRoute}/new`} className="inline-flex items-center gap-2 mt-4 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all">
                 <PlusIcon className="h-4 w-4" /> Add Product
               </Link>
             )}
@@ -361,7 +379,7 @@ export default function ProductList() {
               return (
                 <Link
                   key={p.id}
-                  href={`/products/${p.slug || p.id}`}
+                  href={`${baseRoute}/${p.slug || p.id}`}
                   className="group bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden hover:border-[var(--border-focus)] hover:shadow-xl transition-all duration-200"
                 >
                   {/* Image */}
@@ -405,14 +423,15 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Actions (show on hover) */}
+                    {/* Actions (show on hover) — internal only */}
+                    {isInternal && (
                     <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          router.push(`/products/${p.id}/edit`);
+                          router.push(`${baseRoute}/${p.id}/edit`);
                         }}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
@@ -427,6 +446,7 @@ export default function ProductList() {
                         <TrashIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    )}
                   </div>
 
                   {/* Content */}
@@ -467,8 +487,8 @@ export default function ProductList() {
                       </span>
                     </div>
 
-                    {/* Supplier */}
-                    {suppliers.length > 0 && (
+                    {/* Supplier — internal only */}
+                    {isInternal && suppliers.length > 0 && (
                       <p className="text-[10px] text-[var(--text-ghost)] mt-2 truncate">
                         {suppliers.join(", ")}
                       </p>
@@ -501,7 +521,7 @@ export default function ProductList() {
                 return (
                   <Link
                     key={p.id}
-                    href={`/products/${p.slug || p.id}`}
+                    href={`${baseRoute}/${p.slug || p.id}`}
                     className="group flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
                   >
                     {/* Thumbnail */}
@@ -535,8 +555,8 @@ export default function ProductList() {
                         <span className="text-[var(--text-ghost)]">·</span>
                         <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? "model" : "models"}</span>
                       </div>
-                      {/* Desktop: supplier line under name */}
-                      {suppliers.length > 0 && (
+                      {/* Desktop: supplier line — internal only */}
+                      {isInternal && suppliers.length > 0 && (
                         <p className="hidden md:block text-[11px] text-[var(--text-ghost)] mt-0.5 truncate">
                           {suppliers.join(", ")}
                         </p>
@@ -601,25 +621,29 @@ export default function ProductList() {
                           <EyeOffIcon className="h-3.5 w-3.5 text-[var(--text-dim)]" />
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          router.push(`/products/${p.id}/edit`);
-                        }}
-                        className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
-                        title="Edit product"
-                      >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(e, p.id, p.product_name)}
-                        className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
-                        title="Delete product"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
+                      {isInternal && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(`${baseRoute}/${p.id}/edit`);
+                            }}
+                            className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
+                            title="Edit product"
+                          >
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(e, p.id, p.product_name)}
+                            className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
+                            title="Delete product"
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </Link>
                 );

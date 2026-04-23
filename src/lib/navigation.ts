@@ -151,6 +151,11 @@ export interface SidebarGroup {
 export const APP_REGISTRY: AppDef[] = [
   /* ── Operations ── */
   { id: "products",         tKey: "app.products",         name: "Products",          icon: ProductsIcon,  route: "/products",         active: true  },
+  /* Internal admin tool — full product records including cost_price,
+     supplier, contract terms, internal notes. Guarded by the
+     "Product Data" module permission. Customers NEVER see this in
+     the sidebar; the /products app (above) is the public catalog. */
+  { id: "product-data",     tKey: "app.product-data",     name: "Product Data",      icon: ProductsIcon,  route: "/product-data",     active: true  },
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/products",         active: true  },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: false },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
@@ -220,7 +225,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.operations",
     label: "Operations",
     icon: OperationsSidebarIcon,
-    appIds: ["products", "inventory", "purchase", "landed-cost", "catalogs", "documents"],
+    appIds: ["products", "product-data", "inventory", "purchase", "landed-cost", "catalogs", "documents"],
   },
   {
     id: "commercial",

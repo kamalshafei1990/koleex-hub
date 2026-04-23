@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -355,6 +355,11 @@ function Section({
 
 export default function ProductViewPage() {
   const params = useParams();
+  const pathname = usePathname();
+  /* "internal" when rendered under /product-data/[id]. Under
+     /products/[id] (the PUBLIC page) we hide supplier names, cost
+     info, and other admin-only fields. */
+  const isInternal = (pathname || "").startsWith("/product-data");
   const handle = (params.id as string) || "";
 
   const [loading, setLoading] = useState(true);
@@ -584,12 +589,16 @@ export default function ProductViewPage() {
                 {subcategoryName && <><span className="text-[#D2D2D7] dark:text-white/20">/</span><span className="text-[#1D1D1F] dark:text-white font-medium">{subcategoryName}</span></>}
               </div>
             )}
-            <Link
-              href={`/products/${product.id}/edit`}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] dark:border-white/15 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:text-white transition"
-            >
-              <PencilIcon className="h-3 w-3" /> Edit
-            </Link>
+            {/* Edit only on the internal /product-data view. The
+                public /products detail is read-only. */}
+            {isInternal && (
+              <Link
+                href={`/product-data/${product.id}/edit`}
+                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[#D2D2D7] bg-white hover:bg-[#F5F5F7] text-[11px] text-[#1D1D1F] dark:border-white/15 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:text-white transition"
+              >
+                <PencilIcon className="h-3 w-3" /> Edit
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -1020,16 +1029,19 @@ export default function ProductViewPage() {
                         )}
                       </div>
 
-                      {/* Commercial info */}
-                      {(m.moq || m.lead_time || m.supplier) && (
+                      {/* Commercial info — supplier + MOQ are
+                          internal-only. Lead time is customer-friendly
+                          (they want to know when to expect delivery)
+                          so it stays visible on the public view. */}
+                      {((isInternal && (m.moq || m.supplier)) || m.lead_time) && (
                         <dl className="mt-5 pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08] text-[12px] space-y-1.5">
-                          {m.supplier && (
+                          {isInternal && m.supplier && (
                             <div className="flex justify-between">
                               <dt className="text-[#86868B] dark:text-white/40">Supplier</dt>
                               <dd className="text-[#1D1D1F] dark:text-white/75 truncate ml-2">{m.supplier}</dd>
                             </div>
                           )}
-                          {m.moq && (
+                          {isInternal && m.moq && (
                             <div className="flex justify-between">
                               <dt className="text-[#86868B] dark:text-white/40">MOQ</dt>
                               <dd className="text-[#1D1D1F] dark:text-white/75">{m.moq}</dd>
