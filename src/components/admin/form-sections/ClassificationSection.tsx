@@ -12,6 +12,11 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Image from "next/image";
 import { getDivisionIcon } from "@/components/icons/divisions";
 
+/* Koleex's flagship division. Rendered first in any division picker
+   and given a visual accent so it reads as the primary line. Keep
+   in sync with the constant in ProductList / ProductForm. */
+const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
+
 interface Props {
   data: Pick<ProductFormState, "division_slug" | "category_slug" | "subcategory_slug">;
   onChange: (u: Partial<ProductFormState>) => void;
@@ -47,6 +52,15 @@ export default function ClassificationSection({
   const selectedDiv = divisions.find(d => d.slug === data.division_slug);
   const selectedCat = categories.find(c => c.slug === data.category_slug);
   const selectedSub = subcategories.find(s => s.slug === data.subcategory_slug);
+
+  /* Promote the flagship division to the head of the grid so admins
+     creating a product see the primary Koleex line first. The rest
+     stay in their original order. */
+  const orderedDivisions = useMemo(() => {
+    const flagship = divisions.filter(d => d.slug === FLAGSHIP_DIVISION_SLUG);
+    const rest = divisions.filter(d => d.slug !== FLAGSHIP_DIVISION_SLUG);
+    return [...flagship, ...rest];
+  }, [divisions]);
 
   const step = getStep(data);
 
@@ -101,24 +115,45 @@ export default function ClassificationSection({
         <div>
           <p className="text-[12px] font-medium text-[var(--text-subtle)] mb-3">Select Division</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {divisions.map((div) => {
+            {orderedDivisions.map((div) => {
               const DivIcon = getDivisionIcon(div.slug);
               const logo = divisionLogos?.[div.slug];
+              const isFlagship = div.slug === FLAGSHIP_DIVISION_SLUG;
+              /* Flagship tile gets an accent border + a subtle tinted
+                 background + a "Primary line" caption, so it's clearly
+                 the hub's main division at a glance. Other tiles keep
+                 the neutral surface treatment. */
+              const tileCls = isFlagship
+                ? "group relative flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--text-primary)]/30 bg-[var(--text-primary)]/[0.04] hover:border-[var(--text-primary)]/60 hover:bg-[var(--text-primary)]/[0.08] transition-all text-center"
+                : "group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center";
               return (
                 <button
                   key={div.id}
                   onClick={() => onChange({ division_slug: div.slug, category_slug: "", subcategory_slug: "" })}
-                  className="group flex flex-col items-center justify-center gap-3 px-4 py-5 rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-focus)]/50 hover:bg-[var(--bg-surface-subtle)]/50 transition-all text-center"
+                  className={tileCls}
                 >
+                  {isFlagship && (
+                    <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-[var(--text-primary)]/70">
+                      Primary
+                    </span>
+                  )}
                   {DivIcon ? (
-                    <DivIcon className="h-10 w-10 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors" />
+                    <DivIcon className={`h-10 w-10 transition-colors ${
+                      isFlagship
+                        ? "text-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+                    }`} />
                   ) : logo ? (
                     <Image src={logo} alt={div.name} width={48} height={48} className="h-12 w-12 object-contain" unoptimized />
                   ) : (
                     <LayersIcon className="h-10 w-10 text-[var(--text-ghost)]" />
                   )}
                   <div>
-                    <span className="text-[12px] font-medium text-[var(--text-primary)] leading-tight block">{div.name}</span>
+                    <span className={`text-[12px] leading-tight block ${
+                      isFlagship
+                        ? "font-semibold text-[var(--text-primary)]"
+                        : "font-medium text-[var(--text-primary)]"
+                    }`}>{div.name}</span>
                     {div.tagline && <span className="text-[10px] text-[var(--text-ghost)] leading-tight line-clamp-1 mt-0.5 block">{div.tagline}</span>}
                   </div>
                 </button>
