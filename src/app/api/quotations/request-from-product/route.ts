@@ -72,23 +72,29 @@ export async function POST(req: Request) {
   const notes = body.notes?.trim() || null;
   const modelId = body.model_id?.trim() || null;
 
-  /* Resolve who the quote belongs to. For customer accounts, that's
-     their linked contact row in the Contacts table (the one that
-     represents them as a customer). Internal accounts leave
-     customer_id null — the sales rep fills it in later. */
+  /* Resolve who the quote belongs to. The `quotations.customer_id`
+     FK targets the pricing-engine `customers` table, NOT the
+     `contacts` table — so accounts.contact_id doesn't resolve
+     directly. Best-effort match: pull the customer contact's email,
+     look it up in `customers` table. If no match, leave null and
+     the sales rep links it manually from the builder. */
   let customerId: string | null = null;
   if (auth.user_type === "customer") {
-    /* `accounts.contact_id` is the identity-per-type link for
-     customer-scoped accounts (see accounts_identity_per_type
-     check constraint noted elsewhere). Fall back to person →
-     contact by name if that's null, but in practice customers
-     should always have contact_id set. */
     const { data: acc } = await supabaseServer
       .from("accounts")
-      .select("contact_id")
+      .select("login_email, contact_id")
       .eq("id", auth.account_id)
       .maybeSingle();
-    customerId = ((acc as { contact_id?: string } | null)?.contact_id) ?? null;
+    const email = (acc as { login_email?: string } | null)?.login_email;
+    if (email) {
+      const { data: cust } = await supabaseServer
+        .from("customers")
+        .select("id")
+        .eq("tenant_id", auth.tenant_id)
+        .ilike("email", email)
+        .maybeSingle();
+      customerId = ((cust as { id?: string } | null)?.id) ?? null;
+    }
   }
 
   /* Look up product summary so the draft shows a recognisable name
@@ -144,7 +150,14 @@ export async function POST(req: Request) {
       total: 0,
       doc,
       notes,
-      created_by: auth.account_id,
+      /* quotations.created_by FK targets auth.users(id) (Supabase
+         Auth's internal table), not the app's accounts table. This
+         hub runs on legacy auth so our account IDs aren't in
+         auth.users — passing auth.account_id trips
+         quotations_created_by_fkey. The real creator info is safe
+         inside doc.requestedBy for audit; created_by stays null at
+         the column level. */
+      created_by: null,
     })
     .select("id, quote_no")
     .single();

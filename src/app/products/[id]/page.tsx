@@ -587,8 +587,14 @@ export default function ProductViewPage() {
         fontFeatureSettings: '"kern", "liga", "clig", "calt"',
       }}
     >
-      {/* ── Apple-style sub-nav: slim, translucent, centered breadcrumb ── */}
-      <div className="sticky top-14 z-20 bg-white/80 backdrop-blur-xl border-b border-[#D2D2D7]/60 dark:bg-[#0A0A0A]/80 dark:border-white/10">
+      {/* ── Apple-style sub-nav: slim, solid, centered breadcrumb.
+              Previously used bg-white/80 + backdrop-blur which on
+              large headlines caused the h1 text to bleed through the
+              bar (visually merging "Product Name" with the
+              breadcrumb). Opaque fills fix that plus a higher z-index
+              guarantees the bar stays on top when content scrolls
+              underneath. */}
+      <div className="sticky top-14 z-30 bg-white border-b border-[#D2D2D7] dark:bg-[#0A0A0A] dark:border-white/10">
         <div className="max-w-[1024px] mx-auto px-6 h-11 flex items-center justify-between">
           <Link
             href="/products"
