@@ -230,9 +230,12 @@ export default function DescriptionSection({ data, onChange }: Props) {
         <RichTextEditor
           value={description}
           onChange={(html) => onChange({ description: html })}
-          placeholder="Write a compelling description for this product. Use the Quick Start Blocks above, or start typing. Headings for sections, bullet lists for features, and tables for specs are all supported."
+          placeholder="Write a compelling description for this product. Use the Quick Start Blocks above, or start typing. Supports headings, bullet lists, tables, links, and inline images."
           minHeight={320}
         />
+        <p className="text-[10px] text-[var(--text-ghost)] mt-1 italic">
+          Tip: paste strips formatting by default (clean copy from Word). Use Shift + Paste (⌘⇧V / Ctrl+Shift+V) to preserve bold, bullets, and headings.
+        </p>
 
         {/* ── Metrics row ─────────────────────────────────────────
             Shows char count + word count + read-time. SEO hint is

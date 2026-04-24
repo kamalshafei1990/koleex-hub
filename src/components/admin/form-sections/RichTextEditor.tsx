@@ -30,7 +30,11 @@ import TableIcon from "@/components/icons/ui/TableIcon";
 import Heading1Icon from "@/components/icons/ui/Heading1Icon";
 import Heading2Icon from "@/components/icons/ui/Heading2Icon";
 import Heading3Icon from "@/components/icons/ui/Heading3Icon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "./Modal";
+import { uploadProductFile } from "@/lib/products-admin";
 
 interface Props {
   value: string;
@@ -80,6 +84,25 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const [tableModalOpen, setTableModalOpen] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
+
+  /* Image insert modal. Supports both file upload (→ Supabase
+     Storage) and URL paste (hotlink to an external image). Alt
+     text is captured here so the generated <img> tag has proper
+     accessibility / SEO metadata out of the gate. */
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageAlt, setImageAlt] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  /* Paste-with-formatting flag. Default paste (⌘V) strips
+     everything to plain text — great for cleaning garbage from
+     Word. ⌘+Shift+V flips this flag for ONE paste event so the
+     browser's native rich-paste runs through unaltered (for when
+     the admin really wants the bold + bullets + headings). */
+  const preserveNextPasteRef = useRef(false);
 
   /* Text that was selected at the moment the admin opened the Link
      modal. We stash the Range because clicking an input inside the
@@ -149,11 +172,32 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
     updateActive();
   };
 
+  /* Default paste strips formatting (keeps data clean when copying
+     from Word / websites with heavy styles). Admin can hold
+     ⌘+Shift+V (captured in handleKeyDown) to preserve HTML on the
+     very next paste — handy for moving content from Google Docs
+     with bullets + bold intact. */
   const handlePaste = (e: React.ClipboardEvent) => {
-    // Strip formatting to keep data clean
+    if (preserveNextPasteRef.current) {
+      preserveNextPasteRef.current = false;
+      // Let the browser's native rich paste handle it.
+      return;
+    }
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
     document.execCommand("insertText", false, text);
+  };
+
+  /* Capture ⌘+Shift+V before the paste event fires. Setting the
+     ref here makes the very next onPaste skip the strip logic. */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const isMod = e.metaKey || e.ctrlKey;
+    if (isMod && e.shiftKey && (e.key === "v" || e.key === "V")) {
+      preserveNextPasteRef.current = true;
+      // Do NOT preventDefault — we still want the browser's native
+      // paste handler to fire. The ref just tells handlePaste to
+      // step out of the way this one time.
+    }
   };
 
   const setBlock = (tag: string) => exec("formatBlock", tag);
@@ -241,6 +285,68 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
     setLinkModalOpen(false);
     restoreSelection();
     exec("createLink", candidate);
+  };
+
+  const openImageModal = () => {
+    snapshotSelection();
+    setImageFile(null);
+    setImageUrl("");
+    setImageAlt("");
+    setImageError(null);
+    setImageUploading(false);
+    setImageModalOpen(true);
+  };
+
+  /* Confirm the insert. Two paths:
+     · File selected → upload to Supabase Storage via
+       uploadProductFile → receive a public URL → insert <img>.
+     · URL only → skip upload, insert <img> directly.
+     Max file size ~8MB (keeps product pages fast). Insert adds a
+     safe max-width style so big images don't blow past the
+     content column on the public page. */
+  const confirmImage = async () => {
+    const url = imageUrl.trim();
+    if (!imageFile && !url) {
+      setImageError("Upload a file or paste an image URL.");
+      return;
+    }
+    setImageError(null);
+
+    let finalUrl = url;
+    if (imageFile) {
+      if (imageFile.size > 8 * 1024 * 1024) {
+        setImageError("File is too large. Please upload an image under 8 MB.");
+        return;
+      }
+      if (!/^image\//.test(imageFile.type)) {
+        setImageError("Only image files are supported.");
+        return;
+      }
+      setImageUploading(true);
+      const uploaded = await uploadProductFile(imageFile);
+      setImageUploading(false);
+      if (!uploaded) {
+        setImageError("Upload failed. Try again or paste an image URL instead.");
+        return;
+      }
+      finalUrl = uploaded.url;
+    }
+
+    /* Light URL sanity check — same trick as the link validator.
+       Reject clearly malformed strings; everything else we trust
+       since the admin is the author. */
+    try {
+      new URL(finalUrl);
+    } catch {
+      setImageError("The image URL doesn't look valid.");
+      return;
+    }
+
+    setImageModalOpen(false);
+    restoreSelection();
+    const alt = imageAlt.trim().replace(/"/g, "&quot;");
+    const html = `<img src="${finalUrl}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:8px 0;" />`;
+    exec("insertHTML", html);
   };
 
   const openTableModal = () => {
@@ -346,6 +452,8 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <button type="button" onClick={() => setBlock("BLOCKQUOTE")} className={btn(false)} title="Quote"><QuoteIcon className="h-4 w-4" /></button>
         {/* Link */}
         <button type="button" onClick={openLinkModal} className={btn(false)} title="Insert link"><Link2Icon className="h-4 w-4" /></button>
+        {/* Image */}
+        <button type="button" onClick={openImageModal} className={btn(false)} title="Insert image"><PictureIcon className="h-4 w-4" /></button>
         {/* Table */}
         <button type="button" onClick={openTableModal} className={btn(false)} title="Insert table"><TableIcon className="h-4 w-4" /></button>
         {divider}
@@ -369,6 +477,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         onInput={handleInput}
         onKeyUp={updateActive}
         onMouseUp={updateActive}
+        onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         data-placeholder={placeholder || "Start typing…"}
         className="rte-content px-5 py-4 text-[14px] text-[var(--text-primary)] leading-relaxed outline-none focus:outline-none"
@@ -489,6 +598,133 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <p className="text-[10px] text-[var(--text-ghost)] mt-3">
           Max 50 rows × 20 columns. A starter grid is inserted at the caret and you can keep typing inside it.
         </p>
+      </Modal>
+
+      {/* ── Themed insert-image dialog ──
+            Upload a file OR paste an external URL. Alt text is
+            captured here so the generated <img> has proper
+            accessibility + SEO metadata from the moment it lands
+            in the description. Images uploaded here go to the
+            `media` bucket under `products/<timestamp>_<name>` and
+            are served via Supabase's CDN — no separate record in
+            the product_media table, these belong to the
+            description body itself. */}
+      <Modal
+        open={imageModalOpen}
+        onClose={() => { if (!imageUploading) setImageModalOpen(false); }}
+        title="Insert image"
+        subtitle="Upload a file or paste a URL. Alt text is important for SEO and screen readers."
+        width="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setImageModalOpen(false)}
+              disabled={imageUploading}
+              className="h-10 px-5 rounded-xl text-[13px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmImage}
+              disabled={imageUploading || (!imageFile && !imageUrl.trim())}
+              className="h-10 px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold inline-flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-40"
+            >
+              {imageUploading && <SpinnerIcon className="h-4 w-4 animate-spin" />}
+              {imageUploading ? "Uploading…" : "Insert"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {/* File drop zone */}
+          <div>
+            <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">Upload file</label>
+            <input
+              ref={imageFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                setImageFile(f || null);
+                if (f) setImageUrl("");
+                setImageError(null);
+              }}
+            />
+            {imageFile ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+                <PictureIcon className="h-5 w-5 text-[var(--text-dim)] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-[var(--text-primary)] truncate">{imageFile.name}</p>
+                  <p className="text-[10px] text-[var(--text-ghost)]">
+                    {(imageFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); if (imageFileInputRef.current) imageFileInputRef.current.value = ""; }}
+                  className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                  aria-label="Remove file"
+                >
+                  <CrossIcon className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => imageFileInputRef.current?.click()}
+                className="w-full h-24 rounded-xl border-2 border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/50 hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
+              >
+                <PictureIcon className="h-5 w-5 text-[var(--text-dim)]" />
+                <span className="text-[11px] text-[var(--text-dim)]">Click to choose an image (max 8 MB)</span>
+              </button>
+            )}
+          </div>
+
+          {/* OR — URL */}
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+            <div className="h-px flex-1 bg-[var(--border-subtle)]" />
+            or paste a URL
+            <div className="h-px flex-1 bg-[var(--border-subtle)]" />
+          </div>
+          <div>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => {
+                setImageUrl(e.target.value);
+                if (e.target.value) setImageFile(null);
+                setImageError(null);
+              }}
+              placeholder="https://example.com/image.jpg"
+              disabled={!!imageFile}
+              className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Alt text */}
+          <div>
+            <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
+              Alt text <span className="text-[var(--text-ghost)] normal-case">(recommended)</span>
+            </label>
+            <input
+              type="text"
+              value={imageAlt}
+              onChange={(e) => setImageAlt(e.target.value)}
+              placeholder="e.g. Close-up of the walking-foot mechanism"
+              className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+            />
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Describe what the image shows. Screen readers use this; Google uses it for image search.
+            </p>
+          </div>
+
+          {imageError && (
+            <p className="text-[11px] text-red-400">{imageError}</p>
+          )}
+        </div>
       </Modal>
 
       <style jsx>{`
