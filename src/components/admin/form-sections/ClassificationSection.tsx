@@ -239,7 +239,7 @@ export default function ClassificationSection({
                 >
                   {isFlagship && (
                     <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wider text-[var(--text-primary)]/70">
-                      Primary
+                      Flagship
                     </span>
                   )}
                   {DivIcon ? (
@@ -447,9 +447,22 @@ export default function ClassificationSection({
 
       {/* ═══════ Step 4: Fully classified — done state ═══════ */}
       {step === 4 && (
-        <p className="text-[11px] text-emerald-400/70 font-medium">
-          Classification complete. Click any chip above to change.
-        </p>
+        <div className="space-y-2">
+          <p className="text-[11px] text-emerald-400/70 font-medium">
+            Classification complete. Click any chip above to change.
+          </p>
+          {/* Explain why a Kind wasn't asked for when the chosen
+              subcategory has no machine kinds in the catalog. Without
+              this, admins who just finished "Automatic Sewing Systems
+              → Pocket Welting Machines" wonder why Lockstitch got a
+              4th stage but their flow didn't. */}
+          {selectedSub && !hasKindStage && availableKinds.length === 0 && (
+            <p className="text-[11px] text-[var(--text-ghost)]">
+              <span className="text-[var(--text-dim)]">Machine Kind</span>{" "}
+              doesn&apos;t apply to this subcategory — you can move on.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

@@ -1053,12 +1053,18 @@ export default function ProductForm({ productId }: Props) {
                         {(primaryModel?.tagline || "").length} / 80 · shown big on public page
                       </span>
                     </div>
+                    {/* Tagline is rendered at 32px on the public hero and
+                        was designed to fit comfortably in one line at
+                        ≤ 80 characters. The old maxLength=140 let admins
+                        type past that and contradicted the "char / 80"
+                        counter. Hard cap at 80 so WYSIWYG matches the
+                        rendered page. */}
                     <input
                       type="text"
                       value={primaryModel?.tagline || ""}
                       onChange={(e) => updatePrimaryModel({ tagline: e.target.value })}
                       placeholder="e.g. Precision jetted pockets at 3-second cycle."
-                      maxLength={140}
+                      maxLength={80}
                       className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
                     />
                   </div>
@@ -1092,8 +1098,12 @@ export default function ProductForm({ productId }: Props) {
                     }}
                   />
 
-                  {/* Brand · Family · Origin · Warranty */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {/* Brand · Family · Origin · Warranty
+                      lg:grid-cols-4 (not xl:) — every laptop 1024px+
+                      fits all four cells on one row. The old
+                      xl:grid-cols-4 meant 1024–1280px screens wrapped
+                      Origin + Warranty onto a second row awkwardly. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> Brand</span>
@@ -1145,7 +1155,7 @@ export default function ProductForm({ productId }: Props) {
                         type="text"
                         value={product.warranty}
                         onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                        placeholder="e.g. 2 years"
+                        placeholder="e.g. 2 years parts &amp; labour"
                         className={inp}
                       />
                     </div>
@@ -1181,9 +1191,12 @@ export default function ProductForm({ productId }: Props) {
                       type="text"
                       value={primaryModel?.reference_model || ""}
                       onChange={(e) => updatePrimaryModel({ reference_model: e.target.value })}
-                      placeholder="Factory model code"
+                      placeholder="e.g. JUKI DDL-8700H"
                       className={inp}
                     />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+                      The factory&apos;s own model code. Helps operations match invoices + spare parts.
+                    </p>
                   </div>
                   <div>
                     {/* Cost is what Koleex pays the Chinese factory —
@@ -1290,12 +1303,14 @@ export default function ProductForm({ productId }: Props) {
             {/* ── Preview as customer ──
                   Opens the public product detail page in a new tab
                   so the admin can sanity-check how the product will
-                  render before publishing. Only clickable once a
-                  slug exists (and the product has been saved — on a
-                  fresh new product, this opens a 404, so we dim it
-                  until there's a slug to navigate to). */}
-            {product.slug && (
-              <div className="flex justify-end">
+                  render before publishing.
+
+                  Only works for SAVED products. A fresh new product
+                  has a slug auto-filled from its name but no DB row
+                  yet, so /products/<slug> would 404. Show a disabled
+                  hint on new products instead of a clickable link. */}
+            <div className="flex justify-end">
+              {isEdit && product.slug ? (
                 <a
                   href={`/products/${product.slug}`}
                   target="_blank"
@@ -1305,8 +1320,16 @@ export default function ProductForm({ productId }: Props) {
                   <ExternalLinkIcon className="h-3.5 w-3.5" />
                   Preview as customer
                 </a>
-              </div>
-            )}
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-ghost)] cursor-not-allowed"
+                  title="Save the product first to preview its public page"
+                >
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
+                  Preview (available after save)
+                </span>
+              )}
+            </div>
           </div>
         )}
 
