@@ -94,40 +94,68 @@ export async function POST(req: Request) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  /* Idempotent create: if the brand already exists (case-insensitive
-     on name, exact on slug), return the existing row instead of
-     erroring out. Keeps the admin UI simple — clicking Create when
-     a brand is already there just selects it. */
-  const { data: existing } = await supabaseServer
-    .from("brands")
-    .select("id, name, slug, logo_url")
-    .or(`slug.eq.${slug},name.ilike.${name}`)
-    .maybeSingle();
+  /* Idempotent create via upsert on slug. The earlier version used
+     a manual "check then insert" with a .or() filter that broke
+     silently on brand names containing commas / spaces / PostgREST-
+     meta-characters — the select never matched, the insert racedd
+     into the unique index, and the whole thing came back as "nothing
+     saved". Switching to insert-with-onConflict-return is robust
+     against any name the admin types AND race-safe. */
+  const insertRow: { name: string; slug: string; logo_url: string | null } = {
+    name,
+    slug,
+    logo_url: body.logoUrl || null,
+  };
 
-  if (existing) {
-    /* If the caller provided a logoUrl and the existing row doesn't
-       have one, merge it in so re-creating with a logo backfills. */
-    if (body.logoUrl && !(existing as BrandRow).logo_url) {
-      const { data: updated } = await supabaseServer
-        .from("brands")
-        .update({ logo_url: body.logoUrl, updated_at: new Date().toISOString() })
-        .eq("id", (existing as BrandRow).id)
-        .select("id, name, slug, logo_url")
-        .single();
-      return NextResponse.json({ brand: updated ?? existing });
-    }
-    return NextResponse.json({ brand: existing });
-  }
-
-  const { data, error } = await supabaseServer
+  const { data: inserted, error: insertErr } = await supabaseServer
     .from("brands")
-    .insert({ name, slug, logo_url: body.logoUrl || null })
+    .insert(insertRow)
     .select("id, name, slug, logo_url")
     .single();
 
-  if (error) {
-    console.error("[api/brands POST]", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!insertErr && inserted) {
+    return NextResponse.json({ brand: inserted });
   }
-  return NextResponse.json({ brand: data });
+
+  /* Unique-violation? The brand already exists — fetch the
+     existing row (by slug, which has a direct unique index) and
+     optionally backfill a missing logo. */
+  const isUniqueViolation =
+    insertErr?.code === "23505" ||
+    insertErr?.message?.includes("duplicate key value");
+
+  if (!isUniqueViolation) {
+    console.error("[api/brands POST] insert failed:", insertErr);
+    return NextResponse.json(
+      { error: insertErr?.message || "Failed to create brand" },
+      { status: 500 },
+    );
+  }
+
+  const { data: existing, error: findErr } = await supabaseServer
+    .from("brands")
+    .select("id, name, slug, logo_url")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (findErr || !existing) {
+    console.error("[api/brands POST] lookup after conflict failed:", findErr);
+    return NextResponse.json(
+      { error: findErr?.message || "Brand exists but could not be loaded" },
+      { status: 500 },
+    );
+  }
+
+  /* Backfill missing logo on the existing row. */
+  if (body.logoUrl && !(existing as BrandRow).logo_url) {
+    const { data: updated } = await supabaseServer
+      .from("brands")
+      .update({ logo_url: body.logoUrl, updated_at: new Date().toISOString() })
+      .eq("id", (existing as BrandRow).id)
+      .select("id, name, slug, logo_url")
+      .single();
+    return NextResponse.json({ brand: updated ?? existing });
+  }
+
+  return NextResponse.json({ brand: existing });
 }
