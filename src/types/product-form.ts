@@ -118,13 +118,24 @@ export interface RelatedProductFormState {
   order: number;
 }
 
+/* Koleex defaults for a brand-new product.
+   · brand              → "Koleex" — own-brand is the common case,
+                          rebranding happens after.
+   · country_of_origin  → "CN" — Koleex machinery is manufactured
+                          in China.
+   · warranty           → "3 years" — standard Koleex warranty
+                          across the catalogue.
+   These are pre-filled so admins don't retype them on every new
+   product, but are fully editable if a specific product differs
+   (OEM third-party brand, a non-China supplier, a non-standard
+   warranty window, etc.). */
 export const EMPTY_PRODUCT: ProductFormState = {
   division_slug: "",
   category_slug: "",
   subcategory_slug: "",
   product_name: "",
   slug: "",
-  brand: "",
+  brand: "Koleex",
   level: "",
   family: "",
   tags: [],
@@ -134,7 +145,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   specs: {},
   supports_head_only: false,
   supports_complete_set: true,
-  warranty: "",
+  warranty: "3 years",
   hs_code: "",
   voltage: [],
   plug_types: [],
@@ -143,7 +154,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   visible: true,
   featured: false,
   status: "draft",
-  country_of_origin: "",
+  country_of_origin: "CN",
   moq: "",
   lead_time: "",
 };

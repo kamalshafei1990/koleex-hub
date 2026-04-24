@@ -872,8 +872,14 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "identity" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* ═══ HERO CARD ═══ */}
-            <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-surface-subtle)]/40 rounded-3xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+            {/* ═══ HERO CARD ═══
+                    overflow-visible (not hidden) so the SelectWithCreate
+                    dropdowns inside the Primary Commercial strip —
+                    Supplier, Brand — can render OUTSIDE the card bounds
+                    instead of being clipped behind it. Nothing inside
+                    the card actually overflows visually, so there's no
+                    cost to turning clipping off here. */}
+            <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-surface-subtle)]/40 rounded-3xl border border-[var(--border-subtle)] overflow-visible shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-0">
                 {/* Left: Main Product Image (2/5 width) */}
                 <div className="lg:col-span-2 p-6 md:p-8 lg:border-r lg:border-[var(--border-subtle)] flex flex-col">
