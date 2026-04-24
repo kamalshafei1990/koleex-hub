@@ -53,7 +53,16 @@ export default function SelectWithCreate({
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  const selected = options.find(o => o.value === value);
+  /* Selected option — case-insensitive match so a preset default
+     like "Koleex" still binds to a DB option row saved as "koleex"
+     or " Koleex ". If nothing matches but `value` is non-empty (e.g.
+     on initial page load before the options fetch resolves, or for
+     a legacy value that no longer exists in the options list), fall
+     back to a synthetic entry so the trigger button still shows the
+     current value instead of the placeholder. */
+  const selected =
+    options.find(o => o.value.trim().toLowerCase() === value.trim().toLowerCase()) ||
+    (value ? { value, label: value, icon: null } : undefined);
   const filtered = search
     ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
     : options;
