@@ -8,48 +8,48 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import type { ProductFormState } from "@/types/product-form";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDialog from "./ConfirmDialog";
+import { getDescriptionTemplates } from "@/lib/description-templates";
+import { getKindBySlug } from "@/lib/machine-kinds";
 
 interface Props {
   data: Pick<ProductFormState, "description">;
   onChange: (u: Partial<ProductFormState>) => void;
+  /* Subcategory slug from the Classify step. Drives which family
+     of Quick Start templates we use ("lockstitch", "overlock",
+     "automatic", etc.). Falls back to generic sewing copy if
+     unknown. */
+  subcategorySlug?: string;
+  /* Machine kind slug from Classify → interpolated into the
+     Overview paragraph as the product's display name so the draft
+     reads as if written for that exact kind. */
+  machineKindSlug?: string;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Quick Start Blocks
    ───────────────────────────────────────────────────────────────────────────
-   Pre-built HTML skeletons admins drop into the rich text area and
-   customise. The defaults below are written for industrial sewing
-   machinery — Koleex's primary catalogue — so most lines are
-   plausible first drafts that admins only tweak rather than write
-   from scratch. Still editable after insertion; admins can delete
-   anything that doesn't apply to a specific machine.
-
-   `heading` is the opening tag the dedup check looks for so we can
-   stop an admin accidentally pasting the same section twice.
+   Skeleton metadata — labels, icons, descriptions, and the HTML
+   heading used for dedup. The actual body HTML comes from the
+   kind-aware template module so a Walking-Foot Lockstitch gets
+   lockstitch-specific copy and a 5-Thread Overlock gets overlock
+   copy instead of both sharing a generic industrial-sewing draft.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-interface PresetBlock {
-  id: string;
+interface PresetBlockMeta {
+  id: "overview" | "key-features" | "applications" | "whats-included";
   label: string;
   icon: React.ReactNode;
   description: string;
   heading: string; // Used for dedup detection in the rich-text HTML
-  html: string;
 }
 
-const PRESET_BLOCKS: PresetBlock[] = [
+const BLOCK_META: PresetBlockMeta[] = [
   {
     id: "overview",
     label: "Overview",
     icon: <DocumentIcon className="h-3.5 w-3.5" />,
     description: "High-level product summary",
     heading: "<h2>Overview</h2>",
-    html:
-      `<h2>Overview</h2>` +
-      `<p>This industrial sewing machine is engineered for professional garment production, ` +
-      `combining high-speed performance with operator-friendly controls. ` +
-      `Built for continuous factory use, it delivers consistent stitch quality on light, ` +
-      `medium, and heavy fabrics while keeping downtime and maintenance low.</p>`,
   },
   {
     id: "key-features",
@@ -57,16 +57,6 @@ const PRESET_BLOCKS: PresetBlock[] = [
     icon: <SparklesIcon className="h-3.5 w-3.5" />,
     description: "Bullet list of main features",
     heading: "<h3>Key Features</h3>",
-    html:
-      `<h3>Key Features</h3>` +
-      `<ul>` +
-      `<li>High-speed direct-drive servo motor (up to 5,000 SPM)</li>` +
-      `<li>Automatic thread trimmer for clean seam endings</li>` +
-      `<li>Needle-position detection (stop-up / stop-down)</li>` +
-      `<li>Auto backtack and auto presser-foot lift</li>` +
-      `<li>Energy-saving design with low-noise operation</li>` +
-      `<li>LED workspace lighting for improved operator accuracy</li>` +
-      `</ul>`,
   },
   {
     id: "applications",
@@ -74,16 +64,6 @@ const PRESET_BLOCKS: PresetBlock[] = [
     icon: <TargetIcon className="h-3.5 w-3.5" />,
     description: "Use cases and industries",
     heading: "<h3>Applications</h3>",
-    html:
-      `<h3>Applications</h3>` +
-      `<p>Suitable for a wide range of garment and textile production:</p>` +
-      `<ul>` +
-      `<li>Ready-to-wear garment manufacturing</li>` +
-      `<li>Denim, workwear, and uniforms</li>` +
-      `<li>Home textiles and upholstery</li>` +
-      `<li>Technical textiles and automotive interiors</li>` +
-      `<li>Leather goods and footwear assembly</li>` +
-      `</ul>`,
   },
   {
     id: "whats-included",
@@ -91,16 +71,6 @@ const PRESET_BLOCKS: PresetBlock[] = [
     icon: <LayersIcon className="h-3.5 w-3.5" />,
     description: "Package contents",
     heading: "<h3>What's Included</h3>",
-    html:
-      `<h3>What's Included</h3>` +
-      `<ul>` +
-      `<li>Machine head with direct-drive servo motor</li>` +
-      `<li>Industrial table with built-in LED worklight</li>` +
-      `<li>Motor control box with foot pedal</li>` +
-      `<li>Standard needle plate, feed dog, and presser foot</li>` +
-      `<li>Basic accessories kit (bobbins, oil, needles, screwdriver)</li>` +
-      `<li>Operator and maintenance manuals</li>` +
-      `</ul>`,
   },
 ];
 
@@ -128,8 +98,34 @@ function htmlToPlainText(html: string): string {
 const SEO_MIN_WORDS = 300;
 const WORDS_PER_MINUTE = 200;
 
-export default function DescriptionSection({ data, onChange }: Props) {
+export default function DescriptionSection({
+  data,
+  onChange,
+  subcategorySlug,
+  machineKindSlug,
+}: Props) {
   const description = data.description || "";
+
+  /* Resolve the Quick Start Block body HTML for each block based on
+     the subcategory + kind chosen in Classify. A Lockstitch kind
+     gets lockstitch-specific bullets; a 5-Thread Safety Stitch gets
+     overlock-specific bullets; non-sewing subcategories get the
+     generic fallback. Recomputed whenever the classification
+     changes. */
+  const templates = useMemo(() => {
+    const kind = machineKindSlug ? getKindBySlug(machineKindSlug) : null;
+    return getDescriptionTemplates(subcategorySlug, kind?.name);
+  }, [subcategorySlug, machineKindSlug]);
+
+  /* Mapping from block id → HTML body for this product's family. */
+  const blockHtmlFor = (id: PresetBlockMeta["id"]): string => {
+    switch (id) {
+      case "overview": return templates.overview;
+      case "key-features": return templates.keyFeatures;
+      case "applications": return templates.applications;
+      case "whats-included": return templates.whatsIncluded;
+    }
+  };
 
   const { plainText, wordCount, charCount, readMinutes } = useMemo(() => {
     const plain = htmlToPlainText(description);
@@ -144,7 +140,7 @@ export default function DescriptionSection({ data, onChange }: Props) {
 
   /* Dedup state: tracks which preset block triggered the
      "section already exists" confirm. null = no prompt active. */
-  const [pendingDupBlock, setPendingDupBlock] = useState<PresetBlock | null>(null);
+  const [pendingDupBlock, setPendingDupBlock] = useState<PresetBlockMeta | null>(null);
 
   /* Low-level insert — appends the HTML to the end of the current
      content, separating with a <br/> if the current doc doesn't
@@ -162,20 +158,26 @@ export default function DescriptionSection({ data, onChange }: Props) {
      block and show the themed ConfirmDialog; otherwise insert
      immediately. Prevents the footgun where an admin clicks
      "Key Features" twice and ends up with duplicate sections. */
-  const handleBlockClick = (block: PresetBlock) => {
+  const handleBlockClick = (block: PresetBlockMeta) => {
     if (description.includes(block.heading)) {
       setPendingDupBlock(block);
       return;
     }
-    doInsert(block.html);
+    doInsert(blockHtmlFor(block.id));
   };
 
   const confirmDuplicate = () => {
-    if (pendingDupBlock) doInsert(pendingDupBlock.html);
+    if (pendingDupBlock) doInsert(blockHtmlFor(pendingDupBlock.id));
     setPendingDupBlock(null);
   };
 
   const belowSeoThreshold = plainText.length > 0 && wordCount < SEO_MIN_WORDS;
+
+  /* Header hint for the Quick Start Blocks panel. Lets admins know
+     whether their classification is driving the template choice
+     (nice signal that the Classify step matters downstream). */
+  const activeKind = machineKindSlug ? getKindBySlug(machineKindSlug) : null;
+  const templateLabel = activeKind?.name || "generic industrial sewing machine";
 
   return (
     <div className="space-y-3">
@@ -184,13 +186,13 @@ export default function DescriptionSection({ data, onChange }: Props) {
 
         {/* Preset content blocks */}
         <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <SparklesIcon className="h-3.5 w-3.5 text-amber-400" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Quick Start Blocks</span>
-            <span className="text-[10px] text-[var(--text-ghost)] italic">— insert pre-built sections</span>
+            <span className="text-[10px] text-[var(--text-ghost)] italic">— tailored for {templateLabel}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {PRESET_BLOCKS.map((b) => {
+            {BLOCK_META.map((b) => {
               const alreadyAdded = description.includes(b.heading);
               return (
                 <button

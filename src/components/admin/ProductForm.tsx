@@ -1406,7 +1406,19 @@ export default function ProductForm({ productId }: Props) {
                 signals the admin they're past classification. */}
 
             <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title="Product Description" badge="Rich text">
-              <DescriptionSection data={product} onChange={updateProduct_} />
+              {/* Pass the classification down so Quick Start Blocks
+                  return lockstitch / overlock / automatic copy
+                  tailored to the admin's choice. The machine-kind
+                  slug lives on sewingSpecs.common_specs.machine_kind
+                  (see the Classify step's wiring). */}
+              <DescriptionSection
+                data={product}
+                onChange={updateProduct_}
+                subcategorySlug={product.subcategory_slug}
+                machineKindSlug={
+                  (sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || ""
+                }
+              />
             </Section>
 
             {/* Additional text specs (key/value) */}
