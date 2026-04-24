@@ -1399,14 +1399,11 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "description" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {divisionName && (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
-                <FolderTreeIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
-                <span>{divisionName}</span>
-                {categoryName && <><AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" /><span>{categoryName}</span></>}
-                {subcategoryName && <><AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" /><span className="text-emerald-400 font-medium">{subcategoryName}</span></>}
-              </div>
-            )}
+            {/* Classification breadcrumb used to repeat here, but the
+                same chips already appear in the Classify step and at
+                the top of the wizard. Showing them a third time was
+                noise — the StepNav's "Classify ✓" badge already
+                signals the admin they're past classification. */}
 
             <Section id="description" icon={<DocumentIcon className="h-4 w-4" />} title="Product Description" badge="Rich text">
               <DescriptionSection data={product} onChange={updateProduct_} />

@@ -55,11 +55,21 @@ const COLORS = [
   "#3b82f6", "#6366f1", "#8b5cf6",
 ];
 
+/* Platform-aware modifier for keyboard-shortcut tooltips. "⌘" is
+   the Mac symbol for Command, "Ctrl+" is the Windows / Linux
+   equivalent. Falls back to ⌘ during SSR since Koleex's ops team
+   runs primarily on macOS — minor quirk, consistent visual. */
+const MOD_KEY =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl+";
+
 export default function RichTextEditor({ value, onChange, placeholder, minHeight = 260 }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showColors, setShowColors] = useState(false);
   const [showSizes, setShowSizes] = useState(false);
   const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   /* Insert-link / insert-table used to shell out to native window.prompt()
      which Safari renders with a system dialog that clashes with the
@@ -202,15 +212,35 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const openLinkModal = () => {
     snapshotSelection();
     setLinkUrl("");
+    setLinkError(null);
     setLinkModalOpen(true);
   };
 
+  /* Validate the URL before handing it to document.execCommand.
+     The old flow happily created a link with any string the admin
+     typed ("htp://", "google.com" with no protocol, etc.), then
+     the rendered <a> silently went to a broken destination. Now
+     we require a well-formed URL and auto-prepend https:// when
+     the admin forgets the protocol. */
   const confirmLink = () => {
-    const url = linkUrl.trim();
+    const raw = linkUrl.trim();
+    if (!raw) return;
+    // Auto-prepend https:// for protocol-less input ("example.com").
+    const candidate = /^(https?:|mailto:|tel:|ftp:|\/\/|\/|#)/i.test(raw)
+      ? raw
+      : `https://${raw}`;
+    try {
+      // Using URL() throws on malformed input — the only cheap
+      // structural check we have without a full URL regex.
+      new URL(candidate.startsWith("/") || candidate.startsWith("#") ? `https://x.test${candidate}` : candidate);
+    } catch {
+      setLinkError("That doesn't look like a valid URL. Include a domain (e.g. https://example.com).");
+      return;
+    }
+    setLinkError(null);
     setLinkModalOpen(false);
-    if (!url) return;
     restoreSelection();
-    exec("createLink", url);
+    exec("createLink", candidate);
   };
 
   const openTableModal = () => {
@@ -249,18 +279,30 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
 
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 overflow-hidden focus-within:border-[var(--border-focus)] transition-colors">
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 backdrop-blur">
+      {/* Toolbar
+          On narrow viewports the 20+ toolbar buttons used to wrap
+          onto 3–4 rows and take up half the editor height. Switch
+          to a single horizontally-scrollable row with flex-nowrap
+          so the toolbar stays compact on mobile and admins can
+          side-scroll to less-common actions. Custom scrollbar
+          hidden since it looks ugly inside the toolbar surface. */}
+      <div
+        className="flex items-center gap-0.5 flex-nowrap overflow-x-auto px-2 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 backdrop-blur scrollbar-none"
+        style={{ scrollbarWidth: "none" }}
+      >
         {/* Headings */}
         <button type="button" onClick={() => setBlock("H1")} className={btn(false)} title="Heading 1"><Heading1Icon className="h-4 w-4" /></button>
         <button type="button" onClick={() => setBlock("H2")} className={btn(false)} title="Heading 2"><Heading2Icon className="h-4 w-4" /></button>
         <button type="button" onClick={() => setBlock("H3")} className={btn(false)} title="Heading 3"><Heading3Icon className="h-4 w-4" /></button>
         <button type="button" onClick={() => setBlock("P")} className={btn(false)} title="Paragraph"><TypeIcon className="h-4 w-4" /></button>
         {divider}
-        {/* Basic formatting */}
-        <button type="button" onClick={() => exec("bold")} className={btn(activeFormats.bold)} title="Bold (Ctrl+B)"><BoldIcon className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("italic")} className={btn(activeFormats.italic)} title="Italic (Ctrl+I)"><ItalicIcon className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("underline")} className={btn(activeFormats.underline)} title="Underline (Ctrl+U)"><UnderlineIcon className="h-4 w-4" /></button>
+        {/* Basic formatting — tooltips now show the real platform
+            shortcut instead of hard-coded "Ctrl+", so Mac admins
+            see ⌘B / ⌘I / ⌘U which matches every other app on
+            macOS. */}
+        <button type="button" onClick={() => exec("bold")} className={btn(activeFormats.bold)} title={`Bold (${MOD_KEY}B)`}><BoldIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("italic")} className={btn(activeFormats.italic)} title={`Italic (${MOD_KEY}I)`}><ItalicIcon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("underline")} className={btn(activeFormats.underline)} title={`Underline (${MOD_KEY}U)`}><UnderlineIcon className="h-4 w-4" /></button>
         {divider}
         {/* Font size */}
         <div className="relative">
@@ -308,16 +350,22 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <button type="button" onClick={openTableModal} className={btn(false)} title="Insert table"><TableIcon className="h-4 w-4" /></button>
         {divider}
         {/* Undo/Redo/Clear */}
-        <button type="button" onClick={() => exec("undo")} className={btn(false)} title="Undo"><Undo2Icon className="h-4 w-4" /></button>
-        <button type="button" onClick={() => exec("redo")} className={btn(false)} title="Redo"><Redo2Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("undo")} className={btn(false)} title={`Undo (${MOD_KEY}Z)`}><Undo2Icon className="h-4 w-4" /></button>
+        <button type="button" onClick={() => exec("redo")} className={btn(false)} title={`Redo (${MOD_KEY}Shift+Z)`}><Redo2Icon className="h-4 w-4" /></button>
         <button type="button" onClick={clearFormatting} className={btn(false)} title="Clear formatting"><RemoveFormattingIcon className="h-4 w-4" /></button>
       </div>
 
-      {/* Editor surface */}
+      {/* Editor surface
+          dir="auto" — lets the browser flip individual paragraphs
+          to RTL when the admin types Arabic / Hebrew / Persian
+          without breaking the overall LTR layout when they mix
+          English + Arabic in the same description (common on
+          Koleex product pages). */}
       <div
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        dir="auto"
         onInput={handleInput}
         onKeyUp={updateActive}
         onMouseUp={updateActive}
@@ -360,7 +408,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <input
           type="url"
           value={linkUrl}
-          onChange={(e) => setLinkUrl(e.target.value)}
+          onChange={(e) => { setLinkUrl(e.target.value); if (linkError) setLinkError(null); }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -369,8 +417,19 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
           }}
           autoFocus
           placeholder="https://example.com"
-          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+          className={`w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:ring-1 transition-all ${
+            linkError
+              ? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+              : "border-[var(--border-subtle)] focus:border-[var(--border-focus)] focus:ring-[var(--border-focus)]"
+          }`}
         />
+        {linkError ? (
+          <p className="text-[11px] text-red-400 mt-2">{linkError}</p>
+        ) : (
+          <p className="text-[11px] text-[var(--text-ghost)] mt-2">
+            No protocol? We&apos;ll add <code className="bg-[var(--bg-surface)] px-1 rounded">https://</code> automatically.
+          </p>
+        )}
       </Modal>
 
       {/* ── Themed insert-table dialog ── */}
