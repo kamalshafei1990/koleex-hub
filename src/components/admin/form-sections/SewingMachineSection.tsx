@@ -414,16 +414,287 @@ function MachineKindPicker({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   SpecRowControl — the input-only half of a dense spec row.
+
+   Separated from the label so the row layout can pair
+   [label | dots | * | (?)] on the left with just the control on the
+   right. Shares field-type handling with the classic FieldRenderer
+   but skips labels/help-text — those are rendered by SpecRow.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SpecRowControl({
+  field,
+  value,
+  onChange,
+}: {
+  field: TemplateField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}) {
+  const inp =
+    "w-full h-9 px-3 rounded-md bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
+
+  switch (field.type) {
+    case "text":
+      return (
+        <input
+          type="text"
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          className={inp}
+        />
+      );
+
+    case "number":
+      return (
+        <div className="relative">
+          <input
+            type="number"
+            value={(value as string | number) ?? ""}
+            onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : "")}
+            placeholder={field.placeholder}
+            step={field.step}
+            min={field.min}
+            max={field.max}
+            className={`${inp} ${field.unit ? "pr-11" : ""}`}
+          />
+          {field.unit && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--text-ghost)] pointer-events-none">
+              {field.unit}
+            </span>
+          )}
+        </div>
+      );
+
+    case "select":
+      return (
+        <select
+          value={(value as string) || ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={inp}
+        >
+          <option value="">Select…</option>
+          {field.options?.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      );
+
+    case "multi-select": {
+      const selected = Array.isArray(value) ? (value as string[]) : [];
+      return (
+        <div className="flex flex-wrap gap-1">
+          {field.options?.map((opt) => {
+            const isSelected = selected.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  const next = isSelected
+                    ? selected.filter((v) => v !== opt.value)
+                    : [...selected, opt.value];
+                  onChange(next);
+                }}
+                className={`inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-all cursor-pointer
+                  ${
+                    isSelected
+                      ? "bg-blue-500/15 border-blue-500/30 text-blue-400"
+                      : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
+                  }`}
+              >
+                {isSelected && <CheckIcon className="h-3 w-3" />}
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    case "boolean":
+      return (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!value}
+            onClick={() => onChange(!value)}
+            className={`relative h-6 w-11 rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${
+              value ? "bg-emerald-500" : "bg-zinc-600"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                value ? "translate-x-5" : ""
+              }`}
+            />
+          </button>
+        </div>
+      );
+
+    default:
+      return null;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SpecRow — one dense horizontal row: [dots · label · * · (?)  |  control]
+
+   Tuned for power data entry: one row per field, ~40px tall, help
+   text collapses to a (?) tooltip so nothing bloats vertical rhythm.
+   Hover highlights the whole row so the eye can track label→input.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SpecRow({
+  field,
+  value,
+  onChange,
+  filled,
+}: {
+  field: TemplateField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  filled: boolean;
+}) {
+  const isBoolean = field.type === "boolean";
+  const isMulti = field.type === "multi-select";
+  // Boolean rows pull the switch next to the label for a tight 1-line look.
+  // Multi-select and everything else use the standard 2-col grid.
+  return (
+    <div
+      className={`group grid ${
+        isBoolean
+          ? "grid-cols-[1fr_auto]"
+          : "grid-cols-1 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]"
+      } gap-x-4 gap-y-2 items-center px-3 py-2 border-b border-[var(--border-subtle)]/30 last:border-b-0 hover:bg-[var(--bg-inverted)]/[0.025] transition-colors`}
+    >
+      {/* Label cell */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <FrequencyDots tier={field.tier} />
+        <span
+          className={`text-[12px] ${
+            filled ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+          } font-medium truncate`}
+        >
+          {field.label}
+        </span>
+        {field.required && (
+          <span className="text-red-400 text-[12px] shrink-0" aria-label="required">*</span>
+        )}
+        {!isBoolean && field.unit && field.type !== "number" && (
+          <span className="text-[10px] text-[var(--text-ghost)] shrink-0">({field.unit})</span>
+        )}
+        {field.helpText && (
+          <span
+            className="inline-flex shrink-0"
+            title={field.helpText}
+            aria-label={field.helpText}
+          >
+            <InfoIcon className="h-3 w-3 text-[var(--text-ghost)] hover:text-[var(--text-muted)] cursor-help" />
+          </span>
+        )}
+      </div>
+
+      {/* Control cell. Multi-select can wrap into multi-line, so let
+          the row expand — alignment stays clean because items-center
+          centers the label to the (taller) control block. */}
+      <div className={isMulti ? "self-start pt-1" : ""}>
+        <SpecRowControl field={field} value={value} onChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SpecRowGroup — a collapsible section inside a card.
+
+   Header mimics the catalog reference: thin uppercase label on the
+   left, horizontal rule, count on the right, chevron toggles collapse.
+   When collapsed, rows unmount — freeing scroll space once the admin
+   has finished a section.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SpecRowGroup({
+  group,
+  fields,
+  values,
+  onChange,
+  collapsed,
+  onToggleCollapse,
+  accentText,
+}: {
+  group: string;
+  fields: TemplateField[];
+  values: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  accentText: string;
+}) {
+  const filledCount = fields.filter((f) => {
+    const v = values[f.key];
+    return v !== "" && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0);
+  }).length;
+  const allFilled = filledCount === fields.length;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-inverted)]/[0.03] rounded-md transition-colors group"
+        aria-expanded={!collapsed}
+      >
+        <AngleDownIconLocal
+          className={`h-3 w-3 text-[var(--text-ghost)] shrink-0 transition-transform ${
+            collapsed ? "-rotate-90" : ""
+          }`}
+        />
+        <span className={`text-[10px] font-bold uppercase tracking-[0.08em] ${accentText}`}>
+          {group}
+        </span>
+        <div className="h-px flex-1 bg-[var(--border-subtle)]/50" />
+        <span
+          className={`text-[10px] font-semibold tabular-nums shrink-0 ${
+            allFilled ? "text-emerald-400" : "text-[var(--text-ghost)]"
+          }`}
+        >
+          {filledCount}/{fields.length}
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="mt-1">
+          {fields.map((field) => {
+            const v = values[field.key];
+            const filled =
+              v !== "" && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0);
+            return (
+              <SpecRow
+                key={field.key}
+                field={field}
+                value={v}
+                onChange={(val) => onChange(field.key, val)}
+                filled={filled}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    SpecCardRenderer — renders one three-tier card (Common / Family / Kind)
 
-   Progressive disclosure:
-     · "Essential" + "Recommended" fields render by default
-     · "Advanced" fields collapse behind a "Show advanced" toggle so
-       the form doesn't overwhelm on first open
-
-   The FieldRenderer used below was built for the old TemplateField
-   shape, but the new SpecField type is structurally compatible with
-   it (same required render properties) — we just cast.
+   Rewritten for data-entry density. Uses SpecRowGroup (collapsible,
+   thin header) + SpecRow (1-line field) instead of the old grid
+   panels. Honors the `requiredOnly` prop to hide non-required fields
+   in bulk, and the `showAdvanced` toggle to surface the rare fields.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function SpecCardRenderer({
@@ -431,23 +702,40 @@ function SpecCardRenderer({
   values,
   onChange,
   accentClass,
+  accentText,
   kindIcon,
+  anchorId,
+  requiredOnly,
 }: {
   card: NewSpecCard;
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
   accentClass: string;
+  accentText: string;
   kindIcon?: React.ReactNode;
+  anchorId: string;
+  requiredOnly: boolean;
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  /* Split fields into always-visible vs advanced. Keep them inside
-     their group so a group with only advanced fields folds entirely. */
-  const visibleFields = card.fields.filter((f) => f.tier !== "advanced");
-  const advancedFields = card.fields.filter((f) => f.tier === "advanced");
+  const toggleGroup = (group: string) =>
+    setCollapsed((c) => ({ ...c, [group]: !c[group] }));
 
-  /* Group the visible fields by their `group` attribute so the
-     card renders sub-headings like "Performance" / "Automation". */
+  /* Required-only filter trumps everything — when active, only
+     required fields render, regardless of tier. Otherwise, tier
+     "essential"+"recommended" show by default; "advanced" hides
+     behind the toggle. */
+  const filterFn = requiredOnly
+    ? (f: NewSpecField) => !!f.required
+    : (f: NewSpecField) => f.tier !== "advanced";
+
+  const visibleFields = card.fields.filter(filterFn);
+  const advancedFields = requiredOnly
+    ? []
+    : card.fields.filter((f) => f.tier === "advanced");
+
+  /* Group fields by their `group` attribute, preserving field order. */
   const groupFieldsByHeading = (fields: NewSpecField[]) => {
     const groups: { group: string; fields: NewSpecField[] }[] = [];
     const map = new Map<string, NewSpecField[]>();
@@ -471,42 +759,56 @@ function SpecCardRenderer({
     return v !== "" && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0);
   }).length;
 
+  const hasAnyVisible = visibleGroups.some((g) => g.fields.length > 0);
+
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+    <div
+      id={anchorId}
+      className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden scroll-mt-28"
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-        <div className={`h-10 w-10 rounded-xl bg-gradient-to-br border flex items-center justify-center ${accentClass}`}>
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className={`h-9 w-9 rounded-xl bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
           {kindIcon || <Settings2Icon className="h-4 w-4" />}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{card.title}</h3>
+          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
           {card.subtitle && (
-            <p className="text-[11px] text-[var(--text-ghost)] truncate">{card.subtitle}</p>
+            <p className="text-[11px] text-[var(--text-ghost)] truncate mt-0.5">{card.subtitle}</p>
           )}
         </div>
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${accentClass}`}>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border tabular-nums shrink-0 ${accentClass}`}>
           {filled} / {card.fields.length}
         </span>
       </div>
 
-      {/* Visible (essential + recommended) groups */}
-      <div className="space-y-2">
+      {/* Groups */}
+      <div className="px-2 py-2">
+        {!hasAnyVisible && (
+          <p className="text-center py-8 text-[11px] text-[var(--text-ghost)]">
+            {requiredOnly
+              ? "No required fields in this section."
+              : "No fields available."}
+          </p>
+        )}
         {visibleGroups.map((g) => (
-          <FieldGroup
+          <SpecRowGroup
             key={g.group}
-            groupLabel={g.group}
+            group={g.group}
             fields={g.fields as unknown as TemplateField[]}
             values={values}
             onChange={onChange}
+            collapsed={!!collapsed[g.group]}
+            onToggleCollapse={() => toggleGroup(g.group)}
+            accentText={accentText}
           />
         ))}
       </div>
 
-      {/* Advanced section — collapsed by default. Rendered only
-          when the card actually has advanced fields, so tight
-          cards (like most kind extras) don't show a dead toggle. */}
+      {/* Advanced — only when the card has advanced fields AND we're
+          not already in required-only mode. */}
       {advancedGroups.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]/60">
+        <div className="px-5 pb-4 pt-2 border-t border-[var(--border-subtle)]/60">
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
@@ -516,14 +818,17 @@ function SpecCardRenderer({
             {showAdvanced ? "Hide advanced" : `Show advanced (${advancedFields.length})`}
           </button>
           {showAdvanced && (
-            <div className="space-y-2 mt-3">
+            <div className="mt-2">
               {advancedGroups.map((g) => (
-                <FieldGroup
+                <SpecRowGroup
                   key={g.group}
-                  groupLabel={g.group}
+                  group={g.group}
                   fields={g.fields as unknown as TemplateField[]}
                   values={values}
                   onChange={onChange}
+                  collapsed={!!collapsed[g.group]}
+                  onToggleCollapse={() => toggleGroup(g.group)}
+                  accentText={accentText}
                 />
               ))}
             </div>
@@ -559,9 +864,15 @@ function AngleDownIconLocal({ className }: { className?: string }) {
 function SpecsProgressBar({
   cards,
   data,
+  requiredOnly,
+  onToggleRequiredOnly,
+  onJump,
 }: {
   cards: NewSpecCard[];
   data: SewingSpecsFormState;
+  requiredOnly: boolean;
+  onToggleRequiredOnly: () => void;
+  onJump: (idx: number) => void;
 }) {
   // One stat row per card. Pulls values from the right bucket since
   // common saves to common_specs and family/kind save to template_specs.
@@ -589,7 +900,7 @@ function SpecsProgressBar({
         : card.source === "family"
         ? "text-blue-400"
         : "text-violet-400";
-    return { label: card.title, filled, total, pct, fill, text };
+    return { label: card.title, filled, total, pct, fill, text, source: card.source };
   });
 
   const totalFilled = stats.reduce((a, s) => a + s.filled, 0);
@@ -598,8 +909,9 @@ function SpecsProgressBar({
 
   return (
     <div className="sticky top-0 z-20 -mx-1 px-1">
-      <div className="bg-[var(--bg-primary)]/85 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-4 py-3 shadow-sm">
-        <div className="flex items-center justify-between mb-2.5">
+      <div className="bg-[var(--bg-primary)]/90 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-4 py-3 shadow-sm">
+        {/* Row 1 — title + overall count + required-only toggle */}
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
               Specs progress
@@ -608,11 +920,53 @@ function SpecsProgressBar({
               {overallPct}%
             </span>
           </div>
-          <span className="text-[10px] font-semibold text-[var(--text-dim)] tabular-nums">
-            {totalFilled}
-            <span className="text-[var(--text-ghost)]"> / {totalFields} fields</span>
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggleRequiredOnly}
+              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border transition-colors cursor-pointer ${
+                requiredOnly
+                  ? "bg-red-500/15 border-red-500/40 text-red-400"
+                  : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-ghost)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
+              }`}
+              title="Show only required fields"
+            >
+              <span className="text-red-400">*</span>
+              {requiredOnly ? "Required only" : "Only required"}
+            </button>
+            <span className="text-[10px] font-semibold text-[var(--text-dim)] tabular-nums">
+              {totalFilled}
+              <span className="text-[var(--text-ghost)]"> / {totalFields} fields</span>
+            </span>
+          </div>
         </div>
+
+        {/* Row 2 — jump-nav chips. Each chip scrolls the page to the
+            matching card's anchor and shows filled/total inline so the
+            admin can see which section needs attention at a glance. */}
+        {stats.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {stats.map((s, idx) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => onJump(idx)}
+                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold border cursor-pointer transition-all hover:-translate-y-0.5 ${
+                  s.source === "common"
+                    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:border-emerald-500/50"
+                    : s.source === "family"
+                    ? "bg-blue-500/10 border-blue-500/25 text-blue-400 hover:border-blue-500/50"
+                    : "bg-violet-500/10 border-violet-500/25 text-violet-400 hover:border-violet-500/50"
+                }`}
+              >
+                <span className="truncate max-w-[180px]">{s.label}</span>
+                <span className="opacity-70 tabular-nums">{s.filled}/{s.total}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Row 3 — per-card progress bars */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {stats.map((s) => (
             <div key={s.label} className="min-w-0">
@@ -672,6 +1026,8 @@ function NewSpecsRender({
     [subcategorySlug, activeKindSlug]
   );
 
+  const [requiredOnly, setRequiredOnly] = useState(false);
+
   if (!resolved) return null;
 
   /* Per-card accent — visual cue for what tier the card represents.
@@ -687,12 +1043,35 @@ function NewSpecsRender({
     return "from-violet-500/20 to-violet-600/10 border-violet-500/30 text-violet-400";
   };
 
+  const accentTextFor = (card: NewSpecCard) => {
+    if (card.source === "common") return "text-emerald-400";
+    if (card.source === "family") return "text-blue-400";
+    return "text-violet-400";
+  };
+
+  const anchorIdFor = (card: NewSpecCard, idx: number) =>
+    `specs-card-${card.source}-${idx}`;
+
+  // Jump handler — scroll the card's DOM anchor into view. Uses
+  // scroll-mt on the card root so the sticky progress bar doesn't
+  // cover it after the jump lands.
+  const handleJump = (idx: number) => {
+    const card = resolved.cards[idx];
+    if (!card) return;
+    const el = document.getElementById(anchorIdFor(card, idx));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Sticky progress bar — one row per resolved card. Sits above
-          the card stack so the admin sees overall completion no
-          matter which card they're filling. */}
-      <SpecsProgressBar cards={resolved.cards} data={data} />
+    <div className="space-y-5">
+      {/* Sticky progress bar with jump-nav chips + required-only toggle. */}
+      <SpecsProgressBar
+        cards={resolved.cards}
+        data={data}
+        requiredOnly={requiredOnly}
+        onToggleRequiredOnly={() => setRequiredOnly((v) => !v)}
+        onJump={handleJump}
+      />
 
       {resolved.cards.map((card, idx) => {
         const isCommon = card.source === "common";
@@ -705,7 +1084,10 @@ function NewSpecsRender({
             values={values}
             onChange={onChange}
             accentClass={accentFor(card)}
+            accentText={accentTextFor(card)}
             kindIcon={card.source === "kind" ? activeKindIcon : undefined}
+            anchorId={anchorIdFor(card, idx)}
+            requiredOnly={requiredOnly}
           />
         );
       })}
