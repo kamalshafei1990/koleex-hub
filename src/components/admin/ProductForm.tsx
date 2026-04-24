@@ -367,6 +367,12 @@ export default function ProductForm({ productId }: Props) {
           plug_types: p.plug_types || [],
           watt: p.watt || "",
           colors: p.colors || [],
+          motor_power_w: p.motor_power_w?.toString() || "",
+          power_consumption_w: p.power_consumption_w?.toString() || "",
+          machine_weight_kg: p.machine_weight_kg?.toString() || "",
+          machine_dimensions: p.machine_dimensions || "",
+          ce_certified: !!p.ce_certified,
+          rohs_compliant: !!p.rohs_compliant,
           visible: p.visible,
           featured: p.featured,
           status: (p.status as ProductFormState["status"]) || "draft",
@@ -655,6 +661,14 @@ export default function ProductForm({ productId }: Props) {
         plug_types: product.plug_types,
         watt: product.watt || null,
         colors: product.colors,
+        // Electrical / Physical / Compliance — moved out of common_specs
+        // jsonb into typed columns so we can filter and compare cleanly.
+        motor_power_w: product.motor_power_w ? parseInt(product.motor_power_w, 10) : null,
+        power_consumption_w: product.power_consumption_w ? parseInt(product.power_consumption_w, 10) : null,
+        machine_weight_kg: product.machine_weight_kg ? parseFloat(product.machine_weight_kg) : null,
+        machine_dimensions: product.machine_dimensions || null,
+        ce_certified: product.ce_certified,
+        rohs_compliant: product.rohs_compliant,
         supports_head_only: product.supports_head_only,
         supports_complete_set: product.supports_complete_set,
         warranty: product.warranty || null,
@@ -1439,10 +1453,14 @@ export default function ProductForm({ productId }: Props) {
               />
             </Section>
 
-            {/* Additional text specs (key/value) */}
-            <Section id="specs" icon={<WrenchIcon className="h-4 w-4" />} title="Additional Specifications" badge="Key/value" defaultOpen={false}>
-              <SpecsSection data={product} onChange={updateProduct_} />
-            </Section>
+            {/* The legacy "Additional Specifications" key/value table
+                has been removed from the wizard. Now that the three-tier
+                structured Specs step (Common + Family + Kind) covers the
+                full sewing-machine spec universe, the inline freeform
+                table was a third place where data could land — pure
+                ambiguity. The SpecsSection component still exists in
+                form-sections/ for any future use; it's just not wired
+                into the wizard. */}
           </div>
         )}
 

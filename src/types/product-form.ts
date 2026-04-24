@@ -33,8 +33,22 @@ export interface ProductFormState {
   hs_code: string;
   voltage: string[];
   plug_types: string[];
+  /* Free-text watt kept for legacy reads only. New writes use the
+     structured `motor_power_w` (number) below. */
   watt: string;
   colors: string[];
+  /* Electrical (Technical step). All numbers — typed so we can
+     filter / sort / compare across products. */
+  motor_power_w: string;          // numeric, kept as string in the form for empty support
+  power_consumption_w: string;
+  /* Physical machine (Technical step). Distinct from the per-variant
+     packed/shipment dimensions which live on product_models. */
+  machine_weight_kg: string;
+  machine_dimensions: string;     // free text "L × W × H mm"
+  /* Compliance (Technical step). Both default false so admins flip
+     them on per-product. */
+  ce_certified: boolean;
+  rohs_compliant: boolean;
   visible: boolean;
   featured: boolean;
   status: ProductStatus;
@@ -151,6 +165,12 @@ export const EMPTY_PRODUCT: ProductFormState = {
   plug_types: [],
   watt: "",
   colors: [],
+  motor_power_w: "",
+  power_consumption_w: "",
+  machine_weight_kg: "",
+  machine_dimensions: "",
+  ce_certified: false,
+  rohs_compliant: false,
   visible: true,
   featured: false,
   status: "draft",

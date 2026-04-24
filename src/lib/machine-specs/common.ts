@@ -168,45 +168,17 @@ export const COMMON_FIELDS: SpecField[] = [
     tier: "recommended",
     group: "Mechanical",
   },
-  {
-    key: "motor_power",
-    label: "Motor Power",
-    type: "number",
-    unit: "W",
-    placeholder: "e.g. 550",
-    tier: "advanced",
-    group: "Mechanical",
-  },
+  // NOTE: motor_power, power_consumption, machine_dimensions,
+  // machine_weight, ce_certified and rohs_compliant USED to live here.
+  // They moved to the Technical & Compliance step (typed columns on
+  // products) in the audit pass that consolidated electrical /
+  // physical / regulatory data. Sewing-specific perf specs that DON'T
+  // generalize to other appliance categories stay here.
 
   // ══════════════════════════════════════════════════════════
-  // Physical
+  // Physical (sewing-specific only — overall machine
+  // dimensions/weight are on Technical step)
   // ══════════════════════════════════════════════════════════
-  {
-    key: "machine_dimensions",
-    label: "Machine Dimensions (L×W×H)",
-    type: "text",
-    placeholder: "e.g. 480×180×360 mm",
-    tier: "recommended",
-    group: "Physical",
-  },
-  {
-    key: "machine_weight",
-    label: "Machine Head Weight",
-    type: "number",
-    unit: "kg",
-    placeholder: "e.g. 32",
-    tier: "recommended",
-    group: "Physical",
-  },
-  {
-    key: "power_consumption",
-    label: "Power Consumption",
-    type: "number",
-    unit: "W",
-    placeholder: "e.g. 550",
-    tier: "advanced",
-    group: "Physical",
-  },
   {
     key: "noise_level",
     label: "Noise Level (at max speed)",
@@ -327,21 +299,8 @@ export const COMMON_FIELDS: SpecField[] = [
     group: "Application",
   },
 
-  // ══════════════════════════════════════════════════════════
-  // Certifications (advanced)
-  // ══════════════════════════════════════════════════════════
-  {
-    key: "ce_certified",
-    label: "CE Certified",
-    type: "boolean",
-    tier: "advanced",
-    group: "Certifications",
-  },
-  {
-    key: "rohs_compliant",
-    label: "RoHS Compliant",
-    type: "boolean",
-    tier: "advanced",
-    group: "Certifications",
-  },
+  // CE / RoHS certifications moved to the Technical & Compliance
+  // step (typed columns on products). They're regulatory facts about
+  // the machine, not performance specs — they belong with voltage
+  // and plug types, not with stitch length and thread type.
 ];

@@ -267,8 +267,19 @@ export interface ProductRow {
   hs_code: string | null;
   voltage: string[];
   plug_types: string[];
+  /* Legacy free-text watt — kept for back-compat reads only.
+     New writes go to motor_power_w (typed integer). */
   watt: string | null;
   colors: string[];
+  /* Electrical / Physical / Compliance (Technical step). Moved out
+     of product_sewing_specs.common_specs in the spec-step audit so
+     they can be filtered and queried as typed columns. */
+  motor_power_w: number | null;
+  power_consumption_w: number | null;
+  ce_certified: boolean | null;
+  rohs_compliant: boolean | null;
+  machine_weight_kg: number | null;
+  machine_dimensions: string | null;
   supports_head_only: boolean;
   supports_complete_set: boolean;
   warranty: string | null;

@@ -645,6 +645,42 @@ export default function ProductViewPage() {
     return slug ? getKindBySlug(slug) : null;
   }, [sewingSpecs]);
 
+  /* Technical & Compliance block — sources data from typed columns
+     on `products` (no longer from common_specs jsonb). Same shape as
+     the new-spec blocks so it composes into the spec sheet visually.
+     Each subgroup (Electrical / Physical / Compliance) only renders
+     if at least one of its fields is filled. */
+  const technicalRendered = useMemo(() => {
+    if (!product) return null;
+    type Row = { label: string; value: string };
+    type Group = { group: string; rows: Row[] };
+
+    const elec: Row[] = [];
+    if ((product.voltage?.length || 0) > 0) elec.push({ label: "Voltage", value: (product.voltage || []).join(" / ") });
+    if (product.motor_power_w !== null && product.motor_power_w !== undefined) elec.push({ label: "Motor Power", value: `${product.motor_power_w} W` });
+    if (product.power_consumption_w !== null && product.power_consumption_w !== undefined) elec.push({ label: "Power Consumption", value: `${product.power_consumption_w} W` });
+    if ((product.plug_types?.length || 0) > 0) elec.push({ label: "Plug Types", value: (product.plug_types || []).join(", ") });
+
+    const phys: Row[] = [];
+    if (product.machine_dimensions) phys.push({ label: "Machine Dimensions", value: product.machine_dimensions });
+    if (product.machine_weight_kg !== null && product.machine_weight_kg !== undefined) phys.push({ label: "Machine Weight", value: `${product.machine_weight_kg} kg` });
+
+    const comp: Row[] = [];
+    if (product.hs_code) comp.push({ label: "HS Code", value: product.hs_code });
+    if (product.ce_certified) comp.push({ label: "CE Certified", value: "Yes" });
+    if (product.rohs_compliant) comp.push({ label: "RoHS Compliant", value: "Yes" });
+    if ((product.colors?.length || 0) > 0) comp.push({ label: "Colors", value: (product.colors || []).join(", ") });
+
+    const groups: Group[] = [];
+    if (elec.length > 0) groups.push({ group: "Electrical", rows: elec });
+    if (phys.length > 0) groups.push({ group: "Physical (Bare Machine)", rows: phys });
+    if (comp.length > 0) groups.push({ group: "Compliance & Customs", rows: comp });
+
+    if (groups.length === 0) return null;
+    const filled = groups.reduce((a, g) => a + g.rows.length, 0);
+    return { groups, filled };
+  }, [product]);
+
   const keyFeatures = useMemo<KeyFeature[]>(
     () => (product ? deriveKeyFeatures(product, sewingSpecs) : []),
     [product, sewingSpecs],
@@ -1130,6 +1166,65 @@ export default function ProductViewPage() {
                 </div>
               );
             })}
+
+            {/* Technical & Compliance block — renders the typed
+                columns (voltage, motor_power_w, machine_*, hs_code,
+                ce/rohs, colors) in the same spec-sheet style as the
+                three-tier blocks above. Same look as the rest of the
+                page; no surprises for the customer. */}
+            {technicalRendered && (
+              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 overflow-hidden">
+                <div className="flex items-center gap-4 px-7 sm:px-8 pt-7 sm:pt-8 pb-5">
+                  <div className="h-9 w-9 rounded-full bg-amber-500/5 dark:bg-amber-400/10 ring-1 ring-amber-500/15 dark:ring-amber-400/20 flex items-center justify-center shrink-0">
+                    <ZapIcon className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[17px] sm:text-[19px] font-semibold text-[#1D1D1F] dark:text-white leading-tight tracking-[-0.01em]">
+                      Technical &amp; Compliance
+                    </h3>
+                    <p className="text-[12px] text-[#6E6E73] dark:text-white/55 mt-0.5">
+                      Electrical specs, physical dimensions, certifications, and customs classification.
+                    </p>
+                  </div>
+                  <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500/5 dark:bg-amber-400/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/15 dark:ring-amber-400/20 shrink-0">
+                    {technicalRendered.filled} {technicalRendered.filled === 1 ? "fact" : "facts"}
+                  </span>
+                </div>
+                <div className="px-2 sm:px-3 pb-6">
+                  {technicalRendered.groups.map((g, gIdx) => (
+                    <div key={g.group} className={gIdx > 0 ? "mt-5" : ""}>
+                      <div className="flex items-baseline gap-2 px-5 sm:px-6 mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
+                          {g.group}
+                        </span>
+                        <div className="h-px flex-1 bg-[#D2D2D7]/60 dark:bg-white/[0.06]" />
+                      </div>
+                      <dl className="rounded-2xl bg-white dark:bg-white/[0.025] dark:ring-1 dark:ring-white/[0.05] overflow-hidden">
+                        <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-4 px-6 py-2.5 border-b border-[#D2D2D7]/70 dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-white/[0.02]">
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Specification</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Value</span>
+                        </div>
+                        {g.rows.map((r, rIdx) => (
+                          <div
+                            key={r.label}
+                            className={`grid grid-cols-1 sm:grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-x-4 gap-y-1 px-6 py-3.5 ${
+                              rIdx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]" : ""
+                            } ${rIdx % 2 === 1 ? "bg-[#FAFAFA]/60 dark:bg-white/[0.012]" : ""}`}
+                          >
+                            <dt className="flex items-center text-[13px] text-[#1D1D1F] dark:text-white/85 font-medium">
+                              {r.label}
+                            </dt>
+                            <dd className="text-[13px] text-[#1D1D1F] dark:text-white sm:font-medium leading-snug">
+                              {r.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {genericSpecsRendered.length > 0 && (
               <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8">

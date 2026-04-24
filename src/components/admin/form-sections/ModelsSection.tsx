@@ -400,15 +400,21 @@ function ModelCard({
             </>
           )}
 
-          {/* Packaging & Logistics panel */}
+          {/* Packaging & Logistics panel — these are PACKED/SHIPMENT
+              dimensions, distinct from the bare-machine dimensions and
+              weight that live on the Technical step. Labels include
+              the "Packed" qualifier so admins can't confuse the two. */}
           <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
+            <p className="text-[10px] text-[var(--text-ghost)] mb-3 italic">
+              Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>Weight (kg)</label>
+                <label className={lbl}>Packed Weight (kg)</label>
                 <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
               </div>
               <div>
-                <label className={lbl}>CBM (m³)</label>
+                <label className={lbl}>Packed CBM (m³)</label>
                 <input type="number" step="0.0001" value={model.cbm} onChange={(e) => onUpdate({ cbm: e.target.value })} placeholder="0.0000" className={inp} />
               </div>
               <div>

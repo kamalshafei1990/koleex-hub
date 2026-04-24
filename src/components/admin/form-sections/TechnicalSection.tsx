@@ -20,7 +20,20 @@ function countryFlag(code: string): string {
 }
 
 interface Props {
-  data: Pick<ProductFormState, "hs_code" | "voltage" | "plug_types" | "watt" | "colors">;
+  data: Pick<
+    ProductFormState,
+    | "hs_code"
+    | "voltage"
+    | "plug_types"
+    | "watt"
+    | "colors"
+    | "motor_power_w"
+    | "power_consumption_w"
+    | "machine_weight_kg"
+    | "machine_dimensions"
+    | "ce_certified"
+    | "rohs_compliant"
+  >;
   onChange: (u: Partial<ProductFormState>) => void;
   suggestions?: {
     voltage?: string[];
@@ -347,32 +360,296 @@ function PlugTypeSelector({
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Sub-card wrapper — visual section divider with accent + count.
+   Used by the three Technical groups: Electrical / Physical / Compliance.
+   ───────────────────────────────────────────────────────────────────────── */
+
+function SubCard({
+  number,
+  title,
+  subtitle,
+  accent,
+  children,
+}: {
+  number: number;
+  title: string;
+  subtitle?: string;
+  accent: { edge: string; bg: string; text: string; border: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accent.edge}`} />
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className={`h-7 w-7 rounded-full ${accent.bg} ${accent.border} border flex items-center justify-center shrink-0`}>
+          <span className={`text-[12px] font-bold tabular-nums ${accent.text}`}>{number}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">{title}</h3>
+          {subtitle && (
+            <p className="text-[11px] text-[var(--text-ghost)] truncate mt-0.5">{subtitle}</p>
+          )}
+        </div>
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Number-with-unit input. Replaces the legacy free-text Watt input
+   (which mixed "500W", "550 W", "0.5 kW") with a typed numeric value
+   plus a fixed unit indicator inside the input.
+   ───────────────────────────────────────────────────────────────────────── */
+
+function NumberUnit({
+  label,
+  value,
+  unit,
+  placeholder,
+  onChange,
+  helpText,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  helpText?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full h-10 pl-4 pr-12 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+        />
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--text-ghost)] pointer-events-none">
+          {unit}
+        </span>
+      </div>
+      {helpText && (
+        <p className="text-[10px] text-[var(--text-ghost)] mt-1">{helpText}</p>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Compact toggle row used for boolean flags (CE / RoHS / etc.). Label
+   on the left, switch on the right — reads as a settings row, not a
+   form field.
+   ───────────────────────────────────────────────────────────────────────── */
+
+function ToggleRow({
+  label,
+  helpText,
+  value,
+  onChange,
+}: {
+  label: string;
+  helpText?: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div className="min-w-0">
+        <div className="text-[13px] text-[var(--text-primary)] font-medium">{label}</div>
+        {helpText && (
+          <div className="text-[11px] text-[var(--text-ghost)] mt-0.5">{helpText}</div>
+        )}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        onClick={() => onChange(!value)}
+        className={`relative h-6 w-11 rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${
+          value ? "bg-emerald-500" : "bg-zinc-600"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+            value ? "translate-x-5" : ""
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export default function TechnicalSection({ data, onChange, suggestions }: Props) {
   const hasPlugCards = suggestions?.plug_types && suggestions.plug_types.length > 0;
 
+  // Per-card visual accents — one color per concern (Electrical / Physical
+  // / Compliance) so the Technical step reads at a glance.
+  const electricalAccent = {
+    edge: "bg-amber-500/70",
+    bg: "bg-amber-500/15",
+    text: "text-amber-400",
+    border: "border-amber-500/40",
+  };
+  const physicalAccent = {
+    edge: "bg-blue-500/70",
+    bg: "bg-blue-500/15",
+    text: "text-blue-400",
+    border: "border-blue-500/40",
+  };
+  const complianceAccent = {
+    edge: "bg-emerald-500/70",
+    bg: "bg-emerald-500/15",
+    text: "text-emerald-400",
+    border: "border-emerald-500/40",
+  };
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">HS Code</label>
-          <input type="text" value={data.hs_code} onChange={(e) => onChange({ hs_code: e.target.value })} placeholder="e.g. 8428.90" className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]" />
-        </div>
-        <WattInput value={data.watt} onChange={(v) => onChange({ watt: v })} suggestions={suggestions?.watt} />
-      </div>
-      <ChipInput label="Voltage Options" values={data.voltage} onChange={(v) => onChange({ voltage: v })} placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"} suggestions={suggestions?.voltage} />
-
-      {/* Plug Types — card selector if images available, otherwise chip input */}
-      {hasPlugCards ? (
-        <PlugTypeSelector
-          values={data.plug_types}
-          onChange={(v) => onChange({ plug_types: v })}
-          options={suggestions!.plug_types!}
+      {/* ── 1. Electrical ──
+            Voltage + plug types + motor power + power consumption.
+            Plug types remain a card selector when admin has uploaded
+            plug images, otherwise a chip input. */}
+      <SubCard
+        number={1}
+        title="Electrical"
+        subtitle="Voltage, motor power, and the plug types this product ships with"
+        accent={electricalAccent}
+      >
+        <ChipInput
+          label="Voltage Options"
+          values={data.voltage}
+          onChange={(v) => onChange({ voltage: v })}
+          placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"}
+          suggestions={suggestions?.voltage}
         />
-      ) : (
-        <ChipInput label="Plug Types" values={data.plug_types} onChange={(v) => onChange({ plug_types: v })} placeholder="e.g. Type C (Enter to add)" />
-      )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <NumberUnit
+            label="Motor Power"
+            value={data.motor_power_w}
+            unit="W"
+            placeholder="e.g. 550"
+            onChange={(v) => onChange({ motor_power_w: v })}
+            helpText="Typed integer wattage. Replaces the old free-text Watt field."
+          />
+          <NumberUnit
+            label="Power Consumption"
+            value={data.power_consumption_w}
+            unit="W"
+            placeholder="e.g. 600"
+            onChange={(v) => onChange({ power_consumption_w: v })}
+            helpText="Total draw under typical load (often equal to or slightly above motor power)."
+          />
+        </div>
+        {hasPlugCards ? (
+          <PlugTypeSelector
+            values={data.plug_types}
+            onChange={(v) => onChange({ plug_types: v })}
+            options={suggestions!.plug_types!}
+          />
+        ) : (
+          <ChipInput
+            label="Plug Types"
+            values={data.plug_types}
+            onChange={(v) => onChange({ plug_types: v })}
+            placeholder="e.g. Type C (Enter to add)"
+          />
+        )}
+      </SubCard>
 
-      <ColorChipInput values={data.colors} onChange={(v) => onChange({ colors: v })} suggestions={suggestions?.colors} />
+      {/* ── 2. Physical (Bare Machine) ──
+            Distinct from per-variant packed/shipment data which lives
+            on the Models step. These describe the running machine,
+            not the crate it ships in. */}
+      <SubCard
+        number={2}
+        title="Physical (Bare Machine)"
+        subtitle="Footprint and weight of the machine itself — packed shipment data lives on the Models step"
+        accent={physicalAccent}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+              Machine Dimensions (L × W × H)
+            </label>
+            <input
+              type="text"
+              value={data.machine_dimensions}
+              onChange={(e) => onChange({ machine_dimensions: e.target.value })}
+              placeholder="e.g. 480 × 180 × 360 mm"
+              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            />
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Footprint of the machine in operation. Free-text so you can use any unit / format.
+            </p>
+          </div>
+          <NumberUnit
+            label="Machine Weight"
+            value={data.machine_weight_kg}
+            unit="kg"
+            placeholder="e.g. 32"
+            onChange={(v) => onChange({ machine_weight_kg: v })}
+            helpText="Bare-head weight. Packed crate weight is per-variant on Models."
+          />
+        </div>
+      </SubCard>
+
+      {/* ── 3. Compliance & Customs ──
+            HS code, certifications, and product colors. These either
+            constrain where the product can be sold (CE, RoHS) or
+            classify it for customs (HS code). Colors land here as a
+            product-level visual attribute used in catalog filtering. */}
+      <SubCard
+        number={3}
+        title="Compliance & Customs"
+        subtitle="Certifications, HS classification, and visual attributes"
+        accent={complianceAccent}
+      >
+        <div>
+          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+            HS Code
+          </label>
+          <input
+            type="text"
+            value={data.hs_code}
+            onChange={(e) => onChange({ hs_code: e.target.value })}
+            placeholder="e.g. 8452.21"
+            className="w-full md:w-1/2 h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+          />
+          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+            Harmonized System tariff code — used for customs declarations and duty calculations.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
+          <ToggleRow
+            label="CE Certified"
+            helpText="Required for sale in the European Economic Area."
+            value={data.ce_certified}
+            onChange={(v) => onChange({ ce_certified: v })}
+          />
+          <ToggleRow
+            label="RoHS Compliant"
+            helpText="EU restriction on hazardous substances in electronics."
+            value={data.rohs_compliant}
+            onChange={(v) => onChange({ rohs_compliant: v })}
+          />
+        </div>
+
+        <div className="pt-2 border-t border-[var(--border-subtle)]/40">
+          <ColorChipInput
+            values={data.colors}
+            onChange={(v) => onChange({ colors: v })}
+            suggestions={suggestions?.colors}
+          />
+        </div>
+      </SubCard>
     </div>
   );
 }
