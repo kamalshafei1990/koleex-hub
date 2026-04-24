@@ -407,21 +407,27 @@ export async function fetchProductMainImages(): Promise<Record<string, string>> 
   return map;
 }
 
-// ── Supplier names + logos (from contacts table) ──
+// ── Supplier names + logos ──
+// Goes through /api/suppliers because the contacts table has RLS
+// locked to service-role only. Querying with the anon client
+// returned [] even when suppliers existed — that was the "I saved
+// a supplier but can't find it in the dropdown" bug. The route
+// enforces Product Data OR Suppliers module access so we don't
+// leak the directory to unrelated roles.
 
 export async function fetchSupplierNames(): Promise<{ id: string; name: string; logo: string | null }[]> {
-  const { data } = await supabase
-    .from("contacts")
-    .select("id, company_name_en, photo_url")
-    .eq("contact_type", "supplier")
-    .order("company_name_en", { ascending: true });
-  return (data || [])
-    .filter((r: Record<string, unknown>) => r.company_name_en)
-    .map((r: Record<string, unknown>) => ({
-      id: r.id as string,
-      name: r.company_name_en as string,
-      logo: (r.photo_url as string) || null,
-    }));
+  try {
+    const res = await fetch("/api/suppliers", { credentials: "include" });
+    if (!res.ok) {
+      console.error("[Suppliers] fetch list:", res.status);
+      return [];
+    }
+    const json = (await res.json()) as { suppliers: { id: string; name: string; logo: string | null }[] };
+    return json.suppliers ?? [];
+  } catch (e) {
+    console.error("[Suppliers] fetch error:", e);
+    return [];
+  }
 }
 
 // ── Unique brand names (from products table) ──
