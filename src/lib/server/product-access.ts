@@ -33,6 +33,8 @@ export const PUBLIC_PRODUCT_COLUMNS = [
   "family",
   "level",
   "tags",
+  "excerpt",            // short 1-2 sentence hero pitch
+  "highlights",         // 3-5 bullet strings
   "description",
   "specs",
   "voltage",

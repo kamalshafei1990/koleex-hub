@@ -18,6 +18,13 @@ export interface ProductFormState {
   level: string;
   family: string;
   tags: string[];
+  /* Short 1-2 sentence description. Shown on product cards, SEO
+     meta descriptions, and quote emails. Separate from the long
+     rich-text description on the Description step. */
+  excerpt: string;
+  /* 3-5 bullet strings rendered on the public product hero
+     ("Max 5000 SPM", "Auto thread trimmer", "2-year warranty"). */
+  highlights: string[];
   description: string;
   specs: Record<string, string>;
   supports_head_only: boolean;
@@ -121,6 +128,8 @@ export const EMPTY_PRODUCT: ProductFormState = {
   level: "",
   family: "",
   tags: [],
+  excerpt: "",
+  highlights: [],
   description: "",
   specs: {},
   supports_head_only: false,

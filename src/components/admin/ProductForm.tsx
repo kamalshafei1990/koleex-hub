@@ -50,7 +50,15 @@ import type {
   ProductFormState, ModelFormState, MediaFormState,
   TranslationFormState, MarketPriceFormState, RelatedProductFormState,
 } from "@/types/product-form";
-import { EMPTY_PRODUCT, createEmptyModel } from "@/types/product-form";
+import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES } from "@/types/product-form";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import EyeIcon from "@/components/icons/ui/EyeIcon";
+import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 
 import ClassificationSection from "./form-sections/ClassificationSection";
 import SelectWithCreate from "./form-sections/SelectWithCreate";
@@ -345,6 +353,8 @@ export default function ProductForm({ productId }: Props) {
           level: p.level || "",
           family: p.family || "",
           tags: p.tags || [],
+          excerpt: p.excerpt || "",
+          highlights: p.highlights || [],
           description: p.description || "",
           specs: (p.specs as Record<string, string>) || {},
           supports_head_only: p.supports_head_only,
@@ -616,6 +626,8 @@ export default function ProductForm({ productId }: Props) {
         subcategory_slug: product.subcategory_slug,
         brand: product.brand || null,
         tags: product.tags,
+        excerpt: product.excerpt || null,
+        highlights: product.highlights,
         level: product.level || null,
         family: product.family || null,
         description: product.description || null,
@@ -910,24 +922,103 @@ export default function ProductForm({ productId }: Props) {
 
                 {/* Right: Product Identity (3/5 width) */}
                 <div className="lg:col-span-3 p-6 md:p-8 flex flex-col justify-center gap-5">
-                  {/* Top row: Status pill + brand logo */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <StatusBadge status={product.status} />
-                    {product.brand && (
-                      <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
-                        <StarIcon className="h-3 w-3" /> {product.brand}
-                      </span>
-                    )}
-                    {product.family && (
-                      <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)]">
-                        <PackageIcon className="h-3 w-3" /> {product.family}
-                      </span>
-                    )}
+                  {/* ── Top control row: Status · Featured · Visible · Level ──
+                        Publishing controls live in the hero instead of
+                        being buried in the Technical step. Admins can
+                        see at a glance whether the product will show
+                        up on the site and where it ranks. */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Status pills — 3-way toggle (Draft / Active / Archived) */}
+                    <div className="flex gap-1 p-0.5 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+                      {([
+                        { v: "draft", label: "Draft", cls: "text-amber-400 bg-amber-400/15" },
+                        { v: "active", label: "Active", cls: "text-emerald-400 bg-emerald-400/15" },
+                        { v: "archived", label: "Archived", cls: "text-red-400 bg-red-400/15" },
+                      ] as const).map(s => {
+                        const active = product.status === s.v;
+                        return (
+                          <button
+                            key={s.v}
+                            type="button"
+                            onClick={() => updateProduct_({ status: s.v as ProductFormState["status"] })}
+                            className={`h-7 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                              active ? s.cls : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Featured toggle — hero decision, not buried in Technical */}
+                    <button
+                      type="button"
+                      onClick={() => updateProduct_({ featured: !product.featured })}
+                      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
+                        product.featured
+                          ? "bg-amber-500/15 text-amber-400 border-amber-500/40"
+                          : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
+                      }`}
+                      title={product.featured ? "Featured on homepage" : "Click to feature on homepage"}
+                    >
+                      <StarIcon className="h-3 w-3" />
+                      {product.featured ? "Featured" : "Feature"}
+                    </button>
+
+                    {/* Visibility toggle — gatekeeper for whether this
+                        appears on the public catalog at all. Drafts
+                        stay hidden regardless; Active + Visible = live. */}
+                    <button
+                      type="button"
+                      onClick={() => updateProduct_({ visible: !product.visible })}
+                      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold border transition-all ${
+                        product.visible
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                          : "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)] border-[var(--border-subtle)] hover:text-[var(--text-muted)]"
+                      }`}
+                      title={product.visible ? "Visible on public catalog" : "Hidden from public catalog"}
+                    >
+                      {product.visible ? <EyeIcon className="h-3 w-3" /> : <EyeOffIcon className="h-3 w-3" />}
+                      {product.visible ? "Visible" : "Hidden"}
+                    </button>
+
+                    {/* Level pills — shopper-facing tier. Drives price
+                        tier + catalog filtering. */}
+                    <div className="flex items-center gap-1 ml-auto">
+                      {([
+                        { v: "entry", label: "Entry", cls: "text-blue-400 bg-blue-500/15 border-blue-500/40" },
+                        { v: "mid", label: "Mid", cls: "text-emerald-400 bg-emerald-500/15 border-emerald-500/40" },
+                        { v: "premium", label: "Premium", cls: "text-amber-400 bg-amber-500/15 border-amber-500/40" },
+                        { v: "enterprise", label: "Enterprise", cls: "text-purple-400 bg-purple-500/15 border-purple-500/40" },
+                      ] as const).map(l => {
+                        const active = product.level === l.v;
+                        return (
+                          <button
+                            key={l.v}
+                            type="button"
+                            onClick={() => updateProduct_({ level: active ? "" : l.v })}
+                            className={`h-7 px-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
+                              active ? l.cls : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                            }`}
+                          >
+                            {l.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Product Name — XL prominent */}
                   <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">Product Name *</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Product Name *</label>
+                      {product.product_name && (
+                        <span className="text-[10px] text-[var(--text-ghost)]">
+                          {product.product_name.length} chars
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={product.product_name}
@@ -938,6 +1029,31 @@ export default function ProductForm({ productId }: Props) {
                       }}
                       placeholder="e.g. KX Lockstitch Industrial 9500"
                       className="w-full h-14 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-xl md:text-2xl font-bold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all"
+                    />
+                  </div>
+
+                  {/* Tagline — the one-liner shown directly under the
+                      product name on the public hero. Biggest single
+                      piece of marketing copy on the whole product
+                      page. Lives on the primary model (each model can
+                      have its own tagline) but surfaced here so the
+                      admin isn't hunting for it in Models. */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1.5"><SparklesIcon className="h-3 w-3" /> Tagline</span>
+                      </label>
+                      <span className="text-[10px] text-[var(--text-ghost)]">
+                        {(primaryModel?.tagline || "").length} / 80 · shown big on public page
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={primaryModel?.tagline || ""}
+                      onChange={(e) => updatePrimaryModel({ tagline: e.target.value })}
+                      placeholder="e.g. Precision jetted pockets at 3-second cycle."
+                      maxLength={140}
+                      className="w-full h-12 px-5 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
                     />
                   </div>
 
@@ -955,8 +1071,23 @@ export default function ProductForm({ productId }: Props) {
                     />
                   </div>
 
-                  {/* Brand + Family + Status */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Slug / URL preview — SEO-friendly URL that can be
+                      edited. Auto-syncs from product name until the
+                      admin manually edits it, then stays fixed. */}
+                  <SlugEditor
+                    slug={product.slug}
+                    onChange={(v) => {
+                      setSlugEdited(true);
+                      updateProduct_({ slug: slugify(v) });
+                    }}
+                    onResetToAuto={() => {
+                      setSlugEdited(false);
+                      updateProduct_({ slug: slugify(product.product_name) });
+                    }}
+                  />
+
+                  {/* Brand · Family · Origin · Warranty */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                     <div>
                       <label className={lbl}>
                         <span className="inline-flex items-center gap-1.5"><StarIcon className="h-3 w-3" /> Brand</span>
@@ -987,29 +1118,30 @@ export default function ProductForm({ productId }: Props) {
                     </div>
                     <div>
                       <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><CircleDotIcon className="h-3 w-3" /> Status</span>
+                        <span className="inline-flex items-center gap-1.5"><GlobeIcon className="h-3 w-3" /> Made in</span>
                       </label>
-                      <div className="flex gap-1.5 h-11">
-                        {([
-                          { v: "draft", label: "Draft", cls: "text-amber-400 bg-amber-400/10 border-amber-400/40" },
-                          { v: "active", label: "Active", cls: "text-emerald-400 bg-emerald-400/10 border-emerald-400/40" },
-                          { v: "archived", label: "Archived", cls: "text-red-400 bg-red-400/10 border-red-400/40" },
-                        ] as const).map(s => {
-                          const active = product.status === s.v;
-                          return (
-                            <button
-                              key={s.v}
-                              type="button"
-                              onClick={() => updateProduct_({ status: s.v as ProductFormState["status"] })}
-                              className={`flex-1 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all ${
-                                active ? s.cls : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
-                              }`}
-                            >
-                              {s.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <select
+                        value={product.country_of_origin}
+                        onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
+                        className={inp}
+                      >
+                        <option value="">—</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl}>
+                        <span className="inline-flex items-center gap-1.5"><ShieldCheckIcon className="h-3 w-3" /> Warranty</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={product.warranty}
+                        onChange={(e) => updateProduct_({ warranty: e.target.value })}
+                        placeholder="e.g. 2 years"
+                        className={inp}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1094,6 +1226,49 @@ export default function ProductForm({ productId }: Props) {
               </div>
             </div>
 
+            {/* ── Short description (excerpt) ──
+                  One or two sentences used on product cards in the
+                  catalog, SEO meta descriptions, and quote emails.
+                  Separate from the long rich-text Description step. */}
+            <Section
+              id="excerpt"
+              icon={<DocumentIcon className="h-4 w-4" />}
+              title="Short Description"
+              badge="Cards · SEO · Quotes"
+            >
+              <div>
+                <textarea
+                  value={product.excerpt}
+                  onChange={(e) => updateProduct_({ excerpt: e.target.value })}
+                  placeholder="One or two sentences that summarise this product — shown on product cards and used as the SEO meta description."
+                  rows={3}
+                  maxLength={320}
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all resize-none"
+                />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1.5 flex items-center justify-between">
+                  <span>Aim for under 160 characters for best SEO display.</span>
+                  <span>{product.excerpt.length} / 320</span>
+                </p>
+              </div>
+            </Section>
+
+            {/* ── Key highlights ──
+                  3-5 short bullet strings displayed on the public
+                  product hero ("Max 5000 SPM", "Auto trimmer",
+                  "2-year warranty"). Kept deliberately simple —
+                  no rich text, just short punchy phrases. */}
+            <Section
+              id="highlights"
+              icon={<StarIcon className="h-4 w-4" />}
+              title="Key Highlights"
+              badge={`${product.highlights.length} / 5`}
+            >
+              <HighlightsEditor
+                highlights={product.highlights}
+                onChange={(highlights) => updateProduct_({ highlights })}
+              />
+            </Section>
+
             {/* Tags */}
             <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title="Tags & Keywords">
               <TagsInput
@@ -1102,6 +1277,27 @@ export default function ProductForm({ productId }: Props) {
                 suggestions={allTags}
               />
             </Section>
+
+            {/* ── Preview as customer ──
+                  Opens the public product detail page in a new tab
+                  so the admin can sanity-check how the product will
+                  render before publishing. Only clickable once a
+                  slug exists (and the product has been saved — on a
+                  fresh new product, this opens a 404, so we dim it
+                  until there's a slug to navigate to). */}
+            {product.slug && (
+              <div className="flex justify-end">
+                <a
+                  href={`/products/${product.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+                >
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
+                  Preview as customer
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -1529,6 +1725,185 @@ function SummaryItem({ label, value }: { label: string; value: React.ReactNode }
     <div className="bg-[var(--bg-surface-subtle)] rounded-xl px-4 py-3 border border-[var(--border-subtle)]">
       <div className="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1">{label}</div>
       <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{value}</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SLUG EDITOR — URL preview with edit affordance
+
+   The slug auto-syncs from product_name until the admin manually
+   types into it, then stays fixed (the slugEdited flag tracks
+   this on the parent). Render modes:
+     · display — subtle URL preview line, pencil icon to edit
+     · edit    — inline input with Done / Reset buttons
+   ═══════════════════════════════════════════════════════════════════ */
+function SlugEditor({
+  slug,
+  onChange,
+  onResetToAuto,
+}: {
+  slug: string;
+  onChange: (v: string) => void;
+  onResetToAuto: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <div>
+        <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+          <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> Public URL</span>
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-[var(--text-ghost)] font-mono shrink-0">/products/</span>
+          <input
+            type="text"
+            value={slug}
+            onChange={(e) => onChange(e.target.value)}
+            autoFocus
+            placeholder="lockstitch-9500"
+            className="flex-1 h-9 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)]"
+          />
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            Done
+          </button>
+          <button
+            type="button"
+            onClick={() => { onResetToAuto(); setEditing(false); }}
+            className="h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-muted)] transition-colors"
+            title="Regenerate slug from product name"
+          >
+            Reset
+          </button>
+        </div>
+        <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">
+          Lower-case, letters / numbers / hyphens only. Used in the public URL.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-[var(--text-ghost)] uppercase tracking-wider mb-2">
+        <span className="inline-flex items-center gap-1.5"><Link2Icon className="h-3 w-3" /> Public URL</span>
+      </label>
+      <div className="flex items-center gap-2 px-4 h-11 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)]">
+        <span className="text-[12px] text-[var(--text-ghost)] font-mono">/products/</span>
+        <span className={`text-[12px] font-mono truncate ${slug ? "text-[var(--text-primary)]" : "text-[var(--text-ghost)] italic"}`}>
+          {slug || "auto-generated from product name"}
+        </span>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="ml-auto inline-flex items-center gap-1 h-7 px-2 rounded-lg text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+        >
+          <PencilIcon className="h-3 w-3" /> Edit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HIGHLIGHTS EDITOR — 3-5 short bullet strings
+
+   Renders each highlight as a row with a leading check icon and an
+   inline remove button, plus a single add-row input at the bottom.
+   Enforces a soft cap of 5 so the public hero doesn't turn into a
+   wall of bullets.
+   ═══════════════════════════════════════════════════════════════════ */
+function HighlightsEditor({
+  highlights,
+  onChange,
+}: {
+  highlights: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [input, setInput] = useState("");
+  const atCap = highlights.length >= 5;
+
+  const add = () => {
+    const v = input.trim();
+    if (!v || atCap) return;
+    onChange([...highlights, v]);
+    setInput("");
+  };
+
+  const remove = (i: number) => {
+    onChange(highlights.filter((_, idx) => idx !== i));
+  };
+
+  const update = (i: number, next: string) => {
+    onChange(highlights.map((h, idx) => (idx === i ? next : h)));
+  };
+
+  return (
+    <div className="space-y-2">
+      {highlights.length === 0 && (
+        <p className="text-[11px] text-[var(--text-ghost)] italic px-1">
+          Add 3–5 short bullets that describe what makes this product stand out.
+        </p>
+      )}
+      {highlights.map((h, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-2 px-3 h-11 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)]"
+        >
+          <CheckIcon className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+          <input
+            type="text"
+            value={h}
+            onChange={(e) => update(i, e.target.value)}
+            className="flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none"
+            maxLength={80}
+          />
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+            aria-label={`Remove highlight ${i + 1}`}
+          >
+            <CrossIcon className="h-3 w-3" />
+          </button>
+        </div>
+      ))}
+      {!atCap && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder={highlights.length === 0 ? "e.g. Max 5000 SPM" : "Add another highlight..."}
+            maxLength={80}
+            className="flex-1 h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-all"
+          />
+          <button
+            type="button"
+            onClick={add}
+            disabled={!input.trim()}
+            className="h-11 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+          >
+            <PlusIcon className="h-3.5 w-3.5" /> Add
+          </button>
+        </div>
+      )}
+      {atCap && (
+        <p className="text-[10px] text-[var(--text-ghost)] italic px-1">
+          You&apos;ve reached the 5-bullet cap. Remove one to add another.
+        </p>
+      )}
     </div>
   );
 }

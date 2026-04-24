@@ -676,6 +676,33 @@ export default function ProductViewPage() {
             </p>
           )}
 
+          {/* Short description (excerpt) — the 1-2 sentence pitch
+              admins enter in the Hero step. Falls below the big
+              tagline as a muted subtitle so customers get a second
+              pass of context before the CTAs. */}
+          {product.excerpt && (
+            <p className="mt-3 text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 leading-[1.47] max-w-[640px] mx-auto">
+              {product.excerpt}
+            </p>
+          )}
+
+          {/* Key highlights — 3-5 short bullet strings from the Hero
+              step. Rendered as an inline row of check-marked chips so
+              the hero stays light and scannable. */}
+          {product.highlights && product.highlights.length > 0 && (
+            <ul className="mt-6 md:mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              {product.highlights.map((h, i) => (
+                <li
+                  key={i}
+                  className="inline-flex items-center gap-1.5 text-[13px] md:text-[14px] font-medium text-[#1D1D1F] dark:text-white/80"
+                >
+                  <CheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                  {h}
+                </li>
+              ))}
+            </ul>
+          )}
+
           {/* Price + primary CTAs — Apple style inline */}
           <div className="mt-6 md:mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[17px] md:text-[19px] font-normal">
             {priceFrom !== null && (

@@ -258,6 +258,10 @@ export interface ProductRow {
   brand: string | null;
   tags: string[];
   level: string | null;
+  /* Short 1-2 sentence pitch used on cards + SEO + quotes. */
+  excerpt: string | null;
+  /* 3-5 bullet strings for the public product hero. */
+  highlights: string[];
   description: string | null;
   specs: Record<string, unknown>;
   hs_code: string | null;
