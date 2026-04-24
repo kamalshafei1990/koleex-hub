@@ -229,16 +229,20 @@ function ModelCard({
                 />
               </div>
               <div>
-                <label className={lbl}>Cost Price (USD)</label>
+                {/* Cost is what Koleex pays the Chinese factory —
+                    stored + entered in CNY (¥) across the whole form.
+                    Selling prices below stay in USD since we sell
+                    globally. */}
+                <label className={lbl}>Cost Price (CNY)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">¥</span>
                   <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
               <div>
-                <label className={lbl}>Global Selling Price</label>
+                <label className={lbl}>Global Selling Price (USD)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
                   <input type="number" step="0.01" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />

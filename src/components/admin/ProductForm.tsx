@@ -1186,9 +1186,12 @@ export default function ProductForm({ productId }: Props) {
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Cost Price (USD)</label>
+                    {/* Cost is what Koleex pays the Chinese factory —
+                        stored + entered in CNY (¥). The selling price
+                        below stays in USD since we sell globally. */}
+                    <label className={lbl}>Cost Price (CNY)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[var(--text-ghost)]">¥</span>
                       <input
                         type="number"
                         step="0.01"
