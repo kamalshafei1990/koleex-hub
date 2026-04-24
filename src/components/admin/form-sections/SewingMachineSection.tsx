@@ -77,15 +77,15 @@ function FrequencyDots({ tier }: { tier?: "essential" | "recommended" | "advance
       : "Rare / niche";
   return (
     <span
-      className="inline-flex items-center gap-[2px] mr-1.5 align-middle"
+      className="inline-flex items-center gap-[1.5px] mr-1 align-middle shrink-0"
       title={tip}
       aria-label={tip}
     >
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`block h-[5px] w-[5px] rounded-full ${
-            i < filled ? "bg-amber-400" : "bg-amber-400/20"
+          className={`block h-1 w-1 rounded-full ${
+            i < filled ? "bg-amber-400" : "bg-amber-400/15"
           }`}
         />
       ))}
@@ -563,38 +563,42 @@ function SpecRow({
   const isBoolean = field.type === "boolean";
   const isMulti = field.type === "multi-select";
   // Boolean rows pull the switch next to the label for a tight 1-line look.
-  // Multi-select and everything else use the standard 2-col grid.
+  // Multi-select and everything else use the standard 2-col grid with a
+  // consistent 240px label column so inputs vertically align across cards.
   return (
     <div
       className={`group grid ${
         isBoolean
           ? "grid-cols-[1fr_auto]"
-          : "grid-cols-1 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]"
-      } gap-x-4 gap-y-2 items-center px-3 py-2 border-b border-[var(--border-subtle)]/30 last:border-b-0 hover:bg-[var(--bg-inverted)]/[0.025] transition-colors`}
+          : "grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]"
+      } gap-x-5 gap-y-1.5 items-center px-4 py-2.5 border-b border-[var(--border-subtle)]/20 last:border-b-0 hover:bg-[var(--bg-inverted)]/[0.02] transition-colors`}
     >
       {/* Label cell */}
       <div className="flex items-center gap-1.5 min-w-0">
         <FrequencyDots tier={field.tier} />
         <span
-          className={`text-[12px] ${
+          className={`text-[12.5px] ${
             filled ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
-          } font-medium truncate`}
+          } ${field.required ? "font-semibold" : "font-medium"} truncate`}
+          title={field.helpText}
         >
           {field.label}
         </span>
         {field.required && (
-          <span className="text-red-400 text-[12px] shrink-0" aria-label="required">*</span>
+          <span className="text-red-400 text-[12px] shrink-0 leading-none" aria-label="required">
+            *
+          </span>
         )}
         {!isBoolean && field.unit && field.type !== "number" && (
           <span className="text-[10px] text-[var(--text-ghost)] shrink-0">({field.unit})</span>
         )}
         {field.helpText && (
           <span
-            className="inline-flex shrink-0"
+            className="inline-flex shrink-0 ml-auto"
             title={field.helpText}
             aria-label={field.helpText}
           >
-            <InfoIcon className="h-3 w-3 text-[var(--text-ghost)] hover:text-[var(--text-muted)] cursor-help" />
+            <InfoIcon className="h-3 w-3 text-[var(--text-ghost)] hover:text-[var(--text-muted)] cursor-help transition-colors" />
           </span>
         )}
       </div>
@@ -642,22 +646,17 @@ function SpecRowGroup({
   const allFilled = filledCount === fields.length;
 
   return (
-    <div>
+    <div className="mb-1 last:mb-0">
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-[var(--bg-inverted)]/[0.03] rounded-md transition-colors group"
+        className="w-full flex items-center gap-3 px-4 pt-4 pb-2 group/header cursor-pointer"
         aria-expanded={!collapsed}
       >
-        <AngleDownIconLocal
-          className={`h-3 w-3 text-[var(--text-ghost)] shrink-0 transition-transform ${
-            collapsed ? "-rotate-90" : ""
-          }`}
-        />
-        <span className={`text-[10px] font-bold uppercase tracking-[0.08em] ${accentText}`}>
+        <span className={`text-[10px] font-bold uppercase tracking-[0.1em] ${accentText}`}>
           {group}
         </span>
-        <div className="h-px flex-1 bg-[var(--border-subtle)]/50" />
+        <div className="h-px flex-1 bg-[var(--border-subtle)]/40" />
         <span
           className={`text-[10px] font-semibold tabular-nums shrink-0 ${
             allFilled ? "text-emerald-400" : "text-[var(--text-ghost)]"
@@ -665,9 +664,14 @@ function SpecRowGroup({
         >
           {filledCount}/{fields.length}
         </span>
+        <AngleDownIconLocal
+          className={`h-3 w-3 text-[var(--text-ghost)] shrink-0 transition-all opacity-0 group-hover/header:opacity-100 ${
+            collapsed ? "-rotate-90" : ""
+          }`}
+        />
       </button>
       {!collapsed && (
-        <div className="mt-1">
+        <div>
           {fields.map((field) => {
             const v = values[field.key];
             const filled =
@@ -703,7 +707,8 @@ function SpecCardRenderer({
   onChange,
   accentClass,
   accentText,
-  kindIcon,
+  accentEdge,
+  stepNumber,
   anchorId,
   requiredOnly,
 }: {
@@ -712,7 +717,8 @@ function SpecCardRenderer({
   onChange: (key: string, value: unknown) => void;
   accentClass: string;
   accentText: string;
-  kindIcon?: React.ReactNode;
+  accentEdge: string;
+  stepNumber: number;
   anchorId: string;
   requiredOnly: boolean;
 }) {
@@ -764,12 +770,19 @@ function SpecCardRenderer({
   return (
     <div
       id={anchorId}
-      className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden scroll-mt-28"
+      className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden scroll-mt-28"
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
-        <div className={`h-9 w-9 rounded-xl bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
-          {kindIcon || <Settings2Icon className="h-4 w-4" />}
+      {/* Slim colored left-edge accent — same color as the card's
+          tier (emerald / blue / violet). Replaces the old gradient
+          icon chip for a cleaner spec-sheet feel. */}
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accentEdge}`} />
+
+      {/* Header — numbered step badge + title + subtitle + fill pill.
+          The number (1/2/3) gives the admin a sense of "step N of M"
+          through the three-tier stack. */}
+      <div className="flex items-center gap-3 pl-5 pr-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className={`h-7 w-7 rounded-full bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
+          <span className={`text-[12px] font-bold tabular-nums ${accentText}`}>{stepNumber}</span>
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
@@ -907,84 +920,70 @@ function SpecsProgressBar({
   const totalFields = stats.reduce((a, s) => a + s.total, 0);
   const overallPct = totalFields > 0 ? Math.round((totalFilled / totalFields) * 100) : 0;
 
+  const dotColor = (source: "common" | "family" | "kind") =>
+    source === "common" ? "bg-emerald-400" : source === "family" ? "bg-blue-400" : "bg-violet-400";
+
   return (
     <div className="sticky top-0 z-20 -mx-1 px-1">
-      <div className="bg-[var(--bg-primary)]/90 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-4 py-3 shadow-sm">
-        {/* Row 1 — title + overall count + required-only toggle */}
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
-          <div className="flex items-center gap-2">
+      <div className="bg-[var(--bg-primary)]/92 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-5 py-3.5 shadow-sm">
+        {/* Header row — overall progress + required-only toggle.
+            No redundant second "Row 2" of chips; the card rows below
+            double as jump links. */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-baseline gap-2 min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
               Specs progress
             </span>
-            <span className="text-[10px] font-semibold text-[var(--text-ghost)]">
+            <span className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums">
               {overallPct}%
             </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onToggleRequiredOnly}
-              className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border transition-colors cursor-pointer ${
-                requiredOnly
-                  ? "bg-red-500/15 border-red-500/40 text-red-400"
-                  : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-ghost)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
-              }`}
-              title="Show only required fields"
-            >
-              <span className="text-red-400">*</span>
-              {requiredOnly ? "Required only" : "Only required"}
-            </button>
-            <span className="text-[10px] font-semibold text-[var(--text-dim)] tabular-nums">
-              {totalFilled}
-              <span className="text-[var(--text-ghost)]"> / {totalFields} fields</span>
+            <span className="text-[11px] text-[var(--text-ghost)] tabular-nums truncate">
+              · {totalFilled} of {totalFields} fields
             </span>
           </div>
+          <button
+            type="button"
+            onClick={onToggleRequiredOnly}
+            className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border transition-colors cursor-pointer shrink-0 ${
+              requiredOnly
+                ? "bg-red-500/15 border-red-500/40 text-red-400"
+                : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-ghost)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
+            }`}
+            title="Show only required fields"
+          >
+            <span className="text-red-400 text-[11px] leading-none">*</span>
+            Required only
+          </button>
         </div>
 
-        {/* Row 2 — jump-nav chips. Each chip scrolls the page to the
-            matching card's anchor and shows filled/total inline so the
-            admin can see which section needs attention at a glance. */}
-        {stats.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {stats.map((s, idx) => (
-              <button
-                key={s.label}
-                type="button"
-                onClick={() => onJump(idx)}
-                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold border cursor-pointer transition-all hover:-translate-y-0.5 ${
-                  s.source === "common"
-                    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:border-emerald-500/50"
-                    : s.source === "family"
-                    ? "bg-blue-500/10 border-blue-500/25 text-blue-400 hover:border-blue-500/50"
-                    : "bg-violet-500/10 border-violet-500/25 text-violet-400 hover:border-violet-500/50"
-                }`}
-              >
-                <span className="truncate max-w-[180px]">{s.label}</span>
-                <span className="opacity-70 tabular-nums">{s.filled}/{s.total}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Row 3 — per-card progress bars */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="min-w-0">
-              <div className="flex items-center justify-between mb-1 gap-2">
-                <span className={`text-[10px] font-semibold uppercase tracking-wide ${s.text} truncate`}>
+        {/* One compact row per card — label, bar, X/Y. The whole row
+            is a jump link to that card's anchor. Replaces the old
+            duplicate chip-row + bar-row pair. */}
+        <div className="space-y-2">
+          {stats.map((s, idx) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => onJump(idx)}
+              className="group w-full grid grid-cols-[minmax(0,180px)_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-1 hover:bg-[var(--bg-inverted)]/[0.03] transition-colors cursor-pointer"
+              title={`Jump to ${s.label}`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor(s.source)}`} />
+                <span className={`text-[11px] font-semibold ${s.text} truncate text-left`}>
                   {s.label}
                 </span>
-                <span className="text-[10px] text-[var(--text-ghost)] tabular-nums shrink-0">
-                  {s.filled}/{s.total}
-                </span>
               </div>
-              <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
+              <div className="h-1 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${s.fill}`}
                   style={{ width: `${s.pct}%` }}
                 />
               </div>
-            </div>
+              <span className="text-[10px] text-[var(--text-ghost)] tabular-nums shrink-0 group-hover:text-[var(--text-dim)] transition-colors">
+                {s.filled}/{s.total}
+              </span>
+            </button>
           ))}
         </div>
       </div>
@@ -1009,14 +1008,12 @@ function SpecsProgressBar({
 function NewSpecsRender({
   subcategorySlug,
   activeKindSlug,
-  activeKindIcon,
   data,
   handleCommonChange,
   handleTemplateSpecChange,
 }: {
   subcategorySlug: string;
   activeKindSlug: string;
-  activeKindIcon: React.ReactNode | null;
   data: SewingSpecsFormState;
   handleCommonChange: (key: string, value: unknown) => void;
   handleTemplateSpecChange: (key: string, value: unknown) => void;
@@ -1047,6 +1044,12 @@ function NewSpecsRender({
     if (card.source === "common") return "text-emerald-400";
     if (card.source === "family") return "text-blue-400";
     return "text-violet-400";
+  };
+
+  const accentEdgeFor = (card: NewSpecCard) => {
+    if (card.source === "common") return "bg-emerald-500/70";
+    if (card.source === "family") return "bg-blue-500/70";
+    return "bg-violet-500/70";
   };
 
   const anchorIdFor = (card: NewSpecCard, idx: number) =>
@@ -1085,7 +1088,8 @@ function NewSpecsRender({
             onChange={onChange}
             accentClass={accentFor(card)}
             accentText={accentTextFor(card)}
-            kindIcon={card.source === "kind" ? activeKindIcon : undefined}
+            accentEdge={accentEdgeFor(card)}
+            stepNumber={idx + 1}
             anchorId={anchorIdFor(card, idx)}
             requiredOnly={requiredOnly}
           />
@@ -1234,9 +1238,6 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
             <NewSpecsRender
               subcategorySlug={subcategorySlug}
               activeKindSlug={activeKindSlug}
-              activeKindIcon={
-                activeKind ? <activeKind.icon size={18} /> : null
-              }
               data={data}
               handleCommonChange={handleCommonChange}
               handleTemplateSpecChange={handleTemplateSpecChange}
