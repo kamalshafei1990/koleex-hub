@@ -81,6 +81,7 @@ import SewingMachineSection from "./form-sections/SewingMachineSection";
 import type { SewingSpecsFormState } from "./form-sections/SewingMachineSection";
 import BarcodeQRDisplay from "./form-sections/BarcodeQRDisplay";
 import { isSewingMachineSubcategory } from "@/lib/sewing-machine-templates";
+import { getKindBySlug } from "@/lib/machine-kinds";
 import { slugify } from "@/types/product-form";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -521,6 +522,22 @@ export default function ProductForm({ productId }: Props) {
       return next;
     });
   }, []);
+
+  /* Smart save-button label + styling based on the chosen status.
+     Shared between the Review step's preview card and the bottom
+     nav's primary action so both stay in sync. Draft = grey
+     surface (parking work), Active = green (going live),
+     Archived = neutral dark (record-keeping). */
+  const saveLabel =
+    product.status === "active" ? "Save & Publish"
+    : product.status === "archived" ? "Save Changes"
+    : "Save as Draft";
+  const saveBtnCls =
+    product.status === "active"
+      ? "bg-emerald-600 text-white hover:bg-emerald-500"
+      : product.status === "archived"
+        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90"
+        : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]";
 
   /* ── Classification-gated lock ──
      For sewing products, classification now includes the machine
@@ -1599,34 +1616,187 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP 6: REVIEW & PUBLISH
            ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "finalize" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Summary Card */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6">
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-4">Product Summary</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <SummaryItem label="Product" value={product.product_name || "—"} />
-                <SummaryItem label="Brand" value={product.brand || "—"} />
-                <SummaryItem label="Classification" value={subcategoryName || "—"} />
-                <SummaryItem label="Status" value={<StatusBadge status={product.status} />} />
-                <SummaryItem label="Models" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} />
-                <SummaryItem label="Media Files" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} />
-                <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} />
-                <SummaryItem label="Template" value={sewingSpecs.template_slug ? sewingSpecs.template_slug.replace(/-/g, " ") : "—"} />
+        {steps[currentStep]?.id === "finalize" && (() => {
+          /* ══════════════════════════════════════════════════════════
+             REVIEW & PUBLISH — computed context for this step.
+             All derived values + click-jump handlers live in this
+             IIFE so the render block below stays clean.
+             ══════════════════════════════════════════════════════════ */
+          const jumpTo = (id: string) => {
+            const idx = steps.findIndex((s) => s.id === id);
+            if (idx >= 0) goToStep(idx);
+          };
+
+          /* Resolve the machine kind display name so the summary
+             doesn't show an internal slug. Falls back to the
+             template name, then "—" when neither is set. */
+          const kindSlug = (sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || "";
+          const kind = kindSlug ? getKindBySlug(kindSlug) : null;
+          const templateName = kind?.name
+            || (sewingSpecs.template_slug
+              ? sewingSpecs.template_slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+              : null);
+
+          /* Pre-save missing-fields check. Only flags the genuinely-
+             required fields we marked on Hero + Specs. Each issue
+             carries the step id so the banner can offer a jump. */
+          const missing: { label: string; step: string }[] = [];
+          if (!product.product_name.trim()) missing.push({ label: "Product Name", step: "identity" });
+          if (!product.division_slug) missing.push({ label: "Division", step: "classify" });
+          if (!product.category_slug) missing.push({ label: "Category", step: "classify" });
+          if (!product.subcategory_slug) missing.push({ label: "Subcategory", step: "classify" });
+          if (isSewing && !kindSlug && !sewingSpecs.template_slug) {
+            missing.push({ label: "Machine Kind", step: "classify" });
+          }
+          if (isSewing) {
+            const cs = sewingSpecs.common_specs as Record<string, unknown>;
+            if (!cs.max_sewing_speed) missing.push({ label: "Max Sewing Speed", step: "sewing-specs" });
+            if (!cs.needle_system) missing.push({ label: "Needle System", step: "sewing-specs" });
+            if (!cs.motor_type) missing.push({ label: "Motor Type", step: "sewing-specs" });
+          }
+
+          /* Primary model commercial info for the summary chips. */
+          const priceDisplay = primaryModel?.global_price
+            ? `$${primaryModel.global_price}`
+            : "—";
+          const costDisplay = primaryModel?.cost_price
+            ? `¥${primaryModel.cost_price}`
+            : "—";
+
+          /* Country-of-origin — the field stores an ISO code (e.g.
+             "CN") while the admin picked a full country name in the
+             Hero dropdown. Re-resolve via the COUNTRIES list so the
+             chip reads "China" instead of "CN". */
+          const originName = product.country_of_origin
+            ? (COUNTRIES.find((c) => c.code === product.country_of_origin)?.name || product.country_of_origin)
+            : "";
+
+          /* saveLabel + saveBtnCls are hoisted to the component
+             level so the bottom-nav Save button matches this
+             preview card — see the useState block earlier. */
+
+          return (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              {/* ── Missing-fields warning banner ──
+                    Shown only when at least one required field is
+                    empty. Each row offers a "Jump to [step]" link
+                    so the admin can fix without scrolling back
+                    through every step manually. */}
+              {missing.length > 0 && (
+                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TriangleWarningIcon className="h-4 w-4 text-amber-400" />
+                    <h4 className="text-[12px] font-bold text-amber-400 uppercase tracking-wider">
+                      Missing required fields
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] mb-3 leading-relaxed">
+                    You can still save as Draft, but the product isn&apos;t ready to publish until these are filled in.
+                  </p>
+                  <ul className="space-y-1.5">
+                    {missing.map((m, i) => (
+                      <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)]/60">
+                        <span className="text-[12px] text-[var(--text-primary)]">{m.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => jumpTo(m.step)}
+                          className="text-[11px] font-semibold text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1"
+                        >
+                          <ArrowUpRightIcon className="h-3 w-3" />
+                          Jump to {steps.find((s) => s.id === m.step)?.shortLabel || m.step}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ── Product Summary ──
+                    Every chip is click-through: tapping takes the
+                    admin back to the step that owns that field. Dim
+                    styling on empty values so at-a-glance scans
+                    spot gaps. */}
+              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Product Summary</h3>
+                  <p className="text-[10px] text-[var(--text-ghost)] italic">Click any card to jump back to that step.</p>
+                </div>
+
+                {/* Identity row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <SummaryItem label="Product" value={product.product_name || "—"} dim={!product.product_name} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Brand" value={product.brand || "—"} dim={!product.brand} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Classification" value={subcategoryName || "—"} dim={!subcategoryName} onClick={() => jumpTo("classify")} />
+                  <SummaryItem label="Status" value={<StatusBadge status={product.status} />} onClick={() => jumpTo("identity")} />
+                </div>
+
+                {/* Marketing row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <SummaryItem label="Tagline" value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Level" value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Featured" value={product.featured ? "Yes" : "No"} dim={!product.featured} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Visible" value={product.visible ? "Public" : "Hidden"} dim={!product.visible} onClick={() => jumpTo("identity")} />
+                </div>
+
+                {/* Commercial row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <SummaryItem label="Cost" value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Selling Price" value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Warranty" value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
+                  <SummaryItem label="Made in" value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
+                </div>
+
+                {/* Content + counts row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {isSewing && (
+                    <SummaryItem label="Machine Kind" value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
+                  )}
+                  <SummaryItem label="Models" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} onClick={() => jumpTo("commercial")} />
+                  <SummaryItem label="Media Files" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} dim={media.length === 0} onClick={() => jumpTo("media")} />
+                  <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} dim={translations.length === 0} />
+                </div>
               </div>
+
+              {/* Translations */}
+              <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title="Translations" defaultOpen={false}>
+                <TranslationsSection translations={translations} onChange={setTranslations} />
+              </Section>
+
+              {/* Related Products */}
+              <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
+                <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
+              </Section>
+
+              {/* Save-button preview so the admin sees what action
+                  hitting Save now will perform — "Publishing" vs
+                  "Saving as draft" is a meaningful difference they
+                  should be able to spot before clicking. The
+                  bottom nav bar duplicates this button with the
+                  same label/colour to keep both affordances in
+                  sync. */}
+              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-[12px] font-semibold text-[var(--text-primary)]">
+                    Ready to{" "}
+                    {product.status === "active" ? "publish" : product.status === "archived" ? "archive" : "save"}?
+                  </p>
+                  <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
+                    {product.status === "active"
+                      ? "Status is Active — this product will go live on the public catalog."
+                      : product.status === "archived"
+                        ? "Status is Archived — the product stays in the catalog history but is hidden from the shop."
+                        : "Status is Draft — saved internally, not shown on the public catalog."}
+                    {missing.length > 0 && " Missing-fields warnings above should be resolved first."}
+                  </p>
+                </div>
+                <span className="text-[11px] text-[var(--text-muted)] px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                  Button will read: <span className="font-semibold text-[var(--text-primary)]">{saveLabel}</span>
+                </span>
+              </div>
+
             </div>
-
-            {/* Translations */}
-            <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title="Translations" defaultOpen={false}>
-              <TranslationsSection translations={translations} onChange={setTranslations} />
-            </Section>
-
-            {/* Related Products */}
-            <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
-              <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
-            </Section>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
         <div className="flex items-center justify-between mt-8 mb-4">
@@ -1650,13 +1820,17 @@ export default function ProductForm({ productId }: Props) {
               Next <ArrowRightIcon className="h-4 w-4" />
             </button>
           ) : (
+            /* Smart Save: label + colour driven by the chosen
+               status. Matches the preview card on the Review step
+               so admins always see the same wording in both
+               places. */
             <button
               onClick={save}
               disabled={saving}
-              className="h-10 px-6 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold hover:bg-emerald-500 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+              className={`h-10 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg ${saveBtnCls}`}
             >
               {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-              {saving ? "Saving..." : "Save & Publish"}
+              {saving ? "Saving..." : saveLabel}
             </button>
           )}
         </div>
@@ -1731,13 +1905,43 @@ export default function ProductForm({ productId }: Props) {
 /* ═══════════════════════════════════════════════════════════════════
    SUMMARY ITEM — for review step
    ═══════════════════════════════════════════════════════════════════ */
-function SummaryItem({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="bg-[var(--bg-surface-subtle)] rounded-xl px-4 py-3 border border-[var(--border-subtle)]">
-      <div className="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">{value}</div>
-    </div>
+function SummaryItem({
+  label, value, onClick, dim = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  onClick?: () => void;
+  /* When the value is truly empty ("—"), the chip gets a quieter
+     treatment so admins can spot unfilled fields without the chip
+     screaming at them. */
+  dim?: boolean;
+}) {
+  const base =
+    "rounded-xl px-4 py-3 border transition-colors text-left w-full block";
+  const tone = dim
+    ? "bg-[var(--bg-surface-subtle)]/40 border-[var(--border-subtle)]/60"
+    : "bg-[var(--bg-surface-subtle)] border-[var(--border-subtle)]";
+  const clickable = onClick
+    ? "cursor-pointer hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)]"
+    : "";
+  const content = (
+    <>
+      <div className="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-1">
+        {label}
+      </div>
+      <div className={`text-[13px] font-medium truncate ${dim ? "text-[var(--text-ghost)] italic" : "text-[var(--text-primary)]"}`}>
+        {value}
+      </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${base} ${tone} ${clickable}`}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={`${base} ${tone}`}>{content}</div>;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
