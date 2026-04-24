@@ -12,6 +12,9 @@ import TagsIcon from "@/components/icons/ui/TagsIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import PlayIcon from "@/components/icons/ui/PlayIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "./Modal";
 import type { MediaFormState } from "@/types/product-form";
 import type { ProductMediaType } from "@/types/supabase";
@@ -38,6 +41,11 @@ interface MediaTypeDef {
      Admins occasionally drag a PDF into the Gallery drop zone and
      HTML's `accept=` only filters the picker, not drag-n-drop. */
   mimeCheck: RegExp;
+  /* Soft target for the number of items in this slot. Not enforced —
+     just drives the "still need X" caption that nudges admins to
+     upload enough media for a strong product page. 0 = no guidance
+     (for optional slots like AR/3D or Manual). */
+  suggestedCount: number;
 }
 
 const MB = 1024 * 1024;
@@ -53,6 +61,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: "image/*",
     maxSizeMB: 8,
     mimeCheck: /^image\//,
+    suggestedCount: 1,
   },
   {
     type: "gallery",
@@ -64,6 +73,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: "image/*",
     maxSizeMB: 8,
     mimeCheck: /^image\//,
+    suggestedCount: 4,
   },
   {
     type: "packing_photo",
@@ -75,6 +85,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: "image/*",
     maxSizeMB: 8,
     mimeCheck: /^image\//,
+    suggestedCount: 2,
   },
   {
     type: "label",
@@ -86,6 +97,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: "image/*",
     maxSizeMB: 5,
     mimeCheck: /^image\//,
+    suggestedCount: 0,
   },
   {
     type: "manual",
@@ -97,6 +109,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: ".pdf,.doc,.docx",
     maxSizeMB: 25,
     mimeCheck: /^(application\/pdf|application\/msword|application\/vnd\.openxmlformats-officedocument)/,
+    suggestedCount: 1,
   },
   {
     type: "ar_3d",
@@ -110,6 +123,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     /* 3D model mimetype varies wildly by browser. Fall back to
        filename extension check in addFiles() — see below. */
     mimeCheck: /.*/,
+    suggestedCount: 0,
   },
   {
     type: "video",
@@ -121,6 +135,7 @@ const MEDIA_TYPES: MediaTypeDef[] = [
     accept: "video/*",
     maxSizeMB: 100,
     mimeCheck: /^video\//,
+    suggestedCount: 1,
   },
 ];
 
@@ -139,14 +154,17 @@ function fmtMB(bytes: number): string {
 
 function MediaSlot({
   type, label, description, icon, accentColor, multiple, accept,
-  maxSizeMB, mimeCheck,
-  items, onAdd, onRemove, onEdit,
+  maxSizeMB, mimeCheck, suggestedCount,
+  items, onAdd, onRemove, onEdit, onMoveLeft, onMoveRight, onPreview,
   videoPreviews,
 }: MediaTypeDef & {
   items: MediaFormState[];
   onAdd: (files: FileList) => void;
   onRemove: (tempId: string) => void;
   onEdit: (item: MediaFormState) => void;
+  onMoveLeft: (tempId: string) => void;
+  onMoveRight: (tempId: string) => void;
+  onPreview: (item: MediaFormState) => void;
   videoPreviews: Record<string, string>;
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -268,7 +286,7 @@ function MediaSlot({
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {items.map((item) => {
+            {items.map((item, idx) => {
               const isImageType =
                 item.type === "gallery" ||
                 item.type === "main_image" ||
@@ -279,11 +297,17 @@ function MediaSlot({
               const thumbSrc = isVideo ? videoPreviews[item._tempId] : objectSrc;
               const showAsImage = isImageType && objectSrc;
               const showAsVideoThumb = isVideo && thumbSrc;
+              const canPreview = showAsImage || showAsVideoThumb;
+              const isFirst = idx === 0;
+              const isLast = idx === items.length - 1;
 
               return (
                 <div
                   key={item._tempId}
-                  className="group relative rounded-xl overflow-hidden bg-[var(--bg-primary)] border border-[var(--border-subtle)] aspect-square shadow-[0_1px_4px_rgba(0,0,0,0.15)]"
+                  className={`group relative rounded-xl overflow-hidden bg-[var(--bg-primary)] border border-[var(--border-subtle)] aspect-square shadow-[0_1px_4px_rgba(0,0,0,0.15)] ${
+                    canPreview ? "cursor-zoom-in" : ""
+                  }`}
+                  onClick={() => { if (canPreview) onPreview(item); }}
                 >
                   {showAsImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -321,16 +345,33 @@ function MediaSlot({
                     </div>
                   )}
 
-                  {/* ── Action corner ──
-                        Edit + Delete buttons always visible as tiny
-                        chips in the top-right so the grid is usable
-                        on touch devices. On desktop, they brighten
-                        on hover. The old full-overlay-on-hover design
-                        was unusable on tablets. */}
+                  {/* ── Action corner — always visible at 80% opacity
+                        so touch admins can hit the buttons without
+                        needing hover. Stopping propagation on each
+                        button so clicking Edit/Move/Delete doesn't
+                        also trigger the parent's click-to-preview. */}
                   <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    {multiple && items.length > 1 && !isFirst && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onMoveLeft(item._tempId); }}
+                        className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                        title="Move earlier in order"
+                      >
+                        <ArrowLeftIcon className="h-3 w-3" />
+                      </button>
+                    )}
+                    {multiple && items.length > 1 && !isLast && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onMoveRight(item._tempId); }}
+                        className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                        title="Move later in order"
+                      >
+                        <ArrowRightIcon className="h-3 w-3" />
+                      </button>
+                    )}
                     {(isImageType || isVideo) && (
                       <button
-                        onClick={() => onEdit(item)}
+                        onClick={(e) => { e.stopPropagation(); onEdit(item); }}
                         className="h-7 w-7 rounded-md bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
                         title="Edit alt text"
                       >
@@ -338,13 +379,23 @@ function MediaSlot({
                       </button>
                     )}
                     <button
-                      onClick={() => onRemove(item._tempId)}
+                      onClick={(e) => { e.stopPropagation(); onRemove(item._tempId); }}
                       className="h-7 w-7 rounded-md bg-red-500/80 backdrop-blur-sm text-white flex items-center justify-center hover:bg-red-500 transition-colors"
                       title="Remove"
                     >
                       <TrashIcon className="h-3 w-3" />
                     </button>
                   </div>
+
+                  {/* Order chip bottom-right — visible when there's
+                      more than one item, so admins know which order
+                      the gallery / packing photos will appear in on
+                      the public page. */}
+                  {multiple && items.length > 1 && (
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold">
+                      #{idx + 1}
+                    </div>
+                  )}
 
                   {/* File size chip bottom-left for uploaded files.
                       Helps admins spot accidentally-huge files at a
@@ -370,6 +421,20 @@ function MediaSlot({
             )}
           </div>
         )}
+
+        {/* Soft-count guidance — below the grid when the slot has a
+            non-zero suggested count and the admin hasn't met it yet.
+            Never blocks save; it's a nudge toward better product pages. */}
+        {suggestedCount > 0 && items.length < suggestedCount && (
+          <p className="mt-3 text-[10px] text-amber-400/80">
+            Suggested: at least {suggestedCount} {label.toLowerCase()} item{suggestedCount !== 1 ? "s" : ""}
+            {items.length > 0 ? ` (currently ${items.length})` : ""}.
+            {type === "gallery" && " More angles / details = better conversion."}
+            {type === "packing_photo" && " Buyers rely on packing photos to estimate shipping + inspection."}
+            {type === "manual" && " Datasheets help engineering buyers shortlist faster."}
+            {type === "video" && " A 30-60s demo video dramatically improves engagement."}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -385,6 +450,12 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
      at the bottom of the component. */
   const [editing, setEditing] = useState<MediaFormState | null>(null);
   const [altDraft, setAltDraft] = useState("");
+
+  /* Full-size preview state. When an admin clicks an image or video
+     tile, we show it in a larger modal so they can verify the media
+     looks right before saving — the square-cropped grid thumb hides
+     detail on landscape shots. */
+  const [previewing, setPreviewing] = useState<MediaFormState | null>(null);
 
   /* Client-side thumbnail cache for video uploads. Keyed by the
      media item's _tempId. Values are data-URL JPEGs captured from
@@ -473,16 +544,58 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
     setEditing(null);
   };
 
+  /* Swap a media item with its neighbour inside the same media type.
+     Keeps the `order` field in sync with the visible ordering so
+     the public product page renders items in the exact same
+     sequence the admin arranged here. Non-matching-type items keep
+     their position. */
+  const moveItem = (tempId: string, direction: -1 | 1) => {
+    const target = media.find((m) => m._tempId === tempId);
+    if (!target) return;
+    const sameType = media.filter((m) => m.type === target.type);
+    const idx = sameType.findIndex((m) => m._tempId === tempId);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= sameType.length) return;
+    const swapWith = sameType[swapIdx];
+
+    const next = media.map((m) => {
+      if (m._tempId === target._tempId) return { ...m, order: swapWith.order };
+      if (m._tempId === swapWith._tempId) return { ...m, order: target.order };
+      return m;
+    });
+    /* Re-sort same-type items by order so downstream reads (the
+       filter in MediaSlot.items) pick up the new sequence. */
+    next.sort((a, b) => (a.type === b.type ? a.order - b.order : 0));
+    onChange(next);
+  };
+
+  const moveLeft = (tempId: string) => moveItem(tempId, -1);
+  const moveRight = (tempId: string) => moveItem(tempId, 1);
+
+  /* Preview URL — falls back to the video thumbnail for video items
+     (since File has no natural "preview" beyond the first frame we
+     captured client-side). Regenerated each call so URLs don't
+     leak; the Modal tears down its child <img>/<video> when it
+     closes. */
+  const previewSrc = (item: MediaFormState | null): string => {
+    if (!item) return "";
+    if (item._file) return URL.createObjectURL(item._file);
+    return item.url || "";
+  };
+
   return (
     <div className="space-y-4">
       {MEDIA_TYPES.filter((mt) => !excludeTypes.includes(mt.type)).map((mt) => (
         <MediaSlot
           key={mt.type}
           {...mt}
-          items={media.filter((m) => m.type === mt.type)}
+          items={media.filter((m) => m.type === mt.type).sort((a, b) => a.order - b.order)}
           onAdd={(files) => addFiles(mt.type, files)}
           onRemove={removeItem}
           onEdit={openEdit}
+          onMoveLeft={moveLeft}
+          onMoveRight={moveRight}
+          onPreview={(item) => setPreviewing(item)}
           videoPreviews={videoPreviews}
         />
       ))}
@@ -539,6 +652,60 @@ export default function MediaSection({ media, onChange, excludeTypes = [] }: Pro
           around 10–15 words works best for Google image search.
         </p>
       </Modal>
+
+      {/* ── Full-size preview modal ──
+            The grid tiles are square-cropped for layout consistency,
+            which hides detail on landscape product shots. Clicking a
+            media tile opens it here at full resolution so admins can
+            verify what the customer will actually see.
+
+            Videos play inline with native controls; images render
+            object-contained so the whole frame is visible. The modal
+            uses our own headerless "plain overlay" pattern rather
+            than the shared Modal because we want the media to fill
+            the viewport without chrome getting in the way. */}
+      {previewing && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 cursor-zoom-out"
+          onClick={() => setPreviewing(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setPreviewing(null); }}
+            className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            aria-label="Close preview"
+          >
+            <CrossIcon className="h-5 w-5" />
+          </button>
+          <div
+            className="max-w-[90vw] max-h-[85vh] flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {previewing.type === "video" ? (
+              <video
+                src={previewSrc(previewing)}
+                controls
+                autoPlay
+                className="max-w-full max-h-[80vh] rounded-xl shadow-2xl"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewSrc(previewing)}
+                alt={previewing.alt_text || "Preview"}
+                className="max-w-full max-h-[80vh] rounded-xl shadow-2xl object-contain"
+              />
+            )}
+            {previewing.alt_text && (
+              <p className="text-[12px] text-white/70 italic text-center max-w-[640px]">
+                {previewing.alt_text}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
