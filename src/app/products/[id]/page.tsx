@@ -859,7 +859,10 @@ export default function ProductViewPage() {
                 </p>
               </div>
               <h3 className="text-[22px] md:text-[24px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] tracking-[-0.015em]">
-                {activeTemplate?.icon ? `${activeTemplate.icon} ` : ""}
+                {/* Template emoji was dropped when the Template Picker
+                    was replaced by the SVG-icon Machine Kind picker.
+                    Public page now just shows the template / kind
+                    name — cleaner, no unicode noise. */}
                 {activeTemplate?.name || subcategoryName || "Industrial Sewing Machine"}
               </h3>
               {categoryName && (
@@ -925,7 +928,6 @@ export default function ProductViewPage() {
           {activeTemplate && (
             <div className="mb-12 flex justify-center">
               <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[13px] text-[#1D1D1F] dark:text-white/85">
-                <span className="text-base">{activeTemplate.icon}</span>
                 <span className="font-medium">{activeTemplate.name}</span>
               </div>
             </div>

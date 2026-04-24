@@ -39,14 +39,26 @@ export interface SewingMachineTemplate {
   slug: string;
   name: string;
   description: string;
-  icon: string;          // emoji
   fields: TemplateField[];
+  /* The `icon` emoji used to live here, rendered by the old
+     Template Picker card grid on the Machine Type step. That
+     picker was replaced by the Machine Kind picker (custom SVG
+     icons from src/components/icons/machine-kinds/), so the
+     emoji is dead weight. Dropped so templates don't carry
+     unused fields. */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    COMMON FIELDS — shown for ALL sewing machine subcategories
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* `required: true` surfaces a red "*" next to the field label in
+   the rendered form AND blocks the Specs step from completing
+   until the field has a non-empty value. Don't overdo it — only
+   the specs a customer genuinely expects on a product page (and
+   a salesperson needs to quote) are marked required. Nice-to-
+   have specs stay optional so admins can publish drafts without
+   every single field filled. */
 export const COMMON_SEWING_FIELDS: TemplateField[] = [
   // Performance
   {
@@ -55,6 +67,7 @@ export const COMMON_SEWING_FIELDS: TemplateField[] = [
     type: "number",
     unit: "spm",
     placeholder: "e.g. 5000",
+    required: true,
     group: "Performance",
   },
   {
@@ -90,6 +103,7 @@ export const COMMON_SEWING_FIELDS: TemplateField[] = [
     label: "Needle System",
     type: "text",
     placeholder: "e.g. DB×1, DC×27, UY128GAS",
+    required: true,
     group: "Needle & Thread",
   },
   {
@@ -131,6 +145,7 @@ export const COMMON_SEWING_FIELDS: TemplateField[] = [
       { value: "built-in", label: "Built-in Motor" },
       { value: "stepping", label: "Stepping Motor" },
     ],
+    required: true,
     group: "Mechanical",
   },
   {
@@ -305,7 +320,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     slug: "single-needle-lockstitch",
     name: "Single Needle Lockstitch",
     description: "Standard lockstitch machines for straight stitching",
-    icon: "1️⃣",
     fields: [
       {
         key: "auto_thread_trimmer",
@@ -379,7 +393,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     slug: "double-needle-lockstitch",
     name: "Double Needle Lockstitch",
     description: "Twin needle parallel stitching machines",
-    icon: "2️⃣",
     fields: [
       {
         key: "needle_gauge",
@@ -434,7 +447,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     slug: "overlock",
     name: "Overlock (Serger)",
     description: "Edge finishing and seaming machines",
-    icon: "🔗",
     fields: [
       {
         key: "number_of_threads",
@@ -543,7 +555,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     slug: "flatlock-interlock",
     name: "Flatlock / Interlock",
     description: "Flat seaming and decorative stretch stitching",
-    icon: "🔄",
     fields: [
       {
         key: "number_of_needles",
@@ -637,7 +648,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     slug: "coverstitch",
     name: "Coverstitch",
     description: "Hemming and cover seam machines for knitwear",
-    icon: "📏",
     fields: [
       {
         key: "number_of_needles",
@@ -703,12 +713,20 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
     ],
   },
 
-  /* ── 6. Button Hole ── */
+  /* ── 6. Button Hole ──
+     Earlier revisions of this template accidentally had:
+       · both `buttonhole_type` (multi-select) and `buttonhole_shape`
+         (single select) capturing the same taxonomy
+       · both `max_buttonhole_length`+`min_buttonhole_length` pairs
+         AND a text `buttonhole_length_range` that says the same thing
+       · both `clamping_device` and `clamp_type` selects
+       · `eye_size_adjustable` + `eyelet_option` as two booleans for
+         overlapping concepts
+     Cleaned up below to a single canonical shape per concept. */
   {
     slug: "button-hole",
     name: "Button Hole",
     description: "Buttonhole making machines",
-    icon: "🕳️",
     fields: [
       {
         key: "buttonhole_type",
@@ -723,19 +741,33 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         group: "Buttonhole",
       },
       {
+        key: "min_buttonhole_length",
+        label: "Buttonhole Length (Min)",
+        type: "number",
+        unit: "mm",
+        placeholder: "e.g. 6",
+        group: "Buttonhole",
+      },
+      {
         key: "max_buttonhole_length",
-        label: "Max Buttonhole Length",
+        label: "Buttonhole Length (Max)",
         type: "number",
         unit: "mm",
         placeholder: "e.g. 40",
         group: "Buttonhole",
       },
       {
-        key: "min_buttonhole_length",
-        label: "Min Buttonhole Length",
-        type: "number",
-        unit: "mm",
-        placeholder: "e.g. 6",
+        key: "eye_size_adjustable",
+        label: "Eye Size Adjustable",
+        type: "boolean",
+        helpText: "Covers the separate \"eyelet option\" we used to track as a second flag.",
+        group: "Buttonhole",
+      },
+      {
+        key: "gimp_thread",
+        label: "Gimp Thread Support",
+        type: "boolean",
+        helpText: "Corded buttonhole capability",
         group: "Buttonhole",
       },
       {
@@ -772,63 +804,25 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         ],
         group: "Control",
       },
-      {
-        key: "eye_size_adjustable",
-        label: "Eye Size Adjustable",
-        type: "boolean",
-        group: "Buttonhole",
-      },
-      {
-        key: "gimp_thread",
-        label: "Gimp Thread Support",
-        type: "boolean",
-        helpText: "Corded buttonhole capability",
-        group: "Buttonhole",
-      },
-      {
-        key: "buttonhole_length_range",
-        label: "Buttonhole Length Range",
-        type: "text",
-        placeholder: "e.g. 6~40mm",
-        group: "Buttonhole",
-      },
-      {
-        key: "buttonhole_shape",
-        label: "Buttonhole Shape",
-        type: "select",
-        options: [
-          { value: "round-end", label: "Round End" },
-          { value: "square-end", label: "Square End" },
-          { value: "keyhole", label: "Keyhole" },
-          { value: "straight", label: "Straight" },
-        ],
-        group: "Buttonhole",
-      },
-      {
-        key: "eyelet_option",
-        label: "Eyelet Option",
-        type: "boolean",
-        group: "Buttonhole",
-      },
-      {
-        key: "clamp_type",
-        label: "Clamp Type",
-        type: "select",
-        options: [
-          { value: "auto-clamp", label: "Auto Clamp" },
-          { value: "manual-clamp", label: "Manual Clamp" },
-        ],
-        group: "Mechanism",
-      },
     ],
   },
 
-  /* ── 7. Button Attach / Sewing ── */
+  /* ── 7. Button Attach / Sewing ──
+     Earlier revisions had the following duplicate pairs, each
+     removed in this cleanup:
+       · `button_types` (multi-select) AND `hole_count_support`
+         (multi-select) — same taxonomy twice.
+       · `button_size_min`+`button_size_max` number pair AND a
+         free-text `button_size_range` saying the same thing.
+       · `stitches_per_cycle` (text) AND `stitch_count` (number) —
+         same concept, number is the right shape.
+       · `auto_clamp` (boolean) AND `clamp_type` (select) —
+         the select subsumes the boolean.
+     Consolidated to the single canonical field per concept. */
   {
     slug: "button-attach",
     name: "Button Attach",
     description: "Button sewing and attaching machines",
-    icon: "🔘",
     fields: [
       {
         key: "button_types",
@@ -869,16 +863,29 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         group: "Button",
       },
       {
-        key: "stitches_per_cycle",
-        label: "Stitches per Cycle",
-        type: "text",
-        placeholder: "e.g. 8, 16, 32",
+        key: "stitch_count",
+        label: "Stitch Count (per cycle)",
+        type: "number",
+        placeholder: "e.g. 16",
+        helpText: "Typical values: 8, 16, 32",
         group: "Performance",
       },
       {
-        key: "auto_clamp",
-        label: "Auto Button Clamp",
+        key: "cross_pattern",
+        label: "Cross Stitch Pattern",
         type: "boolean",
+        helpText: "4-hole cross-stitch capability",
+        group: "Stitch",
+      },
+      {
+        key: "clamp_type",
+        label: "Clamp Type",
+        type: "select",
+        options: [
+          { value: "auto-clamp", label: "Auto Clamp" },
+          { value: "manual-clamp", label: "Manual Clamp" },
+          { value: "universal", label: "Universal" },
+        ],
         group: "Automation",
       },
       {
@@ -892,74 +899,42 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         ],
         group: "Automation",
       },
-      {
-        key: "cross_pattern",
-        label: "Cross Stitch Pattern",
-        type: "boolean",
-        helpText: "4-hole cross-stitch capability",
-        group: "Stitch",
-      },
-      {
-        key: "button_size_range",
-        label: "Button Size Range",
-        type: "text",
-        placeholder: "e.g. 10~28mm",
-        group: "Button",
-      },
-      {
-        key: "hole_count_support",
-        label: "Hole Count Support",
-        type: "multi-select",
-        options: [
-          { value: "2-hole", label: "2-Hole" },
-          { value: "4-hole", label: "4-Hole" },
-          { value: "shank", label: "Shank" },
-        ],
-        group: "Button",
-      },
-      {
-        key: "stitch_count",
-        label: "Stitch Count",
-        type: "number",
-        placeholder: "e.g. 16",
-        group: "Performance",
-      },
-      {
-        key: "clamp_type",
-        label: "Clamp Type",
-        type: "select",
-        options: [
-          { value: "auto-clamp", label: "Auto Clamp" },
-          { value: "manual-clamp", label: "Manual Clamp" },
-          { value: "universal", label: "Universal" },
-        ],
-        group: "Automation",
-      },
     ],
   },
 
-  /* ── 8. Bartacking ── */
+  /* ── 8. Bartacking ──
+     Earlier template had `sewing_area_x`/`sewing_area_y` AND
+     `bartack_length`/`bartack_width` — two different names for
+     the same physical dimensions (the max X/Y travel of the
+     sewing head IS the max bartack length/width). Consolidated to
+     the clearer bartack length/width naming. */
   {
     slug: "bartacking",
     name: "Bartacking",
     description: "Reinforcement and bartack sewing machines",
-    icon: "⬛",
     fields: [
       {
-        key: "sewing_area_x",
-        label: "Sewing Area X",
+        key: "bartack_length",
+        label: "Max Bartack Length (X)",
         type: "number",
         unit: "mm",
         placeholder: "e.g. 30",
         group: "Sewing Area",
       },
       {
-        key: "sewing_area_y",
-        label: "Sewing Area Y",
+        key: "bartack_width",
+        label: "Max Bartack Width (Y)",
         type: "number",
         unit: "mm",
         placeholder: "e.g. 20",
         group: "Sewing Area",
+      },
+      {
+        key: "stitch_count",
+        label: "Stitch Count (per bartack)",
+        type: "number",
+        placeholder: "e.g. 42",
+        group: "Performance",
       },
       {
         key: "number_of_patterns",
@@ -973,6 +948,18 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         label: "Pattern Storage Capacity",
         type: "number",
         placeholder: "e.g. 999",
+        group: "Patterns",
+      },
+      {
+        key: "pattern_type",
+        label: "Pattern Type",
+        type: "multi-select",
+        options: [
+          { value: "rectangle", label: "Rectangle" },
+          { value: "circle", label: "Circle" },
+          { value: "triangle", label: "Triangle" },
+          { value: "custom", label: "Custom" },
+        ],
         group: "Patterns",
       },
       {
@@ -1017,50 +1004,21 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         type: "boolean",
         group: "Automation",
       },
-      {
-        key: "stitch_count",
-        label: "Stitch Count",
-        type: "number",
-        placeholder: "e.g. 42",
-        group: "Performance",
-      },
-      {
-        key: "bartack_length",
-        label: "Bartack Length",
-        type: "number",
-        unit: "mm",
-        placeholder: "e.g. 16",
-        group: "Sewing Area",
-      },
-      {
-        key: "bartack_width",
-        label: "Bartack Width",
-        type: "number",
-        unit: "mm",
-        placeholder: "e.g. 3",
-        group: "Sewing Area",
-      },
-      {
-        key: "pattern_type",
-        label: "Pattern Type",
-        type: "multi-select",
-        options: [
-          { value: "rectangle", label: "Rectangle" },
-          { value: "circle", label: "Circle" },
-          { value: "triangle", label: "Triangle" },
-          { value: "custom", label: "Custom" },
-        ],
-        group: "Patterns",
-      },
     ],
   },
 
-  /* ── 9. Feed of the Arm ── */
+  /* ── 9. Feed of the Arm ──
+     Dropped two redundant booleans in this cleanup:
+       · `puller_support` (boolean) — already implied by the
+         `puller` select having a non-"none" value.
+       · `tubular_sewing` (boolean) — feed-of-the-arm machines
+         ARE tubular sewing machines, the category itself makes
+         this redundant. Admins can still call out specific use
+         cases in `specialized_use`. */
   {
     slug: "feed-of-the-arm",
     name: "Feed of the Arm",
     description: "Cylinder arm and lap seam machines",
-    icon: "💪",
     fields: [
       {
         key: "arm_type",
@@ -1078,6 +1036,14 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         type: "number",
         unit: "mm",
         placeholder: "e.g. 50",
+        group: "Configuration",
+      },
+      {
+        key: "arm_dimensions",
+        label: "Arm Length",
+        type: "number",
+        unit: "mm",
+        placeholder: "e.g. 250",
         group: "Configuration",
       },
       {
@@ -1138,25 +1104,6 @@ export const SEWING_MACHINE_TEMPLATES: SewingMachineTemplate[] = [
         label: "Auto Thread Trimmer",
         type: "boolean",
         group: "Automation",
-      },
-      {
-        key: "tubular_sewing",
-        label: "Tubular Sewing Application",
-        type: "boolean",
-        group: "Configuration",
-      },
-      {
-        key: "puller_support",
-        label: "Puller Support",
-        type: "boolean",
-        group: "Feed",
-      },
-      {
-        key: "arm_dimensions",
-        label: "Arm Dimensions",
-        type: "text",
-        placeholder: "e.g. 250mm arm length",
-        group: "Configuration",
       },
       {
         key: "specialized_use",
@@ -1311,15 +1258,12 @@ export function getTemplateForSubcategory(subcategorySlug: string): SewingMachin
   return SEWING_MACHINE_TEMPLATES.find(t => t.slug === templateSlug) || null;
 }
 
-/** Get all available template options (for a dropdown or template picker) */
-export function getAllTemplates(): { slug: string; name: string; icon: string; description: string }[] {
-  return SEWING_MACHINE_TEMPLATES.map(t => ({
-    slug: t.slug,
-    name: t.name,
-    icon: t.icon,
-    description: t.description,
-  }));
-}
+/* `getAllTemplates()` used to feed the Template Picker card grid on
+   the Machine Type step. That picker was replaced by the Machine
+   Kind picker — which scopes to the chosen subcategory — so this
+   helper is dead. Keeping the removal in the same commit as the
+   `icon` field removal so the "template picker" concept exits
+   cleanly and nothing references the old shape. */
 
 /** Group fields by their group property */
 export function groupFields(fields: TemplateField[]): { group: string; fields: TemplateField[] }[] {

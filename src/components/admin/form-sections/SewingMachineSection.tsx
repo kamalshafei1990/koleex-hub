@@ -95,14 +95,26 @@ function FieldRenderer({
     "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
   const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
 
+  /* Shared label renderer — shows "Field Name *" in red for
+     required fields so admins see at a glance what has to be
+     filled. Number fields still append the unit in parens. */
+  const renderLabel = (withUnit: boolean) => (
+    <label className={lbl}>
+      {field.label}
+      {field.required && (
+        <span className="text-red-400 ml-0.5" aria-label="required">*</span>
+      )}
+      {withUnit && field.unit && (
+        <span className="text-[var(--text-ghost)] ml-1">({field.unit})</span>
+      )}
+    </label>
+  );
+
   switch (field.type) {
     case "text":
       return (
         <div>
-          <label className={lbl}>
-            {field.label}
-            {field.unit && <span className="text-[var(--text-ghost)] ml-1">({field.unit})</span>}
-          </label>
+          {renderLabel(true)}
           <input
             type="text"
             value={(value as string) || ""}
@@ -121,10 +133,7 @@ function FieldRenderer({
     case "number":
       return (
         <div>
-          <label className={lbl}>
-            {field.label}
-            {field.unit && <span className="text-[var(--text-ghost)] ml-1">({field.unit})</span>}
-          </label>
+          {renderLabel(true)}
           <div className="relative">
             <input
               type="number"
@@ -148,7 +157,7 @@ function FieldRenderer({
     case "select":
       return (
         <div>
-          <label className={lbl}>{field.label}</label>
+          {renderLabel(false)}
           <select
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
@@ -173,7 +182,7 @@ function FieldRenderer({
       const selected = Array.isArray(value) ? (value as string[]) : [];
       return (
         <div>
-          <label className={lbl}>{field.label}</label>
+          {renderLabel(false)}
           <div className="flex flex-wrap gap-1.5">
             {field.options?.map((opt) => {
               const isSelected = selected.includes(opt.value);
@@ -208,7 +217,12 @@ function FieldRenderer({
       return (
         <div className="flex items-center justify-between py-1">
           <div>
-            <span className="text-[12px] text-[var(--text-muted)]">{field.label}</span>
+            <span className="text-[12px] text-[var(--text-muted)]">
+              {field.label}
+              {field.required && (
+                <span className="text-red-400 ml-0.5" aria-label="required">*</span>
+              )}
+            </span>
             {field.helpText && (
               <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">{field.helpText}</p>
             )}
@@ -508,8 +522,11 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
           {activeTemplate && templateGroups.length > 0 && (
             <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
               <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-2xl">
-                  {activeTemplate.icon}
+                {/* Machine kind SVG icon when available, else a generic
+                    Settings glyph. The template emoji was dropped
+                    alongside the old Template Picker. */}
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  {activeKind ? <activeKind.icon size={18} /> : <Settings2Icon className="h-4 w-4" />}
                 </div>
                 <div className="flex-1">
                   <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{activeTemplate.name} Specs</h3>
