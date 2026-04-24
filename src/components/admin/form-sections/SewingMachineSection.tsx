@@ -19,8 +19,12 @@ import {
   SEWING_MACHINE_TEMPLATES,
   getTemplateForSubcategory,
   groupFields,
-  getAllTemplates,
 } from "@/lib/sewing-machine-templates";
+import {
+  getKindsForSubcategory,
+  getKindBySlug,
+  type MachineKind,
+} from "@/lib/machine-kinds";
 
 /* ── Icons and colors for each group ── */
 const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
@@ -261,32 +265,50 @@ function FieldGroup({
   );
 }
 
-/* ── Template Picker — visual machine type cards ── */
-function TemplatePicker({
-  selected,
+/* ── Machine Kind Picker ──
+       Lists every kind that belongs to the product's subcategory
+       (e.g. Lockstitch → Walking-Foot, Long-Arm, Cylinder-Bed, ...).
+       Each card renders its custom SVG icon from the machine-kinds
+       catalog. Selecting a kind implicitly chooses the spec template
+       that will drive the Specs step. */
+function MachineKindPicker({
+  kinds,
+  selectedKindSlug,
   onSelect,
+  subcategorySlug,
 }: {
-  selected: string;
-  onSelect: (slug: string) => void;
+  kinds: MachineKind[];
+  selectedKindSlug: string;
+  onSelect: (kind: MachineKind) => void;
+  subcategorySlug: string;
 }) {
-  const templates = getAllTemplates();
+  const heading = subcategorySlug
+    ? "Which kind of machine?"
+    : "Sewing Machine Type";
+  const sub = subcategorySlug
+    ? "Pick the specific machine kind. Spec fields are auto-driven by the template behind this choice."
+    : "Pick a subcategory first — or choose any kind from the full list below.";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Sewing Machine Type</h3>
-          <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">Choose the template that matches this machine. Fields adjust automatically.</p>
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{heading}</h3>
+          <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">{sub}</p>
         </div>
+        <span className="text-[10px] font-medium text-[var(--text-ghost)] uppercase tracking-wider">
+          {kinds.length} {kinds.length === 1 ? "option" : "options"}
+        </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {templates.map((t) => {
-          const isSelected = selected === t.slug;
+        {kinds.map((k) => {
+          const isSelected = selectedKindSlug === k.slug;
+          const Icon = k.icon;
           return (
             <button
-              key={t.slug}
+              key={k.slug}
               type="button"
-              onClick={() => onSelect(t.slug)}
+              onClick={() => onSelect(k)}
               className={`group relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all cursor-pointer text-left
                 ${
                   isSelected
@@ -299,15 +321,24 @@ function TemplatePicker({
                   <CheckIcon className="h-3 w-3 text-white" />
                 </div>
               )}
-              <span className="text-3xl mt-1 mb-1">{t.icon}</span>
+              <Icon
+                size={30}
+                className={`mt-1 mb-1 transition-colors ${
+                  isSelected
+                    ? "text-blue-400"
+                    : "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]"
+                }`}
+              />
               <span
                 className={`text-[11px] font-bold text-center leading-tight ${
                   isSelected ? "text-blue-400" : "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
                 }`}
               >
-                {t.name}
+                {k.name}
               </span>
-              <span className="text-[9px] text-[var(--text-ghost)] text-center line-clamp-2 leading-snug">{t.description}</span>
+              <span className="text-[9px] text-[var(--text-ghost)] text-center line-clamp-2 leading-snug">
+                {k.description}
+              </span>
             </button>
           );
         })}
@@ -327,7 +358,26 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
     [subcategorySlug]
   );
 
-  const activeTemplateSlug = data.template_slug || detectedTemplate?.slug || "";
+  /* The "kind" is the specific sub-type the admin chose (e.g.
+     "lockstitch-walking-foot"). Stored inside common_specs under the
+     conventional `machine_kind` key so no schema change is needed.
+     A kind implies a spec template — when the kind changes, we
+     propagate that to template_slug so the Specs step renders the
+     right fields. */
+  const activeKindSlug =
+    (data.common_specs?.machine_kind as string | undefined) || "";
+  const activeKind = useMemo(
+    () => (activeKindSlug ? getKindBySlug(activeKindSlug) : null),
+    [activeKindSlug]
+  );
+
+  const kindsForSubcategory = useMemo(
+    () => getKindsForSubcategory(subcategorySlug),
+    [subcategorySlug]
+  );
+
+  const activeTemplateSlug =
+    data.template_slug || activeKind?.templateSlug || detectedTemplate?.slug || "";
 
   // Auto-persist detected template to parent state so it gets saved
   useEffect(() => {
@@ -353,12 +403,21 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
     [activeTemplate]
   );
 
-  const handleTemplateChange = (slug: string) => {
+  /* Kind click handler. Persists the machine kind slug inside
+     common_specs.machine_kind AND aligns template_slug with the
+     kind's implied template. If the template changed, wipe the
+     template-specific spec values so the admin doesn't carry over
+     numbers that don't apply to the new field shape. */
+  const handleKindChange = (kind: MachineKind) => {
+    const templateChanged = kind.templateSlug !== data.template_slug;
     onChange({
       ...data,
-      template_slug: slug,
-      // Keep template_specs if same template, otherwise reset
-      template_specs: slug === data.template_slug ? data.template_specs : {},
+      template_slug: kind.templateSlug,
+      template_specs: templateChanged ? {} : data.template_specs,
+      common_specs: {
+        ...data.common_specs,
+        machine_kind: kind.slug,
+      },
     });
   };
 
@@ -386,25 +445,30 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
 
   return (
     <div className="space-y-6">
-      {/* Template Picker — shown in "full" and "template" modes */}
+      {/* Machine Kind Picker — shown in "full" and "template" modes */}
       {(mode === "full" || mode === "template") && (
-        <TemplatePicker selected={activeTemplateSlug} onSelect={handleTemplateChange} />
+        <MachineKindPicker
+          kinds={kindsForSubcategory}
+          selectedKindSlug={activeKindSlug}
+          onSelect={handleKindChange}
+          subcategorySlug={subcategorySlug}
+        />
       )}
 
-      {mode === "template" && !activeTemplateSlug && (
+      {mode === "template" && !activeKindSlug && (
         <div className="text-center py-8 border border-dashed border-[var(--border-subtle)] rounded-2xl bg-[var(--bg-surface-subtle)]/30">
-          <p className="text-[12px] text-[var(--text-dim)]">Pick a machine type to unlock its spec fields in the next step.</p>
+          <p className="text-[12px] text-[var(--text-dim)]">Pick a machine kind to unlock its spec fields in the next step.</p>
         </div>
       )}
 
-      {mode === "template" && activeTemplateSlug && activeTemplate && (
+      {mode === "template" && activeKind && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center text-xl">
-            {activeTemplate.icon}
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <activeKind.icon size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-[var(--text-primary)]">{activeTemplate.name}</div>
-            <div className="text-[11px] text-[var(--text-ghost)] truncate">{activeTemplate.description}</div>
+            <div className="text-[13px] font-semibold text-[var(--text-primary)]">{activeKind.name}</div>
+            <div className="text-[11px] text-[var(--text-ghost)] truncate">{activeKind.description}</div>
           </div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Selected</span>
         </div>

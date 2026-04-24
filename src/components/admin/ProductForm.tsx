@@ -514,8 +514,17 @@ export default function ProductForm({ productId }: Props) {
   const classificationComplete =
     !!product.division_slug && !!product.category_slug && !!product.subcategory_slug;
 
-  /* Sewing flow unlocks the "Specs" step only after a template is selected */
-  const machineTypeComplete = !isSewing || !!sewingSpecs.template_slug;
+  /* Sewing flow unlocks the "Specs" step only after the admin has
+     picked a specific machine KIND (e.g. Walking-Foot Lockstitch)
+     — the kind carries its own template_slug, so checking the kind
+     is equivalent to checking the template plus guarantees the
+     admin actually clicked through the Machine Type picker. Fall
+     back to template_slug for products saved before the kind
+     selector shipped. */
+  const machineTypeComplete =
+    !isSewing ||
+    !!(sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind ||
+    !!sewingSpecs.template_slug;
 
   const lockedSteps = useMemo(() => {
     const set = new Set<number>();
