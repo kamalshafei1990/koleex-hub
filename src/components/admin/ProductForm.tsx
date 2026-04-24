@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -1452,94 +1453,63 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "technical" && (
           <div className="space-y-5 animate-in fade-in duration-300">
+            {/* ── Hero-ownership note ──
+                  Visibility (Visible/Featured), Marketing (Level,
+                  Warranty), and URL basics (Slug, Made-in) used to
+                  appear as full form widgets inside Technical —
+                  duplicating Hero's editors and causing desync
+                  risk identical to the one we closed on Models.
+                  Removed them entirely; a compact banner points
+                  admins at Hero when they need those fields. */}
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+              <div className="h-6 w-6 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <SparklesIcon className="h-3 w-3" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-[var(--text-primary)]">
+                  Publishing &amp; marketing fields live on the Hero step.
+                </p>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">
+                  Visibility, Featured, Level, Warranty, Slug, and Made-in are edited on Hero — the single source of truth for customer-facing identity.
+                  This step focuses on electrical / physical specs and internal operations.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const heroIdx = steps.findIndex((s) => s.id === "identity");
+                    if (heroIdx >= 0) goToStep(heroIdx);
+                  }}
+                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 transition-colors mt-2"
+                >
+                  <ArrowUpRightIcon className="h-3 w-3" />
+                  Jump to Hero
+                </button>
+              </div>
+            </div>
+
             <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title="Technical Details" badge="Electrical · Physical">
               <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} />
             </Section>
 
-            {/* Configuration */}
-            <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title="Configuration & Options">
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Website Visibility</label>
-                    <Toggle checked={product.visible} onChange={(v) => updateProduct_({ visible: v })} label="Visible on public catalog" />
-                    <Toggle checked={product.featured} onChange={(v) => updateProduct_({ featured: v })} label="Featured on homepage" />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-[11px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">Purchase Options</label>
-                    <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
-                    <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>Warranty</label>
-                    <input
-                      type="text"
-                      value={product.warranty}
-                      onChange={(e) => updateProduct_({ warranty: e.target.value })}
-                      placeholder="e.g. 2 years parts &amp; labor"
-                      className={inp}
-                    />
-                  </div>
-                  <div>
-                    <label className={lbl}>Level</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(attrSuggestions.levels.length > 0
-                        ? attrSuggestions.levels.map(l => ({ value: l.toLowerCase(), label: l }))
-                        : [
-                            { value: "entry", label: "Entry" },
-                            { value: "mid", label: "Mid" },
-                            { value: "premium", label: "Premium" },
-                            { value: "enterprise", label: "Enterprise" },
-                          ]
-                      ).map(({ value, label }) => {
-                        const active = product.level === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => updateProduct_({ level: active ? "" : value })}
-                            className={`px-3 h-9 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all ${
-                              active
-                                ? "border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]"
-                                : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+            {/* Purchase Options — unique to this step (not on Hero).
+                Visibility / Featured / Warranty / Level moved up to
+                Hero when we redesigned Hero as the publishing hub. */}
+            <Section id="config" icon={<Settings2Icon className="h-4 w-4" />} title="Purchase Options" badge="Head-only · Complete set">
+              <div className="space-y-3">
+                <p className="text-[11px] text-[var(--text-ghost)] italic">
+                  Which configurations can customers actually order for this product.
+                </p>
+                <Toggle checked={product.supports_head_only} onChange={(v) => updateProduct_({ supports_head_only: v })} label="Supports head-only purchase" />
+                <Toggle checked={product.supports_complete_set} onChange={(v) => updateProduct_({ supports_complete_set: v })} label="Supports complete set purchase" />
               </div>
             </Section>
 
-            {/* Advanced / Internal — collapsed by default */}
-            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title="Advanced · Internal Only" badge="MOQ · Lead Time · Slug" defaultOpen={false}>
+            {/* Fulfillment Defaults — collapsed by default. Slug and
+                Country of Origin moved to Hero; this section now
+                only holds the product-level MOQ + Lead Time that
+                cascade to new variants. */}
+            <Section id="advanced" icon={<WrenchIcon className="h-4 w-4" />} title="Fulfillment Defaults" badge="MOQ · Lead Time" defaultOpen={false}>
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={lbl}>Slug (URL Path)</label>
-                    <input
-                      type="text"
-                      value={product.slug}
-                      onChange={(e) => { setSlugEdited(true); updateProduct_({ slug: e.target.value }); }}
-                      className={`${inp} font-mono text-[var(--text-muted)]`}
-                    />
-                  </div>
-                  <div>
-                    <label className={lbl}>Country of Origin</label>
-                    <input
-                      type="text"
-                      value={product.country_of_origin}
-                      onChange={(e) => updateProduct_({ country_of_origin: e.target.value })}
-                      placeholder="e.g. China, Japan"
-                      className={inp}
-                    />
-                  </div>
-                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className={lbl}>Default MOQ (Product-level)</label>
@@ -1550,7 +1520,7 @@ export default function ProductForm({ productId }: Props) {
                       placeholder="e.g. 10"
                       className={inp}
                     />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Can be overridden per model</p>
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Per-model MOQ in the Models step overrides this.</p>
                   </div>
                   <div>
                     <label className={lbl}>Default Lead Time</label>
@@ -1561,6 +1531,7 @@ export default function ProductForm({ productId }: Props) {
                       placeholder="e.g. 7-14 days"
                       className={inp}
                     />
+                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">Per-model Lead Time in the Models step overrides this.</p>
                   </div>
                 </div>
               </div>
