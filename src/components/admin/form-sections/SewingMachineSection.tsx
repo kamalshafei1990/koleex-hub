@@ -54,6 +54,45 @@ function getGroupMeta(name: string) {
   return GROUP_META[name] || { icon: <LayersIcon className="h-3.5 w-3.5" />, color: "from-slate-500/20 to-slate-600/10 border-slate-500/30 text-slate-300" };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   FrequencyDots — 3-dot priority cue next to a field label.
+
+   Maps the spec tier to a "how common is this on real machines" hint:
+     · essential   → ●●●  (very common — almost every product has this)
+     · recommended → ●●○  (common — fill if you have the data)
+     · advanced    → ●○○  (rare / niche — only if it matters)
+
+   Renders nothing for legacy templates (no tier) so the form stays
+   visually quiet for products outside the new three-tier system.
+   ───────────────────────────────────────────────────────────────────────── */
+
+function FrequencyDots({ tier }: { tier?: "essential" | "recommended" | "advanced" }) {
+  if (!tier) return null;
+  const filled = tier === "essential" ? 3 : tier === "recommended" ? 2 : 1;
+  const tip =
+    tier === "essential"
+      ? "Very common — fill first"
+      : tier === "recommended"
+      ? "Common — nice to have"
+      : "Rare / niche";
+  return (
+    <span
+      className="inline-flex items-center gap-[2px] mr-1.5 align-middle"
+      title={tip}
+      aria-label={tip}
+    >
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`block h-[5px] w-[5px] rounded-full ${
+            i < filled ? "bg-amber-400" : "bg-amber-400/20"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
 /* ── Types ── */
 export interface SewingSpecsFormState {
   template_slug: string;
@@ -101,20 +140,17 @@ function FieldRenderer({
     "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
   const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
 
-  /* Shared label renderer — shows "⚡ Field Name *" so admins see
-     at a glance what's worth filling first (essential tier) and what
-     is mandatory (red asterisk). Number fields still append the unit
-     in parens. The ⚡ badge only appears for fields in the new
-     three-tier spec system; legacy templates leave `tier` undefined
-     and render unbadged. */
+  /* Shared label renderer. Three priority cues sit before the label
+     itself:
+       · 3-dot frequency badge (●●● / ●●○ / ●○○)  — how common is
+         this spec in real machines? Pulled from `field.tier`.
+       · Red asterisk — required field.
+     Number fields still append the unit in parens at the end. The
+     dots only appear for fields in the new three-tier spec system;
+     legacy templates leave `tier` undefined and render unbadged. */
   const renderLabel = (withUnit: boolean) => (
     <label className={lbl}>
-      {field.tier === "essential" && (
-        <ZapIcon
-          className="inline h-3 w-3 text-amber-400 mr-1 -mt-0.5"
-          aria-label="essential field"
-        />
-      )}
+      <FrequencyDots tier={field.tier} />
       {field.label}
       {field.required && (
         <span className="text-red-400 ml-0.5" aria-label="required">*</span>
@@ -233,12 +269,7 @@ function FieldRenderer({
         <div className="flex items-center justify-between py-1">
           <div>
             <span className="text-[12px] text-[var(--text-muted)] inline-flex items-center">
-              {field.tier === "essential" && (
-                <ZapIcon
-                  className="h-3 w-3 text-amber-400 mr-1.5 shrink-0"
-                  aria-label="essential field"
-                />
-              )}
+              <FrequencyDots tier={field.tier} />
               <span>{field.label}</span>
               {field.required && (
                 <span className="text-red-400 ml-0.5" aria-label="required">*</span>

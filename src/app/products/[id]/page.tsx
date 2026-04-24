@@ -73,19 +73,64 @@ import {
   groupFields,
   type TemplateField,
 } from "@/lib/sewing-machine-templates";
+import {
+  resolveSpecs,
+  hasNewSpecSystem,
+  type SpecCard as NewSpecCard,
+  type SpecField as NewSpecField,
+} from "@/lib/machine-specs";
+import { getKindBySlug } from "@/lib/machine-kinds";
 
 /* ---------------- helpers ---------------- */
 
 function formatFieldValue(field: TemplateField, raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === "") return null;
   if (field.type === "boolean") return raw ? "Yes" : "No";
-  if (field.type === "multi-select" && Array.isArray(raw)) return raw.join(", ");
+  if (field.type === "multi-select" && Array.isArray(raw)) {
+    if (raw.length === 0) return null;
+    // Map values back to labels when options are defined.
+    const labels = raw.map((v) => {
+      const opt = field.options?.find((o) => o.value === v);
+      return opt ? opt.label : String(v);
+    });
+    return labels.join(", ");
+  }
   if (field.type === "select" && field.options) {
     const opt = field.options.find(o => o.value === raw);
     return opt ? opt.label : String(raw);
   }
   const str = String(raw);
   return field.unit ? `${str} ${field.unit}` : str;
+}
+
+/* Three-dot priority cue used on the public spec sheet. Same visual
+   language as the admin form — fewer dots = rarer spec. Tooltip text
+   keeps it self-explanatory for customers who hover. */
+function FrequencyDotsPublic({ tier }: { tier?: "essential" | "recommended" | "advanced" }) {
+  if (!tier) return null;
+  const filled = tier === "essential" ? 3 : tier === "recommended" ? 2 : 1;
+  const tip =
+    tier === "essential"
+      ? "Very common spec"
+      : tier === "recommended"
+      ? "Common spec"
+      : "Specialized";
+  return (
+    <span
+      className="inline-flex items-center gap-[2px] mr-2 align-middle shrink-0"
+      title={tip}
+      aria-label={tip}
+    >
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`block h-[5px] w-[5px] rounded-full ${
+            i < filled ? "bg-[#FFB000] dark:bg-amber-400" : "bg-[#FFB000]/25 dark:bg-amber-400/20"
+          }`}
+        />
+      ))}
+    </span>
+  );
 }
 
 function fmtMoney(amount: number | null, currency = "USD"): string {
@@ -531,6 +576,75 @@ export default function ProductViewPage() {
       .map(([k, v]) => ({ key: k, value: String(v) }));
   }, [product]);
 
+  /* New three-tier spec system (lockstitch and any other family
+     registered in machine-specs/resolver). Resolves the card stack
+     for the product's subcategory + selected machine kind, then
+     formats saved values from common_specs / template_specs into
+     filled rows grouped by their visual `group` heading. Empty
+     fields are dropped so customers only see what's been entered.
+
+     Falls back to the legacy commonSpecsRendered + templateSpecsRendered
+     path when the subcategory isn't yet in the new system. */
+  const useNewSpecs = useMemo(
+    () => hasNewSpecSystem(product?.subcategory_slug),
+    [product?.subcategory_slug]
+  );
+
+  const newSpecsRendered = useMemo(() => {
+    if (!useNewSpecs || !sewingSpecs || !product) return null;
+    const kindSlug = (sewingSpecs.common_specs as Record<string, unknown> | undefined)?.machine_kind as string | undefined;
+    const resolved = resolveSpecs(product.subcategory_slug, kindSlug);
+    if (!resolved) return null;
+
+    type Row = { field: NewSpecField; value: string };
+    type GroupBlock = { group: string; rows: Row[] };
+    type CardBlock = {
+      source: "common" | "family" | "kind";
+      title: string;
+      subtitle?: string;
+      groups: GroupBlock[];
+      filled: number;
+      total: number;
+    };
+
+    const blocks: CardBlock[] = [];
+    for (const card of resolved.cards) {
+      const isCommon = card.source === "common";
+      const values = (
+        isCommon
+          ? (sewingSpecs.common_specs as Record<string, unknown> | null)
+          : (sewingSpecs.template_specs as Record<string, unknown> | null)
+      ) || {};
+
+      // Group fields by their `group` attribute, keep insertion order.
+      const groupMap = new Map<string, Row[]>();
+      for (const f of card.fields) {
+        const formatted = formatFieldValue(f as unknown as TemplateField, values[f.key]);
+        if (formatted === null) continue;
+        const g = f.group || "General";
+        if (!groupMap.has(g)) groupMap.set(g, []);
+        groupMap.get(g)!.push({ field: f, value: formatted });
+      }
+      const groups: GroupBlock[] = Array.from(groupMap.entries()).map(([group, rows]) => ({ group, rows }));
+      const filled = groups.reduce((a, g) => a + g.rows.length, 0);
+      if (filled === 0) continue;
+      blocks.push({
+        source: card.source,
+        title: card.title,
+        subtitle: card.subtitle,
+        groups,
+        filled,
+        total: card.fields.length,
+      });
+    }
+    return blocks;
+  }, [useNewSpecs, sewingSpecs, product]);
+
+  const activeKindForView = useMemo(() => {
+    const slug = (sewingSpecs?.common_specs as Record<string, unknown> | undefined)?.machine_kind as string | undefined;
+    return slug ? getKindBySlug(slug) : null;
+  }, [sewingSpecs]);
+
   const keyFeatures = useMemo<KeyFeature[]>(
     () => (product ? deriveKeyFeatures(product, sewingSpecs) : []),
     [product, sewingSpecs],
@@ -921,9 +1035,127 @@ export default function ProductViewPage() {
       )}
 
       {/* ══════════════════════════════════════
-          6. TECHNICAL SPECS — Apple clean rows style
+          6. TECHNICAL SPECS — two paths
+
+            (a) NEW three-tier renderer when the product's subcategory
+                is registered in machine-specs/resolver. Renders one
+                "spec sheet" panel per source (Universal / Family /
+                Kind) with a clear section header + 2-col table rows,
+                inspired by the catalog reference style. Frequency
+                dots inline next to each spec name.
+
+            (b) LEGACY rows-style block for everything else, kept
+                until each family gets ported.
           ══════════════════════════════════════ */}
-      {(commonSpecsRendered.length > 0 || templateSpecsRendered.length > 0 || genericSpecsRendered.length > 0) && (
+      {useNewSpecs && newSpecsRendered && newSpecsRendered.length > 0 && (
+        <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white dark:bg-[#0A0A0A]">
+          {(activeTemplate || activeKindForView) && (
+            <div className="mb-10 flex justify-center">
+              <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[13px] text-[#1D1D1F] dark:text-white/85">
+                <span className="font-medium">{activeKindForView?.name || activeTemplate?.name}</span>
+              </div>
+            </div>
+          )}
+          <div className="space-y-6">
+            {newSpecsRendered.map((block, idx) => {
+              // Per-source accent so the three blocks read as the
+              // same hierarchy as the admin form (universal / family
+              // / kind), but in the public color palette.
+              const accent =
+                block.source === "common"
+                  ? { ring: "ring-emerald-500/15 dark:ring-emerald-400/20", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/5 dark:bg-emerald-400/10" }
+                  : block.source === "family"
+                  ? { ring: "ring-blue-500/15 dark:ring-blue-400/20", text: "text-[#06C] dark:text-[#2997FF]", bg: "bg-blue-500/5 dark:bg-blue-400/10" }
+                  : { ring: "ring-violet-500/15 dark:ring-violet-400/20", text: "text-violet-700 dark:text-violet-400", bg: "bg-violet-500/5 dark:bg-violet-400/10" };
+
+              return (
+                <div
+                  key={`${block.source}-${idx}`}
+                  className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 overflow-hidden"
+                >
+                  {/* Card header — section number + title + subtitle + fill counter */}
+                  <div className="flex items-center gap-4 px-7 sm:px-8 pt-7 sm:pt-8 pb-5">
+                    <div className={`h-9 w-9 rounded-full ${accent.bg} ring-1 ${accent.ring} flex items-center justify-center shrink-0`}>
+                      <span className={`text-[13px] font-bold ${accent.text}`}>{idx + 1}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[17px] sm:text-[19px] font-semibold text-[#1D1D1F] dark:text-white leading-tight tracking-[-0.01em]">
+                        {block.title}
+                      </h3>
+                      {block.subtitle && (
+                        <p className="text-[12px] text-[#6E6E73] dark:text-white/55 mt-0.5 line-clamp-2">{block.subtitle}</p>
+                      )}
+                    </div>
+                    <span className={`hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${accent.bg} ${accent.text} ring-1 ${accent.ring} shrink-0`}>
+                      {block.filled} / {block.total}
+                    </span>
+                  </div>
+
+                  {/* Inner spec sheet — table-style rows grouped by section */}
+                  <div className="px-2 sm:px-3 pb-6">
+                    {block.groups.map((g, gIdx) => (
+                      <div key={g.group} className={gIdx > 0 ? "mt-5" : ""}>
+                        <div className="flex items-baseline gap-2 px-5 sm:px-6 mb-2">
+                          <span className={`text-[10px] font-bold uppercase tracking-[0.08em] ${accent.text}`}>
+                            {g.group}
+                          </span>
+                          <div className="h-px flex-1 bg-[#D2D2D7]/60 dark:bg-white/[0.06]" />
+                        </div>
+                        <dl className="rounded-2xl bg-white dark:bg-white/[0.025] dark:ring-1 dark:ring-white/[0.05] overflow-hidden">
+                          {/* Column header — gives the reference "spec sheet" feel without breaking layout */}
+                          <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-4 px-6 py-2.5 border-b border-[#D2D2D7]/70 dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-white/[0.02]">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Specification</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Value</span>
+                          </div>
+                          {g.rows.map(({ field, value }, rIdx) => (
+                            <div
+                              key={field.key}
+                              className={`grid grid-cols-1 sm:grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-x-4 gap-y-1 px-6 py-3.5 ${
+                                rIdx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]" : ""
+                              } ${rIdx % 2 === 1 ? "bg-[#FAFAFA]/60 dark:bg-white/[0.012]" : ""}`}
+                            >
+                              <dt className="flex items-center text-[13px] text-[#1D1D1F] dark:text-white/85 font-medium">
+                                <FrequencyDotsPublic tier={field.tier} />
+                                {field.label}
+                              </dt>
+                              <dd className="text-[13px] text-[#1D1D1F] dark:text-white sm:font-medium leading-snug">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {genericSpecsRendered.length > 0 && (
+              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
+                    <WrenchIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                  </div>
+                  <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
+                    Additional
+                  </h3>
+                </div>
+                <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
+                  {genericSpecsRendered.map(({ key, value }, idx) => (
+                    <div key={key} className={`flex justify-between items-baseline gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}>
+                      <dt className="text-[13px] text-[#6E6E73] dark:text-white/55 capitalize">{key.replace(/_/g, " ")}</dt>
+                      <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {!useNewSpecs && (commonSpecsRendered.length > 0 || templateSpecsRendered.length > 0 || genericSpecsRendered.length > 0) && (
         <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white dark:bg-[#0A0A0A]">
           {activeTemplate && (
             <div className="mb-12 flex justify-center">
