@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import ShirtIcon from "@/components/icons/ui/ShirtIcon";
 import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
 import CogIcon from "@/components/icons/ui/CogIcon";
@@ -25,6 +25,12 @@ import {
   getKindBySlug,
   type MachineKind,
 } from "@/lib/machine-kinds";
+import {
+  resolveSpecs,
+  hasNewSpecSystem,
+  type SpecCard as NewSpecCard,
+  type SpecField as NewSpecField,
+} from "@/lib/machine-specs";
 
 /* ── Icons and colors for each group ── */
 const GROUP_META: Record<string, { icon: React.ReactNode; color: string }> = {
@@ -362,6 +368,207 @@ function MachineKindPicker({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   SpecCardRenderer — renders one three-tier card (Common / Family / Kind)
+
+   Progressive disclosure:
+     · "Essential" + "Recommended" fields render by default
+     · "Advanced" fields collapse behind a "Show advanced" toggle so
+       the form doesn't overwhelm on first open
+
+   The FieldRenderer used below was built for the old TemplateField
+   shape, but the new SpecField type is structurally compatible with
+   it (same required render properties) — we just cast.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SpecCardRenderer({
+  card,
+  values,
+  onChange,
+  accentClass,
+  kindIcon,
+}: {
+  card: NewSpecCard;
+  values: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
+  accentClass: string;
+  kindIcon?: React.ReactNode;
+}) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  /* Split fields into always-visible vs advanced. Keep them inside
+     their group so a group with only advanced fields folds entirely. */
+  const visibleFields = card.fields.filter((f) => f.tier !== "advanced");
+  const advancedFields = card.fields.filter((f) => f.tier === "advanced");
+
+  /* Group the visible fields by their `group` attribute so the
+     card renders sub-headings like "Performance" / "Automation". */
+  const groupFieldsByHeading = (fields: NewSpecField[]) => {
+    const groups: { group: string; fields: NewSpecField[] }[] = [];
+    const map = new Map<string, NewSpecField[]>();
+    for (const f of fields) {
+      const g = f.group || "General";
+      if (!map.has(g)) {
+        map.set(g, []);
+        groups.push({ group: g, fields: map.get(g)! });
+      }
+      map.get(g)!.push(f);
+    }
+    return groups;
+  };
+
+  const visibleGroups = groupFieldsByHeading(visibleFields);
+  const advancedGroups = groupFieldsByHeading(advancedFields);
+
+  // Fill counter — helps admins see progress per card at a glance.
+  const filled = card.fields.filter((f) => {
+    const v = values[f.key];
+    return v !== "" && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0);
+  }).length;
+
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+        <div className={`h-10 w-10 rounded-xl bg-gradient-to-br border flex items-center justify-center ${accentClass}`}>
+          {kindIcon || <Settings2Icon className="h-4 w-4" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{card.title}</h3>
+          {card.subtitle && (
+            <p className="text-[11px] text-[var(--text-ghost)] truncate">{card.subtitle}</p>
+          )}
+        </div>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${accentClass}`}>
+          {filled} / {card.fields.length}
+        </span>
+      </div>
+
+      {/* Visible (essential + recommended) groups */}
+      <div className="space-y-2">
+        {visibleGroups.map((g) => (
+          <FieldGroup
+            key={g.group}
+            groupLabel={g.group}
+            fields={g.fields as unknown as TemplateField[]}
+            values={values}
+            onChange={onChange}
+          />
+        ))}
+      </div>
+
+      {/* Advanced section — collapsed by default. Rendered only
+          when the card actually has advanced fields, so tight
+          cards (like most kind extras) don't show a dead toggle. */}
+      {advancedGroups.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]/60">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <AngleDownIconLocal className={`h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            {showAdvanced ? "Hide advanced" : `Show advanced (${advancedFields.length})`}
+          </button>
+          {showAdvanced && (
+            <div className="space-y-2 mt-3">
+              {advancedGroups.map((g) => (
+                <FieldGroup
+                  key={g.group}
+                  groupLabel={g.group}
+                  fields={g.fields as unknown as TemplateField[]}
+                  values={values}
+                  onChange={onChange}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Tiny local angle-down icon so we don't add another import for one
+   usage inside the progressive-disclosure toggle. */
+function AngleDownIconLocal({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NewSpecsRender — three-tier renderer (Common / Family / Kind)
+
+   Resolves the card stack via `resolveSpecs(subcategory, kind)`, then
+   renders one SpecCardRenderer per card with the right save target:
+
+     · source === "common" → writes to data.common_specs
+     · source === "family" or "kind" → writes to data.template_specs
+
+   Storage keeps the existing two-bucket schema. The new family/kind
+   field keys are namespaced (ls_*, wf_*, hd_*, ...) so they never
+   collide with old-template keys still living in template_specs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function NewSpecsRender({
+  subcategorySlug,
+  activeKindSlug,
+  activeKindIcon,
+  data,
+  handleCommonChange,
+  handleTemplateSpecChange,
+}: {
+  subcategorySlug: string;
+  activeKindSlug: string;
+  activeKindIcon: React.ReactNode | null;
+  data: SewingSpecsFormState;
+  handleCommonChange: (key: string, value: unknown) => void;
+  handleTemplateSpecChange: (key: string, value: unknown) => void;
+}) {
+  const resolved = useMemo(
+    () => resolveSpecs(subcategorySlug, activeKindSlug),
+    [subcategorySlug, activeKindSlug]
+  );
+
+  if (!resolved) return null;
+
+  /* Per-card accent — visual cue for what tier the card represents.
+     Common = emerald (universal), Family = blue (subcategory),
+     Kind = violet (specialized extras). */
+  const accentFor = (card: NewSpecCard) => {
+    if (card.source === "common") {
+      return "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400";
+    }
+    if (card.source === "family") {
+      return "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400";
+    }
+    return "from-violet-500/20 to-violet-600/10 border-violet-500/30 text-violet-400";
+  };
+
+  return (
+    <div className="space-y-6">
+      {resolved.cards.map((card, idx) => {
+        const isCommon = card.source === "common";
+        const values = isCommon ? data.common_specs : data.template_specs;
+        const onChange = isCommon ? handleCommonChange : handleTemplateSpecChange;
+        return (
+          <SpecCardRenderer
+            key={`${card.source}-${idx}`}
+            card={card}
+            values={values}
+            onChange={onChange}
+            accentClass={accentFor(card)}
+            kindIcon={card.source === "kind" ? activeKindIcon : undefined}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -488,66 +695,83 @@ export default function SewingMachineSection({ data, onChange, subcategorySlug, 
         </div>
       )}
 
-      {/* Specs fields — shown in "full" and "specs" modes */}
+      {/* Specs fields — shown in "full" and "specs" modes.
+          Two paths:
+            1. New three-tier system (Common + Family + optional Kind)
+               for subcategories registered in machine-specs/resolver.
+            2. Legacy Common + Template layout for everything else,
+               kept as-is until each family is ported. */}
       {(mode === "full" || mode === "specs") && activeTemplateSlug && (
         <>
-          {/* ── Common Fields Section ── */}
-          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center">
-                <Settings2Icon className="h-4 w-4 text-emerald-400" />
+          {hasNewSpecSystem(subcategorySlug) ? (
+            <NewSpecsRender
+              subcategorySlug={subcategorySlug}
+              activeKindSlug={activeKindSlug}
+              activeKindIcon={
+                activeKind ? <activeKind.icon size={18} /> : null
+              }
+              data={data}
+              handleCommonChange={handleCommonChange}
+              handleTemplateSpecChange={handleTemplateSpecChange}
+            />
+          ) : (
+            <>
+              {/* ── Common Fields Section ── */}
+              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 flex items-center justify-center">
+                    <Settings2Icon className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Common Sewing Specs</h3>
+                    <p className="text-[11px] text-[var(--text-ghost)]">Performance · Needle &amp; Thread · Mechanical · Physical · Application · Automation</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                    {filledCommon} / {COMMON_SEWING_FIELDS.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {commonGroups.map((g) => (
+                    <FieldGroup
+                      key={g.group}
+                      groupLabel={g.group}
+                      fields={g.fields}
+                      values={data.common_specs}
+                      onChange={handleCommonChange}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Common Sewing Specs</h3>
-                <p className="text-[11px] text-[var(--text-ghost)]">Performance · Needle &amp; Thread · Mechanical · Physical · Application · Automation</p>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-                {filledCommon} / {COMMON_SEWING_FIELDS.length}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {commonGroups.map((g) => (
-                <FieldGroup
-                  key={g.group}
-                  groupLabel={g.group}
-                  fields={g.fields}
-                  values={data.common_specs}
-                  onChange={handleCommonChange}
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* ── Template-Specific Fields Section ── */}
-          {activeTemplate && templateGroups.length > 0 && (
-            <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
-              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-                {/* Machine kind SVG icon when available, else a generic
-                    Settings glyph. The template emoji was dropped
-                    alongside the old Template Picker. */}
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                  {activeKind ? <activeKind.icon size={18} /> : <Settings2Icon className="h-4 w-4" />}
+              {/* ── Template-Specific Fields Section ── */}
+              {activeTemplate && templateGroups.length > 0 && (
+                <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-5">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                      {activeKind ? <activeKind.icon size={18} /> : <Settings2Icon className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{activeTemplate.name} Specs</h3>
+                      <p className="text-[11px] text-[var(--text-ghost)]">{activeTemplate.description}</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+                      {filledTemplate} / {activeTemplate.fields.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {templateGroups.map((g) => (
+                      <FieldGroup
+                        key={g.group}
+                        groupLabel={g.group}
+                        fields={g.fields}
+                        values={data.template_specs}
+                        onChange={handleTemplateSpecChange}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{activeTemplate.name} Specs</h3>
-                  <p className="text-[11px] text-[var(--text-ghost)]">{activeTemplate.description}</p>
-                </div>
-                <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
-                  {filledTemplate} / {activeTemplate.fields.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {templateGroups.map((g) => (
-                  <FieldGroup
-                    key={g.group}
-                    groupLabel={g.group}
-                    fields={g.fields}
-                    values={data.template_specs}
-                    onChange={handleTemplateSpecChange}
-                  />
-                ))}
-              </div>
-            </div>
+              )}
+            </>
           )}
         </>
       )}
