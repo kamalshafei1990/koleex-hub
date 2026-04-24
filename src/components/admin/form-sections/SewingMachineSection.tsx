@@ -101,11 +101,20 @@ function FieldRenderer({
     "w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
   const lbl = "block text-[11px] font-medium text-[var(--text-faint)] mb-1";
 
-  /* Shared label renderer — shows "Field Name *" in red for
-     required fields so admins see at a glance what has to be
-     filled. Number fields still append the unit in parens. */
+  /* Shared label renderer — shows "⚡ Field Name *" so admins see
+     at a glance what's worth filling first (essential tier) and what
+     is mandatory (red asterisk). Number fields still append the unit
+     in parens. The ⚡ badge only appears for fields in the new
+     three-tier spec system; legacy templates leave `tier` undefined
+     and render unbadged. */
   const renderLabel = (withUnit: boolean) => (
     <label className={lbl}>
+      {field.tier === "essential" && (
+        <ZapIcon
+          className="inline h-3 w-3 text-amber-400 mr-1 -mt-0.5"
+          aria-label="essential field"
+        />
+      )}
       {field.label}
       {field.required && (
         <span className="text-red-400 ml-0.5" aria-label="required">*</span>
@@ -223,8 +232,14 @@ function FieldRenderer({
       return (
         <div className="flex items-center justify-between py-1">
           <div>
-            <span className="text-[12px] text-[var(--text-muted)]">
-              {field.label}
+            <span className="text-[12px] text-[var(--text-muted)] inline-flex items-center">
+              {field.tier === "essential" && (
+                <ZapIcon
+                  className="h-3 w-3 text-amber-400 mr-1.5 shrink-0"
+                  aria-label="essential field"
+                />
+              )}
+              <span>{field.label}</span>
               {field.required && (
                 <span className="text-red-400 ml-0.5" aria-label="required">*</span>
               )}
@@ -499,6 +514,100 @@ function AngleDownIconLocal({ className }: { className?: string }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   SpecsProgressBar — sticky step-level progress
+
+   Three thin segmented bars (Common / Family / Kind) plus an overall
+   "X / N fields filled" counter. Sticks to the top of the Specs step
+   so admins always know how much is left, regardless of which card
+   they're scrolled to.
+
+   Color matches each card's accent (emerald / blue / violet) so the
+   bars and the cards read as the same system.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SpecsProgressBar({
+  cards,
+  data,
+}: {
+  cards: NewSpecCard[];
+  data: SewingSpecsFormState;
+}) {
+  // One stat row per card. Pulls values from the right bucket since
+  // common saves to common_specs and family/kind save to template_specs.
+  const stats = cards.map((card) => {
+    const isCommon = card.source === "common";
+    const values = isCommon ? data.common_specs : data.template_specs;
+    const filled = card.fields.filter((f) => {
+      const v = values[f.key];
+      return (
+        v !== "" && v !== null && v !== undefined &&
+        !(Array.isArray(v) && v.length === 0)
+      );
+    }).length;
+    const total = card.fields.length;
+    const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+    const fill =
+      card.source === "common"
+        ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
+        : card.source === "family"
+        ? "bg-gradient-to-r from-blue-500 to-blue-400"
+        : "bg-gradient-to-r from-violet-500 to-violet-400";
+    const text =
+      card.source === "common"
+        ? "text-emerald-400"
+        : card.source === "family"
+        ? "text-blue-400"
+        : "text-violet-400";
+    return { label: card.title, filled, total, pct, fill, text };
+  });
+
+  const totalFilled = stats.reduce((a, s) => a + s.filled, 0);
+  const totalFields = stats.reduce((a, s) => a + s.total, 0);
+  const overallPct = totalFields > 0 ? Math.round((totalFilled / totalFields) * 100) : 0;
+
+  return (
+    <div className="sticky top-0 z-20 -mx-1 px-1">
+      <div className="bg-[var(--bg-primary)]/85 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Specs progress
+            </span>
+            <span className="text-[10px] font-semibold text-[var(--text-ghost)]">
+              {overallPct}%
+            </span>
+          </div>
+          <span className="text-[10px] font-semibold text-[var(--text-dim)] tabular-nums">
+            {totalFilled}
+            <span className="text-[var(--text-ghost)]"> / {totalFields} fields</span>
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {stats.map((s) => (
+            <div key={s.label} className="min-w-0">
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <span className={`text-[10px] font-semibold uppercase tracking-wide ${s.text} truncate`}>
+                  {s.label}
+                </span>
+                <span className="text-[10px] text-[var(--text-ghost)] tabular-nums shrink-0">
+                  {s.filled}/{s.total}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${s.fill}`}
+                  style={{ width: `${s.pct}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    NewSpecsRender — three-tier renderer (Common / Family / Kind)
 
    Resolves the card stack via `resolveSpecs(subcategory, kind)`, then
@@ -549,6 +658,11 @@ function NewSpecsRender({
 
   return (
     <div className="space-y-6">
+      {/* Sticky progress bar — one row per resolved card. Sits above
+          the card stack so the admin sees overall completion no
+          matter which card they're filling. */}
+      <SpecsProgressBar cards={resolved.cards} data={data} />
+
       {resolved.cards.map((card, idx) => {
         const isCommon = card.source === "common";
         const values = isCommon ? data.common_specs : data.template_specs;

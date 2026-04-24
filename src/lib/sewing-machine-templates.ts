@@ -33,6 +33,11 @@ export interface TemplateField {
   required?: boolean;
   helpText?: string;
   group?: string;        // visual grouping header
+  /* Optional priority cue from the new three-tier spec system.
+     "essential" fields render with a ⚡ badge so admins know
+     what's worth filling first. Legacy templates leave this
+     undefined and render unbadged. */
+  tier?: "essential" | "recommended" | "advanced";
 }
 
 export interface SewingMachineTemplate {
