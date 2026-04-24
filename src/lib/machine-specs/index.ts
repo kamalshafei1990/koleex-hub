@@ -13,12 +13,12 @@ export type {
 
 export { COMMON_FIELDS } from "./common";
 export { resolveSpecs, hasNewSpecSystem } from "./resolver";
+export { default as SpecGlyph } from "./SpecGlyph";
 export {
-  FIELD_ICONS,
-  GROUP_ICONS,
-  CARD_ICONS,
-  getFieldIcon,
-  getGroupIcon,
-  getCardIcon,
-  type SpecIconComponent,
+  FIELD_GLYPHS,
+  GROUP_GLYPHS,
+  CARD_GLYPHS,
+  getFieldGlyph,
+  getGroupGlyph,
+  getCardGlyph,
 } from "./icons";

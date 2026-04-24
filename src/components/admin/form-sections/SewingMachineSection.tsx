@@ -28,9 +28,10 @@ import {
 import {
   resolveSpecs,
   hasNewSpecSystem,
-  getFieldIcon,
-  getGroupIcon,
-  getCardIcon,
+  SpecGlyph,
+  getFieldGlyph,
+  getGroupGlyph,
+  getCardGlyph,
   type SpecCard as NewSpecCard,
   type SpecField as NewSpecField,
 } from "@/lib/machine-specs";
@@ -578,16 +579,13 @@ function SpecRow({
     >
       {/* Label cell */}
       <div className="flex items-center gap-1.5 min-w-0">
-        {(() => {
-          const FieldIcon = getFieldIcon(field.key);
-          return (
-            <FieldIcon
-              className={`h-3.5 w-3.5 shrink-0 ${
-                filled ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
-              }`}
-            />
-          );
-        })()}
+        <SpecGlyph
+          name={getFieldGlyph(field.key)}
+          size={14}
+          className={`shrink-0 ${
+            filled ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
+          }`}
+        />
         <FrequencyDots tier={field.tier} />
         <span
           className={`text-[12.5px] ${
@@ -642,7 +640,6 @@ function SpecRowGroup({
   onChange,
   collapsed,
   onToggleCollapse,
-  accentText,
 }: {
   group: string;
   fields: TemplateField[];
@@ -650,7 +647,6 @@ function SpecRowGroup({
   onChange: (key: string, value: unknown) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  accentText: string;
 }) {
   const filledCount = fields.filter((f) => {
     const v = values[f.key];
@@ -658,7 +654,6 @@ function SpecRowGroup({
   }).length;
   const allFilled = filledCount === fields.length;
 
-  const GroupIcon = getGroupIcon(group);
   return (
     <div className="mb-1 last:mb-0">
       <button
@@ -667,8 +662,12 @@ function SpecRowGroup({
         className="w-full flex items-center gap-2.5 px-4 pt-4 pb-2 group/header cursor-pointer"
         aria-expanded={!collapsed}
       >
-        <GroupIcon className={`h-3.5 w-3.5 shrink-0 ${accentText} opacity-90`} />
-        <span className={`text-[10px] font-bold uppercase tracking-[0.1em] ${accentText}`}>
+        <SpecGlyph
+          name={getGroupGlyph(group)}
+          size={14}
+          className="shrink-0 text-[var(--text-faint)]"
+        />
+        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-faint)]">
           {group}
         </span>
         <div className="h-px flex-1 bg-[var(--border-subtle)]/40" />
@@ -720,7 +719,6 @@ function SpecCardRenderer({
   card,
   values,
   onChange,
-  accentClass,
   accentText,
   accentEdge,
   stepNumber,
@@ -730,8 +728,11 @@ function SpecCardRenderer({
   card: NewSpecCard;
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
-  accentClass: string;
+  /* Tier color used ONLY for the digit inside the numbered badge
+     and the small dot — never for whole-card chrome. Keeps the page
+     visually quiet while still cueing common / family / kind. */
   accentText: string;
+  /* Tier color for the tiny dot on the numbered badge. */
   accentEdge: string;
   stepNumber: number;
   anchorId: string;
@@ -785,36 +786,34 @@ function SpecCardRenderer({
   return (
     <div
       id={anchorId}
-      className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden scroll-mt-28"
+      className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden scroll-mt-28"
     >
-      {/* Slim colored left-edge accent — same color as the card's
-          tier (emerald / blue / violet). Replaces the old gradient
-          icon chip for a cleaner spec-sheet feel. */}
-      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accentEdge}`} />
-
       {/* Header — numbered step badge + card icon + title + subtitle
-          + fill pill. The number gives a sense of "step N of M" and
-          the card icon (Settings2 / Package / Sparkles) reinforces
-          which tier you're looking at: universal / family / kind. */}
-      <div className="flex items-center gap-3 pl-5 pr-5 py-4 border-b border-[var(--border-subtle)]">
-        <div className={`h-7 w-7 rounded-full bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
+          + fill counter. Layout matches the rest of the hub: neutral
+          chrome with one small tier dot. The single colored mark is
+          the digit inside the numbered badge — keeps the tier
+          identity readable without flooding the page with green/blue/
+          violet. */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className="h-7 w-7 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 relative">
           <span className={`text-[12px] font-bold tabular-nums ${accentText}`}>{stepNumber}</span>
+          {/* Tiny tier dot — the only spot of color on the card. */}
+          <span className={`absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ${accentEdge}`} />
         </div>
-        {(() => {
-          const CardIcon = getCardIcon(card.source);
-          return (
-            <div className={`h-7 w-7 rounded-lg bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
-              <CardIcon className={`h-3.5 w-3.5 ${accentText}`} />
-            </div>
-          );
-        })()}
+        <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+          <SpecGlyph
+            name={getCardGlyph(card.source)}
+            size={14}
+            className="text-[var(--text-muted)]"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
           {card.subtitle && (
             <p className="text-[11px] text-[var(--text-ghost)] truncate mt-0.5">{card.subtitle}</p>
           )}
         </div>
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border tabular-nums shrink-0 ${accentClass}`}>
+        <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] tabular-nums shrink-0 text-[var(--text-muted)]">
           {filled} / {card.fields.length}
         </span>
       </div>
@@ -837,7 +836,6 @@ function SpecCardRenderer({
             onChange={onChange}
             collapsed={!!collapsed[g.group]}
             onToggleCollapse={() => toggleGroup(g.group)}
-            accentText={accentText}
           />
         ))}
       </div>
@@ -865,7 +863,6 @@ function SpecCardRenderer({
                   onChange={onChange}
                   collapsed={!!collapsed[g.group]}
                   onToggleCollapse={() => toggleGroup(g.group)}
-                  accentText={accentText}
                 />
               ))}
             </div>
@@ -951,11 +948,11 @@ function SpecsProgressBar({
     <div className="sticky top-0 z-20 -mx-1 px-1">
       <div className="bg-[var(--bg-primary)]/92 backdrop-blur-md border border-[var(--border-subtle)] rounded-2xl px-5 py-3.5 shadow-sm">
         {/* Header row — overall progress + required-only toggle.
-            No redundant second "Row 2" of chips; the card rows below
-            double as jump links. */}
+            Neutral palette throughout; the only colored marks are
+            the small tier dots in the card rows below. */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-baseline gap-2 min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-faint)]">
               Specs progress
             </span>
             <span className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums">
@@ -970,19 +967,18 @@ function SpecsProgressBar({
             onClick={onToggleRequiredOnly}
             className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border transition-colors cursor-pointer shrink-0 ${
               requiredOnly
-                ? "bg-red-500/15 border-red-500/40 text-red-400"
+                ? "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
                 : "bg-[var(--bg-inverted)]/[0.03] border-[var(--border-subtle)] text-[var(--text-ghost)] hover:border-[var(--border-focus)] hover:text-[var(--text-muted)]"
             }`}
             title="Show only required fields"
           >
-            <span className="text-red-400 text-[11px] leading-none">*</span>
+            <span className="text-red-400/80 text-[11px] leading-none">*</span>
             Required only
           </button>
         </div>
 
-        {/* One compact row per card — label, bar, X/Y. The whole row
-            is a jump link to that card's anchor. Replaces the old
-            duplicate chip-row + bar-row pair. */}
+        {/* One compact row per card — tier dot, label, bar, X/Y. The
+            whole row is a jump link to that card's anchor. */}
         <div className="space-y-2">
           {stats.map((s, idx) => (
             <button
@@ -994,13 +990,13 @@ function SpecsProgressBar({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor(s.source)}`} />
-                <span className={`text-[11px] font-semibold ${s.text} truncate text-left`}>
+                <span className="text-[11px] font-semibold text-[var(--text-muted)] truncate text-left">
                   {s.label}
                 </span>
               </div>
               <div className="h-1 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${s.fill}`}
+                  className="h-full rounded-full bg-[var(--text-muted)]/40 transition-all duration-300"
                   style={{ width: `${s.pct}%` }}
                 />
               </div>
@@ -1051,19 +1047,11 @@ function NewSpecsRender({
 
   if (!resolved) return null;
 
-  /* Per-card accent — visual cue for what tier the card represents.
-     Common = emerald (universal), Family = blue (subcategory),
-     Kind = violet (specialized extras). */
-  const accentFor = (card: NewSpecCard) => {
-    if (card.source === "common") {
-      return "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400";
-    }
-    if (card.source === "family") {
-      return "from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400";
-    }
-    return "from-violet-500/20 to-violet-600/10 border-violet-500/30 text-violet-400";
-  };
-
+  /* Tier color maps. Used ONLY for the small digit inside the
+     numbered badge and the tiny tier dot — never for whole-card
+     chrome. The page stays neutral with the rest of the hub; the
+     three-tier identity comes through the icon, the title, and the
+     subtle dot. */
   const accentTextFor = (card: NewSpecCard) => {
     if (card.source === "common") return "text-emerald-400";
     if (card.source === "family") return "text-blue-400";
@@ -1071,9 +1059,9 @@ function NewSpecsRender({
   };
 
   const accentEdgeFor = (card: NewSpecCard) => {
-    if (card.source === "common") return "bg-emerald-500/70";
-    if (card.source === "family") return "bg-blue-500/70";
-    return "bg-violet-500/70";
+    if (card.source === "common") return "bg-emerald-400";
+    if (card.source === "family") return "bg-blue-400";
+    return "bg-violet-400";
   };
 
   const anchorIdFor = (card: NewSpecCard, idx: number) =>
@@ -1110,7 +1098,6 @@ function NewSpecsRender({
             card={card}
             values={values}
             onChange={onChange}
-            accentClass={accentFor(card)}
             accentText={accentTextFor(card)}
             accentEdge={accentEdgeFor(card)}
             stepNumber={idx + 1}
