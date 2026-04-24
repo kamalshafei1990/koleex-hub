@@ -78,13 +78,30 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
      nothing. Restored just before the exec call. */
   const savedRangeRef = useRef<Range | null>(null);
 
-  // Sync external value → editor content (only when editor not focused)
+  /* The last HTML string this component emitted via onChange. Used
+     by the sync effect below to distinguish "the parent is echoing
+     back what I just typed" (skip — would reset the caret) from
+     "the parent is injecting something new" (apply — e.g. the
+     Description step's Quick Start Block buttons setting the
+     editor content programmatically). The old `activeElement ===
+     editor` guard blocked BOTH cases, so Quick Start Blocks had
+     no visible effect while the editor was focused. */
+  const lastEmittedRef = useRef<string>("");
+
+  // Sync external value → editor content, preserving caret position
+  // when the update is our own echo.
   useEffect(() => {
     if (!editorRef.current) return;
-    if (document.activeElement === editorRef.current) return;
-    if (editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || "";
-    }
+    // Already matches the DOM — nothing to do.
+    if (editorRef.current.innerHTML === (value || "")) return;
+    // If the incoming value is exactly the string we last emitted,
+    // this is our own echo from an onInput — don't touch the DOM,
+    // otherwise we'd jump the caret to position 0 on every keystroke.
+    if (value === lastEmittedRef.current) return;
+    // Otherwise it's a genuine external update — apply it even if
+    // the editor is currently focused.
+    editorRef.current.innerHTML = value || "";
+    lastEmittedRef.current = value || "";
   }, [value]);
 
   const updateActive = useCallback(() => {
@@ -103,12 +120,22 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
   const exec = useCallback((command: string, arg?: string) => {
     editorRef.current?.focus();
     document.execCommand(command, false, arg);
-    if (editorRef.current) onChange(editorRef.current.innerHTML);
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      /* Tag this as our own emission so the sync effect won't
+         try to re-write the DOM (which would collapse the caret). */
+      lastEmittedRef.current = html;
+      onChange(html);
+    }
     updateActive();
   }, [onChange, updateActive]);
 
   const handleInput = () => {
-    if (editorRef.current) onChange(editorRef.current.innerHTML);
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      lastEmittedRef.current = html;
+      onChange(html);
+    }
     updateActive();
   };
 
