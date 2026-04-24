@@ -116,16 +116,17 @@ interface WizardStep {
 }
 
 function getSteps(isSewing: boolean): WizardStep[] {
+  /* Machine Kind used to be its own step (id: "machine-type") but
+     it's really a 4th-tier classification decision — Division →
+     Category → Subcategory → Kind — so it now lives INSIDE the
+     Classify step. Keeping the wizard at 7 / 8 steps instead of
+     8 / 9 and aligning the admin's mental model with how customers
+     browse the catalog. */
   const steps: WizardStep[] = [
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
-  ];
-  if (isSewing) {
-    steps.push({ id: "machine-type", label: "Machine Type", shortLabel: "Machine Type", icon: <FactoryIcon className="h-4 w-4" />, conditional: true });
-  }
-  steps.push(
     { id: "identity", label: "Hero & Identity", shortLabel: "Hero", icon: <SparklesIcon className="h-4 w-4" /> },
     { id: "description", label: "Description", shortLabel: "Description", icon: <DocumentIcon className="h-4 w-4" /> },
-  );
+  ];
   if (isSewing) {
     steps.push({ id: "sewing-specs", label: "Machine Specs", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" />, conditional: true });
   }
@@ -510,32 +511,31 @@ export default function ProductForm({ productId }: Props) {
     });
   }, []);
 
-  /* ── Classification-gated lock ── */
-  const classificationComplete =
-    !!product.division_slug && !!product.category_slug && !!product.subcategory_slug;
-
-  /* Sewing flow unlocks the "Specs" step only after the admin has
-     picked a specific machine KIND (e.g. Walking-Foot Lockstitch)
-     — the kind carries its own template_slug, so checking the kind
-     is equivalent to checking the template plus guarantees the
-     admin actually clicked through the Machine Type picker. Fall
-     back to template_slug for products saved before the kind
-     selector shipped. */
-  const machineTypeComplete =
-    !isSewing ||
+  /* ── Classification-gated lock ──
+     For sewing products, classification now includes the machine
+     kind (the 4th tier inside Classify). For everything else it's
+     still Division → Category → Subcategory. The kind slug rides
+     inside sewingSpecs.common_specs.machine_kind; template_slug is
+     kept as a back-compat fallback for products saved before the
+     kind selector shipped. */
+  const machineKindChosen =
     !!(sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind ||
     !!sewingSpecs.template_slug;
+
+  const classificationComplete =
+    !!product.division_slug &&
+    !!product.category_slug &&
+    !!product.subcategory_slug &&
+    (!isSewing || machineKindChosen);
 
   const lockedSteps = useMemo(() => {
     const set = new Set<number>();
     steps.forEach((s, i) => {
       // Everything after classify is locked until classification is complete
       if (s.id !== "classify" && !classificationComplete) set.add(i);
-      // The "sewing-specs" step also requires a machine-type selection
-      if (s.id === "sewing-specs" && !machineTypeComplete) set.add(i);
     });
     return set;
-  }, [steps, classificationComplete, machineTypeComplete]);
+  }, [steps, classificationComplete]);
 
   /* ── Step navigation ── */
   const goToStep = (idx: number) => {
@@ -567,10 +567,10 @@ export default function ProductForm({ productId }: Props) {
     if (stepId === "classify") {
       if (!product.division_slug || !product.category_slug || !product.subcategory_slug)
         return "Pick division, category and subcategory before continuing";
-    }
-    if (stepId === "machine-type") {
-      if (isSewing && !sewingSpecs.template_slug)
-        return "Select a machine type to continue";
+      /* Machine kind is the 4th classification tier for sewing
+         products — don't let the admin leave Classify without it. */
+      if (isSewing && !machineKindChosen)
+        return "Pick a machine kind to finish classification";
     }
     if (stepId === "identity") {
       if (!product.product_name.trim()) return "Product name is required";
@@ -1110,7 +1110,12 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "classify" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="classification" icon={<FolderTreeIcon className="h-4 w-4" />} title="Classification" badge="Division · Category · Subcategory">
+            <Section
+              id="classification"
+              icon={<FolderTreeIcon className="h-4 w-4" />}
+              title="Classification"
+              badge={isSewing ? "Division · Category · Subcategory · Kind" : "Division · Category · Subcategory"}
+            >
               <ClassificationSection
                 data={product}
                 onChange={updateProduct_}
@@ -1123,6 +1128,39 @@ export default function ProductForm({ productId }: Props) {
                 onClickCreateDivision={() => setShowDivisionModal(true)}
                 onClickCreateCategory={() => setShowCategoryModal(true)}
                 onClickCreateSubcategory={() => setShowSubcategoryModal(true)}
+                /* 4th classification tier: machine kind for sewing
+                   products. ClassificationSection only renders the
+                   kind step when the subcategory has kinds in the
+                   catalog AND onMachineKindChange is wired. */
+                machineKindSlug={
+                  (sewingSpecs.common_specs as { machine_kind?: string })?.machine_kind || ""
+                }
+                onMachineKindChange={(kind) => {
+                  /* Empty-slug kind = "clear the kind" (breadcrumb
+                     chip was clicked). Reset machine_kind and keep
+                     template_specs shape since we're not switching
+                     to a new template. */
+                  if (!kind.slug) {
+                    setSewingSpecs({
+                      ...sewingSpecs,
+                      common_specs: {
+                        ...sewingSpecs.common_specs,
+                        machine_kind: "",
+                      },
+                    });
+                    return;
+                  }
+                  const templateChanged = kind.templateSlug !== sewingSpecs.template_slug;
+                  setSewingSpecs({
+                    ...sewingSpecs,
+                    template_slug: kind.templateSlug,
+                    template_specs: templateChanged ? {} : sewingSpecs.template_specs,
+                    common_specs: {
+                      ...sewingSpecs.common_specs,
+                      machine_kind: kind.slug,
+                    },
+                  });
+                }}
               />
             </Section>
           </div>
@@ -1154,29 +1192,10 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-           STEP: MACHINE TYPE (conditional — right after classification)
-           ═══════════════════════════════════════════════════════════ */}
-        {steps[currentStep]?.id === "machine-type" && (
-          <div className="space-y-5 animate-in fade-in duration-300">
-            <Section id="machine-type" icon={<FactoryIcon className="h-4 w-4" />} title="Machine Type" badge="Template">
-              <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
-                <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
-                  Choose the machine type that best describes this product. The spec fields, defaults, and
-                  visual structure in later steps are driven by this choice — pick carefully.
-                </p>
-              </div>
-              <SewingMachineSection
-                data={sewingSpecs}
-                onChange={setSewingSpecs}
-                subcategorySlug={product.subcategory_slug}
-                mode="template"
-              />
-            </Section>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
            STEP: SEWING MACHINE SPECS (conditional — after description)
+           Machine Type is now a 4th tier inside the Classify step,
+           so this step only renders the dynamic spec fields driven
+           by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "sewing-specs" && (
           <div className="space-y-5 animate-in fade-in duration-300">
