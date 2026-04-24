@@ -17,6 +17,7 @@ import UploadIcon from "@/components/icons/ui/UploadIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import { slugify } from "@/types/product-form";
+import ConfirmDialog from "./form-sections/ConfirmDialog";
 
 /* ---------------------------------------------------------------------------
    TaxonomyAdmin — Reusable CRUD admin for divisions, categories, subcategories.
@@ -170,10 +171,20 @@ export default function TaxonomyAdmin({
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
+  /* Delete confirmation — goes through the themed ConfirmDialog
+     instead of the native window.confirm() which Safari renders
+     with a system dialog that clashes with the hub's dark theme. */
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; childCount: number } | null>(null);
+
+  const askDelete = (id: string, name: string) => {
     const count = childCounts?.[id] || 0;
-    const warn = count > 0 ? ` This will also delete ${count} ${childLabel?.toLowerCase() || "children"}.` : "";
-    if (!confirm(`Delete "${name}"?${warn}`)) return;
+    setDeleteTarget({ id, name, childCount: count });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
+    setDeleteTarget(null);
     const ok = await onDelete(id);
     if (ok) onRefresh();
   };
@@ -338,7 +349,7 @@ export default function TaxonomyAdmin({
                           <PencilIcon className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.id, item.name)}
+                          onClick={() => askDelete(item.id, item.name)}
                           className="h-8 w-8 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
                         >
                           <TrashIcon className="h-3.5 w-3.5" />
@@ -533,6 +544,21 @@ export default function TaxonomyAdmin({
           </div>
         </div>
       )}
+
+      {/* Themed delete confirmation — replaces window.confirm() */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title={deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete?"}
+        message={
+          deleteTarget && deleteTarget.childCount > 0
+            ? `This will also delete ${deleteTarget.childCount} ${childLabel?.toLowerCase() || "children"}. This cannot be undone.`
+            : "This cannot be undone."
+        }
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   );
 }

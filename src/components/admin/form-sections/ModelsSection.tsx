@@ -19,6 +19,7 @@ import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
 import SelectWithCreate from "./SelectWithCreate";
 import BarcodeQRDisplay from "./BarcodeQRDisplay";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface Props {
   models: ModelFormState[];
@@ -329,6 +330,12 @@ function ModelCard({
 }
 
 export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false }: Props) {
+  /* ID of the model the admin is about to remove — drives the
+     themed ConfirmDialog below. Replaces the native window.confirm()
+     which Safari renders with a system dialog that clashes with
+     the hub's dark theme. */
+  const [removeTempId, setRemoveTempId] = useState<string | null>(null);
+
   const addModel = () => {
     onChange([...models, { ...createEmptyModel(), order: models.length }]);
   };
@@ -337,9 +344,12 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
     onChange(models.map((m) => (m._tempId === tempId ? { ...m, ...updates } : m)));
   };
 
-  const removeModel = (tempId: string) => {
-    if (!confirm("Remove this model?")) return;
-    onChange(models.filter((m) => m._tempId !== tempId));
+  const askRemove = (tempId: string) => setRemoveTempId(tempId);
+
+  const confirmRemove = () => {
+    if (!removeTempId) return;
+    onChange(models.filter((m) => m._tempId !== removeTempId));
+    setRemoveTempId(null);
   };
 
   const duplicateModel = (tempId: string) => {
@@ -420,7 +430,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
                 total={models.length}
                 isPrimary={!hidePrimary && trueIdx === 0}
                 onUpdate={(u) => updateModel(m._tempId, u)}
-                onRemove={() => removeModel(m._tempId)}
+                onRemove={() => askRemove(m._tempId)}
                 onDuplicate={() => duplicateModel(m._tempId)}
                 onMoveUp={() => moveUp(trueIdx)}
                 onMoveDown={() => moveDown(trueIdx)}
@@ -432,6 +442,17 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
           })}
         </div>
       )}
+
+      {/* Themed remove confirmation — replaces window.confirm() */}
+      <ConfirmDialog
+        open={removeTempId !== null}
+        onClose={() => setRemoveTempId(null)}
+        onConfirm={confirmRemove}
+        title="Remove this model?"
+        message="The model and its saved prices are removed from this draft. Nothing is deleted from the database until you save the product."
+        confirmLabel="Remove"
+        destructive
+      />
     </div>
   );
 }

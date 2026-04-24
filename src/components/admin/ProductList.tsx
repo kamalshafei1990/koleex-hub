@@ -27,6 +27,7 @@ import {
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
 } from "@/lib/products-admin";
 import type { ProductRow, DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
+import ConfirmDialog from "./form-sections/ConfirmDialog";
 
 /* Koleex's flagship division. The hub treats this line as the
    default view on the public catalog and visually emphasises it
@@ -151,10 +152,21 @@ export default function ProductList() {
     setSearch("");
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+  /* Delete confirmation — goes through the themed ConfirmDialog
+     instead of the native window.confirm() which Safari renders
+     with a system dialog that clashes with the hub's dark theme. */
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
+  const askDelete = (e: React.MouseEvent, id: string, name: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`Delete "${name}"? This will also delete all models, media, translations, and prices.`)) return;
+    setDeleteTarget({ id, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
+    setDeleteTarget(null);
     const ok = await deleteProduct(id);
     if (ok) setProducts(prev => prev.filter(p => p.id !== id));
   };
@@ -530,7 +542,7 @@ export default function ProductList() {
                         <PencilIcon className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={(e) => handleDelete(e, p.id, p.product_name)}
+                        onClick={(e) => askDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
                         title="Delete product"
                       >
@@ -744,7 +756,7 @@ export default function ProductList() {
                             <PencilIcon className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleDelete(e, p.id, p.product_name)}
+                            onClick={(e) => askDelete(e, p.id, p.product_name)}
                             className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"
                             title="Delete product"
                           >
@@ -760,6 +772,17 @@ export default function ProductList() {
           </div>
         )}
       </div>
+
+      {/* Themed confirm for product delete — replaces window.confirm() */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title={deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete product?"}
+        message="This also removes all its models, media, translations, and saved prices. This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   );
 }
