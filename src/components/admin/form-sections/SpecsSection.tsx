@@ -36,8 +36,15 @@ export default function SpecsSection({ data, onChange }: Props) {
 
   return (
     <div>
+      {/* Label deliberately reads "Additional Key-Value Specs",
+          NOT "Technical Specifications". The wizard has a separate
+          "Technical Details" step (voltage, plug types, dimensions,
+          etc.); reusing "Technical" in this inline key/value table
+          meant admins couldn't tell the two apart. These are
+          freeform facts that don't fit the structured Technical
+          step — e.g. payload, stitching style, language support. */}
       <div className="flex items-center justify-between mb-4">
-        <label className="text-[12px] font-medium text-[var(--text-subtle)]">Technical Specifications</label>
+        <label className="text-[12px] font-medium text-[var(--text-subtle)]">Additional Key-Value Specs</label>
         <button
           onClick={addSpec}
           className="h-8 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]/80 flex items-center gap-1.5 transition-colors"
