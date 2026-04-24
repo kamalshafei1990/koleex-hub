@@ -510,39 +510,81 @@ export async function uploadBrandLogo(brandSlug: string, file: File): Promise<st
   return result.data.publicUrl;
 }
 
-// ── Brand Management (brands stored as strings on products, logos in storage) ──
+// ── Brand Management ──
+// Brands live in a dedicated `brands` table (created 2026-04-24).
+// products.brand is still a text column — the `brands` row is the
+// canonical record an admin created, with name / slug / logo_url.
+// Creating a brand via the admin modal now POSTs to /api/brands so
+// the record persists immediately, independent of product save.
 
-/** Fetch all brands with product counts and logo URLs */
+/** Fetch all brands with product counts + logo URLs. Goes through
+ *  /api/brands which merges the brands table with a product-count
+ *  rollup and returns a storage-public logo_url per brand.
+ *  Falls back to the legacy "distinct from products" method if the
+ *  API is unavailable, so an older build doesn't break the form. */
 export async function fetchBrandsWithDetails(): Promise<{
   name: string;
   slug: string;
   logoUrl: string | null;
   productCount: number;
 }[]> {
-  // Get all products with their brand
-  const { data: products } = await supabase.from("products").select("brand");
-  // Get all brand logos from storage
-  const logos = await fetchBrandLogos();
-
-  // Count products per brand
-  const counts: Record<string, number> = {};
-  for (const row of (products || []) as { brand: string | null }[]) {
-    if (row.brand) {
-      counts[row.brand] = (counts[row.brand] || 0) + 1;
+  try {
+    const res = await fetch("/api/brands", { credentials: "include" });
+    if (res.ok) {
+      const json = (await res.json()) as {
+        brands: { name: string; slug: string; logo_url: string | null; productCount: number }[];
+      };
+      return (json.brands ?? []).map((b) => ({
+        name: b.name,
+        slug: b.slug,
+        logoUrl: b.logo_url,
+        productCount: b.productCount,
+      }));
     }
+  } catch (e) {
+    console.warn("[Brands] /api/brands unavailable, falling back to product-derived list:", e);
   }
 
-  // Build brand list
+  // Legacy fallback — derive the list from DISTINCT products.brand.
+  const { data: products } = await supabase.from("products").select("brand");
+  const logos = await fetchBrandLogos();
+  const counts: Record<string, number> = {};
+  for (const row of (products || []) as { brand: string | null }[]) {
+    if (row.brand) counts[row.brand] = (counts[row.brand] || 0) + 1;
+  }
   const brands = Object.keys(counts).sort();
   return brands.map(name => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    return {
-      name,
-      slug,
-      logoUrl: logos[slug] || null,
-      productCount: counts[name] || 0,
-    };
+    return { name, slug, logoUrl: logos[slug] || null, productCount: counts[name] || 0 };
   });
+}
+
+/** Create a brand record in the brands table. Called by the
+ *  CreateBrandModal so the brand persists the moment the modal
+ *  commits — even if the admin navigates away without saving the
+ *  product. Returns the canonical brand row. */
+export async function createBrand(
+  name: string,
+  logoUrl: string | null,
+): Promise<{ name: string; slug: string; logo_url: string | null } | null> {
+  try {
+    const res = await fetch("/api/brands", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, logoUrl }),
+    });
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      console.error("[Brands] Create error:", json.error || res.status);
+      return null;
+    }
+    const json = (await res.json()) as { brand: { name: string; slug: string; logo_url: string | null } };
+    return json.brand ?? null;
+  } catch (e) {
+    console.error("[Brands] Create network error:", e);
+    return null;
+  }
 }
 
 /** Rename a brand across all products */

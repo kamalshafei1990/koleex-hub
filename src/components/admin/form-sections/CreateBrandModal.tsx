@@ -5,7 +5,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import Modal from "./Modal";
-import { uploadBrandLogo } from "@/lib/products-admin";
+import { uploadBrandLogo, createBrand } from "@/lib/products-admin";
 
 interface Props {
   open: boolean;
@@ -40,8 +40,9 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
   };
 
   const handleSave = async () => {
-    if (!name.trim()) { setError("Brand name is required"); return; }
-    if (existingBrands.some(b => b.toLowerCase() === name.trim().toLowerCase())) {
+    const trimmed = name.trim();
+    if (!trimmed) { setError("Brand name is required"); return; }
+    if (existingBrands.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
       setError("This brand already exists");
       return;
     }
@@ -49,14 +50,30 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
     setSaving(true);
     setError("");
 
+    /* 1. Upload the logo first (if one was selected) so the URL
+          is available when we write the brand row. */
     let logoUrl: string | null = null;
     if (logoFile) {
-      const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       logoUrl = await uploadBrandLogo(slug, logoFile);
     }
 
+    /* 2. Persist the brand row itself via /api/brands. This is the
+          change that actually fixes the "my brand didn't save" bug —
+          the brand record lives in the DB from this moment,
+          independent of whether the parent product ever gets saved. */
+    const saved = await createBrand(trimmed, logoUrl);
+    if (!saved) {
+      setSaving(false);
+      setError("Failed to save brand. You may not have Product Data access.");
+      return;
+    }
+
     setSaving(false);
-    onCreated(name.trim(), logoUrl);
+    /* Use the saved row's canonical name (the server may have
+       normalised case / whitespace) so the product's brand field
+       matches the brands table exactly. */
+    onCreated(saved.name, saved.logo_url);
     reset();
     onClose();
   };
@@ -138,7 +155,7 @@ export default function CreateBrandModal({ open, onClose, onCreated, existingBra
               className={inp}
               autoFocus
             />
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Logo is stored in Supabase Storage. Brand is saved when you save the product.</p>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1.5">Brand is saved to the catalog immediately. Logo is stored in Supabase Storage.</p>
           </div>
         </div>
 
