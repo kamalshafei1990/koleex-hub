@@ -1573,18 +1573,13 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "commercial" && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Primary model summary reminder */}
-            {primaryModel && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <StarIcon className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">Primary Model: {primaryModel.model_name || "(unnamed)"}</div>
-                  <div className="text-[10px] text-[var(--text-ghost)]">Identity &amp; pricing entered in the Hero. Add additional variants below when needed.</div>
-                </div>
-              </div>
-            )}
+            {/* The redundant "Primary Model reminder" banner used to
+                live here. It said "Identity & pricing entered in the
+                Hero" — which was true but misleading, because the
+                ModelCard below STILL let admins edit the same fields,
+                causing Hero ⇄ Models desync. Now the primary card
+                itself makes the Hero-basics-are-read-only story
+                explicit, so the banner is redundant and removed. */}
 
             <Section
               id="models"
@@ -1598,6 +1593,10 @@ export default function ProductForm({ productId }: Props) {
                 suppliers={suppliers}
                 onClickCreateSupplier={(tempId) => { setSupplierTarget(tempId); setShowSupplierModal(true); }}
                 hidePrimary={false}
+                onEditInHero={() => {
+                  const heroIdx = steps.findIndex((s) => s.id === "identity");
+                  if (heroIdx >= 0) goToStep(heroIdx);
+                }}
               />
             </Section>
 

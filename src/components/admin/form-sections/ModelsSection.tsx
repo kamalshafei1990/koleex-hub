@@ -14,6 +14,7 @@ import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";
 import WarehouseIcon from "@/components/icons/ui/WarehouseIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import CrownIcon from "@/components/icons/ui/CrownIcon";
+import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import { useState } from "react";
 import type { ModelFormState } from "@/types/product-form";
 import { createEmptyModel, slugify } from "@/types/product-form";
@@ -27,6 +28,12 @@ interface Props {
   suppliers?: { id: string; name: string; logo: string | null }[];
   onClickCreateSupplier?: (modelTempId: string) => void;
   hidePrimary?: boolean;  // when true, skip the first model (it's shown in Hero)
+  /* When the admin clicks "Edit in Hero" on the primary model's
+     read-only basics panel, we jump them back to the Hero step so
+     they can change name / supplier / price there — the single
+     source of truth. Optional because other callers of the section
+     (if any land later) don't need it. */
+  onEditInHero?: () => void;
 }
 
 /* ── Visual grouped panel ── */
@@ -44,9 +51,38 @@ function Panel({ icon, title, children }: { icon: React.ReactNode; title: string
   );
 }
 
+/* ── Tiny read-only field renderer ──
+   Used by the primary model's "Hero Basics" summary so the fields
+   Hero owns (name, supplier, cost, price, etc.) appear as
+   non-editable labels here without looking like they got greyed
+   out "accidentally". Empty value renders a dim dash. */
+function ReadOnlyField({
+  label, value, mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-wider mb-0.5">
+        {label}
+      </div>
+      <div
+        className={`text-[13px] text-[var(--text-primary)] truncate ${
+          mono ? "font-mono text-[var(--text-muted)]" : ""
+        } ${!value ? "italic text-[var(--text-ghost)]" : ""}`}
+      >
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
 function ModelCard({
   model, idx, total, onUpdate, onRemove, onDuplicate, onMoveUp, onMoveDown,
   suppliers, onClickCreateSupplier, defaultOpen = true, isPrimary = false,
+  onEditInHero,
 }: {
   model: ModelFormState; idx: number; total: number;
   onUpdate: (u: Partial<ModelFormState>) => void;
@@ -58,6 +94,9 @@ function ModelCard({
   onClickCreateSupplier?: () => void;
   defaultOpen?: boolean;
   isPrimary?: boolean;
+  /* Callback for the primary model's "Edit in Hero" jump — see Props
+     comment on ModelsSection. Ignored for non-primary variants. */
+  onEditInHero?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -135,136 +174,231 @@ function ModelCard({
           >
             <ArrowDownIcon className="h-3.5 w-3.5" />
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-            title="Duplicate"
-          >
-            <CopyIcon className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="Delete"
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-          </button>
+          {/* Duplicate + Delete are hidden on the primary model.
+              Duplicating the primary would produce an ambiguous
+              second "primary" and deleting the primary removes the
+              record Hero depends on. Admins who want a variant of
+              the primary can add a fresh model via the "Add Model"
+              button below the grid and copy the fields manually. */}
+          {!isPrimary && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                title="Duplicate"
+              >
+                <CopyIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Delete"
+              >
+                <TrashIcon className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
           {open ? <AngleUpIcon className="h-4 w-4 text-[var(--text-ghost)] ml-1" /> : <AngleDownIcon className="h-4 w-4 text-[var(--text-ghost)] ml-1" />}
         </div>
       </div>
 
       {open && (
         <div className="p-5 space-y-4">
-          {/* Identity row */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <label className={lbl}>Model Name *</label>
-              <input
-                type="text"
-                value={model.model_name}
-                onChange={(e) => onUpdate({ model_name: e.target.value, slug: slugify(e.target.value) })}
-                placeholder="e.g. KX-9500-D"
-                className={inp}
-              />
-            </div>
-            <div>
-              <label className={lbl}>Slug / SKU</label>
-              <input
-                type="text"
-                value={model.slug}
-                onChange={(e) => onUpdate({ slug: e.target.value })}
-                className={`${inp} font-mono text-[var(--text-muted)]`}
-              />
-            </div>
-            <div>
-              <label className={lbl}>Status</label>
-              <select
-                value={model.status}
-                onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
-                className={inp}
+          {isPrimary ? (
+            <>
+              {/* ── Primary model: Hero-owned basics are READ-ONLY here.
+                    Model name / slug / tagline / supplier / reference /
+                    cost / global-price all belong to the Hero step —
+                    editing them in two places would just de-sync.
+                    Admins click "Edit in Hero" to jump back. */}
+              <Panel
+                icon={<CrownIcon className="h-3.5 w-3.5" />}
+                title="Hero Basics (read-only · edit in Hero step)"
               >
-                <option value="active">Active</option>
-                <option value="discontinued">Discontinued</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className={lbl}>Tagline</label>
-            <input
-              type="text"
-              value={model.tagline}
-              onChange={(e) => onUpdate({ tagline: e.target.value })}
-              placeholder="Short sub-title shown under the model name"
-              className={inp}
-            />
-          </div>
-
-          {/* Supplier + Pricing panel */}
-          <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Supplier & Pricing">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className={lbl}>Supplier</label>
-                {suppliers ? (
-                  <SelectWithCreate
-                    value={model.supplier}
-                    options={suppliers.map((s) => ({ value: s.name, label: s.name, icon: s.logo }))}
-                    onChange={(val) => onUpdate({ supplier: val })}
-                    onClickCreate={onClickCreateSupplier}
-                    placeholder="Select supplier..."
-                    createLabel="Create Supplier"
-                    className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-surface-subtle)]/70"
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3 mb-3">
+                  <ReadOnlyField label="Model Name" value={model.model_name} />
+                  <ReadOnlyField label="Slug / SKU" value={model.slug} mono />
+                  <ReadOnlyField label="Supplier" value={model.supplier} />
+                  <ReadOnlyField label="Supplier Reference Model" value={model.reference_model} />
+                  <ReadOnlyField
+                    label="Cost Price (CNY)"
+                    value={model.cost_price ? `¥ ${model.cost_price}` : ""}
                   />
-                ) : (
-                  <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+                  <ReadOnlyField
+                    label="Global Selling Price (USD)"
+                    value={model.global_price ? `$ ${model.global_price}` : ""}
+                  />
+                </div>
+                {model.tagline && (
+                  <div className="mb-3">
+                    <ReadOnlyField label="Tagline" value={model.tagline} />
+                  </div>
                 )}
+                {onEditInHero && (
+                  <button
+                    type="button"
+                    onClick={onEditInHero}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/30 transition-colors"
+                  >
+                    <ArrowUpRightIcon className="h-3.5 w-3.5" />
+                    Edit in Hero
+                  </button>
+                )}
+                <p className="text-[10px] text-[var(--text-ghost)] mt-2 italic">
+                  These fields are owned by the Hero step — the single source of truth
+                  for the primary model&apos;s identity + commercial basics. Operational
+                  detail (head-only price, packaging, MOQ, barcode override…) stays editable below.
+                </p>
+              </Panel>
+
+              {/* ── Primary model: Status + operational pricing EDITABLE here. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Status</label>
+                  <select
+                    value={model.status}
+                    onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
+                    className={inp}
+                  >
+                    <option value="active">Active</option>
+                    <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
               </div>
+
+              <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Operational Pricing">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lbl}>Head-Only Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                      <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Complete Set Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                      <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-[var(--text-ghost)] mt-2">
+                  Separate sub-prices for customers who buy just the machine head vs. a full
+                  set with table + motor. Leave blank to fall back to the Global Selling Price above.
+                </p>
+              </Panel>
+            </>
+          ) : (
+            <>
+              {/* Identity row — fully editable on secondary variants */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <label className={lbl}>Model Name *</label>
+                  <input
+                    type="text"
+                    value={model.model_name}
+                    onChange={(e) => onUpdate({ model_name: e.target.value, slug: slugify(e.target.value) })}
+                    placeholder="e.g. KX-9500-D"
+                    className={inp}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Slug / SKU</label>
+                  <input
+                    type="text"
+                    value={model.slug}
+                    onChange={(e) => onUpdate({ slug: e.target.value })}
+                    className={`${inp} font-mono text-[var(--text-muted)]`}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Status</label>
+                  <select
+                    value={model.status}
+                    onChange={(e) => onUpdate({ status: e.target.value as "active" | "discontinued" })}
+                    className={inp}
+                  >
+                    <option value="active">Active</option>
+                    <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className={lbl}>Supplier Reference Model</label>
+                <label className={lbl}>Tagline</label>
                 <input
                   type="text"
-                  value={model.reference_model}
-                  onChange={(e) => onUpdate({ reference_model: e.target.value })}
-                  placeholder="e.g. Factory model code"
+                  value={model.tagline}
+                  onChange={(e) => onUpdate({ tagline: e.target.value })}
+                  placeholder="Short sub-title shown under the model name"
                   className={inp}
                 />
               </div>
-              <div>
-                {/* Cost is what Koleex pays the Chinese factory —
-                    stored + entered in CNY (¥) across the whole form.
-                    Selling prices below stay in USD since we sell
-                    globally. */}
-                <label className={lbl}>Cost Price (CNY)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">¥</span>
-                  <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+
+              {/* Supplier + Pricing panel */}
+              <Panel icon={<DollarSignIcon className="h-3.5 w-3.5" />} title="Supplier & Pricing">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={lbl}>Supplier</label>
+                    {suppliers ? (
+                      <SelectWithCreate
+                        value={model.supplier}
+                        options={suppliers.map((s) => ({ value: s.name, label: s.name, icon: s.logo }))}
+                        onChange={(val) => onUpdate({ supplier: val })}
+                        onClickCreate={onClickCreateSupplier}
+                        placeholder="Select supplier..."
+                        createLabel="Create Supplier"
+                        className="[&_button]:h-10 [&_button]:rounded-lg [&_button]:bg-[var(--bg-surface-subtle)]/70"
+                      />
+                    ) : (
+                      <input type="text" value={model.supplier} onChange={(e) => onUpdate({ supplier: e.target.value })} placeholder="Supplier name" className={inp} />
+                    )}
+                  </div>
+                  <div>
+                    <label className={lbl}>Supplier Reference Model</label>
+                    <input
+                      type="text"
+                      value={model.reference_model}
+                      onChange={(e) => onUpdate({ reference_model: e.target.value })}
+                      placeholder="e.g. Factory model code"
+                      className={inp}
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Cost Price (CNY)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">¥</span>
+                      <input type="number" step="0.01" value={model.cost_price} onChange={(e) => onUpdate({ cost_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-              <div>
-                <label className={lbl}>Global Selling Price (USD)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
-                  <input type="number" step="0.01" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                  <div>
+                    <label className={lbl}>Global Selling Price (USD)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                      <input type="number" step="0.01" value={model.global_price} onChange={(e) => onUpdate({ global_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Head-Only Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                      <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Complete Set Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
+                      <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className={lbl}>Head-Only Price</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
-                  <input type="number" step="0.01" value={model.head_only_price} onChange={(e) => onUpdate({ head_only_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
-                </div>
-              </div>
-              <div>
-                <label className={lbl}>Complete Set Price</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-ghost)]">$</span>
-                  <input type="number" step="0.01" value={model.complete_set_price} onChange={(e) => onUpdate({ complete_set_price: e.target.value })} placeholder="0.00" className={`${inp} pl-7`} />
-                </div>
-              </div>
-            </div>
-          </Panel>
+              </Panel>
+            </>
+          )}
 
           {/* Packaging & Logistics panel */}
           <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
@@ -329,7 +463,7 @@ function ModelCard({
   );
 }
 
-export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false }: Props) {
+export default function ModelsSection({ models, onChange, suppliers, onClickCreateSupplier, hidePrimary = false, onEditInHero }: Props) {
   /* ID of the model the admin is about to remove — drives the
      themed ConfirmDialog below. Replaces the native window.confirm()
      which Safari renders with a system dialog that clashes with
@@ -437,6 +571,7 @@ export default function ModelsSection({ models, onChange, suppliers, onClickCrea
                 suppliers={suppliers}
                 onClickCreateSupplier={onClickCreateSupplier ? () => onClickCreateSupplier(m._tempId) : undefined}
                 defaultOpen={i === 0}
+                onEditInHero={onEditInHero}
               />
             );
           })}
