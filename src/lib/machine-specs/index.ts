@@ -13,3 +13,12 @@ export type {
 
 export { COMMON_FIELDS } from "./common";
 export { resolveSpecs, hasNewSpecSystem } from "./resolver";
+export {
+  FIELD_ICONS,
+  GROUP_ICONS,
+  CARD_ICONS,
+  getFieldIcon,
+  getGroupIcon,
+  getCardIcon,
+  type SpecIconComponent,
+} from "./icons";

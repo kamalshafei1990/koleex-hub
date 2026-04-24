@@ -28,6 +28,9 @@ import {
 import {
   resolveSpecs,
   hasNewSpecSystem,
+  getFieldIcon,
+  getGroupIcon,
+  getCardIcon,
   type SpecCard as NewSpecCard,
   type SpecField as NewSpecField,
 } from "@/lib/machine-specs";
@@ -575,6 +578,16 @@ function SpecRow({
     >
       {/* Label cell */}
       <div className="flex items-center gap-1.5 min-w-0">
+        {(() => {
+          const FieldIcon = getFieldIcon(field.key);
+          return (
+            <FieldIcon
+              className={`h-3.5 w-3.5 shrink-0 ${
+                filled ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
+              }`}
+            />
+          );
+        })()}
         <FrequencyDots tier={field.tier} />
         <span
           className={`text-[12.5px] ${
@@ -645,14 +658,16 @@ function SpecRowGroup({
   }).length;
   const allFilled = filledCount === fields.length;
 
+  const GroupIcon = getGroupIcon(group);
   return (
     <div className="mb-1 last:mb-0">
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="w-full flex items-center gap-3 px-4 pt-4 pb-2 group/header cursor-pointer"
+        className="w-full flex items-center gap-2.5 px-4 pt-4 pb-2 group/header cursor-pointer"
         aria-expanded={!collapsed}
       >
+        <GroupIcon className={`h-3.5 w-3.5 shrink-0 ${accentText} opacity-90`} />
         <span className={`text-[10px] font-bold uppercase tracking-[0.1em] ${accentText}`}>
           {group}
         </span>
@@ -777,13 +792,22 @@ function SpecCardRenderer({
           icon chip for a cleaner spec-sheet feel. */}
       <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accentEdge}`} />
 
-      {/* Header — numbered step badge + title + subtitle + fill pill.
-          The number (1/2/3) gives the admin a sense of "step N of M"
-          through the three-tier stack. */}
+      {/* Header — numbered step badge + card icon + title + subtitle
+          + fill pill. The number gives a sense of "step N of M" and
+          the card icon (Settings2 / Package / Sparkles) reinforces
+          which tier you're looking at: universal / family / kind. */}
       <div className="flex items-center gap-3 pl-5 pr-5 py-4 border-b border-[var(--border-subtle)]">
         <div className={`h-7 w-7 rounded-full bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
           <span className={`text-[12px] font-bold tabular-nums ${accentText}`}>{stepNumber}</span>
         </div>
+        {(() => {
+          const CardIcon = getCardIcon(card.source);
+          return (
+            <div className={`h-7 w-7 rounded-lg bg-gradient-to-br border flex items-center justify-center shrink-0 ${accentClass}`}>
+              <CardIcon className={`h-3.5 w-3.5 ${accentText}`} />
+            </div>
+          );
+        })()}
         <div className="flex-1 min-w-0">
           <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
           {card.subtitle && (
