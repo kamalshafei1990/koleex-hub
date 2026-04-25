@@ -25,6 +25,7 @@ import { COMMON_FIELDS } from "./common";
 // Families (Tier 2)
 import { LOCKSTITCH_FAMILY_FIELDS } from "./families/lockstitch";
 import { OVERLOCK_FAMILY_FIELDS } from "./families/overlock";
+import { INTERLOCK_FAMILY_FIELDS } from "./families/interlock";
 
 // Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
@@ -47,6 +48,14 @@ import { OVERLOCK_ELASTIC_TAPE_FIELDS } from "./kinds/overlock/elastic-tape";
 import { OVERLOCK_GLOVE_FIELDS } from "./kinds/overlock/glove";
 import { OVERLOCK_AUTO_COLLAR_STATION_FIELDS } from "./kinds/overlock/auto-collar-station";
 import { OVERLOCK_TOWEL_FIELDS } from "./kinds/overlock/towel";
+
+// Kind extras (Tier 3) — Interlock
+import { INTERLOCK_CYLINDER_BED_FIELDS } from "./kinds/interlock/cylinder-bed";
+import { INTERLOCK_FEED_OFF_ARM_FIELDS } from "./kinds/interlock/feed-off-arm";
+import { INTERLOCK_FLATLOCK_FIELDS } from "./kinds/interlock/flatlock";
+import { INTERLOCK_RIB_BINDING_FIELDS } from "./kinds/interlock/rib-binding";
+import { INTERLOCK_ELASTIC_ATTACH_FIELDS } from "./kinds/interlock/elastic-attach";
+import { INTERLOCK_TAPE_BINDING_FIELDS } from "./kinds/interlock/tape-binding";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -73,8 +82,13 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Core specs shared by every overlock / serger kind.",
     fields: OVERLOCK_FAMILY_FIELDS,
   },
-  // Future: interlock-machines, chainstitch-machines,
-  // double-needle-machines, multi-needle-machines, pattern-sewing-machines,
+  "interlock-machines": {
+    title: "Coverstitch / Flatlock Basics",
+    subtitle: "Core specs shared by every coverstitch / flatlock kind.",
+    fields: INTERLOCK_FAMILY_FIELDS,
+  },
+  // Future: chainstitch-machines, double-needle-machines,
+  // multi-needle-machines, pattern-sewing-machines,
   // heavy-duty-machines, special-machines.
 };
 
@@ -186,9 +200,42 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Dust extraction + loop-pile handling for terry / fleece work.",
     fields: OVERLOCK_TOWEL_FIELDS,
   },
-  // Standard kinds (1n-2t, 1n-3t, 2n-4t) and the simpler specialties
-  // (back-latching, pocket) inherit Common + Family only — the
-  // family fields fully cover their differentiation.
+
+  // ── Interlock / Coverstitch ───────────────────────────────
+  "interlock-cylinder-bed": {
+    title: "Cylinder Bed Geometry",
+    subtitle: "Tubular-arm dimensions for cuffs, neckbands, sleeve openings.",
+    fields: INTERLOCK_CYLINDER_BED_FIELDS,
+  },
+  "interlock-feed-off-arm": {
+    title: "Feed-Off-Arm Geometry",
+    subtitle: "Narrow-arm specifics for tubular hems + side-seam joining.",
+    fields: INTERLOCK_FEED_OFF_ARM_FIELDS,
+  },
+  "interlock-top-bottom-coverstitch": {
+    title: "Flatlock Top Cover",
+    subtitle: "Top spreader + decorative cover specifics that make this kind a flatlock.",
+    fields: INTERLOCK_FLATLOCK_FIELDS,
+  },
+  "interlock-rib-binding": {
+    title: "Rib-Tape Feeder",
+    subtitle: "Tape feeder geometry for rib-knit neck + armhole binding.",
+    fields: INTERLOCK_RIB_BINDING_FIELDS,
+  },
+  "interlock-elastic-attach": {
+    title: "Elastic Feeder",
+    subtitle: "Elastic feeder mechanism for swimwear / underwear waistbands.",
+    fields: INTERLOCK_ELASTIC_ATTACH_FIELDS,
+  },
+  "interlock-tape-binding": {
+    title: "Binding Folder",
+    subtitle: "Folder geometry for flat-tape binding (T-shirt necks, lingerie trims).",
+    fields: INTERLOCK_TAPE_BINDING_FIELDS,
+  },
+  // Standard 2n / 3n coverstitch kinds inherit Common + Family only -
+  // the family fields (incl. needle gauge) fully cover their
+  // differentiation. Same for the simpler overlock specialties
+  // (back-latching, pocket).
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════

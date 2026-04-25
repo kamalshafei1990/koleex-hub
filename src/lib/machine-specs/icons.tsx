@@ -187,6 +187,64 @@ export const FIELD_GLYPHS: Record<string, string> = {
   ov_tw_dust_extraction: "ls_auto_thread_wiper",    // fan
   ov_tw_loop_pile_height: "ls_max_material_thickness", // cubes-stacked
   ov_tw_foot_type: "presser_foot_lift",             // arrow-up-from-square
+
+  /* ─── Interlock / Coverstitch Family — Tier 2 ─────────────
+     Same reuse strategy as overlock: every il_* key maps to the
+     closest existing uicons glyph so each spec card carries a
+     unique icon without re-running the SVG build script. */
+  il_needle_count: "needle_system",             // needle
+  il_needle_gauge: "needle_size_range",         // ruler-horizontal
+  il_thread_count: "thread_count_tex",          // hashtag-lock
+  il_looper_config: "hook_type",                // fish-hook
+  il_bed_type: "ls_bed_type",                   // bed-alt
+  il_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  il_drive_type: "motor_type",                  // engine
+
+  il_stitch_length_min: "stitch_length_min",    // arrow-small-left
+  il_stitch_length_max: "stitch_length_max",    // arrow-small-right
+  il_differential_feed_ratio: "ls_reverse_feed", // rotate-reverse
+  il_top_cover_stitch: "zz_zigzag_width",       // arrows-h
+  il_feed_dog_type: "ls_feed_dog_type",         // conveyor-belt-arm
+
+  il_auto_thread_trimmer: "ls_auto_thread_trimmer",     // scissors
+  il_auto_presser_foot_lifter: "ls_auto_presser_foot_lifter", // arrow-up
+  il_auto_back_suction: "ls_auto_thread_wiper", // fan
+  il_lubrication_system: "lubrication_system",  // oil-can
+  il_needle_cooler: "ls_auto_thread_wiper",     // fan
+
+  /* ─── Interlock Kind extras — Tier 3 ─────────────────────── */
+  // Cylinder Bed (interlock)
+  il_cb_cylinder_diameter: "cb_cylinder_diameter", // arrows-alt-h
+  il_cb_cylinder_length: "cb_cylinder_length",     // arrows-alt-v
+  il_cb_post_clearance: "pb_post_height",          // arrow-from-bottom
+
+  // Feed-Off-Arm (interlock)
+  il_foa_arm_length: "foa_arm_length",             // measuring-tape
+  il_foa_arm_clearance: "foa_arm_clearance",       // expand-arrows-alt
+  il_foa_feed_direction: "foa_feed_direction",     // arrows-cross
+
+  // Flatlock Top Cover
+  il_fl_top_cover_width: "zz_zigzag_width",        // arrows-h
+  il_fl_spreader_type: "presser_foot_lift",        // arrow-up-from-square
+  il_fl_decorative_threads: "thread_type",         // reel
+
+  // Rib-Tape Feeder
+  il_rb_max_rib_width: "zz_zigzag_width",          // arrows-h
+  il_rb_stretch_ratio: "ls_reverse_feed",          // rotate-reverse
+  il_rb_tension_control: "ls_low_bobbin_sensor",   // signal-bars-weak
+  il_rb_integrated_cutter: "et_knife_type",        // knife
+
+  // Elastic Feeder
+  il_ea_max_elastic_width: "zz_zigzag_width",      // arrows-h
+  il_ea_stretch_ratio: "ls_reverse_feed",          // rotate-reverse
+  il_ea_metering_wheel: "ls_auto_bobbin_winder",   // arrows-repeat
+  il_ea_tension_control: "ls_low_bobbin_sensor",   // signal-bars-weak
+
+  // Binding Folder
+  il_tb_max_tape_width: "zz_zigzag_width",         // arrows-h
+  il_tb_folder_type: "presser_foot_lift",          // arrow-up-from-square
+  il_tb_finished_width: "stitch_length_max",       // arrow-small-right
+  il_tb_quick_change: "et_quick_release",          // bolt
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -226,6 +284,14 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Glove Specifics": "_g_CylinderBed",          // grid-alt
   "Auto Station": "_g_Automation",              // robot
   "Towel Specifics": "_g_Material",             // clothes-hanger
+
+  // Interlock / Coverstitch groups — reuse closest existing
+  // group glyph so the cards render with sensible icons before
+  // dedicated SVGs are added.
+  "Flatlock Top Cover": "_g_StitchFeed",        // arrow-progress
+  "Rib-Tape Feeder": "_g_WalkingFoot",          // robotic-arm
+  "Elastic Feeder": "_g_WalkingFoot",           // robotic-arm
+  "Binding Folder": "_g_StitchFeed",            // arrow-progress
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

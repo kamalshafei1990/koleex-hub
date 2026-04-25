@@ -911,6 +911,8 @@ export default function ProductViewPage() {
       "Gathering Mechanism", "Tape Feeder",
       "Glove Specifics", "Auto Station",
       "Towel Specifics",
+      "Flatlock Top Cover", "Rib-Tape Feeder",
+      "Elastic Feeder", "Binding Folder",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -950,6 +952,9 @@ export default function ProductViewPage() {
         "Gathering Mechanism", "Tape Feeder",
         "Glove Specifics", "Auto Station",
         "Towel Specifics",
+        // Interlock / Coverstitch — same Performance bucket
+        "Flatlock Top Cover", "Rib-Tape Feeder",
+        "Elastic Feeder", "Binding Folder",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],
