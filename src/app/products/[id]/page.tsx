@@ -1226,7 +1226,12 @@ export default function ProductViewPage() {
                   brand blue + slight scale-up so the selection is
                   unmistakable. */}
               {galleryImages.length > 1 && (
-                <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                /* py-2 + px-1 give the active thumb's outer ring +
+                   scale-[1.04] room to render. overflow-x-auto on a
+                   strip implicitly clips the y axis, so without the
+                   vertical padding the active thumb's ring + scale
+                   were being shaved off top and bottom. */
+                <div className="mt-5 flex items-center gap-3 overflow-x-auto py-2 px-1 -mx-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {galleryImages.slice(0, 6).map((img, i) => {
                     const active = i === activeImageIdx;
                     return (
