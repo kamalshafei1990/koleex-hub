@@ -83,6 +83,8 @@ import {
   type SpecCard as NewSpecCard,
   type SpecField as NewSpecField,
 } from "@/lib/machine-specs";
+import SpecGlyph from "@/lib/machine-specs/SpecGlyph";
+import { FIELD_GLYPHS } from "@/lib/machine-specs/icons";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { IMG } from "@/lib/cdn";
 
@@ -869,14 +871,14 @@ export default function ProductViewPage() {
      {category, rows} so the accordion can render Apple-style: one
      headline per category, expandable rows below. Empty categories
      drop out so customers never see "Mechanical (0)". */
-  const specCategories = useMemo<{ category: string; rows: { label: string; value: string }[] }[]>(() => {
-    const map = new Map<string, { label: string; value: string }[]>();
+  const specCategories = useMemo<{ category: string; rows: { label: string; value: string; glyph?: string }[] }[]>(() => {
+    const map = new Map<string, { label: string; value: string; glyph?: string }[]>();
 
     if (newSpecsRendered) {
       for (const block of newSpecsRendered) {
         for (const g of block.groups) {
           const list = map.get(g.group) ?? [];
-          for (const r of g.rows) list.push({ label: r.field.label, value: r.value });
+          for (const r of g.rows) list.push({ label: r.field.label, value: r.value, glyph: r.field.key });
           if (!map.has(g.group)) map.set(g.group, list);
         }
       }
@@ -901,7 +903,7 @@ export default function ProductViewPage() {
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
-    const ordered: { category: string; rows: { label: string; value: string }[] }[] = [];
+    const ordered: { category: string; rows: { label: string; value: string; glyph?: string }[] }[] = [];
     for (const k of order) {
       if (map.has(k)) ordered.push({ category: k, rows: map.get(k)! });
     }
@@ -920,7 +922,7 @@ export default function ProductViewPage() {
      section never shows a long flat list. Each bucket is an array
      of {label, value} rows pulled from one or more underlying
      groups. Empty buckets drop out. */
-  const specTabs = useMemo<{ id: string; label: string; rows: { label: string; value: string }[] }[]>(() => {
+  const specTabs = useMemo<{ id: string; label: string; rows: { label: string; value: string; glyph?: string }[] }[]>(() => {
     const bucketMap: Record<string, string[]> = {
       Performance: [
         "Performance", "Stitch & Feed", "Automation",
@@ -934,9 +936,9 @@ export default function ProductViewPage() {
       Dimensions: ["Physical (Bare Machine)", "Material", "Application", "Compliance & Customs"],
     };
     const byCat = new Map(specCategories.map((c) => [c.category, c.rows] as const));
-    const tabs: { id: string; label: string; rows: { label: string; value: string }[] }[] = [];
+    const tabs: { id: string; label: string; rows: { label: string; value: string; glyph?: string }[] }[] = [];
     for (const [label, cats] of Object.entries(bucketMap)) {
-      const rows: { label: string; value: string }[] = [];
+      const rows: { label: string; value: string; glyph?: string }[] = [];
       for (const c of cats) {
         const r = byCat.get(c);
         if (r) rows.push(...r);
@@ -1522,31 +1524,63 @@ export default function ProductViewPage() {
                         readable). min-h keeps rows aligned across
                         cards with very different value lengths. */}
                     <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {t.rows.map((r, i) => (
-                        <div
-                          key={`${t.id}-${r.label}-${i}`}
-                          className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 min-h-[124px] flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
-                        >
-                          {/* Top row — small icon chip in the group's
-                              own tinted hue. Replaces the previous
-                              vertical accent bar with something more
-                              "iconographic" and visual. */}
-                          <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${s.chipBg} ${s.chipText}`}>
-                            <Icon className="h-3.5 w-3.5" />
-                          </span>
-                          {/* Value — refined display size. Sits with
-                              auto top margin so it pushes to the
-                              middle/bottom of the card and stays
-                              vertically aligned across the row. */}
-                          <dd className="mt-auto pt-4 text-[20px] md:text-[22px] lg:text-[24px] font-semibold tracking-[-0.018em] text-[#1D1D1F] dark:text-white leading-[1.15]">
-                            {r.value}
-                          </dd>
-                          {/* Caption label. */}
-                          <dt className="mt-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.3]">
-                            {r.label}
-                          </dt>
-                        </div>
-                      ))}
+                      {t.rows.map((r, i) => {
+                        /* Per-spec icon: every spec gets its OWN
+                           glyph instead of repeating the group icon.
+                             1) New-spec rows carry a `glyph` key
+                                that maps to a unique uicons entry
+                                in FIELD_GLYPHS — render via
+                                <SpecGlyph>.
+                             2) Technical rows (Voltage / Frequency
+                                / IP Rating / etc.) carry no glyph
+                                key — fall back to a per-label icon
+                                from the imported icon set.
+                             3) If neither matches, use the group's
+                                icon as a last resort. */
+                        const techByLabel: Record<string, typeof GaugeIcon> = {
+                          "Voltage": ZapIcon,
+                          "Frequency": ActivityIcon,
+                          "Motor Power": CpuIcon,
+                          "Power Consumption": GaugeIcon,
+                          "Phase": ZapIcon,
+                          "Plug Types": ZapIcon,
+                          "Machine Dimensions": RulerIcon,
+                          "Machine Weight": PackageIcon,
+                          "HS Code": TagsIcon,
+                          "IP Rating": ShieldCheckIcon,
+                          "Operating Temp": ActivityIcon,
+                          "CE Certified": BadgeCheckIcon,
+                          "RoHS Compliant": ShieldCheckIcon,
+                          "Colors": SparklesIcon,
+                        };
+                        const hasGlyph = !!(r.glyph && FIELD_GLYPHS[r.glyph]);
+                        const TechIcon = techByLabel[r.label];
+                        return (
+                          <div
+                            key={`${t.id}-${r.label}-${i}`}
+                            className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 min-h-[124px] flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
+                          >
+                            {/* Per-spec icon chip in the group's hue. */}
+                            <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${s.chipBg} ${s.chipText}`}>
+                              {hasGlyph ? (
+                                <SpecGlyph name={r.glyph!} size={14} className="h-3.5 w-3.5" />
+                              ) : TechIcon ? (
+                                <TechIcon className="h-3.5 w-3.5" />
+                              ) : (
+                                <Icon className="h-3.5 w-3.5" />
+                              )}
+                            </span>
+                            {/* Value — refined display size. */}
+                            <dd className="mt-auto pt-4 text-[20px] md:text-[22px] lg:text-[24px] font-semibold tracking-[-0.018em] text-[#1D1D1F] dark:text-white leading-[1.15]">
+                              {r.value}
+                            </dd>
+                            {/* Caption label. */}
+                            <dt className="mt-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.3]">
+                              {r.label}
+                            </dt>
+                          </div>
+                        );
+                      })}
                     </dl>
                   </div>
                 );
