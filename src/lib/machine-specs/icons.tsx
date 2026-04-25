@@ -245,6 +245,39 @@ export const FIELD_GLYPHS: Record<string, string> = {
   il_tb_folder_type: "presser_foot_lift",          // arrow-up-from-square
   il_tb_finished_width: "stitch_length_max",       // arrow-small-right
   il_tb_quick_change: "et_quick_release",          // bolt
+
+  /* ─── Double Needle Family — Tier 2 ────────────────────────
+     Same reuse strategy: every dn_* key maps to the closest
+     existing uicons glyph so each spec card carries a unique
+     icon without re-running the SVG build. */
+  dn_needle_distance: "zz_zigzag_width",        // arrows-h
+  dn_needle_bar_type: "needle_system",          // needle
+  dn_stitch_class: "ls_stitch_pattern",         // pulse
+  dn_hook_size: "ls_hook_size",                 // hook
+  dn_bobbin_type: "ls_bobbin_type",             // coil
+  dn_bed_type: "ls_bed_type",                   // bed-alt
+  dn_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  dn_drive_type: "motor_type",                  // engine
+
+  dn_reverse_feed: "ls_reverse_feed",           // rotate-reverse
+  dn_feed_dog_type: "ls_feed_dog_type",         // conveyor-belt-arm
+
+  dn_auto_thread_trimmer: "ls_auto_thread_trimmer",     // scissors
+  dn_auto_backtack: "ls_auto_backtack",                 // arrow-turn-down-left
+  dn_auto_presser_foot_lifter: "ls_auto_presser_foot_lifter", // arrow-up
+  dn_auto_thread_wiper: "ls_auto_thread_wiper",         // fan
+  dn_needle_positioning: "ls_needle_positioning",       // arrows-to-dot
+  dn_auto_bobbin_winder: "ls_auto_bobbin_winder",       // arrows-repeat
+  dn_low_bobbin_sensor: "ls_low_bobbin_sensor",         // signal-bars-weak
+
+  /* ─── Double Needle Chainstitch — Tier 3 ───────────────────
+     Geometric kind extras (walking-foot / long-arm / cylinder-bed
+     / post-bed / feed-off-arm / heavy-duty) reuse the lockstitch
+     fields directly so their glyphs are already mapped. */
+  dn_cs_looper_count: "hook_type",                  // fish-hook
+  dn_cs_chain_stitch_length_min: "stitch_length_min", // arrow-small-left
+  dn_cs_chain_stitch_length_max: "stitch_length_max", // arrow-small-right
+  dn_cs_independent_tension: "ls_low_bobbin_sensor",  // signal-bars-weak
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -292,6 +325,9 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Rib-Tape Feeder": "_g_WalkingFoot",          // robotic-arm
   "Elastic Feeder": "_g_WalkingFoot",           // robotic-arm
   "Binding Folder": "_g_StitchFeed",            // arrow-progress
+
+  // Double-needle groups — reuse closest existing group glyph.
+  "Chainstitch Geometry": "_g_StitchFeed",      // arrow-progress
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

@@ -26,6 +26,7 @@ import { COMMON_FIELDS } from "./common";
 import { LOCKSTITCH_FAMILY_FIELDS } from "./families/lockstitch";
 import { OVERLOCK_FAMILY_FIELDS } from "./families/overlock";
 import { INTERLOCK_FAMILY_FIELDS } from "./families/interlock";
+import { DOUBLE_NEEDLE_FAMILY_FIELDS } from "./families/double-needle";
 
 // Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
@@ -57,6 +58,10 @@ import { INTERLOCK_RIB_BINDING_FIELDS } from "./kinds/interlock/rib-binding";
 import { INTERLOCK_ELASTIC_ATTACH_FIELDS } from "./kinds/interlock/elastic-attach";
 import { INTERLOCK_TAPE_BINDING_FIELDS } from "./kinds/interlock/tape-binding";
 
+// Kind extras (Tier 3) — Double Needle (only NEW field shape;
+// geometric variants reuse lockstitch extras, see KIND_EXTRAS below)
+import { DOUBLE_NEEDLE_CHAINSTITCH_FIELDS } from "./kinds/double-needle/chainstitch";
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
    ───────────────────────────────────────────────────────────────────────────
@@ -87,9 +92,13 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Core specs shared by every coverstitch / flatlock kind.",
     fields: INTERLOCK_FAMILY_FIELDS,
   },
-  // Future: chainstitch-machines, double-needle-machines,
-  // multi-needle-machines, pattern-sewing-machines,
-  // heavy-duty-machines, special-machines.
+  "double-needle-machines": {
+    title: "Double Needle Basics",
+    subtitle: "Twin-needle specs shared across every double-needle kind.",
+    fields: DOUBLE_NEEDLE_FAMILY_FIELDS,
+  },
+  // Future: chainstitch-machines, multi-needle-machines,
+  // pattern-sewing-machines, heavy-duty-machines, special-machines.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -232,10 +241,51 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Folder geometry for flat-tape binding (T-shirt necks, lingerie trims).",
     fields: INTERLOCK_TAPE_BINDING_FIELDS,
   },
-  // Standard 2n / 3n coverstitch kinds inherit Common + Family only -
-  // the family fields (incl. needle gauge) fully cover their
-  // differentiation. Same for the simpler overlock specialties
-  // (back-latching, pocket).
+
+  // ── Double Needle ──────────────────────────────────────────
+  // Geometric variants REUSE the lockstitch geometry extras —
+  // walking-foot / long-arm / cylinder-bed / post-bed / feed-off-arm
+  // are the same physical mechanism whether one or two needles ride
+  // on top. The dn_needle_distance field already tells you how far
+  // apart the twin needles sit.
+  "dn-walking-foot": {
+    title: "Walking-Foot Mechanism",
+    subtitle: "Compound / triple-feed specifics for the twin-needle walking-foot head.",
+    fields: WALKING_FOOT_FIELDS,
+  },
+  "dn-long-arm": {
+    title: "Long-Arm Geometry",
+    subtitle: "Extended reach for oversized twin-needle work.",
+    fields: LONG_ARM_FIELDS,
+  },
+  "dn-cylinder-bed": {
+    title: "Cylinder Bed Geometry",
+    subtitle: "Tubular-arm dimensions for luggage, footwear, saddlery double-row stitching.",
+    fields: CYLINDER_BED_FIELDS,
+  },
+  "dn-post-bed": {
+    title: "Post-Bed Geometry",
+    subtitle: "Vertical post dimensions for 3D twin-needle work (shoes, caps, bags).",
+    fields: POST_BED_FIELDS,
+  },
+  "dn-feed-off-arm": {
+    title: "Feed-Off-Arm Geometry",
+    subtitle: "Narrow-arm specifics for jeans inseam double topstitch.",
+    fields: FEED_OFF_ARM_FIELDS,
+  },
+  "dn-heavy-duty": {
+    title: "Heavy-Duty Capacity",
+    subtitle: "Reinforced build for leather, canvas, and webbing twin-needle work.",
+    fields: HEAVY_DUTY_FIELDS,
+  },
+  "dn-chainstitch": {
+    title: "Chainstitch Geometry",
+    subtitle: "Two-row chainstitch specifics — looper count, stitch length, per-needle tension.",
+    fields: DOUBLE_NEEDLE_CHAINSTITCH_FIELDS,
+  },
+  // dn-lockstitch-fixed / dn-lockstitch-split / dn-needle-feed
+  // inherit Common + Family only — the dn_needle_bar_type field on
+  // the family card fully captures the fixed / split distinction.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
