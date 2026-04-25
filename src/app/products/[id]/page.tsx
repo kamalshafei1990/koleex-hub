@@ -1237,7 +1237,7 @@ export default function ProductViewPage() {
                   All button-shaped controls: h-11, px-8, rounded-full,
                   text-[15px]. Visual hierarchy from fill + font
                   weight + shadow only. ────────────────────────────── */}
-              <nav aria-label="Product actions" className="mt-10">
+              <nav aria-label="Product actions" className="mt-10 w-full max-w-[400px]">
                 {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
