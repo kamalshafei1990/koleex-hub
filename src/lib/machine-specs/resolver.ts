@@ -208,11 +208,11 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Knife type + cutting width for the integrated edge trimmer.",
     fields: EDGE_TRIMMER_FIELDS,
   },
-  "lockstitch-heavy-duty": {
-    title: "Heavy-Duty Capacity",
-    subtitle: "Max thread + material thickness — what makes this machine heavy-duty.",
-    fields: HEAVY_DUTY_FIELDS,
-  },
+  // (No `lockstitch-heavy-duty` kind exists in machine-kinds.ts —
+  //  heavy-duty lockstitch is filed under the `heavy-duty-machines`
+  //  subcategory as `hd-snls`. The HEAVY_DUTY_FIELDS extras are
+  //  reused by other subcategories' heavy-duty kinds via the
+  //  resolver, not by a phantom lockstitch kind.)
 
   // ── Overlock ──────────────────────────────────────────────
   "overlock-rolled-hem": {
