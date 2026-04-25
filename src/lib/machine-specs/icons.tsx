@@ -112,6 +112,7 @@ export const FIELD_GLYPHS: Record<string, string> = {
   ov_looper_config: "hook_type",                // fish-hook
   ov_bed_type: "ls_bed_type",                   // bed-alt
   ov_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  ov_drive_type: "motor_type",                  // engine
 
   ov_stitch_width_min: "stitch_length_min",     // arrow-small-left
   ov_stitch_width_max: "stitch_length_max",     // arrow-small-right
@@ -157,6 +158,30 @@ export const FIELD_GLYPHS: Record<string, string> = {
   ov_ss_chain_gauge: "zz_zigzag_width",          // arrows-h
   ov_ss_chain_stitch_length: "stitch_length_max", // arrow-small-right
   ov_ss_independent_tension: "ls_low_bobbin_sensor", // signal-bars-weak
+
+  // Gathering / Ruffling
+  ov_g_ratio_min: "ls_reverse_feed",             // rotate-reverse
+  ov_g_ratio_max: "ls_reverse_feed",             // rotate-reverse
+  ov_g_foot_type: "presser_foot_lift",           // arrow-up-from-square
+  ov_g_lockable_ratio: "et_quick_release",       // bolt
+
+  // Elastic / Tape Attaching
+  ov_et_max_tape_width: "zz_zigzag_width",       // arrows-h
+  ov_et_tape_stretch_ratio: "ls_reverse_feed",   // rotate-reverse
+  ov_et_tension_control: "ls_low_bobbin_sensor", // signal-bars-weak
+  ov_et_integrated_cutter: "et_knife_type",      // knife
+
+  // Glove Specifics
+  ov_gl_cylinder_diameter: "cb_cylinder_diameter", // arrows-alt-h
+  ov_gl_finger_clearance: "foa_arm_clearance",     // expand-arrows-alt
+  ov_gl_glove_type: "suitable_garments",           // shirt
+
+  // Auto Collar / Waistband Station
+  ov_acs_max_work_diameter: "cb_cylinder_diameter", // arrows-alt-h
+  ov_acs_cycle_time: "max_sewing_speed",            // tachometer
+  ov_acs_programmable_patterns: "zz_programmable",  // microchip
+  ov_acs_jig_change_time: "et_quick_release",       // bolt
+  ov_acs_auto_stacker: "ls_auto_thread_wiper",      // fan
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -191,6 +216,10 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Variable Top-Feed": "_g_WalkingFoot",        // robotic-arm
   "Rolled-Hem Specifics": "_g_StitchFeed",      // arrow-progress
   "Safety-Stitch Geometry": "_g_StitchFeed",    // arrow-progress
+  "Gathering Mechanism": "_g_StitchFeed",       // arrow-progress
+  "Tape Feeder": "_g_WalkingFoot",              // robotic-arm
+  "Glove Specifics": "_g_CylinderBed",          // grid-alt
+  "Auto Station": "_g_Automation",              // robot
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

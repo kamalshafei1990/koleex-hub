@@ -96,6 +96,21 @@ export const OVERLOCK_FAMILY_FIELDS: SpecField[] = [
     group: "Configuration",
     helpText: "Maximum stack of fabric layers the machine can penetrate.",
   },
+  {
+    key: "ov_drive_type",
+    label: "Drive & Automation",
+    type: "select",
+    options: [
+      { value: "standard-clutch", label: "Standard High-Speed (Clutch)" },
+      { value: "direct-drive", label: "Direct-Drive Servo" },
+      { value: "computerized", label: "Fully Automatic Computerized" },
+      { value: "stepping-motor", label: "Intelligent Stepping Motor" },
+      { value: "air-purify", label: "Air-Purify Computerized" },
+    ],
+    tier: "essential",
+    group: "Configuration",
+    helpText: "Motor + automation tier — drives speed, noise, oil-staining and price.",
+  },
 
   // ══════════════════════════════════════════════════════════
   // Stitch & Feed

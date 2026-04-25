@@ -246,6 +246,67 @@ const OVERLOCK_KINDS: MachineKind[] = [
     templateSlug: "overlock",
     icon: HeavyDutyMachineIcon,
   },
+
+  /* ── Specialty / application-driven overlocks ─────────────────
+     Distinct mechanisms with their own attachments + spec
+     differentiators. Each is a real SKU class in commercial
+     overlock catalogs (Juki, Pegasus, Brother, Siruba). */
+  {
+    slug: "overlock-back-latching",
+    name: "Back-Latching Overlock",
+    description: "Auto back-latch at seam end — secures the chain without manual knot.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: AutomaticMachineIcon,
+  },
+  {
+    slug: "overlock-pocket",
+    name: "Pocket Overlock",
+    description: "Dedicated guide + jig for pocket-bag overedging at speed.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: SpecialMachineIcon,
+  },
+  {
+    slug: "overlock-elastic-tape",
+    name: "Elastic / Tape Attaching Overlock",
+    description: "Integrated tape feeder + tension — attaches elastic in one pass.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: SpecialMachineIcon,
+  },
+  {
+    slug: "overlock-gathering",
+    name: "Gathering / Ruffling Overlock",
+    description: "Gather-foot + ratio mechanism — ruffles fabric while overlocking.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: SpecialMachineIcon,
+  },
+  {
+    slug: "overlock-towel",
+    name: "Towel & Washcloth Overlock",
+    description: "Loop-pile fabric handling with dust extraction for terry / fleece.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: HeavyDutyMachineIcon,
+  },
+  {
+    slug: "overlock-glove",
+    name: "Glove Overlock",
+    description: "Small-cylinder overlock for finger seams on industrial / sport gloves.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: CylinderBedMachineIcon,
+  },
+  {
+    slug: "overlock-auto-collar-station",
+    name: "Auto Collar / Waistband Station",
+    description: "Programmable cycle station for round collars + waistbands.",
+    subcategory: "overlock-machines",
+    templateSlug: "overlock",
+    icon: AutomaticMachineIcon,
+  },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════

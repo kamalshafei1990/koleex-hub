@@ -906,6 +906,8 @@ export default function ProductViewPage() {
       "Edge Trimmer", "Heavy-Duty Capacity",
       "Rolled Hem", "Rolled-Hem Specifics",
       "Variable Top-Feed", "Safety-Stitch Geometry",
+      "Gathering Mechanism", "Tape Feeder",
+      "Glove Specifics", "Auto Station",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -942,6 +944,8 @@ export default function ProductViewPage() {
         // not what it's built from).
         "Cutting", "Rolled Hem", "Rolled-Hem Specifics",
         "Variable Top-Feed", "Safety-Stitch Geometry",
+        "Gathering Mechanism", "Tape Feeder",
+        "Glove Specifics", "Auto Station",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],

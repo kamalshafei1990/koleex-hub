@@ -42,6 +42,10 @@ import { VARIABLE_TOP_FEED_FIELDS } from "./kinds/overlock/variable-top-feed";
 import { OVERLOCK_CYLINDER_BED_FIELDS } from "./kinds/overlock/cylinder-bed";
 import { OVERLOCK_HEAVY_DUTY_FIELDS } from "./kinds/overlock/heavy-duty";
 import { OVERLOCK_SAFETY_STITCH_FIELDS } from "./kinds/overlock/safety-stitch";
+import { OVERLOCK_GATHERING_FIELDS } from "./kinds/overlock/gathering";
+import { OVERLOCK_ELASTIC_TAPE_FIELDS } from "./kinds/overlock/elastic-tape";
+import { OVERLOCK_GLOVE_FIELDS } from "./kinds/overlock/glove";
+import { OVERLOCK_AUTO_COLLAR_STATION_FIELDS } from "./kinds/overlock/auto-collar-station";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -156,7 +160,29 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Chain-stitch gauge + length unique to 5-thread safety heads.",
     fields: OVERLOCK_SAFETY_STITCH_FIELDS,
   },
-  // Standard kinds (1n-2t, 1n-3t, 2n-4t) inherit Common + Family only.
+  "overlock-gathering": {
+    title: "Gathering Mechanism",
+    subtitle: "Ratio range + foot type for the ruffling attachment.",
+    fields: OVERLOCK_GATHERING_FIELDS,
+  },
+  "overlock-elastic-tape": {
+    title: "Tape Feeder",
+    subtitle: "Tape width, stretch ratio + tension control for elastic / binding tape.",
+    fields: OVERLOCK_ELASTIC_TAPE_FIELDS,
+  },
+  "overlock-glove": {
+    title: "Glove Specifics",
+    subtitle: "Tiny-cylinder geometry for finger-seam glove construction.",
+    fields: OVERLOCK_GLOVE_FIELDS,
+  },
+  "overlock-auto-collar-station": {
+    title: "Auto Station",
+    subtitle: "Cycle envelope, programmable patterns + automation specs.",
+    fields: OVERLOCK_AUTO_COLLAR_STATION_FIELDS,
+  },
+  // Standard kinds (1n-2t, 1n-3t, 2n-4t) and the simpler specialties
+  // (back-latching, pocket, towel) inherit Common + Family only —
+  // the family fields fully cover their differentiation.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
