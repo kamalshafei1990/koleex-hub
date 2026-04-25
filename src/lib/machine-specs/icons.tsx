@@ -404,6 +404,97 @@ export const FIELD_GLYPHS: Record<string, string> = {
   ps_tk_max_tack_length: "stitch_length_max",            // arrow-small-right
   ps_tk_max_tack_width: "zz_zigzag_width",               // arrows-h
   ps_tk_pattern_count: "zz_stitch_patterns_count",       // grid-three
+
+  /* ─── Heavy-Duty Family — Tier 2 ──────────────────────────
+     hd2_* prefix to avoid colliding with the existing hd_* keys
+     used by the lockstitch heavy-duty KIND extras. */
+  hd2_underlying_class: "ls_stitch_pattern",    // pulse
+  hd2_bed_type: "ls_bed_type",                  // bed-alt
+  hd2_drive_type: "motor_type",                 // engine
+  hd2_max_material_thickness: "hd_max_material_thickness_heavy", // cube
+  hd2_max_thread_thickness: "hd_max_thread_thickness", // arrow-down-strenght
+  hd2_reinforced_frame: "hd_reinforced_frame",  // frame
+  hd2_oversized_hook: "hd_large_hook",          // fort
+  hd2_needle_cooling: "ls_auto_thread_wiper",   // fan
+  hd2_max_sewing_speed: "max_sewing_speed",     // tachometer
+  hd2_stitch_length_max: "stitch_length_max",   // arrow-small-right
+  hd2_intended_materials: "suitable_fabrics",   // fabric
+
+  /* ─── Heavy-Duty Tape-Edge — Tier 3 ───────────────────────── */
+  hd_te_max_mattress_width: "zz_zigzag_width",  // arrows-h
+  hd_te_max_mattress_length: "la_arm_length",   // ruler-vertical
+  hd_te_max_mattress_height: "pb_post_height",  // arrow-from-bottom
+  hd_te_tape_width: "et_cutting_width",         // cutter
+  hd_te_auto_corner: "ls_auto_bobbin_winder",   // arrows-repeat
+
+  /* ─── Heavy-Duty Carpet Binding — Tier 3 ──────────────────── */
+  hd_cb_max_carpet_thickness: "ls_max_material_thickness", // cubes-stacked
+  hd_cb_binding_tape_width: "zz_zigzag_width",  // arrows-h
+  hd_cb_pile_handling: "feed_mechanism",        // conveyor-belt
+  hd_cb_serging_option: "et_knife_type",        // knife
+
+  /* ─── Special Family — Tier 2 ────────────────────────────── */
+  sp_machine_class: "ls_stitch_pattern",        // pulse
+  sp_drive_type: "motor_type",                  // engine
+  sp_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  sp_underlying_stitch: "ls_stitch_pattern",    // pulse
+  sp_max_sewing_speed: "max_sewing_speed",      // tachometer
+  sp_pieces_per_hour: "max_sewing_speed",       // tachometer
+  sp_auto_thread_trimmer: "ls_auto_thread_trimmer", // scissors
+  sp_auto_clamp: "ls_auto_presser_foot_lifter", // arrow-up
+  sp_pattern_memory: "zz_programmable",         // microchip
+  sp_pneumatic_required: "ls_auto_thread_wiper", // fan
+
+  /* ─── Special Buttonhole — Tier 3 ─────────────────────────── */
+  sp_bh_buttonhole_type: "zz_stitch_patterns_count", // grid-three
+  sp_bh_length_min: "stitch_length_min",        // arrow-small-left
+  sp_bh_length_max: "stitch_length_max",        // arrow-small-right
+  sp_bh_stitch_density: "ls_feed_dog_type",     // conveyor-belt-arm
+  sp_bh_knife_action: "et_knife_type",          // knife
+  sp_bh_taping: "thread_type",                  // reel
+
+  /* ─── Special Bartack — Tier 3 ────────────────────────────── */
+  sp_ba_max_tack_length: "stitch_length_max",   // arrow-small-right
+  sp_ba_max_tack_width: "zz_zigzag_width",      // arrows-h
+  sp_ba_max_stitches_per_tack: "ls_auto_backtack", // arrow-turn-down-left
+  sp_ba_built_in_patterns: "zz_stitch_patterns_count", // grid-three
+
+  /* ─── Special Button Attach — Tier 3 ──────────────────────── */
+  sp_btn_button_types: "zz_stitch_patterns_count", // grid-three
+  sp_btn_max_button_diameter: "ls_max_material_thickness", // cubes-stacked
+  sp_btn_min_button_diameter: "stitch_length_min", // arrow-small-left
+  sp_btn_auto_feeder: "ls_auto_bobbin_winder",  // arrows-repeat
+  sp_btn_thread_wrap: "thread_type",            // reel
+
+  /* ─── Special Blindstitch — Tier 3 ────────────────────────── */
+  sp_bs_skip_stitch_ratio: "ls_reverse_feed",   // rotate-reverse
+  sp_bs_hem_depth_max: "stitch_length_max",     // arrow-small-right
+  sp_bs_penetration_depth: "ls_max_material_thickness", // cubes-stacked
+
+  /* ─── Special Smocking — Tier 3 ───────────────────────────── */
+  sp_sm_row_count: "zz_stitch_patterns_count",  // grid-three
+  sp_sm_row_spacing: "zz_zigzag_width",         // arrows-h
+  sp_sm_independent_tension: "ls_low_bobbin_sensor", // signal-bars-weak
+  sp_sm_elastic_thickness: "thread_count_tex",  // hashtag-lock
+
+  /* ─── Special Picot — Tier 3 ──────────────────────────────── */
+  sp_pc_scallop_shape: "zz_stitch_patterns_count", // grid-three
+  sp_pc_scallop_width: "zz_zigzag_width",       // arrows-h
+  sp_pc_scallop_depth: "stitch_length_max",     // arrow-small-right
+  sp_pc_double_edge: "feed_mechanism",          // conveyor-belt
+
+  /* ─── Special Pleating — Tier 3 ───────────────────────────── */
+  sp_pl_pleat_type: "zz_stitch_patterns_count", // grid-three
+  sp_pl_pleat_depth_max: "stitch_length_max",   // arrow-small-right
+  sp_pl_pleat_spacing: "zz_zigzag_width",       // arrows-h
+  sp_pl_max_fabric_width: "la_arm_length",      // ruler-vertical
+
+  /* ─── Special Ultrasonic — Tier 3 ─────────────────────────── */
+  sp_us_frequency: "noise_level",               // music-note
+  sp_us_max_speed: "max_sewing_speed",          // tachometer
+  sp_us_max_layer_thickness: "ls_max_material_thickness", // cubes-stacked
+  sp_us_pattern_wheels: "zz_stitch_patterns_count", // grid-three
+  sp_us_supported_fabrics: "suitable_fabrics",  // fabric
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -468,6 +559,18 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Vision System": "_g_Automation",             // robot
   "Template System": "_g_Configuration",        // sliders-h-square
   "Tacking Station": "_g_Automation",           // robot
+
+  // Heavy-Duty + Special groups
+  "Tape-Edge Station": "_g_HeavyDuty",          // shield
+  "Carpet Binding": "_g_HeavyDuty",             // shield
+  "Buttonhole Cycle": "_g_Configuration",       // sliders-h-square
+  "Bartack Cycle": "_g_Automation",             // robot
+  "Button-Attach Cycle": "_g_Automation",       // robot
+  "Blindstitch Cycle": "_g_StitchFeed",         // arrow-progress
+  "Smocking Mechanism": "_g_StitchFeed",        // arrow-progress
+  "Picot Edging": "_g_ZigZag",                  // magnifying-glass-wave
+  "Pleating Mechanism": "_g_StitchFeed",        // arrow-progress
+  "Ultrasonic Bonding": "_g_Automation",        // robot
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

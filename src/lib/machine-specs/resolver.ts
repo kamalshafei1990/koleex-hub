@@ -30,6 +30,8 @@ import { DOUBLE_NEEDLE_FAMILY_FIELDS } from "./families/double-needle";
 import { CHAINSTITCH_FAMILY_FIELDS } from "./families/chainstitch";
 import { MULTI_NEEDLE_FAMILY_FIELDS } from "./families/multi-needle";
 import { PATTERN_SEWING_FAMILY_FIELDS } from "./families/pattern-sewing";
+import { HEAVY_DUTY_FAMILY_FIELDS } from "./families/heavy-duty";
+import { SPECIAL_FAMILY_FIELDS } from "./families/special";
 
 // Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
@@ -77,6 +79,21 @@ import { BELT_LOOP_FIELDS } from "./kinds/pattern-sewing/belt-loop";
 import { VISION_FIELDS } from "./kinds/pattern-sewing/vision";
 import { TEMPLATE_FIELDS } from "./kinds/pattern-sewing/template";
 import { TACKING_FIELDS } from "./kinds/pattern-sewing/tacking";
+
+// Kind extras (Tier 3) — Heavy-Duty (only NEW shapes; everything
+// else reuses lockstitch geometry extras)
+import { HD_TAPE_EDGE_FIELDS } from "./kinds/heavy-duty/tape-edge";
+import { HD_CARPET_BINDING_FIELDS } from "./kinds/heavy-duty/carpet-binding";
+
+// Kind extras (Tier 3) — Special Machines
+import { BUTTONHOLE_FIELDS } from "./kinds/special/buttonhole";
+import { BARTACK_FIELDS } from "./kinds/special/bartack";
+import { BUTTON_ATTACH_FIELDS } from "./kinds/special/button-attach";
+import { BLINDSTITCH_FIELDS } from "./kinds/special/blindstitch";
+import { SMOCKING_FIELDS } from "./kinds/special/smocking";
+import { PICOT_FIELDS } from "./kinds/special/picot";
+import { PLEATING_FIELDS } from "./kinds/special/pleating";
+import { ULTRASONIC_FIELDS } from "./kinds/special/ultrasonic";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -128,9 +145,16 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Programmable XY pattern stitchers — work area + programming + drive specs.",
     fields: PATTERN_SEWING_FAMILY_FIELDS,
   },
-  // Future: heavy-duty-machines, special-machines, plus the cycle
-  // machines (buttonhole / bartack / button-attach) which need
-  // their own families.
+  "heavy-duty-machines": {
+    title: "Heavy-Duty Basics",
+    subtitle: "Material capacity, frame reinforcement + cooling for heavy-duty heads.",
+    fields: HEAVY_DUTY_FAMILY_FIELDS,
+  },
+  "special-machines": {
+    title: "Special Machine Basics",
+    subtitle: "Thin shared identity for cycle heads, sub-stations + decorative specialty heads.",
+    fields: SPECIAL_FAMILY_FIELDS,
+  },
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -418,6 +442,103 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
   // pattern-auto-waistband / pattern-label-patch inherit Common +
   // Family only — the work-area + programming family fields cover
   // them.
+
+  // ── Heavy-Duty ────────────────────────────────────────────
+  // Most heavy-duty kinds reuse the lockstitch geometry extras —
+  // a heavy-duty walking-foot has the same triple-feed mechanism
+  // as a standard walking-foot, just reinforced. Only tape-edge
+  // and carpet-binding need new field shapes.
+  "hd-walking-foot": {
+    title: "Walking-Foot Mechanism",
+    subtitle: "Reinforced triple-feed for leather, upholstery, harness.",
+    fields: WALKING_FOOT_FIELDS,
+  },
+  "hd-long-arm": {
+    title: "Long-Arm Geometry",
+    subtitle: "Extended reach for sail, tarpaulin, automotive panels.",
+    fields: LONG_ARM_FIELDS,
+  },
+  "hd-cylinder-bed": {
+    title: "Cylinder Bed Geometry",
+    subtitle: "Tubular-arm dimensions for luggage, footwear, tubular heavy work.",
+    fields: CYLINDER_BED_FIELDS,
+  },
+  "hd-post-bed": {
+    title: "Post-Bed Geometry",
+    subtitle: "Vertical post dimensions for shoes, handbags, saddlery.",
+    fields: POST_BED_FIELDS,
+  },
+  "hd-zigzag": {
+    title: "Zig-Zag Stitch",
+    subtitle: "Width + pattern specs for the heavy-duty zigzag swing.",
+    fields: ZIGZAG_FIELDS,
+  },
+  "hd-tape-edge": {
+    title: "Tape-Edge Station",
+    subtitle: "Mattress envelope dimensions + corner handling for tape-edge closing.",
+    fields: HD_TAPE_EDGE_FIELDS,
+  },
+  "hd-carpet-binding": {
+    title: "Carpet Binding",
+    subtitle: "Carpet thickness + binding tape geometry for rug / carpet edge work.",
+    fields: HD_CARPET_BINDING_FIELDS,
+  },
+  // hd-snls / hd-dnls / hd-extra inherit Common + Family only —
+  // the heavy-duty family card already captures their reinforced
+  // build + max material thickness + max thread thickness.
+
+  // ── Special Machines ──────────────────────────────────────
+  "sp-buttonhole-shirt": {
+    title: "Buttonhole Cycle",
+    subtitle: "Straight-bar buttonhole geometry for shirts + light apparel.",
+    fields: BUTTONHOLE_FIELDS,
+  },
+  "sp-buttonhole-eyelet": {
+    title: "Buttonhole Cycle",
+    subtitle: "Eyelet / keyhole buttonhole geometry for jeans, trousers, coats.",
+    fields: BUTTONHOLE_FIELDS,
+  },
+  "sp-bartack": {
+    title: "Bartack Cycle",
+    subtitle: "Tack length / width / stitch count for the electronic bartack.",
+    fields: BARTACK_FIELDS,
+  },
+  "sp-button-attach": {
+    title: "Button-Attach Cycle",
+    subtitle: "Supported button types, diameter range, auto-feeder + thread-wrap.",
+    fields: BUTTON_ATTACH_FIELDS,
+  },
+  "sp-blindstitch": {
+    title: "Blindstitch Cycle",
+    subtitle: "Skip-stitch ratio, hem depth + penetration depth for invisible hemming.",
+    fields: BLINDSTITCH_FIELDS,
+  },
+  "sp-smocking": {
+    title: "Smocking Mechanism",
+    subtitle: "Row count, spacing + per-row tension for elastic shirring.",
+    fields: SMOCKING_FIELDS,
+  },
+  "sp-picot": {
+    title: "Picot Edging",
+    subtitle: "Scallop shape, width + depth for decorative picot finishing.",
+    fields: PICOT_FIELDS,
+  },
+  "sp-pleating": {
+    title: "Pleating Mechanism",
+    subtitle: "Pleat type, depth + spacing range for automated pleating.",
+    fields: PLEATING_FIELDS,
+  },
+  "sp-ultrasonic-bonding": {
+    title: "Ultrasonic Bonding",
+    subtitle: "Frequency, bonding speed + supported synthetic fabric types.",
+    fields: ULTRASONIC_FIELDS,
+  },
+  // Sub-station kinds (sp-sleeve-placket, sp-collar-runstitcher,
+  // sp-yoke-attach, sp-felling) inherit Common + Family only — the
+  // family card captures their cycle / sub-station identity. Other
+  // simple specialty heads (sp-zigzag, sp-pleating-deprecated,
+  // sp-snap-rivet, sp-elastic-cording, sp-belt-loop-maker,
+  // sp-basting, sp-tape-edge-mattress) likewise inherit family.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════

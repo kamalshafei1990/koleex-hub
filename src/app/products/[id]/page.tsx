@@ -919,6 +919,10 @@ export default function ProductViewPage() {
       "Pocket Welt Station", "Dart Station",
       "Belt Loop Station", "Vision System",
       "Template System", "Tacking Station",
+      "Tape-Edge Station", "Carpet Binding",
+      "Buttonhole Cycle", "Bartack Cycle", "Button-Attach Cycle",
+      "Blindstitch Cycle", "Smocking Mechanism",
+      "Picot Edging", "Pleating Mechanism", "Ultrasonic Bonding",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -974,6 +978,12 @@ export default function ProductViewPage() {
         "Pocket Welt Station", "Dart Station",
         "Belt Loop Station", "Vision System",
         "Template System", "Tacking Station",
+        // Heavy-Duty + Special — specialty cycle / decorative /
+        // sub-station heads. All Performance-bucket facing.
+        "Heavy-Duty Capacity", "Tape-Edge Station", "Carpet Binding",
+        "Buttonhole Cycle", "Bartack Cycle", "Button-Attach Cycle",
+        "Blindstitch Cycle", "Smocking Mechanism",
+        "Picot Edging", "Pleating Mechanism", "Ultrasonic Bonding",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],
