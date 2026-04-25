@@ -1179,9 +1179,11 @@ export default function ProductViewPage() {
 
             {/* RIGHT — supporting editorial column. col-span-4 with
                 an explicit max-width on inner content so text never
-                stretches past comfortable reading width. Text is
-                the SUPPORT, not the lead. */}
-            <div className="order-2 lg:col-span-4 lg:max-w-[360px]">
+                stretches past comfortable reading width — and the
+                secondary 50/50 button row has enough space for the
+                "Request Quotation" label to sit comfortably without
+                feeling cramped. Text is the SUPPORT, not the lead. */}
+            <div className="order-2 lg:col-span-4 lg:max-w-[400px]">
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
