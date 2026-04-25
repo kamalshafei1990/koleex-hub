@@ -1198,20 +1198,21 @@ export default function ProductViewPage() {
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
-              {/* H1 sized to the tight 400-px column so "KX-8700-DD"
-                  fits comfortably on one line at every breakpoint
-                  without forcing a wider rail. Still the column's
-                  largest type — just calibrated to its own column. */}
-              <h1 className="mt-8 text-[44px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.025em] leading-[1] text-[#1D1D1F] dark:text-white">
+              {/* H1 weight stepped down semibold → medium and size
+                  44/56/64 → 40/52/60 px so the title reads as calm
+                  identity instead of a heavy headline. The image
+                  already anchors the eye; the H1 just labels the
+                  product. */}
+              <h1 className="mt-8 text-[40px] md:text-[52px] lg:text-[60px] font-medium tracking-[-0.025em] leading-[1] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-4 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-6 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
                   {product.product_name}
                 </p>
               )}
               {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-4 text-[14px] md:text-[15px] leading-[1.6] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-6 text-[14px] md:text-[15px] leading-[1.6] text-[#6E6E73] dark:text-white/55">
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
@@ -1246,11 +1247,11 @@ export default function ProductViewPage() {
                   All button-shaped controls: h-11, px-8, rounded-full,
                   text-[15px]. Visual hierarchy from fill + font
                   weight + shadow only. ────────────────────────────── */}
-              <nav aria-label="Product actions" className="mt-10 w-full max-w-[400px]">
+              <nav aria-label="Product actions" className="mt-12 w-full max-w-[400px]">
                 {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
-                  className="flex items-center justify-center w-full h-10 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_2px_10px_rgba(0,102,204,0.18)] dark:shadow-[0_2px_10px_rgba(41,151,255,0.18)] transition-all"
+                  className="flex items-center justify-center w-full h-10 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors"
                 >
                   Estimate Total Cost
                 </Link>
