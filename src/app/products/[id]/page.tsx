@@ -747,7 +747,9 @@ export default function ProductViewPage() {
     const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
     const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
     const out: { value: string; unit?: string; label: string; icon: React.ReactNode }[] = [];
-    const ic = "h-5 w-5";
+    /* Icon size is locked to h-4 w-4 across the page so every chip
+       (Quick Info + Specs group titles) reads identically. */
+    const ic = "h-4 w-4";
 
     if (cs.max_sewing_speed) {
       out.push({
@@ -1104,12 +1106,14 @@ export default function ProductViewPage() {
             visual focal point of the section.
           ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32 lg:py-40">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            {/* LEFT — floating image with subtle radial backdrop. */}
-            <div className="order-1 lg:col-span-7">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-center">
+            {/* LEFT — DOMINANT image (col-span-8 = 67% on desktop)
+                + larger backdrop ratio. The product is the leading
+                element; text supports it. */}
+            <div className="order-1 lg:col-span-8">
               <div
-                className="relative w-full aspect-[5/4] flex items-center justify-center"
+                className="relative w-full aspect-[6/5] flex items-center justify-center"
                 style={{
                   // Subtle radial gradient gives the product a soft
                   // halo so it doesn't sit on a flat plane — same
@@ -1133,30 +1137,31 @@ export default function ProductViewPage() {
               </div>
             </div>
 
-            {/* RIGHT — editorial column with split title hierarchy. */}
-            <div className="order-2 lg:col-span-5">
+            {/* RIGHT — supporting editorial column (col-span-4 = 33%).
+                Smaller H1, lighter subtitle, less visual weight so
+                the image holds the lead. */}
+            <div className="order-2 lg:col-span-4">
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
-              {/* Main title — model code if available, otherwise the
-                  product name. Big, bold, anchor for the eye. */}
-              <h1 className="mt-4 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.98] text-[#1D1D1F] dark:text-white">
+              {/* H1 — model code, slightly smaller scale (48/64/80)
+                  so the image leads. */}
+              <h1 className="mt-4 text-[48px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.025em] leading-[0.98] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
-              {/* Subtitle — full descriptive name. Lighter weight,
-                  smaller size, muted color. Only shows when it
-                  carries information beyond the H1. */}
+              {/* Subtitle — full descriptive name. Distinct scale
+                  from H3 group titles below (18/20 vs 22/26). */}
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-4 text-[20px] md:text-[24px] font-normal tracking-[-0.005em] leading-[1.25] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-4 text-[18px] md:text-[20px] font-normal tracking-[-0.005em] leading-[1.3] text-[#6E6E73] dark:text-white/55">
                   {product.product_name}
                 </p>
               )}
               {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-8 text-[16px] md:text-[17px] leading-[1.5] text-[#1D1D1F] dark:text-white/85 max-w-[460px]">
+                <p className="mt-8 text-[15px] md:text-[16px] leading-[1.55] text-[#1D1D1F] dark:text-white/80">
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
-              <div className="mt-12 flex items-center gap-6 flex-wrap">
+              <div className="mt-10 flex items-center gap-6 flex-wrap">
                 <button
                   type="button"
                   onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
@@ -1176,17 +1181,18 @@ export default function ProductViewPage() {
         </div>
       </section>
 
-      {/* SECTION 2 — QUICK INFO (4 columns, icon → label → value) ──
-          Icon on top in a neutral chip, small uppercase label, big
-          value with unit. No card chrome — items separated by
-          generous whitespace + subtle column dividers on desktop. */}
+      {/* SECTION 2 — QUICK INFO (4 columns, perfectly aligned) ─────
+          Strict alignment: every item uses the same chip size, the
+          same icon size, the same vertical rhythm, and the same
+          left-aligned text. No conditional padding, no column
+          dividers — just uniform gap. */}
       {headlineStats.length >= 3 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-16 md:gap-y-0 md:divide-x md:divide-[#D2D2D7]/60 dark:md:divide-white/[0.06]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 md:gap-x-12 gap-y-12">
               {headlineStats.map((s, i) => (
-                <div key={i} className={`${i > 0 && i % 2 === 0 ? "md:pl-10" : ""} ${i % 2 === 1 ? "md:pl-10" : ""} ${i < headlineStats.length - 1 ? "md:pr-10" : ""}`}>
-                  <span className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-white dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
+                <div key={i}>
+                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
                     {s.icon}
                   </span>
                   <p className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
@@ -1197,7 +1203,7 @@ export default function ProductViewPage() {
                       {s.value}
                     </span>
                     {s.unit && (
-                      <span className="text-[15px] md:text-[16px] text-[#86868B] dark:text-white/55">
+                      <span className="text-[14px] md:text-[15px] text-[#86868B] dark:text-white/55">
                         {s.unit}
                       </span>
                     )}
@@ -1280,13 +1286,13 @@ export default function ProductViewPage() {
       )}
 
       {/* SECTION 5 — SPECIFICATIONS (all-visible, grouped) ─────────
-          No collapse, no tabs — every spec is on the page.
-          Categories stack vertically with strong section titles
-          + icons. Within each group, a clean 2-col key/value list
-          with subtle row dividers — Apple tech-specs pattern. */}
+          Same chip system as Quick Info: h-10 w-10 rounded-xl with
+          h-4 w-4 icon. H3 group titles at 22/26 — distinct scale
+          from H2 above (32-48) and hero subtitle (18-20). More
+          space between groups (space-y-20) for breathing room. */}
       {specTabs.length > 0 && (
         <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32 lg:py-40">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Specifications
             </p>
@@ -1294,7 +1300,7 @@ export default function ProductViewPage() {
               All the details.
             </h2>
 
-            <div className="mt-16 space-y-16">
+            <div className="mt-16 space-y-20">
               {specTabs.map((t) => {
                 const Icon = t.id === "performance" ? GaugeIcon
                   : t.id === "mechanical" ? CogIcon
@@ -1302,18 +1308,18 @@ export default function ProductViewPage() {
                   : RulerIcon;
                 return (
                   <div key={t.id}>
-                    {/* Group title — icon + name. Strong but not loud
-                        because the H2 above already established the
-                        section's primacy. */}
-                    <div className="flex items-center gap-3 pb-4 border-b border-[#D2D2D7]/60 dark:border-white/[0.06]">
-                      <span className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
+                    {/* Group title — icon chip identical to Quick
+                        Info chip (h-10 w-10 + h-4 w-4 icon) so the
+                        page's icon system is visibly consistent. */}
+                    <div className="flex items-center gap-3 pb-5 border-b border-[#D2D2D7]/60 dark:border-white/[0.06]">
+                      <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
                         <Icon className="h-4 w-4" />
                       </span>
-                      <h3 className="text-[20px] md:text-[24px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                      <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
                         {t.label}
                       </h3>
                     </div>
-                    <dl className="pt-4">
+                    <dl className="pt-2">
                       {t.rows.map((r, i, arr) => (
                         <div
                           key={`${t.id}-${r.label}-${i}`}
@@ -1342,7 +1348,7 @@ export default function ProductViewPage() {
 
       {/* SECTION 6 — CLEAN END (single closing band, no clutter) ──── */}
       <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
-        <div className="max-w-[680px] mx-auto px-6 py-20 md:py-28 text-center">
+        <div className="max-w-[680px] mx-auto px-6 py-24 md:py-32 text-center">
           <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[#1D1D1F] dark:text-white">
             Ready to put it on the line?
           </h2>
