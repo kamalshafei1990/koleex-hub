@@ -1203,51 +1203,36 @@ export default function ProductViewPage() {
                 </p>
               )}
               {/* ── Action stack ──
-                    The customer's job-to-be-done on this page is
-                    "understand total cost, not just product price."
-                    The PRIMARY CTA is therefore the landed-cost
-                    calculator — solid, high-visibility, single
-                    primary button per the rule. Secondary outline
-                    buttons sit below for quote actions + compare.
-                    A muted Contact Sales link rounds it out. */}
-              <div className="mt-8 space-y-4">
-                {/* PRIMARY — solid, high contrast. */}
-                <Link
-                  href={`/landed-cost/new?productId=${product.id}`}
-                  className="inline-flex items-center justify-center w-full sm:w-auto h-12 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
-                >
-                  Calculate Your Final Cost
-                </Link>
-
-                {/* SECONDARY — outline buttons. Same height + text
-                    style as the primary so they line up on a row. */}
+                    Strict three-tier hierarchy:
+                      MAIN row    — primary + 2 outline (max 3, per rule).
+                      Helper text — small line under primary explaining
+                                    where Calculate sends the customer.
+                      Secondary   — Add to Quotation (only when logged in).
+                      Support     — Contact Sales muted text link.
+                    All buttons share the same h-11 height so the row
+                    reads as one unit; primary is visually largest via
+                    solid fill + shadow + heavier weight. */}
+              <div className="mt-8">
+                {/* MAIN ROW — strictly capped at 3 buttons.
+                    PRIMARY (solid) + 2 outline secondaries. */}
                 <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/landed-cost/new?productId=${product.id}`}
+                    className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
+                  >
+                    Calculate Your Final Cost
+                  </Link>
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                    className="inline-flex items-center h-12 px-6 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    className="inline-flex items-center h-11 px-5 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[14px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
                   >
                     Request Quotation
                   </button>
-                  {currentUser && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // TODO: wire to /api/quotations/add-line when
-                        // the multi-product draft endpoint is ready.
-                        // For now, surface the intent so the button
-                        // doesn't dead-end.
-                        alert(`Added ${product.product_name} to your quotation draft.`);
-                      }}
-                      className="inline-flex items-center h-12 px-6 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
-                    >
-                      Add to Quotation
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={toggleCompare}
-                    className={`inline-flex items-center h-12 px-6 rounded-full border text-[15px] font-medium transition-colors ${
+                    className={`inline-flex items-center h-11 px-5 rounded-full border text-[14px] font-medium transition-colors ${
                       inCompare
                         ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
                         : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
@@ -1257,10 +1242,38 @@ export default function ProductViewPage() {
                   </button>
                 </div>
 
-                {/* SUPPORT — quietest tier. */}
+                {/* HELPER TEXT — anchored under the primary, explains
+                    where the calculator goes so customers click with
+                    intent. 8 px gap (mt-2). */}
+                <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
+                  Estimate the full cost including shipping and duties.
+                </p>
+
+                {/* CONDITIONAL — Add to Quotation. Only renders when
+                    the user has an authenticated session. Sits 16 px
+                    below the helper text on its own line so the main
+                    row stays at 3 buttons. */}
+                {currentUser && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // TODO: wire to /api/quotations/add-line when
+                        // the multi-product draft endpoint is ready.
+                        alert(`Added ${product.product_name} to your quotation draft.`);
+                      }}
+                      className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] text-[#1D1D1F] dark:text-white text-[13px] font-medium hover:bg-[#EBEBEF] dark:hover:bg-white/[0.10] transition-colors"
+                    >
+                      <span className="text-[14px] leading-none">+</span>
+                      Add to Quotation
+                    </button>
+                  </div>
+                )}
+
+                {/* SUPPORT — quietest tier, muted text link. */}
                 <Link
                   href="/contacts"
-                  className="inline-flex items-center gap-2 text-[14px] text-[#6E6E73] dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
+                  className="mt-4 inline-flex items-center gap-2 text-[13px] text-[#6E6E73] dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
                 >
                   Contact Sales <AngleRightIcon className="h-4 w-4 mt-0.5" />
                 </Link>
