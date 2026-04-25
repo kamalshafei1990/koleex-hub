@@ -1231,36 +1231,49 @@ export default function ProductViewPage() {
                   (h-11), padding (px-8), radius (rounded-full), and
                   font size (15 px). Visual hierarchy comes from
                   fill + font weight + shadow only. */}
-              <div className="mt-8">
-                {/* ROW 1 — PRIMARY (own line, full focus). */}
-                <div>
-                  <Link
-                    href={`/landed-cost/new?productId=${product.id}`}
-                    className="inline-flex items-center justify-center h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
-                  >
-                    Estimate Total Cost
-                  </Link>
-                  <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
-                    Calculate full cost including shipping, duties, and delivery.
-                  </p>
-                </div>
+              {/* ═══ BUTTON ZONE — clean stacked system ════════════
+                  Vertical layers, each layer has its own visual
+                  weight:
 
-                {/* ROW 2 — SECONDARY (16 px below primary block).
-                    Two buttons in a row, identical shape, separated
-                    by gap-4 (16 px). flex-wrap keeps them stacked
-                    cleanly on narrow widths. */}
-                <div className="mt-4 flex flex-wrap items-center gap-4">
+                    Layer 1   PRIMARY full-width — own line, no
+                              competition, biggest stage.
+                    Layer 2   SECONDARY split 50/50 — Request Quote
+                              + Compare share equal width via grid.
+                    Layer 3   SUPPORT — Contact Sales, tertiary,
+                              separated by 32 px from the cluster.
+
+                  Every button uses h-11 + px-8 + rounded-full +
+                  text-[15px]. Visual hierarchy from fill / weight
+                  / shadow only. ─────────────────────────────────── */}
+              <div className="mt-8">
+                {/* LAYER 1 — PRIMARY full-width on its own line. */}
+                <Link
+                  href={`/landed-cost/new?productId=${product.id}`}
+                  className="flex items-center justify-center w-full h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
+                >
+                  Estimate Total Cost
+                </Link>
+                <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
+                  Calculate full cost including shipping, duties, and delivery.
+                </p>
+
+                {/* LAYER 2 — SECONDARY split 50/50.
+                    grid-cols-2 + gap-4 forces both buttons to share
+                    identical width regardless of label length. They
+                    sit on the same baseline because flex centering
+                    inside each cell is identical. */}
+                <div className="mt-4 grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                    className="inline-flex items-center h-11 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    className="flex items-center justify-center w-full h-11 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
                   >
                     Request Quotation
                   </button>
                   <button
                     type="button"
                     onClick={toggleCompare}
-                    className={`inline-flex items-center h-11 px-8 rounded-full border text-[15px] font-medium transition-colors ${
+                    className={`flex items-center justify-center w-full h-11 px-8 rounded-full border text-[15px] font-medium transition-colors ${
                       inCompare
                         ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
                         : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
@@ -1270,9 +1283,8 @@ export default function ProductViewPage() {
                   </button>
                 </div>
 
-                {/* ROW 3 — TERTIARY support link, separated by 32 px
-                    from the button cluster ("do NOT place with main
-                    buttons"). Plain text link, no border, no surface. */}
+                {/* LAYER 3 — TERTIARY, separated by 32 px from the
+                    button cluster. Plain text link, no border. */}
                 <div className="mt-8">
                   <Link
                     href="/contacts"
