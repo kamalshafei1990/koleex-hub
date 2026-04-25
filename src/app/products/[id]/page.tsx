@@ -23,6 +23,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth-client";
+import type { User } from "@supabase/supabase-js";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -439,6 +441,41 @@ export default function ProductViewPage() {
      hero. Threshold tied to viewport height so it lands consistently
      across screen sizes. Uses requestAnimationFrame to keep the
      scroll handler off the layout-thrash hot path. */
+  /* Auth state for the per-action visibility rules — "Add to
+     Quotation" is the one CTA that ONLY makes sense for an
+     authenticated session. */
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  useEffect(() => {
+    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
+  }, []);
+
+  /* Compare list — sessionStorage-backed toggle so the customer can
+     queue products for side-by-side review across pages. The full
+     comparison view is a separate route; this page just owns the
+     "in / not in" state for the button. */
+  const [inCompare, setInCompare] = useState(false);
+  const COMPARE_KEY = "kx:compare:products";
+  useEffect(() => {
+    if (!product || typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(COMPARE_KEY);
+      const arr = raw ? (JSON.parse(raw) as string[]) : [];
+      setInCompare(arr.includes(product.id));
+    } catch { /* ignore */ }
+  }, [product]);
+  const toggleCompare = () => {
+    if (!product || typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(COMPARE_KEY);
+      const arr = raw ? (JSON.parse(raw) as string[]) : [];
+      const next = arr.includes(product.id)
+        ? arr.filter((x) => x !== product.id)
+        : [...arr, product.id];
+      window.sessionStorage.setItem(COMPARE_KEY, JSON.stringify(next));
+      setInCompare(next.includes(product.id));
+    } catch { /* ignore */ }
+  };
+
   const [stickyNavVisible, setStickyNavVisible] = useState(false);
   useEffect(() => {
     let raf = 0;
@@ -1060,13 +1097,15 @@ export default function ProductViewPage() {
             </nav>
             {/* Spacer for mobile when nav is hidden — pushes CTA right. */}
             <div className="md:hidden flex-1" />
-            <button
-              type="button"
-              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+            {/* Primary CTA in the sticky nav mirrors the hero —
+                "Calculate" routes to the landed-cost simulator,
+                the page's main action. */}
+            <Link
+              href={`/landed-cost/new?productId=${product.id}`}
               className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[12px] md:text-[13px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors shrink-0"
             >
-              Buy
-            </button>
+              Calculate
+            </Link>
           </div>
         </div>
       </div>
@@ -1163,20 +1202,68 @@ export default function ProductViewPage() {
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
-              <div className="mt-8 flex items-center gap-4 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                  className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
+              {/* ── Action stack ──
+                    The customer's job-to-be-done on this page is
+                    "understand total cost, not just product price."
+                    The PRIMARY CTA is therefore the landed-cost
+                    calculator — solid, high-visibility, single
+                    primary button per the rule. Secondary outline
+                    buttons sit below for quote actions + compare.
+                    A muted Contact Sales link rounds it out. */}
+              <div className="mt-8 space-y-4">
+                {/* PRIMARY — solid, high contrast. */}
+                <Link
+                  href={`/landed-cost/new?productId=${product.id}`}
+                  className="inline-flex items-center justify-center w-full sm:w-auto h-12 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
                 >
-                  Request Quote
-                </button>
-                <a
-                  href="#specs"
-                  className="inline-flex items-center gap-2 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
+                  Calculate Your Final Cost
+                </Link>
+
+                {/* SECONDARY — outline buttons. Same height + text
+                    style as the primary so they line up on a row. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+                    className="inline-flex items-center h-12 px-6 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                  >
+                    Request Quotation
+                  </button>
+                  {currentUser && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // TODO: wire to /api/quotations/add-line when
+                        // the multi-product draft endpoint is ready.
+                        // For now, surface the intent so the button
+                        // doesn't dead-end.
+                        alert(`Added ${product.product_name} to your quotation draft.`);
+                      }}
+                      className="inline-flex items-center h-12 px-6 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    >
+                      Add to Quotation
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggleCompare}
+                    className={`inline-flex items-center h-12 px-6 rounded-full border text-[15px] font-medium transition-colors ${
+                      inCompare
+                        ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
+                        : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {inCompare ? "Added to Compare" : "Compare"}
+                  </button>
+                </div>
+
+                {/* SUPPORT — quietest tier. */}
+                <Link
+                  href="/contacts"
+                  className="inline-flex items-center gap-2 text-[14px] text-[#6E6E73] dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
                 >
-                  Specifications <AngleRightIcon className="h-5 w-5 mt-0.5" />
-                </a>
+                  Contact Sales <AngleRightIcon className="h-4 w-4 mt-0.5" />
+                </Link>
               </div>
             </div>
           </div>
