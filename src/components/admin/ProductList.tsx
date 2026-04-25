@@ -58,19 +58,39 @@ export default function ProductList() {
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [filterDiv, setFilterDiv] = useState("");
-  const [filterCat, setFilterCat] = useState("");
-  const [filterSub, setFilterSub] = useState("");
-  const [filterBrand, setFilterBrand] = useState("");
-  const [filterLevel, setFilterLevel] = useState("");
-  const [filterSupplier, setFilterSupplier] = useState("");
-  const [filterVisible, setFilterVisible] = useState("");
-  const [filterFeatured, setFilterFeatured] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  /* Filter state — persisted to sessionStorage so the back-button
+     from a product detail returns the user to the same filtered
+     view they left. Keyed per route (admin /product-data vs public
+     /products) so the two lists don't share state. Hydrated lazily
+     on first render via the useState initialiser to avoid SSR
+     mismatch — `window` only exists in the browser. */
+  const filterStorageKey = `kx:productList:${pathname || "default"}`;
+  type FilterSnapshot = {
+    div: string; cat: string; sub: string; brand: string; level: string;
+    supplier: string; visible: string; featured: string; status: string;
+    search: string; showFilters: boolean; viewMode: "grid" | "list";
+  };
+  const readFilterSnapshot = (): Partial<FilterSnapshot> => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.sessionStorage.getItem(filterStorageKey);
+      return raw ? (JSON.parse(raw) as Partial<FilterSnapshot>) : {};
+    } catch { return {}; }
+  };
+  const initialFilters = readFilterSnapshot();
+
+  const [filterDiv, setFilterDiv] = useState(initialFilters.div ?? "");
+  const [filterCat, setFilterCat] = useState(initialFilters.cat ?? "");
+  const [filterSub, setFilterSub] = useState(initialFilters.sub ?? "");
+  const [filterBrand, setFilterBrand] = useState(initialFilters.brand ?? "");
+  const [filterLevel, setFilterLevel] = useState(initialFilters.level ?? "");
+  const [filterSupplier, setFilterSupplier] = useState(initialFilters.supplier ?? "");
+  const [filterVisible, setFilterVisible] = useState(initialFilters.visible ?? "");
+  const [filterFeatured, setFilterFeatured] = useState(initialFilters.featured ?? "");
+  const [filterStatus, setFilterStatus] = useState(initialFilters.status ?? "");
+  const [search, setSearch] = useState(initialFilters.search ?? "");
+  const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
   useEffect(() => {
     (async () => {
@@ -88,13 +108,43 @@ export default function ProductList() {
          the flagship. Customers browsing /products should see the
          primary line first; they can click "All divisions" or any
          other pill to broaden. Admins (/product-data) still see
-         everything so they don't miss products when filtering. */
-      if (!isInternal && d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
+         everything so they don't miss products when filtering.
+
+         Only apply the flagship default when the user has NO stored
+         filter from a previous visit — otherwise we'd overwrite
+         their persisted choice on every data refresh. */
+      if (
+        !isInternal &&
+        !initialFilters.div &&
+        d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)
+      ) {
         setFilterDiv(FLAGSHIP_DIVISION_SLUG);
       }
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInternal]);
+
+  /* Persist the filter snapshot to sessionStorage on every change.
+     Back-button from a detail page returns to the same view. Stays
+     scoped to the current route (admin vs public) via the storage
+     key so the two lists never bleed into each other. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const snapshot: FilterSnapshot = {
+        div: filterDiv, cat: filterCat, sub: filterSub,
+        brand: filterBrand, level: filterLevel, supplier: filterSupplier,
+        visible: filterVisible, featured: filterFeatured, status: filterStatus,
+        search, showFilters, viewMode,
+      };
+      window.sessionStorage.setItem(filterStorageKey, JSON.stringify(snapshot));
+    } catch { /* quota exceeded — fine */ }
+  }, [
+    filterDiv, filterCat, filterSub, filterBrand, filterLevel,
+    filterSupplier, filterVisible, filterFeatured, filterStatus,
+    search, showFilters, viewMode, filterStorageKey,
+  ]);
 
   const allBrands = useMemo(() => {
     const set = new Set<string>();
@@ -527,21 +577,21 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Actions (show on hover) — internal only */}
+                    {/* Actions (show on hover) — internal only.
+                        Edit is a real <Link> (with prefetch), wrapped
+                        in stopPropagation so the click doesn't also
+                        trigger the parent card's product-detail Link.
+                        Delete stays a <button> since it opens a modal. */}
                     {isInternal && (
                     <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          router.push(`${baseRoute}/${p.id}/edit`);
-                        }}
+                      <Link
+                        href={`${baseRoute}/${p.id}/edit`}
+                        onClick={(e) => e.stopPropagation()}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                         title="Edit product"
                       >
                         <PencilIcon className="h-3.5 w-3.5" />
-                      </button>
+                      </Link>
                       <button
                         onClick={(e) => askDelete(e, p.id, p.product_name)}
                         className="h-8 w-8 rounded-lg bg-[var(--bg-primary)]/80 border border-[var(--border-subtle)] backdrop-blur-sm flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 transition-colors"
@@ -754,18 +804,14 @@ export default function ProductList() {
                       </div>
                       {isInternal && (
                         <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(`${baseRoute}/${p.id}/edit`);
-                            }}
+                          <Link
+                            href={`${baseRoute}/${p.id}/edit`}
+                            onClick={(e) => e.stopPropagation()}
                             className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors"
                             title="Edit product"
                           >
                             <PencilIcon className="h-3.5 w-3.5" />
-                          </button>
+                          </Link>
                           <button
                             onClick={(e) => askDelete(e, p.id, p.product_name)}
                             className="h-8 w-8 rounded-lg hover:bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-dim)] hover:text-red-400 transition-colors"

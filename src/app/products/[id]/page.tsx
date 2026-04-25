@@ -368,7 +368,13 @@ function Section({
 }) {
   const headerAlign = align === "center" ? "text-center mx-auto" : "";
   return (
-    <section id={id} className={`py-20 md:py-28 ${className}`}>
+    <section
+      id={id}
+      /* scroll-mt-24 keeps the section heading visible when an
+         anchor link (#specs / #models / #config) jumps to it —
+         without it, the sticky page chrome covers the title. */
+      className={`py-20 md:py-28 scroll-mt-24 ${className}`}
+    >
       <div className="max-w-[980px] mx-auto px-6">
         {(eyebrow || title || subtitle) && (
           <div className={`mb-12 md:mb-16 ${headerAlign}`}>

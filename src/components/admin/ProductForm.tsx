@@ -295,6 +295,56 @@ export default function ProductForm({ productId }: Props) {
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
   const [originalTranslationIds, setOriginalTranslationIds] = useState<string[]>([]);
 
+  /* ── Dirty tracking ──
+     Set to true the first time the user edits any form state. Reset
+     on successful save. Used to warn before leaving (Cancel button +
+     browser beforeunload).
+
+     Hydration guard: while `loading` is true, the form is
+     receiving its initial values from the server. We ignore changes
+     during that window — the first dep change AFTER loading flips
+     to false counts as the first real edit. Implemented with a ref
+     so we don't double-fire the gating effect itself. */
+  const [dirty, setDirty] = useState(false);
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (loading) return;        // still hydrating from server
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      return;                   // first run AFTER hydration — baseline
+    }
+    setDirty(true);
+  }, [loading, product, models, media, translations, prices, related, sewingSpecs]);
+
+  /* Browser beforeunload warning — fires the native "Leave site?"
+     dialog when the user tries to close/refresh/navigate away with
+     unsaved changes. */
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  /* Smart cancel — confirms with the user when there are unsaved
+     edits, otherwise just routes back to the list. */
+  const handleCancel = () => {
+    if (dirty) {
+      const ok = window.confirm(
+        "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost."
+      );
+      if (!ok) return;
+    }
+    /* Both /products and /product-data routes exist; the wizard is
+       most often reached from /products in the current setup, so
+       send the admin back there. They can switch routes via the
+       sidebar if needed. */
+    router.push("/products");
+  };
+
   /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
 
@@ -822,6 +872,10 @@ export default function ProductForm({ productId }: Props) {
       }
 
       setSuccess("Product saved successfully!");
+      /* Save succeeded → form is in sync with DB. Clear the dirty
+         flag so the post-save router.push doesn't trip the
+         beforeunload "leave this page?" warning. */
+      setDirty(false);
       if (!isEdit) {
         setTimeout(() => router.push(`/products/${pid}/edit`), 800);
       }
@@ -853,21 +907,32 @@ export default function ProductForm({ productId }: Props) {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
 
-        {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style ═══ */}
+        {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style.
+              Back-arrow + Cancel both route to /products via handleCancel,
+              which warns when there are unsaved changes. Save publishes
+              and clears the dirty flag inside `save()`. ═══ */}
         <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/products"
-              className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0"
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
+              title={dirty ? "You have unsaved changes" : "Back to products"}
             >
               <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
+            </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
                   {product.product_name || "New Product"}
                 </h1>
                 {product.product_name && <StatusBadge status={product.status} />}
+                {dirty && (
+                  <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    Unsaved
+                  </span>
+                )}
               </div>
               <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
                 {product.product_name
@@ -876,14 +941,23 @@ export default function ProductForm({ productId }: Props) {
               </p>
             </div>
           </div>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="h-9 px-4 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
-          >
-            {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
-            <span className="hidden sm:inline">{saving ? "Saving..." : "Save Product"}</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="hidden sm:inline-flex h-9 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="h-9 px-4 md:px-6 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shrink-0"
+            >
+              {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+              <span className="hidden sm:inline">{saving ? "Saving..." : "Save Product"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
