@@ -1185,30 +1185,31 @@ export default function ProductViewPage() {
                 aligned to the same left edge but slightly tighter
                 than the prose column above — visually integrated. */}
             <div className="order-2 lg:col-span-5 lg:max-w-[480px]">
-              {/* ── Title block — unified identity unit ──
-                  Eyebrow + H1 + subtitle read as ONE tight pair
-                  (the model's identity). Tagline opens the next
-                  rhythm beat — separated by 32 px. Action block
-                  follows at 40 px below the tagline.
+              {/* ── Title block ──
+                  Open spacing so each text line has its own beat:
+                    Eyebrow → H1:           mt-8  (32)
+                    H1 → subtitle:          mt-4  (16)
+                    Subtitle → description: mt-4  (16)
+                    Description → actions:  mt-10 (40)
 
-                  Spacing rhythm:
-                    Eyebrow → H1:        mt-4  (16, tight pair)
-                    H1 → subtitle:       mt-2  (8,  tight pair)
-                    Subtitle → tagline:  mt-8  (32, beat break)
-                    Tagline → actions:   mt-10 (40, brief value) */}
+                  H1 dropped one step (88 → 80 / 64 / 48) so the
+                  text block reads quieter — image is now clearly
+                  the visual anchor. Description type bumped down
+                  to text-[14/15] muted so it supports the H1
+                  rather than competing. */}
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
-              <h1 className="mt-4 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
+              <h1 className="mt-8 text-[48px] md:text-[64px] lg:text-[80px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-2 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-4 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
                   {product.product_name}
                 </p>
               )}
               {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-8 text-[15px] md:text-[16px] leading-[1.55] text-[#1D1D1F] dark:text-white/80">
+                <p className="mt-4 text-[14px] md:text-[15px] leading-[1.6] text-[#6E6E73] dark:text-white/55">
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
@@ -1247,7 +1248,7 @@ export default function ProductViewPage() {
                 {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
-                  className="flex items-center justify-center w-full h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
+                  className="flex items-center justify-center w-full h-10 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_2px_10px_rgba(0,102,204,0.18)] dark:shadow-[0_2px_10px_rgba(41,151,255,0.18)] transition-all"
                 >
                   Estimate Total Cost
                 </Link>
@@ -1257,14 +1258,14 @@ export default function ProductViewPage() {
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                    className="flex items-center justify-center w-full h-11 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    className="flex items-center justify-center w-full h-10 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[14px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
                   >
                     Request Quotation
                   </button>
                   <button
                     type="button"
                     onClick={toggleCompare}
-                    className={`flex items-center justify-center w-full h-11 px-8 rounded-full border text-[15px] font-medium transition-colors ${
+                    className={`flex items-center justify-center w-full h-10 px-8 rounded-full border text-[14px] font-medium transition-colors ${
                       inCompare
                         ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
                         : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
