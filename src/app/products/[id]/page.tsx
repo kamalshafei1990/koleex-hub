@@ -1423,57 +1423,117 @@ export default function ProductViewPage() {
               All the details.
             </h2>
 
-            {/* Groups separated by 64 px (space-y-16). Each group's
-                row list is constrained to max-w-[760px] so line
-                length stays readable. */}
-            <div className="mt-16 space-y-16">
-              {specTabs.map((t) => {
-                const Icon = t.id === "performance" ? GaugeIcon
-                  : t.id === "mechanical" ? CogIcon
-                  : t.id === "electrical" ? ZapIcon
-                  : RulerIcon;
+            {/* Per-group visual identity — each of the four buckets
+                gets its own accent palette so the eye instantly reads
+                Performance / Mechanical / Electrical / Dimensions as
+                distinct chapters instead of one long list.
+
+                  · chipBg / chipText  → tinted icon chip in header
+                  · accentBar          → 3px vertical bar on each card
+                  · accentText         → "Group 01 / 04" counter colour
+                  · cardRing           → faint coloured hairline on cards
+            */}
+            {(() => null)()}
+            <div className="mt-16 space-y-20">
+              {specTabs.map((t, gi) => {
+                type GroupStyle = {
+                  Icon: typeof GaugeIcon;
+                  chipBg: string;
+                  chipText: string;
+                  accentBar: string;
+                  accentText: string;
+                  cardRing: string;
+                };
+                const palette: Record<string, GroupStyle> = {
+                  performance: {
+                    Icon: GaugeIcon,
+                    chipBg: "bg-[#E6F0FF] dark:bg-[#0B2A55]/60",
+                    chipText: "text-[#06C] dark:text-[#7CB8FF]",
+                    accentBar: "bg-[#06C] dark:bg-[#2997FF]",
+                    accentText: "text-[#06C] dark:text-[#7CB8FF]",
+                    cardRing: "ring-1 ring-[#06C]/[0.06] dark:ring-[#2997FF]/10",
+                  },
+                  mechanical: {
+                    Icon: CogIcon,
+                    chipBg: "bg-[#FFF1DC] dark:bg-[#3A2A0A]/60",
+                    chipText: "text-[#A05A00] dark:text-[#FFB870]",
+                    accentBar: "bg-[#A05A00] dark:bg-[#FFB870]",
+                    accentText: "text-[#A05A00] dark:text-[#FFB870]",
+                    cardRing: "ring-1 ring-[#A05A00]/[0.06] dark:ring-[#FFB870]/10",
+                  },
+                  electrical: {
+                    Icon: ZapIcon,
+                    chipBg: "bg-[#F0E8FF] dark:bg-[#251747]/60",
+                    chipText: "text-[#7A33C9] dark:text-[#C7A6FF]",
+                    accentBar: "bg-[#7A33C9] dark:bg-[#C7A6FF]",
+                    accentText: "text-[#7A33C9] dark:text-[#C7A6FF]",
+                    cardRing: "ring-1 ring-[#7A33C9]/[0.06] dark:ring-[#C7A6FF]/10",
+                  },
+                  dimensions: {
+                    Icon: RulerIcon,
+                    chipBg: "bg-[#E0F5EE] dark:bg-[#0F3A30]/60",
+                    chipText: "text-[#0F8A6E] dark:text-[#5DD0B4]",
+                    accentBar: "bg-[#0F8A6E] dark:bg-[#5DD0B4]",
+                    accentText: "text-[#0F8A6E] dark:text-[#5DD0B4]",
+                    cardRing: "ring-1 ring-[#0F8A6E]/[0.06] dark:ring-[#5DD0B4]/10",
+                  },
+                };
+                const s = palette[t.id] ?? palette.performance;
+                const Icon = s.Icon;
+                const total = specTabs.length;
+                const idx = String(gi + 1).padStart(2, "0");
+                const totalStr = String(total).padStart(2, "0");
                 return (
                   <div key={t.id}>
-                    {/* Group title — icon chip identical to Quick
-                        Info chip (h-10 w-10 + h-5 w-5 icon). 16 px
-                        bottom padding before the divider rule. */}
-                    <div className="flex items-center gap-4 pb-4 border-b border-[#D2D2D7]/60 dark:border-white/[0.06]">
-                      <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
+                    {/* Group header — tinted chip + counter + title +
+                        coloured hairline that fades to neutral. The
+                        counter (01 / 04) gives the section a sense of
+                        progression and structure, not a flat list. */}
+                    <div className="flex items-center gap-4">
+                      <span className={`inline-flex items-center justify-center h-11 w-11 rounded-xl ${s.chipBg} ${s.chipText}`}>
                         <Icon className="h-5 w-5" />
                       </span>
-                      <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
-                        {t.label}
-                      </h3>
+                      <div className="flex-shrink-0">
+                        <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] leading-none ${s.accentText}`}>
+                          {idx}<span className="text-[#86868B] dark:text-white/40 font-medium">  /  {totalStr}</span>
+                        </p>
+                        <h3 className="mt-2 text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+                          {t.label}
+                        </h3>
+                      </div>
+                      {/* Filler hairline — sits between the title and
+                          the spec count to balance the header. Hidden
+                          on small screens to keep things compact. */}
+                      <span
+                        aria-hidden
+                        className="hidden md:block flex-1 h-px ml-3 bg-[#D2D2D7]/60 dark:bg-white/[0.06]"
+                      />
+                      <span className="hidden md:inline-flex items-baseline text-[11px] font-medium text-[#86868B] dark:text-white/45 tabular-nums">
+                        <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${s.accentBar}`} aria-hidden />
+                        {t.rows.length} specs
+                      </span>
                     </div>
-                    {/* Stat-card grid — each spec lives in its own
-                        soft card surface with a coloured accent bar
-                        on the left tied to the group's icon colour.
-                        The big display number reads first; the small
-                        uppercase label sits underneath as a caption.
-                        Hover lifts the card to confirm it's a
-                        designed object, not data dump.
 
-                        2 cols on tablet, 3 cols on desktop, 1 on
-                        mobile. gap-4 between cards. */}
-                    <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Stat-card grid — equal-height cards with
+                        group-coloured accent bar on the left, big
+                        display value on top, small caption label
+                        underneath. min-h ensures rows stay aligned
+                        even when one value is short ("220V") and
+                        another is long ("1,200 × 850 × 1,500 mm"). */}
+                    <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {t.rows.map((r, i) => (
                         <div
                           key={`${t.id}-${r.label}-${i}`}
-                          className="group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/[0.06] p-6 pl-7 transition-all duration-300 hover:bg-[#EEEEF0] dark:hover:bg-white/[0.06] hover:-translate-y-0.5"
+                          className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 pl-6 min-h-[112px] flex flex-col justify-between transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
                         >
-                          {/* Accent bar — vertical hairline tied to
-                              the group's icon colour. Reinforces the
-                              4-bucket grouping at a glance. */}
                           <span
                             aria-hidden
-                            className="absolute left-0 top-6 bottom-6 w-[3px] rounded-full bg-[#06C] dark:bg-[#2997FF] opacity-70 group-hover:opacity-100 transition-opacity"
+                            className={`absolute left-0 top-5 bottom-5 w-[3px] rounded-full ${s.accentBar} opacity-80 group-hover:opacity-100 transition-opacity`}
                           />
-                          {/* Big display value — the stat reads first. */}
-                          <dd className="text-[26px] md:text-[30px] lg:text-[32px] font-semibold tracking-[-0.02em] text-[#1D1D1F] dark:text-white leading-[1.1]">
+                          <dd className="text-[24px] md:text-[28px] lg:text-[30px] font-semibold tracking-[-0.02em] text-[#1D1D1F] dark:text-white leading-[1.1]">
                             {r.value}
                           </dd>
-                          {/* Caption label underneath. */}
-                          <dt className="mt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.4]">
+                          <dt className="mt-3 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45 leading-[1.3]">
                             {r.label}
                           </dt>
                         </div>
