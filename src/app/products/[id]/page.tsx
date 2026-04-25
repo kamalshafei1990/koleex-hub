@@ -1413,7 +1413,7 @@ export default function ProductViewPage() {
                   the customer scrolls. Each badge only renders when
                   the underlying data exists — no empty cells, no
                   fake claims. Max 4 items so the row never wraps. */}
-              {(product.ce_certified || product.rohs_compliant || product.warranty || product.lead_time || product.country_of_origin) && (
+              {(product.ce_certified || product.rohs_compliant || product.warranty || product.country_of_origin) && (
                 <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-[12px] text-[#6E6E73] dark:text-white/55">
                   {product.ce_certified && (
                     <li className="inline-flex items-center gap-1.5">
@@ -1433,13 +1433,7 @@ export default function ProductViewPage() {
                       {product.warranty} warranty
                     </li>
                   )}
-                  {product.lead_time && (
-                    <li className="inline-flex items-center gap-1.5">
-                      <PackageIcon className="h-3.5 w-3.5 text-[#A05A00] dark:text-[#FFB870]" />
-                      Ships in {product.lead_time}
-                    </li>
-                  )}
-                  {!product.lead_time && product.country_of_origin && (
+                  {product.country_of_origin && (
                     <li className="inline-flex items-center gap-1.5">
                       <GlobeIcon className="h-3.5 w-3.5 text-[#86868B] dark:text-white/45" />
                       Made in {product.country_of_origin}
