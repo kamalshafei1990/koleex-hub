@@ -46,6 +46,7 @@ import { OVERLOCK_GATHERING_FIELDS } from "./kinds/overlock/gathering";
 import { OVERLOCK_ELASTIC_TAPE_FIELDS } from "./kinds/overlock/elastic-tape";
 import { OVERLOCK_GLOVE_FIELDS } from "./kinds/overlock/glove";
 import { OVERLOCK_AUTO_COLLAR_STATION_FIELDS } from "./kinds/overlock/auto-collar-station";
+import { OVERLOCK_TOWEL_FIELDS } from "./kinds/overlock/towel";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -180,9 +181,14 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Cycle envelope, programmable patterns + automation specs.",
     fields: OVERLOCK_AUTO_COLLAR_STATION_FIELDS,
   },
+  "overlock-towel": {
+    title: "Towel Specifics",
+    subtitle: "Dust extraction + loop-pile handling for terry / fleece work.",
+    fields: OVERLOCK_TOWEL_FIELDS,
+  },
   // Standard kinds (1n-2t, 1n-3t, 2n-4t) and the simpler specialties
-  // (back-latching, pocket, towel) inherit Common + Family only —
-  // the family fields fully cover their differentiation.
+  // (back-latching, pocket) inherit Common + Family only — the
+  // family fields fully cover their differentiation.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════

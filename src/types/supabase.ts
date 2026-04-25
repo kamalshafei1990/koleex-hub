@@ -278,6 +278,12 @@ export interface ProductRow {
   power_consumption_w: number | null;
   ce_certified: boolean | null;
   rohs_compliant: boolean | null;
+  /* Air-purify / oil-mist filter — relevant for cleanrooms and
+     light-fabric production. Pneumatic supply requirement —
+     relevant for automatic stations and pneumatic presser-foot
+     lifters. Both nullable so existing products default to "n/a". */
+  oil_mist_filter: boolean | null;
+  pneumatic_supply: boolean | null;
   machine_weight_kg: number | null;
   machine_dimensions: string | null;
   /* Technical step v2 audit gap-fill. */

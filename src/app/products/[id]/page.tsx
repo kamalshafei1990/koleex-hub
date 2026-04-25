@@ -744,6 +744,7 @@ export default function ProductViewPage() {
     if (product.power_consumption_w !== null && product.power_consumption_w !== undefined) elec.push({ label: "Power Consumption", value: `${product.power_consumption_w} W` });
     if (product.phase) elec.push({ label: "Phase", value: product.phase === "single" ? "Single phase" : product.phase === "three" ? "Three phase" : product.phase });
     if ((product.plug_types?.length || 0) > 0) elec.push({ label: "Plug Types", value: (product.plug_types || []).join(", ") });
+    if (product.pneumatic_supply) elec.push({ label: "Pneumatic Supply", value: "Required" });
 
     const phys: Row[] = [];
     if (product.machine_dimensions) phys.push({ label: "Machine Dimensions", value: product.machine_dimensions });
@@ -755,6 +756,7 @@ export default function ProductViewPage() {
     if (product.operating_temp) comp.push({ label: "Operating Temp", value: product.operating_temp });
     if (product.ce_certified) comp.push({ label: "CE Certified", value: "Yes" });
     if (product.rohs_compliant) comp.push({ label: "RoHS Compliant", value: "Yes" });
+    if (product.oil_mist_filter) comp.push({ label: "Oil-Mist Filter", value: "Yes" });
     if ((product.colors?.length || 0) > 0) comp.push({ label: "Colors", value: (product.colors || []).join(", ") });
 
     const groups: Group[] = [];
@@ -908,6 +910,7 @@ export default function ProductViewPage() {
       "Variable Top-Feed", "Safety-Stitch Geometry",
       "Gathering Mechanism", "Tape Feeder",
       "Glove Specifics", "Auto Station",
+      "Towel Specifics",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -946,6 +949,7 @@ export default function ProductViewPage() {
         "Variable Top-Feed", "Safety-Stitch Geometry",
         "Gathering Mechanism", "Tape Feeder",
         "Glove Specifics", "Auto Station",
+        "Towel Specifics",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],
@@ -1843,6 +1847,7 @@ export default function ProductViewPage() {
                           "Power Consumption": GaugeIcon,
                           "Phase": ZapIcon,
                           "Plug Types": ZapIcon,
+                          "Pneumatic Supply": WrenchIcon,
                           "Machine Dimensions": RulerIcon,
                           "Machine Weight": PackageIcon,
                           "HS Code": TagsIcon,
@@ -1850,6 +1855,7 @@ export default function ProductViewPage() {
                           "Operating Temp": ActivityIcon,
                           "CE Certified": BadgeCheckIcon,
                           "RoHS Compliant": ShieldCheckIcon,
+                          "Oil-Mist Filter": DropletsIcon,
                           "Colors": SparklesIcon,
                         };
                         const hasGlyph = !!(r.glyph && FIELD_GLYPHS[r.glyph]);

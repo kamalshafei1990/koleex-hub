@@ -423,6 +423,8 @@ export default function ProductForm({ productId }: Props) {
           machine_dimensions: p.machine_dimensions || "",
           ce_certified: !!p.ce_certified,
           rohs_compliant: !!p.rohs_compliant,
+          oil_mist_filter: !!p.oil_mist_filter,
+          pneumatic_supply: !!p.pneumatic_supply,
           frequency_hz: p.frequency_hz || [],
           phase: p.phase || "",
           ip_rating: p.ip_rating || "",
@@ -728,6 +730,8 @@ export default function ProductForm({ productId }: Props) {
         machine_dimensions: product.machine_dimensions || null,
         ce_certified: product.ce_certified,
         rohs_compliant: product.rohs_compliant,
+        oil_mist_filter: product.oil_mist_filter,
+        pneumatic_supply: product.pneumatic_supply,
         // Technical step v2 audit additions.
         frequency_hz: product.frequency_hz,
         phase: product.phase || null,

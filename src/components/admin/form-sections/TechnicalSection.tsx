@@ -51,6 +51,8 @@ interface Props {
     | "phase"
     | "ip_rating"
     | "operating_temp"
+    | "oil_mist_filter"
+    | "pneumatic_supply"
   >;
   onChange: (u: Partial<ProductFormState>) => void;
   suggestions?: {
@@ -646,6 +648,20 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             placeholder="e.g. Type C (Enter to add)"
           />
         )}
+
+        {/* Pneumatic supply requirement — relevant for automatic
+            stations and pneumatic presser-foot lifters. Sits at
+            the bottom of the Electrical card because it's a power
+            requirement, not a compliance flag. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
+          <ToggleRow
+            label="Pneumatic Supply Required"
+            icon={<ZapIcon className="h-3.5 w-3.5" />}
+            helpText="Machine needs an external air-compressor line to operate."
+            value={data.pneumatic_supply}
+            onChange={(v) => onChange({ pneumatic_supply: v })}
+          />
+        </div>
       </SubCard>
 
       {/* ── 2. Physical (Bare Machine) ──
@@ -755,6 +771,17 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             helpText="EU restriction on hazardous substances in electronics."
             value={data.rohs_compliant}
             onChange={(v) => onChange({ rohs_compliant: v })}
+          />
+          {/* Oil-mist filter — for cleanroom and light-fabric
+              production. Independent of drive type so a non-air-
+              purify head can still optionally have an after-market
+              filter retrofit. */}
+          <ToggleRow
+            label="Oil-Mist Filter"
+            icon={<DropletsIcon className="h-3.5 w-3.5" />}
+            helpText="Air-purify / mist filter — keeps oil mist out of cleanroom + light-fabric environments."
+            value={data.oil_mist_filter}
+            onChange={(v) => onChange({ oil_mist_filter: v })}
           />
         </div>
 

@@ -182,6 +182,11 @@ export const FIELD_GLYPHS: Record<string, string> = {
   ov_acs_programmable_patterns: "zz_programmable",  // microchip
   ov_acs_jig_change_time: "et_quick_release",       // bolt
   ov_acs_auto_stacker: "ls_auto_thread_wiper",      // fan
+
+  // Towel Specifics
+  ov_tw_dust_extraction: "ls_auto_thread_wiper",    // fan
+  ov_tw_loop_pile_height: "ls_max_material_thickness", // cubes-stacked
+  ov_tw_foot_type: "presser_foot_lift",             // arrow-up-from-square
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -220,6 +225,7 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Tape Feeder": "_g_WalkingFoot",              // robotic-arm
   "Glove Specifics": "_g_CylinderBed",          // grid-alt
   "Auto Station": "_g_Automation",              // robot
+  "Towel Specifics": "_g_Material",             // clothes-hanger
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

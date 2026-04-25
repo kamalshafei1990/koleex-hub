@@ -45,10 +45,16 @@ export interface ProductFormState {
      packed/shipment dimensions which live on product_models. */
   machine_weight_kg: string;
   machine_dimensions: string;     // free text "L × W × H mm"
-  /* Compliance (Technical step). Both default false so admins flip
+  /* Compliance (Technical step). All default false so admins flip
      them on per-product. */
   ce_certified: boolean;
   rohs_compliant: boolean;
+  /* Air-purify / oil-mist filter — relevant for cleanrooms and
+     light-fabric production. Pneumatic supply requirement —
+     relevant for automatic stations + pneumatic presser-foot
+     lifters. */
+  oil_mist_filter: boolean;
+  pneumatic_supply: boolean;
   /* Technical step v2 — gap-fill audit additions.
      frequency_hz: array since some machines support both 50 and 60.
      phase: "single" | "three" stored as plain string.
@@ -193,6 +199,8 @@ export const EMPTY_PRODUCT: ProductFormState = {
   machine_dimensions: "",
   ce_certified: false,
   rohs_compliant: false,
+  oil_mist_filter: false,
+  pneumatic_supply: false,
   frequency_hz: [],
   phase: "",
   ip_rating: "",
