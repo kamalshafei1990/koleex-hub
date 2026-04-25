@@ -1146,12 +1146,17 @@ export default function ProductViewPage() {
           ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
         <div className="max-w-[1320px] mx-auto px-6 lg:px-8 py-32 md:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-16 items-center">
-            {/* LEFT — DOMINANT image. Section is wider (1320 vs
-                1200), aspect goes 6:5 → 5:4 (wider canvas), and
-                the gap to text is bigger (24 lg). Net image area
-                ≈ +20% from previous pass. */}
-            <div className="order-1 lg:col-span-8">
+          {/* Hero grid — 7/5 split (~58 / 42). Image stays the
+              dominant element (col-span-7 ≈ 706 px wide on a
+              1320-px section) but the text column is now wide
+              enough that the H1 model code sits comfortably on
+              one line and the body type isn't crammed into a
+              narrow rail. Net effect: image and text columns
+              read at near-equal vertical height, so items-center
+              produces a genuinely balanced composition instead of
+              two adjacent halves at different heights. */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
+            <div className="order-1 lg:col-span-7">
               {/* Image floats clean on the section background. The
                   earlier radial-gradient backdrop was removed —
                   whatever subtle halo it provided was reading as
@@ -1173,13 +1178,13 @@ export default function ProductViewPage() {
               </div>
             </div>
 
-            {/* RIGHT — supporting editorial column. col-span-4 with
-                an explicit max-width on inner content so text never
-                stretches past comfortable reading width — and the
-                secondary 50/50 button row has enough space for the
-                "Request Quotation" label to sit comfortably without
-                feeling cramped. Text is the SUPPORT, not the lead. */}
-            <div className="order-2 lg:col-span-4 lg:max-w-[400px]">
+            {/* RIGHT — editorial column. col-span-5 with max-w-[480px]
+                so the column reads as a calm reading width: H1
+                fits on one line, body copy doesn't feel cramped,
+                and the action block (also max-w-[400px]) sits
+                aligned to the same left edge but slightly tighter
+                than the prose column above — visually integrated. */}
+            <div className="order-2 lg:col-span-5 lg:max-w-[480px]">
               {/* ── Title block — unified identity unit ──
                   Eyebrow + H1 + subtitle read as ONE tight pair
                   (the model's identity). Tagline opens the next
