@@ -1152,16 +1152,12 @@ export default function ProductViewPage() {
                 the gap to text is bigger (24 lg). Net image area
                 ≈ +20% from previous pass. */}
             <div className="order-1 lg:col-span-8">
-              <div
-                className="relative w-full aspect-[5/4] flex items-center justify-center"
-                style={{
-                  // Subtle radial gradient gives the product a soft
-                  // halo so it doesn't sit on a flat plane — same
-                  // technique Apple uses on hero product shots.
-                  backgroundImage:
-                    "radial-gradient(ellipse at center, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 70%)",
-                }}
-              >
+              {/* Image floats clean on the section background. The
+                  earlier radial-gradient backdrop was removed —
+                  whatever subtle halo it provided was reading as
+                  visual competition around the product. Pure photo
+                  on pure surface = stronger product presence. */}
+              <div className="relative w-full aspect-[5/4] flex items-center justify-center">
                 {mainImage ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -1184,20 +1180,25 @@ export default function ProductViewPage() {
                 "Request Quotation" label to sit comfortably without
                 feeling cramped. Text is the SUPPORT, not the lead. */}
             <div className="order-2 lg:col-span-4 lg:max-w-[400px]">
+              {/* ── Title block — unified identity unit ──
+                  Eyebrow + H1 + subtitle read as ONE tight pair
+                  (the model's identity). Tagline opens the next
+                  rhythm beat — separated by 32 px. Action block
+                  follows at 40 px below the tagline.
+
+                  Spacing rhythm:
+                    Eyebrow → H1:        mt-4  (16, tight pair)
+                    H1 → subtitle:       mt-2  (8,  tight pair)
+                    Subtitle → tagline:  mt-8  (32, beat break)
+                    Tagline → actions:   mt-10 (40, brief value) */}
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
-              {/* H1 — model code, slightly smaller scale (48/64/80)
-                  so the image leads. */}
-              {/* H1 bumped 48/60/72 → 56/72/88 px (significantly
-                  larger); subtitle dropped 18/20 → 15/16 to widen
-                  the size gap between levels — H1 vs subtitle is
-                  now ≈5.5×. Spacing scale stays in 8/16/32. */}
-              <h1 className="mt-8 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
+              <h1 className="mt-4 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-4 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-2 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
                   {product.product_name}
                 </p>
               )}
