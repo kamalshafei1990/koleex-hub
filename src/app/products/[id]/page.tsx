@@ -1445,20 +1445,20 @@ export default function ProductViewPage() {
                         {t.label}
                       </h3>
                     </div>
-                    <dl className="max-w-[760px]">
-                      {t.rows.map((r, i, arr) => (
-                        <div
-                          key={`${t.id}-${r.label}-${i}`}
-                          className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-8 gap-y-1 py-8 ${
-                            i < arr.length - 1
-                              ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
-                              : ""
-                          }`}
-                        >
-                          <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
+                    {/* Stat-grid layout — each spec is a vertical
+                        stack: small uppercase LABEL → big bold VALUE.
+                        Replaces the previous data-table rows so the
+                        section reads as a designed visual spec sheet
+                        instead of a database dump. 2 cols on tablet,
+                        3 cols on desktop, 1 on mobile — gap-y handles
+                        breathing, no row dividers needed. */}
+                    <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
+                      {t.rows.map((r, i) => (
+                        <div key={`${t.id}-${r.label}-${i}`}>
+                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.4]">
                             {r.label}
                           </dt>
-                          <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium leading-[1.5]">
+                          <dd className="mt-2 text-[20px] md:text-[22px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.25]">
                             {r.value}
                           </dd>
                         </div>
