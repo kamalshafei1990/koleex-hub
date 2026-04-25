@@ -1,10 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
+import ZapIcon from "@/components/icons/ui/ZapIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import GaugeIcon from "@/components/icons/ui/GaugeIcon";
+import PowerIcon from "@/components/icons/ui/PowerIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import HashtagIcon from "@/components/icons/ui/HashtagIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import ScaleIcon from "@/components/icons/ui/ScaleIcon";
+import DropletsIcon from "@/components/icons/ui/DropletsIcon";
+import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
+import AwardIcon from "@/components/icons/ui/AwardIcon";
 import type { ProductFormState } from "@/types/product-form";
 
 interface PlugTypeOption {
@@ -49,13 +63,14 @@ interface Props {
 
 /* ── ChipInput with dropdown suggestions ── */
 function ChipInput({
-  label, values, onChange, placeholder, suggestions,
+  label, values, onChange, placeholder, suggestions, icon,
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
   suggestions?: string[];
+  icon?: React.ReactNode;
 }) {
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
@@ -84,7 +99,11 @@ function ChipInput({
 
   return (
     <div ref={ref}>
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">{label}</label>
+      {icon ? (
+        <FieldLabel icon={icon}>{label}</FieldLabel>
+      ) : (
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">{label}</label>
+      )}
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {values.map(v => (
@@ -374,29 +393,59 @@ function SubCard({
   title,
   subtitle,
   accent,
+  icon,
   children,
 }: {
   number: number;
   title: string;
   subtitle?: string;
-  accent: { edge: string; bg: string; text: string; border: string };
+  /* Tier color used ONLY for the digit inside the numbered badge
+     and a tiny dot — never for whole-card chrome. Same language as
+     the Specs page so Technical reads as part of the same hub. */
+  accent: { dot: string; text: string };
+  icon?: ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accent.edge}`} />
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
-        <div className={`h-7 w-7 rounded-full ${accent.bg} ${accent.border} border flex items-center justify-center shrink-0`}>
-          <span className={`text-[12px] font-bold tabular-nums ${accent.text}`}>{number}</span>
+        <div className="h-9 w-9 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 relative">
+          <span className={`text-[14px] font-bold tabular-nums ${accent.text}`}>{number}</span>
+          {/* Tiny tier dot — the only spot of color on the card. */}
+          <span className={`absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ${accent.dot}`} />
         </div>
+        {icon && (
+          <div className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 text-[var(--text-primary)]">
+            {icon}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
-          <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">{title}</h3>
+          <h3 className="text-[15px] font-semibold text-[var(--text-primary)] leading-tight">{title}</h3>
           {subtitle && (
-            <p className="text-[11px] text-[var(--text-ghost)] truncate mt-0.5">{subtitle}</p>
+            <p className="text-[11.5px] text-[var(--text-ghost)] truncate mt-0.5">{subtitle}</p>
           )}
         </div>
       </div>
       <div className="p-5 space-y-4">{children}</div>
+    </div>
+  );
+}
+
+/* Field label with an inline icon chip — matches the look of the
+   Specs page row labels. Use whenever a Technical field would
+   benefit from a visual cue. */
+function FieldLabel({ icon, children, helpText }: { icon: ReactNode; children: ReactNode; helpText?: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-1.5">
+      <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[var(--bg-inverted)]/[0.04] text-[var(--text-muted)] shrink-0">
+        {icon}
+      </span>
+      <label
+        className="text-[12px] font-medium text-[var(--text-subtle)]"
+        title={helpText}
+      >
+        {children}
+      </label>
     </div>
   );
 }
@@ -414,6 +463,7 @@ function NumberUnit({
   placeholder,
   onChange,
   helpText,
+  icon,
 }: {
   label: string;
   value: string;
@@ -421,12 +471,17 @@ function NumberUnit({
   placeholder?: string;
   onChange: (v: string) => void;
   helpText?: string;
+  icon?: ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-        {label}
-      </label>
+      {icon ? (
+        <FieldLabel icon={icon} helpText={helpText}>{label}</FieldLabel>
+      ) : (
+        <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+          {label}
+        </label>
+      )}
       <div className="relative">
         <input
           type="number"
@@ -457,19 +512,28 @@ function ToggleRow({
   helpText,
   value,
   onChange,
+  icon,
 }: {
   label: string;
   helpText?: string;
   value: boolean;
   onChange: (v: boolean) => void;
+  icon?: ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <div className="min-w-0">
-        <div className="text-[13px] text-[var(--text-primary)] font-medium">{label}</div>
-        {helpText && (
-          <div className="text-[11px] text-[var(--text-ghost)] mt-0.5">{helpText}</div>
+      <div className="min-w-0 flex items-center gap-2.5">
+        {icon && (
+          <span className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-[var(--bg-inverted)]/[0.04] text-[var(--text-muted)] shrink-0">
+            {icon}
+          </span>
         )}
+        <div>
+          <div className="text-[13px] text-[var(--text-primary)] font-medium">{label}</div>
+          {helpText && (
+            <div className="text-[11px] text-[var(--text-ghost)] mt-0.5">{helpText}</div>
+          )}
+        </div>
       </div>
       <button
         type="button"
@@ -493,26 +557,13 @@ function ToggleRow({
 export default function TechnicalSection({ data, onChange, suggestions }: Props) {
   const hasPlugCards = suggestions?.plug_types && suggestions.plug_types.length > 0;
 
-  // Per-card visual accents — one color per concern (Electrical / Physical
-  // / Compliance) so the Technical step reads at a glance.
-  const electricalAccent = {
-    edge: "bg-amber-500/70",
-    bg: "bg-amber-500/15",
-    text: "text-amber-400",
-    border: "border-amber-500/40",
-  };
-  const physicalAccent = {
-    edge: "bg-blue-500/70",
-    bg: "bg-blue-500/15",
-    text: "text-blue-400",
-    border: "border-blue-500/40",
-  };
-  const complianceAccent = {
-    edge: "bg-emerald-500/70",
-    bg: "bg-emerald-500/15",
-    text: "text-emerald-400",
-    border: "border-emerald-500/40",
-  };
+  // Per-card accents — only the digit inside the numbered badge and
+  // a tiny dot get tinted. Whole-card chrome stays neutral so the
+  // Technical step matches the Specs page palette and the rest of
+  // the hub.
+  const electricalAccent = { dot: "bg-amber-400", text: "text-amber-400" };
+  const physicalAccent   = { dot: "bg-blue-400",  text: "text-blue-400"  };
+  const complianceAccent = { dot: "bg-emerald-400", text: "text-emerald-400" };
 
   return (
     <div className="space-y-5">
@@ -525,10 +576,12 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         title="Electrical"
         subtitle="Voltage, frequency, motor power, phase, and the plug types this product ships with"
         accent={electricalAccent}
+        icon={<ZapIcon className="h-4 w-4" />}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChipInput
             label="Voltage Options"
+            icon={<ZapIcon className="h-3.5 w-3.5" />}
             values={data.voltage}
             onChange={(v) => onChange({ voltage: v })}
             placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"}
@@ -536,6 +589,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
           />
           <ChipInput
             label="Frequency (Hz)"
+            icon={<RefreshCwIcon className="h-3.5 w-3.5" />}
             values={data.frequency_hz}
             onChange={(v) => onChange({ frequency_hz: v })}
             placeholder="e.g. 50 (Enter to add)"
@@ -545,6 +599,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <NumberUnit
             label="Motor Power"
+            icon={<PowerIcon className="h-3.5 w-3.5" />}
             value={data.motor_power_w}
             unit="W"
             placeholder="e.g. 550"
@@ -553,6 +608,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
           />
           <NumberUnit
             label="Power Consumption"
+            icon={<GaugeIcon className="h-3.5 w-3.5" />}
             value={data.power_consumption_w}
             unit="W"
             placeholder="e.g. 600"
@@ -560,9 +616,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             helpText="Total draw under typical load."
           />
           <div>
-            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-              Phase
-            </label>
+            <FieldLabel icon={<LayersIcon className="h-3.5 w-3.5" />}>Phase</FieldLabel>
             <select
               value={data.phase}
               onChange={(e) => onChange({ phase: e.target.value })}
@@ -586,6 +640,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         ) : (
           <ChipInput
             label="Plug Types"
+            icon={<BadgeCheckIcon className="h-3.5 w-3.5" />}
             values={data.plug_types}
             onChange={(v) => onChange({ plug_types: v })}
             placeholder="e.g. Type C (Enter to add)"
@@ -602,12 +657,13 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         title="Physical (Bare Machine)"
         subtitle="Footprint and weight of the machine itself — packed shipment data lives on the Models step"
         accent={physicalAccent}
+        icon={<RulerIcon className="h-4 w-4" />}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+            <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
               Machine Dimensions (L × W × H)
-            </label>
+            </FieldLabel>
             <input
               type="text"
               value={data.machine_dimensions}
@@ -621,6 +677,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
           </div>
           <NumberUnit
             label="Machine Weight"
+            icon={<ScaleIcon className="h-3.5 w-3.5" />}
             value={data.machine_weight_kg}
             unit="kg"
             placeholder="e.g. 32"
@@ -640,12 +697,11 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         title="Compliance & Customs"
         subtitle="Certifications, HS classification, environmental ratings, and visual attributes"
         accent={complianceAccent}
+        icon={<ShieldCheckIcon className="h-4 w-4" />}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-              HS Code
-            </label>
+            <FieldLabel icon={<HashtagIcon className="h-3.5 w-3.5" />}>HS Code</FieldLabel>
             <input
               type="text"
               value={data.hs_code}
@@ -658,9 +714,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             </p>
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-              IP Rating
-            </label>
+            <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>IP Rating</FieldLabel>
             <input
               type="text"
               value={data.ip_rating}
@@ -673,9 +727,7 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             </p>
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-              Operating Temperature
-            </label>
+            <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>Operating Temperature</FieldLabel>
             <input
               type="text"
               value={data.operating_temp}
@@ -692,12 +744,14 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
           <ToggleRow
             label="CE Certified"
+            icon={<BadgeCheckIcon className="h-3.5 w-3.5" />}
             helpText="Required for sale in the European Economic Area."
             value={data.ce_certified}
             onChange={(v) => onChange({ ce_certified: v })}
           />
           <ToggleRow
             label="RoHS Compliant"
+            icon={<AwardIcon className="h-3.5 w-3.5" />}
             helpText="EU restriction on hazardous substances in electronics."
             value={data.rohs_compliant}
             onChange={(v) => onChange({ rohs_compliant: v })}

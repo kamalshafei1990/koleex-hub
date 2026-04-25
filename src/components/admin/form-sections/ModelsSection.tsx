@@ -112,10 +112,9 @@ function ModelCard({
   });
 
   return (
-    <div className={`bg-[var(--bg-secondary)] rounded-2xl border overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)] ${
-      isPrimary ? "border-amber-500/40 ring-1 ring-amber-500/20" : "border-[var(--border-subtle)]"
-    }`}>
-      {/* Header */}
+    <div className="relative bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.1)]">
+      {/* Header — neutral chrome, single tier dot for the Primary
+          identity. Matches the Specs/Technical card language. */}
       <div
         className={`flex items-center justify-between px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--bg-surface-subtle)]/40 ${
           open ? "border-b border-[var(--border-subtle)]" : ""
@@ -123,12 +122,15 @@ function ModelCard({
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center text-[12px] font-bold ${
-            isPrimary
-              ? "bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-amber-500/40 text-amber-300"
-              : "bg-gradient-to-br from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border-[var(--border-subtle)] text-[var(--text-muted)]"
-          }`}>
-            {isPrimary ? <CrownIcon className="h-4 w-4" /> : idx + 1}
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] relative">
+            {isPrimary ? (
+              <CrownIcon className="h-4 w-4 text-amber-400" />
+            ) : (
+              <span className="text-[12px] font-bold tabular-nums">{idx + 1}</span>
+            )}
+            {isPrimary && (
+              <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -136,19 +138,16 @@ function ModelCard({
                 {model.model_name || "Untitled Model"}
               </span>
               {isPrimary && (
-                <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/15 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-                  <CrownIcon className="h-2.5 w-2.5" /> Primary
+                <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  Primary
                 </span>
               )}
               <span
-                className={`inline-flex items-center gap-1 h-5 px-2 rounded-full border text-[9px] font-bold uppercase tracking-wider ${
-                  isActive
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                }`}
+                className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
                 title={isActive ? "Active" : "Discontinued"}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-amber-400"}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400" : "bg-zinc-500"}`} />
                 {isActive ? "Active" : "Discontinued"}
               </span>
             </div>
