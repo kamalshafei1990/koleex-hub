@@ -1215,38 +1215,23 @@ export default function ProductViewPage() {
                     reads as one unit; primary is visually largest via
                     solid fill + shadow + heavier weight. */}
               {/* ═══ BUTTON ZONE ════════════════════════════════════
-                  Single dedicated container for all actions, sitting
-                  32 px below the title block. Internal layout reads
-                  top-down as a visual hierarchy:
+                  One dedicated container under the title block, mt-8
+                  (32 px) separation. Three vertical layers stacked
+                  on the left edge of the column:
 
-                    Row 1   PRIMARY — alone, full focus.
-                    helper  small caption under primary.
-                    Row 2   SECONDARY — Request Quotation + Compare,
-                            equal width, evenly spaced.
-                    ────    32 px separator
-                    Row 3   SUPPORT — Contact Sales, tertiary text
-                            link, low visual weight.
+                    Layer 1  PRIMARY full-width — own row, no
+                             neighbour, strongest visual weight.
+                    Layer 2  SECONDARY split 50/50 — Request Quote
+                             + Compare share identical width via
+                             grid-cols-2.
+                    Layer 3  SUPPORT — Contact Sales, tertiary text
+                             link, separated 32 px from the cluster.
 
-                  All button-shaped controls share the same height
-                  (h-11), padding (px-8), radius (rounded-full), and
-                  font size (15 px). Visual hierarchy comes from
-                  fill + font weight + shadow only. */}
-              {/* ═══ BUTTON ZONE — clean stacked system ════════════
-                  Vertical layers, each layer has its own visual
-                  weight:
-
-                    Layer 1   PRIMARY full-width — own line, no
-                              competition, biggest stage.
-                    Layer 2   SECONDARY split 50/50 — Request Quote
-                              + Compare share equal width via grid.
-                    Layer 3   SUPPORT — Contact Sales, tertiary,
-                              separated by 32 px from the cluster.
-
-                  Every button uses h-11 + px-8 + rounded-full +
-                  text-[15px]. Visual hierarchy from fill / weight
-                  / shadow only. ─────────────────────────────────── */}
-              <div className="mt-8">
-                {/* LAYER 1 — PRIMARY full-width on its own line. */}
+                  All button-shaped controls: h-11, px-8, rounded-full,
+                  text-[15px]. Visual hierarchy from fill + font
+                  weight + shadow only. ────────────────────────────── */}
+              <nav aria-label="Product actions" className="mt-8">
+                {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
                   className="flex items-center justify-center w-full h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
@@ -1257,11 +1242,7 @@ export default function ProductViewPage() {
                   Calculate full cost including shipping, duties, and delivery.
                 </p>
 
-                {/* LAYER 2 — SECONDARY split 50/50.
-                    grid-cols-2 + gap-4 forces both buttons to share
-                    identical width regardless of label length. They
-                    sit on the same baseline because flex centering
-                    inside each cell is identical. */}
+                {/* Layer 2 — SECONDARY (mt-4 medium gap, 50/50 grid) */}
                 <div className="mt-4 grid grid-cols-2 gap-4">
                   <button
                     type="button"
@@ -1283,8 +1264,7 @@ export default function ProductViewPage() {
                   </button>
                 </div>
 
-                {/* LAYER 3 — TERTIARY, separated by 32 px from the
-                    button cluster. Plain text link, no border. */}
+                {/* Layer 3 — SUPPORT (mt-8 large gap from cluster) */}
                 <div className="mt-8">
                   <Link
                     href="/contacts"
@@ -1293,7 +1273,7 @@ export default function ProductViewPage() {
                     Contact Sales <AngleRightIcon className="h-5 w-5 mt-0.5" />
                   </Link>
                 </div>
-              </div>
+              </nav>
             </div>
           </div>
         </div>
