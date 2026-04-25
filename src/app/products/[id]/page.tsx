@@ -869,20 +869,46 @@ export default function ProductViewPage() {
   /* Per-category open/closed state for the accordion. First category
      opens by default so the page never lands on a fully-collapsed
      Specifications section. */
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+  /* Tabbed spec presentation (per brief — tabs, not accordion).
+     Maps the categorized data into 4 customer-facing buckets so the
+     section never shows a long flat list. Each bucket is an array
+     of {label, value} rows pulled from one or more underlying
+     groups. Empty buckets drop out. */
+  const specTabs = useMemo<{ id: string; label: string; rows: { label: string; value: string }[] }[]>(() => {
+    const bucketMap: Record<string, string[]> = {
+      Performance: [
+        "Performance", "Stitch & Feed", "Automation",
+        "Walking-Foot Mechanism", "Long-Arm Geometry",
+        "Cylinder Bed Geometry", "Post-Bed Geometry",
+        "Feed-Off-Arm Geometry", "Zig-Zag Stitch",
+        "Edge Trimmer", "Heavy-Duty Capacity",
+      ],
+      Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
+      Electrical: ["Electrical"],
+      Dimensions: ["Physical (Bare Machine)", "Material", "Application", "Compliance & Customs"],
+    };
+    const byCat = new Map(specCategories.map((c) => [c.category, c.rows] as const));
+    const tabs: { id: string; label: string; rows: { label: string; value: string }[] }[] = [];
+    for (const [label, cats] of Object.entries(bucketMap)) {
+      const rows: { label: string; value: string }[] = [];
+      for (const c of cats) {
+        const r = byCat.get(c);
+        if (r) rows.push(...r);
+      }
+      if (rows.length > 0) {
+        tabs.push({ id: label.toLowerCase(), label, rows });
+      }
+    }
+    return tabs;
+  }, [specCategories]);
+
+  const [activeSpecTab, setActiveSpecTab] = useState<string>("");
   useEffect(() => {
-    if (specCategories.length > 0 && openCategories.size === 0) {
-      setOpenCategories(new Set([specCategories[0].category]));
+    if (specTabs.length > 0 && !specTabs.some((t) => t.id === activeSpecTab)) {
+      setActiveSpecTab(specTabs[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [specCategories.length]);
-  const toggleCategory = (cat: string) => {
-    setOpenCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat); else next.add(cat);
-      return next;
-    });
-  };
+  }, [specTabs]);
 
   /* ── Loading / not found ── */
   if (loading) {
@@ -1042,58 +1068,38 @@ export default function ProductViewPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          REDESIGNED PRODUCT PAGE — 5 STRICT SECTIONS
-          ═══════════════════════════════════════════════════════════════
-          Apple-grade visual hierarchy. Every section uses the same
-          design tokens:
-            · Section vertical padding:  py-20 md:py-28 lg:py-32
-            · Container:                 max-w-[1200px] mx-auto px-6 lg:px-10
-            · Body container:            max-w-[720px] mx-auto
-            · Card radius:               rounded-3xl (24px)
-            · Card padding:              p-8 md:p-10
-            · Spacing scale:             8 / 16 / 24 / 40 / 64 px ONLY
-          Typography:
-            · Eyebrow:  text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B]
-            · H1:       text-[44px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.02em]
-            · H2:       text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em]
-            · Body:     text-[17px] md:text-[19px] leading-[1.5]
-            · Meta:     text-[14px] / text-[15px]
-          Sections alternate white ↔ #F5F5F7 to read as discrete blocks
-          without dividers. ═══════════════════════════════════════════════════════════════ */}
+          REDESIGNED PRODUCT PAGE — STRICT 6-SECTION LAYOUT
 
-      {/* SECTION 1 — HERO ─────────────────────────────────────────── */}
+          Per design brief:
+            1. HERO          — image LEFT (~58%), text RIGHT, minimal
+            2. QUICK INFO    — 4-column scan block (label + value)
+            3. OVERVIEW      — single column prose, max readable width
+            4. FEATURES      — 2-col image+text visual rhythm
+            5. SPECIFICATIONS— TABS (General/Performance/Electrical/Dim)
+            6. CLEAN END     — minimal closing CTA, no clutter
+
+          Strict tokens:
+            · Spacing scale 8 / 16 / 24 / 32 / 64 px ONLY
+            · Section padding py-24 md:py-32 lg:py-40 (96→160 px)
+            · Container max-w-[1200px] mx-auto px-6 lg:px-10
+            · Body container max-w-[680px]
+            · Card radius rounded-3xl
+            · Surfaces alternate white ↔ #F5F5F7
+          Typography:
+            · Eyebrow:  12 px, semibold, uppercase, 0.1em tracking
+            · H1:       56 / 72 / 88 px, semibold, -0.02em tracking
+            · H2:       32 / 40 / 48 px, semibold, -0.018em tracking
+            · Body lg:  18 / 20 px, leading 1.5
+            · Body:     15 / 16 px, leading 1.6
+            · Label:    12 px, semibold, uppercase
+        ═══════════════════════════════════════════════════════════════ */}
+
+      {/* SECTION 1 — HERO (image LEFT 60%, text RIGHT 40%) ────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32 lg:py-40">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            <div className="lg:col-span-5 order-2 lg:order-1">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-                {product.brand || "Koleex"}
-              </p>
-              <h1 className="mt-4 text-[44px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.02em] leading-[1.05] text-[#1D1D1F] dark:text-white">
-                {product.product_name}
-              </h1>
-              {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60 max-w-[440px]">
-                  {primaryModel?.tagline || product.excerpt}
-                </p>
-              )}
-              <div className="mt-10 flex items-center gap-6 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                  className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
-                >
-                  Request Quote
-                </button>
-                <a
-                  href="#specs"
-                  className="inline-flex items-center gap-1 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
-                >
-                  Specifications <AngleRightIcon className="h-4 w-4 mt-0.5" />
-                </a>
-              </div>
-            </div>
-            <div className="lg:col-span-7 order-1 lg:order-2">
+            {/* LEFT — dominant image (lg col-span-7 = 58%) */}
+            <div className="order-1 lg:col-span-7">
               <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
                 {mainImage ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
@@ -1111,15 +1117,45 @@ export default function ProductViewPage() {
                 )}
               </div>
             </div>
+
+            {/* RIGHT — minimal editorial column (lg col-span-5 = 42%) */}
+            <div className="order-2 lg:col-span-5">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                {product.brand || "Koleex"}
+              </p>
+              <h1 className="mt-4 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.98] text-[#1D1D1F] dark:text-white">
+                {product.product_name}
+              </h1>
+              {(primaryModel?.tagline || product.excerpt) && (
+                <p className="mt-8 text-[18px] md:text-[20px] leading-[1.5] text-[#6E6E73] dark:text-white/65 max-w-[460px]">
+                  {primaryModel?.tagline || product.excerpt}
+                </p>
+              )}
+              <div className="mt-12 flex items-center gap-6 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+                  className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
+                >
+                  Request Quote
+                </button>
+                <a
+                  href="#specs"
+                  className="inline-flex items-center gap-1 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
+                >
+                  Specifications <AngleRightIcon className="h-4 w-4 mt-0.5" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* SECTION 2 — QUICK INFO GRID ──────────────────────────────── */}
+      {/* SECTION 2 — QUICK INFO (4 columns, label + strong value) ─── */}
       {headlineStats.length >= 3 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.02] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 lg:gap-16">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-16 md:py-24">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-16">
               {headlineStats.map((s, i) => (
                 <div key={i}>
                   <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
@@ -1142,110 +1178,61 @@ export default function ProductViewPage() {
         </section>
       )}
 
-      {/* SECTION 3 — PRODUCT OVERVIEW ─────────────────────────────── */}
-      {(product.description || product.excerpt || (product.highlights && product.highlights.length > 0)) && (
+      {/* SECTION 3 — OVERVIEW (clean prose, max-width readable) ───── */}
+      {(product.description || product.excerpt) && (
         <section id="overview" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[720px] mx-auto px-6 py-20 md:py-28 lg:py-32">
+          <div className="max-w-[680px] mx-auto px-6 py-24 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Overview
             </p>
-            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+            <h2 className="mt-6 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
               The machine, in detail.
             </h2>
             {product.excerpt && (
-              <p className="mt-10 text-[17px] md:text-[19px] leading-[1.55] text-[#1D1D1F] dark:text-white/85">
+              <p className="mt-10 text-[18px] md:text-[20px] leading-[1.6] text-[#1D1D1F] dark:text-white/85">
                 {product.excerpt}
               </p>
             )}
             {product.description && (
               <div
-                className="mt-6 text-[16px] leading-[1.7] text-[#6E6E73] dark:text-white/65 [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
+                className="mt-8 text-[16px] leading-[1.7] text-[#6E6E73] dark:text-white/65 [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             )}
-            {product.highlights && product.highlights.length > 0 && (
-              <ul className="mt-10 space-y-4">
-                {product.highlights.map((h, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-3 text-[15px] md:text-[16px] text-[#1D1D1F] dark:text-white/85 leading-[1.55]"
-                  >
-                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
-                      <CheckIcon className="h-2.5 w-2.5" />
-                    </span>
-                    {h}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </section>
       )}
 
-      {/* SECTION 4 — SPECIFICATIONS (Apple tech-specs accordion) ──── */}
-      {specCategories.length > 0 && (
-        <section id="specs" className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-              Specifications
-            </p>
-            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
-              Built to a standard.
-            </h2>
-            <div className="mt-10 rounded-3xl bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06] divide-y divide-[#D2D2D7]/60 dark:divide-white/[0.06] overflow-hidden">
-              {specCategories.map(({ category, rows }) => {
-                const isOpen = openCategories.has(category);
-                return (
-                  <div key={category}>
-                    <button
-                      type="button"
-                      onClick={() => toggleCategory(category)}
-                      aria-expanded={isOpen}
-                      className="w-full flex items-center justify-between gap-6 px-6 md:px-10 py-6 text-left hover:bg-[#F5F5F7]/40 dark:hover:bg-white/[0.02] transition-colors"
-                    >
-                      <h3 className="text-[17px] md:text-[19px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white">
-                        {category}
-                      </h3>
-                      <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] text-[#1D1D1F] dark:text-white transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`}>
-                        <AngleDownIcon className="h-3.5 w-3.5" />
-                      </span>
-                    </button>
-                    {isOpen && (
-                      <dl className="px-6 md:px-10 pb-8">
-                        {rows.map((r, i) => (
-                          <div
-                            key={`${r.label}-${i}`}
-                            className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1 py-4 ${
-                              i < rows.length - 1
-                                ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
-                                : ""
-                            }`}
-                          >
-                            <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
-                              {r.label}
-                            </dt>
-                            <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium text-right leading-[1.5]">
-                              {r.value}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* SECTION 5 — VISUAL BLOCK (image + text side-by-side) ─────── */}
-      {(galleryImages.length > 1 || mainImage) && tags.length > 0 && (
-        <section id="applications" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
+      {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
+      {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
+        <section className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-              <div className="lg:col-span-7">
-                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
+              {/* LEFT — text */}
+              <div className="lg:col-span-5 order-2 lg:order-1">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                  Engineered for the line
+                </p>
+                <h2 className="mt-6 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+                  Built for daily volume.
+                </h2>
+                <ul className="mt-10 space-y-4">
+                  {product.highlights.slice(0, 5).map((h, i) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-3 text-[16px] md:text-[17px] text-[#1D1D1F] dark:text-white/85 leading-[1.55]"
+                    >
+                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
+                        <CheckIcon className="h-3 w-3" />
+                      </span>
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {/* RIGHT — image */}
+              <div className="lg:col-span-7 order-1 lg:order-2">
+                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-white dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
@@ -1256,146 +1243,78 @@ export default function ProductViewPage() {
                   />
                 </div>
               </div>
-              <div className="lg:col-span-5">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-                  Where it performs
-                </p>
-                <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
-                  Built for your line.
-                </h2>
-                <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60">
-                  Engineered for the operations and materials your floor runs every day.
-                </p>
-                <div className="mt-8 flex flex-wrap gap-2">
-                  {tags.slice(0, 8).map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center h-8 px-3.5 rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] dark:border dark:border-white/[0.08] text-[13px] text-[#1D1D1F] dark:text-white/85 capitalize"
-                    >
-                      {t.replace(/-/g, " ")}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </section>
       )}
 
-      {/* SECTION 6 — MODELS PICKER (compact, optional) ────────────── */}
-      {models.filter(m => m.visible !== false).length > 0 && (
-        <section id="models" className="bg-[#F5F5F7] dark:bg-white/[0.015] border-t border-[#D2D2D7]/60 dark:border-white/[0.04]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
+      {/* SECTION 5 — SPECIFICATIONS (TABS, never a flat list) ─────── */}
+      {specTabs.length > 0 && (
+        <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-              Configurations
+              Specifications
             </p>
-            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
-              Pick the variant.
+            <h2 className="mt-6 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              All the details.
             </h2>
-            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {models.filter(m => m.visible !== false).map((m) => {
-                const price = m.global_price ?? m.head_only_price ?? m.complete_set_price ?? null;
-                const photo = media.find((md) => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"));
+
+            {/* Tab strip — segmented buttons. Active tab gets a solid
+                fill, inactive tabs stay quiet. Single-line on mobile
+                with horizontal scroll if it needs to. */}
+            <div className="mt-12 flex flex-wrap gap-2 border-b border-[#D2D2D7]/60 dark:border-white/[0.06] pb-4">
+              {specTabs.map((t) => {
+                const active = t.id === activeSpecTab;
                 return (
-                  <div
-                    key={m.id}
-                    className="rounded-3xl bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden"
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveSpecTab(t.id)}
+                    className={`inline-flex items-center h-10 px-5 rounded-full text-[14px] font-medium transition-colors ${
+                      active
+                        ? "bg-[#1D1D1F] text-white dark:bg-white dark:text-[#1D1D1F]"
+                        : "bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/75 hover:bg-[#EBEBEF] dark:hover:bg-white/[0.08]"
+                    }`}
                   >
-                    <div className="aspect-[5/4] bg-[#F5F5F7] dark:bg-white/[0.02] flex items-center justify-center">
-                      {(photo || mainImage) ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={IMG.card(photo?.url || mainImage || "")}
-                          alt={m.model_name}
-                          className="w-full h-full object-contain p-6"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <ImageRawIcon className="h-10 w-10 text-[#86868B] dark:text-white/30" />
-                      )}
-                    </div>
-                    <div className="p-8">
-                      <h3 className="text-[17px] md:text-[19px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white">
-                        {m.model_name}
-                      </h3>
-                      {m.tagline && (
-                        <p className="mt-2 text-[14px] text-[#6E6E73] dark:text-white/55 leading-[1.5] line-clamp-2">
-                          {m.tagline}
-                        </p>
-                      )}
-                      {price !== null && (
-                        <p className="mt-6 text-[15px] text-[#86868B] dark:text-white/45">
-                          From{" "}
-                          <span className="text-[#1D1D1F] dark:text-white font-semibold">
-                            {fmtMoney(price)}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                    {t.label}
+                  </button>
                 );
               })}
             </div>
-          </div>
-        </section>
-      )}
 
-      {/* SECTION 7 — RESOURCES (compact, only when present) ───────── */}
-      {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-        <section id="resources" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-20 md:py-28">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-              Resources
-            </p>
-            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
-              Dig deeper.
-            </h2>
-            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[...videos, ...manuals, ...otherDocs].slice(0, 6).map((r) => (
-                <a
-                  key={r.id}
-                  href={r.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-4 p-6 rounded-3xl bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] hover:bg-[#EFEFEF] dark:hover:bg-white/[0.05] transition-colors"
+            {/* Tab panel — single clean two-column key/value table.
+                Subtle row dividers, no card chrome. Apple tech-specs
+                pattern. */}
+            <dl className="mt-8">
+              {(specTabs.find((t) => t.id === activeSpecTab)?.rows || []).map((r, i, arr) => (
+                <div
+                  key={`${r.label}-${i}`}
+                  className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-6 gap-y-1 py-5 ${
+                    i < arr.length - 1
+                      ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
+                      : ""
+                  }`}
                 >
-                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-white dark:bg-white/[0.08] dark:border dark:border-white/10 text-[#06C] dark:text-[#2997FF] shrink-0">
-                    {r.type === "video" ? (
-                      <PlayIcon className="h-4 w-4" />
-                    ) : r.type === "manual" ? (
-                      <DocumentIcon className="h-4 w-4" />
-                    ) : (
-                      <DownloadIcon className="h-4 w-4" />
-                    )}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[15px] font-medium text-[#1D1D1F] dark:text-white truncate">
-                      {r.alt_text || r.type.replace(/_/g, " ")}
-                    </span>
-                    <span className="block text-[12px] text-[#86868B] dark:text-white/45 mt-1">
-                      {r.type === "video" ? "Watch" : r.type === "manual" ? "Download manual" : "Download"}
-                    </span>
-                  </span>
-                  <ExternalLinkIcon className="h-4 w-4 text-[#86868B] dark:text-white/45 shrink-0" />
-                </a>
+                  <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
+                    {r.label}
+                  </dt>
+                  <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium leading-[1.5]">
+                    {r.value}
+                  </dd>
+                </div>
               ))}
-            </div>
+            </dl>
           </div>
         </section>
       )}
 
-      {/* SECTION 8 — FINAL CTA (closing band) ─────────────────────── */}
-      <section className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
-        <div className="max-w-[720px] mx-auto px-6 py-20 md:py-28 lg:py-32 text-center">
-          <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+      {/* SECTION 6 — CLEAN END (single closing band, no clutter) ──── */}
+      <section className="bg-[#F5F5F7] dark:bg-white/[0.02] border-t border-[#D2D2D7]/60 dark:border-white/[0.04]">
+        <div className="max-w-[680px] mx-auto px-6 py-20 md:py-28 text-center">
+          <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[#1D1D1F] dark:text-white">
             Ready to put it on the line?
           </h2>
-          <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60">
-            Tell us your volumes — we&apos;ll come back with a price, lead time,
-            and the configuration that fits.
-          </p>
-          <div className="mt-10 flex items-center justify-center gap-6 flex-wrap">
+          <div className="mt-10">
             <button
               type="button"
               onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
@@ -1403,15 +1322,10 @@ export default function ProductViewPage() {
             >
               Request Quote
             </button>
-            <a
-              href="#specs"
-              className="inline-flex items-center gap-1 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
-            >
-              Re-read specs <AngleRightIcon className="h-4 w-4 mt-0.5" />
-            </a>
           </div>
         </div>
       </section>
+
 
 
       {/* ══════════════════════════════════════
