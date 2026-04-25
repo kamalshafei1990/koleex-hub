@@ -1123,7 +1123,7 @@ export default function ProductViewPage() {
 
           Strict tokens:
             · Spacing scale 8 / 16 / 32 / 64 px ONLY
-            · Section padding py-24 md:py-32 lg:py-40 (96→160 px)
+            · Section padding py-32 (uniform 128 px every breakpoint)
             · Container max-w-[1200px] mx-auto px-6 lg:px-8
             · Body container max-w-[680px]
             · Card radius rounded-3xl
@@ -1145,7 +1145,7 @@ export default function ProductViewPage() {
             visual focal point of the section.
           ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1320px] mx-auto px-6 lg:px-8 py-24 md:py-32">
+        <div className="max-w-[1320px] mx-auto px-6 lg:px-8 py-32 md:py-32">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-16 items-center">
             {/* LEFT — DOMINANT image. Section is wider (1320 vs
                 1200), aspect goes 6:5 → 5:4 (wider canvas), and
@@ -1187,13 +1187,15 @@ export default function ProductViewPage() {
               </p>
               {/* H1 — model code, slightly smaller scale (48/64/80)
                   so the image leads. */}
-              <h1 className="mt-4 text-[48px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.025em] leading-[0.98] text-[#1D1D1F] dark:text-white">
+              {/* H1 bumped 48/60/72 → 56/72/88 px (significantly
+                  larger); subtitle dropped 18/20 → 15/16 to widen
+                  the size gap between levels — H1 vs subtitle is
+                  now ≈5.5×. Spacing scale stays in 8/16/32. */}
+              <h1 className="mt-8 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
-              {/* Subtitle — full descriptive name. Distinct scale
-                  from H3 group titles below (18/20 vs 22/26). */}
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
-                <p className="mt-4 text-[18px] md:text-[20px] font-normal tracking-[-0.005em] leading-[1.3] text-[#6E6E73] dark:text-white/55">
+                <p className="mt-4 text-[15px] md:text-[16px] font-normal tracking-[-0.005em] leading-[1.5] text-[#6E6E73] dark:text-white/55">
                   {product.product_name}
                 </p>
               )}
@@ -1218,21 +1220,21 @@ export default function ProductViewPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
                     href={`/landed-cost/new?productId=${product.id}`}
-                    className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
+                    className="inline-flex items-center justify-center h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
                   >
                     Estimate Total Cost
                   </Link>
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                    className="inline-flex items-center h-11 px-5 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[14px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                    className="inline-flex items-center h-11 px-4 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[14px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
                   >
                     Request Quotation
                   </button>
                   <button
                     type="button"
                     onClick={toggleCompare}
-                    className={`inline-flex items-center h-11 px-5 rounded-full border text-[14px] font-medium transition-colors ${
+                    className={`inline-flex items-center h-11 px-4 rounded-full border text-[14px] font-medium transition-colors ${
                       inCompare
                         ? "border-[#06C] dark:border-[#2997FF] bg-[#06C]/[0.06] dark:bg-[#2997FF]/[0.12] text-[#06C] dark:text-[#2997FF]"
                         : "border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04]"
@@ -1291,7 +1293,7 @@ export default function ProductViewPage() {
           wraps. Same chip, same icon, same alignment everywhere. */}
       {headlineStats.length >= 3 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 md:py-32">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {headlineStats.map((s, i) => (
                 <div
@@ -1301,10 +1303,16 @@ export default function ProductViewPage() {
                   <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] text-[#06C] dark:text-[#2997FF] shrink-0">
                     {s.icon}
                   </span>
-                  <p className="mt-8 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
+                  {/* Label area — fixed minimum height so the value
+                      block below baseline-aligns across all 4 cards
+                      even when one label wraps to two lines. */}
+                  <p className="mt-8 min-h-[36px] text-[12px] font-semibold uppercase tracking-[0.08em] leading-[1.5] text-[#86868B] dark:text-white/45">
                     {s.label}
                   </p>
-                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                  {/* mt-auto pushes the value to the bottom of the
+                      card so all 4 numbers sit on the same horizontal
+                      line regardless of label length. */}
+                  <div className="mt-auto flex items-baseline gap-2 flex-wrap">
                     <span className="text-[32px] md:text-[40px] lg:text-[44px] font-semibold tracking-[-0.02em] leading-none text-[#1D1D1F] dark:text-white">
                       {s.value}
                     </span>
@@ -1324,7 +1332,7 @@ export default function ProductViewPage() {
       {/* SECTION 3 — OVERVIEW (clean prose, max-width readable) ───── */}
       {(product.description || product.excerpt) && (
         <section id="overview" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[680px] mx-auto px-6 py-24 md:py-32">
+          <div className="max-w-[680px] mx-auto px-6 py-32 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Overview
             </p>
@@ -1349,7 +1357,7 @@ export default function ProductViewPage() {
       {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
       {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 md:py-32">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
               {/* LEFT — text */}
               <div className="lg:col-span-5 order-2 lg:order-1">
@@ -1398,7 +1406,7 @@ export default function ProductViewPage() {
           space between groups (space-y-16) for breathing room. */}
       {specTabs.length > 0 && (
         <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-8 py-24 md:py-32">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Specifications
             </p>
@@ -1457,7 +1465,7 @@ export default function ProductViewPage() {
 
       {/* SECTION 6 — CLEAN END (single closing band, no clutter) ──── */}
       <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
-        <div className="max-w-[680px] mx-auto px-6 py-24 md:py-32 text-center">
+        <div className="max-w-[680px] mx-auto px-6 py-32 md:py-32 text-center">
           <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[#1D1D1F] dark:text-white">
             Ready to put it on the line?
           </h2>
