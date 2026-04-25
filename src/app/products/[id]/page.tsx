@@ -992,7 +992,7 @@ export default function ProductViewPage() {
   /* ════════════════════════════════════════════ */
   return (
     <div
-      className="min-h-screen bg-white text-[#1D1D1F] dark:bg-[#0A0A0A] dark:text-white antialiased"
+      className="min-h-screen bg-white text-[#1D1D1F] dark:bg-[#0A0A0A] dark:text-white antialiased pb-24 md:pb-0"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -1082,19 +1082,23 @@ export default function ProductViewPage() {
             <span className="text-[14px] md:text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white truncate max-w-[200px] md:max-w-[320px]">
               {product.product_name}
             </span>
-            {/* Anchor links — desktop only. Mobile gets the CTA only
-                because the breadcrumb bar above already lets them
-                jump back to the list. */}
+            {/* Anchor links — desktop only. Reflects the actual
+                section ids on the page (#overview / #features /
+                #models / #specs). Each link only renders if its
+                target section will actually be shown — no dead
+                links if the underlying data is missing. */}
             <nav className="hidden md:flex items-center gap-5 ml-2 mr-auto text-[13px] text-[#1D1D1F]/80 dark:text-white/70">
-              <a href="#specs" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Specs</a>
-              {models.length > 0 && (
+              {(product.description || product.excerpt) && (
+                <a href="#overview" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Overview</a>
+              )}
+              {(product.highlights && product.highlights.length > 0 && (galleryImages.length > 1 || mainImage)) && (
+                <a href="#features" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Features</a>
+              )}
+              {models.length > 1 && (
                 <a href="#models" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Models</a>
               )}
-              {tags.length > 0 && (
-                <a href="#applications" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Applications</a>
-              )}
-              {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-                <a href="#resources" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Resources</a>
+              {specTabs.length > 0 && (
+                <a href="#specs" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Specs</a>
               )}
             </nav>
             {/* Spacer for mobile when nav is hidden — pushes CTA right. */}
@@ -1107,6 +1111,42 @@ export default function ProductViewPage() {
               className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[12px] md:text-[13px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors shrink-0"
             >
               Estimate
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════
+          MOBILE STICKY CTA BAR
+          Bottom-anchored on phones only. Once the user scrolls
+          past the hero, this slides up and parks the two highest-
+          intent actions inside thumb reach: Quote (full-width
+          primary) + Estimate (icon-only secondary). Desktop is
+          covered by the top sticky bar above.
+          ══════════════════════════════════════ */}
+      <div
+        aria-hidden={!stickyNavVisible}
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ${
+          stickyNavVisible ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-[#D2D2D7]/60 dark:border-white/[0.08] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+          {/* Two-button cluster: primary fills, secondary fixed-width
+              square so the row reads as one tight cell. */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+              className="flex-1 h-11 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[14px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors"
+            >
+              Request Quote
+            </button>
+            <Link
+              href={`/landed-cost/new?productId=${product.id}`}
+              aria-label="Estimate total cost"
+              className="inline-flex items-center justify-center h-11 w-11 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 text-[#1D1D1F] dark:text-white hover:bg-[#1D1D1F]/[0.04] dark:hover:bg-white/[0.04] transition-colors"
+            >
+              <GaugeIcon className="h-5 w-5" />
             </Link>
           </div>
         </div>
@@ -1157,18 +1197,19 @@ export default function ProductViewPage() {
               action" stack instead of a competing prose column. */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
             <div className="order-1 lg:col-span-8">
-              {/* Image floats clean on the section background. The
-                  earlier radial-gradient backdrop was removed —
-                  whatever subtle halo it provided was reading as
-                  visual competition around the product. Pure photo
-                  on pure surface = stronger product presence. */}
+              {/* Active hero photo. Sourced from galleryImages[
+                  activeImageIdx] so the thumbnail strip below can
+                  swap which image is currently displayed without
+                  refetching anything. Falls back to mainImage if
+                  the gallery is empty. */}
               <div className="relative w-full aspect-[5/4] flex items-center justify-center">
-                {mainImage ? (
+                {(galleryImages[activeImageIdx]?.url || mainImage) ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={IMG.hero(mainImage)}
-                    alt={product.product_name}
-                    className="relative max-w-full max-h-full object-contain"
+                    key={galleryImages[activeImageIdx]?.url || mainImage || ""}
+                    src={IMG.hero(galleryImages[activeImageIdx]?.url || mainImage || "")}
+                    alt={galleryImages[activeImageIdx]?.alt_text || product.product_name}
+                    className="relative max-w-full max-h-full object-contain transition-opacity duration-300"
                     decoding="async"
                     fetchPriority="high"
                   />
@@ -1176,6 +1217,49 @@ export default function ProductViewPage() {
                   <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
                 )}
               </div>
+
+              {/* Thumbnail strip — only renders when there's more
+                  than one image. Caps at 6 visible thumbnails so
+                  the row never wraps; remaining gallery photos can
+                  be reached via keyboard arrows on the active
+                  thumbnail. Active thumb gets a 2-px ring in the
+                  brand blue + slight scale-up so the selection is
+                  unmistakable. */}
+              {galleryImages.length > 1 && (
+                <div className="mt-6 flex items-center gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {galleryImages.slice(0, 6).map((img, i) => {
+                    const active = i === activeImageIdx;
+                    return (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => setActiveImageIdx(i)}
+                        aria-label={`View image ${i + 1}`}
+                        aria-pressed={active}
+                        className={`group relative shrink-0 h-16 w-16 md:h-20 md:w-20 rounded-xl overflow-hidden transition-all ${
+                          active
+                            ? "ring-2 ring-[#06C] dark:ring-[#2997FF] scale-[1.04]"
+                            : "ring-1 ring-[#D2D2D7]/70 dark:ring-white/[0.08] hover:ring-[#1D1D1F]/30 dark:hover:ring-white/30 opacity-75 hover:opacity-100"
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={IMG.thumb(img.url)}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-contain p-1.5 bg-white dark:bg-white/[0.04]"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </button>
+                    );
+                  })}
+                  {galleryImages.length > 6 && (
+                    <span className="shrink-0 text-[12px] text-[#86868B] dark:text-white/45 ml-1">
+                      +{galleryImages.length - 6}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* RIGHT — tight editorial column.
@@ -1218,6 +1302,32 @@ export default function ProductViewPage() {
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
+
+              {/* ── Price chip ──
+                  Small pill that gives the page a commitment: a
+                  starting price if any model carries one, otherwise
+                  the standard "Quote on request" line so customers
+                  always see SOMETHING financial above the actions.
+                  Sits between the description and the buttons so it
+                  reads as a hand-off from "what is this" to "how do
+                  I act". */}
+              <div className="mt-6 inline-flex items-baseline gap-2 rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] px-3.5 py-1.5">
+                {priceFrom ? (
+                  <>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                      From
+                    </span>
+                    <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                      ${new Intl.NumberFormat("en-US").format(priceFrom)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[12px] font-medium tracking-[-0.005em] text-[#6E6E73] dark:text-white/55">
+                    Quote on request
+                  </span>
+                )}
+              </div>
+
               {/* ── Action stack ──
                     Strict three-tier hierarchy:
                       MAIN row    — primary + 2 outline (max 3, per rule).
@@ -1291,6 +1401,47 @@ export default function ProductViewPage() {
                   </Link>
                 </div>
               </nav>
+
+              {/* ── Trust strip ──
+                  Tiny signal row at the bottom of the right column.
+                  Closes the loop on "is this product legit?" before
+                  the customer scrolls. Each badge only renders when
+                  the underlying data exists — no empty cells, no
+                  fake claims. Max 4 items so the row never wraps. */}
+              {(product.ce_certified || product.rohs_compliant || product.warranty || product.lead_time || product.country_of_origin) && (
+                <ul className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-[12px] text-[#6E6E73] dark:text-white/55">
+                  {product.ce_certified && (
+                    <li className="inline-flex items-center gap-1.5">
+                      <BadgeCheckIcon className="h-3.5 w-3.5 text-[#0F8A6E] dark:text-[#5DD0B4]" />
+                      CE certified
+                    </li>
+                  )}
+                  {product.rohs_compliant && (
+                    <li className="inline-flex items-center gap-1.5">
+                      <ShieldCheckIcon className="h-3.5 w-3.5 text-[#0F8A6E] dark:text-[#5DD0B4]" />
+                      RoHS
+                    </li>
+                  )}
+                  {product.warranty && (
+                    <li className="inline-flex items-center gap-1.5">
+                      <AwardIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      {product.warranty} warranty
+                    </li>
+                  )}
+                  {product.lead_time && (
+                    <li className="inline-flex items-center gap-1.5">
+                      <PackageIcon className="h-3.5 w-3.5 text-[#A05A00] dark:text-[#FFB870]" />
+                      Ships in {product.lead_time}
+                    </li>
+                  )}
+                  {!product.lead_time && product.country_of_origin && (
+                    <li className="inline-flex items-center gap-1.5">
+                      <GlobeIcon className="h-3.5 w-3.5 text-[#86868B] dark:text-white/45" />
+                      Made in {product.country_of_origin}
+                    </li>
+                  )}
+                </ul>
+              )}
             </div>
           </div>
         </div>
@@ -1367,7 +1518,7 @@ export default function ProductViewPage() {
 
       {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
       {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
-        <section className="bg-[#F5F5F7] dark:bg-white/[0.015]">
+        <section id="features" className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
               {/* LEFT — text */}
@@ -1405,6 +1556,139 @@ export default function ProductViewPage() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── SECTION 4.5 — MODELS / VARIANTS ─────────────────────────
+          Renders only when the product has 2+ visible models. Each
+          model card carries its own image (model-scoped media if
+          available, else the product's main image), name, tagline,
+          pricing options (Head Only / Complete Set / Global), and a
+          quick "Request Quote for this model" action. Customers use
+          this block to pick the variant they actually want before
+          they fire the quote. */}
+      {models.filter((m) => m.visible).length > 1 && (
+        <section id="models" className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-32 md:py-32">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+              Models
+            </p>
+            <h2 className="mt-4 text-[32px] md:text-[40px] lg:text-[48px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              Pick your variant.
+            </h2>
+            <p className="mt-4 max-w-[640px] text-[15px] md:text-[16px] leading-[1.6] text-[#6E6E73] dark:text-white/60">
+              Available configurations of this model. Pricing, packing, and lead times vary by variant.
+            </p>
+
+            <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {models.filter((m) => m.visible).map((m) => {
+                const modelImage =
+                  media.find((md) => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"))?.url ||
+                  mainImage;
+                const priceOptions: { label: string; value: number }[] = [];
+                if (m.global_price) priceOptions.push({ label: "Global", value: m.global_price });
+                if (m.head_only_price && m.supports_head_only) priceOptions.push({ label: "Head Only", value: m.head_only_price });
+                if (m.complete_set_price && m.supports_complete_set) priceOptions.push({ label: "Complete Set", value: m.complete_set_price });
+                const fmt = new Intl.NumberFormat("en-US");
+                return (
+                  <article
+                    key={m.id}
+                    className="group rounded-3xl bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/[0.06] overflow-hidden flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_6px_24px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5"
+                  >
+                    {/* Image header — same aspect across all cards
+                        so the row aligns visually. White inner so
+                        the photo never inherits the gray surface. */}
+                    <div className="relative w-full aspect-[4/3] bg-white dark:bg-white/[0.03]">
+                      {modelImage ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={IMG.card(modelImage)}
+                          alt={m.model_name}
+                          className="absolute inset-0 w-full h-full object-contain p-6"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <ImageRawIcon className="h-10 w-10 text-[#86868B] dark:text-white/30" />
+                        </div>
+                      )}
+                      {/* Stock-status pill — only renders when the
+                          model carries a status flag. */}
+                      {m.stock_status && (
+                        <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-white/90 dark:bg-[#0A0A0A]/85 backdrop-blur-sm text-[10.5px] font-medium uppercase tracking-[0.06em] text-[#1D1D1F] dark:text-white">
+                          <span className={`h-1.5 w-1.5 rounded-full ${m.stock_status.toLowerCase().includes("stock") || m.stock_status.toLowerCase() === "available" ? "bg-[#0F8A6E]" : "bg-[#A05A00]"}`} />
+                          {m.stock_status}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Card body */}
+                    <div className="p-6 flex flex-col flex-1">
+                      <h3 className="text-[18px] md:text-[20px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.2]">
+                        {m.model_name}
+                      </h3>
+                      {m.tagline && (
+                        <p className="mt-2 text-[13px] md:text-[14px] leading-[1.5] text-[#6E6E73] dark:text-white/55 line-clamp-2">
+                          {m.tagline}
+                        </p>
+                      )}
+
+                      {/* Price stack — up to 3 small rows. Each
+                          row: muted label + bold value. Skipped
+                          entirely when the model has no prices. */}
+                      {priceOptions.length > 0 && (
+                        <dl className="mt-5 space-y-1.5">
+                          {priceOptions.map((p) => (
+                            <div key={p.label} className="flex items-baseline justify-between gap-3">
+                              <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
+                                {p.label}
+                              </dt>
+                              <dd className="text-[15px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white tabular-nums">
+                                ${fmt.format(p.value)}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+
+                      {/* Meta row — MOQ / lead time, only when set. */}
+                      {(m.moq || m.lead_time) && (
+                        <ul className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px] text-[#6E6E73] dark:text-white/55">
+                          {m.moq != null && (
+                            <li className="inline-flex items-center gap-1.5">
+                              <BoxesIcon className="h-3.5 w-3.5" />
+                              MOQ {m.moq}
+                            </li>
+                          )}
+                          {m.lead_time && (
+                            <li className="inline-flex items-center gap-1.5">
+                              <PackageIcon className="h-3.5 w-3.5" />
+                              {m.lead_time}
+                            </li>
+                          )}
+                        </ul>
+                      )}
+
+                      {/* Spacer pushes the action to the bottom of
+                          every card so the bottom edges align across
+                          the row even when text is uneven. */}
+                      <div className="mt-auto pt-6">
+                        <button
+                          type="button"
+                          onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+                          className="inline-flex items-center justify-center gap-1.5 h-9 px-5 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[13px] font-medium hover:opacity-90 transition-opacity"
+                        >
+                          Request Quote
+                          <AngleRightIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
         </section>
