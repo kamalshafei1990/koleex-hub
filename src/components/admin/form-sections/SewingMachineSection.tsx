@@ -81,15 +81,15 @@ function FrequencyDots({ tier }: { tier?: "essential" | "recommended" | "advance
       : "Rare / niche";
   return (
     <span
-      className="inline-flex items-center gap-[1.5px] mr-1 align-middle shrink-0"
+      className="inline-flex items-center gap-[2px] mr-1.5 align-middle shrink-0"
       title={tip}
       aria-label={tip}
     >
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`block h-1 w-1 rounded-full ${
-            i < filled ? "bg-amber-400" : "bg-amber-400/15"
+          className={`block h-[5px] w-[5px] rounded-full ${
+            i < filled ? "bg-white/85" : "bg-white/15"
           }`}
         />
       ))}
@@ -568,27 +568,29 @@ function SpecRow({
   const isMulti = field.type === "multi-select";
   // Boolean rows pull the switch next to the label for a tight 1-line look.
   // Multi-select and everything else use the standard 2-col grid with a
-  // consistent 240px label column so inputs vertically align across cards.
+  // consistent 260px label column so inputs vertically align across cards.
   return (
     <div
       className={`group grid ${
         isBoolean
           ? "grid-cols-[1fr_auto]"
-          : "grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]"
-      } gap-x-5 gap-y-1.5 items-center px-4 py-2.5 border-b border-[var(--border-subtle)]/20 last:border-b-0 hover:bg-[var(--bg-inverted)]/[0.02] transition-colors`}
+          : "grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]"
+      } gap-x-5 gap-y-1.5 items-center px-4 py-3 border-b border-[var(--border-subtle)]/25 last:border-b-0 hover:bg-[var(--bg-inverted)]/[0.025] transition-colors`}
     >
       {/* Label cell */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <SpecGlyph
-          name={getFieldGlyph(field.key)}
-          size={14}
-          className={`shrink-0 ${
-            filled ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className={`shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
+            filled
+              ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+              : "bg-[var(--bg-inverted)]/[0.04] text-[var(--text-muted)]"
           }`}
-        />
+        >
+          <SpecGlyph name={getFieldGlyph(field.key)} size={16} />
+        </span>
         <FrequencyDots tier={field.tier} />
         <span
-          className={`text-[12.5px] ${
+          className={`text-[13px] ${
             filled ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
           } ${field.required ? "font-semibold" : "font-medium"} truncate`}
           title={field.helpText}
@@ -664,10 +666,10 @@ function SpecRowGroup({
       >
         <SpecGlyph
           name={getGroupGlyph(group)}
-          size={14}
-          className="shrink-0 text-[var(--text-faint)]"
+          size={15}
+          className="shrink-0 text-[var(--text-muted)]"
         />
-        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-faint)]">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
           {group}
         </span>
         <div className="h-px flex-1 bg-[var(--border-subtle)]/40" />
@@ -795,25 +797,25 @@ function SpecCardRenderer({
           identity readable without flooding the page with green/blue/
           violet. */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
-        <div className="h-7 w-7 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 relative">
-          <span className={`text-[12px] font-bold tabular-nums ${accentText}`}>{stepNumber}</span>
+        <div className="h-9 w-9 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 relative">
+          <span className={`text-[14px] font-bold tabular-nums ${accentText}`}>{stepNumber}</span>
           {/* Tiny tier dot — the only spot of color on the card. */}
           <span className={`absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full ${accentEdge}`} />
         </div>
-        <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+        <div className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
           <SpecGlyph
             name={getCardGlyph(card.source)}
-            size={14}
-            className="text-[var(--text-muted)]"
+            size={18}
+            className="text-[var(--text-primary)]"
           />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
+          <h3 className="text-[15px] font-semibold text-[var(--text-primary)] leading-tight">{card.title}</h3>
           {card.subtitle && (
-            <p className="text-[11px] text-[var(--text-ghost)] truncate mt-0.5">{card.subtitle}</p>
+            <p className="text-[11.5px] text-[var(--text-ghost)] truncate mt-0.5">{card.subtitle}</p>
           )}
         </div>
-        <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] tabular-nums shrink-0 text-[var(--text-muted)]">
+        <span className="text-[11px] font-semibold px-3 py-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] tabular-nums shrink-0 text-[var(--text-muted)]">
           {filled} / {card.fields.length}
         </span>
       </div>
