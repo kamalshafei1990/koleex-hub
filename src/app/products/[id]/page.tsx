@@ -1145,18 +1145,16 @@ export default function ProductViewPage() {
             visual focal point of the section.
           ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1320px] mx-auto px-6 lg:px-8 py-32 md:py-32">
-          {/* Hero grid — 7/5 split (~58 / 42). Image stays the
-              dominant element (col-span-7 ≈ 706 px wide on a
-              1320-px section) but the text column is now wide
-              enough that the H1 model code sits comfortably on
-              one line and the body type isn't crammed into a
-              narrow rail. Net effect: image and text columns
-              read at near-equal vertical height, so items-center
-              produces a genuinely balanced composition instead of
-              two adjacent halves at different heights. */}
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-8 py-32 md:py-32">
+          {/* Hero grid — 8/4 (~67 / 33).
+              Image is now the unambiguous anchor: section widened
+              1320 → 1440 px and image column 7 → 8 (~+25 % wider
+              than the previous pass). Text column dropped 5 → 4
+              and constrained to a tight max-w-[400px] so the
+              right side reads as a calm "label + caption +
+              action" stack instead of a competing prose column. */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
-            <div className="order-1 lg:col-span-7">
+            <div className="order-1 lg:col-span-8">
               {/* Image floats clean on the section background. The
                   earlier radial-gradient backdrop was removed —
                   whatever subtle halo it provided was reading as
@@ -1178,13 +1176,13 @@ export default function ProductViewPage() {
               </div>
             </div>
 
-            {/* RIGHT — editorial column. col-span-5 with max-w-[480px]
-                so the column reads as a calm reading width: H1
-                fits on one line, body copy doesn't feel cramped,
-                and the action block (also max-w-[400px]) sits
-                aligned to the same left edge but slightly tighter
-                than the prose column above — visually integrated. */}
-            <div className="order-2 lg:col-span-5 lg:max-w-[480px]">
+            {/* RIGHT — tight editorial column.
+                col-span-4 with max-w-[400px]. Same width as the
+                action block below it so the entire right side
+                reads as a single 400-px column from eyebrow to
+                Contact Sales — text content and buttons share
+                the exact same left and right edges. */}
+            <div className="order-2 lg:col-span-4 lg:max-w-[400px]">
               {/* ── Title block ──
                   Open spacing so each text line has its own beat:
                     Eyebrow → H1:           mt-8  (32)
@@ -1200,7 +1198,11 @@ export default function ProductViewPage() {
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
-              <h1 className="mt-8 text-[48px] md:text-[64px] lg:text-[80px] font-semibold tracking-[-0.025em] leading-[0.95] text-[#1D1D1F] dark:text-white">
+              {/* H1 sized to the tight 400-px column so "KX-8700-DD"
+                  fits comfortably on one line at every breakpoint
+                  without forcing a wider rail. Still the column's
+                  largest type — just calibrated to its own column. */}
+              <h1 className="mt-8 text-[44px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.025em] leading-[1] text-[#1D1D1F] dark:text-white">
                 {primaryModel?.model_name || product.product_name}
               </h1>
               {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
