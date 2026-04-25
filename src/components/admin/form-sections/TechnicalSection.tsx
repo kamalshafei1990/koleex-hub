@@ -33,6 +33,10 @@ interface Props {
     | "machine_dimensions"
     | "ce_certified"
     | "rohs_compliant"
+    | "frequency_hz"
+    | "phase"
+    | "ip_rating"
+    | "operating_temp"
   >;
   onChange: (u: Partial<ProductFormState>) => void;
   suggestions?: {
@@ -519,24 +523,33 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
       <SubCard
         number={1}
         title="Electrical"
-        subtitle="Voltage, motor power, and the plug types this product ships with"
+        subtitle="Voltage, frequency, motor power, phase, and the plug types this product ships with"
         accent={electricalAccent}
       >
-        <ChipInput
-          label="Voltage Options"
-          values={data.voltage}
-          onChange={(v) => onChange({ voltage: v })}
-          placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"}
-          suggestions={suggestions?.voltage}
-        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ChipInput
+            label="Voltage Options"
+            values={data.voltage}
+            onChange={(v) => onChange({ voltage: v })}
+            placeholder={suggestions?.voltage?.length ? "Select or type voltage..." : "e.g. 220V (Enter to add)"}
+            suggestions={suggestions?.voltage}
+          />
+          <ChipInput
+            label="Frequency (Hz)"
+            values={data.frequency_hz}
+            onChange={(v) => onChange({ frequency_hz: v })}
+            placeholder="e.g. 50 (Enter to add)"
+            suggestions={["50", "60", "50/60"]}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <NumberUnit
             label="Motor Power"
             value={data.motor_power_w}
             unit="W"
             placeholder="e.g. 550"
             onChange={(v) => onChange({ motor_power_w: v })}
-            helpText="Typed integer wattage. Replaces the old free-text Watt field."
+            helpText="Replaces the old free-text Watt field."
           />
           <NumberUnit
             label="Power Consumption"
@@ -544,8 +557,25 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
             unit="W"
             placeholder="e.g. 600"
             onChange={(v) => onChange({ power_consumption_w: v })}
-            helpText="Total draw under typical load (often equal to or slightly above motor power)."
+            helpText="Total draw under typical load."
           />
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+              Phase
+            </label>
+            <select
+              value={data.phase}
+              onChange={(e) => onChange({ phase: e.target.value })}
+              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            >
+              <option value="">Select…</option>
+              <option value="single">Single phase</option>
+              <option value="three">Three phase</option>
+            </select>
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Three phase typical for 380V industrial machines.
+            </p>
+          </div>
         </div>
         {hasPlugCards ? (
           <PlugTypeSelector
@@ -608,23 +638,55 @@ export default function TechnicalSection({ data, onChange, suggestions }: Props)
       <SubCard
         number={3}
         title="Compliance & Customs"
-        subtitle="Certifications, HS classification, and visual attributes"
+        subtitle="Certifications, HS classification, environmental ratings, and visual attributes"
         accent={complianceAccent}
       >
-        <div>
-          <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
-            HS Code
-          </label>
-          <input
-            type="text"
-            value={data.hs_code}
-            onChange={(e) => onChange({ hs_code: e.target.value })}
-            placeholder="e.g. 8452.21"
-            className="w-full md:w-1/2 h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-          />
-          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-            Harmonized System tariff code — used for customs declarations and duty calculations.
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+              HS Code
+            </label>
+            <input
+              type="text"
+              value={data.hs_code}
+              onChange={(e) => onChange({ hs_code: e.target.value })}
+              placeholder="e.g. 8452.21"
+              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            />
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Harmonized System tariff code.
+            </p>
+          </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+              IP Rating
+            </label>
+            <input
+              type="text"
+              value={data.ip_rating}
+              onChange={(e) => onChange({ ip_rating: e.target.value })}
+              placeholder="e.g. IP44"
+              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            />
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Ingress protection (dust + water).
+            </p>
+          </div>
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--text-subtle)] mb-1.5">
+              Operating Temperature
+            </label>
+            <input
+              type="text"
+              value={data.operating_temp}
+              onChange={(e) => onChange({ operating_temp: e.target.value })}
+              placeholder="e.g. 0–40 °C"
+              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+            />
+            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+              Recommended operating range.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">

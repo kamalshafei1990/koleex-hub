@@ -49,6 +49,15 @@ export interface ProductFormState {
      them on per-product. */
   ce_certified: boolean;
   rohs_compliant: boolean;
+  /* Technical step v2 — gap-fill audit additions.
+     frequency_hz: array since some machines support both 50 and 60.
+     phase: "single" | "three" stored as plain string.
+     ip_rating: free text (IP44, IP54…).
+     operating_temp: free text range. */
+  frequency_hz: string[];
+  phase: string;
+  ip_rating: string;
+  operating_temp: string;
   visible: boolean;
   featured: boolean;
   status: ProductStatus;
@@ -71,11 +80,24 @@ export interface ModelFormState {
   supports_complete_set: boolean | null;
   head_only_price: string;
   complete_set_price: string;
+  /* Gross / packed weight (kg) — the existing "weight" column has
+     always been the packed/shipment weight. Net (bare-machine)
+     weight is a separate field below so admins can record both
+     NW and GW like a real commercial invoice. */
   weight: string;
+  net_weight: string;
   cbm: string;
+  carton_dimensions: string;
   packing_type: string;
   box_include: string;
   extra_accessories: string;
+  /* Logistics / availability — added in the Technical+Models v2 audit.
+     container_20ft_qty / container_40ft_qty: ints kept as strings to
+     allow empty input. stock_status: "in_stock" | "made_to_order" |
+     "pre_order" | "sold_out". */
+  container_20ft_qty: string;
+  container_40ft_qty: string;
+  stock_status: string;
   order: number;
   visible: boolean;
   status: ModelStatus;
@@ -171,6 +193,10 @@ export const EMPTY_PRODUCT: ProductFormState = {
   machine_dimensions: "",
   ce_certified: false,
   rohs_compliant: false,
+  frequency_hz: [],
+  phase: "",
+  ip_rating: "",
+  operating_temp: "",
   visible: true,
   featured: false,
   status: "draft",
@@ -194,10 +220,15 @@ export function createEmptyModel(): ModelFormState {
     head_only_price: "",
     complete_set_price: "",
     weight: "",
+    net_weight: "",
     cbm: "",
+    carton_dimensions: "",
     packing_type: "",
     box_include: "",
     extra_accessories: "",
+    container_20ft_qty: "",
+    container_40ft_qty: "",
+    stock_status: "",
     order: 0,
     visible: true,
     status: "active",

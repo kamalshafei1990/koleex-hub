@@ -251,7 +251,10 @@ function ModelCard({
                 </p>
               </Panel>
 
-              {/* ── Primary model: Status + operational pricing EDITABLE here. */}
+              {/* ── Primary model: Status + Stock + operational pricing.
+                    Status is the LIFECYCLE state (active vs retired);
+                    Stock Status is the AVAILABILITY (in-stock vs
+                    made-to-order vs sold-out). Two independent facts. */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Status</label>
@@ -262,6 +265,20 @@ function ModelCard({
                   >
                     <option value="active">Active</option>
                     <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Stock Status</label>
+                  <select
+                    value={model.stock_status}
+                    onChange={(e) => onUpdate({ stock_status: e.target.value })}
+                    className={inp}
+                  >
+                    <option value="">— Not specified —</option>
+                    <option value="in_stock">In stock</option>
+                    <option value="made_to_order">Made to order</option>
+                    <option value="pre_order">Pre-order</option>
+                    <option value="sold_out">Sold out</option>
                   </select>
                 </div>
               </div>
@@ -292,7 +309,7 @@ function ModelCard({
           ) : (
             <>
               {/* Identity row — fully editable on secondary variants */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
                   <label className={lbl}>Model Name *</label>
                   <input
@@ -321,6 +338,20 @@ function ModelCard({
                   >
                     <option value="active">Active</option>
                     <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Stock Status</label>
+                  <select
+                    value={model.stock_status}
+                    onChange={(e) => onUpdate({ stock_status: e.target.value })}
+                    className={inp}
+                  >
+                    <option value="">—</option>
+                    <option value="in_stock">In stock</option>
+                    <option value="made_to_order">Made to order</option>
+                    <option value="pre_order">Pre-order</option>
+                    <option value="sold_out">Sold out</option>
                   </select>
                 </div>
               </div>
@@ -402,20 +433,33 @@ function ModelCard({
 
           {/* Packaging & Logistics panel — these are PACKED/SHIPMENT
               dimensions, distinct from the bare-machine dimensions and
-              weight that live on the Technical step. Labels include
-              the "Packed" qualifier so admins can't confuse the two. */}
+              weight that live on the Technical step. Net + Gross weight
+              both render here so admins can fill the standard
+              NW / GW pair shown on every commercial invoice. */}
           <Panel icon={<PackageIcon className="h-3.5 w-3.5" />} title="Packaging & Logistics">
             <p className="text-[10px] text-[var(--text-ghost)] mb-3 italic">
               Packed crate dimensions and shipment data. The bare-machine weight + footprint live on the Technical step.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>Packed Weight (kg)</label>
+                <label className={lbl}>Net Weight (kg)</label>
+                <input type="number" step="0.1" value={model.net_weight} onChange={(e) => onUpdate({ net_weight: e.target.value })} placeholder="0.0" className={inp} />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">Bare machine, no packaging.</p>
+              </div>
+              <div>
+                <label className={lbl}>Gross Weight (kg)</label>
                 <input type="number" step="0.1" value={model.weight} onChange={(e) => onUpdate({ weight: e.target.value })} placeholder="0.0" className={inp} />
+                <p className="text-[10px] text-[var(--text-ghost)] mt-1">Includes crate + accessories.</p>
               </div>
               <div>
                 <label className={lbl}>Packed CBM (m³)</label>
                 <input type="number" step="0.0001" value={model.cbm} onChange={(e) => onUpdate({ cbm: e.target.value })} placeholder="0.0000" className={inp} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className={lbl}>Carton Dimensions (L × W × H)</label>
+                <input type="text" value={model.carton_dimensions} onChange={(e) => onUpdate({ carton_dimensions: e.target.value })} placeholder="e.g. 60 × 50 × 65 cm" className={inp} />
               </div>
               <div>
                 <label className={lbl}>Packing Type</label>
@@ -434,11 +478,11 @@ function ModelCard({
             </div>
           </Panel>
 
-          {/* Advanced (MOQ / Lead Time / Barcode override) */}
+          {/* Advanced (MOQ / Lead Time / Container loading / Barcode) */}
           <details className="group">
             <summary className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-subtle)]/50 transition-colors list-none">
               <WarehouseIcon className="h-3.5 w-3.5 text-[var(--text-ghost)]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Advanced · Fulfillment & Codes</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">Advanced · Fulfillment &amp; Codes</span>
               <AngleDownIcon className="h-3.5 w-3.5 text-[var(--text-ghost)] ml-auto transition-transform group-open:rotate-180" />
             </summary>
             <div className="pt-3 px-1 space-y-4">
@@ -454,6 +498,19 @@ function ModelCard({
                 <div>
                   <label className={lbl}>Barcode Override</label>
                   <input type="text" value={model.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} placeholder="Leave empty = auto from SKU" className={`${inp} font-mono`} />
+                </div>
+              </div>
+              {/* Container loading — units that fit in standard
+                  20'/40' ocean containers. Used by the logistics
+                  team to quote FCL pricing. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Container 20&apos; (units)</label>
+                  <input type="number" value={model.container_20ft_qty} onChange={(e) => onUpdate({ container_20ft_qty: e.target.value })} placeholder="e.g. 120" className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>Container 40&apos; (units)</label>
+                  <input type="number" value={model.container_40ft_qty} onChange={(e) => onUpdate({ container_40ft_qty: e.target.value })} placeholder="e.g. 280" className={inp} />
                 </div>
               </div>
             </div>

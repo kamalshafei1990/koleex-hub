@@ -280,6 +280,11 @@ export interface ProductRow {
   rohs_compliant: boolean | null;
   machine_weight_kg: number | null;
   machine_dimensions: string | null;
+  /* Technical step v2 audit gap-fill. */
+  frequency_hz: string[] | null;
+  phase: string | null;
+  ip_rating: string | null;
+  operating_temp: string | null;
   supports_head_only: boolean;
   supports_complete_set: boolean;
   warranty: string | null;
@@ -309,11 +314,20 @@ export interface ProductModelRow {
   supports_complete_set: boolean | null;
   head_only_price: number | null;
   complete_set_price: number | null;
+  /* `weight` is the GROSS / packed weight (kg). `net_weight` is the
+     bare-machine weight; both fields exist so a model card can carry
+     the standard NW / GW pair shown on every commercial invoice. */
   weight: number | null;
+  net_weight: number | null;
   cbm: number | null;
+  carton_dimensions: string | null;
   packing_type: string | null;
   box_include: string | null;
   extra_accessories: string | null;
+  /* Logistics + availability — added in the Technical+Models v2 audit. */
+  container_20ft_qty: number | null;
+  container_40ft_qty: number | null;
+  stock_status: string | null;
   order: number;
   visible: boolean;
   status: string | null;

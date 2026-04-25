@@ -657,8 +657,10 @@ export default function ProductViewPage() {
 
     const elec: Row[] = [];
     if ((product.voltage?.length || 0) > 0) elec.push({ label: "Voltage", value: (product.voltage || []).join(" / ") });
+    if ((product.frequency_hz?.length || 0) > 0) elec.push({ label: "Frequency", value: (product.frequency_hz || []).map((h) => `${h} Hz`).join(" / ") });
     if (product.motor_power_w !== null && product.motor_power_w !== undefined) elec.push({ label: "Motor Power", value: `${product.motor_power_w} W` });
     if (product.power_consumption_w !== null && product.power_consumption_w !== undefined) elec.push({ label: "Power Consumption", value: `${product.power_consumption_w} W` });
+    if (product.phase) elec.push({ label: "Phase", value: product.phase === "single" ? "Single phase" : product.phase === "three" ? "Three phase" : product.phase });
     if ((product.plug_types?.length || 0) > 0) elec.push({ label: "Plug Types", value: (product.plug_types || []).join(", ") });
 
     const phys: Row[] = [];
@@ -667,6 +669,8 @@ export default function ProductViewPage() {
 
     const comp: Row[] = [];
     if (product.hs_code) comp.push({ label: "HS Code", value: product.hs_code });
+    if (product.ip_rating) comp.push({ label: "IP Rating", value: product.ip_rating });
+    if (product.operating_temp) comp.push({ label: "Operating Temp", value: product.operating_temp });
     if (product.ce_certified) comp.push({ label: "CE Certified", value: "Yes" });
     if (product.rohs_compliant) comp.push({ label: "RoHS Compliant", value: "Yes" });
     if ((product.colors?.length || 0) > 0) comp.push({ label: "Colors", value: (product.colors || []).join(", ") });
