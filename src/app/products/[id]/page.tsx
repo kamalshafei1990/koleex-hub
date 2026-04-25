@@ -1214,18 +1214,23 @@ export default function ProductViewPage() {
                     All buttons share the same h-11 height so the row
                     reads as one unit; primary is visually largest via
                     solid fill + shadow + heavier weight. */}
-              {/* ═══ BUTTON ZONE ════════════════════════════════════
-                  One dedicated container under the title block, mt-8
-                  (32 px) separation. Three vertical layers stacked
-                  on the left edge of the column:
+              {/* ═══ BUTTON CONTAINER ═══════════════════════════════
+                  One dedicated container directly under the title
+                  block. Three vertical layers stacked on the column's
+                  left edge:
 
-                    Layer 1  PRIMARY full-width — own row, no
-                             neighbour, strongest visual weight.
-                    Layer 2  SECONDARY split 50/50 — Request Quote
-                             + Compare share identical width via
-                             grid-cols-2.
+                    Layer 1  PRIMARY full-width — alone, strongest
+                             visual weight.
+                    Layer 2  SECONDARY 50/50 — Request Quote + Compare,
+                             identical width via grid-cols-2.
                     Layer 3  SUPPORT — Contact Sales, tertiary text
-                             link, separated 32 px from the cluster.
+                             link, visibly separated.
+
+                  Spacing rules followed:
+                    · Title  → primary:        mt-8  (32 px)  large
+                    · Primary → secondary:     mt-4  (16 px)  medium
+                    · Secondary → support:     mt-8  (32 px)  large
+                    · Between secondary buttons: gap-4 (16 px) even
 
                   All button-shaped controls: h-11, px-8, rounded-full,
                   text-[15px]. Visual hierarchy from fill + font
@@ -1238,11 +1243,11 @@ export default function ProductViewPage() {
                 >
                   Estimate Total Cost
                 </Link>
-                <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
-                  Calculate full cost including shipping, duties, and delivery.
-                </p>
 
-                {/* Layer 2 — SECONDARY (mt-4 medium gap, 50/50 grid) */}
+                {/* Layer 2 — SECONDARY (mt-4 = 16 px medium, 50/50 grid).
+                    Helper text was deliberately removed — it broke
+                    the primary→secondary gap rhythm and isn't in
+                    the layout brief. */}
                 <div className="mt-4 grid grid-cols-2 gap-4">
                   <button
                     type="button"
