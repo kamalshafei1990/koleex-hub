@@ -1098,13 +1098,13 @@ export default function ProductViewPage() {
             {/* Spacer for mobile when nav is hidden — pushes CTA right. */}
             <div className="md:hidden flex-1" />
             {/* Primary CTA in the sticky nav mirrors the hero —
-                "Calculate" routes to the landed-cost simulator,
+                "Estimate" routes to the landed-cost simulator,
                 the page's main action. */}
             <Link
               href={`/landed-cost/new?productId=${product.id}`}
               className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[12px] md:text-[13px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors shrink-0"
             >
-              Calculate
+              Estimate
             </Link>
           </div>
         </div>
@@ -1220,7 +1220,7 @@ export default function ProductViewPage() {
                     href={`/landed-cost/new?productId=${product.id}`}
                     className="inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
                   >
-                    Calculate Your Final Cost
+                    Estimate Total Cost
                   </Link>
                   <button
                     type="button"
@@ -1246,7 +1246,7 @@ export default function ProductViewPage() {
                     where the calculator goes so customers click with
                     intent. 8 px gap (mt-2). */}
                 <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
-                  Estimate the full cost including shipping and duties.
+                  Calculate full cost including shipping, duties, and delivery.
                 </p>
 
                 {/* CONDITIONAL — Add to Quotation. Only renders when
