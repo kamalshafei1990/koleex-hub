@@ -897,9 +897,15 @@ export default function ProductViewPage() {
     const order = [
       "Performance", "Needle & Thread", "Mechanical", "Stitch & Feed",
       "Configuration", "Automation",
+      // Overlock-specific groups slot in alongside the lockstitch
+      // ones — they describe the same kinds of capabilities so the
+      // ordering stays consistent across families.
+      "Cutting",
       "Walking-Foot Mechanism", "Long-Arm Geometry", "Cylinder Bed Geometry",
       "Post-Bed Geometry", "Feed-Off-Arm Geometry", "Zig-Zag Stitch",
       "Edge Trimmer", "Heavy-Duty Capacity",
+      "Rolled Hem", "Rolled-Hem Specifics",
+      "Variable Top-Feed", "Safety-Stitch Geometry",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -930,6 +936,12 @@ export default function ProductViewPage() {
         "Cylinder Bed Geometry", "Post-Bed Geometry",
         "Feed-Off-Arm Geometry", "Zig-Zag Stitch",
         "Edge Trimmer", "Heavy-Duty Capacity",
+        // Overlock groups (Configuration goes to Mechanical below;
+        // Cutting + the kind-specific overlock groups belong to
+        // Performance because they describe what the machine DOES,
+        // not what it's built from).
+        "Cutting", "Rolled Hem", "Rolled-Hem Specifics",
+        "Variable Top-Feed", "Safety-Stitch Geometry",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],

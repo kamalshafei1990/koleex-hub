@@ -101,6 +101,62 @@ export const FIELD_GLYPHS: Record<string, string> = {
   hd_max_material_thickness_heavy: "hd_max_material_thickness_heavy", // cube
   hd_reinforced_frame: "hd_reinforced_frame",           // frame
   hd_large_hook: "hd_large_hook",                       // fort
+
+  /* ─── Overlock Family — Tier 2 ──────────────────────────
+     Reuse existing uicons glyphs by mapping the new ov_*
+     keys to the closest semantic glyph already in
+     glyph-paths.ts. Avoids re-running the SVG build script
+     while still giving every overlock spec its own visual. */
+  ov_thread_count: "thread_count_tex",          // hashtag-lock
+  ov_needle_count: "needle_system",             // needle
+  ov_looper_config: "hook_type",                // fish-hook
+  ov_bed_type: "ls_bed_type",                   // bed-alt
+  ov_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+
+  ov_stitch_width_min: "stitch_length_min",     // arrow-small-left
+  ov_stitch_width_max: "stitch_length_max",     // arrow-small-right
+  ov_stitch_length_min: "stitch_length_min",    // arrow-small-left
+  ov_stitch_length_max: "stitch_length_max",    // arrow-small-right
+  ov_differential_feed_ratio: "ls_reverse_feed", // rotate-reverse
+  ov_feed_dog_type: "ls_feed_dog_type",         // conveyor-belt-arm
+
+  ov_cutting_width: "et_cutting_width",         // cutter
+  ov_knife_type: "et_knife_type",               // knife
+  ov_knife_disengage: "et_quick_release",       // bolt
+
+  ov_auto_thread_trimmer: "ls_auto_thread_trimmer",     // scissors
+  ov_auto_presser_foot_lifter: "ls_auto_presser_foot_lifter", // arrow-up
+  ov_auto_back_suction: "ls_auto_thread_wiper", // fan
+  ov_lubrication_system: "lubrication_system",  // oil-can
+  ov_needle_cooler: "ls_auto_thread_wiper",     // fan
+
+  /* ─── Overlock Kind extras — Tier 3 ─────────────────────── */
+  // Rolled-Hem
+  ov_rh_hem_width: "ls_max_material_thickness", // cubes-stacked
+  ov_rh_plate_type: "ls_bed_type",              // bed-alt
+  ov_rh_pico_edge: "zz_zigzag_width",           // arrows-h
+
+  // Variable Top-Feed
+  ov_vtf_top_feed_travel: "wf_walking_foot_travel", // footprint
+  ov_vtf_feed_ratio_min: "ls_reverse_feed",         // rotate-reverse
+  ov_vtf_feed_ratio_max: "ls_reverse_feed",         // rotate-reverse
+  ov_vtf_quick_lock: "et_quick_release",            // bolt
+
+  // Cylinder Bed (overlock)
+  ov_cb_cylinder_diameter: "cb_cylinder_diameter", // arrows-alt-h
+  ov_cb_cylinder_length: "cb_cylinder_length",     // arrows-alt-v
+  ov_cb_post_clearance: "pb_post_height",          // arrow-from-bottom
+
+  // Heavy-Duty (overlock)
+  ov_hd_max_thread_thickness: "hd_max_thread_thickness",     // arrow-down-strenght
+  ov_hd_max_material_thickness: "hd_max_material_thickness_heavy", // cube
+  ov_hd_reinforced_frame: "hd_reinforced_frame",             // frame
+  ov_hd_large_loopers: "hd_large_hook",                      // fort
+
+  // 5-Thread Safety-Stitch
+  ov_ss_chain_gauge: "zz_zigzag_width",          // arrows-h
+  ov_ss_chain_stitch_length: "stitch_length_max", // arrow-small-right
+  ov_ss_independent_tension: "ls_low_bobbin_sensor", // signal-bars-weak
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -126,6 +182,15 @@ export const GROUP_GLYPHS: Record<string, string> = {
   "Zig-Zag Stitch": "_g_ZigZag",                // magnifying-glass-wave
   "Edge Trimmer": "_g_EdgeTrimmer",             // knife-kitchen
   "Heavy-Duty Capacity": "_g_HeavyDuty",        // shield
+
+  // Overlock-specific groups — reuse closest existing group
+  // glyphs so the kind extras render with sensible icons even
+  // before dedicated SVGs are added to glyph-paths.ts.
+  "Cutting": "_g_EdgeTrimmer",                  // knife-kitchen
+  "Rolled Hem": "_g_StitchFeed",                // arrow-progress
+  "Variable Top-Feed": "_g_WalkingFoot",        // robotic-arm
+  "Rolled-Hem Specifics": "_g_StitchFeed",      // arrow-progress
+  "Safety-Stitch Geometry": "_g_StitchFeed",    // arrow-progress
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

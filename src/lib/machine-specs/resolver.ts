@@ -24,8 +24,9 @@ import { COMMON_FIELDS } from "./common";
 
 // Families (Tier 2)
 import { LOCKSTITCH_FAMILY_FIELDS } from "./families/lockstitch";
+import { OVERLOCK_FAMILY_FIELDS } from "./families/overlock";
 
-// Kind extras (Tier 3)
+// Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
 import { LONG_ARM_FIELDS } from "./kinds/lockstitch/long-arm";
 import { CYLINDER_BED_FIELDS } from "./kinds/lockstitch/cylinder-bed";
@@ -34,6 +35,13 @@ import { FEED_OFF_ARM_FIELDS } from "./kinds/lockstitch/feed-off-arm";
 import { ZIGZAG_FIELDS } from "./kinds/lockstitch/zigzag";
 import { EDGE_TRIMMER_FIELDS } from "./kinds/lockstitch/edge-trimmer";
 import { HEAVY_DUTY_FIELDS } from "./kinds/lockstitch/heavy-duty";
+
+// Kind extras (Tier 3) — Overlock
+import { ROLLED_HEM_FIELDS } from "./kinds/overlock/rolled-hem";
+import { VARIABLE_TOP_FEED_FIELDS } from "./kinds/overlock/variable-top-feed";
+import { OVERLOCK_CYLINDER_BED_FIELDS } from "./kinds/overlock/cylinder-bed";
+import { OVERLOCK_HEAVY_DUTY_FIELDS } from "./kinds/overlock/heavy-duty";
+import { OVERLOCK_SAFETY_STITCH_FIELDS } from "./kinds/overlock/safety-stitch";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -55,7 +63,12 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Core specs shared by every lockstitch kind.",
     fields: LOCKSTITCH_FAMILY_FIELDS,
   },
-  // Future: overlock-machines, interlock-machines, chainstitch-machines,
+  "overlock-machines": {
+    title: "Overlock Basics",
+    subtitle: "Core specs shared by every overlock / serger kind.",
+    fields: OVERLOCK_FAMILY_FIELDS,
+  },
+  // Future: interlock-machines, chainstitch-machines,
   // double-needle-machines, multi-needle-machines, pattern-sewing-machines,
   // heavy-duty-machines, special-machines.
 };
@@ -75,6 +88,7 @@ interface KindExtrasDef {
 }
 
 const KIND_EXTRAS: Record<string, KindExtrasDef> = {
+  // ── Lockstitch ────────────────────────────────────────────
   "lockstitch-walking-foot": {
     title: "Walking-Foot Mechanism",
     subtitle: "Compound / triple-feed specifics unique to walking-foot lockstitch.",
@@ -115,6 +129,34 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
     subtitle: "Max thread + material thickness — what makes this machine heavy-duty.",
     fields: HEAVY_DUTY_FIELDS,
   },
+
+  // ── Overlock ──────────────────────────────────────────────
+  "overlock-rolled-hem": {
+    title: "Rolled-Hem Specifics",
+    subtitle: "Tongue + plate dimensions for the narrow rolled-hem head.",
+    fields: ROLLED_HEM_FIELDS,
+  },
+  "overlock-variable-top-feed": {
+    title: "Variable Top-Feed",
+    subtitle: "Adjustable top-feed travel + ratio for clean knit-fabric seaming.",
+    fields: VARIABLE_TOP_FEED_FIELDS,
+  },
+  "overlock-cylinder-bed": {
+    title: "Cylinder Bed Geometry",
+    subtitle: "Tubular-arm dimensions for cuffs, socks, gloves.",
+    fields: OVERLOCK_CYLINDER_BED_FIELDS,
+  },
+  "overlock-heavy-duty": {
+    title: "Heavy-Duty Capacity",
+    subtitle: "Max thread + material thickness for jeans / canvas / upholstery.",
+    fields: OVERLOCK_HEAVY_DUTY_FIELDS,
+  },
+  "overlock-5t-safety": {
+    title: "Safety-Stitch Geometry",
+    subtitle: "Chain-stitch gauge + length unique to 5-thread safety heads.",
+    fields: OVERLOCK_SAFETY_STITCH_FIELDS,
+  },
+  // Standard kinds (1n-2t, 1n-3t, 2n-4t) inherit Common + Family only.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
