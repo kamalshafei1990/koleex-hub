@@ -50,6 +50,7 @@ import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
 import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
+import CogIcon from "@/components/icons/ui/CogIcon";
 import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
@@ -741,17 +742,19 @@ export default function ProductViewPage() {
      facts presented as oversized typography. Pulls from the spec
      buckets only when their values exist, so empty data products
      show a smaller stat row instead of a half-filled one. */
-  const headlineStats = useMemo<{ value: string; unit?: string; label: string }[]>(() => {
+  const headlineStats = useMemo<{ value: string; unit?: string; label: string; icon: React.ReactNode }[]>(() => {
     if (!product) return [];
     const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
     const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
-    const out: { value: string; unit?: string; label: string }[] = [];
+    const out: { value: string; unit?: string; label: string; icon: React.ReactNode }[] = [];
+    const ic = "h-5 w-5";
 
     if (cs.max_sewing_speed) {
       out.push({
         value: Number(cs.max_sewing_speed).toLocaleString("en-US"),
         unit: "SPM",
         label: "Max sewing speed",
+        icon: <GaugeIcon className={ic} />,
       });
     }
     const thickness = ts.hd_max_material_thickness_heavy ?? ts.ls_max_material_thickness;
@@ -760,6 +763,7 @@ export default function ProductViewPage() {
         value: String(thickness),
         unit: "mm",
         label: "Material thickness",
+        icon: <LayersIcon className={ic} />,
       });
     }
     if (product.motor_power_w !== null && product.motor_power_w !== undefined) {
@@ -767,6 +771,7 @@ export default function ProductViewPage() {
         value: String(product.motor_power_w),
         unit: "W",
         label: "Motor power",
+        icon: <ZapIcon className={ic} />,
       });
     }
     if (product.warranty) {
@@ -777,6 +782,7 @@ export default function ProductViewPage() {
         value: m ? m[1] : product.warranty,
         unit: m ? (tail || "yr") : undefined,
         label: "Warranty",
+        icon: <ShieldCheckIcon className={ic} />,
       });
     }
     // Fallback if none of the headline stats are filled — try
@@ -786,6 +792,7 @@ export default function ProductViewPage() {
         value: String(cs.stitch_length_max),
         unit: "mm",
         label: "Max stitch length",
+        icon: <RulerIcon className={ic} />,
       });
     }
     return out.slice(0, 4);
@@ -902,13 +909,8 @@ export default function ProductViewPage() {
     return tabs;
   }, [specCategories]);
 
-  const [activeSpecTab, setActiveSpecTab] = useState<string>("");
-  useEffect(() => {
-    if (specTabs.length > 0 && !specTabs.some((t) => t.id === activeSpecTab)) {
-      setActiveSpecTab(specTabs[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [specTabs]);
+  // Spec sections are now all-visible (per the brief — no collapse,
+  // no tabs). Active-tab state was here previously; removed.
 
   /* ── Loading / not found ── */
   if (loading) {
@@ -1094,40 +1096,63 @@ export default function ProductViewPage() {
             · Label:    12 px, semibold, uppercase
         ═══════════════════════════════════════════════════════════════ */}
 
-      {/* SECTION 1 — HERO (image LEFT 60%, text RIGHT 40%) ────────── */}
+      {/* SECTION 1 — HERO (image LEFT, text RIGHT) ────────────────
+          · Title splits into MAIN (model code) + SUBTITLE (full
+            descriptive name) — strong contrast in size and weight.
+          · Image floats freely on a soft radial gradient — no card
+            frame, no border, no surface. The product becomes the
+            visual focal point of the section.
+          ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32 lg:py-40">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            {/* LEFT — dominant image (lg col-span-7 = 58%) */}
+            {/* LEFT — floating image with subtle radial backdrop. */}
             <div className="order-1 lg:col-span-7">
-              <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
+              <div
+                className="relative w-full aspect-[5/4] flex items-center justify-center"
+                style={{
+                  // Subtle radial gradient gives the product a soft
+                  // halo so it doesn't sit on a flat plane — same
+                  // technique Apple uses on hero product shots.
+                  backgroundImage:
+                    "radial-gradient(ellipse at center, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0) 70%)",
+                }}
+              >
                 {mainImage ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={IMG.hero(mainImage)}
                     alt={product.product_name}
-                    className="absolute inset-0 w-full h-full object-contain p-6 md:p-10"
+                    className="relative max-w-full max-h-full object-contain"
                     decoding="async"
                     fetchPriority="high"
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
-                  </div>
+                  <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
                 )}
               </div>
             </div>
 
-            {/* RIGHT — minimal editorial column (lg col-span-5 = 42%) */}
+            {/* RIGHT — editorial column with split title hierarchy. */}
             <div className="order-2 lg:col-span-5">
               <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
                 {product.brand || "Koleex"}
               </p>
+              {/* Main title — model code if available, otherwise the
+                  product name. Big, bold, anchor for the eye. */}
               <h1 className="mt-4 text-[56px] md:text-[72px] lg:text-[88px] font-semibold tracking-[-0.025em] leading-[0.98] text-[#1D1D1F] dark:text-white">
-                {product.product_name}
+                {primaryModel?.model_name || product.product_name}
               </h1>
+              {/* Subtitle — full descriptive name. Lighter weight,
+                  smaller size, muted color. Only shows when it
+                  carries information beyond the H1. */}
+              {primaryModel?.model_name && product.product_name && primaryModel.model_name !== product.product_name && (
+                <p className="mt-4 text-[20px] md:text-[24px] font-normal tracking-[-0.005em] leading-[1.25] text-[#6E6E73] dark:text-white/55">
+                  {product.product_name}
+                </p>
+              )}
               {(primaryModel?.tagline || product.excerpt) && (
-                <p className="mt-8 text-[18px] md:text-[20px] leading-[1.5] text-[#6E6E73] dark:text-white/65 max-w-[460px]">
+                <p className="mt-8 text-[16px] md:text-[17px] leading-[1.5] text-[#1D1D1F] dark:text-white/85 max-w-[460px]">
                   {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
@@ -1151,18 +1176,24 @@ export default function ProductViewPage() {
         </div>
       </section>
 
-      {/* SECTION 2 — QUICK INFO (4 columns, label + strong value) ─── */}
+      {/* SECTION 2 — QUICK INFO (4 columns, icon → label → value) ──
+          Icon on top in a neutral chip, small uppercase label, big
+          value with unit. No card chrome — items separated by
+          generous whitespace + subtle column dividers on desktop. */}
       {headlineStats.length >= 3 && (
-        <section className="bg-[#F5F5F7] dark:bg-white/[0.02] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-16 md:py-24">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-16">
+        <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-16 md:gap-y-0 md:divide-x md:divide-[#D2D2D7]/60 dark:md:divide-white/[0.06]">
               {headlineStats.map((s, i) => (
-                <div key={i}>
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
+                <div key={i} className={`${i > 0 && i % 2 === 0 ? "md:pl-10" : ""} ${i % 2 === 1 ? "md:pl-10" : ""} ${i < headlineStats.length - 1 ? "md:pr-10" : ""}`}>
+                  <span className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-white dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
+                    {s.icon}
+                  </span>
+                  <p className="mt-6 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
                     {s.label}
                   </p>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="text-[40px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.02em] leading-none text-[#1D1D1F] dark:text-white">
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-[36px] md:text-[44px] lg:text-[52px] font-semibold tracking-[-0.02em] leading-none text-[#1D1D1F] dark:text-white">
                       {s.value}
                     </span>
                     {s.unit && (
@@ -1205,7 +1236,7 @@ export default function ProductViewPage() {
 
       {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
       {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
-        <section className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
+        <section className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
               {/* LEFT — text */}
@@ -1248,10 +1279,14 @@ export default function ProductViewPage() {
         </section>
       )}
 
-      {/* SECTION 5 — SPECIFICATIONS (TABS, never a flat list) ─────── */}
+      {/* SECTION 5 — SPECIFICATIONS (all-visible, grouped) ─────────
+          No collapse, no tabs — every spec is on the page.
+          Categories stack vertically with strong section titles
+          + icons. Within each group, a clean 2-col key/value list
+          with subtle row dividers — Apple tech-specs pattern. */}
       {specTabs.length > 0 && (
         <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32 lg:py-40">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Specifications
             </p>
@@ -1259,57 +1294,54 @@ export default function ProductViewPage() {
               All the details.
             </h2>
 
-            {/* Tab strip — segmented buttons. Active tab gets a solid
-                fill, inactive tabs stay quiet. Single-line on mobile
-                with horizontal scroll if it needs to. */}
-            <div className="mt-12 flex flex-wrap gap-2 border-b border-[#D2D2D7]/60 dark:border-white/[0.06] pb-4">
+            <div className="mt-16 space-y-16">
               {specTabs.map((t) => {
-                const active = t.id === activeSpecTab;
+                const Icon = t.id === "performance" ? GaugeIcon
+                  : t.id === "mechanical" ? CogIcon
+                  : t.id === "electrical" ? ZapIcon
+                  : RulerIcon;
                 return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setActiveSpecTab(t.id)}
-                    className={`inline-flex items-center h-10 px-5 rounded-full text-[14px] font-medium transition-colors ${
-                      active
-                        ? "bg-[#1D1D1F] text-white dark:bg-white dark:text-[#1D1D1F]"
-                        : "bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/75 hover:bg-[#EBEBEF] dark:hover:bg-white/[0.08]"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
+                  <div key={t.id}>
+                    {/* Group title — icon + name. Strong but not loud
+                        because the H2 above already established the
+                        section's primacy. */}
+                    <div className="flex items-center gap-3 pb-4 border-b border-[#D2D2D7]/60 dark:border-white/[0.06]">
+                      <span className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <h3 className="text-[20px] md:text-[24px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                        {t.label}
+                      </h3>
+                    </div>
+                    <dl className="pt-4">
+                      {t.rows.map((r, i, arr) => (
+                        <div
+                          key={`${t.id}-${r.label}-${i}`}
+                          className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-6 gap-y-1 py-5 ${
+                            i < arr.length - 1
+                              ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
+                              : ""
+                          }`}
+                        >
+                          <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
+                            {r.label}
+                          </dt>
+                          <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium leading-[1.5]">
+                            {r.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
                 );
               })}
             </div>
-
-            {/* Tab panel — single clean two-column key/value table.
-                Subtle row dividers, no card chrome. Apple tech-specs
-                pattern. */}
-            <dl className="mt-8">
-              {(specTabs.find((t) => t.id === activeSpecTab)?.rows || []).map((r, i, arr) => (
-                <div
-                  key={`${r.label}-${i}`}
-                  className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-6 gap-y-1 py-5 ${
-                    i < arr.length - 1
-                      ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
-                      : ""
-                  }`}
-                >
-                  <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
-                    {r.label}
-                  </dt>
-                  <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium leading-[1.5]">
-                    {r.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
           </div>
         </section>
       )}
 
       {/* SECTION 6 — CLEAN END (single closing band, no clutter) ──── */}
-      <section className="bg-[#F5F5F7] dark:bg-white/[0.02] border-t border-[#D2D2D7]/60 dark:border-white/[0.04]">
+      <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
         <div className="max-w-[680px] mx-auto px-6 py-20 md:py-28 text-center">
           <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.15] text-[#1D1D1F] dark:text-white">
             Ready to put it on the line?
