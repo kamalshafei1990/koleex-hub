@@ -356,19 +356,6 @@ function describeApplication(tag: string): AppInfo {
   return { kind: "Application", icon: LayersIcon, description: "Optimised for industrial garment production." };
 }
 
-/* Compact icon+label pill used across the hero quick-facts strip
-   and the closing summary bar. Premium-feeling chip in the same
-   visual language as the rest of the page (Apple-light by default,
-   Apple-dark in dark mode). */
-function QuickFact({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-3 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[12px] font-medium text-[#1D1D1F] dark:text-white/85">
-      <span className="text-[#06C] dark:text-[#2997FF]">{icon}</span>
-      {label}
-    </span>
-  );
-}
-
 function Section({
   id, eyebrow, title, subtitle, children, className = "", align = "center",
 }: {
@@ -804,6 +791,32 @@ export default function ProductViewPage() {
     return out.slice(0, 4);
   }, [product, sewingSpecs]);
 
+  /* "At a glance" digest — the second-tier spec callout right
+     under the headline band. Pulls 6-8 of the most useful facts
+     (sewing speed, stitch length, motor, material capacity, voltage,
+     weight, warranty, machine kind…) and presents them in one
+     scannable card. Each row is { icon, label, value } so the
+     render stays clean. Empty values are skipped. */
+  const atGlanceRows = useMemo<{ icon: React.ReactNode; label: string; value: string }[]>(() => {
+    if (!product) return [];
+    const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
+    const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
+    const rows: { icon: React.ReactNode; label: string; value: string }[] = [];
+    const ic = "h-4 w-4";
+
+    if (cs.max_sewing_speed) rows.push({ icon: <GaugeIcon className={ic} />, label: "Max sewing speed", value: `${Number(cs.max_sewing_speed).toLocaleString("en-US")} SPM` });
+    if (cs.stitch_length_max) rows.push({ icon: <RulerIcon className={ic} />, label: "Stitch length", value: `${cs.stitch_length_min ?? "0"}–${cs.stitch_length_max} mm` });
+    if (cs.needle_system) rows.push({ icon: <ScissorsIcon className={ic} />, label: "Needle system", value: String(cs.needle_system) });
+    if (cs.motor_type) rows.push({ icon: <CpuIcon className={ic} />, label: "Motor type", value: String(cs.motor_type).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) });
+    if (product.motor_power_w) rows.push({ icon: <ZapIcon className={ic} />, label: "Motor power", value: `${product.motor_power_w} W` });
+    const thickness = ts.hd_max_material_thickness_heavy ?? ts.ls_max_material_thickness;
+    if (thickness) rows.push({ icon: <LayersIcon className={ic} />, label: "Max material thickness", value: `${thickness} mm` });
+    if (product.voltage && product.voltage.length > 0) rows.push({ icon: <ZapIcon className={ic} />, label: "Voltage", value: product.voltage.join(" / ") });
+    if (product.machine_weight_kg) rows.push({ icon: <PackageIcon className={ic} />, label: "Machine weight", value: `${product.machine_weight_kg} kg` });
+
+    return rows;
+  }, [product, sewingSpecs]);
+
   /* ── Loading / not found ── */
   if (loading) {
     return (
@@ -962,145 +975,141 @@ export default function ProductViewPage() {
       </div>
 
       {/* ══════════════════════════════════════
-          1. HERO — Apple.com style: centered headline + dominant image below
+          1. HERO — split layout
+
+          Left column carries the editorial: brand line, name,
+          tagline, excerpt, highlight bullets, pricing, CTAs.
+          Right column is a premium image card with a soft
+          neutral surface so the photo always sits in a frame.
+          On mobile the columns stack image-first.
           ══════════════════════════════════════ */}
-      <section className="relative pt-16 md:pt-24 pb-0 bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[980px] mx-auto px-6 text-center">
-          {/* "New" eyebrow (Apple-blue — works in both themes) */}
-          {product.featured && (
-            <p className="text-[18px] md:text-[21px] font-normal text-[#06C] dark:text-[#2997FF] mb-2 tracking-[-0.005em]">
-              New
-            </p>
-          )}
-          {!product.featured && product.brand && (
-            <p className="text-[14px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-2 tracking-[-0.005em]">
-              {product.brand}
-            </p>
-          )}
-
-          {/* Headline — Apple Hero Title */}
-          <h1 className="text-[40px] md:text-[64px] lg:text-[80px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.05] tracking-[-0.015em]">
-            {product.product_name}
-          </h1>
-
-          {/* Tagline */}
-          {primaryModel?.tagline && (
-            <p className="mt-4 md:mt-5 text-[21px] md:text-[28px] lg:text-[32px] font-normal text-[#1D1D1F] dark:text-white leading-[1.15] tracking-[-0.005em] max-w-[760px] mx-auto">
-              {primaryModel.tagline}
-            </p>
-          )}
-
-          {/* Short description (excerpt) — the 1-2 sentence pitch
-              admins enter in the Hero step. Falls below the big
-              tagline as a muted subtitle so customers get a second
-              pass of context before the CTAs. */}
-          {product.excerpt && (
-            <p className="mt-3 text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 leading-[1.47] max-w-[640px] mx-auto">
-              {product.excerpt}
-            </p>
-          )}
-
-          {/* Key highlights — 3-5 short bullet strings from the Hero
-              step. Rendered as an inline row of check-marked chips so
-              the hero stays light and scannable. */}
-          {product.highlights && product.highlights.length > 0 && (
-            <ul className="mt-6 md:mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-              {product.highlights.map((h, i) => (
-                <li
-                  key={i}
-                  className="inline-flex items-center gap-1.5 text-[13px] md:text-[14px] font-medium text-[#1D1D1F] dark:text-white/80"
-                >
-                  <CheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
-                  {h}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Price + primary CTAs — premium Apple-style stack.
-              Pricing leads (anchor for the eye), primary "Request
-              Quote" pill follows, secondary "Learn more" sits as
-              a quiet text link. */}
-          <div className="mt-7 md:mt-9 flex flex-col items-center gap-4">
-            {priceFrom !== null && (
-              <p className="text-[15px] md:text-[17px] text-[#86868B] dark:text-white/55">
-                <span className="text-[#1D1D1F] dark:text-white">From </span>
-                <span className="font-semibold text-[#1D1D1F] dark:text-white">
-                  {fmtMoney(priceFrom)}
+      <section className="relative bg-white dark:bg-[#0A0A0A]">
+        <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-14 md:py-20 lg:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 lg:gap-14 items-center">
+            {/* ── Left: editorial column ── */}
+            <div className="order-2 lg:order-1">
+              {/* Eyebrow — "New" pill when featured, otherwise brand. */}
+              {product.featured ? (
+                <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[#06C]/10 dark:bg-[#2997FF]/15 text-[11px] font-semibold tracking-[0.04em] text-[#06C] dark:text-[#2997FF]">
+                  <SparklesIcon className="h-3 w-3" /> NEW
                 </span>
-              </p>
-            )}
-            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
-              <button
-                type="button"
-                onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                className="inline-flex items-center h-[40px] md:h-[44px] px-6 md:px-7 rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] shadow-[0_2px_10px_rgba(0,102,204,0.25)] dark:shadow-[0_2px_10px_rgba(41,151,255,0.2)] transition-all"
-              >
-                Request Quote
-              </button>
-              <a
-                href="#specs"
-                className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
-              >
-                Learn more <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
-              </a>
+              ) : product.brand ? (
+                <p className="text-[12px] font-semibold tracking-[0.08em] uppercase text-[#86868B] dark:text-white/50">
+                  {product.brand}
+                </p>
+              ) : null}
+
+              {/* Headline — left-aligned, tight tracking. */}
+              <h1 className="mt-3 text-[36px] md:text-[44px] lg:text-[52px] xl:text-[60px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.05] tracking-[-0.02em]">
+                {product.product_name}
+              </h1>
+
+              {/* Tagline (large) + excerpt (calmer). */}
+              {primaryModel?.tagline && (
+                <p className="mt-4 text-[18px] md:text-[20px] lg:text-[22px] font-normal text-[#1D1D1F] dark:text-white/90 leading-[1.3] tracking-[-0.005em]">
+                  {primaryModel.tagline}
+                </p>
+              )}
+              {product.excerpt && (
+                <p className="mt-3 text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/60 leading-[1.55]">
+                  {product.excerpt}
+                </p>
+              )}
+
+              {/* Highlight bullets — bigger checkmarks, more breathing
+                  room than chip row. Reads like a premium feature list. */}
+              {product.highlights && product.highlights.length > 0 && (
+                <ul className="mt-6 space-y-2">
+                  {product.highlights.slice(0, 5).map((h, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[14px] text-[#1D1D1F] dark:text-white/85">
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#06C]/10 dark:bg-[#2997FF]/15 text-[#06C] dark:text-[#2997FF] shrink-0 mt-0.5">
+                        <CheckIcon className="h-3 w-3" />
+                      </span>
+                      <span className="leading-snug">{h}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Pricing card — gives the price its own surface. */}
+              {priceFrom !== null && (
+                <div className="mt-7 inline-flex items-baseline gap-2 px-4 py-2.5 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.05] dark:border dark:border-white/[0.08]">
+                  <span className="text-[12px] uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 font-medium">From</span>
+                  <span className="text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                    {fmtMoney(priceFrom)}
+                  </span>
+                </div>
+              )}
+
+              {/* CTA row */}
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+                <button
+                  type="button"
+                  onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+                  className="inline-flex items-center h-[44px] px-7 rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] shadow-[0_4px_18px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_18px_rgba(41,151,255,0.22)] transition-all"
+                >
+                  Request Quote
+                </button>
+                <a
+                  href="#specs"
+                  className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[15px] font-medium"
+                >
+                  See full specs <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
+                </a>
+              </div>
+
+              {/* Trust row — warranty / origin / CE / RoHS as compact
+                  badges. Replaces the old chip-strip below the image. */}
+              {(product.warranty || product.country_of_origin || product.ce_certified || product.rohs_compliant) && (
+                <div className="mt-7 pt-6 border-t border-[#D2D2D7]/60 dark:border-white/[0.06] flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-[#6E6E73] dark:text-white/50">
+                  {product.warranty && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <ShieldCheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      {product.warranty} warranty
+                    </span>
+                  )}
+                  {product.country_of_origin && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <GlobeIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      Made in {product.country_of_origin}
+                    </span>
+                  )}
+                  {product.ce_certified && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <BadgeCheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      CE Certified
+                    </span>
+                  )}
+                  {product.rohs_compliant && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <AwardIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
+                      RoHS
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Right: hero image card ── */}
+            <div className="order-1 lg:order-2">
+              <div className="relative w-full aspect-[5/4] lg:aspect-[6/5] rounded-[24px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] shadow-[0_2px_24px_rgba(0,0,0,0.04)] dark:shadow-none">
+                {mainImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={IMG.hero(mainImage)}
+                    alt={product.product_name}
+                    className="absolute inset-0 w-full h-full object-contain p-4 md:p-6"
+                    decoding="async"
+                    fetchPriority="high"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Hero image — wrapped in a soft surface card so even
-              source photos with tight framing breathe. The CARD
-              owns the aspect ratio (16/10 wide-format), the IMAGE
-              uses object-contain to fit edge-to-edge inside it
-              without any extra padding fighting the source. Means
-              we never clip — whatever the source's natural
-              proportions, the full machine is visible. */}
-          <div className="mt-10 md:mt-14 relative">
-            <div className="w-full max-w-[1080px] mx-auto aspect-[16/10] rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden flex items-center justify-center">
-              {mainImage ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={IMG.hero(mainImage)}
-                  alt={product.product_name}
-                  className="w-full h-full object-contain"
-                  decoding="async"
-                  fetchPriority="high"
-                />
-              ) : (
-                <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
-              )}
-            </div>
-          </div>
-
-          {/* Quick-facts strip — small icon+label pills under the
-              hero image. Captures warranty, origin, certifications,
-              and headline electrical specs in one scannable row.
-              Customers absorb the at-a-glance facts without
-              scrolling deeper. Each pill renders only when its
-              underlying field is populated. */}
-          {(product.warranty || product.country_of_origin || product.ce_certified
-            || product.rohs_compliant || product.motor_power_w
-            || (product.voltage && product.voltage.length > 0)) && (
-            <div className="mt-8 md:mt-10 flex flex-wrap items-center justify-center gap-2 md:gap-2.5">
-              {product.warranty && (
-                <QuickFact icon={<ShieldCheckIcon className="h-3.5 w-3.5" />} label={`${product.warranty} warranty`} />
-              )}
-              {product.country_of_origin && (
-                <QuickFact icon={<GlobeIcon className="h-3.5 w-3.5" />} label={`Made in ${product.country_of_origin}`} />
-              )}
-              {product.motor_power_w && (
-                <QuickFact icon={<ZapIcon className="h-3.5 w-3.5" />} label={`${product.motor_power_w} W motor`} />
-              )}
-              {product.voltage && product.voltage.length > 0 && (
-                <QuickFact icon={<ZapIcon className="h-3.5 w-3.5" />} label={product.voltage.join(" / ")} />
-              )}
-              {product.ce_certified && (
-                <QuickFact icon={<BadgeCheckIcon className="h-3.5 w-3.5" />} label="CE Certified" />
-              )}
-              {product.rohs_compliant && (
-                <QuickFact icon={<AwardIcon className="h-3.5 w-3.5" />} label="RoHS" />
-              )}
-            </div>
-          )}
         </div>
       </section>
 
@@ -1134,6 +1143,64 @@ export default function ProductViewPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════
+          1.7 AT A GLANCE — premium quick-spec card
+
+          Right after the big stat band, present the next layer
+          of data as a single elegant card — readable in 5
+          seconds, before customers commit to scrolling the full
+          spec sheet. Pulls from common_specs + products columns
+          so it's always grounded in real data. Two columns:
+          PERFORMANCE on the left, BUILD & POWER on the right.
+          Renders only when at least one row has a value.
+          ══════════════════════════════════════ */}
+      {atGlanceRows.length > 0 && (
+        <section className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[1180px] mx-auto px-6 py-16 md:py-20">
+            <div className="rounded-[24px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden">
+              <div className="px-7 md:px-10 py-6 md:py-7 border-b border-[#D2D2D7]/60 dark:border-white/[0.06] flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">At a glance</p>
+                  <h2 className="mt-1 text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
+                    The essentials, in one card.
+                  </h2>
+                </div>
+                <a
+                  href="#specs"
+                  className="inline-flex items-center gap-1 text-[13px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
+                >
+                  See full specifications <AngleRightIcon className="h-3.5 w-3.5" />
+                </a>
+              </div>
+              <dl className="grid grid-cols-1 md:grid-cols-2">
+                {atGlanceRows.map((row, idx) => (
+                  <div
+                    key={row.label}
+                    className={`flex items-center gap-4 px-7 md:px-10 py-4 ${
+                      // Border-bottom on every row except the last, and
+                      // border-right on left-column rows in the 2-col grid.
+                      idx < atGlanceRows.length - (atGlanceRows.length % 2 === 0 ? 2 : 1)
+                        ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]"
+                        : ""
+                    } ${
+                      idx % 2 === 0 ? "md:border-r md:border-[#D2D2D7]/60 dark:md:border-white/[0.06]" : ""
+                    }`}
+                  >
+                    <span className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 text-[#06C] dark:text-[#2997FF] shrink-0">
+                      {row.icon}
+                    </span>
+                    <dt className="text-[12.5px] text-[#6E6E73] dark:text-white/55 flex-1 min-w-0">{row.label}</dt>
+                    <dd className="text-[14px] md:text-[15px] font-semibold text-[#1D1D1F] dark:text-white text-right tabular-nums">
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
         </section>
@@ -1891,6 +1958,42 @@ export default function ProductViewPage() {
           </div>
         </Section>
       )}
+
+      {/* ══════════════════════════════════════
+          9.5 FINAL CTA BAND — last call to quote
+
+          Sits right before related products as a premium full-width
+          band. Last opportunity to capture an inquiry before the
+          customer wanders off into "you might also like". Single
+          big quote button + a softer secondary path back to the
+          spec sheet for power users still doing their homework.
+          ══════════════════════════════════════ */}
+      <section className="bg-[#0A0A0A] dark:bg-black border-y border-[#1D1D1F] dark:border-white/[0.05]">
+        <div className="max-w-[980px] mx-auto px-6 py-16 md:py-20 text-center">
+          <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-white/45">Get a tailored quote</p>
+          <h2 className="mt-3 text-[32px] md:text-[44px] lg:text-[52px] font-semibold tracking-[-0.02em] text-white leading-[1.05]">
+            Ready to put it on the line?
+          </h2>
+          <p className="mt-4 text-[15px] md:text-[17px] text-white/60 leading-[1.5] max-w-[620px] mx-auto">
+            Tell us your volumes and we&apos;ll come back with a price, lead time, and the configuration that fits your workshop.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+            <button
+              type="button"
+              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+              className="inline-flex items-center h-[48px] px-8 rounded-full bg-[#2997FF] text-white text-[15px] font-medium hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(41,151,255,0.35)] transition-all"
+            >
+              Request a Quote
+            </button>
+            <a
+              href="#specs"
+              className="inline-flex items-center gap-1.5 text-[15px] font-medium text-white/85 hover:text-white"
+            >
+              Re-read the specs <AngleRightIcon className="h-4 w-4 mt-0.5" />
+            </a>
+          </div>
+        </div>
+      </section>
 
       {/* ══════════════════════════════════════
           10. RELATED PRODUCTS — Apple clean shopping cards
