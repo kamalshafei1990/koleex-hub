@@ -20,78 +20,171 @@ import type {
 
 const BUCKET = "media";
 
+/* ─── Taxonomy in-flight + session cache ─────────────────────────────
+   Divisions / Categories / Subcategories are read on EVERY product
+   page mount (admin list, detail page, edit form). They almost
+   never change in a session. We cache twice:
+
+     1. In-flight promise dedupe — if two callers ask at the same
+        time, only one network round-trip happens.
+     2. sessionStorage with a 60s TTL — instant return on subsequent
+        navigations within the session, while still picking up real
+        changes within ~a minute.
+
+   Mutations (create/update/delete) call `invalidateTaxonomyCache()`
+   so the next read is fresh. Zero behavior change for callers —
+   they still await the same Promise<Row[]>. */
+
+const TAXO_TTL_MS = 60_000;
+type Cached<T> = { data: T; expiresAt: number };
+
+const inflight = new Map<string, Promise<unknown>>();
+
+function readSessionCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Cached<T>;
+    if (parsed.expiresAt < Date.now()) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch { return null; }
+}
+
+function writeSessionCache<T>(key: string, data: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: Cached<T> = { data, expiresAt: Date.now() + TAXO_TTL_MS };
+    window.sessionStorage.setItem(key, JSON.stringify(payload));
+  } catch { /* quota exceeded — fine, fall through */ }
+}
+
+function clearSessionKey(key: string): void {
+  if (typeof window === "undefined") return;
+  try { window.sessionStorage.removeItem(key); } catch { /* noop */ }
+}
+
+/** Call this from every taxonomy mutation so the next read pulls
+ *  fresh data instead of a stale cache. */
+export function invalidateTaxonomyCache(): void {
+  clearSessionKey("kx:taxo:divisions");
+  clearSessionKey("kx:taxo:categories");
+  clearSessionKey("kx:taxo:subcategories");
+  inflight.delete("divisions");
+  inflight.delete("categories");
+  inflight.delete("subcategories");
+}
+
+async function memoFetch<T>(
+  key: string,
+  loader: () => Promise<T>,
+): Promise<T> {
+  const cached = readSessionCache<T>(`kx:taxo:${key}`);
+  if (cached !== null) return cached;
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+  const p = loader().then((data) => {
+    writeSessionCache(`kx:taxo:${key}`, data);
+    inflight.delete(key);
+    return data;
+  }).catch((err) => {
+    inflight.delete(key);
+    throw err;
+  });
+  inflight.set(key, p);
+  return p;
+}
+
 // ── Divisions CRUD ──
 
 export async function fetchDivisions(): Promise<DivisionRow[]> {
-  const { data } = await supabase.from("divisions").select("*").order("order");
-  return (data as DivisionRow[]) || [];
+  return memoFetch("divisions", async () => {
+    const { data } = await supabase.from("divisions").select("*").order("order");
+    return (data as DivisionRow[]) || [];
+  });
 }
 
 export async function createDivision(d: Record<string, unknown>): Promise<DivisionRow | null> {
   const { data, error } = await supabase.from("divisions").insert(d).select().single();
   if (error) { console.error("[Divisions] Create:", error.message); return null; }
+  invalidateTaxonomyCache();
   return data as DivisionRow;
 }
 
 export async function updateDivision(id: string, d: Record<string, unknown>): Promise<boolean> {
   const { error } = await supabase.from("divisions").update(d).eq("id", id);
   if (error) { console.error("[Divisions] Update:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 
 export async function deleteDivision(id: string): Promise<boolean> {
   const { error } = await supabase.from("divisions").delete().eq("id", id);
   if (error) { console.error("[Divisions] Delete:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 
 // ── Categories CRUD ──
 
 export async function fetchCategories(): Promise<CategoryRow[]> {
-  const { data } = await supabase.from("categories").select("*").order("order");
-  return (data as CategoryRow[]) || [];
+  return memoFetch("categories", async () => {
+    const { data } = await supabase.from("categories").select("*").order("order");
+    return (data as CategoryRow[]) || [];
+  });
 }
 
 export async function createCategory(c: Record<string, unknown>): Promise<CategoryRow | null> {
   const { data, error } = await supabase.from("categories").insert(c).select().single();
   if (error) { console.error("[Categories] Create:", error.message); return null; }
+  invalidateTaxonomyCache();
   return data as CategoryRow;
 }
 
 export async function updateCategory(id: string, c: Record<string, unknown>): Promise<boolean> {
   const { error } = await supabase.from("categories").update(c).eq("id", id);
   if (error) { console.error("[Categories] Update:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 
 export async function deleteCategory(id: string): Promise<boolean> {
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) { console.error("[Categories] Delete:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 
 // ── Subcategories CRUD ──
 
 export async function fetchSubcategories(): Promise<SubcategoryRow[]> {
-  const { data } = await supabase.from("subcategories").select("*").order("order");
-  return (data as SubcategoryRow[]) || [];
+  return memoFetch("subcategories", async () => {
+    const { data } = await supabase.from("subcategories").select("*").order("order");
+    return (data as SubcategoryRow[]) || [];
+  });
 }
 
 export async function createSubcategory(s: Record<string, unknown>): Promise<SubcategoryRow | null> {
   const { data, error } = await supabase.from("subcategories").insert(s).select().single();
   if (error) { console.error("[Subcategories] Create:", error.message); return null; }
+  invalidateTaxonomyCache();
   return data as SubcategoryRow;
 }
 
 export async function updateSubcategory(id: string, s: Record<string, unknown>): Promise<boolean> {
   const { error } = await supabase.from("subcategories").update(s).eq("id", id);
   if (error) { console.error("[Subcategories] Update:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 
 export async function deleteSubcategory(id: string): Promise<boolean> {
   const { error } = await supabase.from("subcategories").delete().eq("id", id);
   if (error) { console.error("[Subcategories] Delete:", error.message); return false; }
+  invalidateTaxonomyCache();
   return true;
 }
 

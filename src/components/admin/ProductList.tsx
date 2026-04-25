@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -637,10 +638,20 @@ export default function ProductList() {
                     href={`${baseRoute}/${p.slug || p.id}`}
                     className="group flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
                   >
-                    {/* Thumbnail */}
+                    {/* Thumbnail — Supabase Storage transform downscales
+                        the source photo to ~96px @ q75 (typically <30 KB
+                        instead of multi-MB originals). loading="lazy"
+                        keeps off-screen rows from blocking the
+                        first paint. */}
                     <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
                       {imgUrl ? (
-                        <img src={imgUrl} alt={p.product_name} className="w-full h-full object-contain p-1" />
+                        <img
+                          src={IMG.thumb(imgUrl)}
+                          alt={p.product_name}
+                          className="w-full h-full object-contain p-1"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <ImageRawIcon className="h-5 w-5 text-[var(--text-ghost)]" />
                       )}

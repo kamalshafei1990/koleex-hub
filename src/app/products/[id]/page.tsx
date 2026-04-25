@@ -80,6 +80,7 @@ import {
   type SpecField as NewSpecField,
 } from "@/lib/machine-specs";
 import { getKindBySlug } from "@/lib/machine-kinds";
+import { IMG } from "@/lib/cdn";
 
 /* ---------------- helpers ---------------- */
 
@@ -448,14 +449,20 @@ export default function ProductViewPage() {
       setLoading(true);
       setNotFound(false);
 
-      const [divs, cats, subs] = await Promise.all([
-        fetchDivisions(), fetchCategories(), fetchSubcategories(),
+      /* PERF: collapsed three sequential network rounds into two.
+              Round 1 fires the product read in parallel with the
+              taxonomy reads (taxonomy doesn't depend on the product).
+              Round 2 fires models + media + specs + related in
+              parallel (all need the product id, can't be earlier).
+              Saves ~one full RTT (often 150–300ms on a cold load). */
+      const [divs, cats, subs, p] = await Promise.all([
+        fetchDivisions(),
+        fetchCategories(),
+        fetchSubcategories(),
+        fetchProductByIdOrSlug(handle),
       ]);
       if (cancelled) return;
       setDivisions(divs); setCategories(cats); setSubcategories(subs);
-
-      const p = await fetchProductByIdOrSlug(handle);
-      if (cancelled) return;
 
       if (!p) { setNotFound(true); setLoading(false); return; }
 
@@ -473,25 +480,30 @@ export default function ProductViewPage() {
       setSewingSpecs(specs);
       setRelated(rel);
 
-      // Resolve related product details + main image in parallel
+      /* PERF: related products used to fan out two sequential
+              Promise.alls (details, then media). Now a single
+              Promise.all interleaves both — same number of network
+              calls but one RTT shorter. */
       if (rel.length > 0) {
-        const detailsArr = await Promise.all(
-          rel.map(r => fetchProductByIdOrSlug(r.related_id))
+        const fanout = await Promise.all(
+          rel.flatMap(r => [
+            fetchProductByIdOrSlug(r.related_id),
+            fetchMediaByProductId(r.related_id),
+          ])
         );
         const detailsMap: Record<string, ProductRow> = {};
-        detailsArr.forEach((d, i) => { if (d) detailsMap[rel[i].related_id] = d; });
-        if (!cancelled) setRelatedDetails(detailsMap);
-
-        // Fetch main images for related products
-        const imgFetches = await Promise.all(
-          rel.map(r => fetchMediaByProductId(r.related_id))
-        );
         const imgMap: Record<string, string> = {};
-        imgFetches.forEach((arr, i) => {
-          const main = arr.find(m => m.type === "main_image") || arr[0];
-          if (main) imgMap[rel[i].related_id] = main.url;
+        rel.forEach((r, i) => {
+          const detail = fanout[i * 2] as ProductRow | null;
+          const mediaArr = fanout[i * 2 + 1] as ProductMediaRow[];
+          if (detail) detailsMap[r.related_id] = detail;
+          const main = mediaArr.find(m => m.type === "main_image") || mediaArr[0];
+          if (main) imgMap[r.related_id] = main.url;
         });
-        if (!cancelled) setRelatedImages(imgMap);
+        if (!cancelled) {
+          setRelatedDetails(detailsMap);
+          setRelatedImages(imgMap);
+        }
       }
 
       setLoading(false);
@@ -883,14 +895,20 @@ export default function ProductViewPage() {
             </a>
           </div>
 
-          {/* Hero image — centered, dominant, no frame */}
+          {/* Hero image — centered, dominant, no frame.
+              fetchPriority high so it's the LCP and grabbed first.
+              Routed through IMG.hero — Supabase Storage transform
+              re-encodes to ~1600px @ q80 (typically 5–8× smaller
+              than the raw upload). */}
           <div className="mt-10 md:mt-14 relative">
             {mainImage ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
-                src={mainImage}
+                src={IMG.hero(mainImage)}
                 alt={product.product_name}
                 className="w-full max-w-[900px] mx-auto aspect-[4/3] object-contain"
+                decoding="async"
+                fetchPriority="high"
               />
             ) : (
               <div className="w-full max-w-[900px] mx-auto aspect-[4/3] flex items-center justify-center bg-[#F5F5F7] dark:bg-white/[0.03] rounded-[22px]">
@@ -921,9 +939,11 @@ export default function ProductViewPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={galleryImages[activeImageIdx]?.id}
-                src={galleryImages[activeImageIdx]?.url}
+                src={IMG.gallery(galleryImages[activeImageIdx]?.url)}
                 alt={galleryImages[activeImageIdx]?.alt_text || product.product_name}
                 className="absolute inset-0 w-full h-full object-contain p-10 md:p-14 transition-transform duration-[800ms] ease-out group-hover:scale-[1.04] animate-in fade-in duration-500"
+                loading="lazy"
+                decoding="async"
               />
               {/* Image counter */}
               <div className="absolute bottom-5 right-5 inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/90 backdrop-blur-md text-[11px] font-medium text-[#1D1D1F] shadow-sm dark:bg-black/50 dark:text-white/90 dark:shadow-none">
@@ -942,7 +962,13 @@ export default function ProductViewPage() {
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="w-full h-full object-contain p-2" />
+                  <img
+                    src={IMG.thumb(img.url)}
+                    alt=""
+                    className="w-full h-full object-contain p-2"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </button>
               ))}
             </div>
@@ -1669,8 +1695,13 @@ export default function ProductViewPage() {
                   <div className="aspect-[4/3] bg-white dark:bg-white/[0.02] relative overflow-hidden">
                     {img ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={img} alt={rp.product_name}
-                           className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.05] transition-transform duration-700 ease-out" />
+                      <img
+                        src={IMG.card(img)}
+                        alt={rp.product_name}
+                        className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.05] transition-transform duration-700 ease-out"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
                         <ImageRawIcon className="h-10 w-10" />
