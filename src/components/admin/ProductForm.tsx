@@ -1786,35 +1786,183 @@ export default function ProductForm({ productId }: Props) {
              level so the bottom-nav Save button matches this
              preview card — see the useState block earlier. */
 
+          /* ── Completion meter ──
+                Counts essential fields filled vs total so the admin
+                sees overall readiness at a glance. Includes the same
+                fields as the missing-list above + a small set of
+                strongly-recommended fields (excerpt, highlights,
+                primary model) that don't block save but make the
+                public page meaningfully better. */
+          const essentialFilled = [
+            product.product_name.trim(),
+            product.division_slug,
+            product.category_slug,
+            product.subcategory_slug,
+            isSewing ? (kindSlug || sewingSpecs.template_slug) : "ok",
+            product.brand,
+            product.excerpt,
+            product.highlights && product.highlights.length > 0 ? "ok" : "",
+            primaryModel?.global_price,
+            mainImageSrc,
+            ...(isSewing
+              ? [
+                  (sewingSpecs.common_specs as Record<string, unknown>).max_sewing_speed,
+                  (sewingSpecs.common_specs as Record<string, unknown>).needle_system,
+                  (sewingSpecs.common_specs as Record<string, unknown>).motor_type,
+                ]
+              : []),
+          ].filter(Boolean).length;
+          const essentialTotal = isSewing ? 13 : 10;
+          const completionPct = Math.round((essentialFilled / essentialTotal) * 100);
+
+          /* Status meaning for the publish card. */
+          const statusCopy = product.status === "active"
+            ? { headline: "Ready to publish", body: "Status is Active — this product will go live on the public catalog as soon as you save." }
+            : product.status === "archived"
+            ? { headline: "Archive on save", body: "Status is Archived — the product stays in the catalog history but won't appear in the public shop." }
+            : { headline: "Save as draft", body: "Status is Draft — saved internally, not shown on the public catalog. Switch to Active on the Hero step when ready to publish." };
+
           return (
             <div className="space-y-5 animate-in fade-in duration-300">
-              {/* ── Missing-fields warning banner ──
-                    Shown only when at least one required field is
-                    empty. Each row offers a "Jump to [step]" link
-                    so the admin can fix without scrolling back
-                    through every step manually. */}
-              {missing.length > 0 && (
-                <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TriangleWarningIcon className="h-4 w-4 text-amber-400" />
-                    <h4 className="text-[12px] font-bold text-amber-400 uppercase tracking-wider">
-                      Missing required fields
-                    </h4>
+              {/* ── Live preview card ──
+                    Mirrors the public detail page's hero: image,
+                    name, tagline, quick-fact pills, pricing. Built
+                    so the admin sees what customers will see
+                    BEFORE clicking save. Apple-light surface to
+                    visually separate "preview" from the dark
+                    wizard chrome around it. */}
+              <div className="rounded-[22px] overflow-hidden border border-[var(--border-subtle)] bg-white dark:bg-white/[0.04]">
+                <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#F5F5F7] dark:bg-white/[0.02] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-[#86868B] dark:text-white/40">
+                    <EyeIcon className="h-3.5 w-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">Live preview</span>
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] mb-3 leading-relaxed">
-                    You can still save as Draft, but the product isn&apos;t ready to publish until these are filled in.
-                  </p>
-                  <ul className="space-y-1.5">
+                  <span className="text-[10px] text-[#86868B] dark:text-white/40">How customers see this product</span>
+                </div>
+                <div className="p-7 md:p-10">
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_280px] gap-6 md:gap-8 items-center">
+                    <div className="min-w-0">
+                      {product.brand && (
+                        <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1.5">
+                          {product.brand}
+                        </p>
+                      )}
+                      <h2 className="text-[24px] md:text-[30px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.1]">
+                        {product.product_name || "Untitled product"}
+                      </h2>
+                      {primaryModel?.tagline && (
+                        <p className="mt-2 text-[15px] md:text-[17px] text-[#1D1D1F] dark:text-white/85 leading-snug">
+                          {primaryModel.tagline}
+                        </p>
+                      )}
+                      {product.excerpt && (
+                        <p className="mt-2 text-[13px] text-[#6E6E73] dark:text-white/60 leading-[1.5] line-clamp-3">
+                          {product.excerpt}
+                        </p>
+                      )}
+                      {/* Quick-fact pills — same visual language as the
+                          public detail page. Renders only filled fields. */}
+                      <div className="mt-4 flex flex-wrap items-center gap-1.5">
+                        {priceDisplay !== "—" && (
+                          <ReviewPill icon={<DollarSignIcon className="h-3 w-3" />}>
+                            From {priceDisplay}
+                          </ReviewPill>
+                        )}
+                        {templateName && (
+                          <ReviewPill icon={<Settings2Icon className="h-3 w-3" />}>{templateName}</ReviewPill>
+                        )}
+                        {product.warranty && (
+                          <ReviewPill icon={<ShieldCheckIcon className="h-3 w-3" />}>{product.warranty} warranty</ReviewPill>
+                        )}
+                        {originName && (
+                          <ReviewPill icon={<GlobeIcon className="h-3 w-3" />}>Made in {originName}</ReviewPill>
+                        )}
+                        {models.length > 0 && (
+                          <ReviewPill icon={<BoxesIcon className="h-3 w-3" />}>
+                            {models.length} variant{models.length === 1 ? "" : "s"}
+                          </ReviewPill>
+                        )}
+                      </div>
+                    </div>
+                    <div className="aspect-[4/3] rounded-[16px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
+                      {mainImageSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mainImageSrc} alt={product.product_name} className="w-full h-full object-contain p-3" />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-[#86868B] dark:text-white/30">
+                          <ImageRawIcon className="h-9 w-9" />
+                          <span className="text-[10px] uppercase tracking-wider">No image yet</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Completion meter ──
+                    Single thin progress bar with the % + filled/total
+                    counters. Click jumps to the missing-fields banner
+                    (or a smooth no-op when the product is complete). */}
+              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-5 py-4">
+                <div className="flex items-center justify-between gap-3 mb-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-faint)]">Readiness</span>
+                    <span className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">{completionPct}%</span>
+                    <span className="text-[11px] text-[var(--text-ghost)] tabular-nums">
+                      · {essentialFilled} of {essentialTotal} essential fields
+                    </span>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                      missing.length === 0
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                        : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${missing.length === 0 ? "bg-emerald-400" : "bg-amber-400"}`} />
+                    {missing.length === 0 ? "Ready to publish" : `${missing.length} required field${missing.length === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[var(--bg-inverted)]/[0.08] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      completionPct >= 90 ? "bg-emerald-500"
+                      : completionPct >= 60 ? "bg-blue-500"
+                      : "bg-amber-500"
+                    }`}
+                    style={{ width: `${Math.max(completionPct, 4)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* ── Missing-fields warning banner ──
+                    Only when at least one required field is empty. */}
+              {missing.length > 0 && (
+                <div className="rounded-2xl bg-amber-500/[0.06] border border-amber-500/25 p-5">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <TriangleWarningIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <div>
+                      <h4 className="text-[13px] font-semibold text-[var(--text-primary)] leading-tight">Missing required fields</h4>
+                      <p className="text-[11px] text-[var(--text-ghost)] mt-0.5">
+                        Save as Draft anytime, but the product won&apos;t publish until these are filled.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {missing.map((m, i) => (
-                      <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)]/60">
-                        <span className="text-[12px] text-[var(--text-primary)]">{m.label}</span>
+                      <li key={i}>
                         <button
                           type="button"
                           onClick={() => jumpTo(m.step)}
-                          className="text-[11px] font-semibold text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1"
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)]/50 border border-[var(--border-subtle)]/60 hover:border-amber-500/40 hover:bg-amber-500/[0.04] transition-colors group"
                         >
-                          <ArrowUpRightIcon className="h-3 w-3" />
-                          Jump to {steps.find((s) => s.id === m.step)?.shortLabel || m.step}
+                          <span className="text-[12px] text-[var(--text-primary)]">{m.label}</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400 group-hover:text-amber-300">
+                            {steps.find((s) => s.id === m.step)?.shortLabel || m.step}
+                            <ArrowUpRightIcon className="h-3 w-3" />
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -1822,89 +1970,103 @@ export default function ProductForm({ productId }: Props) {
                 </div>
               )}
 
-              {/* ── Product Summary ──
-                    Every chip is click-through: tapping takes the
-                    admin back to the step that owns that field. Dim
-                    styling on empty values so at-a-glance scans
-                    spot gaps. */}
-              <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Product Summary</h3>
-                  <p className="text-[10px] text-[var(--text-ghost)] italic">Click any card to jump back to that step.</p>
-                </div>
+              {/* ── Grouped review sections ──
+                    Each card carries its own icon + sub-title and
+                    holds the SummaryItems for that domain. Replaces
+                    the flat 4-row grid with a structured spec-sheet
+                    feel that matches the new Specs / Technical / Models
+                    pages. */}
+              <ReviewGroup
+                icon={<TagsIcon className="h-3.5 w-3.5" />}
+                title="Identity & classification"
+                onJump={() => jumpTo("identity")}
+              >
+                <SummaryItem label="Name" value={product.product_name || "—"} dim={!product.product_name} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Brand" value={product.brand || "—"} dim={!product.brand} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Subcategory" value={subcategoryName || "—"} dim={!subcategoryName} onClick={() => jumpTo("classify")} />
+                <SummaryItem label="Status" value={<StatusBadge status={product.status} />} onClick={() => jumpTo("identity")} />
+                {isSewing && (
+                  <SummaryItem label="Machine Kind" value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
+                )}
+                <SummaryItem label="Level" value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Featured" value={product.featured ? "Yes" : "No"} dim={!product.featured} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Visible" value={product.visible ? "Public" : "Hidden"} dim={!product.visible} onClick={() => jumpTo("identity")} />
+              </ReviewGroup>
 
-                {/* Identity row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                  <SummaryItem label="Product" value={product.product_name || "—"} dim={!product.product_name} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Brand" value={product.brand || "—"} dim={!product.brand} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Classification" value={subcategoryName || "—"} dim={!subcategoryName} onClick={() => jumpTo("classify")} />
-                  <SummaryItem label="Status" value={<StatusBadge status={product.status} />} onClick={() => jumpTo("identity")} />
-                </div>
+              <ReviewGroup
+                icon={<DollarSignIcon className="h-3.5 w-3.5" />}
+                title="Commercial & primary model"
+                onJump={() => jumpTo("commercial")}
+              >
+                <SummaryItem label="Tagline" value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label="Cost (CNY)" value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label="Selling price (USD)" value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("commercial")} />
+                <SummaryItem label="Warranty" value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Made in" value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Variants" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} onClick={() => jumpTo("commercial")} />
+              </ReviewGroup>
 
-                {/* Marketing row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                  <SummaryItem label="Tagline" value={primaryModel?.tagline || "—"} dim={!primaryModel?.tagline} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Level" value={product.level ? product.level.charAt(0).toUpperCase() + product.level.slice(1) : "—"} dim={!product.level} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Featured" value={product.featured ? "Yes" : "No"} dim={!product.featured} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Visible" value={product.visible ? "Public" : "Hidden"} dim={!product.visible} onClick={() => jumpTo("identity")} />
-                </div>
+              <ReviewGroup
+                icon={<BoxesIcon className="h-3.5 w-3.5" />}
+                title="Content & catalog"
+                onJump={() => jumpTo("media")}
+              >
+                <SummaryItem label="Excerpt" value={product.excerpt ? "Filled" : "—"} dim={!product.excerpt} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Highlights" value={product.highlights && product.highlights.length > 0 ? `${product.highlights.length} items` : "—"} dim={!product.highlights || product.highlights.length === 0} onClick={() => jumpTo("identity")} />
+                <SummaryItem label="Description" value={product.description ? "Filled" : "—"} dim={!product.description} onClick={() => jumpTo("description")} />
+                <SummaryItem label="Media" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} dim={media.length === 0} onClick={() => jumpTo("media")} />
+                <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} dim={translations.length === 0} />
+                <SummaryItem label="Related" value={`${related.length} link${related.length !== 1 ? "s" : ""}`} dim={related.length === 0} />
+              </ReviewGroup>
 
-                {/* Commercial row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                  <SummaryItem label="Cost" value={costDisplay} dim={costDisplay === "—"} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Selling Price" value={priceDisplay} dim={priceDisplay === "—"} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Warranty" value={product.warranty || "—"} dim={!product.warranty} onClick={() => jumpTo("identity")} />
-                  <SummaryItem label="Made in" value={originName || "—"} dim={!originName} onClick={() => jumpTo("identity")} />
-                </div>
-
-                {/* Content + counts row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {isSewing && (
-                    <SummaryItem label="Machine Kind" value={templateName || "—"} dim={!templateName} onClick={() => jumpTo("classify")} />
-                  )}
-                  <SummaryItem label="Models" value={`${models.length} variant${models.length !== 1 ? "s" : ""}`} onClick={() => jumpTo("commercial")} />
-                  <SummaryItem label="Media Files" value={`${media.length} file${media.length !== 1 ? "s" : ""}`} dim={media.length === 0} onClick={() => jumpTo("media")} />
-                  <SummaryItem label="Translations" value={`${translations.length} locale${translations.length !== 1 ? "s" : ""}`} dim={translations.length === 0} />
-                </div>
-              </div>
-
-              {/* Translations */}
+              {/* Translations + Related editors stay collapsed below
+                  so the review remains scannable, but power-users can
+                  still adjust them inline. */}
               <Section id="translations" icon={<LanguagesIcon className="h-4 w-4" />} title="Translations" defaultOpen={false}>
                 <TranslationsSection translations={translations} onChange={setTranslations} />
               </Section>
 
-              {/* Related Products */}
               <Section id="related" icon={<Link2Icon className="h-4 w-4" />} title="Related Products" defaultOpen={false}>
                 <RelatedProductsSection related={related} onChange={setRelated} currentProductId={productId} />
               </Section>
 
-              {/* Save-button preview so the admin sees what action
-                  hitting Save now will perform — "Publishing" vs
-                  "Saving as draft" is a meaningful difference they
-                  should be able to spot before clicking. The
-                  bottom nav bar duplicates this button with the
-                  same label/colour to keep both affordances in
-                  sync. */}
-              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-4 flex items-center justify-between gap-3 flex-wrap">
+              {/* ── Publish action card ──
+                    Bigger, clearer, premium. Status meaning + the
+                    button label preview live side-by-side; the
+                    action button itself is here too so the admin
+                    doesn't need to scroll back to the bottom nav. */}
+              <div className={`rounded-2xl border p-6 md:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                missing.length === 0
+                  ? "bg-emerald-500/[0.04] border-emerald-500/25"
+                  : "bg-[var(--bg-surface-subtle)]/50 border-[var(--border-subtle)]"
+              }`}>
                 <div className="min-w-0">
-                  <p className="text-[12px] font-semibold text-[var(--text-primary)]">
-                    Ready to{" "}
-                    {product.status === "active" ? "publish" : product.status === "archived" ? "archive" : "save"}?
-                  </p>
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-0.5">
-                    {product.status === "active"
-                      ? "Status is Active — this product will go live on the public catalog."
-                      : product.status === "archived"
-                        ? "Status is Archived — the product stays in the catalog history but is hidden from the shop."
-                        : "Status is Draft — saved internally, not shown on the public catalog."}
-                    {missing.length > 0 && " Missing-fields warnings above should be resolved first."}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${
+                      missing.length === 0 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                      : "bg-[var(--bg-surface)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
+                    }`}>
+                      {missing.length === 0
+                        ? <CheckIcon className="h-4 w-4" />
+                        : <DiskIcon className="h-4 w-4" />}
+                    </span>
+                    <h4 className="text-[14px] font-semibold text-[var(--text-primary)]">
+                      {statusCopy.headline}
+                    </h4>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed max-w-[560px]">
+                    {statusCopy.body}
                   </p>
                 </div>
-                <span className="text-[11px] text-[var(--text-muted)] px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-                  Button will read: <span className="font-semibold text-[var(--text-primary)]">{saveLabel}</span>
-                </span>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className={`h-11 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 inline-flex items-center gap-2 shadow-lg shrink-0 ${saveBtnCls}`}
+                >
+                  {saving ? <SpinnerIcon className="h-4 w-4 animate-spin" /> : <DiskIcon className="h-4 w-4" />}
+                  {saving ? "Saving..." : saveLabel}
+                </button>
               </div>
-
             </div>
           );
         })()}
@@ -2016,6 +2178,58 @@ export default function ProductForm({ productId }: Props) {
 /* ═══════════════════════════════════════════════════════════════════
    SUMMARY ITEM — for review step
    ═══════════════════════════════════════════════════════════════════ */
+/* Group container for the redesigned Review step. Wraps a set of
+   SummaryItem cards under a small icon+title header, with a quiet
+   "Edit" link in the top-right that jumps to the owning step.
+   Visual cousin of the SubCard pattern used on Technical / Specs
+   so the wizard reads as one coherent app. */
+function ReviewGroup({
+  icon, title, onJump, children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  onJump?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-[var(--border-subtle)]">
+        <span className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] shrink-0">
+          {icon}
+        </span>
+        <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-faint)] flex-1">
+          {title}
+        </h4>
+        {onJump && (
+          <button
+            type="button"
+            onClick={onJump}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            Edit
+            <ArrowUpRightIcon className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      <div className="p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* Compact icon+label pill used on the live preview card under the
+   product name. Matches the public detail page's quick-fact strip
+   visual language so admins see the same cues customers will. */
+function ReviewPill({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 h-7 pl-2 pr-2.5 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[11px] font-medium text-[#1D1D1F] dark:text-white/85">
+      <span className="text-[#06C] dark:text-[#2997FF]">{icon}</span>
+      {children}
+    </span>
+  );
+}
+
 function SummaryItem({
   label, value, onClick, dim = false,
 }: {
