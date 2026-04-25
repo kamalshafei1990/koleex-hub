@@ -336,6 +336,74 @@ export const FIELD_GLYPHS: Record<string, string> = {
   mn_pf_pattern_type: "zz_stitch_patterns_count", // grid-three
   mn_pf_gap_width: "zz_zigzag_width",             // arrows-h
   mn_pf_plate_swap: "et_quick_release",           // bolt
+
+  /* ─── Pattern Sewing Family — Tier 2 ───────────────────────
+     Reuse strategy continues — every ps_* key maps to the
+     closest semantic uicons glyph already in glyph-paths.ts. */
+  // Work Area
+  ps_work_area_x: "zz_zigzag_width",            // arrows-h (X axis)
+  ps_work_area_y: "la_arm_length",              // ruler-vertical (Y axis)
+  ps_max_stitches_per_pattern: "zz_stitch_patterns_count", // grid-three
+
+  // Programming
+  ps_pattern_memory: "zz_programmable",         // microchip
+  ps_programming_methods: "zz_programmable",    // microchip
+  ps_pattern_scaling: "ls_reverse_feed",        // rotate-reverse
+
+  // Performance
+  ps_max_sewing_speed: "max_sewing_speed",      // tachometer
+  ps_max_xy_speed: "max_sewing_speed",          // tachometer
+  ps_stitch_length_max: "stitch_length_max",    // arrow-small-right
+
+  // Configuration
+  ps_head_type: "ls_stitch_pattern",            // pulse
+  ps_drive_type: "motor_type",                  // engine
+  ps_clamp_type: "ls_bed_type",                 // bed-alt
+
+  // Automation
+  ps_auto_thread_trimmer: "ls_auto_thread_trimmer",     // scissors
+  ps_auto_clamp_open: "ls_auto_presser_foot_lifter",    // arrow-up
+  ps_laser_pointer: "ls_needle_positioning",            // arrows-to-dot
+  ps_auto_lubrication: "lubrication_system",            // oil-can
+
+  /* ─── Pattern Sewing Kind extras — Tier 3 ────────────────── */
+  // Pocket Welt
+  ps_pw_max_pocket_length: "la_arm_length",     // ruler-vertical
+  ps_pw_min_pocket_length: "stitch_length_min", // arrow-small-left
+  ps_pw_max_flap_thickness: "ls_max_material_thickness", // cubes-stacked
+  ps_pw_corner_knife: "et_knife_type",          // knife
+  ps_pw_dart_function: "ls_reverse_feed",       // rotate-reverse
+
+  // Dart Sewer
+  ps_ds_dart_length_min: "stitch_length_min",   // arrow-small-left
+  ps_ds_dart_length_max: "stitch_length_max",   // arrow-small-right
+  ps_ds_taper_pattern_count: "zz_stitch_patterns_count", // grid-three
+  ps_ds_auto_trim_at_point: "ls_auto_thread_trimmer",    // scissors
+
+  // Belt Loop
+  ps_bl_loop_length_min: "stitch_length_min",   // arrow-small-left
+  ps_bl_loop_length_max: "stitch_length_max",   // arrow-small-right
+  ps_bl_loops_per_minute: "max_sewing_speed",   // tachometer
+  ps_bl_auto_indexing: "ls_auto_bobbin_winder", // arrows-repeat
+  ps_bl_max_loops_per_garment: "wf_max_layer_count", // cubes
+
+  // Vision
+  ps_v_camera_resolution: "zz_programmable",    // microchip
+  ps_v_recognition_speed: "max_sewing_speed",   // tachometer
+  ps_v_registration_marks: "ls_needle_positioning", // arrows-to-dot
+  ps_v_edge_detection: "foa_arm_clearance",     // expand-arrows-alt
+  ps_v_tilt_correction: "ls_reverse_feed",      // rotate-reverse
+
+  // Template
+  ps_t_template_count: "zz_stitch_patterns_count", // grid-three
+  ps_t_swap_mechanism: "et_quick_release",      // bolt
+  ps_t_template_swap_time: "max_sewing_speed",  // tachometer
+
+  // Tacking
+  ps_tk_max_stitches_per_tack: "ls_auto_backtack",       // arrow-turn-down-left
+  ps_tk_max_tack_length: "stitch_length_max",            // arrow-small-right
+  ps_tk_max_tack_width: "zz_zigzag_width",               // arrows-h
+  ps_tk_pattern_count: "zz_stitch_patterns_count",       // grid-three
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -390,6 +458,16 @@ export const GROUP_GLYPHS: Record<string, string> = {
   // Multi-needle groups
   "Quilting Panel": "_g_HeavyDuty",             // shield
   "Decorative Specifics": "_g_ZigZag",          // magnifying-glass-wave
+
+  // Pattern-sewing family + kind groups
+  "Work Area": "_g_LongArm",                    // ruler-combined
+  "Programming": "_g_Automation",               // robot
+  "Pocket Welt Station": "_g_EdgeTrimmer",      // knife-kitchen
+  "Dart Station": "_g_StitchFeed",              // arrow-progress
+  "Belt Loop Station": "_g_Configuration",      // sliders-h-square
+  "Vision System": "_g_Automation",             // robot
+  "Template System": "_g_Configuration",        // sliders-h-square
+  "Tacking Station": "_g_Automation",           // robot
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

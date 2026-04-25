@@ -915,6 +915,10 @@ export default function ProductViewPage() {
       "Elastic Feeder", "Binding Folder",
       "Chainstitch Geometry",
       "Quilting Panel", "Decorative Specifics",
+      "Work Area", "Programming",
+      "Pocket Welt Station", "Dart Station",
+      "Belt Loop Station", "Vision System",
+      "Template System", "Tacking Station",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -962,6 +966,14 @@ export default function ProductViewPage() {
         "Chainstitch Geometry",
         // Multi-Needle — quilting + decorative
         "Quilting Panel", "Decorative Specifics",
+        // Pattern Sewing — work area / programming as sibling to
+        // Performance + Stitch & Feed; specialised stations group
+        // here too (pocket welt / dart / belt loop / vision /
+        // template / tacking).
+        "Work Area", "Programming",
+        "Pocket Welt Station", "Dart Station",
+        "Belt Loop Station", "Vision System",
+        "Template System", "Tacking Station",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],

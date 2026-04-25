@@ -29,6 +29,7 @@ import { INTERLOCK_FAMILY_FIELDS } from "./families/interlock";
 import { DOUBLE_NEEDLE_FAMILY_FIELDS } from "./families/double-needle";
 import { CHAINSTITCH_FAMILY_FIELDS } from "./families/chainstitch";
 import { MULTI_NEEDLE_FAMILY_FIELDS } from "./families/multi-needle";
+import { PATTERN_SEWING_FAMILY_FIELDS } from "./families/pattern-sewing";
 
 // Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
@@ -68,6 +69,14 @@ import { DOUBLE_NEEDLE_CHAINSTITCH_FIELDS } from "./kinds/double-needle/chainsti
 // geometric variants reuse lockstitch extras, see KIND_EXTRAS below)
 import { MULTI_NEEDLE_QUILTING_FIELDS } from "./kinds/multi-needle/quilting";
 import { MULTI_NEEDLE_PICOT_FAGOTING_FIELDS } from "./kinds/multi-needle/picot-fagoting";
+
+// Kind extras (Tier 3) — Pattern Sewing
+import { POCKET_WELT_FIELDS } from "./kinds/pattern-sewing/pocket-welt";
+import { DART_SEWER_FIELDS } from "./kinds/pattern-sewing/dart-sewer";
+import { BELT_LOOP_FIELDS } from "./kinds/pattern-sewing/belt-loop";
+import { VISION_FIELDS } from "./kinds/pattern-sewing/vision";
+import { TEMPLATE_FIELDS } from "./kinds/pattern-sewing/template";
+import { TACKING_FIELDS } from "./kinds/pattern-sewing/tacking";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -114,8 +123,14 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Specs shared across 3+ needle heads (chainstitch / coverstitch / quilting).",
     fields: MULTI_NEEDLE_FAMILY_FIELDS,
   },
-  // Future: pattern-sewing-machines, heavy-duty-machines,
-  // special-machines.
+  "pattern-sewing-machines": {
+    title: "Pattern Sewing Basics",
+    subtitle: "Programmable XY pattern stitchers — work area + programming + drive specs.",
+    fields: PATTERN_SEWING_FAMILY_FIELDS,
+  },
+  // Future: heavy-duty-machines, special-machines, plus the cycle
+  // machines (buttonhole / bartack / button-attach) which need
+  // their own families.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -358,6 +373,51 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
   // mn-3-chain / mn-4-chain / mn-multi-chain / mn-coverstitch /
   // mn-lockstitch inherit Common + Family only — the family card
   // (needle count + gauge + stitch class) covers them.
+
+  // ── Pattern Sewing ────────────────────────────────────────
+  // pattern-pocket-welt-single + pattern-pocket-welt-double share
+  // the same pocket-welt field shape (the difference is just one
+  // welt vs two parallel welts — both registered to the same set).
+  "pattern-pocket-welt-single": {
+    title: "Pocket Welt Station",
+    subtitle: "Welt + corner-knife specifics for single-welt jetted pockets.",
+    fields: POCKET_WELT_FIELDS,
+  },
+  "pattern-pocket-welt-double": {
+    title: "Pocket Welt Station",
+    subtitle: "Welt + corner-knife specifics for double-welt jetted pockets.",
+    fields: POCKET_WELT_FIELDS,
+  },
+  "pattern-dart-sewer": {
+    title: "Dart Station",
+    subtitle: "Taper geometry + auto-trim specifics for the dart-sewing cycle.",
+    fields: DART_SEWER_FIELDS,
+  },
+  "pattern-belt-loop": {
+    title: "Belt Loop Station",
+    subtitle: "Loop length range + production rate for auto belt-loop attaching.",
+    fields: BELT_LOOP_FIELDS,
+  },
+  "pattern-vision": {
+    title: "Vision System",
+    subtitle: "Camera resolution + recognition specifics for vision-guided pattern sewing.",
+    fields: VISION_FIELDS,
+  },
+  "pattern-template": {
+    title: "Template System",
+    subtitle: "Template count + swap mechanism for template-based pattern sewing.",
+    fields: TEMPLATE_FIELDS,
+  },
+  "pattern-tacking": {
+    title: "Tacking Station",
+    subtitle: "Programmable tack length / width / pattern count.",
+    fields: TACKING_FIELDS,
+  },
+  // pattern-small-area / pattern-medium-area / pattern-large-area /
+  // pattern-xxl-long-arm / pattern-auto-sleeve-setter /
+  // pattern-auto-waistband / pattern-label-patch inherit Common +
+  // Family only — the work-area + programming family fields cover
+  // them.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
