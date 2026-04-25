@@ -55,14 +55,24 @@ export function cdnImage(url: string | null | undefined, opts: CdnImageOptions =
 }
 
 /** Common preset sizes used across the products app. Centralized
- *  so resize choices stay consistent and easy to tune. */
+ *  so resize choices stay consistent and easy to tune.
+ *
+ *  All presets use `resize: "contain"` — the Supabase transform
+ *  fits the source within the requested width while preserving
+ *  the natural aspect ratio. Without this hint the transform
+ *  defaults to a centred crop ("cover"), which on product photos
+ *  can clip legs/edges of the machine. With contain we always get
+ *  the full image back.
+ */
 export const IMG = {
-  /** Tiny avatar / row thumbnail — list cells, brand logos. */
-  thumb: (url: string | null | undefined) => cdnImage(url, { width: 96, quality: 75 }),
+  /** Row thumbnail — list cells, brand logos. Bumped from 96 → 160
+   *  because the products app routinely shows these inside ≥120px
+   *  containers and 96 was rendering too tight to be recognisable. */
+  thumb: (url: string | null | undefined) => cdnImage(url, { width: 160, quality: 75, resize: "contain" }),
   /** Card grid thumbnail — products list, related products. */
-  card: (url: string | null | undefined) => cdnImage(url, { width: 480, quality: 75 }),
+  card: (url: string | null | undefined) => cdnImage(url, { width: 480, quality: 75, resize: "contain" }),
   /** Detail page gallery slot — main image carousel cells. */
-  gallery: (url: string | null | undefined) => cdnImage(url, { width: 1200, quality: 78 }),
+  gallery: (url: string | null | undefined) => cdnImage(url, { width: 1400, quality: 80, resize: "contain" }),
   /** Detail page hero — large above-the-fold photo. */
-  hero: (url: string | null | undefined) => cdnImage(url, { width: 1600, quality: 80 }),
+  hero: (url: string | null | undefined) => cdnImage(url, { width: 1800, quality: 82, resize: "contain" }),
 };

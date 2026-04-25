@@ -750,6 +750,60 @@ export default function ProductViewPage() {
     [product, sewingSpecs],
   );
 
+  /* Headline stat band under the hero — the four most quote-worthy
+     facts presented as oversized typography. Pulls from the spec
+     buckets only when their values exist, so empty data products
+     show a smaller stat row instead of a half-filled one. */
+  const headlineStats = useMemo<{ value: string; unit?: string; label: string }[]>(() => {
+    if (!product) return [];
+    const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
+    const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
+    const out: { value: string; unit?: string; label: string }[] = [];
+
+    if (cs.max_sewing_speed) {
+      out.push({
+        value: Number(cs.max_sewing_speed).toLocaleString("en-US"),
+        unit: "SPM",
+        label: "Max sewing speed",
+      });
+    }
+    const thickness = ts.hd_max_material_thickness_heavy ?? ts.ls_max_material_thickness;
+    if (thickness) {
+      out.push({
+        value: String(thickness),
+        unit: "mm",
+        label: "Material thickness",
+      });
+    }
+    if (product.motor_power_w !== null && product.motor_power_w !== undefined) {
+      out.push({
+        value: String(product.motor_power_w),
+        unit: "W",
+        label: "Motor power",
+      });
+    }
+    if (product.warranty) {
+      // Pull just the leading number ("3 years" → "3", "24 months" → "24")
+      const m = product.warranty.match(/(\d+(?:\.\d+)?)/);
+      const tail = product.warranty.replace(/^\s*\d+(?:\.\d+)?\s*/, "").trim();
+      out.push({
+        value: m ? m[1] : product.warranty,
+        unit: m ? (tail || "yr") : undefined,
+        label: "Warranty",
+      });
+    }
+    // Fallback if none of the headline stats are filled — try
+    // stitch length max so the band still has substance.
+    if (out.length < 2 && cs.stitch_length_max) {
+      out.push({
+        value: String(cs.stitch_length_max),
+        unit: "mm",
+        label: "Max stitch length",
+      });
+    }
+    return out.slice(0, 4);
+  }, [product, sewingSpecs]);
+
   /* ── Loading / not found ── */
   if (loading) {
     return (
@@ -993,26 +1047,28 @@ export default function ProductViewPage() {
             </div>
           </div>
 
-          {/* Hero image — centered, dominant, no frame.
-              fetchPriority high so it's the LCP and grabbed first.
-              Routed through IMG.hero — Supabase Storage transform
-              re-encodes to ~1600px @ q80 (typically 5–8× smaller
-              than the raw upload). */}
+          {/* Hero image — wrapped in a soft surface card so even
+              source photos with tight framing breathe. The CARD
+              owns the aspect ratio (16/10 wide-format), the IMAGE
+              uses object-contain to fit edge-to-edge inside it
+              without any extra padding fighting the source. Means
+              we never clip — whatever the source's natural
+              proportions, the full machine is visible. */}
           <div className="mt-10 md:mt-14 relative">
-            {mainImage ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={IMG.hero(mainImage)}
-                alt={product.product_name}
-                className="w-full max-w-[900px] mx-auto aspect-[4/3] object-contain"
-                decoding="async"
-                fetchPriority="high"
-              />
-            ) : (
-              <div className="w-full max-w-[900px] mx-auto aspect-[4/3] flex items-center justify-center bg-[#F5F5F7] dark:bg-white/[0.03] rounded-[22px]">
+            <div className="w-full max-w-[1080px] mx-auto aspect-[16/10] rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden flex items-center justify-center">
+              {mainImage ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={IMG.hero(mainImage)}
+                  alt={product.product_name}
+                  className="w-full h-full object-contain"
+                  decoding="async"
+                  fetchPriority="high"
+                />
+              ) : (
                 <ImageRawIcon className="h-20 w-20 text-[#86868B] dark:text-white/30" />
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Quick-facts strip — small icon+label pills under the
@@ -1049,19 +1105,59 @@ export default function ProductViewPage() {
       </section>
 
       {/* ══════════════════════════════════════
+          1.5 HEADLINE NUMBERS — premium stat band
+
+          Pulls 3-4 of the most quote-worthy specs (max speed,
+          material thickness, motor power, warranty) and presents
+          them as oversized typographic callouts in a single dark
+          band — the move Apple, Sony, and Dyson all use to make
+          product pages feel decisive. Renders only when at least
+          two of the four stats are populated, so empty-data
+          products don't get a half-baked version.
+          ══════════════════════════════════════ */}
+      {headlineStats.length >= 2 && (
+        <section className="bg-[#0A0A0A] dark:bg-black border-y border-[#1D1D1F] dark:border-white/[0.05]">
+          <div className="max-w-[1180px] mx-auto px-6 py-16 md:py-24">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6 md:divide-x md:divide-white/10">
+              {headlineStats.map((s, i) => (
+                <div key={i} className={`text-center ${i > 0 ? "md:px-4" : ""}`}>
+                  <p className="text-[44px] md:text-[64px] lg:text-[72px] font-semibold tracking-[-0.02em] text-white leading-[1.05]">
+                    {s.value}
+                    {s.unit && (
+                      <span className="ml-1.5 text-[20px] md:text-[28px] font-medium text-white/55 align-baseline">
+                        {s.unit}
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-2 text-[12px] md:text-[13px] font-medium text-white/55 tracking-[-0.005em]">
+                    {s.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════
           2. IMAGE GALLERY — Apple light
           Large main image + clean thumbnail strip.
           ══════════════════════════════════════ */}
       {galleryImages.length > 1 && (
         <Section eyebrow="Gallery" title="Every angle." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_120px] gap-6">
-            <div className="group relative aspect-[4/3] md:aspect-[16/10] rounded-[22px] overflow-hidden bg-white dark:bg-white/[0.03]">
+          {/* Wider thumbnail rail (160px → roomier thumbnails so the
+              machine is recognizable, not a sliver). Main panel
+              dropped the heavy p-10/p-14 padding that was eating
+              the image — the card frame already provides the
+              breathing room. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_160px] gap-6">
+            <div className="group relative aspect-[16/10] rounded-[22px] overflow-hidden bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={galleryImages[activeImageIdx]?.id}
                 src={IMG.gallery(galleryImages[activeImageIdx]?.url)}
                 alt={galleryImages[activeImageIdx]?.alt_text || product.product_name}
-                className="absolute inset-0 w-full h-full object-contain p-10 md:p-14 transition-transform duration-[800ms] ease-out group-hover:scale-[1.04] animate-in fade-in duration-500"
+                className="absolute inset-0 w-full h-full object-contain transition-transform duration-[800ms] ease-out group-hover:scale-[1.02] animate-in fade-in duration-500"
                 loading="lazy"
                 decoding="async"
               />
@@ -1070,12 +1166,12 @@ export default function ProductViewPage() {
                 {activeImageIdx + 1} / {galleryImages.length}
               </div>
             </div>
-            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-y-auto lg:max-h-[520px] pb-2 lg:pb-0 lg:pr-1">
+            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-y-auto lg:max-h-[560px] pb-2 lg:pb-0 lg:pr-1">
               {galleryImages.map((img, idx) => (
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`relative shrink-0 h-20 w-20 lg:h-[100px] lg:w-full rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] transition-all duration-300 ${
+                  className={`relative shrink-0 h-24 w-24 lg:h-[120px] lg:w-full aspect-square rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] transition-all duration-300 ${
                     idx === activeImageIdx
                       ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7] dark:ring-[#2997FF] dark:ring-offset-[#0A0A0A]"
                       : "opacity-70 hover:opacity-100 ring-1 ring-[#D2D2D7] dark:ring-white/10"
@@ -1083,9 +1179,9 @@ export default function ProductViewPage() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={IMG.thumb(img.url)}
+                    src={IMG.card(img.url)}
                     alt=""
-                    className="w-full h-full object-contain p-2"
+                    className="absolute inset-0 w-full h-full object-contain"
                     loading="lazy"
                     decoding="async"
                   />
