@@ -1445,22 +1445,37 @@ export default function ProductViewPage() {
                         {t.label}
                       </h3>
                     </div>
-                    {/* Stat-grid layout — each spec is a vertical
-                        stack: small uppercase LABEL → big bold VALUE.
-                        Replaces the previous data-table rows so the
-                        section reads as a designed visual spec sheet
-                        instead of a database dump. 2 cols on tablet,
-                        3 cols on desktop, 1 on mobile — gap-y handles
-                        breathing, no row dividers needed. */}
-                    <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-10">
+                    {/* Stat-card grid — each spec lives in its own
+                        soft card surface with a coloured accent bar
+                        on the left tied to the group's icon colour.
+                        The big display number reads first; the small
+                        uppercase label sits underneath as a caption.
+                        Hover lifts the card to confirm it's a
+                        designed object, not data dump.
+
+                        2 cols on tablet, 3 cols on desktop, 1 on
+                        mobile. gap-4 between cards. */}
+                    <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {t.rows.map((r, i) => (
-                        <div key={`${t.id}-${r.label}-${i}`}>
-                          <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.4]">
-                            {r.label}
-                          </dt>
-                          <dd className="mt-2 text-[20px] md:text-[22px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white leading-[1.25]">
+                        <div
+                          key={`${t.id}-${r.label}-${i}`}
+                          className="group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/[0.06] p-6 pl-7 transition-all duration-300 hover:bg-[#EEEEF0] dark:hover:bg-white/[0.06] hover:-translate-y-0.5"
+                        >
+                          {/* Accent bar — vertical hairline tied to
+                              the group's icon colour. Reinforces the
+                              4-bucket grouping at a glance. */}
+                          <span
+                            aria-hidden
+                            className="absolute left-0 top-6 bottom-6 w-[3px] rounded-full bg-[#06C] dark:bg-[#2997FF] opacity-70 group-hover:opacity-100 transition-opacity"
+                          />
+                          {/* Big display value — the stat reads first. */}
+                          <dd className="text-[26px] md:text-[30px] lg:text-[32px] font-semibold tracking-[-0.02em] text-[#1D1D1F] dark:text-white leading-[1.1]">
                             {r.value}
                           </dd>
+                          {/* Caption label underneath. */}
+                          <dt className="mt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.4]">
+                            {r.label}
+                          </dt>
                         </div>
                       ))}
                     </dl>
