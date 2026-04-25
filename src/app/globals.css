@@ -107,6 +107,14 @@
   --font-sans: var(--font-inter);
 }
 
+html {
+  /* Smooth-scroll on anchor link jumps so #specs / #models /
+     #applications / #resources animate into view instead of
+     snapping. The product detail page in particular relies on
+     this — its sticky in-page nav uses anchor jumps. */
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

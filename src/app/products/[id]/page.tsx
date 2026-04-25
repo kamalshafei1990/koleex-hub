@@ -49,6 +49,7 @@ import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import ActivityIcon from "@/components/icons/ui/ActivityIcon";
 import AwardIcon from "@/components/icons/ui/AwardIcon";
+import BadgeCheckIcon from "@/components/icons/ui/BadgeCheckIcon";
 import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
@@ -355,6 +356,19 @@ function describeApplication(tag: string): AppInfo {
   return { kind: "Application", icon: LayersIcon, description: "Optimised for industrial garment production." };
 }
 
+/* Compact icon+label pill used across the hero quick-facts strip
+   and the closing summary bar. Premium-feeling chip in the same
+   visual language as the rest of the page (Apple-light by default,
+   Apple-dark in dark mode). */
+function QuickFact({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-3 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[12px] font-medium text-[#1D1D1F] dark:text-white/85">
+      <span className="text-[#06C] dark:text-[#2997FF]">{icon}</span>
+      {label}
+    </span>
+  );
+}
+
 function Section({
   id, eyebrow, title, subtitle, children, className = "", align = "center",
 }: {
@@ -432,6 +446,29 @@ export default function ProductViewPage() {
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>({});
   const toggleModel = (id: string) =>
     setExpandedModels(prev => ({ ...prev, [id]: !prev[id] }));
+
+  /* Sticky in-page nav — slides in once the user scrolls past the
+     hero. Threshold tied to viewport height so it lands consistently
+     across screen sizes. Uses requestAnimationFrame to keep the
+     scroll handler off the layout-thrash hot path. */
+  const [stickyNavVisible, setStickyNavVisible] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const threshold = Math.max(window.innerHeight * 0.6, 480);
+        setStickyNavVisible(window.scrollY > threshold);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
 
   /* ── Request Quote modal state ──
      Customer (or anyone authenticated) clicks the "Request Quote"
@@ -820,6 +857,57 @@ export default function ProductViewPage() {
       </div>
 
       {/* ══════════════════════════════════════
+          STICKY IN-PAGE NAV
+          Appears once the user scrolls past the hero. Mirrors the
+          pattern Apple, B&O, Dyson use on long product pages —
+          gives customers a fast jump-link to any section + a
+          persistent "Request Quote" CTA without reaching for the
+          browser scroll bar. Backdrop-blur + slide-down on enter
+          keeps it lightweight visually.
+          ══════════════════════════════════════ */}
+      <div
+        aria-hidden={!stickyNavVisible}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          stickyNavVisible
+            ? "translate-y-0 opacity-100"
+            : "-translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="bg-white/85 dark:bg-[#0A0A0A]/85 backdrop-blur-xl border-b border-[#D2D2D7]/60 dark:border-white/[0.08]">
+          <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-10 h-12 md:h-14 flex items-center gap-3">
+            {/* Product name — truncated to keep the bar a single line. */}
+            <span className="text-[14px] md:text-[15px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white truncate max-w-[200px] md:max-w-[320px]">
+              {product.product_name}
+            </span>
+            {/* Anchor links — desktop only. Mobile gets the CTA only
+                because the breadcrumb bar above already lets them
+                jump back to the list. */}
+            <nav className="hidden md:flex items-center gap-5 ml-2 mr-auto text-[13px] text-[#1D1D1F]/80 dark:text-white/70">
+              <a href="#specs" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Specs</a>
+              {models.length > 0 && (
+                <a href="#models" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Models</a>
+              )}
+              {tags.length > 0 && (
+                <a href="#applications" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Applications</a>
+              )}
+              {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
+                <a href="#resources" className="hover:text-[#1D1D1F] dark:hover:text-white transition-colors">Resources</a>
+              )}
+            </nav>
+            {/* Spacer for mobile when nav is hidden — pushes CTA right. */}
+            <div className="md:hidden flex-1" />
+            <button
+              type="button"
+              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+              className="inline-flex items-center h-8 md:h-9 px-3 md:px-4 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[12px] md:text-[13px] font-medium hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] transition-colors shrink-0"
+            >
+              Buy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════
           1. HERO — Apple.com style: centered headline + dominant image below
           ══════════════════════════════════════ */}
       <section className="relative pt-16 md:pt-24 pb-0 bg-white dark:bg-[#0A0A0A]">
@@ -875,30 +963,34 @@ export default function ProductViewPage() {
             </ul>
           )}
 
-          {/* Price + primary CTAs — Apple style inline */}
-          <div className="mt-6 md:mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[17px] md:text-[19px] font-normal">
+          {/* Price + primary CTAs — premium Apple-style stack.
+              Pricing leads (anchor for the eye), primary "Request
+              Quote" pill follows, secondary "Learn more" sits as
+              a quiet text link. */}
+          <div className="mt-7 md:mt-9 flex flex-col items-center gap-4">
             {priceFrom !== null && (
-              <span className="text-[#1D1D1F] dark:text-white">
-                From <span className="font-medium">{fmtMoney(priceFrom)}</span>
-              </span>
+              <p className="text-[15px] md:text-[17px] text-[#86868B] dark:text-white/55">
+                <span className="text-[#1D1D1F] dark:text-white">From </span>
+                <span className="font-semibold text-[#1D1D1F] dark:text-white">
+                  {fmtMoney(priceFrom)}
+                </span>
+              </p>
             )}
-            {/* "Request Quote" is the primary customer action. On the
-                internal /product-data view we still show it — it's a
-                shortcut for sales to start a draft quote with this
-                product pre-selected. */}
-            <button
-              type="button"
-              onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-              className="inline-flex items-center h-[36px] md:h-[38px] px-[18px] rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
-            >
-              Request Quote
-            </button>
-            <a
-              href="#specs"
-              className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
-            >
-              Learn more <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+              <button
+                type="button"
+                onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
+                className="inline-flex items-center h-[40px] md:h-[44px] px-6 md:px-7 rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] shadow-[0_2px_10px_rgba(0,102,204,0.25)] dark:shadow-[0_2px_10px_rgba(41,151,255,0.2)] transition-all"
+              >
+                Request Quote
+              </button>
+              <a
+                href="#specs"
+                className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[17px]"
+              >
+                Learn more <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
+              </a>
+            </div>
           </div>
 
           {/* Hero image — centered, dominant, no frame.
@@ -923,13 +1015,35 @@ export default function ProductViewPage() {
             )}
           </div>
 
-          {/* Small meta line under image */}
-          {(product.warranty || product.country_of_origin) && (
-            <p className="mt-6 text-[12px] text-[#86868B] dark:text-white/40">
-              {product.warranty && <>{product.warranty} warranty</>}
-              {product.warranty && product.country_of_origin && <span className="mx-2">·</span>}
-              {product.country_of_origin && <>Made in {product.country_of_origin}</>}
-            </p>
+          {/* Quick-facts strip — small icon+label pills under the
+              hero image. Captures warranty, origin, certifications,
+              and headline electrical specs in one scannable row.
+              Customers absorb the at-a-glance facts without
+              scrolling deeper. Each pill renders only when its
+              underlying field is populated. */}
+          {(product.warranty || product.country_of_origin || product.ce_certified
+            || product.rohs_compliant || product.motor_power_w
+            || (product.voltage && product.voltage.length > 0)) && (
+            <div className="mt-8 md:mt-10 flex flex-wrap items-center justify-center gap-2 md:gap-2.5">
+              {product.warranty && (
+                <QuickFact icon={<ShieldCheckIcon className="h-3.5 w-3.5" />} label={`${product.warranty} warranty`} />
+              )}
+              {product.country_of_origin && (
+                <QuickFact icon={<GlobeIcon className="h-3.5 w-3.5" />} label={`Made in ${product.country_of_origin}`} />
+              )}
+              {product.motor_power_w && (
+                <QuickFact icon={<ZapIcon className="h-3.5 w-3.5" />} label={`${product.motor_power_w} W motor`} />
+              )}
+              {product.voltage && product.voltage.length > 0 && (
+                <QuickFact icon={<ZapIcon className="h-3.5 w-3.5" />} label={product.voltage.join(" / ")} />
+              )}
+              {product.ce_certified && (
+                <QuickFact icon={<BadgeCheckIcon className="h-3.5 w-3.5" />} label="CE Certified" />
+              )}
+              {product.rohs_compliant && (
+                <QuickFact icon={<AwardIcon className="h-3.5 w-3.5" />} label="RoHS" />
+              )}
+            </div>
           )}
         </div>
       </section>
@@ -1590,7 +1704,7 @@ export default function ProductViewPage() {
           8. APPLICATIONS — Apple clean tile cards
           ══════════════════════════════════════ */}
       {tags.length > 0 && (
-        <Section eyebrow="Applications" title="Where it performs." className="bg-white dark:bg-[#0A0A0A]">
+        <Section id="applications" eyebrow="Applications" title="Where it performs." className="bg-white dark:bg-[#0A0A0A]">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {tags.map(t => {
               const info = describeApplication(t);
@@ -1631,7 +1745,7 @@ export default function ProductViewPage() {
           9. MEDIA / DOWNLOADS — Apple clean resource cards
           ══════════════════════════════════════ */}
       {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-        <Section eyebrow="Resources" title="Dig deeper." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
+        <Section id="resources" eyebrow="Resources" title="Dig deeper." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {videos.map(v => (
               <a key={v.id} href={v.url} target="_blank" rel="noreferrer"
