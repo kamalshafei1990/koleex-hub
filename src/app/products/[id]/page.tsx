@@ -1214,7 +1214,7 @@ export default function ProductViewPage() {
                     All buttons share the same h-11 height so the row
                     reads as one unit; primary is visually largest via
                     solid fill + shadow + heavier weight. */}
-              {/* ═══ BUTTON CONTAINER ═══════════════════════════════
+              {/* ═══ BUTTON BLOCK ═══════════════════════════════════
                   One dedicated container directly under the title
                   block. Three vertical layers stacked on the column's
                   left edge:
@@ -1226,16 +1226,16 @@ export default function ProductViewPage() {
                     Layer 3  SUPPORT — Contact Sales, tertiary text
                              link, visibly separated.
 
-                  Spacing rules followed:
-                    · Title  → primary:        mt-8  (32 px)  large
-                    · Primary → secondary:     mt-4  (16 px)  medium
-                    · Secondary → support:     mt-8  (32 px)  large
-                    · Between secondary buttons: gap-4 (16 px) even
+                  Spacing — explicit pixel values per brief:
+                    · Title  → primary:          mt-10 (40 px)
+                    · Primary → secondary:       mt-5  (20 px)
+                    · Secondary → support:       mt-10 (40 px)
+                    · Between secondary buttons: gap-4 (16 px)
 
                   All button-shaped controls: h-11, px-8, rounded-full,
                   text-[15px]. Visual hierarchy from fill + font
                   weight + shadow only. ────────────────────────────── */}
-              <nav aria-label="Product actions" className="mt-8">
+              <nav aria-label="Product actions" className="mt-10">
                 {/* Layer 1 — PRIMARY (own row, w-full) */}
                 <Link
                   href={`/landed-cost/new?productId=${product.id}`}
@@ -1244,11 +1244,8 @@ export default function ProductViewPage() {
                   Estimate Total Cost
                 </Link>
 
-                {/* Layer 2 — SECONDARY (mt-4 = 16 px medium, 50/50 grid).
-                    Helper text was deliberately removed — it broke
-                    the primary→secondary gap rhythm and isn't in
-                    the layout brief. */}
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                {/* Layer 2 — SECONDARY (mt-5 = 20 px, 50/50 grid). */}
+                <div className="mt-5 grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
@@ -1269,8 +1266,9 @@ export default function ProductViewPage() {
                   </button>
                 </div>
 
-                {/* Layer 3 — SUPPORT (mt-8 large gap from cluster) */}
-                <div className="mt-8">
+                {/* Layer 3 — SUPPORT (mt-10 = 40 px large gap from
+                    the secondary cluster). */}
+                <div className="mt-10">
                   <Link
                     href="/contacts"
                     className="inline-flex items-center gap-2 text-[14px] text-[#6E6E73] dark:text-white/55 hover:text-[#1D1D1F] dark:hover:text-white transition-colors"
