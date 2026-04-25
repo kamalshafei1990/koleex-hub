@@ -1514,26 +1514,35 @@ export default function ProductViewPage() {
                       </span>
                     </div>
 
-                    {/* Stat-card grid — equal-height cards with
-                        group-coloured accent bar on the left, big
-                        display value on top, small caption label
-                        underneath. min-h ensures rows stay aligned
-                        even when one value is short ("220V") and
-                        another is long ("1,200 × 850 × 1,500 mm"). */}
+                    {/* Stat-card grid — each card carries a small
+                        icon chip on top in the group's colour, then
+                        the value, then the label. Refined type scale:
+                        value at 20-24 px (down from 24-30 — was too
+                        loud), label at 11.5 px (up from 10.5 — more
+                        readable). min-h keeps rows aligned across
+                        cards with very different value lengths. */}
                     <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {t.rows.map((r, i) => (
                         <div
                           key={`${t.id}-${r.label}-${i}`}
-                          className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 pl-6 min-h-[112px] flex flex-col justify-between transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
+                          className={`group relative overflow-hidden rounded-2xl bg-[#F5F5F7] dark:bg-white/[0.035] ${s.cardRing} dark:border dark:border-white/[0.05] p-5 min-h-[124px] flex flex-col transition-all duration-300 hover:bg-white dark:hover:bg-white/[0.06] hover:shadow-[0_4px_18px_rgba(0,0,0,0.06)] dark:hover:shadow-none hover:-translate-y-0.5`}
                         >
-                          <span
-                            aria-hidden
-                            className={`absolute left-0 top-5 bottom-5 w-[3px] rounded-full ${s.accentBar} opacity-80 group-hover:opacity-100 transition-opacity`}
-                          />
-                          <dd className="text-[24px] md:text-[28px] lg:text-[30px] font-semibold tracking-[-0.02em] text-[#1D1D1F] dark:text-white leading-[1.1]">
+                          {/* Top row — small icon chip in the group's
+                              own tinted hue. Replaces the previous
+                              vertical accent bar with something more
+                              "iconographic" and visual. */}
+                          <span className={`inline-flex items-center justify-center h-7 w-7 rounded-lg ${s.chipBg} ${s.chipText}`}>
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
+                          {/* Value — refined display size. Sits with
+                              auto top margin so it pushes to the
+                              middle/bottom of the card and stays
+                              vertically aligned across the row. */}
+                          <dd className="mt-auto pt-4 text-[20px] md:text-[22px] lg:text-[24px] font-semibold tracking-[-0.018em] text-[#1D1D1F] dark:text-white leading-[1.15]">
                             {r.value}
                           </dd>
-                          <dt className="mt-3 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45 leading-[1.3]">
+                          {/* Caption label. */}
+                          <dt className="mt-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 leading-[1.3]">
                             {r.label}
                           </dt>
                         </div>
