@@ -1214,28 +1214,42 @@ export default function ProductViewPage() {
                     All buttons share the same h-11 height so the row
                     reads as one unit; primary is visually largest via
                     solid fill + shadow + heavier weight. */}
-              {/* ── Action stack — 3-tier strict hierarchy ──
-                    PRIMARY     · solid blue, semibold, shadow.
-                    SECONDARY   · outline, medium weight.
-                    OPTIONAL    · same outline style as secondary,
-                                  only renders when logged in.
-                    TERTIARY    · plain text link below, separated
-                                  from the main button group.
+              {/* ═══ BUTTON ZONE ════════════════════════════════════
+                  Single dedicated container for all actions, sitting
+                  32 px below the title block. Internal layout reads
+                  top-down as a visual hierarchy:
 
-                  All button-shaped controls share the EXACT same
-                  height (h-11), the SAME horizontal padding (px-8),
-                  the SAME radius (rounded-full), and the same
-                  baseline. Visual hierarchy comes from fill + font
-                  weight + shadow — not from dimension. */}
+                    Row 1   PRIMARY — alone, full focus.
+                    helper  small caption under primary.
+                    Row 2   SECONDARY — Request Quotation + Compare,
+                            equal width, evenly spaced.
+                    ────    32 px separator
+                    Row 3   SUPPORT — Contact Sales, tertiary text
+                            link, low visual weight.
+
+                  All button-shaped controls share the same height
+                  (h-11), padding (px-8), radius (rounded-full), and
+                  font size (15 px). Visual hierarchy comes from
+                  fill + font weight + shadow only. */}
               <div className="mt-8">
-                {/* MAIN ROW — primary + 2 outline secondary. */}
-                <div className="flex flex-wrap items-center gap-4">
+                {/* ROW 1 — PRIMARY (own line, full focus). */}
+                <div>
                   <Link
                     href={`/landed-cost/new?productId=${product.id}`}
                     className="inline-flex items-center justify-center h-11 px-8 rounded-full bg-[#06C] dark:bg-[#2997FF] text-white text-[15px] font-semibold hover:bg-[#0077ED] dark:hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_22px_rgba(41,151,255,0.25)] transition-all"
                   >
                     Estimate Total Cost
                   </Link>
+                  <p className="mt-2 text-[12px] text-[#86868B] dark:text-white/45">
+                    Calculate full cost including shipping, duties, and delivery.
+                  </p>
+                </div>
+
+                {/* ROW 2 — SECONDARY (16 px below primary block).
+                    Two buttons in a row, identical shape, separated
+                    by gap-4 (16 px). flex-wrap keeps them stacked
+                    cleanly on narrow widths. */}
+                <div className="mt-4 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
                     onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
@@ -1256,36 +1270,9 @@ export default function ProductViewPage() {
                   </button>
                 </div>
 
-                {/* HELPER TEXT — anchored under the primary so the
-                    customer reads the destination context inline. */}
-                <p className="mt-4 text-[12px] text-[#86868B] dark:text-white/45">
-                  Calculate full cost including shipping, duties, and delivery.
-                </p>
-
-                {/* OPTIONAL — Add to Quotation. Same outline style
-                    as the secondary buttons; sits on its own line
-                    below so the main row stays at 3 buttons. */}
-                {currentUser && (
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // TODO: wire to /api/quotations/add-line when
-                        // the multi-product draft endpoint is ready.
-                        alert(`Added ${product.product_name} to your quotation draft.`);
-                      }}
-                      className="inline-flex items-center h-11 px-8 rounded-full border border-[#1D1D1F]/15 dark:border-white/15 bg-transparent text-[#1D1D1F] dark:text-white text-[15px] font-medium hover:border-[#1D1D1F]/40 dark:hover:border-white/35 hover:bg-[#1D1D1F]/[0.03] dark:hover:bg-white/[0.04] transition-colors"
-                    >
-                      Add to Quotation
-                    </button>
-                  </div>
-                )}
-
-                {/* TERTIARY — Contact Sales. Tertiary tier per the
-                    brief: "do NOT place with main buttons" → moved
-                    to its own group, separated by 32 px from the
-                    button cluster above. Plain text link, no border,
-                    no surface. */}
+                {/* ROW 3 — TERTIARY support link, separated by 32 px
+                    from the button cluster ("do NOT place with main
+                    buttons"). Plain text link, no border, no surface. */}
                 <div className="mt-8">
                   <Link
                     href="/contacts"
