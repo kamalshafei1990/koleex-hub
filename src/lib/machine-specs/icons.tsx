@@ -278,6 +278,64 @@ export const FIELD_GLYPHS: Record<string, string> = {
   dn_cs_chain_stitch_length_min: "stitch_length_min", // arrow-small-left
   dn_cs_chain_stitch_length_max: "stitch_length_max", // arrow-small-right
   dn_cs_independent_tension: "ls_low_bobbin_sensor",  // signal-bars-weak
+
+  /* ─── Chainstitch Family — Tier 2 ──────────────────────────
+     Geometric kind extras (cylinder-bed, post-bed, long-arm,
+     feed-off-arm, heavy-duty) reuse the lockstitch fields, so
+     only the cs_* family fields need new glyph mappings. */
+  cs_needle_count: "needle_system",             // needle
+  cs_thread_class: "ls_stitch_pattern",         // pulse
+  cs_needle_gauge: "needle_size_range",         // ruler-horizontal
+  cs_looper_type: "hook_type",                  // fish-hook
+  cs_bed_type: "ls_bed_type",                   // bed-alt
+  cs_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  cs_drive_type: "motor_type",                  // engine
+
+  cs_stitch_length_min: "stitch_length_min",    // arrow-small-left
+  cs_stitch_length_max: "stitch_length_max",    // arrow-small-right
+  cs_differential_feed_ratio: "ls_reverse_feed", // rotate-reverse
+  cs_feed_dog_type: "ls_feed_dog_type",         // conveyor-belt-arm
+
+  cs_auto_thread_trimmer: "ls_auto_thread_trimmer", // scissors
+  cs_auto_presser_foot_lifter: "ls_auto_presser_foot_lifter", // arrow-up
+  cs_auto_back_suction: "ls_auto_thread_wiper", // fan
+  cs_lubrication_system: "lubrication_system",  // oil-can
+  cs_low_thread_sensor: "ls_low_bobbin_sensor", // signal-bars-weak
+
+  /* ─── Multi-Needle Family — Tier 2 ─────────────────────────
+     Same reuse strategy: every mn_* key maps to the closest
+     existing uicons glyph. */
+  mn_needle_count: "needle_system",             // needle
+  mn_needle_gauge: "needle_size_range",         // ruler-horizontal
+  mn_working_width: "zz_zigzag_width",          // arrows-h
+  mn_stitch_class: "ls_stitch_pattern",         // pulse
+  mn_looper_config: "hook_type",                // fish-hook
+  mn_bed_type: "ls_bed_type",                   // bed-alt
+  mn_max_material_thickness: "ls_max_material_thickness", // cubes-stacked
+  mn_drive_type: "motor_type",                  // engine
+
+  mn_stitch_length_min: "stitch_length_min",    // arrow-small-left
+  mn_stitch_length_max: "stitch_length_max",    // arrow-small-right
+  mn_differential_feed: "ls_reverse_feed",      // rotate-reverse
+  mn_top_cover_stitch: "zz_zigzag_width",       // arrows-h
+
+  mn_auto_thread_trimmer: "ls_auto_thread_trimmer",     // scissors
+  mn_auto_presser_foot_lifter: "ls_auto_presser_foot_lifter", // arrow-up
+  mn_lubrication_system: "lubrication_system",  // oil-can
+  mn_individual_needle_disengage: "et_quick_release", // bolt
+
+  /* ─── Multi-Needle Quilting — Tier 3 ─────────────────────── */
+  mn_q_panel_width: "zz_zigzag_width",          // arrows-h
+  mn_q_panel_length: "la_arm_length",           // ruler-vertical
+  mn_q_max_layers: "wf_max_layer_count",        // cubes
+  mn_q_pattern_memory: "zz_programmable",       // microchip
+  mn_q_auto_loader: "ls_auto_thread_wiper",     // fan
+  mn_q_auto_stacker: "ls_auto_thread_wiper",    // fan
+
+  /* ─── Multi-Needle Picot / Fagoting — Tier 3 ──────────────── */
+  mn_pf_pattern_type: "zz_stitch_patterns_count", // grid-three
+  mn_pf_gap_width: "zz_zigzag_width",             // arrows-h
+  mn_pf_plate_swap: "et_quick_release",           // bolt
 };
 
 /* ─── Per-group heading glyphs ──────────────────────────────────── */
@@ -328,6 +386,10 @@ export const GROUP_GLYPHS: Record<string, string> = {
 
   // Double-needle groups — reuse closest existing group glyph.
   "Chainstitch Geometry": "_g_StitchFeed",      // arrow-progress
+
+  // Multi-needle groups
+  "Quilting Panel": "_g_HeavyDuty",             // shield
+  "Decorative Specifics": "_g_ZigZag",          // magnifying-glass-wave
 };
 
 /* ─── Per-card glyphs ───────────────────────────────────────────── */

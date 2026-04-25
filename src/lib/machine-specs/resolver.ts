@@ -27,6 +27,8 @@ import { LOCKSTITCH_FAMILY_FIELDS } from "./families/lockstitch";
 import { OVERLOCK_FAMILY_FIELDS } from "./families/overlock";
 import { INTERLOCK_FAMILY_FIELDS } from "./families/interlock";
 import { DOUBLE_NEEDLE_FAMILY_FIELDS } from "./families/double-needle";
+import { CHAINSTITCH_FAMILY_FIELDS } from "./families/chainstitch";
+import { MULTI_NEEDLE_FAMILY_FIELDS } from "./families/multi-needle";
 
 // Kind extras (Tier 3) — Lockstitch
 import { WALKING_FOOT_FIELDS } from "./kinds/lockstitch/walking-foot";
@@ -61,6 +63,11 @@ import { INTERLOCK_TAPE_BINDING_FIELDS } from "./kinds/interlock/tape-binding";
 // Kind extras (Tier 3) — Double Needle (only NEW field shape;
 // geometric variants reuse lockstitch extras, see KIND_EXTRAS below)
 import { DOUBLE_NEEDLE_CHAINSTITCH_FIELDS } from "./kinds/double-needle/chainstitch";
+
+// Kind extras (Tier 3) — Multi-Needle (NEW field shapes only;
+// geometric variants reuse lockstitch extras, see KIND_EXTRAS below)
+import { MULTI_NEEDLE_QUILTING_FIELDS } from "./kinds/multi-needle/quilting";
+import { MULTI_NEEDLE_PICOT_FAGOTING_FIELDS } from "./kinds/multi-needle/picot-fagoting";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Family registry
@@ -97,8 +104,18 @@ const FAMILIES: Record<string, FamilyDef> = {
     subtitle: "Twin-needle specs shared across every double-needle kind.",
     fields: DOUBLE_NEEDLE_FAMILY_FIELDS,
   },
-  // Future: chainstitch-machines, multi-needle-machines,
-  // pattern-sewing-machines, heavy-duty-machines, special-machines.
+  "chainstitch-machines": {
+    title: "Chainstitch Basics",
+    subtitle: "Core specs shared across every chainstitch kind (Class 101 / 401).",
+    fields: CHAINSTITCH_FAMILY_FIELDS,
+  },
+  "multi-needle-machines": {
+    title: "Multi-Needle Basics",
+    subtitle: "Specs shared across 3+ needle heads (chainstitch / coverstitch / quilting).",
+    fields: MULTI_NEEDLE_FAMILY_FIELDS,
+  },
+  // Future: pattern-sewing-machines, heavy-duty-machines,
+  // special-machines.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -286,6 +303,61 @@ const KIND_EXTRAS: Record<string, KindExtrasDef> = {
   // dn-lockstitch-fixed / dn-lockstitch-split / dn-needle-feed
   // inherit Common + Family only — the dn_needle_bar_type field on
   // the family card fully captures the fixed / split distinction.
+
+  // ── Chainstitch ────────────────────────────────────────────
+  // All geometric variants reuse the lockstitch extras directly —
+  // the underlying mechanism (walking-foot kinematics, long-arm
+  // throat depth, cylinder dimensions) is identical regardless of
+  // stitch class. The cs_thread_class family field already encodes
+  // the chain-stitch lineage.
+  "chainstitch-cylinder-bed": {
+    title: "Cylinder Bed Geometry",
+    subtitle: "Tubular-arm dimensions for tubular chainstitch work.",
+    fields: CYLINDER_BED_FIELDS,
+  },
+  "chainstitch-post-bed": {
+    title: "Post-Bed Geometry",
+    subtitle: "Vertical post dimensions for 3D chainstitch work.",
+    fields: POST_BED_FIELDS,
+  },
+  "chainstitch-long-arm": {
+    title: "Long-Arm Geometry",
+    subtitle: "Extended reach for oversized chainstitch work.",
+    fields: LONG_ARM_FIELDS,
+  },
+  "chainstitch-feed-off-arm": {
+    title: "Feed-Off-Arm Geometry",
+    subtitle: "Narrow-arm specifics for tubular chainstitch hems.",
+    fields: FEED_OFF_ARM_FIELDS,
+  },
+  "chainstitch-heavy-duty": {
+    title: "Heavy-Duty Capacity",
+    subtitle: "Reinforced chainstitch build for jeans / canvas / webbing.",
+    fields: HEAVY_DUTY_FIELDS,
+  },
+  // chainstitch-single-needle / chainstitch-double-needle /
+  // chainstitch-multi-needle inherit Common + Family only — the
+  // family card already captures needle count + stitch class.
+
+  // ── Multi-Needle ──────────────────────────────────────────
+  "mn-quilting": {
+    title: "Quilting Panel",
+    subtitle: "Panel area, layer stack + pattern memory for industrial panel quilting.",
+    fields: MULTI_NEEDLE_QUILTING_FIELDS,
+  },
+  "mn-picot-fagoting": {
+    title: "Decorative Specifics",
+    subtitle: "Picot loop / fagoting gap dimensions for openwork heads.",
+    fields: MULTI_NEEDLE_PICOT_FAGOTING_FIELDS,
+  },
+  "mn-elastic-attach": {
+    title: "Elastic Feeder",
+    subtitle: "Elastic-feeder geometry — reused from the interlock family.",
+    fields: INTERLOCK_ELASTIC_ATTACH_FIELDS,
+  },
+  // mn-3-chain / mn-4-chain / mn-multi-chain / mn-coverstitch /
+  // mn-lockstitch inherit Common + Family only — the family card
+  // (needle count + gauge + stitch class) covers them.
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -914,6 +914,7 @@ export default function ProductViewPage() {
       "Flatlock Top Cover", "Rib-Tape Feeder",
       "Elastic Feeder", "Binding Folder",
       "Chainstitch Geometry",
+      "Quilting Panel", "Decorative Specifics",
       "Electrical", "Physical (Bare Machine)", "Material",
       "Application", "Compliance & Customs",
     ];
@@ -959,6 +960,8 @@ export default function ProductViewPage() {
         // Double Needle — chainstitch geometry, geometric variants
         // already covered by lockstitch group names above.
         "Chainstitch Geometry",
+        // Multi-Needle — quilting + decorative
+        "Quilting Panel", "Decorative Specifics",
       ],
       Mechanical: ["Mechanical", "Needle & Thread", "Configuration"],
       Electrical: ["Electrical"],
