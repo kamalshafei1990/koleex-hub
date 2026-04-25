@@ -749,7 +749,7 @@ export default function ProductViewPage() {
     const out: { value: string; unit?: string; label: string; icon: React.ReactNode }[] = [];
     /* Icon size is locked to h-4 w-4 across the page so every chip
        (Quick Info + Specs group titles) reads identically. */
-    const ic = "h-4 w-4";
+    const ic = "h-5 w-5";
 
     if (cs.max_sewing_speed) {
       out.push({
@@ -811,7 +811,7 @@ export default function ProductViewPage() {
     const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
     const ts = (sewingSpecs?.template_specs || {}) as Record<string, unknown>;
     const rows: { icon: React.ReactNode; label: string; value: string }[] = [];
-    const ic = "h-4 w-4";
+    const ic = "h-5 w-5";
 
     if (cs.max_sewing_speed) rows.push({ icon: <GaugeIcon className={ic} />, label: "Max sewing speed", value: `${Number(cs.max_sewing_speed).toLocaleString("en-US")} SPM` });
     if (cs.stitch_length_max) rows.push({ icon: <RulerIcon className={ic} />, label: "Stitch length", value: `${cs.stitch_length_min ?? "0"}–${cs.stitch_length_max} mm` });
@@ -1083,9 +1083,9 @@ export default function ProductViewPage() {
             6. CLEAN END     — minimal closing CTA, no clutter
 
           Strict tokens:
-            · Spacing scale 8 / 16 / 24 / 32 / 64 px ONLY
+            · Spacing scale 8 / 16 / 32 / 64 px ONLY
             · Section padding py-24 md:py-32 lg:py-40 (96→160 px)
-            · Container max-w-[1200px] mx-auto px-6 lg:px-10
+            · Container max-w-[1200px] mx-auto px-6 lg:px-8
             · Body container max-w-[680px]
             · Card radius rounded-3xl
             · Surfaces alternate white ↔ #F5F5F7
@@ -1106,8 +1106,8 @@ export default function ProductViewPage() {
             visual focal point of the section.
           ──────────────────────────────────────────────────────── */}
       <section className="bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1320px] mx-auto px-6 lg:px-10 py-24 md:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24 items-center">
+        <div className="max-w-[1320px] mx-auto px-6 lg:px-8 py-24 md:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-16 items-center">
             {/* LEFT — DOMINANT image. Section is wider (1320 vs
                 1200), aspect goes 6:5 → 5:4 (wider canvas), and
                 the gap to text is bigger (24 lg). Net image area
@@ -1175,7 +1175,7 @@ export default function ProductViewPage() {
                   href="#specs"
                   className="inline-flex items-center gap-2 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
                 >
-                  Specifications <AngleRightIcon className="h-4 w-4 mt-0.5" />
+                  Specifications <AngleRightIcon className="h-5 w-5 mt-0.5" />
                 </a>
               </div>
             </div>
@@ -1191,7 +1191,7 @@ export default function ProductViewPage() {
           wraps. Same chip, same icon, same alignment everywhere. */}
       {headlineStats.length >= 3 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.02]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 md:py-32">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {headlineStats.map((s, i) => (
                 <div
@@ -1249,7 +1249,7 @@ export default function ProductViewPage() {
       {/* SECTION 4 — FEATURES (visual rhythm: text LEFT, image RIGHT) */}
       {(galleryImages.length > 1 || mainImage) && product.highlights && product.highlights.length > 0 && (
         <section className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-24 md:py-32">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
               {/* LEFT — text */}
               <div className="lg:col-span-5 order-2 lg:order-1">
@@ -1265,8 +1265,8 @@ export default function ProductViewPage() {
                       key={i}
                       className="flex items-start gap-4 text-[16px] md:text-[17px] text-[#1D1D1F] dark:text-white/85 leading-[1.55]"
                     >
-                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
-                        <CheckIcon className="h-3 w-3" />
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
+                        <CheckIcon className="h-5 w-5" />
                       </span>
                       {h}
                     </li>
@@ -1293,12 +1293,12 @@ export default function ProductViewPage() {
 
       {/* SECTION 5 — SPECIFICATIONS (all-visible, grouped) ─────────
           Same chip system as Quick Info: h-10 w-10 rounded-xl with
-          h-4 w-4 icon. H3 group titles at 22/26 — distinct scale
+          h-5 w-5 icon. H3 group titles at 22/26 — distinct scale
           from H2 above (32-48) and hero subtitle (18-20). More
           space between groups (space-y-16) for breathing room. */}
       {specTabs.length > 0 && (
         <section id="specs" className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-24 md:py-32">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-8 py-24 md:py-32">
             <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
               Specifications
             </p>
@@ -1318,11 +1318,11 @@ export default function ProductViewPage() {
                 return (
                   <div key={t.id}>
                     {/* Group title — icon chip identical to Quick
-                        Info chip (h-10 w-10 + h-4 w-4 icon). 16 px
+                        Info chip (h-10 w-10 + h-5 w-5 icon). 16 px
                         bottom padding before the divider rule. */}
                     <div className="flex items-center gap-4 pb-4 border-b border-[#D2D2D7]/60 dark:border-white/[0.06]">
                       <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/[0.08] text-[#06C] dark:text-[#2997FF]">
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-5 w-5" />
                       </span>
                       <h3 className="text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
                         {t.label}
@@ -1332,7 +1332,7 @@ export default function ProductViewPage() {
                       {t.rows.map((r, i, arr) => (
                         <div
                           key={`${t.id}-${r.label}-${i}`}
-                          className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-8 gap-y-1 py-4 ${
+                          className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-x-8 gap-y-1 py-8 ${
                             i < arr.length - 1
                               ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
                               : ""
