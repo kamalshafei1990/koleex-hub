@@ -817,6 +817,73 @@ export default function ProductViewPage() {
     return rows;
   }, [product, sewingSpecs]);
 
+  /* Flat category accordion source for the Specifications section.
+     Folds the three-tier spec data (Universal / Family / Kind) and
+     the Technical & Compliance block into a single ordered list of
+     {category, rows} so the accordion can render Apple-style: one
+     headline per category, expandable rows below. Empty categories
+     drop out so customers never see "Mechanical (0)". */
+  const specCategories = useMemo<{ category: string; rows: { label: string; value: string }[] }[]>(() => {
+    const map = new Map<string, { label: string; value: string }[]>();
+
+    if (newSpecsRendered) {
+      for (const block of newSpecsRendered) {
+        for (const g of block.groups) {
+          const list = map.get(g.group) ?? [];
+          for (const r of g.rows) list.push({ label: r.field.label, value: r.value });
+          if (!map.has(g.group)) map.set(g.group, list);
+        }
+      }
+    }
+    if (technicalRendered) {
+      for (const g of technicalRendered.groups) {
+        const list = map.get(g.group) ?? [];
+        for (const r of g.rows) list.push({ label: r.label, value: r.value });
+        if (!map.has(g.group)) map.set(g.group, list);
+      }
+    }
+
+    /* Curated category order so the accordion reads like a real
+       Apple-style tech-specs page: customer-facing facts first,
+       compliance + extras at the end. */
+    const order = [
+      "Performance", "Needle & Thread", "Mechanical", "Stitch & Feed",
+      "Configuration", "Automation",
+      "Walking-Foot Mechanism", "Long-Arm Geometry", "Cylinder Bed Geometry",
+      "Post-Bed Geometry", "Feed-Off-Arm Geometry", "Zig-Zag Stitch",
+      "Edge Trimmer", "Heavy-Duty Capacity",
+      "Electrical", "Physical (Bare Machine)", "Material",
+      "Application", "Compliance & Customs",
+    ];
+    const ordered: { category: string; rows: { label: string; value: string }[] }[] = [];
+    for (const k of order) {
+      if (map.has(k)) ordered.push({ category: k, rows: map.get(k)! });
+    }
+    // Append any unknown categories at the end so we never lose data.
+    for (const [k, rows] of map.entries()) {
+      if (!order.includes(k)) ordered.push({ category: k, rows });
+    }
+    return ordered.filter((c) => c.rows.length > 0);
+  }, [newSpecsRendered, technicalRendered]);
+
+  /* Per-category open/closed state for the accordion. First category
+     opens by default so the page never lands on a fully-collapsed
+     Specifications section. */
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (specCategories.length > 0 && openCategories.size === 0) {
+      setOpenCategories(new Set([specCategories[0].category]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specCategories.length]);
+  const toggleCategory = (cat: string) => {
+    setOpenCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  };
+
   /* ── Loading / not found ── */
   if (loading) {
     return (
@@ -974,131 +1041,66 @@ export default function ProductViewPage() {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════
-          1. HERO — split layout
+      {/* ═══════════════════════════════════════════════════════════════
+          REDESIGNED PRODUCT PAGE — 5 STRICT SECTIONS
+          ═══════════════════════════════════════════════════════════════
+          Apple-grade visual hierarchy. Every section uses the same
+          design tokens:
+            · Section vertical padding:  py-20 md:py-28 lg:py-32
+            · Container:                 max-w-[1200px] mx-auto px-6 lg:px-10
+            · Body container:            max-w-[720px] mx-auto
+            · Card radius:               rounded-3xl (24px)
+            · Card padding:              p-8 md:p-10
+            · Spacing scale:             8 / 16 / 24 / 40 / 64 px ONLY
+          Typography:
+            · Eyebrow:  text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B]
+            · H1:       text-[44px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.02em]
+            · H2:       text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em]
+            · Body:     text-[17px] md:text-[19px] leading-[1.5]
+            · Meta:     text-[14px] / text-[15px]
+          Sections alternate white ↔ #F5F5F7 to read as discrete blocks
+          without dividers. ═══════════════════════════════════════════════════════════════ */}
 
-          Left column carries the editorial: brand line, name,
-          tagline, excerpt, highlight bullets, pricing, CTAs.
-          Right column is a premium image card with a soft
-          neutral surface so the photo always sits in a frame.
-          On mobile the columns stack image-first.
-          ══════════════════════════════════════ */}
-      <section className="relative bg-white dark:bg-[#0A0A0A]">
-        <div className="max-w-[1280px] mx-auto px-6 lg:px-10 py-14 md:py-20 lg:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 lg:gap-14 items-center">
-            {/* ── Left: editorial column ── */}
-            <div className="order-2 lg:order-1">
-              {/* Eyebrow — "New" pill when featured, otherwise brand. */}
-              {product.featured ? (
-                <span className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-[#06C]/10 dark:bg-[#2997FF]/15 text-[11px] font-semibold tracking-[0.04em] text-[#06C] dark:text-[#2997FF]">
-                  <SparklesIcon className="h-3 w-3" /> NEW
-                </span>
-              ) : product.brand ? (
-                <p className="text-[12px] font-semibold tracking-[0.08em] uppercase text-[#86868B] dark:text-white/50">
-                  {product.brand}
-                </p>
-              ) : null}
-
-              {/* Headline — left-aligned, tight tracking. */}
-              <h1 className="mt-3 text-[36px] md:text-[44px] lg:text-[52px] xl:text-[60px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.05] tracking-[-0.02em]">
+      {/* SECTION 1 — HERO ─────────────────────────────────────────── */}
+      <section className="bg-white dark:bg-[#0A0A0A]">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+            <div className="lg:col-span-5 order-2 lg:order-1">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                {product.brand || "Koleex"}
+              </p>
+              <h1 className="mt-4 text-[44px] md:text-[60px] lg:text-[72px] font-semibold tracking-[-0.02em] leading-[1.05] text-[#1D1D1F] dark:text-white">
                 {product.product_name}
               </h1>
-
-              {/* Tagline (large) + excerpt (calmer). */}
-              {primaryModel?.tagline && (
-                <p className="mt-4 text-[18px] md:text-[20px] lg:text-[22px] font-normal text-[#1D1D1F] dark:text-white/90 leading-[1.3] tracking-[-0.005em]">
-                  {primaryModel.tagline}
+              {(primaryModel?.tagline || product.excerpt) && (
+                <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60 max-w-[440px]">
+                  {primaryModel?.tagline || product.excerpt}
                 </p>
               )}
-              {product.excerpt && (
-                <p className="mt-3 text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/60 leading-[1.55]">
-                  {product.excerpt}
-                </p>
-              )}
-
-              {/* Highlight bullets — bigger checkmarks, more breathing
-                  room than chip row. Reads like a premium feature list. */}
-              {product.highlights && product.highlights.length > 0 && (
-                <ul className="mt-6 space-y-2">
-                  {product.highlights.slice(0, 5).map((h, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-[14px] text-[#1D1D1F] dark:text-white/85">
-                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#06C]/10 dark:bg-[#2997FF]/15 text-[#06C] dark:text-[#2997FF] shrink-0 mt-0.5">
-                        <CheckIcon className="h-3 w-3" />
-                      </span>
-                      <span className="leading-snug">{h}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* Pricing card — gives the price its own surface. */}
-              {priceFrom !== null && (
-                <div className="mt-7 inline-flex items-baseline gap-2 px-4 py-2.5 rounded-xl bg-[#F5F5F7] dark:bg-white/[0.05] dark:border dark:border-white/[0.08]">
-                  <span className="text-[12px] uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45 font-medium">From</span>
-                  <span className="text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
-                    {fmtMoney(priceFrom)}
-                  </span>
-                </div>
-              )}
-
-              {/* CTA row */}
-              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <div className="mt-10 flex items-center gap-6 flex-wrap">
                 <button
                   type="button"
                   onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-                  className="inline-flex items-center h-[44px] px-7 rounded-full bg-[#06C] text-white text-[14px] md:text-[15px] font-medium hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] shadow-[0_4px_18px_rgba(0,102,204,0.28)] dark:shadow-[0_4px_18px_rgba(41,151,255,0.22)] transition-all"
+                  className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
                 >
                   Request Quote
                 </button>
                 <a
                   href="#specs"
-                  className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] hover:underline text-[14px] md:text-[15px] font-medium"
+                  className="inline-flex items-center gap-1 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
                 >
-                  See full specs <AngleRightIcon className="h-3.5 w-3.5 mt-0.5" />
+                  Specifications <AngleRightIcon className="h-4 w-4 mt-0.5" />
                 </a>
               </div>
-
-              {/* Trust row — warranty / origin / CE / RoHS as compact
-                  badges. Replaces the old chip-strip below the image. */}
-              {(product.warranty || product.country_of_origin || product.ce_certified || product.rohs_compliant) && (
-                <div className="mt-7 pt-6 border-t border-[#D2D2D7]/60 dark:border-white/[0.06] flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-[#6E6E73] dark:text-white/50">
-                  {product.warranty && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <ShieldCheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
-                      {product.warranty} warranty
-                    </span>
-                  )}
-                  {product.country_of_origin && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <GlobeIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
-                      Made in {product.country_of_origin}
-                    </span>
-                  )}
-                  {product.ce_certified && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <BadgeCheckIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
-                      CE Certified
-                    </span>
-                  )}
-                  {product.rohs_compliant && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <AwardIcon className="h-3.5 w-3.5 text-[#06C] dark:text-[#2997FF]" />
-                      RoHS
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
-
-            {/* ── Right: hero image card ── */}
-            <div className="order-1 lg:order-2">
-              <div className="relative w-full aspect-[5/4] lg:aspect-[6/5] rounded-[24px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] shadow-[0_2px_24px_rgba(0,0,0,0.04)] dark:shadow-none">
+            <div className="lg:col-span-7 order-1 lg:order-2">
+              <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
                 {mainImage ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={IMG.hero(mainImage)}
                     alt={product.product_name}
-                    className="absolute inset-0 w-full h-full object-contain p-4 md:p-6"
+                    className="absolute inset-0 w-full h-full object-contain p-6 md:p-10"
                     decoding="async"
                     fetchPriority="high"
                   />
@@ -1113,986 +1115,304 @@ export default function ProductViewPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          1.5 HEADLINE NUMBERS — premium stat band
-
-          Pulls 3-4 of the most quote-worthy specs (max speed,
-          material thickness, motor power, warranty) and presents
-          them as oversized typographic callouts in a single dark
-          band — the move Apple, Sony, and Dyson all use to make
-          product pages feel decisive. Renders only when at least
-          two of the four stats are populated, so empty-data
-          products don't get a half-baked version.
-          ══════════════════════════════════════ */}
-      {headlineStats.length >= 2 && (
-        <section className="bg-[#0A0A0A] dark:bg-black border-y border-[#1D1D1F] dark:border-white/[0.05]">
-          <div className="max-w-[1180px] mx-auto px-6 py-16 md:py-24">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6 md:divide-x md:divide-white/10">
+      {/* SECTION 2 — QUICK INFO GRID ──────────────────────────────── */}
+      {headlineStats.length >= 3 && (
+        <section className="bg-[#F5F5F7] dark:bg-white/[0.02] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 lg:gap-16">
               {headlineStats.map((s, i) => (
-                <div key={i} className={`text-center ${i > 0 ? "md:px-4" : ""}`}>
-                  <p className="text-[44px] md:text-[64px] lg:text-[72px] font-semibold tracking-[-0.02em] text-white leading-[1.05]">
-                    {s.value}
+                <div key={i}>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/45">
+                    {s.label}
+                  </p>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-[40px] md:text-[48px] lg:text-[56px] font-semibold tracking-[-0.02em] leading-none text-[#1D1D1F] dark:text-white">
+                      {s.value}
+                    </span>
                     {s.unit && (
-                      <span className="ml-1.5 text-[20px] md:text-[28px] font-medium text-white/55 align-baseline">
+                      <span className="text-[15px] md:text-[16px] text-[#86868B] dark:text-white/55">
                         {s.unit}
                       </span>
                     )}
-                  </p>
-                  <p className="mt-2 text-[12px] md:text-[13px] font-medium text-white/55 tracking-[-0.005em]">
-                    {s.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ══════════════════════════════════════
-          1.7 AT A GLANCE — premium quick-spec card
-
-          Right after the big stat band, present the next layer
-          of data as a single elegant card — readable in 5
-          seconds, before customers commit to scrolling the full
-          spec sheet. Pulls from common_specs + products columns
-          so it's always grounded in real data. Two columns:
-          PERFORMANCE on the left, BUILD & POWER on the right.
-          Renders only when at least one row has a value.
-          ══════════════════════════════════════ */}
-      {atGlanceRows.length > 0 && (
-        <section className="bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[1180px] mx-auto px-6 py-16 md:py-20">
-            <div className="rounded-[24px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden">
-              <div className="px-7 md:px-10 py-6 md:py-7 border-b border-[#D2D2D7]/60 dark:border-white/[0.06] flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">At a glance</p>
-                  <h2 className="mt-1 text-[22px] md:text-[26px] font-semibold tracking-[-0.01em] text-[#1D1D1F] dark:text-white">
-                    The essentials, in one card.
-                  </h2>
-                </div>
-                <a
-                  href="#specs"
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
-                >
-                  See full specifications <AngleRightIcon className="h-3.5 w-3.5" />
-                </a>
-              </div>
-              <dl className="grid grid-cols-1 md:grid-cols-2">
-                {atGlanceRows.map((row, idx) => (
-                  <div
-                    key={row.label}
-                    className={`flex items-center gap-4 px-7 md:px-10 py-4 ${
-                      // Border-bottom on every row except the last, and
-                      // border-right on left-column rows in the 2-col grid.
-                      idx < atGlanceRows.length - (atGlanceRows.length % 2 === 0 ? 2 : 1)
-                        ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]"
-                        : ""
-                    } ${
-                      idx % 2 === 0 ? "md:border-r md:border-[#D2D2D7]/60 dark:md:border-white/[0.06]" : ""
-                    }`}
-                  >
-                    <span className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 text-[#06C] dark:text-[#2997FF] shrink-0">
-                      {row.icon}
-                    </span>
-                    <dt className="text-[12.5px] text-[#6E6E73] dark:text-white/55 flex-1 min-w-0">{row.label}</dt>
-                    <dd className="text-[14px] md:text-[15px] font-semibold text-[#1D1D1F] dark:text-white text-right tabular-nums">
-                      {row.value}
-                    </dd>
                   </div>
-                ))}
-              </dl>
+                </div>
+              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ══════════════════════════════════════
-          2. IMAGE GALLERY — Apple light
-          Large main image + clean thumbnail strip.
-          ══════════════════════════════════════ */}
-      {galleryImages.length > 1 && (
-        <Section eyebrow="Gallery" title="Every angle." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          {/* Wider thumbnail rail (160px → roomier thumbnails so the
-              machine is recognizable, not a sliver). Main panel
-              dropped the heavy p-10/p-14 padding that was eating
-              the image — the card frame already provides the
-              breathing room. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_160px] gap-6">
-            <div className="group relative aspect-[16/10] rounded-[22px] overflow-hidden bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                key={galleryImages[activeImageIdx]?.id}
-                src={IMG.gallery(galleryImages[activeImageIdx]?.url)}
-                alt={galleryImages[activeImageIdx]?.alt_text || product.product_name}
-                className="absolute inset-0 w-full h-full object-contain transition-transform duration-[800ms] ease-out group-hover:scale-[1.02] animate-in fade-in duration-500"
-                loading="lazy"
-                decoding="async"
-              />
-              {/* Image counter */}
-              <div className="absolute bottom-5 right-5 inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-white/90 backdrop-blur-md text-[11px] font-medium text-[#1D1D1F] shadow-sm dark:bg-black/50 dark:text-white/90 dark:shadow-none">
-                {activeImageIdx + 1} / {galleryImages.length}
-              </div>
-            </div>
-            <div className="flex lg:flex-col gap-3 overflow-x-auto lg:overflow-y-auto lg:max-h-[560px] pb-2 lg:pb-0 lg:pr-1">
-              {galleryImages.map((img, idx) => (
-                <button
-                  key={img.id}
-                  onClick={() => setActiveImageIdx(idx)}
-                  className={`relative shrink-0 h-24 w-24 lg:h-[120px] lg:w-full aspect-square rounded-2xl overflow-hidden bg-white dark:bg-white/[0.03] transition-all duration-300 ${
-                    idx === activeImageIdx
-                      ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7] dark:ring-[#2997FF] dark:ring-offset-[#0A0A0A]"
-                      : "opacity-70 hover:opacity-100 ring-1 ring-[#D2D2D7] dark:ring-white/10"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={IMG.card(img.url)}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-contain"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {/* ══════════════════════════════════════
-          3. PRODUCT DESCRIPTION — Apple light prose
-          ══════════════════════════════════════ */}
-      {product.description && (
-        <section className="py-20 md:py-28 bg-white dark:bg-[#0A0A0A]">
-          <div className="max-w-[740px] mx-auto px-6 text-center">
-            <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-4 tracking-[-0.005em]">
-              About
+      {/* SECTION 3 — PRODUCT OVERVIEW ─────────────────────────────── */}
+      {(product.description || product.excerpt || (product.highlights && product.highlights.length > 0)) && (
+        <section id="overview" className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[720px] mx-auto px-6 py-20 md:py-28 lg:py-32">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+              Overview
             </p>
-            <div
-              className="max-w-none text-[19px] md:text-[24px] text-[#1D1D1F] dark:text-white/80 leading-[1.45] font-normal tracking-[-0.005em] [&_h1]:text-[#1D1D1F] dark:[&_h1]:text-white [&_h1]:font-semibold [&_h2]:text-[#1D1D1F] dark:[&_h2]:text-white [&_h2]:font-semibold [&_h3]:text-[#1D1D1F] dark:[&_h3]:text-white [&_h3]:font-semibold [&_strong]:text-[#1D1D1F] dark:[&_strong]:text-white [&_strong]:font-semibold [&_p]:mb-5 [&_a]:text-[#06C] dark:[&_a]:text-[#2997FF] [&_a]:no-underline hover:[&_a]:underline"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
+            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              The machine, in detail.
+            </h2>
+            {product.excerpt && (
+              <p className="mt-10 text-[17px] md:text-[19px] leading-[1.55] text-[#1D1D1F] dark:text-white/85">
+                {product.excerpt}
+              </p>
+            )}
+            {product.description && (
+              <div
+                className="mt-6 text-[16px] leading-[1.7] text-[#6E6E73] dark:text-white/65 [&>p]:mb-4 [&>p:last-child]:mb-0 [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:mb-4 [&>ol]:list-decimal [&>ol]:pl-5 [&>ol]:mb-4"
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            )}
+            {product.highlights && product.highlights.length > 0 && (
+              <ul className="mt-10 space-y-4">
+                {product.highlights.map((h, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-3 text-[15px] md:text-[16px] text-[#1D1D1F] dark:text-white/85 leading-[1.55]"
+                  >
+                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shrink-0 mt-0.5">
+                      <CheckIcon className="h-2.5 w-2.5" />
+                    </span>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
       )}
 
-      {/* ══════════════════════════════════════
-          4. KEY FEATURES — Apple clean card grid
-          ══════════════════════════════════════ */}
-      {keyFeatures.length > 0 && (
-        <Section eyebrow="Key features" title="Engineered to perform." className="bg-white dark:bg-[#0A0A0A]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {keyFeatures.map((f, i) => (
-              <div
-                key={i}
-                className="group relative overflow-hidden rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 p-8 md:p-9 transition-all duration-300 hover:scale-[1.01]"
-              >
-                <div className="h-11 w-11 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center text-[#06C] dark:text-[#2997FF] mb-6 shadow-sm dark:shadow-none">
-                  {f.icon}
-                </div>
-                <h3 className="text-[20px] md:text-[22px] font-semibold text-[#1D1D1F] dark:text-white tracking-[-0.015em] leading-[1.2]">
-                  {f.title}
-                </h3>
-                {f.value && (
-                  <p className="mt-1.5 text-[15px] font-medium text-[#06C] dark:text-[#2997FF]">{f.value}</p>
-                )}
-                <p className="mt-3 text-[15px] text-[#6E6E73] dark:text-white/60 leading-[1.5]">
-                  {f.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ══════════════════════════════════════
-          5. SEWING MACHINE OVERVIEW — Apple clean blocks
-          ══════════════════════════════════════ */}
-      {(activeTemplate || subcategoryName || tags.length > 0) && (
-        <Section eyebrow="Machine overview" title="Designed for your line." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Machine Type */}
-            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <FactoryIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
-                  Machine Type
-                </p>
-              </div>
-              <h3 className="text-[22px] md:text-[24px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] tracking-[-0.015em]">
-                {/* Template emoji was dropped when the Template Picker
-                    was replaced by the SVG-icon Machine Kind picker.
-                    Public page now just shows the template / kind
-                    name — cleaner, no unicode noise. */}
-                {activeTemplate?.name || subcategoryName || "Industrial Sewing Machine"}
-              </h3>
-              {categoryName && (
-                <p className="mt-auto pt-4 text-[13px] text-[#86868B] dark:text-white/40">
-                  {categoryName}
-                </p>
-              )}
-            </div>
-
-            {/* Main Function */}
-            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <ScissorsIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
-                  Main Function
-                </p>
-              </div>
-              <p className="text-[17px] md:text-[18px] text-[#1D1D1F] dark:text-white/85 leading-[1.45] font-normal">
-                {activeTemplate?.description ||
-                  primaryModel?.tagline ||
-                  `${product.product_name} delivers industrial-grade performance for professional sewing lines.`}
-              </p>
-            </div>
-
-            {/* Application */}
-            <div className="rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 flex flex-col min-h-[240px]">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center">
-                  <LayersIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <p className="text-[13px] font-medium text-[#6E6E73] dark:text-white/60">
-                  Application
-                </p>
-              </div>
-              {tags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {tags.slice(0, 8).map(t => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center h-7 px-3 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[12px] text-[#1D1D1F] dark:text-white/85 capitalize"
+      {/* SECTION 4 — SPECIFICATIONS (Apple tech-specs accordion) ──── */}
+      {specCategories.length > 0 && (
+        <section id="specs" className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+              Specifications
+            </p>
+            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              Built to a standard.
+            </h2>
+            <div className="mt-10 rounded-3xl bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06] divide-y divide-[#D2D2D7]/60 dark:divide-white/[0.06] overflow-hidden">
+              {specCategories.map(({ category, rows }) => {
+                const isOpen = openCategories.has(category);
+                return (
+                  <div key={category}>
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(category)}
+                      aria-expanded={isOpen}
+                      className="w-full flex items-center justify-between gap-6 px-6 md:px-10 py-6 text-left hover:bg-[#F5F5F7]/40 dark:hover:bg-white/[0.02] transition-colors"
                     >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-[15px] text-[#6E6E73] dark:text-white/60">
-                  General-purpose industrial sewing across garment production lines.
-                </p>
-              )}
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {/* ══════════════════════════════════════
-          6. TECHNICAL SPECS — two paths
-
-            (a) NEW three-tier renderer when the product's subcategory
-                is registered in machine-specs/resolver. Renders one
-                "spec sheet" panel per source (Universal / Family /
-                Kind) with a clear section header + 2-col table rows,
-                inspired by the catalog reference style. Frequency
-                dots inline next to each spec name.
-
-            (b) LEGACY rows-style block for everything else, kept
-                until each family gets ported.
-          ══════════════════════════════════════ */}
-      {useNewSpecs && newSpecsRendered && newSpecsRendered.length > 0 && (
-        <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white dark:bg-[#0A0A0A]">
-          {(activeTemplate || activeKindForView) && (
-            <div className="mb-10 flex justify-center">
-              <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[13px] text-[#1D1D1F] dark:text-white/85">
-                <span className="font-medium">{activeKindForView?.name || activeTemplate?.name}</span>
-              </div>
-            </div>
-          )}
-          <div className="space-y-6">
-            {newSpecsRendered.map((block, idx) => {
-              // Per-source accent so the three blocks read as the
-              // same hierarchy as the admin form (universal / family
-              // / kind), but in the public color palette.
-              const accent =
-                block.source === "common"
-                  ? { ring: "ring-emerald-500/15 dark:ring-emerald-400/20", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/5 dark:bg-emerald-400/10" }
-                  : block.source === "family"
-                  ? { ring: "ring-blue-500/15 dark:ring-blue-400/20", text: "text-[#06C] dark:text-[#2997FF]", bg: "bg-blue-500/5 dark:bg-blue-400/10" }
-                  : { ring: "ring-violet-500/15 dark:ring-violet-400/20", text: "text-violet-700 dark:text-violet-400", bg: "bg-violet-500/5 dark:bg-violet-400/10" };
-
-              return (
-                <div
-                  key={`${block.source}-${idx}`}
-                  className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 overflow-hidden"
-                >
-                  {/* Card header — section number + title + subtitle + fill counter */}
-                  <div className="flex items-center gap-4 px-7 sm:px-8 pt-7 sm:pt-8 pb-5">
-                    <div className={`h-9 w-9 rounded-full ${accent.bg} ring-1 ${accent.ring} flex items-center justify-center shrink-0`}>
-                      <span className={`text-[13px] font-bold ${accent.text}`}>{idx + 1}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-[17px] sm:text-[19px] font-semibold text-[#1D1D1F] dark:text-white leading-tight tracking-[-0.01em]">
-                        {block.title}
+                      <h3 className="text-[17px] md:text-[19px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white">
+                        {category}
                       </h3>
-                      {block.subtitle && (
-                        <p className="text-[12px] text-[#6E6E73] dark:text-white/55 mt-0.5 line-clamp-2">{block.subtitle}</p>
-                      )}
-                    </div>
-                    <span className={`hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${accent.bg} ${accent.text} ring-1 ${accent.ring} shrink-0`}>
-                      {block.filled} / {block.total}
-                    </span>
-                  </div>
-
-                  {/* Inner spec sheet — table-style rows grouped by section */}
-                  <div className="px-2 sm:px-3 pb-6">
-                    {block.groups.map((g, gIdx) => (
-                      <div key={g.group} className={gIdx > 0 ? "mt-5" : ""}>
-                        <div className="flex items-baseline gap-2 px-5 sm:px-6 mb-2">
-                          <span className={`text-[10px] font-bold uppercase tracking-[0.08em] ${accent.text}`}>
-                            {g.group}
-                          </span>
-                          <div className="h-px flex-1 bg-[#D2D2D7]/60 dark:bg-white/[0.06]" />
-                        </div>
-                        <dl className="rounded-2xl bg-white dark:bg-white/[0.025] dark:ring-1 dark:ring-white/[0.05] overflow-hidden">
-                          {/* Column header — gives the reference "spec sheet" feel without breaking layout */}
-                          <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-4 px-6 py-2.5 border-b border-[#D2D2D7]/70 dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-white/[0.02]">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Specification</span>
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Value</span>
-                          </div>
-                          {g.rows.map(({ field, value }, rIdx) => (
-                            <div
-                              key={field.key}
-                              className={`grid grid-cols-1 sm:grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-x-4 gap-y-1 px-6 py-3.5 ${
-                                rIdx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]" : ""
-                              } ${rIdx % 2 === 1 ? "bg-[#FAFAFA]/60 dark:bg-white/[0.012]" : ""}`}
-                            >
-                              <dt className="flex items-center text-[13px] text-[#1D1D1F] dark:text-white/85 font-medium">
-                                <FrequencyDotsPublic tier={field.tier} />
-                                {field.label}
-                              </dt>
-                              <dd className="text-[13px] text-[#1D1D1F] dark:text-white sm:font-medium leading-snug">
-                                {value}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Technical & Compliance block — renders the typed
-                columns (voltage, motor_power_w, machine_*, hs_code,
-                ce/rohs, colors) in the same spec-sheet style as the
-                three-tier blocks above. Same look as the rest of the
-                page; no surprises for the customer. */}
-            {technicalRendered && (
-              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 overflow-hidden">
-                <div className="flex items-center gap-4 px-7 sm:px-8 pt-7 sm:pt-8 pb-5">
-                  <div className="h-9 w-9 rounded-full bg-amber-500/5 dark:bg-amber-400/10 ring-1 ring-amber-500/15 dark:ring-amber-400/20 flex items-center justify-center shrink-0">
-                    <ZapIcon className="h-4 w-4 text-amber-700 dark:text-amber-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-[17px] sm:text-[19px] font-semibold text-[#1D1D1F] dark:text-white leading-tight tracking-[-0.01em]">
-                      Technical &amp; Compliance
-                    </h3>
-                    <p className="text-[12px] text-[#6E6E73] dark:text-white/55 mt-0.5">
-                      Electrical specs, physical dimensions, certifications, and customs classification.
-                    </p>
-                  </div>
-                  <span className="hidden sm:inline-flex text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500/5 dark:bg-amber-400/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/15 dark:ring-amber-400/20 shrink-0">
-                    {technicalRendered.filled} {technicalRendered.filled === 1 ? "fact" : "facts"}
-                  </span>
-                </div>
-                <div className="px-2 sm:px-3 pb-6">
-                  {technicalRendered.groups.map((g, gIdx) => (
-                    <div key={g.group} className={gIdx > 0 ? "mt-5" : ""}>
-                      <div className="flex items-baseline gap-2 px-5 sm:px-6 mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-amber-700 dark:text-amber-400">
-                          {g.group}
-                        </span>
-                        <div className="h-px flex-1 bg-[#D2D2D7]/60 dark:bg-white/[0.06]" />
-                      </div>
-                      <dl className="rounded-2xl bg-white dark:bg-white/[0.025] dark:ring-1 dark:ring-white/[0.05] overflow-hidden">
-                        <div className="hidden sm:grid grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-4 px-6 py-2.5 border-b border-[#D2D2D7]/70 dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-white/[0.02]">
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Specification</span>
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#86868B] dark:text-white/40">Value</span>
-                        </div>
-                        {g.rows.map((r, rIdx) => (
+                      <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] text-[#1D1D1F] dark:text-white transition-transform shrink-0 ${isOpen ? "rotate-180" : ""}`}>
+                        <AngleDownIcon className="h-3.5 w-3.5" />
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <dl className="px-6 md:px-10 pb-8">
+                        {rows.map((r, i) => (
                           <div
-                            key={r.label}
-                            className={`grid grid-cols-1 sm:grid-cols-[minmax(220px,1fr)_minmax(180px,2fr)] gap-x-4 gap-y-1 px-6 py-3.5 ${
-                              rIdx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]" : ""
-                            } ${rIdx % 2 === 1 ? "bg-[#FAFAFA]/60 dark:bg-white/[0.012]" : ""}`}
+                            key={`${r.label}-${i}`}
+                            className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1 py-4 ${
+                              i < rows.length - 1
+                                ? "border-b border-[#D2D2D7]/50 dark:border-white/[0.05]"
+                                : ""
+                            }`}
                           >
-                            <dt className="flex items-center text-[13px] text-[#1D1D1F] dark:text-white/85 font-medium">
+                            <dt className="text-[14px] md:text-[15px] text-[#6E6E73] dark:text-white/55 leading-[1.5]">
                               {r.label}
                             </dt>
-                            <dd className="text-[13px] text-[#1D1D1F] dark:text-white sm:font-medium leading-snug">
+                            <dd className="text-[14px] md:text-[15px] text-[#1D1D1F] dark:text-white font-medium text-right leading-[1.5]">
                               {r.value}
                             </dd>
                           </div>
                         ))}
                       </dl>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {genericSpecsRendered.length > 0 && (
-              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
-                    <WrenchIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
+                    )}
                   </div>
-                  <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
-                    Additional
-                  </h3>
-                </div>
-                <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
-                  {genericSpecsRendered.map(({ key, value }, idx) => (
-                    <div key={key} className={`flex justify-between items-baseline gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}>
-                      <dt className="text-[13px] text-[#6E6E73] dark:text-white/55 capitalize">{key.replace(/_/g, " ")}</dt>
-                      <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
-        </Section>
+        </section>
       )}
 
-      {!useNewSpecs && (commonSpecsRendered.length > 0 || templateSpecsRendered.length > 0 || genericSpecsRendered.length > 0) && (
-        <Section id="specs" eyebrow="Specifications" title="Built to a standard." className="bg-white dark:bg-[#0A0A0A]">
-          {activeTemplate && (
-            <div className="mb-12 flex justify-center">
-              <div className="inline-flex items-center gap-2.5 px-5 h-9 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] dark:border dark:border-white/10 text-[13px] text-[#1D1D1F] dark:text-white/85">
-                <span className="font-medium">{activeTemplate.name}</span>
+      {/* SECTION 5 — VISUAL BLOCK (image + text side-by-side) ─────── */}
+      {(galleryImages.length > 1 || mainImage) && tags.length > 0 && (
+        <section id="applications" className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28 lg:py-32">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+              <div className="lg:col-span-7">
+                <div className="relative w-full aspect-[5/4] rounded-3xl overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.025] dark:border dark:border-white/[0.06]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={IMG.gallery(galleryImages[1]?.url || mainImage || "")}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-contain p-6 md:p-10"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div className="lg:col-span-5">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                  Where it performs
+                </p>
+                <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+                  Built for your line.
+                </h2>
+                <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60">
+                  Engineered for the operations and materials your floor runs every day.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-2">
+                  {tags.slice(0, 8).map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center h-8 px-3.5 rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] dark:border dark:border-white/[0.08] text-[13px] text-[#1D1D1F] dark:text-white/85 capitalize"
+                    >
+                      {t.replace(/-/g, " ")}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[...commonSpecsRendered, ...templateSpecsRendered].map((g) => {
-              const GroupIcon =
-                g.group === "Performance" ? GaugeIcon :
-                g.group === "Mechanical" ? FactoryIcon :
-                g.group === "Electrical" ? ZapIcon :
-                (g.group === "Physical" || g.group === "Physical / Installation") ? RulerIcon :
-                g.group === "Needle & Thread" ? TargetIcon :
-                WrenchIcon;
-              return (
-                <div
-                  key={g.group}
-                  className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8"
-                >
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
-                      <GroupIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                    </div>
-                    <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
-                      {g.group}
-                    </h3>
-                  </div>
-                  <dl className="space-y-0">
-                    {g.rows.map(({ field, value }, idx) => (
-                      <div
-                        key={field.key}
-                        className={`flex justify-between items-baseline gap-4 py-3 ${idx < g.rows.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}
-                      >
-                        <dt className="text-[13px] text-[#6E6E73] dark:text-white/55">{field.label}</dt>
-                        <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              );
-            })}
-
-            {genericSpecsRendered.length > 0 && (
-              <div className="rounded-[22px] bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/10 p-8 md:col-span-2">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-9 w-9 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none">
-                    <WrenchIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                  </div>
-                  <h3 className="text-[17px] font-semibold text-[#1D1D1F] dark:text-white leading-none tracking-[-0.01em]">
-                    Additional
-                  </h3>
-                </div>
-                <dl className="grid grid-cols-1 md:grid-cols-2 md:gap-x-10">
-                  {genericSpecsRendered.map(({ key, value }, idx) => (
-                    <div key={key} className={`flex justify-between items-baseline gap-4 py-3 ${idx < genericSpecsRendered.length - 1 ? "border-b border-[#D2D2D7]/60 dark:border-white/[0.06]" : ""}`}>
-                      <dt className="text-[13px] text-[#6E6E73] dark:text-white/55 capitalize">{key.replace(/_/g, " ")}</dt>
-                      <dd className="text-[13px] text-[#1D1D1F] dark:text-white text-right font-medium">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
           </div>
-        </Section>
+        </section>
       )}
 
-      {/* ══════════════════════════════════════
-          7. MODELS / VARIANTS — Apple Buy-like clean cards
-          ══════════════════════════════════════ */}
-      {models.length > 0 && (
-        <Section
-          id="models"
-          eyebrow={`${models.length} variant${models.length === 1 ? "" : "s"}`}
-          title="Choose your model."
-          subtitle="Which is right for you?"
-          className="bg-[#F5F5F7] dark:bg-white/[0.015]"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {models
-              .filter(m => m.visible !== false)
-              .map((m, idx) => {
-                const modelPhoto = media.find(md => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"));
+      {/* SECTION 6 — MODELS PICKER (compact, optional) ────────────── */}
+      {models.filter(m => m.visible !== false).length > 0 && (
+        <section id="models" className="bg-[#F5F5F7] dark:bg-white/[0.015] border-t border-[#D2D2D7]/60 dark:border-white/[0.04]">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-20 md:py-28">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+              Configurations
+            </p>
+            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              Pick the variant.
+            </h2>
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {models.filter(m => m.visible !== false).map((m) => {
                 const price = m.global_price ?? m.head_only_price ?? m.complete_set_price ?? null;
-                const isExpanded = !!expandedModels[m.id];
-                const isBestChoice = idx === 0 && models.filter(mm => mm.visible !== false).length > 1;
-                const hasDetails = Boolean(
-                  m.weight || m.cbm || m.packing_type || m.box_include || m.extra_accessories || m.barcode || m.reference_model
-                );
-
-                // Pull top 3-4 key specs from common_specs for inline preview
-                const cs = (sewingSpecs?.common_specs || {}) as Record<string, unknown>;
-                const keySpecs: { label: string; value: string }[] = [];
-                if (cs.max_sewing_speed) keySpecs.push({ label: "Max speed", value: `${cs.max_sewing_speed} spm` });
-                if (cs.motor_type) keySpecs.push({ label: "Motor", value: String(cs.motor_type).replace(/-/g, " ") });
-                if (cs.stitch_length_max) keySpecs.push({ label: "Stitch", value: `${cs.stitch_length_min ? cs.stitch_length_min + "–" : "up to "}${cs.stitch_length_max} mm` });
-                if (cs.needle_system && keySpecs.length < 4) keySpecs.push({ label: "Needle", value: String(cs.needle_system) });
-                if (keySpecs.length < 3 && cs.lubrication_system) keySpecs.push({ label: "Lubrication", value: String(cs.lubrication_system).replace(/-/g, " ") });
-
+                const photo = media.find((md) => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"));
                 return (
                   <div
                     key={m.id}
-                    className={`group relative rounded-[22px] overflow-hidden flex flex-col bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 ${
-                      isBestChoice
-                        ? "ring-2 ring-[#06C] ring-offset-2 ring-offset-[#F5F5F7] dark:ring-[#2997FF] dark:ring-offset-[#0A0A0A]"
-                        : ""
-                    }`}
+                    className="rounded-3xl bg-white dark:bg-white/[0.03] dark:border dark:border-white/[0.06] overflow-hidden"
                   >
-                    {/* Best Choice ribbon — Apple-style top bar */}
-                    {isBestChoice && (
-                      <div className="absolute top-0 left-0 right-0 z-10 h-7 bg-[#06C] dark:bg-[#2997FF] flex items-center justify-center gap-1.5 text-[11px] font-medium text-white tracking-[-0.005em]">
-                        <SparklesIcon className="h-3 w-3" /> Best Choice
-                      </div>
-                    )}
-
-                    {/* Image area */}
-                    <div className={`aspect-[4/3] relative overflow-hidden bg-white dark:bg-white/[0.02] ${isBestChoice ? "pt-7" : ""}`}>
-                      {modelPhoto || mainImage ? (
+                    <div className="aspect-[5/4] bg-[#F5F5F7] dark:bg-white/[0.02] flex items-center justify-center">
+                      {(photo || mainImage) ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
-                          src={modelPhoto?.url || mainImage!}
+                          src={IMG.card(photo?.url || mainImage || "")}
                           alt={m.model_name}
-                          className="absolute inset-0 w-full h-full object-contain p-8 group-hover:scale-[1.04] transition-transform duration-700 ease-out"
+                          className="w-full h-full object-contain p-6"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
-                          <ImageRawIcon className="h-12 w-12" />
-                        </div>
+                        <ImageRawIcon className="h-10 w-10 text-[#86868B] dark:text-white/30" />
                       )}
                     </div>
-
-                    {/* Content */}
-                    <div className="p-7 flex flex-col flex-1">
-                      {/* Name */}
-                      <h3 className="text-[22px] font-semibold text-[#1D1D1F] dark:text-white tracking-[-0.015em] leading-[1.15]">
+                    <div className="p-8">
+                      <h3 className="text-[17px] md:text-[19px] font-semibold tracking-[-0.005em] text-[#1D1D1F] dark:text-white">
                         {m.model_name}
                       </h3>
                       {m.tagline && (
-                        <p className="text-[14px] text-[#6E6E73] dark:text-white/55 mt-2 line-clamp-2 leading-[1.4]">
+                        <p className="mt-2 text-[14px] text-[#6E6E73] dark:text-white/55 leading-[1.5] line-clamp-2">
                           {m.tagline}
                         </p>
                       )}
-
-                      {/* Price */}
                       {price !== null && (
-                        <p className="mt-4 text-[17px] text-[#1D1D1F] dark:text-white">
-                          From <span className="font-medium">{fmtMoney(price)}</span>
+                        <p className="mt-6 text-[15px] text-[#86868B] dark:text-white/45">
+                          From{" "}
+                          <span className="text-[#1D1D1F] dark:text-white font-semibold">
+                            {fmtMoney(price)}
+                          </span>
                         </p>
                       )}
-
-                      {/* Key spec preview — 3-4 lines */}
-                      {keySpecs.length > 0 && (
-                        <dl className="mt-6 pt-6 border-t border-[#D2D2D7]/60 dark:border-white/[0.08] space-y-2.5">
-                          {keySpecs.slice(0, 4).map(s => (
-                            <div key={s.label} className="flex items-baseline justify-between gap-3 text-[13px]">
-                              <dt className="text-[#6E6E73] dark:text-white/45 capitalize">{s.label}</dt>
-                              <dd className="text-[#1D1D1F] dark:text-white/90 font-medium text-right capitalize">{s.value}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      )}
-
-                      {/* Config badges */}
-                      <div className="mt-5 flex flex-wrap gap-1.5">
-                        {m.sku && (
-                          <span className="text-[11px] px-2 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#6E6E73] dark:text-white/60 font-mono tracking-tight">
-                            {m.sku}
-                          </span>
-                        )}
-                        {m.supports_head_only && (
-                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
-                            <CheckIcon className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Head only
-                          </span>
-                        )}
-                        {m.supports_complete_set && (
-                          <span className="text-[11px] px-2.5 h-6 inline-flex items-center rounded-full bg-[#F5F5F7] dark:bg-white/[0.05] text-[#1D1D1F] dark:text-white/80">
-                            <CheckIcon className="h-2.5 w-2.5 mr-1 text-[#06C] dark:text-[#2997FF]" /> Complete set
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Commercial info — supplier + MOQ are
-                          internal-only. Lead time is customer-friendly
-                          (they want to know when to expect delivery)
-                          so it stays visible on the public view. */}
-                      {((isInternal && (m.moq || m.supplier)) || m.lead_time) && (
-                        <dl className="mt-5 pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08] text-[12px] space-y-1.5">
-                          {isInternal && m.supplier && (
-                            <div className="flex justify-between">
-                              <dt className="text-[#86868B] dark:text-white/40">Supplier</dt>
-                              <dd className="text-[#1D1D1F] dark:text-white/75 truncate ml-2">{m.supplier}</dd>
-                            </div>
-                          )}
-                          {isInternal && m.moq && (
-                            <div className="flex justify-between">
-                              <dt className="text-[#86868B] dark:text-white/40">MOQ</dt>
-                              <dd className="text-[#1D1D1F] dark:text-white/75">{m.moq}</dd>
-                            </div>
-                          )}
-                          {m.lead_time && (
-                            <div className="flex justify-between">
-                              <dt className="text-[#86868B] dark:text-white/40">Lead time</dt>
-                              <dd className="text-[#1D1D1F] dark:text-white/75">{m.lead_time}</dd>
-                            </div>
-                          )}
-                        </dl>
-                      )}
-
-                      {/* Expand details */}
-                      {hasDetails && (
-                        <>
-                          <div
-                            className={`grid transition-all duration-300 ease-out ${
-                              isExpanded ? "grid-rows-[1fr] opacity-100 mt-5" : "grid-rows-[0fr] opacity-0"
-                            }`}
-                          >
-                            <div className="overflow-hidden">
-                              <div className="pt-5 border-t border-[#D2D2D7]/60 dark:border-white/[0.08]">
-                                <p className="text-[12px] font-medium text-[#6E6E73] dark:text-white/50 mb-3 flex items-center gap-1.5">
-                                  <PackageIcon className="h-3 w-3" /> Packaging
-                                </p>
-                                <dl className="text-[12px] space-y-1.5">
-                                  {m.weight && (
-                                    <div className="flex justify-between">
-                                      <dt className="text-[#86868B] dark:text-white/40">Weight</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80">{m.weight} kg</dd>
-                                    </div>
-                                  )}
-                                  {m.cbm && (
-                                    <div className="flex justify-between">
-                                      <dt className="text-[#86868B] dark:text-white/40">Volume</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80">{m.cbm} m³</dd>
-                                    </div>
-                                  )}
-                                  {m.packing_type && (
-                                    <div className="flex justify-between">
-                                      <dt className="text-[#86868B] dark:text-white/40">Packing</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80 truncate ml-2">{m.packing_type}</dd>
-                                    </div>
-                                  )}
-                                  {m.box_include && (
-                                    <div className="pt-1">
-                                      <dt className="text-[#86868B] dark:text-white/40 mb-0.5">Box includes</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80 leading-snug">{m.box_include}</dd>
-                                    </div>
-                                  )}
-                                  {m.extra_accessories && (
-                                    <div className="pt-1">
-                                      <dt className="text-[#86868B] dark:text-white/40 mb-0.5">Accessories</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80 leading-snug">{m.extra_accessories}</dd>
-                                    </div>
-                                  )}
-                                  {m.reference_model && (
-                                    <div className="flex justify-between">
-                                      <dt className="text-[#86868B] dark:text-white/40">Reference</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80 font-mono">{m.reference_model}</dd>
-                                    </div>
-                                  )}
-                                  {m.barcode && (
-                                    <div className="flex justify-between">
-                                      <dt className="text-[#86868B] dark:text-white/40">Barcode</dt>
-                                      <dd className="text-[#1D1D1F] dark:text-white/80 font-mono">{m.barcode}</dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleModel(m.id)}
-                            className="mt-5 inline-flex items-center gap-1 text-[13px] font-normal text-[#06C] dark:text-[#2997FF] hover:underline self-start"
-                          >
-                            {isExpanded ? "Hide details" : "Show details"}
-                            <AngleDownIcon className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                          </button>
-                        </>
-                      )}
-
-                      {/* Apple-style Buy CTA pinned at bottom */}
-                      <div className="mt-auto pt-7">
-                        <Link
-                          href="/contacts"
-                          className="w-full inline-flex items-center justify-center h-[38px] rounded-full bg-[#06C] text-white text-[14px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
-                        >
-                          Buy
-                        </Link>
-                      </div>
                     </div>
                   </div>
                 );
               })}
+            </div>
           </div>
-        </Section>
+        </section>
       )}
 
-      {/* ══════════════════════════════════════
-          8. APPLICATIONS — Apple clean tile cards
-          ══════════════════════════════════════ */}
-      {tags.length > 0 && (
-        <Section id="applications" eyebrow="Applications" title="Where it performs." className="bg-white dark:bg-[#0A0A0A]">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {tags.map(t => {
-              const info = describeApplication(t);
-              const Icon = info.icon;
-              return (
-                <div
-                  key={t}
-                  className="group relative aspect-[4/5] rounded-[22px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.02]"
-                >
-                  <div className="relative h-full flex flex-col p-7">
-                    {/* Large icon as visual anchor */}
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="h-20 w-20 rounded-full bg-white dark:bg-white/[0.06] dark:border dark:border-white/10 flex items-center justify-center shadow-sm dark:shadow-none group-hover:scale-105 transition-transform duration-300">
-                        <Icon className="h-9 w-9 text-[#06C] dark:text-[#2997FF]" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[12px] font-medium text-[#86868B] dark:text-white/40 mb-1">
-                        {info.kind}
-                      </p>
-                      <h3 className="text-[18px] md:text-[20px] font-semibold text-[#1D1D1F] dark:text-white capitalize leading-[1.2] tracking-[-0.015em]">
-                        {t}
-                      </h3>
-                      <p className="mt-2 text-[13px] text-[#6E6E73] dark:text-white/60 leading-[1.45] line-clamp-2">
-                        {info.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Section>
-      )}
-
-      {/* ══════════════════════════════════════
-          9. MEDIA / DOWNLOADS — Apple clean resource cards
-          ══════════════════════════════════════ */}
+      {/* SECTION 7 — RESOURCES (compact, only when present) ───────── */}
       {(videos.length > 0 || manuals.length > 0 || otherDocs.length > 0) && (
-        <Section id="resources" eyebrow="Resources" title="Dig deeper." className="bg-[#F5F5F7] dark:bg-white/[0.015]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {videos.map(v => (
-              <a key={v.id} href={v.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <PlayIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">Video</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{v.alt_text || "Product video"}</p>
-                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    Watch now <ExternalLinkIcon className="h-3 w-3" />
-                  </p>
-                </div>
-              </a>
-            ))}
-            {manuals.map(m => (
-              <a key={m.id} href={m.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <DocumentIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1">PDF manual</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em]">{m.alt_text || "Technical manual"}</p>
-                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    Download <DownloadIcon className="h-3 w-3" />
-                  </p>
-                </div>
-              </a>
-            ))}
-            {otherDocs.map(d => (
-              <a key={d.id} href={d.url} target="_blank" rel="noreferrer"
-                 className="group flex items-start gap-5 p-7 rounded-[22px] bg-white dark:bg-white/[0.03] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.01]">
-                <div className="h-12 w-12 rounded-full bg-[#F5F5F7] dark:bg-white/[0.06] flex items-center justify-center shrink-0">
-                  <ImageRawIcon className="h-4 w-4 text-[#06C] dark:text-[#2997FF]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[#86868B] dark:text-white/45 mb-1 capitalize">{d.type.replace(/_/g, " ")}</p>
-                  <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.25] tracking-[-0.01em] capitalize">{(d.alt_text || d.type).replace(/_/g, " ")}</p>
-                  <p className="text-[13px] text-[#06C] dark:text-[#2997FF] mt-2 inline-flex items-center gap-1 group-hover:underline">
-                    View <ExternalLinkIcon className="h-3 w-3" />
-                  </p>
-                </div>
-              </a>
-            ))}
+        <section id="resources" className="bg-white dark:bg-[#0A0A0A]">
+          <div className="max-w-[1080px] mx-auto px-6 lg:px-10 py-20 md:py-28">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+              Resources
+            </p>
+            <h2 className="mt-4 text-[28px] md:text-[36px] lg:text-[42px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
+              Dig deeper.
+            </h2>
+            <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[...videos, ...manuals, ...otherDocs].slice(0, 6).map((r) => (
+                <a
+                  key={r.id}
+                  href={r.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-4 p-6 rounded-3xl bg-[#F5F5F7] dark:bg-white/[0.03] dark:border dark:border-white/[0.06] hover:bg-[#EFEFEF] dark:hover:bg-white/[0.05] transition-colors"
+                >
+                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-white dark:bg-white/[0.08] dark:border dark:border-white/10 text-[#06C] dark:text-[#2997FF] shrink-0">
+                    {r.type === "video" ? (
+                      <PlayIcon className="h-4 w-4" />
+                    ) : r.type === "manual" ? (
+                      <DocumentIcon className="h-4 w-4" />
+                    ) : (
+                      <DownloadIcon className="h-4 w-4" />
+                    )}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-[#1D1D1F] dark:text-white truncate">
+                      {r.alt_text || r.type.replace(/_/g, " ")}
+                    </span>
+                    <span className="block text-[12px] text-[#86868B] dark:text-white/45 mt-1">
+                      {r.type === "video" ? "Watch" : r.type === "manual" ? "Download manual" : "Download"}
+                    </span>
+                  </span>
+                  <ExternalLinkIcon className="h-4 w-4 text-[#86868B] dark:text-white/45 shrink-0" />
+                </a>
+              ))}
+            </div>
           </div>
-        </Section>
+        </section>
       )}
 
-      {/* ══════════════════════════════════════
-          9.5 FINAL CTA BAND — last call to quote
-
-          Sits right before related products as a premium full-width
-          band. Last opportunity to capture an inquiry before the
-          customer wanders off into "you might also like". Single
-          big quote button + a softer secondary path back to the
-          spec sheet for power users still doing their homework.
-          ══════════════════════════════════════ */}
-      <section className="bg-[#0A0A0A] dark:bg-black border-y border-[#1D1D1F] dark:border-white/[0.05]">
-        <div className="max-w-[980px] mx-auto px-6 py-16 md:py-20 text-center">
-          <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-white/45">Get a tailored quote</p>
-          <h2 className="mt-3 text-[32px] md:text-[44px] lg:text-[52px] font-semibold tracking-[-0.02em] text-white leading-[1.05]">
+      {/* SECTION 8 — FINAL CTA (closing band) ─────────────────────── */}
+      <section className="bg-[#F5F5F7] dark:bg-white/[0.015] border-y border-[#D2D2D7]/60 dark:border-white/[0.04]">
+        <div className="max-w-[720px] mx-auto px-6 py-20 md:py-28 lg:py-32 text-center">
+          <h2 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold tracking-[-0.018em] leading-[1.1] text-[#1D1D1F] dark:text-white">
             Ready to put it on the line?
           </h2>
-          <p className="mt-4 text-[15px] md:text-[17px] text-white/60 leading-[1.5] max-w-[620px] mx-auto">
-            Tell us your volumes and we&apos;ll come back with a price, lead time, and the configuration that fits your workshop.
+          <p className="mt-6 text-[17px] md:text-[19px] leading-[1.5] text-[#6E6E73] dark:text-white/60">
+            Tell us your volumes — we&apos;ll come back with a price, lead time,
+            and the configuration that fits.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+          <div className="mt-10 flex items-center justify-center gap-6 flex-wrap">
             <button
               type="button"
               onClick={() => { setRqResult(null); setRqQty(1); setRqNotes(""); setRqOpen(true); }}
-              className="inline-flex items-center h-[48px] px-8 rounded-full bg-[#2997FF] text-white text-[15px] font-medium hover:bg-[#47A9FF] shadow-[0_4px_22px_rgba(41,151,255,0.35)] transition-all"
+              className="inline-flex items-center h-12 px-8 rounded-full bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] text-[15px] font-medium hover:opacity-90 transition-opacity"
             >
-              Request a Quote
+              Request Quote
             </button>
             <a
               href="#specs"
-              className="inline-flex items-center gap-1.5 text-[15px] font-medium text-white/85 hover:text-white"
+              className="inline-flex items-center gap-1 text-[15px] font-medium text-[#06C] dark:text-[#2997FF] hover:underline"
             >
-              Re-read the specs <AngleRightIcon className="h-4 w-4 mt-0.5" />
+              Re-read specs <AngleRightIcon className="h-4 w-4 mt-0.5" />
             </a>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════
-          10. RELATED PRODUCTS — Apple clean shopping cards
-          ══════════════════════════════════════ */}
-      {related.length > 0 && (
-        <Section eyebrow="You might also like" title="Related machines." className="bg-white dark:bg-[#0A0A0A]">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {related.map(r => {
-              const rp = relatedDetails[r.related_id];
-              const img = relatedImages[r.related_id];
-              if (!rp) return null;
-              return (
-                <Link
-                  key={r.related_id}
-                  href={`/products/${rp.slug || rp.id}`}
-                  className="group rounded-[22px] overflow-hidden bg-[#F5F5F7] dark:bg-white/[0.04] dark:border dark:border-white/10 transition-all duration-300 hover:scale-[1.02]"
-                >
-                  <div className="aspect-[4/3] bg-white dark:bg-white/[0.02] relative overflow-hidden">
-                    {img ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={IMG.card(img)}
-                        alt={rp.product_name}
-                        className="absolute inset-0 w-full h-full object-contain p-6 group-hover:scale-[1.05] transition-transform duration-700 ease-out"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-[#D2D2D7] dark:text-white/20">
-                        <ImageRawIcon className="h-10 w-10" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    {rp.brand && (
-                      <p className="text-[12px] font-medium text-[#86868B] dark:text-white/40 mb-1">{rp.brand}</p>
-                    )}
-                    <p className="text-[16px] font-semibold text-[#1D1D1F] dark:text-white leading-[1.2] line-clamp-2 tracking-[-0.01em]">{rp.product_name}</p>
-                    <p className="mt-3 inline-flex items-center gap-1 text-[13px] text-[#06C] dark:text-[#2997FF] group-hover:underline">
-                      Learn more <AngleRightIcon className="h-3 w-3" />
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </Section>
-      )}
-
-      {/* ══════════════════════════════════════
-          11. FINAL CTA — Apple closing statement
-          ══════════════════════════════════════ */}
-      <section className="relative py-24 md:py-32 bg-[#F5F5F7] dark:bg-white/[0.015]">
-        <div className="max-w-[980px] mx-auto px-6 text-center">
-          <p className="text-[15px] md:text-[17px] font-normal text-[#6E6E73] dark:text-white/60 mb-3 tracking-[-0.005em]">
-            Let&apos;s talk
-          </p>
-          <h2 className="text-[36px] md:text-[56px] lg:text-[64px] font-semibold tracking-[-0.015em] text-[#1D1D1F] dark:text-white leading-[1.08]">
-            Ready to elevate<br />your production line?
-          </h2>
-          <p className="mt-5 text-[19px] md:text-[21px] text-[#6E6E73] dark:text-white/60 leading-[1.45] max-w-[640px] mx-auto font-normal">
-            Our specialists will help you select the right {product.product_name} configuration for your factory.
-          </p>
-          <div className="mt-9 flex items-center justify-center gap-4 flex-wrap">
-            <Link
-              href="/contacts"
-              className="inline-flex items-center gap-1 h-[44px] px-[22px] rounded-full bg-[#06C] text-white text-[17px] font-normal hover:bg-[#0077ED] dark:bg-[#2997FF] dark:hover:bg-[#47A9FF] transition-colors"
-            >
-              Contact sales <AngleRightIcon className="h-4 w-4 mt-0.5" />
-            </Link>
-            <a
-              href="#models"
-              className="inline-flex items-center gap-1 text-[#06C] dark:text-[#2997FF] text-[17px] font-normal hover:underline"
-            >
-              Review models <AngleRightIcon className="h-4 w-4 mt-0.5" />
-            </a>
-          </div>
-          <div className="mt-12 flex items-center justify-center gap-4 text-[12px] text-[#86868B] dark:text-white/40">
-            <span className="inline-flex items-center gap-1.5">
-              <BoxesIcon className="h-3 w-3" />
-              {models.length} model{models.length === 1 ? "" : "s"}
-            </span>
-            {product.hs_code && (
-              <>
-                <span className="h-1 w-1 rounded-full bg-[#D2D2D7] dark:bg-white/20" />
-                <span className="font-mono">HS {product.hs_code}</span>
-              </>
-            )}
-            {product.warranty && (
-              <>
-                <span className="h-1 w-1 rounded-full bg-[#D2D2D7] dark:bg-white/20" />
-                <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheckIcon className="h-3 w-3" /> {product.warranty}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
 
       {/* ══════════════════════════════════════
           REQUEST QUOTE MODAL
