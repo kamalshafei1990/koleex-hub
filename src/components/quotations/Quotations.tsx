@@ -194,6 +194,15 @@ function compressImage(file: File): Promise<string> {
           reject(new Error("No canvas context"));
           return;
         }
+        // Paint the canvas WHITE before drawing. The output format
+        // is JPEG (which has no alpha channel) — without this fill
+        // any transparent pixels in the source PNG get flattened to
+        // BLACK on the canvas → JPEG conversion. Product photos are
+        // commonly PNGs with transparent backgrounds, so the bug
+        // shows up as a black halo / fill behind every uploaded
+        // photo on the Quotation document.
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         resolve(canvas.toDataURL("image/jpeg", 0.6));
       };
