@@ -71,8 +71,12 @@ export const IMG = {
   thumb: (url: string | null | undefined) => cdnImage(url, { width: 160, quality: 75, resize: "contain" }),
   /** Card grid thumbnail — products list, related products. */
   card: (url: string | null | undefined) => cdnImage(url, { width: 480, quality: 75, resize: "contain" }),
-  /** Detail page gallery slot — main image carousel cells. */
-  gallery: (url: string | null | undefined) => cdnImage(url, { width: 1400, quality: 80, resize: "contain" }),
+  /** Detail page gallery slot — main image carousel cells. The hero
+   *  on `aspect-[5/4]` actually paints at ~960px wide on a 1440px
+   *  viewport (~480px on mobile), so 1200×q78 covers retina displays
+   *  at 2× without paying for a 1800px PNG that no display ever uses
+   *  natively. Cuts hero output bytes ~50% on a heavy PNG source. */
+  gallery: (url: string | null | undefined) => cdnImage(url, { width: 1200, quality: 78, resize: "contain" }),
   /** Detail page hero — large above-the-fold photo. */
-  hero: (url: string | null | undefined) => cdnImage(url, { width: 1800, quality: 82, resize: "contain" }),
+  hero: (url: string | null | undefined) => cdnImage(url, { width: 1400, quality: 78, resize: "contain" }),
 };
