@@ -467,21 +467,26 @@ export async function fetchModelSummaries(): Promise<{
   counts: Record<string, number>;
   suppliers: Record<string, string[]>;
   allSuppliers: string[];
+  /* product_id → primary model name (first row by order asc).
+     Lets ProductList show the model code on each card without a
+     second round-trip. */
+  primaryModelNames: Record<string, string>;
 }> {
   /* Supplier data is stripped server-side when the caller lacks
      Product Data access — customers get populated counts but
      empty suppliers + allSuppliers. */
   try {
     const res = await fetch("/api/product-models?summary=1", { credentials: "include" });
-    if (!res.ok) return { counts: {}, suppliers: {}, allSuppliers: [] };
+    if (!res.ok) return { counts: {}, suppliers: {}, allSuppliers: [], primaryModelNames: {} };
     return (await res.json()) as {
       counts: Record<string, number>;
       suppliers: Record<string, string[]>;
       allSuppliers: string[];
+      primaryModelNames: Record<string, string>;
     };
   } catch (e) {
     console.error("[Models] fetchSummaries:", e);
-    return { counts: {}, suppliers: {}, allSuppliers: [] };
+    return { counts: {}, suppliers: {}, allSuppliers: [], primaryModelNames: {} };
   }
 }
 

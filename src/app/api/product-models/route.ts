@@ -33,12 +33,17 @@ export async function GET(req: Request) {
 
   if (wantSummary) {
     /* Counts are safe for everyone; supplier names are admin-only.
-       Fetch only the minimal columns we need — don't return a row
-       shape that could later leak cost. */
-    const selectCols = canSeeSecrets ? "product_id, supplier" : "product_id";
+       primaryModelNames (product_id → first model_name) lets the
+       products list show the model code under each card without a
+       second round-trip. Fetch only the minimal columns we need —
+       don't return a row shape that could later leak cost. */
+    const selectCols = canSeeSecrets
+      ? `product_id, supplier, model_name, "order"`
+      : `product_id, model_name, "order"`;
     const { data, error } = await supabaseServer
       .from("product_models")
-      .select(selectCols);
+      .select(selectCols)
+      .order("order", { ascending: true });
     if (error) {
       console.error("[api/product-models GET summary]", error.message);
       return NextResponse.json({ error: "Failed to load models" }, { status: 500 });
@@ -46,9 +51,19 @@ export async function GET(req: Request) {
     const counts: Record<string, number> = {};
     const suppliers: Record<string, string[]> = {};
     const supplierSet = new Set<string>();
-    const rows = (data ?? []) as unknown as Array<{ product_id: string; supplier?: string | null }>;
+    const primaryModelNames: Record<string, string> = {};
+    const rows = (data ?? []) as unknown as Array<{
+      product_id: string;
+      supplier?: string | null;
+      model_name?: string | null;
+      order?: number | null;
+    }>;
     for (const row of rows) {
       counts[row.product_id] = (counts[row.product_id] || 0) + 1;
+      // First-seen model_name wins (rows are pre-sorted by order asc)
+      if (row.model_name && !primaryModelNames[row.product_id]) {
+        primaryModelNames[row.product_id] = row.model_name;
+      }
       if (canSeeSecrets && row.supplier) {
         if (!suppliers[row.product_id]) suppliers[row.product_id] = [];
         if (!suppliers[row.product_id].includes(row.supplier)) {
@@ -62,6 +77,7 @@ export async function GET(req: Request) {
         counts,
         suppliers,
         allSuppliers: Array.from(supplierSet).sort(),
+        primaryModelNames,
       },
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
     );

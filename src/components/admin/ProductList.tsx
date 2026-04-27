@@ -55,8 +55,16 @@ export default function ProductList() {
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const [productSuppliers, setProductSuppliers] = useState<Record<string, string[]>>({});
   const [allSuppliers, setAllSuppliers] = useState<string[]>([]);
+  const [primaryModelNames, setPrimaryModelNames] = useState<Record<string, string>>({});
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  /* Pagination — only render the first PAGE_SIZE filtered cards at
+     a time. With 600+ products in the catalog, rendering all cards
+     up-front pegged React reconciliation. The user clicks "Load
+     more" or scrolls to grow the visible window. */
+  const PAGE_SIZE = 60;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   /* Filter state — persisted to sessionStorage so the back-button
      from a product detail returns the user to the same filtered
@@ -103,6 +111,7 @@ export default function ProductList() {
       setModelCounts(ms.counts);
       setProductSuppliers(ms.suppliers);
       setAllSuppliers(ms.allSuppliers);
+      setPrimaryModelNames(ms.primaryModelNames || {});
       setMainImages(imgs);
       /* Public catalog lands on Garment Machinery by default — it's
          the flagship. Customers browsing /products should see the
@@ -178,6 +187,7 @@ export default function ProductList() {
   const filteredSubs = useMemo(() => selectedCatId ? subcategories.filter(s => s.category_id === selectedCatId) : subcategories, [subcategories, selectedCatId]);
 
   const filtered = useMemo(() => {
+    const q = search.toLowerCase();
     return products.filter(p => {
       if (filterDiv && p.division_slug !== filterDiv) return false;
       if (filterCat && p.category_slug !== filterCat) return false;
@@ -190,10 +200,34 @@ export default function ProductList() {
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
       if (filterStatus && (p.status || "draft") !== filterStatus) return false;
-      if (search && !p.product_name.toLowerCase().includes(search.toLowerCase()) && !p.slug.includes(search.toLowerCase())) return false;
+      if (q) {
+        // Match against product name, slug, OR primary model code
+        const mn = (primaryModelNames[p.id] || "").toLowerCase();
+        const inName = p.product_name.toLowerCase().includes(q);
+        const inSlug = p.slug.includes(q);
+        const inModel = mn.includes(q);
+        if (!inName && !inSlug && !inModel) return false;
+      }
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers]);
+  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, primaryModelNames]);
+
+  /* Reset the visible page back to 1 whenever the filter set
+     changes — otherwise scrolling halfway through with the brand
+     filter applied would leave the new (smaller) result set
+     pre-paginated to a stale offset. */
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search]);
+
+  /* Slice for the visible page. Keeps DOM small (60 cards instead
+     of 600+) which is the difference between 100ms first paint and
+     a 2-3s render stall. */
+  const visibleProducts = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+  const hasMore = visibleProducts.length < filtered.length;
 
   const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
 
@@ -524,7 +558,7 @@ export default function ProductList() {
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-            {filtered.map((p) => {
+            {visibleProducts.map((p) => {
               const imgUrl = mainImages[p.id];
               const models = modelCounts[p.id] || 0;
               const suppliers = productSuppliers[p.id] || [];
@@ -605,13 +639,27 @@ export default function ProductList() {
 
                   {/* Content */}
                   <div className="p-3.5 md:p-4">
-                    {/* Product Name */}
-                    <h3 className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                    {/* Model code — small uppercase label above the
+                        descriptive name. Hidden when the name itself
+                        IS the model code (no separate descriptive
+                        name was extracted from the catalog). */}
+                    {(() => {
+                      const mn = primaryModelNames[p.id];
+                      if (!mn || mn === p.product_name) return null;
+                      return (
+                        <p className="text-[10px] md:text-[11px] font-mono font-semibold text-[var(--text-highlight)] uppercase tracking-wider truncate mb-1">
+                          {mn}
+                        </p>
+                      );
+                    })()}
+
+                    {/* Product Name (descriptive) */}
+                    <h3 className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--text-highlight)] transition-colors">
                       {p.product_name}
                     </h3>
 
                     {/* Category */}
-                    <p className="text-[11px] text-[var(--text-dim)] mt-1 truncate flex items-center gap-1">
+                    <p className="text-[11px] text-[var(--text-dim)] mt-1.5 truncate flex items-center gap-1">
                       <LayersIcon className="h-3 w-3 shrink-0" />
                       {catMap[p.category_slug] || p.category_slug}
                     </p>
@@ -676,7 +724,7 @@ export default function ProductList() {
               <span />
             </div>
             <div className="divide-y divide-[var(--border-subtle)]">
-              {filtered.map((p) => {
+              {visibleProducts.map((p) => {
                 const imgUrl = mainImages[p.id];
                 const models = modelCounts[p.id] || 0;
                 const suppliers = productSuppliers[p.id] || [];
@@ -709,6 +757,15 @@ export default function ProductList() {
 
                     {/* Product info (mobile: all info here, desktop: just name) */}
                     <div className="flex-1 md:flex-none min-w-0">
+                      {(() => {
+                        const mn = primaryModelNames[p.id];
+                        if (!mn || mn === p.product_name) return null;
+                        return (
+                          <p className="text-[10px] font-mono font-semibold text-[var(--text-highlight)] uppercase tracking-wider truncate">
+                            {mn}
+                          </p>
+                        );
+                      })()}
                       <div className="flex items-center gap-2">
                         <h3 className="text-[13px] md:text-[14px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
                           {p.product_name}
@@ -826,6 +883,25 @@ export default function ProductList() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Load-more button — appears below the visible list when
+            there are more filtered products waiting. Avoids
+            rendering 600+ DOM cards up-front (the difference between
+            a 100ms first paint and a multi-second render stall). */}
+        {!loading && hasMore && (
+          <div className="flex flex-col items-center mt-8 gap-2">
+            <p className="text-[12px] text-[var(--text-dim)]">
+              Showing {visibleProducts.length} of {filtered.length}
+            </p>
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+              className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+            >
+              Load more
+            </button>
           </div>
         )}
       </div>
