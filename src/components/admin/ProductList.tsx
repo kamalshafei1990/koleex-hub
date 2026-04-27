@@ -639,27 +639,34 @@ export default function ProductList() {
 
                   {/* Content */}
                   <div className="p-3.5 md:p-4">
-                    {/* Model code — small uppercase label above the
-                        descriptive name. Hidden when the name itself
-                        IS the model code (no separate descriptive
-                        name was extracted from the catalog). */}
                     {(() => {
                       const mn = primaryModelNames[p.id];
-                      if (!mn || mn === p.product_name) return null;
+                      const hasDistinctName = mn && mn !== p.product_name;
+                      if (hasDistinctName) {
+                        // Catalog layout — code first as the heading,
+                        // descriptive name as the subtitle below.
+                        return (
+                          <>
+                            <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                              {mn}
+                            </h3>
+                            <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug">
+                              {p.product_name}
+                            </p>
+                          </>
+                        );
+                      }
+                      // No descriptive name — just show the model code
+                      // (which lives in product_name) as the title.
                       return (
-                        <p className="text-[10px] md:text-[11px] font-mono font-semibold text-[var(--text-highlight)] uppercase tracking-wider truncate mb-1">
-                          {mn}
-                        </p>
+                        <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                          {p.product_name}
+                        </h3>
                       );
                     })()}
 
-                    {/* Product Name (descriptive) */}
-                    <h3 className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug group-hover:text-[var(--text-highlight)] transition-colors">
-                      {p.product_name}
-                    </h3>
-
                     {/* Category */}
-                    <p className="text-[11px] text-[var(--text-dim)] mt-1.5 truncate flex items-center gap-1">
+                    <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1">
                       <LayersIcon className="h-3 w-3 shrink-0" />
                       {catMap[p.category_slug] || p.category_slug}
                     </p>
@@ -759,21 +766,31 @@ export default function ProductList() {
                     <div className="flex-1 md:flex-none min-w-0">
                       {(() => {
                         const mn = primaryModelNames[p.id];
-                        if (!mn || mn === p.product_name) return null;
+                        const hasDistinctName = mn && mn !== p.product_name;
+                        if (hasDistinctName) {
+                          return (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-[14px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                                  {mn}
+                                </h3>
+                                {p.featured && <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />}
+                              </div>
+                              <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] truncate">
+                                {p.product_name}
+                              </p>
+                            </>
+                          );
+                        }
                         return (
-                          <p className="text-[10px] font-mono font-semibold text-[var(--text-highlight)] uppercase tracking-wider truncate">
-                            {mn}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-[14px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                              {p.product_name}
+                            </h3>
+                            {p.featured && <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />}
+                          </div>
                         );
                       })()}
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-[13px] md:text-[14px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
-                          {p.product_name}
-                        </h3>
-                        {p.featured && (
-                          <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />
-                        )}
-                      </div>
                       {/* Mobile: show all meta inline */}
                       <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
