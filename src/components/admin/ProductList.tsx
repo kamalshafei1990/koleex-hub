@@ -59,12 +59,6 @@ export default function ProductList() {
   const [mainImages, setMainImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  /* Pagination — only render the first PAGE_SIZE filtered cards at
-     a time. With 600+ products in the catalog, rendering all cards
-     up-front pegged React reconciliation. The user clicks "Load
-     more" or scrolls to grow the visible window. */
-  const PAGE_SIZE = 60;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   /* Filter state — persisted to sessionStorage so the back-button
      from a product detail returns the user to the same filtered
@@ -186,8 +180,25 @@ export default function ProductList() {
   const selectedCatId = useMemo(() => categories.find(c => c.slug === filterCat)?.id, [categories, filterCat]);
   const filteredSubs = useMemo(() => selectedCatId ? subcategories.filter(s => s.category_id === selectedCatId) : subcategories, [subcategories, selectedCatId]);
 
+  /* Cheap O(1) lookups so the search hot path doesn't re-scan the
+     taxonomy arrays for every product on every keystroke. Built
+     here (not inside the memo) so they're shared with section
+     headers downstream. */
+  const divNameBySlug = useMemo(
+    () => Object.fromEntries(divisions.map(d => [d.slug, d.name.toLowerCase()])),
+    [divisions],
+  );
+  const catNameBySlug = useMemo(
+    () => Object.fromEntries(categories.map(c => [c.slug, c.name.toLowerCase()])),
+    [categories],
+  );
+  const subNameBySlug = useMemo(
+    () => Object.fromEntries(subcategories.map(s => [s.slug, s.name.toLowerCase()])),
+    [subcategories],
+  );
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return products.filter(p => {
       if (filterDiv && p.division_slug !== filterDiv) return false;
       if (filterCat && p.category_slug !== filterCat) return false;
@@ -201,33 +212,73 @@ export default function ProductList() {
       if (filterFeatured === "no" && p.featured) return false;
       if (filterStatus && (p.status || "draft") !== filterStatus) return false;
       if (q) {
-        // Match against product name, slug, OR primary model code
+        // Match across every commonly-typed field. Multi-token search:
+        // the user types "lockstitch direct" and we require BOTH
+        // tokens to appear somewhere in the haystack. Avoids the
+        // single-token short-match foot-gun while keeping it forgiving.
         const mn = (primaryModelNames[p.id] || "").toLowerCase();
-        const inName = p.product_name.toLowerCase().includes(q);
-        const inSlug = p.slug.includes(q);
-        const inModel = mn.includes(q);
-        if (!inName && !inSlug && !inModel) return false;
+        const haystack = [
+          p.product_name.toLowerCase(),
+          p.slug,
+          mn,
+          (p.brand || "").toLowerCase(),
+          (p.level || "").toLowerCase(),
+          (p.status || "").toLowerCase(),
+          divNameBySlug[p.division_slug] || "",
+          catNameBySlug[p.category_slug] || "",
+          subNameBySlug[p.subcategory_slug] || "",
+          (p.tags || []).join(" ").toLowerCase(),
+        ].join(" ");
+        const tokens = q.split(/\s+/);
+        for (const t of tokens) {
+          if (t && !haystack.includes(t)) return false;
+        }
       }
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, primaryModelNames]);
+  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug]);
 
-  /* Reset the visible page back to 1 whenever the filter set
-     changes — otherwise scrolling halfway through with the brand
-     filter applied would leave the new (smaller) result set
-     pre-paginated to a stale offset. */
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search]);
-
-  /* Slice for the visible page. Keeps DOM small (60 cards instead
-     of 600+) which is the difference between 100ms first paint and
-     a 2-3s render stall. */
-  const visibleProducts = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
+  /* Build sub-category and category name lookup tables once so
+     section headers + the search index resolve in O(1). */
+  const subMap = useMemo(
+    () => Object.fromEntries(subcategories.map(s => [s.slug, s.name])),
+    [subcategories],
   );
-  const hasMore = visibleProducts.length < filtered.length;
+
+  /* Group the filtered products by subcategory so the page reads as
+     organised sections (Lockstitch Machines / Overlock Machines /
+     etc.) instead of one undifferentiated 600-card grid. When a
+     subcategory filter is active there's only one group anyway,
+     which still renders cleanly under a single header.
+
+     Order: sections appear in the same order subcategories were
+     fetched (DB `order` column). */
+  const productSections = useMemo(() => {
+    const groupOrder: string[] = [];
+    const groups: Record<string, ProductRow[]> = {};
+    for (const p of filtered) {
+      const k = p.subcategory_slug || "_uncategorized";
+      if (!(k in groups)) {
+        groups[k] = [];
+        groupOrder.push(k);
+      }
+      groups[k].push(p);
+    }
+    // Re-order to match the DB subcategory order
+    const dbOrder = subcategories.map(s => s.slug);
+    groupOrder.sort((a, b) => {
+      const ai = dbOrder.indexOf(a); const bi = dbOrder.indexOf(b);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return groupOrder.map(slug => ({
+      slug,
+      name: subMap[slug] || (slug === "_uncategorized" ? "Uncategorized" : slug),
+      products: groups[slug],
+    }));
+  }, [filtered, subcategories, subMap]);
 
   const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
 
@@ -557,8 +608,27 @@ export default function ProductList() {
             )}
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-            {visibleProducts.map((p) => {
+          /* Sections grouped by sub-category — gives the page real
+             visual structure on a 600+ catalog. content-visibility:
+             auto on each section means the browser skips layout +
+             paint for off-screen sections, keeping scroll buttery
+             even with all rows mounted at once. */
+          <div className="space-y-10">
+          {productSections.map((section) => (
+            <section
+              key={section.slug}
+              style={{ contentVisibility: "auto", containIntrinsicSize: "1px 600px" }}
+            >
+              <header className="flex items-baseline gap-3 mb-3 pb-2 border-b border-[var(--border-subtle)]">
+                <h2 className="text-[15px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)]">
+                  {section.name}
+                </h2>
+                <span className="text-[12px] font-medium text-[var(--text-dim)] tabular-nums">
+                  {section.products.length}
+                </span>
+              </header>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+            {section.products.map((p) => {
               const imgUrl = mainImages[p.id];
               const models = modelCounts[p.id] || 0;
               const suppliers = productSuppliers[p.id] || [];
@@ -576,6 +646,8 @@ export default function ProductList() {
                       <img
                         src={imgUrl}
                         alt={p.product_name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
@@ -716,6 +788,9 @@ export default function ProductList() {
                 </Link>
               );
             })}
+              </div>
+            </section>
+          ))}
           </div>
         ) : (
           /* ── List View ── */
@@ -730,8 +805,8 @@ export default function ProductList() {
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">Status</span>
               <span />
             </div>
-            <div className="divide-y divide-[var(--border-subtle)]">
-              {visibleProducts.map((p) => {
+            <div className="divide-y divide-[var(--border-subtle)]" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 1200px" }}>
+              {filtered.map((p) => {
                 const imgUrl = mainImages[p.id];
                 const models = modelCounts[p.id] || 0;
                 const suppliers = productSuppliers[p.id] || [];
@@ -900,25 +975,6 @@ export default function ProductList() {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Load-more button — appears below the visible list when
-            there are more filtered products waiting. Avoids
-            rendering 600+ DOM cards up-front (the difference between
-            a 100ms first paint and a multi-second render stall). */}
-        {!loading && hasMore && (
-          <div className="flex flex-col items-center mt-8 gap-2">
-            <p className="text-[12px] text-[var(--text-dim)]">
-              Showing {visibleProducts.length} of {filtered.length}
-            </p>
-            <button
-              type="button"
-              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-              className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-            >
-              Load more
-            </button>
           </div>
         )}
       </div>
