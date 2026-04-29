@@ -1,0 +1,16 @@
+# Files Vercel must NOT upload as part of the deployment payload.
+# These live in the working tree for local data-import / OCR work
+# but are not part of the runtime app — including them in the
+# upload bloats it past Vercel's API limits and causes EPIPE /
+# "Internal Server Error" responses on `vercel deploy`.
+
+# 2.5 GB of source catalog photos (used to seed Supabase Storage,
+# already uploaded via scripts/catalog-import.mjs).
+catalog Photos/
+
+# 77 MB image-only PDF used by the OCR import scripts. Not needed
+# at runtime.
+Koleex Catalog 2025.pdf
+
+# Local one-shot scripts — only needed on a workstation.
+scripts/
