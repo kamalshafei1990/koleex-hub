@@ -387,8 +387,12 @@ export default function ProductList() {
           {products.length} products in catalog
         </p>
 
-        {/* Search + Filters */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4 mb-6">
+        {/* Search + Filters — sticky to the top of the viewport so
+            the user can refine the query without scrolling back up.
+            z-30 sits above the category jump-nav (z-20) so the
+            search row always wins when both stack. */}
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mb-6 bg-[var(--bg-primary)]/85 backdrop-blur-md border-b border-[var(--border-subtle)]">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4">
           <div className="flex gap-3">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
@@ -540,6 +544,44 @@ export default function ProductList() {
               </div>
             </div>
           )}
+
+          {/* Active filter chips — surfaces every active filter as a
+              removable chip so the user always knows what's narrowing
+              the catalog. Click the X on any chip to clear just that
+              filter; clearing the search via the X here also clears
+              its own filter. Only renders when at least one is set. */}
+          {(activeFilterCount > 0 || search) && (
+            <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-ghost)]">Active:</span>
+              {(() => {
+                const chips: { label: string; onClear: () => void }[] = [];
+                if (search) chips.push({ label: `"${search}"`, onClear: () => setSearch("") });
+                if (filterDiv) chips.push({ label: `Division: ${divNameBySlug[filterDiv] || filterDiv}`, onClear: () => { setFilterDiv(""); setFilterCat(""); setFilterSub(""); } });
+                if (filterCat) chips.push({ label: `Category: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
+                if (filterSub) chips.push({ label: `Subcategory: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
+                if (filterBrand) chips.push({ label: `Brand: ${filterBrand}`, onClear: () => setFilterBrand("") });
+                if (filterLevel) chips.push({ label: `Level: ${filterLevel}`, onClear: () => setFilterLevel("") });
+                if (filterSupplier) chips.push({ label: `Supplier: ${filterSupplier}`, onClear: () => setFilterSupplier("") });
+                if (filterVisible) chips.push({ label: filterVisible === "visible" ? "Visible" : "Hidden", onClear: () => setFilterVisible("") });
+                if (filterFeatured) chips.push({ label: filterFeatured === "yes" ? "Featured" : "Not featured", onClear: () => setFilterFeatured("") });
+                if (filterStatus) chips.push({ label: `Status: ${filterStatus}`, onClear: () => setFilterStatus("") });
+                return chips.map((c, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-focus)] text-[11px] font-medium text-[var(--text-primary)]">
+                    {c.label}
+                    <button
+                      type="button"
+                      onClick={c.onClear}
+                      aria-label={`Remove filter ${c.label}`}
+                      className="h-5 w-5 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                    >
+                      <span className="text-[14px] leading-none">×</span>
+                    </button>
+                  </span>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
         </div>
 
         {/* ── Division pill strip ──
@@ -832,19 +874,37 @@ export default function ProductList() {
                           </>
                         );
                       }
-                      // No descriptive name — just show the model code
-                      // (which lives in product_name) as the title.
+                      // No descriptive name yet — show the model code
+                      // as the title and a small "Needs name" pill to
+                      // flag it for the admin.
                       return (
-                        <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
-                          {p.product_name}
-                        </h3>
+                        <>
+                          <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                            {p.product_name}
+                          </h3>
+                          {isInternal && (
+                            <p className="mt-0.5 text-[10px] font-medium text-amber-400/80">
+                              Needs name
+                            </p>
+                          )}
+                        </>
                       );
                     })()}
 
-                    {/* Category */}
-                    <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1">
+                    {/* Category + Subcategory line.
+                        Subcategory shown as a chip after the category
+                        so admins can spot at a glance whether a
+                        product is in lockstitch / overlock / etc.
+                        without opening it. */}
+                    <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1.5">
                       <LayersIcon className="h-3 w-3 shrink-0" />
-                      {catMap[p.category_slug] || p.category_slug}
+                      <span className="truncate">{catMap[p.category_slug] || p.category_slug}</span>
+                      {p.subcategory_slug && subMap[p.subcategory_slug] && (
+                        <>
+                          <span className="text-[var(--text-ghost)]">·</span>
+                          <span className="truncate text-[var(--text-muted)]">{subMap[p.subcategory_slug]}</span>
+                        </>
+                      )}
                     </p>
 
                     {/* Division label — only for non-flagship products.
