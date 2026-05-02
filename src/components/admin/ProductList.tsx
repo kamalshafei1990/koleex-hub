@@ -245,40 +245,65 @@ export default function ProductList() {
     [subcategories],
   );
 
-  /* Group the filtered products by subcategory so the page reads as
-     organised sections (Lockstitch Machines / Overlock Machines /
-     etc.) instead of one undifferentiated 600-card grid. When a
-     subcategory filter is active there's only one group anyway,
-     which still renders cleanly under a single header.
+  /* TWO-LEVEL grouping: Category → Subcategory → Products.
+     Lands the user on a real catalog page where each top-level
+     CATEGORY (Industrial Sewing Machines / Cutting Equipment /
+     Embroidery Equipment / etc.) is its own banner-headed section,
+     and within it each SUBCATEGORY is a sub-section of cards.
 
-     Order: sections appear in the same order subcategories were
-     fetched (DB `order` column). */
-  const productSections = useMemo(() => {
-    const groupOrder: string[] = [];
-    const groups: Record<string, ProductRow[]> = {};
+     Order:
+       · Categories appear in the order returned by fetchCategories
+         (DB `order` then name).
+       · Subcategories within each category match the DB order.
+
+     Empty buckets drop out automatically. */
+  type CategoryGroup = {
+    slug: string;
+    name: string;
+    total: number;
+    subSections: { slug: string; name: string; products: ProductRow[] }[];
+  };
+
+  const categoryTree = useMemo<CategoryGroup[]>(() => {
+    if (filtered.length === 0) return [];
+    // Build product index: cat -> sub -> ProductRow[]
+    const catBuckets: Record<string, Record<string, ProductRow[]>> = {};
     for (const p of filtered) {
-      const k = p.subcategory_slug || "_uncategorized";
-      if (!(k in groups)) {
-        groups[k] = [];
-        groupOrder.push(k);
-      }
-      groups[k].push(p);
+      const c = p.category_slug || "_uncategorized";
+      const s = p.subcategory_slug || "_uncategorized";
+      if (!catBuckets[c]) catBuckets[c] = {};
+      if (!catBuckets[c][s]) catBuckets[c][s] = [];
+      catBuckets[c][s].push(p);
     }
-    // Re-order to match the DB subcategory order
-    const dbOrder = subcategories.map(s => s.slug);
-    groupOrder.sort((a, b) => {
-      const ai = dbOrder.indexOf(a); const bi = dbOrder.indexOf(b);
+    const catOrder = categories.map(c => c.slug);
+    const subOrder = subcategories.map(s => s.slug);
+    const catSlugs = Object.keys(catBuckets).sort((a, b) => {
+      const ai = catOrder.indexOf(a); const bi = catOrder.indexOf(b);
       if (ai === -1 && bi === -1) return 0;
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
     });
-    return groupOrder.map(slug => ({
-      slug,
-      name: subMap[slug] || (slug === "_uncategorized" ? "Uncategorized" : slug),
-      products: groups[slug],
-    }));
-  }, [filtered, subcategories, subMap]);
+    return catSlugs.map(catSlug => {
+      const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? "Uncategorized" : catSlug);
+      const subSlugs = Object.keys(catBuckets[catSlug]).sort((a, b) => {
+        const ai = subOrder.indexOf(a); const bi = subOrder.indexOf(b);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+      const subSections = subSlugs.map(subSlug => ({
+        slug: subSlug,
+        name: subMap[subSlug] || (subSlug === "_uncategorized" ? "Other" : subSlug),
+        products: catBuckets[catSlug][subSlug],
+      }));
+      const total = subSections.reduce((a, s) => a + s.products.length, 0);
+      // Capitalise first letter of category name even if input is title cased lower in our map
+      const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
+      return { slug: catSlug, name: displayName, total, subSections };
+    });
+  }, [filtered, categories, subcategories, subMap, catNameBySlug]);
 
   const activeFilterCount = [filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
 
@@ -608,25 +633,75 @@ export default function ProductList() {
             )}
           </div>
         ) : viewMode === "grid" ? (
-          /* Sections grouped by sub-category — gives the page real
-             visual structure on a 600+ catalog. content-visibility:
-             auto on each section means the browser skips layout +
-             paint for off-screen sections, keeping scroll buttery
-             even with all rows mounted at once. */
-          <div className="space-y-10">
-          {productSections.map((section) => (
+          /* Two-level catalog layout:
+               CATEGORY banner (e.g. "Industrial Sewing Machines")
+                 SUB-CATEGORY header  (e.g. "Lockstitch Machines")
+                   product cards in a 4-column grid
+                 SUB-CATEGORY header  (e.g. "Overlock Machines")
+                   product cards
+               CATEGORY banner (e.g. "Cutting Equipment")
+                 SUB-CATEGORY header
+                   product cards
+               …
+
+             Sticky jump-nav at the top lets the user hop between
+             categories instantly. content-visibility:auto on each
+             category section keeps render fast even with 600+ cards
+             mounted at once. */
+          <>
+            {/* ── Category jump-nav ── */}
+            {categoryTree.length > 1 && (
+              <nav className="sticky top-0 z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-6 bg-[var(--bg-primary)]/85 backdrop-blur-md border-b border-[var(--border-subtle)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex items-center gap-2">
+                  {categoryTree.map((cat) => (
+                    <a
+                      key={cat.slug}
+                      href={`#cat-${cat.slug}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const el = document.getElementById(`cat-${cat.slug}`);
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      className="inline-flex items-center gap-2 h-8 px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] hover:border-[var(--border-focus)] transition-all whitespace-nowrap shrink-0"
+                    >
+                      {cat.name}
+                      <span className="text-[10px] tabular-nums text-[var(--text-dim)]">{cat.total}</span>
+                    </a>
+                  ))}
+                </div>
+              </nav>
+            )}
+
+          <div className="space-y-12">
+          {categoryTree.map((cat) => (
             <section
-              key={section.slug}
-              style={{ contentVisibility: "auto", containIntrinsicSize: "1px 600px" }}
+              key={cat.slug}
+              id={`cat-${cat.slug}`}
+              style={{ contentVisibility: "auto", containIntrinsicSize: "1px 800px" }}
+              className="scroll-mt-20"
             >
-              <header className="flex items-baseline gap-3 mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                <h2 className="text-[15px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)]">
-                  {section.name}
+              {/* ── CATEGORY banner ── prominent, gradient-tinted */}
+              <div className="mb-6 px-5 md:px-7 py-4 md:py-5 rounded-2xl bg-gradient-to-r from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-baseline justify-between gap-3">
+                <h2 className="text-[18px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] truncate">
+                  {cat.name}
                 </h2>
-                <span className="text-[12px] font-medium text-[var(--text-dim)] tabular-nums">
-                  {section.products.length}
+                <span className="shrink-0 text-[12px] md:text-[13px] font-semibold text-[var(--text-muted)] tabular-nums">
+                  {cat.total} {cat.total === 1 ? "product" : "products"}
                 </span>
-              </header>
+              </div>
+
+              {/* Sub-sections within the category */}
+              <div className="space-y-8">
+              {cat.subSections.map((section) => (
+                <div key={section.slug}>
+                  <header className="flex items-baseline gap-3 mb-3 pb-2 border-b border-[var(--border-subtle)]">
+                    <h3 className="text-[14px] md:text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+                      {section.name}
+                    </h3>
+                    <span className="text-[11px] font-medium text-[var(--text-dim)] tabular-nums">
+                      {section.products.length}
+                    </span>
+                  </header>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
             {section.products.map((p) => {
               const imgUrl = mainImages[p.id];
@@ -789,9 +864,13 @@ export default function ProductList() {
               );
             })}
               </div>
+                </div>
+              ))}
+              </div>
             </section>
           ))}
           </div>
+          </>
         ) : (
           /* ── List View ── */
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
