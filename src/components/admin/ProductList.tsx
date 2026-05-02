@@ -197,8 +197,35 @@ export default function ProductList() {
     [subcategories],
   );
 
+  /* Pre-build the per-product search haystack ONCE so each keystroke
+     just runs N substring checks instead of rebuilding 600+ joined
+     strings every render. Matters when the catalog grows past a few
+     hundred products and the user is typing live. */
+  const searchHaystack = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of products) {
+      const mn = (primaryModelNames[p.id] || "").toLowerCase();
+      map[p.id] = [
+        p.product_name.toLowerCase(),
+        p.slug,
+        mn,
+        (p.brand || "").toLowerCase(),
+        (p.excerpt || "").toLowerCase(),
+        (p.description || "").toLowerCase(),
+        (p.level || "").toLowerCase(),
+        (p.status || "").toLowerCase(),
+        divNameBySlug[p.division_slug] || "",
+        catNameBySlug[p.category_slug] || "",
+        subNameBySlug[p.subcategory_slug] || "",
+        (p.tags || []).join(" ").toLowerCase(),
+      ].join(" ");
+    }
+    return map;
+  }, [products, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
     return products.filter(p => {
       if (filterDiv && p.division_slug !== filterDiv) return false;
       if (filterCat && p.category_slug !== filterCat) return false;
@@ -211,32 +238,13 @@ export default function ProductList() {
       if (filterFeatured === "yes" && !p.featured) return false;
       if (filterFeatured === "no" && p.featured) return false;
       if (filterStatus && (p.status || "draft") !== filterStatus) return false;
-      if (q) {
-        // Match across every commonly-typed field. Multi-token search:
-        // the user types "lockstitch direct" and we require BOTH
-        // tokens to appear somewhere in the haystack. Avoids the
-        // single-token short-match foot-gun while keeping it forgiving.
-        const mn = (primaryModelNames[p.id] || "").toLowerCase();
-        const haystack = [
-          p.product_name.toLowerCase(),
-          p.slug,
-          mn,
-          (p.brand || "").toLowerCase(),
-          (p.level || "").toLowerCase(),
-          (p.status || "").toLowerCase(),
-          divNameBySlug[p.division_slug] || "",
-          catNameBySlug[p.category_slug] || "",
-          subNameBySlug[p.subcategory_slug] || "",
-          (p.tags || []).join(" ").toLowerCase(),
-        ].join(" ");
-        const tokens = q.split(/\s+/);
-        for (const t of tokens) {
-          if (t && !haystack.includes(t)) return false;
-        }
+      if (tokens.length > 0) {
+        const hay = searchHaystack[p.id] || "";
+        for (const t of tokens) if (!hay.includes(t)) return false;
       }
       return true;
     });
-  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug]);
+  }, [products, filterDiv, filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus, search, productSuppliers, searchHaystack]);
 
   /* Build sub-category and category name lookup tables once so
      section headers + the search index resolve in O(1). */
@@ -385,12 +393,26 @@ export default function ProductList() {
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
               <input
-                type="text"
+                type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products..."
-                className="w-full h-10 pl-10 pr-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+                placeholder="Search by name, model code, brand, category, tags…"
+                aria-label="Search products"
+                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors [&::-webkit-search-cancel-button]:hidden"
               />
+              {/* Clear button — only when there's text. Native input
+                  type=search clear button is inconsistent across
+                  browsers so we render our own. */}
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+                >
+                  <span className="text-[16px] leading-none">×</span>
+                </button>
+              )}
             </div>
             {/* View Toggle */}
             <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
@@ -582,10 +604,17 @@ export default function ProductList() {
           </div>
         )}
 
-        {/* Results count */}
+        {/* Results count — live tally tied to the search/filter state.
+            When a search is typed, surface the match count
+            prominently so the user gets immediate feedback that
+            the query is doing something. */}
         {(activeFilterCount > 0 || search) && (
           <p className="text-[12px] text-[var(--text-dim)] mb-4 px-1">
-            Showing {filtered.length} of {products.length} products
+            {filtered.length === 0 ? (
+              <span className="text-amber-400">No matches for <strong className="text-[var(--text-primary)]">"{search}"</strong></span>
+            ) : (
+              <>Showing <strong className="text-[var(--text-primary)] tabular-nums">{filtered.length}</strong> of {products.length} products{search ? <> matching <strong className="text-[var(--text-primary)]">"{search}"</strong></> : null}</>
+            )}
           </p>
         )}
 
