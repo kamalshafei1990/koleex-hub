@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { IMG } from "@/lib/cdn";
@@ -94,6 +94,15 @@ export default function ProductList() {
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
+  /* Search suggestions — typeahead dropdown that pops below the
+     input when it has focus + at least one typed character. The
+     dropdown groups matches into Categories / Subcategories /
+     Brands / Products. Keyboard nav (↑↓/Enter/Escape) and a
+     click-outside close are wired below. */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeSuggestionIdx, setActiveSuggestionIdx] = useState(-1);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     (async () => {
       const [p, d, c, s, ms, imgs] = await Promise.all([
@@ -154,6 +163,27 @@ export default function ProductList() {
     products.forEach(p => { if (p.brand) set.add(p.brand); });
     return Array.from(set).sort();
   }, [products]);
+
+  /* Close the suggestions dropdown on click-outside or Escape so
+     the user always has a clean exit even when they don't pick a
+     suggestion. */
+  useEffect(() => {
+    if (!searchOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSearchOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [searchOpen]);
 
   const allLevels = useMemo(() => {
     const set = new Set<string>();
@@ -222,6 +252,128 @@ export default function ProductList() {
     }
     return map;
   }, [products, primaryModelNames, divNameBySlug, catNameBySlug, subNameBySlug]);
+
+  /* Typeahead suggestions built from the typed query.
+       · Categories  → click sets the category filter
+       · Subcategories → click sets the subcategory filter
+       · Brands  → click sets the brand filter
+       · Products → click navigates to that product
+     Each section is capped (3-6) to keep the dropdown short, with
+     the first section being whatever currently has the strongest
+     match so common typed prefixes (like "I" for "Industrial...")
+     surface category hits first. */
+  type Suggestion =
+    | { kind: "category"; slug: string; label: string; count: number }
+    | { kind: "subcategory"; slug: string; categorySlug: string; label: string; count: number }
+    | { kind: "brand"; label: string; count: number }
+    | { kind: "product"; id: string; slug: string; label: string; modelCode?: string; thumb?: string };
+
+  const suggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q || q.length < 1) return [] as Suggestion[];
+
+    const categoryProductCounts: Record<string, number> = {};
+    const subcategoryProductCounts: Record<string, number> = {};
+    const brandProductCounts: Record<string, number> = {};
+    for (const p of products) {
+      categoryProductCounts[p.category_slug] = (categoryProductCounts[p.category_slug] || 0) + 1;
+      subcategoryProductCounts[p.subcategory_slug] = (subcategoryProductCounts[p.subcategory_slug] || 0) + 1;
+      if (p.brand) brandProductCounts[p.brand] = (brandProductCounts[p.brand] || 0) + 1;
+    }
+
+    /* Prefer prefix matches first (typing "i" → Industrial Sewing
+       Machines comes before Cutting Equipment), fall back to
+       contains-matches after, deduplicated. */
+    const prefixThenContains = (haystack: string, needle: string) => {
+      const h = haystack.toLowerCase();
+      if (h.startsWith(needle)) return 0;
+      if (h.split(/\s+/).some(w => w.startsWith(needle))) return 1;
+      if (h.includes(needle)) return 2;
+      return -1;
+    };
+
+    const cats = categories
+      .map(c => ({ c, score: prefixThenContains(c.name, q) }))
+      .filter(x => x.score >= 0)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 4)
+      .map(({ c }): Suggestion => ({ kind: "category", slug: c.slug, label: c.name, count: categoryProductCounts[c.slug] || 0 }));
+
+    const subs = subcategories
+      .map(s => ({ s, score: prefixThenContains(s.name, q) }))
+      .filter(x => x.score >= 0)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 5)
+      .map(({ s }): Suggestion => ({
+        kind: "subcategory",
+        slug: s.slug,
+        categorySlug: categories.find(c => c.id === s.category_id)?.slug || "",
+        label: s.name,
+        count: subcategoryProductCounts[s.slug] || 0,
+      }));
+
+    const brands = allBrands
+      .map(b => ({ b, score: prefixThenContains(b, q) }))
+      .filter(x => x.score >= 0)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map(({ b }): Suggestion => ({ kind: "brand", label: b, count: brandProductCounts[b] || 0 }));
+
+    const prods: Suggestion[] = [];
+    for (const p of products) {
+      const mn = primaryModelNames[p.id] || "";
+      const sName = prefixThenContains(p.product_name, q);
+      const sModel = mn ? prefixThenContains(mn, q) : -1;
+      const score = Math.min(sName === -1 ? Infinity : sName, sModel === -1 ? Infinity : sModel);
+      if (!Number.isFinite(score)) continue;
+      prods.push({ kind: "product", id: p.id, slug: p.slug || p.id, label: p.product_name, modelCode: mn || undefined, thumb: mainImages[p.id], _score: score } as Suggestion & { _score: number });
+    }
+    (prods as (Suggestion & { _score: number })[]).sort((a, b) => a._score - b._score);
+    const productSuggestions = prods.slice(0, 6);
+
+    return [...cats, ...subs, ...brands, ...productSuggestions];
+  }, [search, categories, subcategories, allBrands, products, primaryModelNames, mainImages]);
+
+  /* Reset the keyboard cursor whenever the suggestion list changes. */
+  useEffect(() => { setActiveSuggestionIdx(-1); }, [suggestions]);
+
+  /* Highlight matched substring inside a suggestion label. */
+  const highlight = (label: string, q: string) => {
+    if (!q) return label;
+    const i = label.toLowerCase().indexOf(q.toLowerCase());
+    if (i === -1) return label;
+    return (
+      <>
+        {label.slice(0, i)}
+        <strong className="text-[var(--text-highlight)] font-bold">{label.slice(i, i + q.length)}</strong>
+        {label.slice(i + q.length)}
+      </>
+    );
+  };
+
+  /* Apply a suggestion: either set a filter or navigate to a product. */
+  const applySuggestion = (s: Suggestion) => {
+    setSearchOpen(false);
+    setSearch("");
+    setActiveSuggestionIdx(-1);
+    if (s.kind === "category") {
+      const cat = categories.find(c => c.slug === s.slug);
+      const div = divisions.find(d => d.id === cat?.division_id);
+      if (div) setFilterDiv(div.slug);
+      setFilterCat(s.slug);
+      setFilterSub("");
+    } else if (s.kind === "subcategory") {
+      const cat = categories.find(c => c.slug === s.categorySlug);
+      const div = divisions.find(d => d.id === cat?.division_id);
+      if (div) setFilterDiv(div.slug);
+      if (cat) setFilterCat(cat.slug);
+      setFilterSub(s.slug);
+    } else if (s.kind === "brand") {
+      setFilterBrand(s.label);
+    } else if (s.kind === "product") {
+      router.push(`${baseRoute}/${s.slug}`);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -394,14 +546,32 @@ export default function ProductList() {
         <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-3 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
         <div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)] p-3.5 shadow-sm">
           <div className="flex gap-3">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
+            <div className="relative flex-1" ref={searchBoxRef}>
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
               <input
                 type="search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSearchOpen(true);
+                    setActiveSuggestionIdx(i => Math.min(i + 1, suggestions.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActiveSuggestionIdx(i => Math.max(i - 1, -1));
+                  } else if (e.key === "Enter" && activeSuggestionIdx >= 0 && suggestions[activeSuggestionIdx]) {
+                    e.preventDefault();
+                    applySuggestion(suggestions[activeSuggestionIdx]);
+                  } else if (e.key === "Escape") {
+                    setSearchOpen(false);
+                  }
+                }}
                 placeholder="Search by name, model code, brand, category, tags…"
                 aria-label="Search products"
+                aria-autocomplete="list"
+                aria-expanded={searchOpen && suggestions.length > 0}
                 className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors [&::-webkit-search-cancel-button]:hidden"
               />
               {/* Clear button — only when there's text. Native input
@@ -410,12 +580,108 @@ export default function ProductList() {
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onClick={() => { setSearch(""); setSearchOpen(false); }}
                   aria-label="Clear search"
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-md flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
                 >
                   <span className="text-[16px] leading-none">×</span>
                 </button>
+              )}
+
+              {/* ── Suggestions dropdown ── Pops below the input
+                  while focused with a non-empty query. Groups
+                  matches by kind (Categories, Subcategories,
+                  Brands, Products). Keyboard nav: ↑↓ moves the
+                  active row, Enter applies, Escape closes. */}
+              {searchOpen && suggestions.length > 0 && (
+                <div
+                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
+                >
+                  {(() => {
+                    const groups: { title: string; items: Suggestion[] }[] = [];
+                    const cats = suggestions.filter(s => s.kind === "category");
+                    const subs = suggestions.filter(s => s.kind === "subcategory");
+                    const brs  = suggestions.filter(s => s.kind === "brand");
+                    const prs  = suggestions.filter(s => s.kind === "product");
+                    if (cats.length) groups.push({ title: "Categories", items: cats });
+                    if (subs.length) groups.push({ title: "Subcategories", items: subs });
+                    if (brs.length)  groups.push({ title: "Brands", items: brs });
+                    if (prs.length)  groups.push({ title: "Products", items: prs });
+
+                    let idx = -1;
+                    return groups.map((g) => (
+                      <div key={g.title}>
+                        <div className="sticky top-0 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-ghost)] bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)]/40">
+                          {g.title}
+                        </div>
+                        {g.items.map((s) => {
+                          idx++;
+                          const isActive = idx === activeSuggestionIdx;
+                          const key = `${s.kind}-${"slug" in s ? s.slug : "id" in s ? s.id : s.label}`;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              role="option"
+                              aria-selected={isActive}
+                              onMouseEnter={() => setActiveSuggestionIdx(idx)}
+                              onClick={() => applySuggestion(s)}
+                              className={`w-full text-left flex items-center gap-3 px-4 py-2.5 text-[13px] transition-colors border-l-2 ${
+                                isActive
+                                  ? "bg-[var(--bg-surface)] border-[var(--border-focus)] text-[var(--text-primary)]"
+                                  : "border-transparent text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                              }`}
+                            >
+                              {/* Icon / thumb per kind */}
+                              {s.kind === "product" ? (
+                                <div className="h-9 w-9 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
+                                  {s.thumb ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={IMG.thumb(s.thumb)} alt="" className="w-full h-full object-contain p-1" />
+                                  ) : (
+                                    <ImageRawIcon className="h-4 w-4 text-[var(--text-ghost)]" />
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="h-7 w-7 rounded-md bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
+                                  {s.kind === "category" && <LayersIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                  {s.kind === "subcategory" && <BoxesIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                  {s.kind === "brand" && <TagsIcon className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                                </div>
+                              )}
+
+                              {/* Label + secondary line */}
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">
+                                  {s.kind === "product" && s.modelCode
+                                    ? <>{highlight(s.modelCode, search)}<span className="text-[var(--text-dim)] ml-2 font-normal">{highlight(s.label, search)}</span></>
+                                    : highlight(s.label, search)}
+                                </div>
+                                {s.kind === "subcategory" && (
+                                  <div className="text-[11px] text-[var(--text-dim)] truncate">
+                                    in {catNameBySlug[s.categorySlug] || s.categorySlug}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Trailing count or arrow */}
+                              {("count" in s) ? (
+                                <span className="shrink-0 text-[10px] tabular-nums font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] rounded-full px-1.5 h-[18px] inline-flex items-center justify-center">
+                                  {s.count}
+                                </span>
+                              ) : (
+                                <span className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--text-ghost)] font-semibold">
+                                  Open →
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
               )}
             </div>
             {/* View Toggle */}
