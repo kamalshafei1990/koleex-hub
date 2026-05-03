@@ -795,10 +795,12 @@ export default function ProductList() {
                   href={`${baseRoute}/${p.slug || p.id}`}
                   className="group relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 hover:border-[var(--border-focus)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]"
                 >
-                  {/* Image — calm, clean. Slightly brighter background,
-                      tighter padding, no scale on hover (image stays
-                      put while the card lifts). */}
-                  <div className="relative aspect-[4/3] bg-white overflow-hidden">
+                  {/* Image — calm, clean. Background matches the
+                      card surface so transparent product photos
+                      blend in (no white box around the photo).
+                      No scale on hover — the card lifts, image
+                      stays put. */}
+                  <div className="relative aspect-[4/3] bg-[var(--bg-surface-subtle)] overflow-hidden">
                     {imgUrl ? (
                       <img
                         src={imgUrl}
