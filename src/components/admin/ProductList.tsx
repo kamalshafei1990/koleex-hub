@@ -391,8 +391,8 @@ export default function ProductList() {
             the user can refine the query without scrolling back up.
             z-30 sits above the category jump-nav (z-20) so the
             search row always wins when both stack. */}
-        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mb-6 bg-[var(--bg-primary)]/85 backdrop-blur-md border-b border-[var(--border-subtle)]">
-        <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-4">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-3 pb-2 mb-4 bg-[var(--bg-primary)]/95 backdrop-blur-xl">
+        <div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)] p-3.5 shadow-sm">
           <div className="flex gap-3">
             <div className="relative flex-1">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)]" />
@@ -722,8 +722,8 @@ export default function ProductList() {
           <>
             {/* ── Category jump-nav ── */}
             {categoryTree.length > 1 && (
-              <nav className="sticky top-0 z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-2 mb-6 bg-[var(--bg-primary)]/85 backdrop-blur-md border-b border-[var(--border-subtle)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex items-center gap-2">
+              <nav className="sticky top-[68px] z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 py-3 mb-8 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-subtle)] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex items-center gap-1.5">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -733,45 +733,54 @@ export default function ProductList() {
                         const el = document.getElementById(`cat-${cat.slug}`);
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="inline-flex items-center gap-2 h-8 px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] hover:border-[var(--border-focus)] transition-all whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors whitespace-nowrap shrink-0"
                     >
-                      {cat.name}
-                      <span className="text-[10px] tabular-nums text-[var(--text-dim)]">{cat.total}</span>
+                      <span>{cat.name}</span>
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-surface)] text-[10px] tabular-nums font-semibold text-[var(--text-dim)]">{cat.total}</span>
                     </a>
                   ))}
                 </div>
               </nav>
             )}
 
-          <div className="space-y-12">
+          <div className="space-y-14">
           {categoryTree.map((cat) => (
             <section
               key={cat.slug}
               id={`cat-${cat.slug}`}
               style={{ contentVisibility: "auto", containIntrinsicSize: "1px 800px" }}
-              className="scroll-mt-20"
+              className="scroll-mt-32"
             >
-              {/* ── CATEGORY banner ── prominent, gradient-tinted */}
-              <div className="mb-6 px-5 md:px-7 py-4 md:py-5 rounded-2xl bg-gradient-to-r from-[var(--bg-surface)] to-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-baseline justify-between gap-3">
-                <h2 className="text-[18px] md:text-[22px] font-bold tracking-tight text-[var(--text-primary)] truncate">
-                  {cat.name}
-                </h2>
-                <span className="shrink-0 text-[12px] md:text-[13px] font-semibold text-[var(--text-muted)] tabular-nums">
+              {/* ── CATEGORY headline — calm, editorial. An accent
+                  bar on the left replaces the heavier gradient
+                  background; the title sits big with the count
+                  rendered as a small uppercase caption above. */}
+              <div className="mb-7 flex items-end justify-between gap-3 pl-4 border-l-[3px] border-[var(--border-focus)]">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-ghost)] mb-1">
+                    Category
+                  </p>
+                  <h2 className="text-[20px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-tight">
+                    {cat.name}
+                  </h2>
+                </div>
+                <span className="shrink-0 text-[12px] font-semibold text-[var(--text-muted)] tabular-nums whitespace-nowrap">
                   {cat.total} {cat.total === 1 ? "product" : "products"}
                 </span>
               </div>
 
               {/* Sub-sections within the category */}
-              <div className="space-y-8">
+              <div className="space-y-10">
               {cat.subSections.map((section) => (
                 <div key={section.slug}>
-                  <header className="flex items-baseline gap-3 mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                    <h3 className="text-[14px] md:text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+                  <header className="flex items-baseline gap-2.5 mb-4">
+                    <h3 className="text-[15px] md:text-[16px] font-semibold tracking-tight text-[var(--text-primary)]">
                       {section.name}
                     </h3>
-                    <span className="text-[11px] font-medium text-[var(--text-dim)] tabular-nums">
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">
                       {section.products.length}
                     </span>
+                    <span className="flex-1 h-px bg-[var(--border-subtle)] ml-1" />
                   </header>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
             {section.products.map((p) => {
@@ -784,17 +793,19 @@ export default function ProductList() {
                 <Link
                   key={p.id}
                   href={`${baseRoute}/${p.slug || p.id}`}
-                  className="group bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden hover:border-[var(--border-focus)] hover:shadow-xl transition-all duration-200"
+                  className="group relative bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden transition-all duration-300 hover:border-[var(--border-focus)] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]"
                 >
-                  {/* Image */}
-                  <div className="relative aspect-[4/3] bg-[var(--bg-surface-subtle)] overflow-hidden">
+                  {/* Image — calm, clean. Slightly brighter background,
+                      tighter padding, no scale on hover (image stays
+                      put while the card lifts). */}
+                  <div className="relative aspect-[4/3] bg-white overflow-hidden">
                     {imgUrl ? (
                       <img
                         src={imgUrl}
                         alt={p.product_name}
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-contain p-4"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
