@@ -87,6 +87,7 @@ import SpecGlyph from "@/lib/machine-specs/SpecGlyph";
 import { FIELD_GLYPHS } from "@/lib/machine-specs/icons";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { IMG } from "@/lib/cdn";
+import KoleexLogo from "@/components/layout/KoleexLogo";
 
 /* ---------------- helpers ---------------- */
 
@@ -1340,9 +1341,27 @@ export default function ProductViewPage() {
                   the visual anchor. Description type bumped down
                   to text-[14/15] muted so it supports the H1
                   rather than competing. */}
-              <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
-                {product.brand || "Koleex"}
-              </p>
+              {/* Brand eyebrow — render the KOLEEX wordmark as a
+                  proper logo (inline SVG) when the brand is Koleex
+                  (or unset, which defaults to Koleex). For any
+                  third-party / partner brand, fall back to the
+                  uppercase text eyebrow. */}
+              {(() => {
+                const brand = (product.brand || "Koleex").trim();
+                const isKoleex = brand.toLowerCase() === "koleex";
+                if (isKoleex) {
+                  return (
+                    <KoleexLogo
+                      className="h-4 md:h-5 w-auto text-[#1D1D1F] dark:text-white"
+                    />
+                  );
+                }
+                return (
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#86868B] dark:text-white/45">
+                    {brand}
+                  </p>
+                );
+              })()}
               {/* H1 weight stepped down semibold → medium and size
                   44/56/64 → 40/52/60 px so the title reads as calm
                   identity instead of a heavy headline. The image
