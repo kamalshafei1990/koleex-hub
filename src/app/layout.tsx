@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import RootShell from "@/components/layout/RootShell";
+import DialogHost from "@/lib/ui-dialog";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -45,6 +46,10 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden flex flex-col bg-[#0A0A0A] text-white font-sans">
         <RootShell>{children}</RootShell>
+        {/* Global themed replacement for window.confirm/alert/prompt.
+            Mounted once so any component can call dialog.confirm()
+            without each page wiring its own state. */}
+        <DialogHost />
       </body>
     </html>
   );
