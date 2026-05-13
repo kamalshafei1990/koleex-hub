@@ -573,7 +573,7 @@ export default function QuotationA4Preview({
         >
           <thead>
             <tr>
-              <Th width="5%"  align="center">NO.</Th>
+              <Th width="5%"  align="center" isFirst>NO.</Th>
               <Th width="27%" align="center">ITEM</Th>
               <Th width="13%" align="center">MODEL</Th>
               {/* Picture column gets a little extra width so the inner
@@ -582,7 +582,7 @@ export default function QuotationA4Preview({
               <Th width="16%" align="center">PICTURE</Th>
               <Th width="11%" align="center">UNIT PRICE</Th>
               <Th width="7%"  align="center">QTY</Th>
-              <Th width="16%" align="center">TOTAL</Th>
+              <Th width="16%" align="center" isLast>TOTAL</Th>
             </tr>
           </thead>
           <tbody>
@@ -1467,17 +1467,25 @@ function Th({
   children,
   width,
   align,
+  isFirst,
+  isLast,
 }: {
   children: React.ReactNode;
   width: string;
   align?: "left" | "center" | "right";
+  isFirst?: boolean;
+  isLast?: boolean;
 }) {
   /* Note: only right + bottom borders are drawn per cell. The
      table's own border supplies the outer top + left + right + bottom
      edges. CSS pseudo-selectors (in PRINT_AND_DOC_STYLES) suppress
      the right-border on the last column. This keeps the grid one
      px thick everywhere, without doubling under
-     `border-collapse: separate`. */
+     `border-collapse: separate`.
+
+     The first and last <th> get matching corner radii so the black
+     header strip follows the table's outer rounded corners (12 px)
+     instead of bleeding past them as a sharp rectangle. */
   return (
     <th
       style={{
@@ -1490,8 +1498,10 @@ function Th({
         letterSpacing: "0.06em",
         padding: "8px 8px",
         textAlign: align ?? "center",
-        borderRight: "1px solid #333",
+        borderRight: isLast ? "none" : "1px solid #333",
         borderBottom: "1px solid #333",
+        borderTopLeftRadius: isFirst ? 12 : 0,
+        borderTopRightRadius: isLast ? 12 : 0,
       }}
     >
       {children}
