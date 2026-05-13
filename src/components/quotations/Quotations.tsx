@@ -53,6 +53,12 @@ interface Quotation {
   status: "draft" | "final";
   createdAt: string;
   updatedAt: string;
+  /* Server-side grand total from the quotations.total column. The
+     list endpoint strips items from the doc payload to keep responses
+     small, so a local recomputation from items always returns 0 for
+     rows fetched in the list view. Use this for the per-row badge
+     and the TOTAL VALUE KPI tile. Undefined for unsaved drafts. */
+  serverTotal?: number;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -123,6 +129,7 @@ function fromRow(row: RemoteDocRow): Quotation {
     status: (row.status === "final" ? "final" : "draft") as "draft" | "final",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    serverTotal: typeof row.total === "number" ? row.total : (row.total != null ? Number(row.total) : undefined),
   };
 }
 
@@ -786,7 +793,13 @@ export default function Quotations() {
           {(() => {
             const drafts = quotations.filter((q) => q.status === "draft").length;
             const finals = quotations.filter((q) => q.status === "final").length;
-            const total = quotations.reduce((s, q) => s + computeGrandTotal(q), 0);
+            /* Prefer the server-side total column. The list payload
+               has items stripped, so a local recomputation would
+               give 0 for every saved quotation. */
+            const total = quotations.reduce((s, q) => {
+              const tt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
+              return s + tt;
+            }, 0);
             const now = new Date();
             const soon = new Date(now); soon.setDate(now.getDate() + 7);
             const expiringSoon = quotations.filter((q) => {
@@ -825,11 +838,16 @@ export default function Quotations() {
           ) : (
             <div className="grid gap-3">
               {sortedQuotations.map((q) => {
-                const st = q.items.reduce(
+                /* The list endpoint strips items from the doc payload
+                   to keep responses small, so recomputing here gives 0.
+                   Prefer the server-side `serverTotal` (the row's total
+                   column). Fall back to local compute for unsaved
+                   drafts where serverTotal hasn't been set yet. */
+                const computed = q.items.reduce(
                   (s, i) => s + i.unitPrice * i.qty,
                   0
-                );
-                const gt = st + q.tax + q.shipping + q.others;
+                ) + q.tax + q.shipping + q.others;
+                const gt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computed;
                 return (
                   <div
                     key={q.id}
