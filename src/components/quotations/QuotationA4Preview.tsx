@@ -571,20 +571,41 @@ export default function QuotationA4Preview({
             marginTop: 12,
           }}
         >
-          <thead>
-            <tr>
-              <Th width="5%"  align="center" isFirst>NO.</Th>
-              <Th width="27%" align="center">ITEM</Th>
-              <Th width="13%" align="center">MODEL</Th>
-              {/* Picture column gets a little extra width so the inner
-                  image cell can render as a true square once the
-                  10 px L+R padding is subtracted. */}
-              <Th width="16%" align="center">PICTURE</Th>
-              <Th width="11%" align="center">UNIT PRICE</Th>
-              <Th width="7%"  align="center">QTY</Th>
-              <Th width="16%" align="center" isLast>TOTAL</Th>
-            </tr>
-          </thead>
+          {/* Items-table header renders on PAGE 1 ONLY. Continuation
+              pages (2..N) start straight with rows — saves vertical
+              space and matches the user's preferred print convention.
+              The column widths set on the <th> still apply to <td>
+              widths in subsequent pages because tableLayout: "fixed"
+              propagates the colgroup measurements. */}
+          {isFirstPage && (
+            <thead>
+              <tr>
+                <Th width="5%"  align="center" isFirst>NO.</Th>
+                <Th width="27%" align="center">ITEM</Th>
+                <Th width="13%" align="center">MODEL</Th>
+                {/* Picture column gets a little extra width so the inner
+                    image cell can render as a true square once the
+                    10 px L+R padding is subtracted. */}
+                <Th width="16%" align="center">PICTURE</Th>
+                <Th width="11%" align="center">UNIT PRICE</Th>
+                <Th width="7%"  align="center">QTY</Th>
+                <Th width="16%" align="center" isLast>TOTAL</Th>
+              </tr>
+            </thead>
+          )}
+          {/* Tableless colgroup on continuation pages so the column
+              widths stay locked even without a thead. */}
+          {!isFirstPage && (
+            <colgroup>
+              <col style={{ width: "5%" }} />
+              <col style={{ width: "27%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "16%" }} />
+            </colgroup>
+          )}
           <tbody>
             {pageItems.map((item, localIdx) => {
               /* `idx` is the GLOBAL item index across all pages, so
