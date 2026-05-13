@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     .select(
       `id, tenant_id, quote_no, customer_id, status, currency, discount_percent,
        notes, doc, issue_date, valid_till, total, created_at, updated_at,
-       customer:customer_id ( id, display_name, company_name )`,
+       customer:customer_id ( id, name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
 
