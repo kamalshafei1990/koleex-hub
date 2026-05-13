@@ -56,11 +56,22 @@ import { cachedFetchJson, invalidateFetchCache } from "@/lib/fetch-cache";
 
 export async function fetchDocList<T = Record<string, unknown>>(
   b: DocBindings<string, string>,
+  opts: { fresh?: boolean } = {},
 ): Promise<RemoteDocRow<T>[]> {
   // 3 s client cache + in-flight dedup. The server also sends
-  // Cache-Control: max-age=5 so rapid navigation is instant.
+  // Cache-Control: max-age=30 so rapid navigation is instant.
+  //
+  // `fresh: true` bypasses BOTH the in-memory client cache AND the
+  // browser HTTP cache (via `cache: "no-store"`). Use it right after
+  // a write (delete / upsert) so the list reflects the new state —
+  // otherwise the browser may keep serving the cached payload for up
+  // to the Cache-Control max-age window and the row appears to
+  // "reappear" after a delete.
   try {
-    const json = await cachedFetchJson<Record<string, RemoteDocRow<T>[]>>(b.listPath);
+    const json = await cachedFetchJson<Record<string, RemoteDocRow<T>[]>>(
+      b.listPath,
+      opts.fresh ? { ttl: 0, init: { cache: "no-store" } } : {},
+    );
     return json[b.listKey] ?? [];
   } catch {
     return [];

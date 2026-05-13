@@ -141,8 +141,8 @@ function ddmmyyyyToISO(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
-async function loadQuotationsRemote(): Promise<Quotation[]> {
-  const rows = await fetchDocList(QUOTATIONS_SYNC);
+async function loadQuotationsRemote(opts: { fresh?: boolean } = {}): Promise<Quotation[]> {
+  const rows = await fetchDocList(QUOTATIONS_SYNC, opts);
   return rows.map(fromRow);
 }
 
@@ -583,8 +583,14 @@ export default function Quotations() {
   const handleDeleteFromList = useCallback(
     async (id: string) => {
       if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
+      // Optimistic: remove from local state immediately so the user
+      // sees the row disappear even if the browser HTTP cache is still
+      // holding the pre-delete list.
+      setQuotations((prev) => prev.filter((q) => q.id !== id));
       await deleteQuotationRemote(id);
-      const list = await loadQuotationsRemote();
+      // `fresh: true` bypasses both the in-memory and browser HTTP
+      // cache so the reconciliation read reflects the post-delete state.
+      const list = await loadQuotationsRemote({ fresh: true });
       setQuotations(list);
     },
     [t]
@@ -594,11 +600,13 @@ export default function Quotations() {
   const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
     if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
-    await deleteQuotationRemote(current.id);
-    const list = await loadQuotationsRemote();
-    setQuotations(list);
+    const id = current.id;
+    setQuotations((prev) => prev.filter((q) => q.id !== id));
     setCurrent(null);
     setView("list");
+    await deleteQuotationRemote(id);
+    const list = await loadQuotationsRemote({ fresh: true });
+    setQuotations(list);
   }, [current, t]);
 
   /* ── Save current ── */
@@ -609,7 +617,7 @@ export default function Quotations() {
       const saved = await saveQuotationRemote(intent);
       if (saved) {
         setCurrent(saved);
-        const list = await loadQuotationsRemote();
+        const list = await loadQuotationsRemote({ fresh: true });
         setQuotations(list);
       }
     },
