@@ -16,6 +16,7 @@ import QuotationA4Preview from "./QuotationA4Preview";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
+  fetchDocOne,
   upsertDoc,
   deleteDoc,
   convertQuotationToInvoice,
@@ -573,10 +574,23 @@ export default function Quotations() {
     setView("editor");
   }, []);
 
-  /* ── Open existing ── */
-  const handleOpen = useCallback((q: Quotation) => {
+  /* ── Open existing ──
+     The list endpoint strips `items` from the doc payload to keep the
+     response small, so the row coming from the list view has no items.
+     Re-fetch the full quotation by id before mounting the editor —
+     otherwise the items table renders as a single empty placeholder. */
+  const handleOpen = useCallback(async (q: Quotation) => {
+    // Optimistic mount so the editor opens immediately with header data…
     setCurrent({ ...q, items: q.items.map((i) => ({ ...i })) });
     setView("editor");
+    // …then hydrate the full doc (with items) from the detail endpoint.
+    if (q.id.length === 36) {
+      const full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+      if (full) {
+        const hydrated = fromRow(full);
+        setCurrent({ ...hydrated, items: hydrated.items.map((i) => ({ ...i })) });
+      }
+    }
   }, []);
 
   /* ── Delete from list ── */
