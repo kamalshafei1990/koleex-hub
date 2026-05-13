@@ -309,11 +309,11 @@ const PRINT_AND_DOC_STYLES = `
 .quot-doc-inner { padding: 32px 32px 24px; }
 
 /* Force black text on white for all children */
-/* Set a sensible default text colour on the A4 surface, but don't
-   use a `* { ... !important }` wildcard here — the multi-page editor
-   relies on inline `color` styles for every black/white header strip
-   (meta strip, From/Quotation To, stamp/signature, bank bar, totals)
-   and an !important wildcard would obliterate them. */
+/* Set a sensible default text colour on the A4 surface, but do NOT
+   use a wildcard !important rule here — the multi-page editor relies
+   on inline color styles for every black-strip header (meta strip,
+   From / Quotation To, stamp / signature, bank bar, totals) and a
+   wildcard !important would obliterate them. */
 .quot-a4-doc { color: #000; }
 .quot-a4-doc .pq-stamp-box { color: #aaa !important; }
 .quot-a4-doc .pq-footer { color: #555 !important; }
