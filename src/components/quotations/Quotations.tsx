@@ -581,28 +581,30 @@ const PRINT_AND_DOC_STYLES = `
 
      On-screen view unaffected (inline style stays at 297 mm — only
      the print pipeline uses 275 mm). */
-  /* Doc height tightened to 250 mm — generous safety margin against
-     any sheet's printable area (US Letter physical ~265 mm after
-     driver margins, A4 ~280 mm). Going aggressive on the slack so
-     Safari never decides the doc is "almost too tall" and pushes it
-     to a new sheet (which would create a blank previous sheet —
-     that was the cause of the 8 docs → 16 sheets bug).
+  /* Doc height = 268 mm. Carefully chosen:
+     · US Letter printable area: ~265-270 mm depending on the
+       printer driver's hairline.
+     · A4 printable area: ~280 mm.
+     · 268 mm fits inside US Letter's printable region without
+       overflow (so no blank-after-every-page bug) AND uses enough
+       of the sheet that pages 7-8 don't have huge unused white
+       space at the bottom.
 
-     NO page-break-before / page-break-after rules. With each doc at
-     a fixed height that fits a single sheet, AND page-break-inside:
-     avoid keeping each doc together, the browser naturally places
-     each doc on its own sheet. Adding page-break-before was creating
-     extra empty sheets between docs in Safari. */
+     NO page-break-before — that rule was producing extra blank
+     sheets between docs in Safari. With each doc at a fixed
+     268 mm height and page-break-inside: avoid keeping it
+     together, the browser naturally places each doc on its own
+     sheet. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 250mm !important;
-    min-height: 250mm !important;
-    max-height: 250mm !important;
+    height: 268mm !important;
+    min-height: 268mm !important;
+    max-height: 268mm !important;
     margin: 0 !important;
-    padding: 20px 24px 16px !important;
+    padding: 24px 28px 18px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
