@@ -1329,12 +1329,16 @@ export default function QuotationA4Preview({
             >
               Authorised Stamp
             </div>
-            <div style={{ padding: 10 }}>
+            <div style={{ padding: 12 }}>
+              {/* Bigger stamp area — sized to fit a real Koleex company
+                  stamp (typical Egyptian/Chinese corporate stamps are
+                  40–45 mm circular). 150 px square gives ≈ 40 mm at
+                  96 dpi which matches the physical stamp's footprint. */}
               <div
                 className="pq-stamp-box"
                 style={{
                   width: "100%",
-                  height: 86,
+                  height: 150,
                   border: `1px dashed ${T.inkGhost}`,
                   borderRadius: 10,
                   display: "flex",
@@ -1377,38 +1381,34 @@ export default function QuotationA4Preview({
             </div>
             <div
               style={{
-                padding: "10px 12px 8px",
+                padding: 12,
                 flex: 1,
                 display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {/* Signature line — taller so a real signature fits */}
+              {/* Bigger blank signature area — matches the stamp card
+                  height. NO Name / Title / Date labels — just the
+                  signature space. A dashed border at the bottom
+                  hints the line where the user will sign. */}
               <div
                 style={{
-                  height: 48,
-                  borderBottom: `1px solid ${T.inkSoft}`,
-                  marginBottom: 6,
-                }}
-              />
-              {/* Field labels under the line — Name / Title / Date */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 4,
-                  fontSize: 8,
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
+                  width: "100%",
+                  height: 150,
+                  border: `1px dashed ${T.inkGhost}`,
+                  borderRadius: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 9,
                   color: T.inkGhost,
-                  textAlign: "center",
+                  fontWeight: 600,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
                 }}
               >
-                <span>Name</span>
-                <span>Title</span>
-                <span>Date</span>
+                Sign Here
               </div>
             </div>
           </div>
