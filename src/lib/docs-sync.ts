@@ -82,7 +82,14 @@ export async function fetchDocOne<T = Record<string, unknown>>(
   b: DocBindings<string, string>,
   id: string,
 ): Promise<RemoteDocRow<T> | null> {
-  const res = await fetch(`${b.listPath}/${id}`, { credentials: "include" });
+  // Always bypass the browser HTTP cache when fetching a single doc
+  // — the editor MUST reflect the latest server state (image edits,
+  // qty changes, price updates etc.), and any cached response would
+  // re-mount the editor with stale items.
+  const res = await fetch(`${b.listPath}/${id}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
   if (!res.ok) return null;
   const json = (await res.json()) as Record<string, RemoteDocRow<T>>;
   return json[b.oneKey] ?? null;
