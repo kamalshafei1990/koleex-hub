@@ -356,6 +356,18 @@ const PRINT_AND_DOC_STYLES = `
   color: #aaa !important;
   -webkit-text-fill-color: #aaa !important;
 }
+/* Internal-notes panel lives OUTSIDE the printed A4 paper in the
+   dark editor area, so its textarea needs WHITE text instead of
+   the black-on-white forced above. Same exemption for its
+   placeholder so the hint reads as light gray on dark. */
+.quot-a4-doc .quot-row-notes textarea {
+  color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+}
+.quot-a4-doc .quot-row-notes textarea::placeholder {
+  color: rgba(255, 255, 255, 0.40) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
+}
 .quot-a4-doc .pq-grand input {
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
