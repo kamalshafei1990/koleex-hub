@@ -553,26 +553,26 @@ const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* Every page: A4 surface with a 4 mm safety margin (293 mm instead
-     of 297 mm). Safari's print engine sometimes computes the printable
-     area as slightly less than the @page size — even with margin: 0
-     the physical printer driver may reserve a hairline. Pinning to
-     293 mm guarantees the doc never overflows by 1-2 mm and triggers
-     a phantom blank sheet after every real page.
+  /* Every page sized to fit the SMALLER of A4 (297 mm) and US Letter
+     (279 mm). Picking US-Letter-safe dimensions (275 mm tall) means
+     the doc never overflows regardless of which paper size the
+     printer driver defaults to. On A4 paper the bottom 22 mm will
+     just be white space — acceptable trade-off vs the phantom-blank-
+     page-between-every-real-page bug that hits when the doc is
+     sized for A4 but printed to US Letter.
 
-     The on-screen view stays at 297 mm because the inline style sets
-     height: 297mm, but the @media print rules (with !important) take
-     over for the print pipeline. */
+     On-screen view unaffected (inline style stays at 297 mm — only
+     the print pipeline uses 275 mm). */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 293mm !important;
-    min-height: 293mm !important;
-    max-height: 293mm !important;
+    height: 275mm !important;
+    min-height: 275mm !important;
+    max-height: 275mm !important;
     margin: 0 !important;
-    padding: 28px 28px 20px !important;
+    padding: 24px 28px 18px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
