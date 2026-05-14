@@ -49,7 +49,11 @@ async function nextQuoteNumber(tenantId: string): Promise<string> {
     .order("quote_no", { ascending: false })
     .limit(1);
   const last = data?.[0]?.quote_no as string | undefined;
-  const nextSeq = last ? Number(last.replace(prefix, "")) + 1 : 1;
+  const lastSeq = last ? Number(last.replace(prefix, "")) : 0;
+  // Same floor as src/app/api/quotations/route.ts — keep both routes
+  // aligned so a customer-portal request and an internal "New" both
+  // mint numbers from the same sequence.
+  const nextSeq = Math.max(lastSeq + 1, 1520);
   return `${prefix}${String(nextSeq).padStart(4, "0")}`;
 }
 
