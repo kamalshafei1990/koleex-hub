@@ -685,8 +685,14 @@ export default function QuotationA4Preview({
               const idx = startItemIdx + localIdx;
               const lineTotal = (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
               return (
-                <tr key={idx} style={{ minHeight: 124, height: "auto", position: "relative" }}>
-                  <Td align="center" style={{ color: T.inkSoft, fontVariantNumeric: "tabular-nums" }}>
+                <tr key={idx} style={{ height: "auto", position: "relative" }}>
+                  {/* The NO. cell carries an explicit height: 124 so
+                      the row's <tr> is guaranteed to be at least 124
+                      px tall — that's what anchors the row action
+                      cluster + notes panel (both 124 px) inside the
+                      row. minHeight on <tr> itself is unreliable
+                      across browsers due to table layout. */}
+                  <Td align="center" style={{ color: T.inkSoft, fontVariantNumeric: "tabular-nums", height: 124 }}>
                     {idx + 1}
                   </Td>
                   <Td>
@@ -844,39 +850,36 @@ export default function QuotationA4Preview({
                         rounded-xl, surface background, subtle border,
                         clear hover. Bigger than before (36 px) so
                         they're obviously discoverable. */}
-                    {/* Row action cluster — SOLID dark surface so the
-                        cluster is clearly visible against the dark
-                        editor backdrop. Three buttons stacked
-                        vertically as <div role="button"> to avoid
-                        Safari's <button> chrome that was squishing
-                        them into narrow rectangles. */}
+                    {/* Row action cluster — CSS Grid with explicit
+                        track sizes so the 3 buttons CAN'T escape the
+                        pill. Same outer height (124 px) but laid out
+                        as a rigid 3-row grid instead of flex (flex
+                        was letting children spill past the wrapper
+                        on shorter rows). */}
                     <div
                       className="no-print"
                       style={{
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Geometry — cluster width 44, gap 16 past
-                           paper edge → right = 32 (paper pad) + 44 +
-                           16 = 92. */
                         right: -92,
                         width: 44,
                         height: 124,
                         boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        /* SOLID surface (not rgba) so the cluster
-                           reads against any backdrop. Hub uses
-                           #1A1A1A for the surface token; matching
-                           border / shadow keeps it consistent with
-                           the rest of the editor chrome. */
+                        display: "grid",
+                        /* 3 rigid 32 px rows + 2 × 5 px row gaps fit
+                           inside 124 px minus 5 px padding × 2 = 114
+                           content height. 32×3 + 5×2 = 106 ≤ 114. */
+                        gridTemplateRows: "32px 32px 32px",
+                        rowGap: 5,
+                        alignContent: "center",
+                        justifyItems: "center",
                         background: "#1A1A1A",
                         border: "1px solid #2D2D2D",
                         borderRadius: 10,
                         padding: 5,
                         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+                        overflow: "hidden",
                         zIndex: 2,
                       }}
                     >
