@@ -54,7 +54,16 @@ export interface Quotation {
   date: string;
   clientNo: string;
   validTill: string;
+  /* Legacy free-form address field — kept for back-compat with older
+     quotations that pre-date the structured QUOTATION TO card. The
+     editor no longer surfaces it; use toAddress / toAcid / toEmail. */
   quotTo: string;
+  /* Structured QUOTATION TO fields. Each maps to one labelled row
+     in the card (COMPANY NAME / ADDRESS / ACID NUMBER / CONTACT
+     PERSON + email). All optional so older docs still render. */
+  toAddress?: string;
+  toAcid?: string;
+  toEmail?: string;
   items: QuotationItem[];
   tax: number;
   shipping: number;
@@ -498,7 +507,10 @@ export default function QuotationA4Preview({
             </div>
           </div>
 
-          {/* ── QUOTATION TO (Customer) ── */}
+          {/* ── QUOTATION TO (Customer) ──
+              Structured 4-row table: COMPANY NAME / ADDRESS / ACID
+              NUMBER / CONTACT PERSON (with email). Mirrors the
+              labelled-row card style used on the invoice. */}
           <div
             style={{
               border: `1px solid ${T.border}`,
@@ -511,7 +523,7 @@ export default function QuotationA4Preview({
                 background: T.black,
                 color: "#fff",
                 padding: "6px 12px",
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
@@ -519,37 +531,65 @@ export default function QuotationA4Preview({
             >
               Quotation To
             </div>
-            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 5 }}>
-              <input
-                value={current.customerName}
-                onChange={(e) => setMeta("customerName", e.target.value)}
-                placeholder="Contact person"
-                style={{ ...inputResetStyle, fontSize: 12, fontWeight: 700, color: T.ink }}
-              />
-              <input
-                value={current.companyName}
-                onChange={(e) => setMeta("companyName", e.target.value)}
-                placeholder="Company name"
-                style={{ ...inputResetStyle, fontSize: 11, color: T.ink }}
-              />
-              <textarea
-                rows={3}
-                placeholder="Address, country, contact details…"
-                value={current.quotTo}
-                onChange={(e) => setMeta("quotTo", e.target.value)}
-                style={{
-                  ...inputResetStyle,
-                  fontSize: 10,
-                  color: T.inkSoft,
-                  lineHeight: 1.5,
-                  // No resize handle — the card sizes to its content
-                  // automatically and the resize grip would otherwise
-                  // sit visibly in the corner of the printed page.
-                  resize: "none",
-                  minHeight: 50,
-                }}
-              />
-            </div>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                tableLayout: "fixed",
+                fontSize: 10,
+              }}
+            >
+              <tbody>
+                <QuotToRow label="Company Name">
+                  <input
+                    value={current.companyName}
+                    onChange={(e) => setMeta("companyName", e.target.value)}
+                    placeholder="—"
+                    style={{ ...inputResetStyle, fontSize: 11, fontWeight: 700, color: T.ink }}
+                  />
+                </QuotToRow>
+                <QuotToRow label="Address">
+                  <textarea
+                    rows={2}
+                    value={current.toAddress ?? ""}
+                    onChange={(e) => setMeta("toAddress", e.target.value)}
+                    placeholder="—"
+                    style={{
+                      ...inputResetStyle,
+                      fontSize: 10,
+                      lineHeight: 1.4,
+                      color: T.ink,
+                      resize: "none",
+                      minHeight: 30,
+                    }}
+                  />
+                </QuotToRow>
+                <QuotToRow label="ACID Number">
+                  <input
+                    value={current.toAcid ?? ""}
+                    onChange={(e) => setMeta("toAcid", e.target.value)}
+                    placeholder="—"
+                    style={{ ...inputResetStyle, fontSize: 10, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
+                  />
+                </QuotToRow>
+                <QuotToRow label="Contact Person" isLast>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <input
+                      value={current.customerName}
+                      onChange={(e) => setMeta("customerName", e.target.value)}
+                      placeholder="—"
+                      style={{ ...inputResetStyle, fontSize: 11, fontWeight: 700, color: T.ink }}
+                    />
+                    <input
+                      value={current.toEmail ?? ""}
+                      onChange={(e) => setMeta("toEmail", e.target.value)}
+                      placeholder="email@example.com"
+                      style={{ ...inputResetStyle, fontSize: 10, color: T.inkSoft }}
+                    />
+                  </div>
+                </QuotToRow>
+              </tbody>
+            </table>
           </div>
         </div>
         </>)}
@@ -1521,6 +1561,52 @@ function MetaStripCell({
         {children}
       </div>
     </div>
+  );
+}
+
+/* One labelled row inside the QUOTATION TO card. Black label cell
+   on the left (fixed width), white value cell on the right. The
+   last row omits the bottom border so the card's outer rounded
+   corner reads cleanly. */
+function QuotToRow({
+  label,
+  children,
+  isLast,
+}: {
+  label: string;
+  children: React.ReactNode;
+  isLast?: boolean;
+}) {
+  const cellBorder = isLast ? "none" : `1px solid ${T.border}`;
+  return (
+    <tr>
+      <td
+        style={{
+          background: T.black,
+          color: "#fff",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontSize: 10,
+          padding: "6px 10px",
+          width: 110,
+          verticalAlign: "middle",
+          borderBottom: cellBorder,
+        }}
+      >
+        {label}
+      </td>
+      <td
+        style={{
+          padding: "6px 10px",
+          verticalAlign: "middle",
+          borderBottom: cellBorder,
+          borderLeft: `1px solid ${T.border}`,
+        }}
+      >
+        {children}
+      </td>
+    </tr>
   );
 }
 
