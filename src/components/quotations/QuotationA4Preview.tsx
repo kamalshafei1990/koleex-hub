@@ -542,7 +542,10 @@ export default function QuotationA4Preview({
                   fontSize: 10,
                   color: T.inkSoft,
                   lineHeight: 1.5,
-                  resize: "vertical",
+                  // No resize handle — the card sizes to its content
+                  // automatically and the resize grip would otherwise
+                  // sit visibly in the corner of the printed page.
+                  resize: "none",
                   minHeight: 50,
                 }}
               />
