@@ -553,40 +553,57 @@ const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* Every page: full A4 surface, no shadow / margin, hard page
-     break after so each lands on its own sheet.
+  /* Every page: full A4 surface, no shadow / margin.
 
-     CRITICAL: box-sizing must be border-box so the 32 + 24 px
-     vertical padding is INCLUDED in the 297 mm height. Default
-     content-box would make total height = 297mm + 56 px ≈ 312 mm,
-     overflowing the A4 sheet and producing one BLANK page after
-     every real page.
+     Pagination strategy — page-break BEFORE every doc except the
+     first, NOT page-break after. Reason: page-break-after creates
+     a *trailing* break that the print engine may interpret as
+     "after the current doc finishes printing, create a new sheet"
+     — even if the current doc is exactly A4-sized, the trailing
+     break can manifest as a blank sheet between docs. break-before
+     starts each new doc on a fresh sheet without the trailing
+     ambiguity.
 
-     Also pin height to EXACTLY 297mm (not just min-height) and
-     overflow: hidden — any line that tries to push the page over
-     A4 gets clipped at the bottom edge instead of triggering an
-     overflow blank sheet. The pagination capacities (5 / 8 / 3)
-     already keep each page well inside A4, so clipping should
-     never actually trim visible content. */
+     Height pinned to 295mm (2mm safety margin against A4 297mm)
+     with border-box sizing so padding is INCLUDED. Overflow hidden
+     clips any content that tries to push past the page edge so
+     it can't trigger a phantom sheet. */
   .quot-a4-doc {
     box-sizing: border-box !important;
+    display: block !important;
+    position: static !important;
     width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    height: 295mm !important;
+    min-height: 295mm !important;
+    max-height: 295mm !important;
     margin: 0 !important;
+    padding: 32px 32px 24px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
     overflow: hidden !important;
-    page-break-after: always !important;
-    break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  .quot-a4-doc:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
+  /* Force every doc AFTER the first onto its own fresh sheet. */
+  .quot-a4-doc + .quot-a4-doc {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Items table — never split a single row across sheets and
+     never split the header / footer. The page already fits its
+     items inside one A4 height, but these guards prevent edge
+     cases where a row's image makes it slightly taller than
+     expected. */
+  .pq-tbl,
+  .pq-tbl tr,
+  .pq-tbl thead,
+  .pq-tbl tfoot,
+  .pq-tbl thead tr,
+  .pq-tbl tfoot tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   input, textarea, [contenteditable] {
