@@ -686,13 +686,13 @@ export default function QuotationA4Preview({
               const lineTotal = (Number(item.unitPrice) || 0) * (Number(item.qty) || 0);
               return (
                 <tr key={idx} style={{ height: "auto", position: "relative" }}>
-                  {/* The NO. cell carries an explicit height: 124 so
-                      the row's <tr> is guaranteed to be at least 124
+                  {/* The NO. cell carries an explicit height: 112 so
+                      the row's <tr> is guaranteed to be at least 112
                       px tall — that's what anchors the row action
-                      cluster + notes panel (both 124 px) inside the
+                      cluster + notes panel (both 112 px) inside the
                       row. minHeight on <tr> itself is unreliable
                       across browsers due to table layout. */}
-                  <Td align="center" style={{ color: T.inkSoft, fontVariantNumeric: "tabular-nums", height: 124 }}>
+                  <Td align="center" style={{ color: T.inkSoft, fontVariantNumeric: "tabular-nums", height: 112 }}>
                     {idx + 1}
                   </Td>
                   <Td>
@@ -866,17 +866,17 @@ export default function QuotationA4Preview({
                            Geometry:
                              paper inner right padding ..... 32 px
                              gap from paper outer edge ..... 40 px
-                             cluster width ................. 44 px
-                           right offset = 32 + 40 + 44 = 116. */
-                        right: -116,
-                        width: 44,
-                        height: 124,
+                             cluster width ................. 40 px
+                           right offset = 32 + 40 + 40 = 112. */
+                        right: -112,
+                        width: 40,
+                        height: 112,
                         boxSizing: "border-box",
                         display: "grid",
-                        /* 3 rigid 32 px rows + 2 × 5 px row gaps fit
-                           inside 124 px minus 5 px padding × 2 = 114
-                           content height. 32×3 + 5×2 = 106 ≤ 114. */
-                        gridTemplateRows: "32px 32px 32px",
+                        /* 3 rigid 30 px rows + 2 × 5 px row gaps fit
+                           inside 112 px minus 5 px padding × 2 = 102
+                           content height. 30×3 + 5×2 = 100 ≤ 102. */
+                        gridTemplateRows: "30px 30px 30px",
                         rowGap: 5,
                         alignContent: "center",
                         justifyItems: "center",
@@ -920,14 +920,15 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Cluster ends at right offset 116 (cluster
-                           width 44 + 40 gap from paper edge + 32 paper
-                           padding). Notes starts 12 px to the right of
-                           the cluster, 200 px wide.
-                             right_offset = 116 + 12 + 200 = 328. */
-                        right: -328,
+                        /* Cluster ends at right offset 112 (cluster
+                           width 40 + 40 gap from paper edge + 32 paper
+                           padding). Notes starts 28 px to the right of
+                           the cluster — comfortable visual gap —
+                           and is 200 px wide.
+                             right_offset = 112 + 28 + 200 = 340. */
+                        right: -340,
                         width: 200,
-                        height: 124,
+                        height: 112,
                         boxSizing: "border-box",
                         background: "#1A1A1A",
                         border: "1px solid #2D2D2D",
@@ -1830,10 +1831,10 @@ function RowActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 32,
-        height: 32,
-        minWidth: 32,
-        minHeight: 32,
+        width: 30,
+        height: 30,
+        minWidth: 30,
+        minHeight: 30,
         flexShrink: 0,
         borderRadius: 8,
         background: disabled ? "rgba(255,255,255,0.02)" : (hover ? hoverBg : idleBg),
