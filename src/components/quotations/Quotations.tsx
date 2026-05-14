@@ -478,50 +478,59 @@ const PRINT_AND_DOC_STYLES = `
 .pq-tc-area:focus { background: #f8f8ff; }
 
 /* ── PRINT ──
-   Strategy:
-   1. @page sets the paper to A4 with ZERO margins — the .quot-a4-doc
-      pages already have 32 px / 24 px of internal padding so they
-      visually match the on-screen frame. With non-zero @page margin
-      and width: 210mm on the doc, the doc would overflow the
-      printable area and the browser would scale everything down
-      ("doesn't fit A4, must scale manually").
-   2. Hide every element OUTSIDE the .quot-a4-stack wrapper —
-      previously only `#quotation-a4-preview` was made visible, but
-      that ID is set on page 1 ONLY, so pages 2..N were invisible
-      ("not all pages show").
-   3. Force a hard page break AFTER every .quot-a4-doc (except the
-      last). Without this, pages run together on the same physical
-      sheet and the multi-page document collapses to one.
-   4. Strip the on-screen scaffolding (margin, box-shadow, border)
-      from every page so each one is a flush A4 surface. */
+   Strategy (rewritten — the previous visibility:hidden +
+   position:absolute combo collapsed the multi-page document into
+   2 print pages because absolutely-positioned content doesn't
+   paginate across sheets):
+
+   1. Hide chrome with DISPLAY:NONE so it occupies zero space:
+        · <header>, <aside>  → MainHeader + Sidebar
+        · .fixed              → FloatingPanel
+        · .no-print           → editor toolbar
+   2. Reset the Hub layout wrappers (pt-14, shell-content-offset,
+      min-h-screen) so the .quot-a4-stack flows from the top of
+      the page with no leftover header offset / scrollable shell.
+   3. Each .quot-a4-doc is a normal in-flow A4 page with a hard
+      page-break-after — Chrome / Safari / Firefox honour that
+      because the parent is no longer position:absolute.
+   4. @page { size: A4; margin: 0 } so the browser doesn't add
+      print gutters that would shrink the usable width below the
+      doc's 210 mm and force a scale-to-fit. */
 @media print {
-  /* Reset margins / overflow so the browser doesn't add its own
-     gutters between the doc and the paper edge. */
+  /* Page setup — A4, zero browser margin (the doc has its own
+     32 px / 24 px padding). */
+  @page { size: A4; margin: 0; }
+
+  /* Reset page chrome */
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
     overflow: visible !important;
+    height: auto !important;
   }
-  /* Hide everything by default, then bring back every A4 page and
-     all of its descendants. */
-  body * { visibility: hidden !important; }
-  .quot-a4-stack,
-  .quot-a4-stack *,
-  .quot-a4-doc,
-  .quot-a4-doc * { visibility: visible !important; }
-  /* Pull the multi-page stack into the top-left corner of the
-     print viewport so each page lands flush on its A4 sheet. */
+
+  /* Hide every known piece of Hub chrome that should NOT print. */
+  header, aside, .no-print, .fixed { display: none !important; }
+  .quot-row-del-btn { display: none !important; }
+  .pq-add-btn { display: none !important; }
+
+  /* Collapse Tailwind layout classes the Hub layout uses so the
+     editor doesn't carry header offsets / min-height: 100vh
+     padding into the print page. */
+  [class~="pt-14"] { padding-top: 0 !important; }
+  [class~="min-h-screen"] { min-height: 0 !important; }
+  .shell-content-offset { padding: 0 !important; }
+
+  /* Stack flows naturally — NO position:absolute. */
   .quot-a4-stack {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 210mm !important;
   }
+
   /* Every page: full A4 surface, no shadow / margin, hard page
-     break after so the next page lands on its own sheet. */
+     break after so each lands on its own sheet. */
   .quot-a4-doc {
     width: 210mm !important;
     min-height: 297mm !important;
@@ -531,7 +540,7 @@ const PRINT_AND_DOC_STYLES = `
     background: #fff !important;
     page-break-after: always !important;
     break-after: page !important;
-    /* Avoid splitting a single page across two sheets. */
+    /* Don't split a single A4 surface across two sheets. */
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
@@ -539,14 +548,6 @@ const PRINT_AND_DOC_STYLES = `
     page-break-after: auto !important;
     break-after: auto !important;
   }
-  /* @page with margin: 0 so the doc's own 32 px padding handles
-     the visual margin. Anything else (e.g. 5mm) would shrink the
-     usable paper width below the doc's 210 mm and force the
-     browser to scale-to-fit. */
-  @page { size: A4; margin: 0; }
-  .no-print { display: none !important; }
-  .quot-row-del-btn { display: none !important; }
-  .pq-add-btn { display: none !important; }
 
   input, textarea, [contenteditable] {
     background: transparent !important;
