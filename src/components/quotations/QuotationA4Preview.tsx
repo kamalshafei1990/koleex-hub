@@ -577,13 +577,15 @@ export default function QuotationA4Preview({
                   fontSize: 10,
                 }}
               >
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>ACID</span>
-                <input
-                  value={current.toAcid ?? ""}
-                  onChange={(e) => setMeta("toAcid", e.target.value)}
-                  placeholder="—"
-                  style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
-                />
+                {/* ACID Number intentionally NOT shown on the
+                    quotation — that number is generated through
+                    Egypt's NAFEZA customs portal once a shipment is
+                    registered, so it belongs on the Commercial
+                    Invoice + shipment docs, not the price-offer
+                    stage. The field stays on the doc data model
+                    (toAcid) for back-compat with older saved
+                    quotations and will be surfaced again on the
+                    Invoice template. */}
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Contact</span>
                 <input
                   value={current.customerName}
