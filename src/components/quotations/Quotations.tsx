@@ -499,7 +499,7 @@ const PRINT_AND_DOC_STYLES = `
 @media print {
   /* Page setup — A4, zero browser margin (the doc has its own
      32 px / 24 px padding). */
-  @page { size: A4; margin: 0; }
+  @page { size: A4 portrait; margin: 0; }
 
   /* Reset page chrome */
   html, body {
@@ -508,6 +508,7 @@ const PRINT_AND_DOC_STYLES = `
     background: #fff !important;
     overflow: visible !important;
     height: auto !important;
+    width: auto !important;
   }
 
   /* Hide every known piece of Hub chrome that should NOT print. */
@@ -515,11 +516,27 @@ const PRINT_AND_DOC_STYLES = `
   .quot-row-del-btn { display: none !important; }
   .pq-add-btn { display: none !important; }
 
-  /* Collapse Tailwind layout classes the Hub layout uses so the
-     editor doesn't carry header offsets / min-height: 100vh
-     padding into the print page. */
+  /* NUKE all height + overflow constraints inherited from the Hub's
+     Tailwind layout (RootShell uses h-[calc(100vh-0px)],
+     overflow-hidden, min-h-0 on multiple wrappers — those collapse
+     the printable area to a single viewport height and clip the
+     multi-page stack). Forcing every element to have flexible
+     height + visible overflow lets the .quot-a4-doc pages flow
+     naturally through the print pipeline. */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  /* Tailwind-flavoured height utilities — reset to auto so the
+     wrappers stop pinning the viewport at 100vh. */
+  [class*="h-screen"],
+  [class*="h-[calc"],
+  [class*="min-h-screen"],
+  [class*="min-h-0"] {
+    height: auto !important;
+    min-height: 0 !important;
+  }
   [class~="pt-14"] { padding-top: 0 !important; }
-  [class~="min-h-screen"] { min-height: 0 !important; }
   .shell-content-offset { padding: 0 !important; }
 
   /* Stack flows naturally — NO position:absolute. */
@@ -527,6 +544,7 @@ const PRINT_AND_DOC_STYLES = `
     margin: 0 !important;
     padding: 0 !important;
     width: 210mm !important;
+    overflow: visible !important;
   }
 
   /* Every page: full A4 surface, no shadow / margin, hard page
