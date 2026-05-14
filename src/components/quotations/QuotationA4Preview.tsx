@@ -571,12 +571,14 @@ export default function QuotationA4Preview({
                 }}
               />
               {/* Inline label-value grid for the remaining structured
-                  fields. 55 px label column matches the FROM card's
-                  left-column rhythm so the two cards feel symmetric. */}
+                  fields. 90 px label column gives "CONTACT PERSON:"
+                  enough room to sit on one line without wrapping;
+                  the other labels (PHONE / MOBILE / EMAIL / WEB)
+                  just left-align inside the wider gutter. */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "60px 1fr",
+                  gridTemplateColumns: "90px 1fr",
                   rowGap: 3,
                   columnGap: 8,
                   fontSize: 10,
@@ -589,7 +591,7 @@ export default function QuotationA4Preview({
                     stays on the doc data model (toAcid) for
                     back-compat and will be surfaced on the Invoice
                     template. */}
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Contact</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Contact Person:</span>
                 <input
                   value={current.customerName}
                   onChange={(e) => setMeta("customerName", e.target.value)}
