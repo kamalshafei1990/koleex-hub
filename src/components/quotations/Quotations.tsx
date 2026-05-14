@@ -438,29 +438,11 @@ const PRINT_AND_DOC_STYLES = `
 }
 .quot-img-cell.has-img { border: none; background: transparent; }
 
-/* Delete button outside table */
-.quot-row-del-btn {
-  position: absolute;
-  top: 50%;
-  right: -28px;
-  transform: translateY(-50%);
-  background: none;
-  border: 1px solid rgba(0,0,0,0.10);
-  color: #999;
-  font-size: 13px;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-  font-weight: 400;
-  border-radius: 50%;
-  z-index: 5;
-}
-.quot-row-del-btn:hover { color: #fff; background: #e74c3c; border-color: #e74c3c; }
+/* The row-action cluster (.quot-row-del-btn) is now positioned and
+   styled inline by QuotationA4Preview — no screen styles here. The
+   print rule below still hides it on the printed page; the screen
+   rule is intentionally omitted so it doesn't clobber the new inline
+   width / height / transform. */
 
 /* Hide number spinners */
 .quot-a4-doc input[type="number"]::-webkit-outer-spin-button,
