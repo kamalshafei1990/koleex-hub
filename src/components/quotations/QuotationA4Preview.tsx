@@ -297,7 +297,15 @@ export default function QuotationA4Preview({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "8px 0 12px",
+            /* Taller header band so the KOLEEX logo + QUOTATION
+               wordmark sit comfortably in the middle of the
+               whitespace between the A4 top edge and the first
+               table (the COMPANY NAME / SHAPING THE FUTURE
+               strip). Old padding (8 / 12) crammed the logo
+               into the very top. New 36 / 32 px padding pushes
+               the brand mark to roughly the vertical centre of
+               that opening band. */
+            padding: "36px 0 32px",
           }}
         >
           {/* Koleex wordmark logo */}
