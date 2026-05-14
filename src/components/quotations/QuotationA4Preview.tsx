@@ -508,9 +508,12 @@ export default function QuotationA4Preview({
           </div>
 
           {/* ── QUOTATION TO (Customer) ──
-              Structured 4-row table: COMPANY NAME / ADDRESS / ACID
-              NUMBER / CONTACT PERSON (with email). Mirrors the
-              labelled-row card style used on the invoice. */}
+              Back to the free-form card: black "QUOTATION TO" header
+              over a single content area. The body is laid out as a
+              tidy stack — company name (bold, prominent) at the top,
+              then an inline label-value grid for Address, ACID
+              Number, Contact, Email so the structured fields read
+              clearly without the heavy black-label table style. */}
           <div
             style={{
               border: `1px solid ${T.border}`,
@@ -531,65 +534,64 @@ export default function QuotationA4Preview({
             >
               Quotation To
             </div>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                tableLayout: "fixed",
-                fontSize: 10,
-              }}
-            >
-              <tbody>
-                <QuotToRow label="Company Name">
-                  <input
-                    value={current.companyName}
-                    onChange={(e) => setMeta("companyName", e.target.value)}
-                    placeholder="—"
-                    style={{ ...inputResetStyle, fontSize: 11, fontWeight: 700, color: T.ink }}
-                  />
-                </QuotToRow>
-                <QuotToRow label="Address">
-                  <textarea
-                    rows={2}
-                    value={current.toAddress ?? ""}
-                    onChange={(e) => setMeta("toAddress", e.target.value)}
-                    placeholder="—"
-                    style={{
-                      ...inputResetStyle,
-                      fontSize: 10,
-                      lineHeight: 1.4,
-                      color: T.ink,
-                      resize: "none",
-                      minHeight: 30,
-                    }}
-                  />
-                </QuotToRow>
-                <QuotToRow label="ACID Number">
-                  <input
-                    value={current.toAcid ?? ""}
-                    onChange={(e) => setMeta("toAcid", e.target.value)}
-                    placeholder="—"
-                    style={{ ...inputResetStyle, fontSize: 10, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
-                  />
-                </QuotToRow>
-                <QuotToRow label="Contact Person" isLast>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <input
-                      value={current.customerName}
-                      onChange={(e) => setMeta("customerName", e.target.value)}
-                      placeholder="—"
-                      style={{ ...inputResetStyle, fontSize: 11, fontWeight: 700, color: T.ink }}
-                    />
-                    <input
-                      value={current.toEmail ?? ""}
-                      onChange={(e) => setMeta("toEmail", e.target.value)}
-                      placeholder="email@example.com"
-                      style={{ ...inputResetStyle, fontSize: 10, color: T.inkSoft }}
-                    />
-                  </div>
-                </QuotToRow>
-              </tbody>
-            </table>
+            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Company name — prominent at the top */}
+              <input
+                value={current.companyName}
+                onChange={(e) => setMeta("companyName", e.target.value)}
+                placeholder="Company name"
+                style={{ ...inputResetStyle, fontSize: 12, fontWeight: 700, color: T.ink, letterSpacing: "0.01em" }}
+              />
+              {/* Address — full width line under the company name */}
+              <textarea
+                rows={2}
+                value={current.toAddress ?? ""}
+                onChange={(e) => setMeta("toAddress", e.target.value)}
+                placeholder="Address"
+                style={{
+                  ...inputResetStyle,
+                  fontSize: 10,
+                  lineHeight: 1.5,
+                  color: T.inkSoft,
+                  resize: "none",
+                  minHeight: 28,
+                }}
+              />
+              {/* Inline label-value grid for the remaining structured
+                  fields. 55 px label column matches the FROM card's
+                  left-column rhythm so the two cards feel symmetric. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "60px 1fr",
+                  rowGap: 3,
+                  columnGap: 8,
+                  fontSize: 10,
+                }}
+              >
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>ACID</span>
+                <input
+                  value={current.toAcid ?? ""}
+                  onChange={(e) => setMeta("toAcid", e.target.value)}
+                  placeholder="—"
+                  style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
+                />
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Contact</span>
+                <input
+                  value={current.customerName}
+                  onChange={(e) => setMeta("customerName", e.target.value)}
+                  placeholder="Contact person"
+                  style={{ ...inputResetStyle, fontWeight: 700, color: T.ink }}
+                />
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</span>
+                <input
+                  value={current.toEmail ?? ""}
+                  onChange={(e) => setMeta("toEmail", e.target.value)}
+                  placeholder="email@example.com"
+                  style={{ ...inputResetStyle, color: T.ink }}
+                />
+              </div>
+            </div>
           </div>
         </div>
         </>)}
@@ -1561,52 +1563,6 @@ function MetaStripCell({
         {children}
       </div>
     </div>
-  );
-}
-
-/* One labelled row inside the QUOTATION TO card. Black label cell
-   on the left (fixed width), white value cell on the right. The
-   last row omits the bottom border so the card's outer rounded
-   corner reads cleanly. */
-function QuotToRow({
-  label,
-  children,
-  isLast,
-}: {
-  label: string;
-  children: React.ReactNode;
-  isLast?: boolean;
-}) {
-  const cellBorder = isLast ? "none" : `1px solid ${T.border}`;
-  return (
-    <tr>
-      <td
-        style={{
-          background: T.black,
-          color: "#fff",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          fontSize: 10,
-          padding: "6px 10px",
-          width: 110,
-          verticalAlign: "middle",
-          borderBottom: cellBorder,
-        }}
-      >
-        {label}
-      </td>
-      <td
-        style={{
-          padding: "6px 10px",
-          verticalAlign: "middle",
-          borderBottom: cellBorder,
-          borderLeft: `1px solid ${T.border}`,
-        }}
-      >
-        {children}
-      </td>
-    </tr>
   );
 }
 
