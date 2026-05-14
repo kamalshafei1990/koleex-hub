@@ -838,44 +838,43 @@ export default function QuotationA4Preview({
                         icon buttons. Subtle hairline dividers between
                         buttons read as one grouped control rather
                         than 3 floating circles. */}
+                    {/* Row action cluster — sits in the dark area
+                        outside the A4 paper. Three separate pill
+                        buttons stacked vertically. Hub design system:
+                        rounded-xl, surface background, subtle border,
+                        clear hover. Bigger than before (36 px) so
+                        they're obviously discoverable. */}
                     <div
                       className="quot-row-del-btn no-print"
                       style={{
                         position: "absolute",
                         top: 4,
-                        /* A4 has 32 px right padding; offset must
-                           exceed that to clear the white paper. -72
-                           puts the cluster ~40 px past the A4 edge
-                           in the dark background, leaving a clean
-                           gap between A4 and pill. */
-                        right: -72,
+                        /* A4 has 32 px right padding; -84 puts the
+                           cluster ~52 px past the paper edge with a
+                           comfortable gap between paper and buttons. */
+                        right: -84,
                         display: "flex",
                         flexDirection: "column",
-                        background: "rgba(255, 255, 255, 0.04)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                        borderRadius: 12,
-                        overflow: "hidden",
+                        gap: 6,
                       }}
                     >
                       <RowActionBtn
                         title="Move row up"
                         disabled={idx === 0}
                         onClick={() => moveItem(idx, -1)}
-                        icon={<ArrowUpIcon size={14} />}
+                        icon={<ArrowUpIcon size={16} />}
                       />
-                      <ClusterDivider />
                       <RowActionBtn
                         title="Move row down"
                         disabled={idx === current.items.length - 1}
                         onClick={() => moveItem(idx, 1)}
-                        icon={<ArrowDownIcon size={14} />}
+                        icon={<ArrowDownIcon size={16} />}
                       />
-                      <ClusterDivider />
                       <RowActionBtn
                         title="Remove row"
                         disabled={current.items.length <= 1}
                         onClick={() => removeItem(idx)}
-                        icon={<TrashIcon size={13} />}
+                        icon={<TrashIcon size={15} />}
                         destructive
                       />
                     </div>
@@ -1751,6 +1750,10 @@ function TotalsRow({
 /* Single button inside the row-action pill. Uses real icons (not
    characters) to match the Hub icon set, transparent background with
    a soft hover, and a destructive (red) variant for the trash. */
+/* Row action button — Hub design system pill. Surface background,
+   subtle border, rounded-xl, clear hover. The cluster sits in the
+   dark area outside the A4 paper so the surface tokens hit a dark
+   backdrop naturally. */
 function RowActionBtn({
   icon,
   title,
@@ -1765,6 +1768,15 @@ function RowActionBtn({
   destructive?: boolean;
 }) {
   const [hover, setHover] = useState(false);
+  /* Base palette pulls from the Hub design tokens that ship with
+     the dark theme — same look as the toolbar buttons on top of
+     the editor (Back / Save Draft / Convert to Invoice). */
+  const idleBg     = "rgba(255, 255, 255, 0.06)";
+  const hoverBg    = destructive ? "rgba(239, 68, 68, 0.18)" : "rgba(255, 255, 255, 0.14)";
+  const idleBorder = "rgba(255, 255, 255, 0.10)";
+  const hoverBorder= destructive ? "rgba(239, 68, 68, 0.45)" : "rgba(255, 255, 255, 0.22)";
+  const idleColor  = destructive ? "rgba(248, 113, 113, 0.95)" : "rgba(255, 255, 255, 0.92)";
+  const hoverColor = destructive ? "#FCA5A5" : "#FFFFFF";
   return (
     <button
       type="button"
@@ -1774,19 +1786,23 @@ function RowActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 28,
-        height: 28,
-        border: "none",
-        background: hover && !disabled ? "rgba(255, 255, 255, 0.10)" : "transparent",
-        color: destructive
-          ? (disabled ? "rgba(248, 113, 113, 0.4)" : "rgba(248, 113, 113, 0.95)")
-          : (disabled ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.75)"),
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.06)" : (hover ? hoverBorder : idleBorder)}`,
+        background: disabled ? "rgba(255,255,255,0.03)" : (hover ? hoverBg : idleBg),
+        color: disabled
+          ? (destructive ? "rgba(248,113,113,0.35)" : "rgba(255,255,255,0.30)")
+          : (hover ? hoverColor : idleColor),
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 0,
-        transition: "background-color 120ms ease, color 120ms ease",
+        boxShadow: disabled
+          ? "none"
+          : (hover ? "0 4px 14px rgba(0,0,0,0.35)" : "0 2px 6px rgba(0,0,0,0.25)"),
+        transition: "background-color 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
       }}
     >
       {icon}
@@ -2013,18 +2029,6 @@ function ToolSep() {
   );
 }
 
-/* 1 px hairline between buttons inside the row-action pill so the
-   three buttons read as one grouped control. */
-function ClusterDivider() {
-  return (
-    <div
-      style={{
-        height: 1,
-        background: "rgba(255, 255, 255, 0.06)",
-      }}
-    />
-  );
-}
 
 function BankRow({
   label,
