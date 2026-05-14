@@ -248,6 +248,14 @@ export default function QuotationA4Preview({
       const totalPages  = pages.length;
       const pageItems   = page.items;
       const startItemIdx = page.startIdx;
+      /* True on the LAST page that actually has item rows. When the
+         document ends with a footer-only summary page, that's the
+         page BEFORE this one (pages[pageIdx+1].items.length === 0).
+         The items-table footer (Total qty / Total amount) renders
+         only here so it doesn't get repeated mid-document. */
+      const isLastItemPage =
+        pageItems.length > 0 &&
+        (isLastPage || (pages[pageIdx + 1]?.items.length ?? 0) === 0);
       return (
     <div
       key={pageIdx}
@@ -874,6 +882,61 @@ export default function QuotationA4Preview({
               );
             })}
           </tbody>
+          {/* Items-table summary footer. Renders on the LAST page
+              that holds item rows so the totals sit immediately
+              below the final row — not repeated on every page,
+              and not orphaned on the footer-only summary page. */}
+          {isLastItemPage && (
+            <tfoot>
+              <tr>
+                <td
+                  colSpan={5}
+                  style={{
+                    background: T.surface,
+                    padding: "8px 10px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    textAlign: "right",
+                    borderTop: `1px solid ${T.border}`,
+                    borderBottomLeftRadius: 12,
+                  }}
+                >
+                  Total
+                </td>
+                <td
+                  style={{
+                    background: T.surface,
+                    padding: "8px 10px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: `1px solid ${T.border}`,
+                    borderLeft: `1px solid ${T.border}`,
+                  }}
+                >
+                  {totalQty}
+                </td>
+                <td
+                  style={{
+                    background: T.surface,
+                    padding: "8px 10px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    borderTop: `1px solid ${T.border}`,
+                    borderLeft: `1px solid ${T.border}`,
+                    borderBottomRightRadius: 12,
+                  }}
+                >
+                  US$ {fmt(subTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
         )}
 
