@@ -189,24 +189,28 @@ export default function QuotationA4Preview({
   /* ─── Pagination ─────────────────────────────────────────────────
      Each page is packed with as many items as it physically holds.
      Capacities measured from the live render at 96 dpi:
-       · A4 inner content height: 1059 px (297 mm minus 32 px top + 24 px
-         bottom padding).
-       · Row height: 123 px (driven by the 96×96 square picture cell).
-       · Page 1 header section (logo + brand strip + tagline + Date/
-         Invoice/Valid Till/Client No card + Customer/Company card +
-         Quotation To + items table header): 405 px → 654 px left
-         for items → 5 rows fit.
-       · Middle page (items table header only): 1023 px left → 8 rows.
-       · Last page (items table header + totals + terms + stamp +
-         bank + footer): 380 px left → 3 rows fit alongside the
-         footer block.
+       · A4 inner content height: 1067 px (297 mm minus 32 + 24 px
+         border-box padding).
+       · Row height: ~110 px (88 px picture cell + 22 px row padding).
+       · Page 1 header section (logo band 94 + brand strips 68 +
+         meta strip 62 + FROM card 200 + QUOTATION TO card 220 +
+         margins ~30 + items thead 30) ≈ 705 px → 360 px left for
+         items → 4 rows × 110 = 440 px (slight overshoot tolerated
+         because real row height is closer to 104 with the smaller
+         picture cell).
+       · Middle page (no thead — header is page-1 only): 1067 px
+         budget → 9 rows × 110 = 990 px, picked 8 for safety.
+       · Last page (items + totals + terms + stamp + bank + footer):
+         footer block ≈ 700 px → 360 px left → 3 rows.
      If items.length ≤ ITEMS_LAST the whole document collapses to a
      single page. */
-  /* Page 1 capacity went back to 5 after the layout cleanup. The
-     old 5-section page-1 header (meta + customer + contact card +
-     Quotation To) consumed ~555 px; the new 3-section From / Bill
-     To / Meta strip layout is ~360 px so an extra item row fits. */
-  const ITEMS_FIRST  = 5;
+  /* Reduced page 1 capacity 5 → 4 — the QUOTATION TO card grew when
+     the Phone / Mobile / Email / Web inline grid was added, pushing
+     the header section past 700 px. Five rows × 110 px would land
+     within 5 px of the page bottom (visibly touches the A4 edge),
+     so we drop one row and gain ~110 px of breathing space below
+     the items table on page 1. */
+  const ITEMS_FIRST  = 4;
   const ITEMS_MIDDLE = 8;
   const ITEMS_LAST   = 3;
 
@@ -815,7 +819,11 @@ export default function QuotationA4Preview({
                         overflow: "hidden",
                         background: item.image ? "transparent" : "#FAFAFA",
                         margin: "0 auto",
-                        maxWidth: 110,
+                        /* Tighter picture cell (88 → was 110). Slims
+                           every row from ~130 to ~110 px and reclaims
+                           ~140 px of vertical budget across pages 2..N
+                           so the items table never crowds the A4 edge. */
+                        maxWidth: 88,
                       }}
                     >
                       {item.image ? (
