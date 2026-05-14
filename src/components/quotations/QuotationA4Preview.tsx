@@ -854,12 +854,18 @@ export default function QuotationA4Preview({
                            taller than a single line. */
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* A4 has 32 px right padding; -56 puts the
-                           cluster ~24 px past the paper edge with a
-                           comfortable gap between paper and buttons.
-                           36 px button + 24 px gap = 60 px total
-                           reach from the paper edge. */
-                        right: -56,
+                        /* Geometry — the cluster has to land OUTSIDE
+                           the A4 paper frame, not just past the
+                           items-table edge.
+                             · A4 inner padding: 32 px on the right
+                             · Cluster width: 36 px
+                             · Right offset relative to TOTAL cell
+                           For the cluster's LEFT edge to land at the
+                           paper's outer edge:
+                             right = paper-padding + cluster-width
+                                   = 32 + 36 = 68
+                           Add a 20 px breathing gap → right = -88. */
+                        right: -88,
                         display: "flex",
                         flexDirection: "column",
                         gap: 6,
