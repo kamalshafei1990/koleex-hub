@@ -845,17 +845,25 @@ export default function QuotationA4Preview({
                         clear hover. Bigger than before (36 px) so
                         they're obviously discoverable. */}
                     <div
-                      className="quot-row-del-btn no-print"
+                      className="no-print"
                       style={{
                         position: "absolute",
-                        top: 4,
-                        /* A4 has 32 px right padding; -84 puts the
-                           cluster ~52 px past the paper edge with a
-                           comfortable gap between paper and buttons. */
-                        right: -84,
+                        /* Pin to vertical centre of the row so the
+                           cluster always tracks the row's height,
+                           even when long descriptions push the row
+                           taller than a single line. */
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        /* A4 has 32 px right padding; -56 puts the
+                           cluster ~24 px past the paper edge with a
+                           comfortable gap between paper and buttons.
+                           36 px button + 24 px gap = 60 px total
+                           reach from the paper edge. */
+                        right: -56,
                         display: "flex",
                         flexDirection: "column",
                         gap: 6,
+                        zIndex: 2,
                       }}
                     >
                       <RowActionBtn
