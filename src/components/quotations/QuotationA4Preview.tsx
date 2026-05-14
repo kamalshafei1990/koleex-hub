@@ -587,7 +587,12 @@ export default function QuotationA4Preview({
                     image cell can render as a true square once the
                     10 px L+R padding is subtracted. */}
                 <Th width="16%" align="center">PICTURE</Th>
-                <Th width="11%" align="center">UNIT PRICE</Th>
+                <Th width="11%" align="center">
+                  <div>UNIT PRICE</div>
+                  <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
+                    (FOB NINGBO)
+                  </div>
+                </Th>
                 <Th width="7%"  align="center">QTY</Th>
                 <Th width="16%" align="center" isLast>TOTAL</Th>
               </tr>
