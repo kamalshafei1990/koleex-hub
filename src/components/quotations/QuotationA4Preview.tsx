@@ -571,14 +571,16 @@ export default function QuotationA4Preview({
                 }}
               />
               {/* Inline label-value grid for the remaining structured
-                  fields. 90 px label column gives "CONTACT PERSON:"
-                  enough room to sit on one line without wrapping;
+                  fields. 105 px label column comfortably fits the
+                  longest label "CONTACT PERSON:" on a single line;
                   the other labels (PHONE / MOBILE / EMAIL / WEB)
-                  just left-align inside the wider gutter. */}
+                  just left-align inside the wider gutter. Every
+                  label also has whiteSpace: nowrap as a belt-and-
+                  braces guarantee against wrapping. */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "90px 1fr",
+                  gridTemplateColumns: "105px 1fr",
                   rowGap: 3,
                   columnGap: 8,
                   fontSize: 10,
@@ -591,35 +593,35 @@ export default function QuotationA4Preview({
                     stays on the doc data model (toAcid) for
                     back-compat and will be surfaced on the Invoice
                     template. */}
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Contact Person:</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Contact Person:</span>
                 <input
                   value={current.customerName}
                   onChange={(e) => setMeta("customerName", e.target.value)}
                   placeholder="Contact person"
                   style={{ ...inputResetStyle, fontWeight: 700, color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Phone</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Phone</span>
                 <input
                   value={current.toPhone ?? ""}
                   onChange={(e) => setMeta("toPhone", e.target.value)}
                   placeholder="—"
                   style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Mobile</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Mobile</span>
                 <input
                   value={current.toMobile ?? ""}
                   onChange={(e) => setMeta("toMobile", e.target.value)}
                   placeholder="—"
                   style={{ ...inputResetStyle, fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Email</span>
                 <input
                   value={current.toEmail ?? ""}
                   onChange={(e) => setMeta("toEmail", e.target.value)}
                   placeholder="email@example.com"
                   style={{ ...inputResetStyle, color: T.ink }}
                 />
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Web</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Web</span>
                 <input
                   value={current.toWebsite ?? ""}
                   onChange={(e) => setMeta("toWebsite", e.target.value)}
