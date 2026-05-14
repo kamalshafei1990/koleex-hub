@@ -569,27 +569,34 @@ const PRINT_AND_DOC_STYLES = `
 
      On-screen view unaffected (inline style stays at 297 mm — only
      the print pipeline uses 275 mm). */
+  /* Doc height tightened to 250 mm — generous safety margin against
+     any sheet's printable area (US Letter physical ~265 mm after
+     driver margins, A4 ~280 mm). Going aggressive on the slack so
+     Safari never decides the doc is "almost too tall" and pushes it
+     to a new sheet (which would create a blank previous sheet —
+     that was the cause of the 8 docs → 16 sheets bug).
+
+     NO page-break-before / page-break-after rules. With each doc at
+     a fixed height that fits a single sheet, AND page-break-inside:
+     avoid keeping each doc together, the browser naturally places
+     each doc on its own sheet. Adding page-break-before was creating
+     extra empty sheets between docs in Safari. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 275mm !important;
-    min-height: 275mm !important;
-    max-height: 275mm !important;
+    height: 250mm !important;
+    min-height: 250mm !important;
+    max-height: 250mm !important;
     margin: 0 !important;
-    padding: 24px 28px 18px !important;
+    padding: 20px 24px 16px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
     overflow: hidden !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-  /* Force every doc AFTER the first onto its own fresh sheet. */
-  .quot-a4-doc + .quot-a4-doc {
-    page-break-before: always !important;
-    break-before: page !important;
   }
 
   /* Items table — never split a single row across sheets and
