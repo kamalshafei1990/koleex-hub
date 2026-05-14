@@ -477,23 +477,73 @@ const PRINT_AND_DOC_STYLES = `
 }
 .pq-tc-area:focus { background: #f8f8ff; }
 
-/* ── PRINT ── */
+/* ── PRINT ──
+   Strategy:
+   1. @page sets the paper to A4 with ZERO margins — the .quot-a4-doc
+      pages already have 32 px / 24 px of internal padding so they
+      visually match the on-screen frame. With non-zero @page margin
+      and width: 210mm on the doc, the doc would overflow the
+      printable area and the browser would scale everything down
+      ("doesn't fit A4, must scale manually").
+   2. Hide every element OUTSIDE the .quot-a4-stack wrapper —
+      previously only `#quotation-a4-preview` was made visible, but
+      that ID is set on page 1 ONLY, so pages 2..N were invisible
+      ("not all pages show").
+   3. Force a hard page break AFTER every .quot-a4-doc (except the
+      last). Without this, pages run together on the same physical
+      sheet and the multi-page document collapses to one.
+   4. Strip the on-screen scaffolding (margin, box-shadow, border)
+      from every page so each one is a flush A4 surface. */
 @media print {
-  body * { visibility: hidden !important; }
-  #quotation-a4-preview,
-  #quotation-a4-preview * { visibility: visible !important; }
-  #quotation-a4-preview {
-    position: absolute !important;
-    left: 0;
-    top: 0;
-    width: 210mm !important;
-    margin: 0;
-    padding: 32px 32px 24px;
-    box-shadow: none;
-    border: none;
+  /* Reset margins / overflow so the browser doesn't add its own
+     gutters between the doc and the paper edge. */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
     background: #fff !important;
+    overflow: visible !important;
   }
-  @page { size: A4; margin: 5mm 8mm; }
+  /* Hide everything by default, then bring back every A4 page and
+     all of its descendants. */
+  body * { visibility: hidden !important; }
+  .quot-a4-stack,
+  .quot-a4-stack *,
+  .quot-a4-doc,
+  .quot-a4-doc * { visibility: visible !important; }
+  /* Pull the multi-page stack into the top-left corner of the
+     print viewport so each page lands flush on its A4 sheet. */
+  .quot-a4-stack {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm !important;
+  }
+  /* Every page: full A4 surface, no shadow / margin, hard page
+     break after so the next page lands on its own sheet. */
+  .quot-a4-doc {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    /* Avoid splitting a single page across two sheets. */
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .quot-a4-doc:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  /* @page with margin: 0 so the doc's own 32 px padding handles
+     the visual margin. Anything else (e.g. 5mm) would shrink the
+     usable paper width below the doc's 210 mm and force the
+     browser to scale-to-fit. */
+  @page { size: A4; margin: 0; }
   .no-print { display: none !important; }
   .quot-row-del-btn { display: none !important; }
   .pq-add-btn { display: none !important; }
@@ -514,6 +564,20 @@ const PRINT_AND_DOC_STYLES = `
   .pq-strip-gray { background: #e0e0e0 !important; color: #333 !important; }
   .pq-tfoot-row td { background: #f5f5f5 !important; }
   .pq-bl { background: #f5f5f5 !important; }
+  /* Force the items-table header strip + tfoot summary row to
+     keep their dark backgrounds when printed (Chrome and Safari
+     otherwise strip backgrounds on print). */
+  .pq-tbl thead th,
+  .pq-tbl tfoot td {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+/* Force all browsers to print exact colors so the black header
+   strips don't drop to white. */
+.quot-a4-doc, .quot-a4-doc * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 `;
 
