@@ -585,10 +585,6 @@ const PRINT_AND_DOC_STYLES = `
     page-break-before: always !important;
     break-before: page !important;
   }
-  /* Also enforce overflow hidden on the body / html so nothing
-     from outside the .quot-a4-stack can spill onto a sheet. */
-  html, body { overflow: hidden !important; }
-  body { width: 210mm !important; }
 
   /* Items table — never split a single row across sheets and
      never split the header / footer. The page already fits its
