@@ -49,7 +49,10 @@ interface Quotation {
   quotTo: string;
   toAddress?: string;
   toAcid?: string;
+  toPhone?: string;
+  toMobile?: string;
   toEmail?: string;
+  toWebsite?: string;
   items: QuotationItem[];
   tax: number;
   shipping: number;
@@ -128,7 +131,10 @@ function fromRow(row: RemoteDocRow): Quotation {
     quotTo: doc.quotTo ?? "",
     toAddress: doc.toAddress ?? "",
     toAcid: doc.toAcid ?? "",
+    toPhone: doc.toPhone ?? "",
+    toMobile: doc.toMobile ?? "",
     toEmail: doc.toEmail ?? "",
+    toWebsite: doc.toWebsite ?? "",
     items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
     tax: Number(doc.tax ?? 0),
     shipping: Number(doc.shipping ?? 0),
@@ -656,7 +662,10 @@ export default function Quotations() {
       quotTo: "",
       toAddress: "",
       toAcid: "",
+      toPhone: "",
+      toMobile: "",
       toEmail: "",
+      toWebsite: "",
       items: [{ ...EMPTY_ITEM }],
       tax: 0,
       shipping: 0,
