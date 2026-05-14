@@ -588,14 +588,24 @@ export default function QuotationA4Preview({
           {isFirstPage && (
             <thead>
               <tr>
+                {/* Column widths measured against worst-case real
+                    data from the Koleex catalogue:
+                    · NO     5%  — 1–2 digits
+                    · ITEM  28% — long descriptions (the only
+                              column that absorbs line breaks)
+                    · MODEL 15% — codes up to 19 chars
+                              (XSO-988LC-4T-24BCTQ)
+                    · PIC   15% — picture cell capped at 110 px
+                              square via aspectRatio
+                    · UPRC  14% — "(FOB NINGBO)" subtitle needs
+                              ~85 px to sit on one line
+                    · QTY    7% — up to 3 digits / footer "235"
+                    · TOTAL 16% — line totals up to "44,368" */}
                 <Th width="5%"  align="center" isFirst>NO.</Th>
-                <Th width="27%" align="center">ITEM</Th>
-                <Th width="13%" align="center">MODEL</Th>
-                {/* Picture column gets a little extra width so the inner
-                    image cell can render as a true square once the
-                    10 px L+R padding is subtracted. */}
-                <Th width="16%" align="center">PICTURE</Th>
-                <Th width="11%" align="center">
+                <Th width="28%" align="center">ITEM</Th>
+                <Th width="15%" align="center">MODEL</Th>
+                <Th width="15%" align="center">PICTURE</Th>
+                <Th width="14%" align="center">
                   <div>UNIT PRICE</div>
                   <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
                     (FOB NINGBO)
@@ -606,15 +616,16 @@ export default function QuotationA4Preview({
               </tr>
             </thead>
           )}
-          {/* Tableless colgroup on continuation pages so the column
-              widths stay locked even without a thead. */}
+          {/* Tableless colgroup on continuation pages — same widths
+              as the thead so cells stay column-aligned with page 1
+              even without a header. */}
           {!isFirstPage && (
             <colgroup>
               <col style={{ width: "5%" }} />
-              <col style={{ width: "27%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "11%" }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "14%" }} />
               <col style={{ width: "7%" }} />
               <col style={{ width: "16%" }} />
             </colgroup>
