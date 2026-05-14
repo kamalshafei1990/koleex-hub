@@ -862,7 +862,13 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        right: -92,
+                        /* Cluster fully outside the A4 paper frame.
+                           Geometry:
+                             paper inner right padding ..... 32 px
+                             gap from paper outer edge ..... 40 px
+                             cluster width ................. 44 px
+                           right offset = 32 + 40 + 44 = 116. */
+                        right: -116,
                         width: 44,
                         height: 124,
                         boxSizing: "border-box",
@@ -914,13 +920,12 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Cluster occupies right offsets 48..92 (44 px
-                           wide, 16 px gap from paper, ending 92 px
-                           past TOTAL cell). Notes starts 8 px to the
-                           right of the cluster, 200 px wide.
-                             right_offset = cluster_outer + gap + width
-                                          = 92 + 8 + 200 = 300. */
-                        right: -300,
+                        /* Cluster ends at right offset 116 (cluster
+                           width 44 + 40 gap from paper edge + 32 paper
+                           padding). Notes starts 12 px to the right of
+                           the cluster, 200 px wide.
+                             right_offset = 116 + 12 + 200 = 328. */
+                        right: -328,
                         width: 200,
                         height: 124,
                         boxSizing: "border-box",
