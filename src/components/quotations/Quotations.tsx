@@ -553,31 +553,21 @@ const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* Every page: full A4 surface, no shadow / margin.
-
-     Pagination strategy — page-break BEFORE every doc except the
-     first, NOT page-break after. Reason: page-break-after creates
-     a *trailing* break that the print engine may interpret as
-     "after the current doc finishes printing, create a new sheet"
-     — even if the current doc is exactly A4-sized, the trailing
-     break can manifest as a blank sheet between docs. break-before
-     starts each new doc on a fresh sheet without the trailing
-     ambiguity.
-
-     Height pinned to 295mm (2mm safety margin against A4 297mm)
-     with border-box sizing so padding is INCLUDED. Overflow hidden
-     clips any content that tries to push past the page edge so
-     it can't trigger a phantom sheet. */
+  /* Every page: full A4 surface (297 mm) with border-box sizing so
+     padding is INCLUDED in the height. The inline style on each
+     .quot-a4-doc now also has box-sizing: border-box + height: 297mm
+     so the print engine sees a stable A4-sized box at all times,
+     not relying on @media print to override an oversized inline
+     style. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 295mm !important;
-    min-height: 295mm !important;
-    max-height: 295mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
-    padding: 32px 32px 24px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;

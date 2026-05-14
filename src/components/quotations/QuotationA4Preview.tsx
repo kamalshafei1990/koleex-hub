@@ -277,8 +277,14 @@ export default function QuotationA4Preview({
       className="quot-a4-doc"
       dir="ltr"
       style={{
+        /* Use border-box so the 32+24 px padding is INCLUDED in the
+           297 mm height. With the default content-box the doc would
+           be 297mm + 56px ≈ 312mm — taller than A4 — and the print
+           engine would spill the overflow onto a blank second sheet
+           after every real page. */
+        boxSizing: "border-box",
         width: "210mm",
-        minHeight: "297mm",
+        height: "297mm",
         background: T.paper,
         boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
         margin: pageIdx === 0 ? "0 auto" : "32px auto 0",
@@ -288,6 +294,7 @@ export default function QuotationA4Preview({
         fontSize: 11,
         lineHeight: 1.45,
         position: "relative",
+        overflow: "hidden",
       }}
     >
       <div className="quot-doc-inner">
