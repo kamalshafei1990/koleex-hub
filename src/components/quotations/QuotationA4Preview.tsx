@@ -844,31 +844,34 @@ export default function QuotationA4Preview({
                         rounded-xl, surface background, subtle border,
                         clear hover. Bigger than before (36 px) so
                         they're obviously discoverable. */}
+                    {/* Row action cluster — single unified pill that
+                        groups the 3 buttons (↑ / ↓ / 🗑) as one
+                        organised control. Anchored to vertical centre
+                        of the row so it tracks the row's height. */}
                     <div
                       className="no-print"
                       style={{
                         position: "absolute",
-                        /* Pin to vertical centre of the row so the
-                           cluster always tracks the row's height,
-                           even when long descriptions push the row
-                           taller than a single line. */
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Geometry — the cluster has to land OUTSIDE
-                           the A4 paper frame, not just past the
-                           items-table edge.
-                             · A4 inner padding: 32 px on the right
-                             · Cluster width: 36 px
-                             · Right offset relative to TOTAL cell
-                           For the cluster's LEFT edge to land at the
-                           paper's outer edge:
-                             right = paper-padding + cluster-width
-                                   = 32 + 36 = 68
-                           Add a 20 px breathing gap → right = -88. */
+                        /* Geometry — must land OUTSIDE the A4 paper
+                           frame.
+                             A4 inner padding right ........ 32 px
+                             Cluster width (pill + buttons)  40 px
+                             Breathing gap ................. 16 px
+                           right = 32 + 40 + 16 = 88. */
                         right: -88,
                         display: "flex",
                         flexDirection: "column",
-                        gap: 6,
+                        gap: 4,
+                        /* Single grouped pill — subtle dark surface +
+                           border so the three buttons read as ONE
+                           control, not three floating squares. */
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        borderRadius: 12,
+                        padding: 4,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
                         zIndex: 2,
                       }}
                     >
@@ -876,44 +879,53 @@ export default function QuotationA4Preview({
                         title="Move row up"
                         disabled={idx === 0}
                         onClick={() => moveItem(idx, -1)}
-                        icon={<ArrowUpIcon size={16} />}
+                        icon={<ArrowUpIcon size={14} />}
                       />
                       <RowActionBtn
                         title="Move row down"
                         disabled={idx === current.items.length - 1}
                         onClick={() => moveItem(idx, 1)}
-                        icon={<ArrowDownIcon size={16} />}
+                        icon={<ArrowDownIcon size={14} />}
                       />
                       <RowActionBtn
                         title="Remove row"
                         disabled={current.items.length <= 1}
                         onClick={() => removeItem(idx)}
-                        icon={<TrashIcon size={15} />}
+                        icon={<TrashIcon size={13} />}
                         destructive
                       />
                     </div>
 
-                    {/* Internal notes — same trick, further out
-                        sitting outside the A4 with a clean gap. The
-                        8 px radius matches every other rounded block
-                        in the document so the rhythm stays
-                        consistent. */}
+                    {/* Internal notes — sits to the right of the
+                        action cluster, outside the A4 paper frame.
+                        Same visual language as the action pill
+                        (surface + border + shadow + 12 px radius)
+                        and sized to match the row's height so the
+                        two controls feel paired. */}
                     <div
                       className="quot-row-notes no-print"
                       style={{
                         position: "absolute",
-                        top: 4,
-                        bottom: 4,
-                        right: -300,
-                        width: 220,
-                        background: "rgba(255, 255, 255, 0.04)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        /* Cluster takes 88 + 8 (its own width) = 96
+                           px past the cell edge → 64 px past the
+                           paper. Notes panel starts ~8 px to its
+                           right with a 200 px width. */
+                        right: -312,
+                        width: 200,
+                        /* Cap height to row height so notes never
+                           overflow into the next row. */
+                        maxHeight: "calc(100% - 8px)",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        border: "1px solid rgba(255, 255, 255, 0.10)",
                         borderRadius: 12,
                         padding: 10,
                         display: "flex",
                         flexDirection: "column",
                         gap: 4,
                         textAlign: "left",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
                       }}
                     >
                       <div
@@ -1764,10 +1776,10 @@ function TotalsRow({
 /* Single button inside the row-action pill. Uses real icons (not
    characters) to match the Hub icon set, transparent background with
    a soft hover, and a destructive (red) variant for the trash. */
-/* Row action button — Hub design system pill. Surface background,
-   subtle border, rounded-xl, clear hover. The cluster sits in the
-   dark area outside the A4 paper so the surface tokens hit a dark
-   backdrop naturally. */
+/* Row action button — inner control of the unified action pill.
+   The wrapper supplies the surface + border + shadow so each button
+   is just a 32 × 32 hit target with a hover background; no own
+   border or shadow (those would duplicate the pill's frame). */
 function RowActionBtn({
   icon,
   title,
@@ -1782,15 +1794,10 @@ function RowActionBtn({
   destructive?: boolean;
 }) {
   const [hover, setHover] = useState(false);
-  /* Base palette pulls from the Hub design tokens that ship with
-     the dark theme — same look as the toolbar buttons on top of
-     the editor (Back / Save Draft / Convert to Invoice). */
-  const idleBg     = "rgba(255, 255, 255, 0.06)";
-  const hoverBg    = destructive ? "rgba(239, 68, 68, 0.18)" : "rgba(255, 255, 255, 0.14)";
-  const idleBorder = "rgba(255, 255, 255, 0.10)";
-  const hoverBorder= destructive ? "rgba(239, 68, 68, 0.45)" : "rgba(255, 255, 255, 0.22)";
-  const idleColor  = destructive ? "rgba(248, 113, 113, 0.95)" : "rgba(255, 255, 255, 0.92)";
-  const hoverColor = destructive ? "#FCA5A5" : "#FFFFFF";
+  const idleBg    = "transparent";
+  const hoverBg   = destructive ? "rgba(239, 68, 68, 0.18)" : "rgba(255, 255, 255, 0.12)";
+  const idleColor = destructive ? "rgba(248, 113, 113, 0.90)" : "rgba(255, 255, 255, 0.85)";
+  const hoverColor= destructive ? "#FCA5A5" : "#FFFFFF";
   return (
     <button
       type="button"
@@ -1800,23 +1807,20 @@ function RowActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 12,
-        border: `1px solid ${disabled ? "rgba(255,255,255,0.06)" : (hover ? hoverBorder : idleBorder)}`,
-        background: disabled ? "rgba(255,255,255,0.03)" : (hover ? hoverBg : idleBg),
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        border: "none",
+        background: disabled ? "transparent" : (hover ? hoverBg : idleBg),
         color: disabled
-          ? (destructive ? "rgba(248,113,113,0.35)" : "rgba(255,255,255,0.30)")
+          ? (destructive ? "rgba(248,113,113,0.30)" : "rgba(255,255,255,0.25)")
           : (hover ? hoverColor : idleColor),
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 0,
-        boxShadow: disabled
-          ? "none"
-          : (hover ? "0 4px 14px rgba(0,0,0,0.35)" : "0 2px 6px rgba(0,0,0,0.25)"),
-        transition: "background-color 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
+        transition: "background-color 120ms ease, color 120ms ease",
       }}
     >
       {icon}
