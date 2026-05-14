@@ -553,21 +553,26 @@ const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* Every page: full A4 surface (297 mm) with border-box sizing so
-     padding is INCLUDED in the height. The inline style on each
-     .quot-a4-doc now also has box-sizing: border-box + height: 297mm
-     so the print engine sees a stable A4-sized box at all times,
-     not relying on @media print to override an oversized inline
-     style. */
+  /* Every page: A4 surface with a 4 mm safety margin (293 mm instead
+     of 297 mm). Safari's print engine sometimes computes the printable
+     area as slightly less than the @page size — even with margin: 0
+     the physical printer driver may reserve a hairline. Pinning to
+     293 mm guarantees the doc never overflows by 1-2 mm and triggers
+     a phantom blank sheet after every real page.
+
+     The on-screen view stays at 297 mm because the inline style sets
+     height: 297mm, but the @media print rules (with !important) take
+     over for the print pipeline. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    height: 293mm !important;
+    min-height: 293mm !important;
+    max-height: 293mm !important;
     margin: 0 !important;
+    padding: 28px 28px 20px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
@@ -580,6 +585,10 @@ const PRINT_AND_DOC_STYLES = `
     page-break-before: always !important;
     break-before: page !important;
   }
+  /* Also enforce overflow hidden on the body / html so nothing
+     from outside the .quot-a4-stack can spill onto a sheet. */
+  html, body { overflow: hidden !important; }
+  body { width: 210mm !important; }
 
   /* Items table — never split a single row across sheets and
      never split the header / footer. The page already fits its
