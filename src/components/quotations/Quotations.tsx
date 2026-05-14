@@ -315,9 +315,15 @@ function numberToWords(num: number): string {
 
 const PRINT_AND_DOC_STYLES = `
 /* ── A4 document base ── */
+/* On-screen styling for the A4 page. Print sizing is handled
+   exclusively by @media print below — DO NOT set height here, only
+   min-height (so screen view fills A4 height but print pipeline can
+   override cleanly via !important without competing with inline). */
 .quot-a4-doc {
+  box-sizing: border-box;
   width: 210mm;
   min-height: 297mm;
+  padding: 32px 32px 24px;
   background: #fff;
   color: #000;
   margin: 0 auto 40px;
@@ -327,7 +333,7 @@ const PRINT_AND_DOC_STYLES = `
   font-size: 11px;
   line-height: 1.4;
 }
-.quot-doc-inner { padding: 32px 32px 24px; }
+.quot-doc-inner { padding: 0; }
 
 /* Force black text on white for all children */
 /* Set a sensible default text colour on the A4 surface, but do NOT
