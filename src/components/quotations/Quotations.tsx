@@ -548,17 +548,33 @@ const PRINT_AND_DOC_STYLES = `
   }
 
   /* Every page: full A4 surface, no shadow / margin, hard page
-     break after so each lands on its own sheet. */
+     break after so each lands on its own sheet.
+
+     CRITICAL: box-sizing must be border-box so the 32 + 24 px
+     vertical padding is INCLUDED in the 297 mm height. Default
+     content-box would make total height = 297mm + 56 px ≈ 312 mm,
+     overflowing the A4 sheet and producing one BLANK page after
+     every real page.
+
+     Also pin height to EXACTLY 297mm (not just min-height) and
+     overflow: hidden — any line that tries to push the page over
+     A4 gets clipped at the bottom edge instead of triggering an
+     overflow blank sheet. The pagination capacities (5 / 8 / 3)
+     already keep each page well inside A4, so clipping should
+     never actually trim visible content. */
   .quot-a4-doc {
+    box-sizing: border-box !important;
     width: 210mm !important;
+    height: 297mm !important;
     min-height: 297mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;
+    overflow: hidden !important;
     page-break-after: always !important;
     break-after: page !important;
-    /* Don't split a single A4 surface across two sheets. */
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
