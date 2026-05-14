@@ -368,7 +368,7 @@ export default function QuotationA4Preview({
 
         {/* ═══════════════════════════════════════════════════════════════
             (d) Meta strip ABOVE the From / Quotation-To party row.
-            Four equal-width cells (Date · Invoice No · Valid Till ·
+            Four equal-width cells (Date · Quotation No · Valid Till ·
             Client No) using CSS grid so each pair stays the SAME
             width regardless of value length. Below: two side-by-side
             party cards (FROM / QUOTATION TO).
@@ -403,7 +403,7 @@ export default function QuotationA4Preview({
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>
-          <MetaStripCell label="Invoice No">
+          <MetaStripCell label="Quotation No">
             <span style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}>
               {current.invoiceNo || "—"}
             </span>
