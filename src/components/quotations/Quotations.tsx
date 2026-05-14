@@ -671,6 +671,13 @@ export default function Quotations() {
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Quotation | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /* Save state for the Save Draft / Save Final buttons. "idle" is the
+     resting state; "saving" while the POST is in flight; "saved" for a
+     brief confirmation flash; "error" if the request failed. Without
+     this, the buttons gave NO visual feedback — users couldn't tell
+     whether a click was registered or whether the save succeeded. */
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string>("");
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   /* ── Load from Supabase on mount ── */
@@ -771,12 +778,31 @@ export default function Quotations() {
   const handleSave = useCallback(
     async (status: "draft" | "final") => {
       if (!current) return;
+      setSaveState("saving");
+      setSaveError("");
       const intent = { ...current, status, updatedAt: new Date().toISOString() };
-      const saved = await saveQuotationRemote(intent);
-      if (saved) {
-        setCurrent(saved);
-        const list = await loadQuotationsRemote({ fresh: true });
-        setQuotations(list);
+      try {
+        const saved = await saveQuotationRemote(intent);
+        if (saved) {
+          setCurrent(saved);
+          const list = await loadQuotationsRemote({ fresh: true });
+          setQuotations(list);
+          setSaveState("saved");
+          // Reset the "Saved ✓" flash after 2.5 s so the button returns
+          // to its idle label.
+          setTimeout(() => setSaveState("idle"), 2500);
+        } else {
+          // saveQuotationRemote returns null when the POST returned non-OK.
+          // upsertDoc swallows the error so we have no detail; surface a
+          // generic message and keep the editor unchanged.
+          setSaveState("error");
+          setSaveError("Save failed — server returned an error.");
+          setTimeout(() => setSaveState("idle"), 4000);
+        }
+      } catch (e) {
+        setSaveState("error");
+        setSaveError(e instanceof Error ? e.message : String(e));
+        setTimeout(() => setSaveState("idle"), 4000);
       }
     },
     [current]
@@ -1084,17 +1110,37 @@ export default function Quotations() {
         >
           {current.status === "final" ? t("status.final") : t("status.draft")}
         </span>
+        {/* Save state pill — gives the user explicit feedback that
+            the save click was registered and what happened. Without
+            this, both Save buttons did their network call silently
+            and the user couldn't tell if anything was happening. */}
+        {saveState !== "idle" && (
+          <span
+            className={`text-xs font-semibold px-3 py-1 rounded-full ${
+              saveState === "saving" ? "bg-blue-500/15 text-blue-300"
+              : saveState === "saved" ? "bg-green-500/20 text-green-300"
+              : "bg-red-500/20 text-red-300"
+            }`}
+            title={saveError || undefined}
+          >
+            {saveState === "saving" && "Saving…"}
+            {saveState === "saved" && "✓ Saved"}
+            {saveState === "error" && "✕ Save failed"}
+          </span>
+        )}
         <button
           onClick={() => handleSave("draft")}
-          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          disabled={saveState === "saving"}
+          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t("btn.saveDraft")}
+          {saveState === "saving" ? "Saving…" : t("btn.saveDraft")}
         </button>
         <button
           onClick={() => handleSave("final")}
-          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
+          disabled={saveState === "saving"}
+          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t("btn.saveFinal")}
+          {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
         </button>
         <button
           onClick={handleConvertToInvoice}

@@ -105,7 +105,19 @@ export async function upsertDoc<T = Record<string, unknown>>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Pull the server's error message and THROW — silent null was making
+    // it impossible for callers (Quotations.tsx save flow) to tell the
+    // user why their save failed.
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = (j && typeof j.error === "string") ? j.error : "";
+    } catch {
+      try { detail = await res.text(); } catch { /* ignore */ }
+    }
+    throw new Error(`Save failed (${res.status})${detail ? `: ${detail}` : ""}`);
+  }
   // Bust any cached list/detail responses so the next read is fresh.
   invalidateFetchCache(b.listPath);
   const json = (await res.json()) as Record<string, RemoteDocRow<T>>;
