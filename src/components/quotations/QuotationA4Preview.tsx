@@ -847,7 +847,9 @@ export default function QuotationA4Preview({
                     {/* Row action cluster — single unified pill that
                         groups the 3 buttons (↑ / ↓ / 🗑) as one
                         organised control. Anchored to vertical centre
-                        of the row so it tracks the row's height. */}
+                        of the row so it tracks the row's height.
+                        Explicit width + alignment so it can't be
+                        squished by parent flex constraints. */}
                     <div
                       className="no-print"
                       style={{
@@ -857,19 +859,23 @@ export default function QuotationA4Preview({
                         /* Geometry — must land OUTSIDE the A4 paper
                            frame.
                              A4 inner padding right ........ 32 px
-                             Cluster width (pill + buttons)  40 px
+                             Cluster width (pill 40 px) ... 40 px
                              Breathing gap ................. 16 px
                            right = 32 + 40 + 16 = 88. */
                         right: -88,
+                        width: 40,
+                        boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
                         gap: 4,
                         /* Single grouped pill — subtle dark surface +
                            border so the three buttons read as ONE
                            control, not three floating squares. */
                         background: "rgba(255,255,255,0.05)",
                         border: "1px solid rgba(255,255,255,0.10)",
-                        borderRadius: 12,
+                        borderRadius: 10,
                         padding: 4,
                         boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
                         zIndex: 2,
@@ -1807,10 +1813,19 @@ function RowActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 32,
-        height: 32,
+        /* Fixed square — flexShrink: 0 stops the parent flex
+           container from squishing the button when row height is
+           tight. Outline and appearance reset clears any browser
+           defaults (Safari's iOS-style chrome on <button>). */
+        width: 30,
+        height: 30,
+        minWidth: 30,
+        flexShrink: 0,
         borderRadius: 8,
         border: "none",
+        outline: "none",
+        WebkitAppearance: "none",
+        appearance: "none",
         background: disabled ? "transparent" : (hover ? hoverBg : idleBg),
         color: disabled
           ? (destructive ? "rgba(248,113,113,0.30)" : "rgba(255,255,255,0.25)")
@@ -1820,6 +1835,8 @@ function RowActionBtn({
         alignItems: "center",
         justifyContent: "center",
         padding: 0,
+        margin: 0,
+        boxSizing: "border-box",
         transition: "background-color 120ms ease, color 120ms ease",
       }}
     >
