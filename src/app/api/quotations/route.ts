@@ -22,6 +22,12 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
          doc: Record<string, unknown> // full UI snapshot
        } */
 
+/* Floor for the first quote_no of any year. Lets Koleex pick up
+   the sequence from their existing offline numbering (1520 in the
+   2026 series) instead of starting from 0001. New years and tenants
+   without history both inherit this floor. */
+const QUOTE_NO_FLOOR = 1520;
+
 async function nextQuoteNumber(tenantId: string): Promise<string> {
   const year = new Date().getFullYear();
   const prefix = `KL${year}-`;
@@ -33,7 +39,10 @@ async function nextQuoteNumber(tenantId: string): Promise<string> {
     .order("quote_no", { ascending: false })
     .limit(1);
   const last = data?.[0]?.quote_no as string | undefined;
-  const nextSeq = last ? Number(last.replace(prefix, "")) + 1 : 1;
+  const lastSeq = last ? Number(last.replace(prefix, "")) : 0;
+  // Pick the higher of (lastSeq + 1) and the floor so we never go
+  // backwards once the sequence has passed the floor in a later year.
+  const nextSeq = Math.max(lastSeq + 1, QUOTE_NO_FLOOR);
   return `${prefix}${String(nextSeq).padStart(4, "0")}`;
 }
 
