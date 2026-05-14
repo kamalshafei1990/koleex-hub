@@ -870,20 +870,26 @@ export default function QuotationA4Preview({
                            right offset = 32 + 40 + 40 = 112. */
                         right: -112,
                         width: 40,
-                        height: 112,
+                        /* Cluster height shrunk 112 → 100 to leave
+                           visible vertical breathing space (≈15 px
+                           above + below) between adjacent rows'
+                           clusters. Picture-cell-driven rows are
+                           ~130 px tall, so the slack now reads as a
+                           clear vertical gap between controls. */
+                        height: 100,
                         boxSizing: "border-box",
                         display: "grid",
-                        /* 3 rigid 30 px rows + 2 × 5 px row gaps fit
-                           inside 112 px minus 5 px padding × 2 = 102
-                           content height. 30×3 + 5×2 = 100 ≤ 102. */
-                        gridTemplateRows: "30px 30px 30px",
-                        rowGap: 5,
+                        /* 3 rigid 28 px rows + 2 × 4 px row gaps fit
+                           inside 100 px minus 4 px padding × 2 = 92
+                           content height. 28×3 + 4×2 = 92 ≤ 92. */
+                        gridTemplateRows: "28px 28px 28px",
+                        rowGap: 4,
                         alignContent: "center",
                         justifyItems: "center",
                         background: "#1A1A1A",
                         border: "1px solid #2D2D2D",
                         borderRadius: 10,
-                        padding: 5,
+                        padding: 4,
                         boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
                         overflow: "hidden",
                         zIndex: 2,
@@ -920,15 +926,20 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Cluster ends at right offset 112 (cluster
-                           width 40 + 40 gap from paper edge + 32 paper
-                           padding). Notes starts 28 px to the right of
-                           the cluster — comfortable visual gap —
-                           and is 200 px wide.
-                             right_offset = 112 + 28 + 200 = 340. */
-                        right: -340,
+                        /* Cluster's outer-right edge sits at right
+                           offset 112 (cluster width 40 + 40 gap +
+                           32 paper padding). Notes starts 48 px to
+                           the right of the cluster — generous visual
+                           gap between the two controls — and is
+                           200 px wide.
+                             right_offset = 112 + 48 + 200 = 360. */
+                        right: -360,
                         width: 200,
-                        height: 112,
+                        /* Matches cluster height; 30 px slack against
+                           the ~130 px row leaves ~15 px breathing
+                           space above and below adjacent notes
+                           panels. */
+                        height: 100,
                         boxSizing: "border-box",
                         background: "#1A1A1A",
                         border: "1px solid #2D2D2D",
@@ -1831,12 +1842,12 @@ function RowActionBtn({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 30,
-        height: 30,
-        minWidth: 30,
-        minHeight: 30,
+        width: 28,
+        height: 28,
+        minWidth: 28,
+        minHeight: 28,
         flexShrink: 0,
-        borderRadius: 8,
+        borderRadius: 7,
         background: disabled ? "rgba(255,255,255,0.02)" : (hover ? hoverBg : idleBg),
         color: disabled
           ? (destructive ? "rgba(248,113,113,0.35)" : "rgba(255,255,255,0.30)")
