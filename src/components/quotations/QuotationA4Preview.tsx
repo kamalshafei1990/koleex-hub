@@ -1765,14 +1765,54 @@ const FONT_COLOR_OPTIONS = [
   "#7c3aed", "#c026d3", "#db2777",
 ];
 
+/* Render-time normalisation. Quotes saved before the structured-
+   row upgrade have their terms stored as <br>-separated HTML. We
+   wrap each <br>-line in a styled <div> at display time so old
+   quotes get the new bordered-rows look without touching the
+   stored data. Detection: 'no <div> wrappers anywhere' = legacy. */
+function normaliseTermsForDisplay(rawTerms: string): string {
+  if (!rawTerms) return rawTerms;
+  if (/<div[^>]*>[\s\S]*?<\/div>/i.test(rawTerms)) {
+    /* Already div-structured — leave untouched. */
+    return rawTerms;
+  }
+  const rowStyle = "border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;";
+  const notesStyle = "padding: 6px 0; min-height: 28px;";
+  /* Split on EITHER <br> (HTML line break) OR \n (legacy plain-text
+     newline — older quotes were saved as plain strings before the
+     rich-text upgrade and the contentEditable's white-space:pre-wrap
+     rendered them as line breaks). Filter trailing empty parts so
+     the free-text <div> only gets one trailing slot. */
+  const parts = rawTerms.split(/<br\s*\/?>|\n/i);
+  while (parts.length > 1 && parts[parts.length - 1].replace(/<[^>]+>/g, "").trim() === "") {
+    parts.pop();
+  }
+  const wrapped = parts.map((p) => {
+    const plain = p.replace(/<[^>]+>/g, "").trim();
+    if (!plain) {
+      /* Empty legacy line → render as a blank styled row so the
+         visual rhythm stays consistent. */
+      return `<div style="${rowStyle}"><br></div>`;
+    }
+    /* Heuristic: a 'Label:' line gets the bordered row style; prose
+       without a colon goes into the free-text bucket. */
+    const looksLikeLabel = /^[A-Za-z][A-Za-z &]*?:/.test(plain);
+    return looksLikeLabel
+      ? `<div style="${rowStyle}">${p}</div>`
+      : `<div style="${notesStyle}">${p}</div>`;
+  });
+  /* Always end with a free-text slot so the operator can keep
+     typing below the last structured row. */
+  return wrapped.join("") + `<div style="${notesStyle}"><br></div>`;
+}
+
 function injectTotalQty(rawTerms: string, totalQty: number): string {
-  /* Unified with the Quick Fill rewrite pipeline so the Total Qty
-     line gets the same canonical bold treatment as every other
-     auto-managed line. applyQuickFillToTerms handles the HTML /
-     plain-text detection, alias matching ('Total Qty' / 'Total
-     Quantity' / 'Qty Total'), and the '<strong>Label:</strong>
-     value' rebuild. */
-  return applyQuickFillToTerms(rawTerms, { "Total Qty": String(totalQty) });
+  /* First normalise legacy <br>-only terms into the new <div>-row
+     layout (no-op if already structured). Then route through the
+     Quick Fill rewrite pipeline so the Total Qty line gets the same
+     canonical bold treatment as every other auto-managed line. */
+  const normalised = normaliseTermsForDisplay(rawTerms);
+  return applyQuickFillToTerms(normalised, { "Total Qty": String(totalQty) });
 }
 
 function TermsArea({
