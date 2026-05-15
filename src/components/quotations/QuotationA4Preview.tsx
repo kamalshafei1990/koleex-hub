@@ -89,6 +89,11 @@ interface Props {
     value: QuotationItem[K],
   ) => void;
   addItem: () => void;
+  /* Optional handler for the "+ From catalog" button. The parent
+     owns the picker modal — this prop just opens it. If undefined,
+     the button is hidden (e.g. when used somewhere without a
+     parent-supplied catalog). */
+  onPickFromCatalog?: () => void;
   removeItem: (idx: number) => void;
   moveItem: (idx: number, direction: -1 | 1) => void;
   handleImageUpload: (idx: number, file: File) => void;
@@ -151,6 +156,7 @@ export default function QuotationA4Preview({
   setCurrent,
   updateItem,
   addItem,
+  onPickFromCatalog,
   removeItem,
   moveItem,
   handleImageUpload,
@@ -1124,30 +1130,57 @@ export default function QuotationA4Preview({
         )}
 
         {isLastPage && (<>
-        {/* Add-row button */}
-        <button
-          type="button"
-          onClick={addItem}
-          className="pq-add-btn no-print"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            height: 28,
-            padding: "0 14px",
-            border: `1px solid ${T.border}`,
-            background: "#fff",
-            color: T.inkSoft,
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-            margin: "10px 0 16px",
-          }}
-        >
-          + Add row
-        </button>
+        {/* Add-row + From-catalog buttons. Empty row is the manual
+            entry path; the catalog picker fills model, name, unit
+            price and image in one click. */}
+        <div className="no-print" style={{ display: "flex", gap: 8, margin: "10px 0 16px" }}>
+          <button
+            type="button"
+            onClick={addItem}
+            className="pq-add-btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              height: 28,
+              padding: "0 14px",
+              border: `1px solid ${T.border}`,
+              background: "#fff",
+              color: T.inkSoft,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            + Add row
+          </button>
+          {onPickFromCatalog && (
+            <button
+              type="button"
+              onClick={onPickFromCatalog}
+              className="pq-add-btn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                height: 28,
+                padding: "0 14px",
+                border: `1px solid ${T.black}`,
+                background: T.black,
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              + From catalog
+            </button>
+          )}
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════
             (g) BOTTOM ROW — totals (left) + terms (right)

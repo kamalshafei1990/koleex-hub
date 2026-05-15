@@ -9,10 +9,12 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationA4Preview from "./QuotationA4Preview";
+import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
@@ -679,6 +681,10 @@ export default function Quotations() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string>("");
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  /* "+ From catalog" picker. Owned by the parent so the modal can
+     stay mounted across A4-page renders without each page mounting
+     its own copy. */
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   /* ── Load from Supabase on mount ── */
   useEffect(() => {
@@ -841,6 +847,34 @@ export default function Quotations() {
     document.title = prev;
   }, [current]);
 
+  /* ── Duplicate ──
+     Clones the current quote into a fresh draft and drops the user
+     straight into the editor. The new draft gets:
+       · A brand-new client-side id so React treats it as a new row.
+       · An empty invoiceNo so the server mints a fresh
+         KL{YYYY}-{MMDD} (date-based) number on first save.
+       · Today's date as the new issue date + a 30-day validity.
+       · Deep-cloned items so edits on the copy don't bleed back
+         into the source quote's state. */
+  const handleDuplicate = useCallback(() => {
+    if (!current) return;
+    const today = todayDDMMYYYY();
+    const copy: Quotation = {
+      ...current,
+      id: generateId(),
+      invoiceNo: "",
+      date: today,
+      validTill: addDays(today, 30),
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      serverTotal: undefined,
+      items: current.items.map((it) => ({ ...it })),
+    };
+    setCurrent(copy);
+    setView("editor");
+  }, [current]);
+
   /* ── Item helpers ── */
   const updateItem = useCallback(
     (idx: number, field: keyof QuotationItem, value: string | number) => {
@@ -857,6 +891,37 @@ export default function Quotations() {
     if (!current) return;
     setCurrent({ ...current, items: [...current.items, { ...EMPTY_ITEM }] });
   }, [current]);
+
+  /* Append a new item pre-filled from the catalog picker. If the
+     bottom-most row is still completely blank (typical right after
+     a "+ Add row"), replace it instead of appending — keeps the
+     items list tidy when the user clicks "From catalog" first. */
+  const addItemFromCatalog = useCallback(
+    (pick: PickResult) => {
+      if (!current) return;
+      const fresh: QuotationItem = {
+        ...EMPTY_ITEM,
+        description: pick.description,
+        model: pick.model,
+        image: pick.imageUrl,
+        unitPrice: pick.unitPrice,
+        qty: 1,
+      };
+      const items = current.items.slice();
+      const last = items[items.length - 1];
+      const lastIsEmpty =
+        last &&
+        !last.description &&
+        !last.model &&
+        !last.image &&
+        !last.unitPrice &&
+        last.qty === 1;
+      if (lastIsEmpty) items[items.length - 1] = fresh;
+      else items.push(fresh);
+      setCurrent({ ...current, items });
+    },
+    [current],
+  );
 
   const removeItem = useCallback(
     (idx: number) => {
@@ -1143,6 +1208,14 @@ export default function Quotations() {
           {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
         </button>
         <button
+          onClick={handleDuplicate}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Clone this quote into a new draft (fresh number, today's date)."
+        >
+          <CopyIcon size={14} />
+          Duplicate
+        </button>
+        <button
           onClick={handleConvertToInvoice}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
           title={t("tip.convert")}
@@ -1243,6 +1316,7 @@ export default function Quotations() {
         setCurrent={setCurrent}
         updateItem={updateItem}
         addItem={addItem}
+        onPickFromCatalog={() => setPickerOpen(true)}
         removeItem={removeItem}
         moveItem={moveItem}
         handleImageUpload={handleImageUpload}
@@ -1251,6 +1325,11 @@ export default function Quotations() {
         grandTotal={grandTotal}
         fmt={fmt}
         numberToWords={numberToWords}
+      />
+      <ProductPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={addItemFromCatalog}
       />
     </div>
   );
