@@ -16,6 +16,7 @@ import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationA4Preview from "./QuotationA4Preview";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
+import CustomerPickerModal, { type CustomerPickResult } from "./CustomerPickerModal";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   QUOTATIONS_SYNC,
@@ -70,6 +71,11 @@ export interface Quotation {
      in that case. */
   stampUrl?: string;
   signatureUrl?: string;
+  /* Contact-table id of the linked CRM customer. The editor's
+     "Link Customer" picker stores this when the user picks from
+     the CRM; the QUOTATION TO fields below are auto-filled at the
+     same time. Optional — historic quotes have this undefined. */
+  customerContactId?: string;
   status: "draft" | "final";
   createdAt: string;
   updatedAt: string;
@@ -154,6 +160,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
     terms: doc.terms ?? DEFAULT_TERMS,
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
+    customerContactId: doc.customerContactId,
     status: (row.status === "final" ? "final" : "draft") as "draft" | "final",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -697,6 +704,9 @@ export default function Quotations() {
      stay mounted across A4-page renders without each page mounting
      its own copy. */
   const [pickerOpen, setPickerOpen] = useState(false);
+  /* "Link customer" picker — same pattern as the product picker:
+     parent owns the modal, the preview triggers it via prop. */
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   /* Tenant-wide saved stamp + signature. Loaded once on editor
      mount; refreshed after the operator uploads a new one so the
      "Use saved" button appears immediately. Null until the fetch
@@ -1028,6 +1038,30 @@ export default function Quotations() {
     if (!current) return;
     setCurrent({ ...current, items: [...current.items, { ...EMPTY_ITEM }] });
   }, [current]);
+
+  /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
+     editor's company / contact / phone / mobile / email / website
+     fields and stores customerContactId in the doc so we can show
+     a "Linked" indicator on reload. Doesn't touch the legacy
+     schema-level customer_id FK (that targets a different table) —
+     just keeps the link in the doc payload. */
+  const applyCustomerPick = useCallback(
+    (pick: CustomerPickResult) => {
+      if (!current) return;
+      setCurrent({
+        ...current,
+        customerContactId: pick.id,
+        customerName: pick.displayName || current.customerName,
+        companyName: pick.companyName || current.companyName,
+        toAddress: pick.address || current.toAddress,
+        toPhone: pick.phone || current.toPhone,
+        toMobile: pick.mobile || current.toMobile,
+        toEmail: pick.email || current.toEmail,
+        toWebsite: pick.website || current.toWebsite,
+      });
+    },
+    [current],
+  );
 
   /* Append a new item pre-filled from the catalog picker. If the
      bottom-most row is still completely blank (typical right after
@@ -1548,6 +1582,7 @@ export default function Quotations() {
         updateItem={updateItem}
         addItem={addItem}
         onPickFromCatalog={() => setPickerOpen(true)}
+        onPickCustomer={() => setCustomerPickerOpen(true)}
         savedStampUrl={savedStampUrl}
         savedSignatureUrl={savedSignatureUrl}
         isSuperAdmin={isSuperAdmin}
@@ -1570,6 +1605,11 @@ export default function Quotations() {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={addItemFromCatalog}
+      />
+      <CustomerPickerModal
+        open={customerPickerOpen}
+        onClose={() => setCustomerPickerOpen(false)}
+        onPick={applyCustomerPick}
       />
     </div>
   );

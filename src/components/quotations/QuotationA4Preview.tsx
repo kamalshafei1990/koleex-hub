@@ -84,6 +84,12 @@ export interface Quotation {
      the parent's Quotation interface. */
   stampUrl?: string;
   signatureUrl?: string;
+  /* Optional FK-by-text into the contacts table for the linked
+     customer. Persisted in the doc payload (not the schema's
+     customer_id column, which targets the legacy pricing-engine
+     customers table). Lets the editor remember which CRM record a
+     quote was auto-filled from. */
+  customerContactId?: string;
 }
 
 interface Props {
@@ -100,6 +106,9 @@ interface Props {
      the button is hidden (e.g. when used somewhere without a
      parent-supplied catalog). */
   onPickFromCatalog?: () => void;
+  /* Optional handler for the "Link customer" button on the
+     QUOTATION TO header. Parent owns the modal. */
+  onPickCustomer?: () => void;
   /* Saved-asset hooks for the Stamp + Signature cards. The parent
      fetches /api/quotations/saved-assets on mount and passes the
      URLs (or null) here, plus the handlers that attach/detach an
@@ -178,6 +187,7 @@ export default function QuotationA4Preview({
   updateItem,
   addItem,
   onPickFromCatalog,
+  onPickCustomer,
   savedStampUrl,
   savedSignatureUrl,
   isSuperAdmin,
@@ -602,9 +612,37 @@ export default function QuotationA4Preview({
                 fontWeight: 700,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
               }}
             >
-              Quotation To
+              <span>Quotation To</span>
+              {/* Link-to-CRM button. Editor-only (`.no-print`) so the
+                  black header strip stays clean on the printed PDF. */}
+              {onPickCustomer && (
+                <button
+                  type="button"
+                  className="no-print"
+                  onClick={onPickCustomer}
+                  title="Pick a customer from the CRM — auto-fills the fields below."
+                  style={{
+                    background: "rgba(255,255,255,0.14)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    padding: "2px 8px",
+                    borderRadius: 5,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                  }}
+                >
+                  {current.customerContactId ? "Change" : "Link Customer"}
+                </button>
+              )}
             </div>
             <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
               {/* Company name — prominent at the top */}
