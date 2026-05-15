@@ -242,6 +242,12 @@ export default function QuotationA4Preview({
     () => current.items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0),
     [current.items],
   );
+  /* Bumped every time something OUTSIDE the rich-text terms area
+     changes the terms — Quick Fill picks, future 'apply customer
+     defaults' button, etc. TermsArea force-syncs its innerHTML on
+     this revision so the visible text matches even if the operator
+     had the rich-text area focused at the moment of the pick. */
+  const [termsRevision, setTermsRevision] = useState(0);
 
   /* Which item-description cell currently has the user's focus.
      The rich-text toolbar renders right above that cell so the user
@@ -1407,6 +1413,12 @@ export default function QuotationA4Preview({
                         );
                       }
                       setCurrent(next);
+                      /* Force the rich-text terms area to re-sync
+                         even if the operator had it focused when
+                         they used the dropdown. Without this bump
+                         the visible text would lag until the
+                         150 ms blur-grace window fired. */
+                      setTermsRevision((v) => v + 1);
                     }}
                   />
                   <div className="pq-terms-value" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -1414,6 +1426,7 @@ export default function QuotationA4Preview({
                       terms={current.terms}
                       totalQty={totalQty}
                       onCommit={(v) => setMeta("terms", v)}
+                      externalRevision={termsRevision}
                     />
                   </div>
                 </div>
@@ -1740,10 +1753,19 @@ function TermsArea({
   terms,
   totalQty,
   onCommit,
+  externalRevision = 0,
 }: {
   terms: string;
   totalQty: number;
   onCommit: (next: string) => void;
+  /* Bumped by the parent whenever something OTHER than the user
+     typing changes the terms (Quick Fill pick, customer-defaults
+     apply, etc.). When this number changes we force-sync the
+     innerHTML even if the area still thinks it's focused — the
+     dropdown click moved keyboard focus away momentarily but the
+     blurTimer hasn't fired, so without this we'd swallow the
+     external update for 150 ms. */
+  externalRevision?: number;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [focused, setFocused] = useState(false);
@@ -1760,13 +1782,39 @@ function TermsArea({
     [terms, totalQty],
   );
 
+  /* Track the last externalRevision we synced so we only force-sync
+     on a NEW external change, not every render. */
+  const lastSyncedRevision = useRef<number>(-1);
+
   useEffect(() => {
     if (!ref.current) return;
+    /* External revision changed — force-sync even if focused. After
+       syncing, move the caret to the end so the operator can
+       immediately continue typing after the inserted line. */
+    if (externalRevision !== lastSyncedRevision.current) {
+      lastSyncedRevision.current = externalRevision;
+      if (ref.current.innerHTML !== displayedTerms) {
+        ref.current.innerHTML = displayedTerms;
+        if (focused) {
+          /* Restore caret to end of content. */
+          const range = document.createRange();
+          range.selectNodeContents(ref.current);
+          range.collapse(false);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+      }
+      return;
+    }
+    /* Normal path — only sync when not actively editing, so a
+       user keystroke doesn't get clobbered by an auto-rerender from
+       the parent (e.g. Total Qty auto-injection during typing). */
     if (focused) return;
     if (ref.current.innerHTML !== displayedTerms) {
       ref.current.innerHTML = displayedTerms;
     }
-  }, [displayedTerms, focused]);
+  }, [displayedTerms, focused, externalRevision]);
 
   /* Save the live HTML into the parent. Called on blur and after
      every formatting command so an in-flight edit doesn't get lost
