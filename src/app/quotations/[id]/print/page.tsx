@@ -142,21 +142,76 @@ export default function QuotationPrintPage({
   }
 
   return (
-    <div className="quot-a4-stack" style={{ background: "#fff" }}>
-      <QuotationA4Preview
-        current={quote}
-        setCurrent={stubSetCurrent as never}
-        updateItem={stubUpdate as never}
-        addItem={stubUpdate as never}
-        removeItem={stubUpdate as never}
-        moveItem={stubUpdate as never}
-        handleImageUpload={stubUpdate as never}
-        fileInputRefs={fileInputRefs}
-        subTotal={subTotal}
-        grandTotal={grandTotal}
-        fmt={fmt}
-        numberToWords={numberToWords}
-      />
-    </div>
+    <>
+      {/* PDF-optimised stylesheet — only applies on this route. The
+          editor's @media print rules deliberately shrink each page to
+          268 mm so the doc fits inside US Letter's 279 mm printable
+          area when the user hits the browser Print dialog. That hack
+          doesn't apply to the server-side Puppeteer pipeline (we tell
+          it format: A4 explicitly), so every page renders 29 mm short
+          and the PDF has a thick white strip at the bottom of each
+          sheet.
+
+          On this print route we override the height back to a full
+          A4 297 mm and force a page-break after every <.quot-a4-doc>
+          so Puppeteer's page slicer lands exactly on doc boundaries.
+          We also strip the screen-only shadow, gap, and outer scroll
+          so the captured bitmap is purely the doc surface. */}
+      <style>{`
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #fff !important;
+          overflow: visible !important;
+        }
+        .quot-a4-stack {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 210mm !important;
+          background: #fff !important;
+        }
+        .quot-a4-doc {
+          box-sizing: border-box !important;
+          width: 210mm !important;
+          height: 297mm !important;
+          min-height: 297mm !important;
+          max-height: 297mm !important;
+          margin: 0 !important;
+          padding: 24px 28px 18px !important;
+          box-shadow: none !important;
+          border: none !important;
+          background: #fff !important;
+          overflow: hidden !important;
+          page-break-after: always !important;
+          break-after: page !important;
+          page-break-inside: avoid !important;
+        }
+        .quot-a4-doc:last-child {
+          page-break-after: auto !important;
+          break-after: auto !important;
+        }
+        /* No editor chrome on this route, but kill any stray
+           .no-print elements (toolbars, file inputs etc.) just in
+           case a future change adds one. */
+        .no-print { display: none !important; }
+        @page { size: A4 portrait; margin: 0; }
+      `}</style>
+      <div className="quot-a4-stack">
+        <QuotationA4Preview
+          current={quote}
+          setCurrent={stubSetCurrent as never}
+          updateItem={stubUpdate as never}
+          addItem={stubUpdate as never}
+          removeItem={stubUpdate as never}
+          moveItem={stubUpdate as never}
+          handleImageUpload={stubUpdate as never}
+          fileInputRefs={fileInputRefs}
+          subTotal={subTotal}
+          grandTotal={grandTotal}
+          fmt={fmt}
+          numberToWords={numberToWords}
+        />
+      </div>
+    </>
   );
 }

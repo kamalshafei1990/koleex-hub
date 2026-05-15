@@ -148,25 +148,37 @@ export async function GET(req: Request, { params }: RouteCtx) {
       secure: proto === "https",
     });
 
-    await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
-    /* Wait for the page's own readiness signal — set after images
-       finish decoding. Falls back to a fixed wait if the flag never
-       flips (e.g. an error path replaced the layout). */
+    /* Speed pass — every wait below got tightened after the user
+       reported renders feeling "very long". The big saver is dropping
+       networkidle-style behaviour: we don't care if Supabase or the
+       sidebar finishes warming up, only that the doc + its images
+       resolve, and the print page's `__quotation_pdf_ready__` flag
+       already covers that.
+
+       Bumped timeout to 60 s only for the cold-start case where
+       Chromium downloads the binary mid-navigation; warm calls
+       complete in well under 5 s. */
+    await page.goto(printUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page
       .waitForFunction(
         () =>
           (window as unknown as { __quotation_pdf_ready__?: boolean })
             .__quotation_pdf_ready__ === true,
-        { timeout: 30_000 },
+        { timeout: 20_000, polling: 100 },
       )
       .catch(() => {
         /* Fall through — render whatever's on screen rather than fail. */
       });
 
+    /* preferCSSPageSize:false — we set the A4 / margin:0 layout via
+       the @page rule in /quotations/[id]/print/page.tsx AND via the
+       format option here. Letting Puppeteer trust the format option
+       avoids a class of edge case where a missing/conflicting @page
+       declaration produces oddly-sized first pages. */
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
 
