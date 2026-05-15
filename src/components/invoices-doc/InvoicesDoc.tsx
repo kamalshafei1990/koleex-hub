@@ -1062,7 +1062,7 @@ export default function Quotations() {
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
 
   /* ── Export PDF ──
-     Opens /quotations/<id>/print?auto=1 in a new window. That page
+     Opens /invoices/<id>/print?auto=1 in a new window. That page
      renders the same A4 layout the server-side Puppeteer pipeline
      uses (210×297 mm, page-break-after each doc) and auto-fires
      window.print() once every image decodes. The operator picks
@@ -1098,7 +1098,13 @@ export default function Quotations() {
         setTimeout(() => setPdfState("idle"), 2_000);
         return;
       }
-      const url = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      /* Route to the dedicated invoice print page so the renderer
+         receives docKind="invoice" and shows "COMMERCIAL INVOICE"
+         in the header / "Invoice No" / "Due Date" labels. Using
+         the quotation print page would (a) 404 because invoices
+         live in a different table and (b) display the wrong
+         document headings on the printed PDF. */
+      const url = `/invoices/${encodeURIComponent(quotationId)}/print?auto=1`;
       window.open(url, "_blank", "noopener,noreferrer");
       /* Briefly reflect success; the actual render happens in the new
          window so we don't have anything else to wait on. */
@@ -1177,7 +1183,7 @@ export default function Quotations() {
       /* Open the print window first so the operator's browser is
          already showing the printable doc when they switch to the
          email tab to attach the saved PDF. */
-      const printUrl = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      const printUrl = `/invoices/${encodeURIComponent(quotationId)}/print?auto=1`;
       window.open(printUrl, "_blank", "noopener,noreferrer");
 
       /* Fire the mailto on a small delay so the print window grabs

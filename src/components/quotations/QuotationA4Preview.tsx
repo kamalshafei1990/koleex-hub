@@ -3464,7 +3464,27 @@ interface ShippingMethodLite {
    inline formatting tags), and replace its trailing content. If no
    matching line exists we append one. The Total-Qty injection in
    TermsArea uses the same line-by-line convention. */
+/* Escapes any HTML-significant characters in a value before it
+   gets interpolated into the terms HTML. Without this, the
+   inline-editable Shipment Details cells (which read raw
+   textContent) plus any Quick Fill picks containing `<`, `&`,
+   `"`, etc. would land in current.terms as live HTML -- both
+   an XSS vector and a data-integrity bug. */
+function escapeTermValue(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string>): string {
+  /* Escape every value once at the entry point so all three
+     interpolation sites below stay safe. */
+  const safe: Record<string, string> = {};
+  for (const k of Object.keys(updates)) safe[k] = escapeTermValue(updates[k] ?? "");
+  updates = safe;
   /* Strip tags only when checking — keep them when rewriting so any
      bolding the operator did survives. We split on <br> (HTML line
      breaks the rich-text editor uses) and on "\n" for legacy
@@ -4692,6 +4712,11 @@ function ShipmentDetailsCard({
         }
         @media print {
           .pq-detail-cell[contenteditable="true"]:empty::before { content: ""; }
+          .pq-detail-cell[contenteditable="true"]:hover,
+          .pq-detail-cell[contenteditable="true"]:focus {
+            outline: none !important;
+            background: transparent !important;
+          }
         }
       `}</style>
       {/* Grid body — CSS grid, 4 columns on desktop / print, 2 on
@@ -4974,13 +4999,15 @@ function TermsQuickFillModal({
   const [incoterms, setIncoterms] = useState<IncotermLite[]>([]);
   const [methods, setMethods] = useState<ShippingMethodLite[]>([]);
 
-  /* Country picker state for the discharge port. Initialised
-     from the saved port (we try to recognise the country
-     suffix); after that it is operator-driven so they can
-     re-pick a country without committing a port first. */
-  const [dischargeCountry, setDischargeCountry] = useState<string>(
-    () => deriveDischargeCountry(current.dischargePort),
-  );
+  /* Country picker state for the discharge port. We keep an
+     OPTIONAL manual override; when it's null the effective
+     country is derived from current.dischargePort. Using a
+     derived value (instead of a useEffect that calls setState
+     on every prop change) avoids the cascading-render lint and
+     stops the country from flickering during inline edits. */
+  const [manualDischargeCountry, setManualDischargeCountry] = useState<string | null>(null);
+  const dischargeCountry = manualDischargeCountry ?? deriveDischargeCountry(current.dischargePort);
+  const setDischargeCountry = (c: string) => setManualDischargeCountry(c);
 
   useEffect(() => {
     let cancelled = false;
@@ -5004,15 +5031,8 @@ function TermsQuickFillModal({
     [methods, current.shippingMethodId],
   );
 
-  /* When the saved discharge port matches a port we know about
-     (e.g. the operator edited it inline on the Shipment Details
-     card) keep the country picker in sync. We do NOT clear the
-     country if the saved port is empty — the operator may have
-     just picked the country and is about to pick a port. */
-  useEffect(() => {
-    const derived = deriveDischargeCountry(current.dischargePort);
-    if (derived) setDischargeCountry(derived);
-  }, [current.dischargePort]);
+  /* (No useEffect needed -- dischargeCountry is derived above
+     from manualDischargeCountry ?? deriveDischargeCountry().) */
 
   const allPaymentTerms = useMemo(
     () => payCats.flatMap((c) => c.terms.map((t) => ({ ...t, catName: c.short_name ?? c.name }))),
@@ -5147,6 +5167,7 @@ function TermsQuickFillModal({
   return (
     <div
       onClick={onClose}
+      className="no-print"
       style={{
         position: "fixed",
         inset: 0,
