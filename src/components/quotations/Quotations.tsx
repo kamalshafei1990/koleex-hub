@@ -11,6 +11,7 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
@@ -1056,6 +1057,90 @@ export default function Quotations() {
     }
   }, [current, handleSave]);
 
+  /* ── Send by email ──
+     Opens a print window so the operator can "Save as PDF" the
+     attachment, AND fires a mailto: with To/Subject/Body pre-
+     filled from the quote. We deliberately don't try to attach
+     the PDF programmatically — mailto can't carry binary
+     attachments and rigging up a real SMTP path means adding
+     Resend / SendGrid + an env-var dance. The two-window flow
+     (print tab + Mail composer) gives a near-one-click experience
+     on every platform without that infrastructure.
+
+     Marks the quote as Sent on the way out so the status pill +
+     audit log reflect the action. Skips that side-effect if the
+     quote is already past Sent (Accepted / Rejected). */
+  const handleSendEmail = useCallback(async () => {
+    if (!current) return;
+    const to = (current.toEmail || "").trim();
+    if (!to) {
+      alert("Add the customer's email in the QUOTATION TO card before sending.");
+      return;
+    }
+    try {
+      /* Save first so the print window pulls the latest doc. */
+      const targetStatus: QuoteStatus =
+        current.status === "accepted" ||
+        current.status === "rejected" ||
+        current.status === "expired"
+          ? current.status
+          : "sent";
+      if (current.id.length !== 36 || current.status !== targetStatus) {
+        await handleSave(targetStatus);
+      }
+      const refreshed = await loadQuotationsRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const quotationId = match?.id ?? current.id;
+      if (quotationId.length !== 36) {
+        alert("Please save the quotation before sending.");
+        return;
+      }
+
+      /* Build a friendly cover-email skeleton. The operator can
+         tweak it in their mail client before pressing send. */
+      const greetingName = current.customerName?.trim() || "there";
+      const grandTotalNum =
+        current.serverTotal != null && current.serverTotal > 0
+          ? current.serverTotal
+          : computeGrandTotal(current);
+      const subject = `Quotation ${current.invoiceNo || "from Koleex"}${
+        current.companyName ? ` — ${current.companyName}` : ""
+      }`;
+      const body = [
+        `Dear ${greetingName},`,
+        "",
+        `Please find attached our quotation ${current.invoiceNo || ""} ` +
+          `for your review. The total amount is US$ ${fmt(grandTotalNum)}, ` +
+          `valid until ${current.validTill || "the date noted on the quote"}.`,
+        "",
+        "We're happy to discuss any of the items, prices, or delivery terms — just reply to this email or give us a call.",
+        "",
+        "Best regards,",
+        "Koleex Group",
+      ].join("\n");
+
+      /* Open the print window first so the operator's browser is
+         already showing the printable doc when they switch to the
+         email tab to attach the saved PDF. */
+      const printUrl = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      window.open(printUrl, "_blank", "noopener,noreferrer");
+
+      /* Fire the mailto on a small delay so the print window grabs
+         focus first — otherwise some OS mail handlers steal it
+         immediately and the print-as-PDF dialog never opens. */
+      setTimeout(() => {
+        const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+          subject,
+        )}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailto;
+      }, 600);
+    } catch (e) {
+      alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [current, handleSave]);
+
   /* ── Duplicate ──
      Clones the current quote into a fresh draft and drops the user
      straight into the editor. The new draft gets:
@@ -1568,6 +1653,14 @@ export default function Quotations() {
         >
           <DownloadIcon size={14} />
           {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
+        </button>
+        <button
+          onClick={handleSendEmail}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Open your mail app pre-filled with the customer's email, quote number, and a cover note. A print window also opens so you can save the PDF and attach it."
+        >
+          <PaperPlaneIcon size={14} />
+          Send
         </button>
         <button
           onClick={handlePrint}
