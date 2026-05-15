@@ -108,6 +108,7 @@ export interface Quotation {
   loadingPort?: string;
   dischargePort?: string;
   shippingMethodId?: string;
+  shippingMarks?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
 }
@@ -1410,6 +1411,7 @@ export default function QuotationA4Preview({
                     loadingPort={current.loadingPort}
                     dischargePort={current.dischargePort}
                     shippingMethodId={current.shippingMethodId}
+                    shippingMarks={current.shippingMarks}
                     leadTimeDays={current.leadTimeDays}
                     leadTimeBasis={current.leadTimeBasis}
                     onChange={(patch) => {
@@ -1729,32 +1731,13 @@ const FONT_COLOR_OPTIONS = [
 ];
 
 function injectTotalQty(rawTerms: string, totalQty: number): string {
-  /* Detect whether the stored value is plain text (legacy) or HTML.
-     We treat anything with an angle-bracket tag as HTML. Plain text
-     gets its "\n" line breaks converted to <br> for display. */
-  const looksLikeHtml = /<[a-z][\s\S]*>/i.test(rawTerms);
-  const html = looksLikeHtml ? rawTerms : rawTerms.replace(/\n/g, "<br>");
-
-  /* Match the "Total Qty:" label tolerant to formatting tags wrapped
-     around it (<b>, <span style=...>, etc.) and to existing digits
-     after the colon. Captures the label + any whitespace/inline tags
-     between the colon and the number so we can preserve them. <br>
-     and block tags are EXCLUDED from the gap — otherwise a stored
-     "Total Qty: <br>Shipping marks…" gets the number wedged in front
-     of the next line ("Total Qty: <br>185Shipping marks…"). */
-  const labelRe =
-    /(Total Qty:)((?:\s|&nbsp;|<(?!br\b|\/?(?:div|p|li|ul|ol)\b)\/?[^>]+>)*)\d*/i;
-  if (labelRe.test(html)) {
-    return html.replace(labelRe, (_m, label: string, between: string) => {
-      const gap = between.trim() === "" ? " " : between;
-      return `${label}${gap}${totalQty}`;
-    });
-  }
-
-  /* No "Total Qty:" found — append a fresh line at the very end. */
-  const trimmed = html.replace(/(?:<br\s*\/?>\s*|\s)+$/i, "");
-  const sep = trimmed ? "<br>" : "";
-  return `${trimmed}${sep}Total Qty: ${totalQty}`;
+  /* Unified with the Quick Fill rewrite pipeline so the Total Qty
+     line gets the same canonical bold treatment as every other
+     auto-managed line. applyQuickFillToTerms handles the HTML /
+     plain-text detection, alias matching ('Total Qty' / 'Total
+     Quantity' / 'Qty Total'), and the '<strong>Label:</strong>
+     value' rebuild. */
+  return applyQuickFillToTerms(rawTerms, { "Total Qty": String(totalQty) });
 }
 
 function TermsArea({
@@ -2151,11 +2134,21 @@ interface QuickFillPatch {
     loadingPort?: string;
     dischargePort?: string;
     shippingMethodId?: string;
+    shippingMarks?: string;
     leadTimeDays?: number;
     leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   };
   termsLineUpdates?: Record<string, string>;
 }
+
+/* Standard Shipping Marks options used in international machinery
+   trade. 'As per buyer's instruction' is the default — buyer sends
+   the actual marks (logo, PO ref, destination port) ~1 week before
+   shipment and the factory stencils them on the wooden cases. */
+const SHIPPING_MARKS_OPTIONS: { value: string; label: string }[] = [
+  { value: "As per buyer's instruction", label: "As per buyer's instruction" },
+  { value: "No marks",                   label: "No marks" },
+];
 
 const LEAD_TIME_BASIS_LABEL: Record<NonNullable<QuickFillPatch["fields"]["leadTimeBasis"]>, string> = {
   after_deposit:    "after receipt of deposit",
@@ -2221,6 +2214,8 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     "Discharge port": ["Discharge port", "Port of discharge", "POD", "To port", "Destination port", "Port of destination", "Port of arrival"],
     "Lead time":      ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
     "Delivery time":  ["Delivery time", "ETA", "ETD", "Estimated Time of Arrival", "Estimated Time of Departure", "Estimated arrival", "Estimated departure", "Estimated delivery", "Ready for shipment"],
+    "Shipping marks": ["Shipping marks", "Shipping mark", "Marks", "Marks and Numbers", "Marks & Numbers", "Case marks", "Carton marks"],
+    "Total Qty":      ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
   };
 
   const keyMatches = (segText: string, key: string): boolean => {
@@ -2281,6 +2276,7 @@ function QuickFillBar({
   loadingPort,
   dischargePort,
   shippingMethodId,
+  shippingMarks,
   leadTimeDays,
   leadTimeBasis,
   onChange,
@@ -2291,6 +2287,7 @@ function QuickFillBar({
   loadingPort?: string;
   dischargePort?: string;
   shippingMethodId?: string;
+  shippingMarks?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   onChange: (patch: QuickFillPatch) => void;
@@ -2500,6 +2497,28 @@ function QuickFillBar({
           <option key={m.id} value={m.id}>
             {m.short_name ?? m.name}
           </option>
+        ))}
+      </select>
+
+      {/* Shipping marks — 'As per buyer's instruction' is the
+          industry default. Picker writes a bold 'Shipping marks:'
+          line into the terms; the operator can still type a custom
+          value directly in the terms body afterwards. */}
+      <select
+        value={shippingMarks ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({
+            fields: { shippingMarks: v || undefined },
+            termsLineUpdates: { "Shipping marks": v },
+          });
+        }}
+        style={selectStyle}
+        title={shippingMarks || "Pick a shipping-marks rule"}
+      >
+        <option value="">Shipping marks…</option>
+        {SHIPPING_MARKS_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
 

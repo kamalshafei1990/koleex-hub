@@ -97,6 +97,7 @@ export interface Invoice {
   loadingPort?: string;
   dischargePort?: string;
   shippingMethodId?: string;
+  shippingMarks?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   /* Lifecycle:
@@ -219,6 +220,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
     loadingPort: doc.loadingPort,
     dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
+    shippingMarks: doc.shippingMarks,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —

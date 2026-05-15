@@ -108,6 +108,10 @@ export interface Quotation {
   loadingPort?: string;
   dischargePort?: string;
   shippingMethodId?: string;
+  /* Shipping marks pick — three standard options in international
+     trade. 'As per buyer's instruction' is the most common (buyer
+     supplies exact marks before shipment). */
+  shippingMarks?: string;
   /* Timing block — Lead Time + auto-computed ETD/ETA. The picker
      writes 'Lead time: 30 days after receipt of deposit' + an ETD/
      ETA chip into the terms. The basis is one of 'after_deposit',
@@ -237,6 +241,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
     loadingPort: doc.loadingPort,
     dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
+    shippingMarks: doc.shippingMarks,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
