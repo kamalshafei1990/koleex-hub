@@ -97,6 +97,11 @@ export interface Quotation {
      All optional — legacy quotes have these undefined. */
   paymentTermId?: string;
   incotermId?: string;
+  /* Picked Incoterm's short code (FOB, CIF, DDP, ...). Stored
+     alongside incotermId so the items-table header can show the
+     'UNIT PRICE (FOB Ningbo, USD)' subtitle without fetching the
+     full Incoterm row. */
+  incotermCode?: string;
   /* DEPRECATED — kept for back-compat with quotes saved before the
      port-pair split. Newer docs use loadingPort + dischargePort. */
   incotermLocation?: string;
@@ -242,6 +247,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
     incotermId: doc.incotermId,
+    incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
     loadingPort: doc.loadingPort,
     dischargePort: doc.dischargePort,
@@ -323,9 +329,17 @@ async function deleteQuotationRemote(id: string): Promise<boolean> {
   return deleteDoc(QUOTATIONS_SYNC, id);
 }
 
+/* Smart money formatter. Drops the trailing '.00' when the value is
+   a round number ('285' instead of '285.00') but preserves the
+   decimals when there are real cents ('301,460.20'). Thousands
+   separators are kept. The '$' suffix is appended at the call site
+   so non-monetary callers (qty, days) can still use this for the
+   number-only formatting. */
 function fmt(n: number): string {
+  const fixed = n.toFixed(2);
+  const hasCents = !fixed.endsWith(".00");
   return n.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: hasCents ? 2 : 0,
     maximumFractionDigits: 2,
   });
 }

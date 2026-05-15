@@ -93,6 +93,7 @@ export interface Invoice {
      the Quotation type — see Quotations.tsx. */
   paymentTermId?: string;
   incotermId?: string;
+  incotermCode?: string;
   incotermLocation?: string;
   loadingPort?: string;
   dischargePort?: string;
@@ -218,6 +219,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
     incotermId: doc.incotermId,
+    incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
     loadingPort: doc.loadingPort,
     dischargePort: doc.dischargePort,
@@ -295,9 +297,13 @@ async function deleteInvoiceRemote(id: string): Promise<boolean> {
   return deleteDoc(INVOICES_DOC_SYNC, id);
 }
 
+/* Smart money formatter — see Quotations.tsx. Drops '.00' when the
+   value is a round number; keeps cents when there are any. */
 function fmt(n: number): string {
+  const fixed = n.toFixed(2);
+  const hasCents = !fixed.endsWith(".00");
   return n.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
+    minimumFractionDigits: hasCents ? 2 : 0,
     maximumFractionDigits: 2,
   });
 }

@@ -104,6 +104,7 @@ export interface Quotation {
      selection when an existing doc is opened. */
   paymentTermId?: string;
   incotermId?: string;
+  incotermCode?: string;
   incotermLocation?: string;
   loadingPort?: string;
   dischargePort?: string;
@@ -254,6 +255,23 @@ export default function QuotationA4Preview({
      this revision so the visible text matches even if the operator
      had the rich-text area focused at the moment of the pick. */
   const [termsRevision, setTermsRevision] = useState(0);
+
+  /* Items-table 'UNIT PRICE' subtitle. Derived from the picked
+     Incoterm + the relevant port — FOB/FAS/EXW reference the
+     loading port, CFR/CIF/DAP/DPU/DDP/CPT/CIP reference the
+     discharge port. Falls back to a plain 'USD' when nothing is
+     picked yet so the column still reads sensibly. */
+  const priceTypeSubtitle = useMemo(() => {
+    const code = current.incotermCode?.toUpperCase();
+    if (!code) return "(USD)";
+    /* Which port does this term name? */
+    const dischargeBased = new Set(["CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]);
+    const port = dischargeBased.has(code)
+      ? current.dischargePort
+      : current.loadingPort;
+    const locationPart = port ? ` ${port}` : "";
+    return `(${code}${locationPart}, USD)`;
+  }, [current.incotermCode, current.loadingPort, current.dischargePort]);
 
   /* Which item-description cell currently has the user's focus.
      The rich-text toolbar renders right above that cell so the user
@@ -842,7 +860,7 @@ export default function QuotationA4Preview({
                 <Th width="14%" align="center">
                   <div>UNIT PRICE</div>
                   <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
-                    (FOB NINGBO)
+                    {priceTypeSubtitle}
                   </div>
                 </Th>
                 <Th width="7%"  align="center">QTY</Th>
@@ -965,7 +983,7 @@ export default function QuotationA4Preview({
                         outline: "none",
                       }}
                     >
-                      {item.unitPrice > 0 ? fmt(item.unitPrice) : "0"}
+                      {item.unitPrice > 0 ? `${fmt(item.unitPrice)} $` : "0"}
                     </div>
                   </Td>
                   <Td align="center">
@@ -987,7 +1005,7 @@ export default function QuotationA4Preview({
                     </div>
                   </Td>
                   <Td align="right" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                    {fmt(lineTotal)}
+                    {lineTotal > 0 ? `${fmt(lineTotal)} $` : "0"}
 
                     {/* Floating row actions — ↑ / ↓ / ✕ rendered as
                         children of the TOTAL cell (not extra <td>s)
@@ -1196,7 +1214,7 @@ export default function QuotationA4Preview({
                     borderBottomRightRadius: 12,
                   }}
                 >
-                  US$ {fmt(subTotal)}
+                  {fmt(subTotal)} $
                 </td>
               </tr>
             </tfoot>
@@ -1278,7 +1296,7 @@ export default function QuotationA4Preview({
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", border: "none" }}>
                   <tbody>
-                    <TotalsRow label="Subtotal" value={`US$ ${fmt(subTotal)}`} muted />
+                    <TotalsRow label="Subtotal" value={`${fmt(subTotal)} $`} muted />
                     <TotalsRow
                       label="Tax"
                       editable
@@ -1338,7 +1356,7 @@ export default function QuotationA4Preview({
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        US$ {fmt(grandTotal)}
+                        {fmt(grandTotal)} $
                       </td>
                     </tr>
                   </tbody>
@@ -2142,6 +2160,7 @@ interface QuickFillPatch {
   fields: {
     paymentTermId?: string;
     incotermId?: string;
+    incotermCode?: string;
     incotermLocation?: string;
     loadingPort?: string;
     dischargePort?: string;
@@ -2295,6 +2314,7 @@ function QuickFillBar({
 }: {
   paymentTermId?: string;
   incotermId?: string;
+  incotermCode?: string;
   incotermLocation?: string;
   loadingPort?: string;
   dischargePort?: string;
@@ -2360,11 +2380,17 @@ function QuickFillBar({
   const onPickIncoterm = (id: string) => {
     const term = incoterms.find((t) => t.id === id);
     if (!term) {
-      onChange({ fields: { incotermId: undefined }, termsLineUpdates: { "Price Type": "" } });
+      onChange({
+        fields: { incotermId: undefined, incotermCode: undefined },
+        termsLineUpdates: { "Price Type": "" },
+      });
       return;
     }
+    /* Store both the FK id AND the short code on the doc so the
+       items-table header can render '(FOB Ningbo, USD)' without
+       fetching the incoterms list. */
     onChange({
-      fields: { incotermId: id },
+      fields: { incotermId: id, incotermCode: term.code },
       termsLineUpdates: { "Price Type": `${term.code} (${term.name})` },
     });
   };
@@ -3312,7 +3338,7 @@ function DiscountRow({
               fontWeight: amount > 0 ? 600 : 400,
             }}
           >
-            {amount > 0 ? `− US$ ${fmt(amount)}` : "—"}
+            {amount > 0 ? `− ${fmt(amount)} $` : "—"}
           </span>
         </span>
       </td>
@@ -3366,7 +3392,6 @@ function TotalsRow({
       >
         {editable ? (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end", width: "100%" }}>
-            <span style={{ color: T.inkGhost, fontWeight: 400 }}>US$</span>
             <span
               contentEditable
               suppressContentEditableWarning
@@ -3378,6 +3403,7 @@ function TotalsRow({
             >
               {rawValue && rawValue > 0 ? rawValue : "0"}
             </span>
+            <span style={{ color: T.inkGhost, fontWeight: 400 }}>$</span>
           </span>
         ) : (
           value
