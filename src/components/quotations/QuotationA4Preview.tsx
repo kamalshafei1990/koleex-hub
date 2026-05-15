@@ -2622,11 +2622,24 @@ const CN_LOADING_PORTS: PortOption[] = [
   { value: "Hong Kong",            label: "Hong Kong",       sublabel: "Special Administrative Region — frequent transshipment" },
 ];
 
-interface CountryPorts { region: string; ports: PortOption[] }
+interface CountryPorts { region: string; iso2: string; ports: PortOption[] }
+
+/* Converts an ISO 3166-1 alpha-2 country code to its Unicode
+   regional-indicator flag emoji. "EG" → 🇪🇬. The two letters
+   are mapped to U+1F1E6…U+1F1FF and rendered by every modern
+   browser / OS font that supports flag emoji. */
+function iso2ToFlag(iso2: string): string {
+  if (!iso2 || iso2.length !== 2) return "";
+  const base = 0x1f1e6 - 65; // 'A'
+  return String.fromCodePoint(
+    base + iso2.toUpperCase().charCodeAt(0),
+    base + iso2.toUpperCase().charCodeAt(1),
+  );
+}
 
 const DISCHARGE_PORTS_BY_COUNTRY: Record<string, CountryPorts> = {
   /* ── Middle East & North Africa (the dominant Koleex lane) ── */
-  "Egypt": { region: "Middle East & North Africa", ports: [
+  "Egypt": { region: "Middle East & North Africa", iso2: "EG", ports: [
     { value: "Alexandria, Egypt",       label: "Alexandria",       sublabel: "Mediterranean, primary commercial port" },
     { value: "El Dekheila, Egypt",      label: "El Dekheila",      sublabel: "Alexandria western annex" },
     { value: "Damietta, Egypt",         label: "Damietta",         sublabel: "Mediterranean, Nile Delta" },
@@ -2635,203 +2648,203 @@ const DISCHARGE_PORTS_BY_COUNTRY: Record<string, CountryPorts> = {
     { value: "Ain Sokhna, Egypt",       label: "Ain Sokhna",       sublabel: "Red Sea, Suez Canal southern entrance" },
     { value: "Suez, Egypt",             label: "Suez",             sublabel: "Southern entrance of Suez Canal" },
   ]},
-  "United Arab Emirates": { region: "Middle East & North Africa", ports: [
+  "United Arab Emirates": { region: "Middle East & North Africa", iso2: "AE", ports: [
     { value: "Jebel Ali, UAE",          label: "Jebel Ali",        sublabel: "Dubai — Middle East's biggest container port" },
     { value: "Khalifa Port, UAE",       label: "Khalifa Port",     sublabel: "Abu Dhabi" },
     { value: "Mina Zayed, UAE",         label: "Mina Zayed",       sublabel: "Abu Dhabi, breakbulk" },
     { value: "Sharjah, UAE",            label: "Sharjah",          sublabel: "Khor Fakkan + Hamriyah" },
     { value: "Fujairah, UAE",           label: "Fujairah",         sublabel: "East coast, Indian Ocean" },
   ]},
-  "Saudi Arabia": { region: "Middle East & North Africa", ports: [
+  "Saudi Arabia": { region: "Middle East & North Africa", iso2: "SA", ports: [
     { value: "Jeddah, Saudi Arabia",        label: "Jeddah",           sublabel: "Red Sea, primary commercial port" },
     { value: "Dammam, Saudi Arabia",        label: "Dammam",           sublabel: "Persian Gulf, King Abdulaziz Port" },
     { value: "Yanbu, Saudi Arabia",         label: "Yanbu",            sublabel: "Red Sea" },
     { value: "Jubail, Saudi Arabia",        label: "Jubail",           sublabel: "Persian Gulf, industrial port" },
     { value: "King Abdullah Port, Saudi Arabia", label: "King Abdullah Port", sublabel: "Red Sea, near Rabigh" },
   ]},
-  "Qatar":   { region: "Middle East & North Africa", ports: [
+  "Qatar":   { region: "Middle East & North Africa", iso2: "QA", ports: [
     { value: "Hamad Port, Qatar",       label: "Hamad Port",       sublabel: "Doha — main container port" },
     { value: "Doha Port, Qatar",        label: "Doha Port",        sublabel: "Older port, mainly cruise / breakbulk" },
   ]},
-  "Kuwait":  { region: "Middle East & North Africa", ports: [
+  "Kuwait":  { region: "Middle East & North Africa", iso2: "KW", ports: [
     { value: "Shuwaikh, Kuwait",        label: "Shuwaikh",         sublabel: "Kuwait City, main container terminal" },
     { value: "Shuaiba, Kuwait",         label: "Shuaiba",          sublabel: "Industrial port" },
   ]},
-  "Oman":    { region: "Middle East & North Africa", ports: [
+  "Oman":    { region: "Middle East & North Africa", iso2: "OM", ports: [
     { value: "Sohar, Oman",             label: "Sohar",            sublabel: "Northern industrial hub" },
     { value: "Salalah, Oman",           label: "Salalah",          sublabel: "Southern — major transshipment" },
     { value: "Muscat, Oman",            label: "Muscat",           sublabel: "Sultan Qaboos Port" },
   ]},
-  "Bahrain": { region: "Middle East & North Africa", ports: [
+  "Bahrain": { region: "Middle East & North Africa", iso2: "BH", ports: [
     { value: "Khalifa Bin Salman, Bahrain", label: "Khalifa Bin Salman Port", sublabel: "Manama" },
   ]},
-  "Iraq":    { region: "Middle East & North Africa", ports: [
+  "Iraq":    { region: "Middle East & North Africa", iso2: "IQ", ports: [
     { value: "Umm Qasr, Iraq",          label: "Umm Qasr",         sublabel: "Persian Gulf, main commercial port" },
     { value: "Basra, Iraq",             label: "Basra",            sublabel: "Shatt al-Arab" },
   ]},
-  "Iran":    { region: "Middle East & North Africa", ports: [
+  "Iran":    { region: "Middle East & North Africa", iso2: "IR", ports: [
     { value: "Bandar Abbas, Iran",      label: "Bandar Abbas",     sublabel: "Strait of Hormuz, Shahid Rajaee terminal" },
     { value: "Bushehr, Iran",           label: "Bushehr",          sublabel: "Persian Gulf" },
   ]},
-  "Yemen":   { region: "Middle East & North Africa", ports: [
+  "Yemen":   { region: "Middle East & North Africa", iso2: "YE", ports: [
     { value: "Aden, Yemen",             label: "Aden",             sublabel: "Gulf of Aden" },
     { value: "Hodeidah, Yemen",         label: "Hodeidah",         sublabel: "Red Sea" },
   ]},
-  "Jordan":  { region: "Middle East & North Africa", ports: [
+  "Jordan":  { region: "Middle East & North Africa", iso2: "JO", ports: [
     { value: "Aqaba, Jordan",           label: "Aqaba",            sublabel: "Red Sea, Jordan's only port" },
   ]},
-  "Lebanon": { region: "Middle East & North Africa", ports: [
+  "Lebanon": { region: "Middle East & North Africa", iso2: "LB", ports: [
     { value: "Beirut, Lebanon",         label: "Beirut",           sublabel: "Mediterranean" },
     { value: "Tripoli, Lebanon",        label: "Tripoli (LB)",     sublabel: "Northern Lebanon" },
   ]},
-  "Syria":   { region: "Middle East & North Africa", ports: [
+  "Syria":   { region: "Middle East & North Africa", iso2: "SY", ports: [
     { value: "Latakia, Syria",          label: "Latakia",          sublabel: "Mediterranean" },
     { value: "Tartus, Syria",           label: "Tartus",           sublabel: "Mediterranean" },
   ]},
-  "Turkey":  { region: "Middle East & North Africa", ports: [
+  "Turkey":  { region: "Middle East & North Africa", iso2: "TR", ports: [
     { value: "Istanbul, Turkey",        label: "Istanbul",         sublabel: "Ambarlı / Haydarpaşa" },
     { value: "Izmir, Turkey",           label: "Izmir",            sublabel: "Aliağa container terminals" },
     { value: "Mersin, Turkey",          label: "Mersin",           sublabel: "Eastern Mediterranean" },
     { value: "Iskenderun, Turkey",      label: "Iskenderun",       sublabel: "Eastern Mediterranean" },
   ]},
-  "Israel":  { region: "Middle East & North Africa", ports: [
+  "Israel":  { region: "Middle East & North Africa", iso2: "IL", ports: [
     { value: "Haifa, Israel",           label: "Haifa",            sublabel: "Mediterranean, primary port" },
     { value: "Ashdod, Israel",          label: "Ashdod",           sublabel: "Mediterranean, southern" },
   ]},
-  "Sudan":   { region: "Middle East & North Africa", ports: [
+  "Sudan":   { region: "Middle East & North Africa", iso2: "SD", ports: [
     { value: "Port Sudan, Sudan",       label: "Port Sudan",       sublabel: "Red Sea" },
   ]},
-  "Libya":   { region: "Middle East & North Africa", ports: [
+  "Libya":   { region: "Middle East & North Africa", iso2: "LY", ports: [
     { value: "Tripoli, Libya",          label: "Tripoli (LY)",     sublabel: "Mediterranean" },
     { value: "Benghazi, Libya",         label: "Benghazi",         sublabel: "Eastern Mediterranean" },
     { value: "Misrata, Libya",          label: "Misrata",          sublabel: "Central coast" },
   ]},
-  "Algeria": { region: "Middle East & North Africa", ports: [
+  "Algeria": { region: "Middle East & North Africa", iso2: "DZ", ports: [
     { value: "Algiers, Algeria",        label: "Algiers",          sublabel: "Mediterranean" },
     { value: "Oran, Algeria",           label: "Oran",             sublabel: "West Mediterranean" },
     { value: "Bejaia, Algeria",         label: "Bejaia",           sublabel: "Eastern Mediterranean" },
   ]},
-  "Morocco": { region: "Middle East & North Africa", ports: [
+  "Morocco": { region: "Middle East & North Africa", iso2: "MA", ports: [
     { value: "Tanger Med, Morocco",     label: "Tanger Med",       sublabel: "Strait of Gibraltar — Africa's biggest container port" },
     { value: "Casablanca, Morocco",     label: "Casablanca",       sublabel: "Atlantic" },
     { value: "Agadir, Morocco",         label: "Agadir",           sublabel: "Atlantic, southern" },
   ]},
-  "Tunisia": { region: "Middle East & North Africa", ports: [
+  "Tunisia": { region: "Middle East & North Africa", iso2: "TN", ports: [
     { value: "Tunis (La Goulette), Tunisia", label: "Tunis (La Goulette)", sublabel: "Mediterranean" },
     { value: "Rades, Tunisia",          label: "Rades",            sublabel: "Tunis container terminal" },
     { value: "Sfax, Tunisia",           label: "Sfax",             sublabel: "Eastern coast" },
   ]},
 
   /* ── Sub-Saharan Africa ── */
-  "Kenya":          { region: "Sub-Saharan Africa", ports: [
+  "Kenya":          { region: "Sub-Saharan Africa", iso2: "KE", ports: [
     { value: "Mombasa, Kenya",          label: "Mombasa",          sublabel: "East Africa's largest port" },
   ]},
-  "Tanzania":       { region: "Sub-Saharan Africa", ports: [
+  "Tanzania":       { region: "Sub-Saharan Africa", iso2: "TZ", ports: [
     { value: "Dar es Salaam, Tanzania", label: "Dar es Salaam",    sublabel: "East Africa" },
   ]},
-  "South Africa":   { region: "Sub-Saharan Africa", ports: [
+  "South Africa":   { region: "Sub-Saharan Africa", iso2: "ZA", ports: [
     { value: "Durban, South Africa",    label: "Durban",           sublabel: "Indian Ocean — main container port" },
     { value: "Cape Town, South Africa", label: "Cape Town",        sublabel: "Atlantic" },
     { value: "Port Elizabeth, South Africa", label: "Port Elizabeth", sublabel: "Eastern Cape" },
     { value: "Coega (Ngqura), South Africa", label: "Coega (Ngqura)", sublabel: "Deep-water hub near PE" },
   ]},
-  "Nigeria":        { region: "Sub-Saharan Africa", ports: [
+  "Nigeria":        { region: "Sub-Saharan Africa", iso2: "NG", ports: [
     { value: "Lagos (Apapa), Nigeria",  label: "Lagos — Apapa",    sublabel: "Primary commercial port" },
     { value: "Lagos (Tin Can), Nigeria", label: "Lagos — Tin Can", sublabel: "Container terminal" },
     { value: "Onne, Nigeria",           label: "Onne",             sublabel: "Port Harcourt area" },
   ]},
-  "Ghana":          { region: "Sub-Saharan Africa", ports: [
+  "Ghana":          { region: "Sub-Saharan Africa", iso2: "GH", ports: [
     { value: "Tema, Ghana",             label: "Tema",             sublabel: "Near Accra" },
     { value: "Takoradi, Ghana",         label: "Takoradi",          sublabel: "Western Ghana" },
   ]},
-  "Ivory Coast":    { region: "Sub-Saharan Africa", ports: [
+  "Ivory Coast":    { region: "Sub-Saharan Africa", iso2: "CI", ports: [
     { value: "Abidjan, Ivory Coast",    label: "Abidjan",          sublabel: "West Africa's busiest port" },
   ]},
-  "Senegal":        { region: "Sub-Saharan Africa", ports: [
+  "Senegal":        { region: "Sub-Saharan Africa", iso2: "SN", ports: [
     { value: "Dakar, Senegal",          label: "Dakar",            sublabel: "Atlantic, West Africa" },
   ]},
-  "Cameroon":       { region: "Sub-Saharan Africa", ports: [
+  "Cameroon":       { region: "Sub-Saharan Africa", iso2: "CM", ports: [
     { value: "Douala, Cameroon",        label: "Douala",           sublabel: "Gulf of Guinea" },
     { value: "Kribi, Cameroon",         label: "Kribi",            sublabel: "Deep-water" },
   ]},
-  "Angola":         { region: "Sub-Saharan Africa", ports: [
+  "Angola":         { region: "Sub-Saharan Africa", iso2: "AO", ports: [
     { value: "Luanda, Angola",          label: "Luanda",           sublabel: "Atlantic" },
   ]},
-  "Mozambique":     { region: "Sub-Saharan Africa", ports: [
+  "Mozambique":     { region: "Sub-Saharan Africa", iso2: "MZ", ports: [
     { value: "Maputo, Mozambique",      label: "Maputo",           sublabel: "Indian Ocean, southern" },
     { value: "Beira, Mozambique",       label: "Beira",            sublabel: "Central" },
     { value: "Nacala, Mozambique",      label: "Nacala",           sublabel: "Northern, deep-water" },
   ]},
-  "Madagascar":     { region: "Sub-Saharan Africa", ports: [
+  "Madagascar":     { region: "Sub-Saharan Africa", iso2: "MG", ports: [
     { value: "Toamasina, Madagascar",   label: "Toamasina",        sublabel: "East coast, primary port" },
   ]},
-  "Ethiopia":       { region: "Sub-Saharan Africa", ports: [
+  "Ethiopia":       { region: "Sub-Saharan Africa", iso2: "ET", ports: [
     { value: "Djibouti (for Ethiopia)", label: "Djibouti",         sublabel: "Used as Ethiopia's gateway" },
   ]},
 
   /* ── Europe ── */
-  "Germany":     { region: "Europe", ports: [
+  "Germany":     { region: "Europe", iso2: "DE", ports: [
     { value: "Hamburg, Germany",        label: "Hamburg",          sublabel: "North Range hub" },
     { value: "Bremerhaven, Germany",    label: "Bremerhaven",      sublabel: "Container terminal" },
   ]},
-  "Netherlands": { region: "Europe", ports: [
+  "Netherlands": { region: "Europe", iso2: "NL", ports: [
     { value: "Rotterdam, Netherlands",  label: "Rotterdam",        sublabel: "Europe's #1 container port" },
     { value: "Amsterdam, Netherlands",  label: "Amsterdam",        sublabel: "General cargo" },
   ]},
-  "Belgium":     { region: "Europe", ports: [
+  "Belgium":     { region: "Europe", iso2: "BE", ports: [
     { value: "Antwerp, Belgium",        label: "Antwerp",          sublabel: "Antwerp-Bruges port" },
     { value: "Zeebrugge, Belgium",      label: "Zeebrugge",        sublabel: "RoRo + container" },
   ]},
-  "United Kingdom": { region: "Europe", ports: [
+  "United Kingdom": { region: "Europe", iso2: "GB", ports: [
     { value: "Felixstowe, UK",          label: "Felixstowe",       sublabel: "UK's #1 container port" },
     { value: "Southampton, UK",         label: "Southampton",      sublabel: "South coast" },
     { value: "London Gateway, UK",      label: "London Gateway",   sublabel: "Thames Estuary" },
     { value: "Liverpool, UK",           label: "Liverpool",        sublabel: "Irish Sea" },
   ]},
-  "France":      { region: "Europe", ports: [
+  "France":      { region: "Europe", iso2: "FR", ports: [
     { value: "Le Havre, France",        label: "Le Havre",         sublabel: "English Channel" },
     { value: "Marseille-Fos, France",   label: "Marseille-Fos",    sublabel: "Mediterranean" },
   ]},
-  "Spain":       { region: "Europe", ports: [
+  "Spain":       { region: "Europe", iso2: "ES", ports: [
     { value: "Valencia, Spain",         label: "Valencia",         sublabel: "Mediterranean, #1 in Spain" },
     { value: "Barcelona, Spain",        label: "Barcelona",        sublabel: "Mediterranean" },
     { value: "Algeciras, Spain",        label: "Algeciras",        sublabel: "Strait of Gibraltar" },
     { value: "Bilbao, Spain",           label: "Bilbao",           sublabel: "Atlantic, northern" },
   ]},
-  "Italy":       { region: "Europe", ports: [
+  "Italy":       { region: "Europe", iso2: "IT", ports: [
     { value: "Genoa, Italy",            label: "Genoa",            sublabel: "Mediterranean" },
     { value: "La Spezia, Italy",        label: "La Spezia",        sublabel: "Mediterranean" },
     { value: "Gioia Tauro, Italy",      label: "Gioia Tauro",      sublabel: "Transshipment hub, Calabria" },
     { value: "Trieste, Italy",          label: "Trieste",          sublabel: "Adriatic" },
     { value: "Naples, Italy",           label: "Naples",           sublabel: "Mediterranean" },
   ]},
-  "Greece":      { region: "Europe", ports: [
+  "Greece":      { region: "Europe", iso2: "GR", ports: [
     { value: "Piraeus, Greece",         label: "Piraeus",          sublabel: "Athens — Eastern Med hub" },
     { value: "Thessaloniki, Greece",    label: "Thessaloniki",     sublabel: "Northern Greece" },
   ]},
-  "Portugal":    { region: "Europe", ports: [
+  "Portugal":    { region: "Europe", iso2: "PT", ports: [
     { value: "Lisbon, Portugal",        label: "Lisbon",           sublabel: "Atlantic" },
     { value: "Leixoes, Portugal",       label: "Leixões",          sublabel: "Porto area" },
     { value: "Sines, Portugal",         label: "Sines",            sublabel: "Deep-water, container hub" },
   ]},
-  "Poland":      { region: "Europe", ports: [
+  "Poland":      { region: "Europe", iso2: "PL", ports: [
     { value: "Gdansk, Poland",          label: "Gdańsk",           sublabel: "Baltic" },
     { value: "Gdynia, Poland",          label: "Gdynia",           sublabel: "Baltic" },
   ]},
-  "Russia":      { region: "Europe", ports: [
+  "Russia":      { region: "Europe", iso2: "RU", ports: [
     { value: "Novorossiysk, Russia",    label: "Novorossiysk",     sublabel: "Black Sea" },
     { value: "St. Petersburg, Russia",  label: "St. Petersburg",   sublabel: "Baltic" },
     { value: "Vladivostok, Russia",     label: "Vladivostok",      sublabel: "Pacific" },
   ]},
-  "Romania":     { region: "Europe", ports: [
+  "Romania":     { region: "Europe", iso2: "RO", ports: [
     { value: "Constanta, Romania",      label: "Constanța",        sublabel: "Black Sea" },
   ]},
-  "Ukraine":     { region: "Europe", ports: [
+  "Ukraine":     { region: "Europe", iso2: "UA", ports: [
     { value: "Odesa, Ukraine",          label: "Odesa",            sublabel: "Black Sea" },
   ]},
 
   /* ── North America ── */
-  "United States": { region: "North America", ports: [
+  "United States": { region: "North America", iso2: "US", ports: [
     { value: "Los Angeles, USA",        label: "Los Angeles",      sublabel: "West Coast" },
     { value: "Long Beach, USA",         label: "Long Beach",       sublabel: "West Coast, twin of LA" },
     { value: "Oakland, USA",            label: "Oakland",          sublabel: "Bay Area" },
@@ -2842,79 +2855,79 @@ const DISCHARGE_PORTS_BY_COUNTRY: Record<string, CountryPorts> = {
     { value: "Houston, USA",            label: "Houston",          sublabel: "Gulf of Mexico" },
     { value: "Miami, USA",              label: "Miami",            sublabel: "South Florida" },
   ]},
-  "Canada":        { region: "North America", ports: [
+  "Canada":        { region: "North America", iso2: "CA", ports: [
     { value: "Vancouver, Canada",       label: "Vancouver",        sublabel: "West Coast" },
     { value: "Montreal, Canada",        label: "Montreal",         sublabel: "St. Lawrence" },
     { value: "Halifax, Canada",         label: "Halifax",          sublabel: "East Coast" },
     { value: "Prince Rupert, Canada",   label: "Prince Rupert",    sublabel: "North BC, China-direct" },
   ]},
-  "Mexico":        { region: "North America", ports: [
+  "Mexico":        { region: "North America", iso2: "MX", ports: [
     { value: "Manzanillo, Mexico",      label: "Manzanillo",       sublabel: "Pacific" },
     { value: "Lazaro Cardenas, Mexico", label: "Lázaro Cárdenas",  sublabel: "Pacific" },
     { value: "Veracruz, Mexico",        label: "Veracruz",         sublabel: "Gulf of Mexico" },
   ]},
 
   /* ── South America ── */
-  "Brazil":     { region: "South America", ports: [
+  "Brazil":     { region: "South America", iso2: "BR", ports: [
     { value: "Santos, Brazil",          label: "Santos",           sublabel: "São Paulo — largest in S. America" },
     { value: "Paranagua, Brazil",       label: "Paranaguá",        sublabel: "Paraná" },
     { value: "Rio Grande, Brazil",      label: "Rio Grande",       sublabel: "Southern Brazil" },
     { value: "Rio de Janeiro, Brazil",  label: "Rio de Janeiro",   sublabel: "Southeast" },
   ]},
-  "Argentina":  { region: "South America", ports: [
+  "Argentina":  { region: "South America", iso2: "AR", ports: [
     { value: "Buenos Aires, Argentina", label: "Buenos Aires",     sublabel: "Río de la Plata" },
   ]},
-  "Chile":      { region: "South America", ports: [
+  "Chile":      { region: "South America", iso2: "CL", ports: [
     { value: "Valparaiso, Chile",       label: "Valparaíso",       sublabel: "Pacific" },
     { value: "San Antonio, Chile",      label: "San Antonio",      sublabel: "Pacific, near Santiago" },
   ]},
-  "Peru":       { region: "South America", ports: [
+  "Peru":       { region: "South America", iso2: "PE", ports: [
     { value: "Callao, Peru",            label: "Callao",           sublabel: "Lima's port" },
   ]},
-  "Colombia":   { region: "South America", ports: [
+  "Colombia":   { region: "South America", iso2: "CO", ports: [
     { value: "Cartagena, Colombia",     label: "Cartagena",        sublabel: "Caribbean" },
     { value: "Buenaventura, Colombia",  label: "Buenaventura",     sublabel: "Pacific" },
   ]},
 
   /* ── East / South-East / South Asia ── */
-  "Japan":       { region: "Asia", ports: [
+  "Japan":       { region: "Asia", iso2: "JP", ports: [
     { value: "Tokyo, Japan",            label: "Tokyo",            sublabel: "Honshu, eastern" },
     { value: "Yokohama, Japan",         label: "Yokohama",         sublabel: "Near Tokyo" },
     { value: "Osaka, Japan",            label: "Osaka",            sublabel: "Kansai" },
     { value: "Kobe, Japan",             label: "Kobe",             sublabel: "Kansai" },
     { value: "Nagoya, Japan",           label: "Nagoya",           sublabel: "Central" },
   ]},
-  "South Korea": { region: "Asia", ports: [
+  "South Korea": { region: "Asia", iso2: "KR", ports: [
     { value: "Busan, South Korea",      label: "Busan",            sublabel: "World top-10 container port" },
     { value: "Incheon, South Korea",    label: "Incheon",          sublabel: "Yellow Sea" },
   ]},
-  "Vietnam":     { region: "Asia", ports: [
+  "Vietnam":     { region: "Asia", iso2: "VN", ports: [
     { value: "Ho Chi Minh, Vietnam",    label: "Ho Chi Minh City", sublabel: "Cat Lai / Cai Mep" },
     { value: "Hai Phong, Vietnam",      label: "Hai Phong",        sublabel: "North Vietnam" },
     { value: "Da Nang, Vietnam",        label: "Da Nang",          sublabel: "Central" },
   ]},
-  "Thailand":    { region: "Asia", ports: [
+  "Thailand":    { region: "Asia", iso2: "TH", ports: [
     { value: "Laem Chabang, Thailand",  label: "Laem Chabang",     sublabel: "Eastern Seaboard" },
     { value: "Bangkok, Thailand",       label: "Bangkok",          sublabel: "Klong Toey" },
   ]},
-  "Singapore":   { region: "Asia", ports: [
+  "Singapore":   { region: "Asia", iso2: "SG", ports: [
     { value: "Singapore",               label: "Singapore",        sublabel: "Top global transshipment hub" },
   ]},
-  "Malaysia":    { region: "Asia", ports: [
+  "Malaysia":    { region: "Asia", iso2: "MY", ports: [
     { value: "Port Klang, Malaysia",    label: "Port Klang",       sublabel: "Near Kuala Lumpur" },
     { value: "Tanjung Pelepas, Malaysia", label: "Tanjung Pelepas", sublabel: "Johor" },
     { value: "Penang, Malaysia",        label: "Penang",           sublabel: "Northern" },
   ]},
-  "Indonesia":   { region: "Asia", ports: [
+  "Indonesia":   { region: "Asia", iso2: "ID", ports: [
     { value: "Jakarta (Tanjung Priok), Indonesia", label: "Jakarta", sublabel: "Tanjung Priok" },
     { value: "Surabaya, Indonesia",     label: "Surabaya",         sublabel: "Tanjung Perak" },
   ]},
-  "Philippines": { region: "Asia", ports: [
+  "Philippines": { region: "Asia", iso2: "PH", ports: [
     { value: "Manila, Philippines",     label: "Manila",           sublabel: "North + South Harbor" },
     { value: "Cebu, Philippines",       label: "Cebu",             sublabel: "Visayas" },
     { value: "Subic Bay, Philippines",  label: "Subic Bay",        sublabel: "Luzon" },
   ]},
-  "India":       { region: "Asia", ports: [
+  "India":       { region: "Asia", iso2: "IN", ports: [
     { value: "Mumbai (Nhava Sheva), India", label: "Nhava Sheva (JNPT)", sublabel: "Mumbai area, India's #1" },
     { value: "Mundra, India",           label: "Mundra",           sublabel: "Gujarat — Adani Ports" },
     { value: "Chennai, India",          label: "Chennai",          sublabel: "Bay of Bengal" },
@@ -2922,42 +2935,45 @@ const DISCHARGE_PORTS_BY_COUNTRY: Record<string, CountryPorts> = {
     { value: "Cochin, India",           label: "Cochin",           sublabel: "Kerala, Arabian Sea" },
     { value: "Visakhapatnam, India",    label: "Visakhapatnam",    sublabel: "Andhra Pradesh" },
   ]},
-  "Pakistan":    { region: "Asia", ports: [
+  "Pakistan":    { region: "Asia", iso2: "PK", ports: [
     { value: "Karachi, Pakistan",       label: "Karachi",          sublabel: "Arabian Sea" },
     { value: "Port Qasim, Pakistan",    label: "Port Qasim",       sublabel: "Karachi area" },
     { value: "Gwadar, Pakistan",        label: "Gwadar",           sublabel: "Deep-water, CPEC" },
   ]},
-  "Bangladesh":  { region: "Asia", ports: [
+  "Bangladesh":  { region: "Asia", iso2: "BD", ports: [
     { value: "Chittagong, Bangladesh",  label: "Chittagong",       sublabel: "Bay of Bengal" },
   ]},
-  "Sri Lanka":   { region: "Asia", ports: [
+  "Sri Lanka":   { region: "Asia", iso2: "LK", ports: [
     { value: "Colombo, Sri Lanka",      label: "Colombo",          sublabel: "Indian Ocean transshipment hub" },
   ]},
-  "Myanmar":     { region: "Asia", ports: [
+  "Myanmar":     { region: "Asia", iso2: "MM", ports: [
     { value: "Yangon, Myanmar",         label: "Yangon",           sublabel: "Andaman Sea" },
   ]},
 
   /* ── Oceania ── */
-  "Australia":   { region: "Oceania", ports: [
+  "Australia":   { region: "Oceania", iso2: "AU", ports: [
     { value: "Sydney, Australia",       label: "Sydney",           sublabel: "Port Botany" },
     { value: "Melbourne, Australia",    label: "Melbourne",        sublabel: "Australia's #1 container port" },
     { value: "Brisbane, Australia",     label: "Brisbane",         sublabel: "Queensland" },
     { value: "Adelaide, Australia",     label: "Adelaide",         sublabel: "South Australia" },
     { value: "Fremantle, Australia",    label: "Fremantle",        sublabel: "Perth's port" },
   ]},
-  "New Zealand": { region: "Oceania", ports: [
+  "New Zealand": { region: "Oceania", iso2: "NZ", ports: [
     { value: "Auckland, New Zealand",   label: "Auckland",         sublabel: "North Island" },
     { value: "Tauranga, New Zealand",   label: "Tauranga",         sublabel: "North Island, biggest by tonnage" },
   ]},
 };
 
 /* Country dropdown options — keep the regional grouping so the
-   list is scannable instead of a flat 60-item dump. */
+   list is scannable instead of a flat 60-item dump, and prepend
+   the ISO 3166-1 flag emoji so the operator can spot familiar
+   destinations at a glance. */
 const DISCHARGE_COUNTRY_OPTIONS: CustomSelectOption[] = Object.entries(DISCHARGE_PORTS_BY_COUNTRY)
   .map(([country, data]) => ({
     value: country,
     label: country,
     group: data.region,
+    flag: iso2ToFlag(data.iso2),
   }));
 
 /* Best-effort: given a stored "Port, Country" string, find which
@@ -3622,6 +3638,10 @@ type CustomSelectOption = {
   sublabel?: string;
   group?: string;
   help?: OptHelp | null;
+  /* Optional emoji / icon shown as a prefix to the label. Used
+     by the discharge-country dropdown to display the country
+     flag. */
+  flag?: string;
 };
 
 function CustomSelect({
@@ -3629,11 +3649,16 @@ function CustomSelect({
   options,
   onChange,
   placeholder = "— Pick —",
+  searchable = false,
 }: {
   value: string;
   options: CustomSelectOption[];
   onChange: (v: string) => void;
   placeholder?: string;
+  /* When true, the popover renders a pinned search input at
+     the top that filters options as the operator types. Used
+     for the 60-country discharge picker. */
+  searchable?: boolean;
 }) {
   /* Dropdown open state PLUS the trigger button's bounding rect
      at the moment of open. We position the option list with
@@ -3642,6 +3667,17 @@ function CustomSelect({
      we applied to the hover tooltips. */
   const [openRect, setOpenRect] = useState<DOMRect | null>(null);
   const open = openRect !== null;
+  /* Search query for the in-popover filter (only used when
+     searchable=true). Reset whenever the popover closes. */
+  const [query, setQuery] = useState("");
+  useEffect(() => { if (!open) setQuery(""); }, [open]);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (open && searchable) {
+      /* Focus on the next frame so the popover has mounted. */
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [open, searchable]);
   /* Track which option is being help-hovered AND its anchor rect
      so the tooltip can render at fixed coordinates outside the
      dropdown's overflow:auto clip rect. */
@@ -3696,22 +3732,35 @@ function CustomSelect({
 
   const selected = options.find((o) => o.value === value);
 
+  /* Apply the search filter (label / sublabel / value / group
+     all match) before grouping. */
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !query.trim()) return options;
+    const q = query.trim().toLowerCase();
+    return options.filter((o) =>
+      o.label.toLowerCase().includes(q)
+      || (o.sublabel ?? "").toLowerCase().includes(q)
+      || (o.group ?? "").toLowerCase().includes(q)
+      || o.value.toLowerCase().includes(q),
+    );
+  }, [options, query, searchable]);
+
   /* Preserve insertion order while grouping. */
   const groupOrder = useMemo(() => {
     const seen = new Set<string>();
     const order: string[] = [];
-    for (const o of options) {
+    for (const o of filteredOptions) {
       const g = o.group ?? "";
       if (!seen.has(g)) { seen.add(g); order.push(g); }
     }
     return order;
-  }, [options]);
+  }, [filteredOptions]);
 
   const grouped = useMemo(() => {
     const out: Record<string, CustomSelectOption[]> = {};
-    for (const o of options) (out[o.group ?? ""] ??= []).push(o);
+    for (const o of filteredOptions) (out[o.group ?? ""] ??= []).push(o);
     return out;
-  }, [options]);
+  }, [filteredOptions]);
 
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
@@ -3747,10 +3796,16 @@ function CustomSelect({
       >
         <span style={{
           flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          display: "inline-flex", alignItems: "center", gap: 6,
         }}>
-          {selected
-            ? selected.label
-            : <span style={{ color: "rgba(255,255,255,0.4)" }}>{placeholder}</span>}
+          {selected ? (
+            <>
+              {selected.flag && <span style={{ fontSize: 14, lineHeight: 1 }}>{selected.flag}</span>}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.label}</span>
+            </>
+          ) : (
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>{placeholder}</span>
+          )}
         </span>
         <span style={{
           position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
@@ -3788,6 +3843,49 @@ function CustomSelect({
           padding: 4,
           colorScheme: "dark",
         }}>
+          {/* Pinned search input. Stays at the top of the
+              popover even while the option list below scrolls.
+              Hidden when searchable=false. */}
+          {searchable && (
+            <div style={{
+              position: "sticky", top: 0, zIndex: 2,
+              padding: 4,
+              background: "#0A0A0A",
+              borderBottom: "1px solid #2a2a2a",
+            }}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search…"
+                style={{
+                  width: "100%", height: 30,
+                  padding: "0 10px",
+                  background: "#000000",
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                  caretColor: "#ffffff",
+                  border: "1px solid #333333",
+                  borderRadius: 5,
+                  fontSize: 12,
+                  outline: "none",
+                  colorScheme: "dark",
+                }}
+                onKeyDown={(e) => {
+                  /* Don't let the dropdown's own Escape handler
+                     close the popover while the user is still
+                     typing -- one Escape clears the query, a
+                     second one closes the dropdown. */
+                  if (e.key === "Escape" && query) {
+                    e.stopPropagation();
+                    setQuery("");
+                  }
+                }}
+              />
+            </div>
+          )}
+
           {/* Clear option */}
           <button
             type="button"
@@ -3801,6 +3899,18 @@ function CustomSelect({
           >
             {placeholder}
           </button>
+
+          {/* No-match hint when the filter returned zero rows. */}
+          {searchable && filteredOptions.length === 0 && query.trim() && (
+            <div style={{
+              padding: "10px 10px 6px",
+              fontSize: 11,
+              color: "rgba(255,255,255,0.5)",
+              fontStyle: "italic",
+            }}>
+              No matches for &ldquo;{query}&rdquo;.
+            </div>
+          )}
 
           {groupOrder.map((g) => (
             <div key={g || "__none__"}>
@@ -3839,6 +3949,9 @@ function CustomSelect({
                           selectedHere ? "rgba(255,255,255,0.10)" : "transparent";
                       }}
                     >
+                      {o.flag && (
+                        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{o.flag}</span>
+                      )}
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {o.label}
@@ -4768,11 +4881,13 @@ function TermsQuickFillModal({
                 <CustomSelect
                   value={current.loadingPort ?? ""}
                   placeholder="— Pick a Chinese port —"
+                  searchable
                   onChange={(v) => onChangePort("loadingPort", v)}
                   options={CN_LOADING_PORTS.map((p) => ({
                     value: p.value,
                     label: p.label,
                     sublabel: p.sublabel,
+                    flag: iso2ToFlag("CN"),
                   }))}
                 />
               </div>
@@ -4782,6 +4897,7 @@ function TermsQuickFillModal({
                   <CustomSelect
                     value={dischargeCountry}
                     placeholder="— Pick a country —"
+                    searchable
                     onChange={(c) => {
                       setDischargeCountry(c);
                       /* If the currently-selected port belongs
@@ -4799,6 +4915,7 @@ function TermsQuickFillModal({
                   <CustomSelect
                     value={current.dischargePort ?? ""}
                     placeholder={dischargeCountry ? "— Pick a port —" : "— Pick a country first —"}
+                    searchable
                     onChange={(v) => onChangePort("dischargePort", v)}
                     options={(dischargeCountry
                       ? DISCHARGE_PORTS_BY_COUNTRY[dischargeCountry]?.ports ?? []
@@ -4807,6 +4924,7 @@ function TermsQuickFillModal({
                       value: p.value,
                       label: p.label,
                       sublabel: p.sublabel,
+                      flag: dischargeCountry ? iso2ToFlag(DISCHARGE_PORTS_BY_COUNTRY[dischargeCountry]?.iso2 ?? "") : undefined,
                     }))}
                   />
                 </div>
