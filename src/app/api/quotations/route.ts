@@ -22,28 +22,59 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
          doc: Record<string, unknown> // full UI snapshot
        } */
 
-/* Floor for the first quote_no of any year. Lets Koleex pick up
-   the sequence from their existing offline numbering (1520 in the
-   2026 series) instead of starting from 0001. New years and tenants
-   without history both inherit this floor. */
-const QUOTE_NO_FLOOR = 1520;
+/* Date-based quote numbering: `KL{YYYY}-{MMDD}` derived from the
+   issue date. A quote dated 24/10/2025 becomes `KL2025-1024`. When
+   multiple quotes are minted on the same date the first keeps the
+   bare form and subsequent ones get a `-A`, `-B`, `-C`… suffix in
+   ASCII order. This replaced the prior monotonic-sequence scheme
+   (KL2026-1520, -1521…) so the number reads as a date and stays
+   meaningful at a glance. */
+async function nextQuoteNumber(
+  tenantId: string,
+  issueDate?: string,
+): Promise<string> {
+  // Parse the issue date as a calendar date in the operator's intent,
+  // not as a UTC instant. `new Date("2025-10-24")` would be UTC midnight
+  // and slip a day in negative tz offsets, so split the YYYY-MM-DD
+  // string directly.
+  const iso = (issueDate ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+  const [yStr, mStr, dStr] = iso.split("-");
+  const year = yStr || String(new Date().getFullYear());
+  const mmdd = `${mStr ?? "01"}${dStr ?? "01"}`;
+  const base = `KL${year}-${mmdd}`;
 
-async function nextQuoteNumber(tenantId: string): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `KL${year}-`;
+  // Pull every quote_no in this tenant that starts with the base. The
+  // set is tiny (one date's worth), so an in-memory scan for the next
+  // free letter is cheaper than a clever SQL ordering.
   const { data } = await supabaseServer
     .from("quotations")
     .select("quote_no")
     .eq("tenant_id", tenantId)
-    .ilike("quote_no", `${prefix}%`)
-    .order("quote_no", { ascending: false })
-    .limit(1);
-  const last = data?.[0]?.quote_no as string | undefined;
-  const lastSeq = last ? Number(last.replace(prefix, "")) : 0;
-  // Pick the higher of (lastSeq + 1) and the floor so we never go
-  // backwards once the sequence has passed the floor in a later year.
-  const nextSeq = Math.max(lastSeq + 1, QUOTE_NO_FLOOR);
-  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+    .ilike("quote_no", `${base}%`);
+  const taken = new Set(
+    (data ?? [])
+      .map((r) => (r as { quote_no: string | null }).quote_no)
+      .filter((n): n is string => typeof n === "string"),
+  );
+
+  if (!taken.has(base)) return base;
+  // Walk A, B, C … Z, then AA, AB, … on the off-chance a single date
+  // overflows 26 quotes (extremely unlikely, but cheap to support).
+  const letter = (n: number): string => {
+    let s = "";
+    let v = n;
+    while (v >= 0) {
+      s = String.fromCharCode(65 + (v % 26)) + s;
+      v = Math.floor(v / 26) - 1;
+    }
+    return s;
+  };
+  for (let i = 0; i < 26 * 27; i++) {
+    const candidate = `${base}-${letter(i)}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  // Truly degenerate fallback — should never run in practice.
+  return `${base}-${Date.now()}`;
 }
 
 export async function GET(req: Request) {
@@ -137,7 +168,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ quotation: data });
   }
 
-  const quote_no = body.quote_no ?? (await nextQuoteNumber(auth.tenant_id));
+  const quote_no =
+    body.quote_no ??
+    (await nextQuoteNumber(auth.tenant_id, body.issue_date));
   const { data, error } = await supabaseServer
     .from("quotations")
     .insert({

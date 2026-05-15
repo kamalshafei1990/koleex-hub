@@ -36,25 +36,40 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 
 async function nextQuoteNumber(tenantId: string): Promise<string> {
-  /* Mirrors the minting logic in /api/quotations — KL<year>-NNNN.
-     Duplicated rather than imported to keep this route self-contained
-     and to avoid a circular edit surface. */
-  const year = new Date().getFullYear();
-  const prefix = `KL${year}-`;
+  /* Mirrors the minting logic in /api/quotations — date-based
+     KL{YYYY}-{MMDD} with -A, -B, -C… for same-day collisions.
+     Customer-portal product requests don't carry their own issue
+     date, so we use today. */
+  const iso = new Date().toISOString().slice(0, 10);
+  const [yStr, mStr, dStr] = iso.split("-");
+  const base = `KL${yStr}-${mStr}${dStr}`;
+
   const { data } = await supabaseServer
     .from("quotations")
     .select("quote_no")
     .eq("tenant_id", tenantId)
-    .ilike("quote_no", `${prefix}%`)
-    .order("quote_no", { ascending: false })
-    .limit(1);
-  const last = data?.[0]?.quote_no as string | undefined;
-  const lastSeq = last ? Number(last.replace(prefix, "")) : 0;
-  // Same floor as src/app/api/quotations/route.ts — keep both routes
-  // aligned so a customer-portal request and an internal "New" both
-  // mint numbers from the same sequence.
-  const nextSeq = Math.max(lastSeq + 1, 1520);
-  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+    .ilike("quote_no", `${base}%`);
+  const taken = new Set(
+    (data ?? [])
+      .map((r) => (r as { quote_no: string | null }).quote_no)
+      .filter((n): n is string => typeof n === "string"),
+  );
+
+  if (!taken.has(base)) return base;
+  const letter = (n: number): string => {
+    let s = "";
+    let v = n;
+    while (v >= 0) {
+      s = String.fromCharCode(65 + (v % 26)) + s;
+      v = Math.floor(v / 26) - 1;
+    }
+    return s;
+  };
+  for (let i = 0; i < 26 * 27; i++) {
+    const candidate = `${base}-${letter(i)}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
 }
 
 export async function POST(req: Request) {
