@@ -865,6 +865,43 @@ export default function QuotationA4Preview({
                       ) : (
                         <span style={{ fontSize: 22, color: T.inkGhost, fontWeight: 300 }}>+</span>
                       )}
+                      {/* Remove-photo button. Only rendered when a photo is
+                          present. stopPropagation so the click doesn't
+                          bubble up to the cell and open the file picker
+                          instead. Hidden in print via .no-print so the
+                          exported PDF never shows the X chip. */}
+                      {item.image && (
+                        <button
+                          type="button"
+                          className="no-print quot-img-remove"
+                          title="Remove photo"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateItem(idx, "image", "");
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            right: 2,
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            border: "none",
+                            background: "rgba(0,0,0,0.6)",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontSize: 12,
+                            lineHeight: 1,
+                            fontWeight: 600,
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
                       <input
                         type="file"
                         accept="image/*"
