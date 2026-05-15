@@ -3690,6 +3690,23 @@ type ParsedTermRow = {
 /* Walks the current.terms HTML and returns one entry per row.
    Works on the new div-wrapped layout (what every fresh quote
    uses) and on the legacy <br>-separated layout. */
+/* Inverse of escapeTermValue. The terms HTML stores values with
+   entities (&amp; / &lt; / &gt; / &quot; / &#39;) so they survive
+   the round-trip without becoming live HTML; when we parse the
+   value back for display in the inline-edit cells or the read-
+   only Shipment Details grid we need to decode them so the
+   operator sees plain "Smith & Co" rather than literal
+   "Smith &amp; Co". Order matters: &amp; must be last so we
+   don't accidentally double-decode "&amp;lt;" -> "&lt;" -> "<". */
+function decodeTermEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function parseTermRows(html: string): ParsedTermRow[] {
   if (!html) return [];
 
@@ -3698,9 +3715,9 @@ function parseTermRows(html: string): ParsedTermRow[] {
   const classify = (innerText: string): { canonical: string | null; rawLabel: string | null; value: string } => {
     const plain = innerText.replace(/<[^>]+>/g, "").trim();
     const m = plain.match(/^([^:]+):\s*(.*)$/);
-    if (!m) return { canonical: null, rawLabel: null, value: plain };
-    const rawLabel = m[1].trim();
-    const value = m[2].trim();
+    if (!m) return { canonical: null, rawLabel: null, value: decodeTermEntities(plain) };
+    const rawLabel = decodeTermEntities(m[1].trim());
+    const value = decodeTermEntities(m[2].trim());
     const rawLower = rawLabel.toLowerCase();
     for (const [key, aliases] of Object.entries(TERMS_LABEL_ALIASES)) {
       if (aliases.some((a) => a.toLowerCase() === rawLower)) {
