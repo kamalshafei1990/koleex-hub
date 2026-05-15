@@ -2394,6 +2394,195 @@ const LEAD_TIME_BASIS_LABEL: Record<NonNullable<QuickFillPatch["fields"]["leadTi
   after_lc_opening: "after L/C opening",
 };
 
+/* ── Estimated transit-time engine for the "Delivery time" row.
+
+   The Delivery row used to mean "lead time + generic transit
+   for this shipping mode" -- which conflated production and
+   transport. The operator's correction: Delivery should be a
+   PURE TRANSIT estimate counted from the moment the goods leave
+   the loading port, varying by route (Ningbo→Alexandria differs
+   from Shanghai→Hamburg) and by mode (sea is slower than air).
+
+   Strategy:
+     1. Normalise both port strings into a stable key
+        (lowercase, drop "Port", ", China", punctuation).
+     2. Look up the pair in SEA_TRANSIT_DAYS for sea-mode
+        sub-types (FCL / LCL / RoRo / Reefer / Break Bulk).
+     3. Air / road / courier modes use generic per-mode ranges
+        because route variance is small for them.
+     4. Rail uses the China-Europe corridor estimate when the
+        ports look like CN and EU respectively.
+     5. Fall back to the DB row's typical_transit_days_min/max
+        if nothing else matches, so we never show "—" when the
+        operator has picked at least a mode.
+*/
+
+function normalisePortKey(p: string): string {
+  return p
+    .toLowerCase()
+    .replace(/\bport\b/g, "")
+    .replace(/,.*$/, "")          // strip ", China" / ", Egypt"
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+/* Sea / inland-water transit ranges in days, port-pair indexed.
+   Sourced from typical 2025 sailing schedules for the dominant
+   Koleex lanes (China → Egypt) plus other common destinations.
+   Numbers are conservative ranges that cover both direct and
+   single-transshipment services. */
+const SEA_TRANSIT_DAYS: Record<string, { min: number; max: number }> = {
+  /* ── China → Egypt (primary Koleex lanes) ── */
+  "ningbo→alexandria":    { min: 28, max: 32 },
+  "ningbo→damietta":      { min: 30, max: 34 },
+  "ningbo→portsaid":      { min: 26, max: 30 },
+  "ningbo→suez":          { min: 26, max: 30 },
+  "shanghai→alexandria":  { min: 28, max: 32 },
+  "shanghai→damietta":    { min: 30, max: 34 },
+  "shanghai→portsaid":    { min: 26, max: 30 },
+  "shanghai→suez":        { min: 26, max: 30 },
+  "shenzhen→alexandria":  { min: 26, max: 30 },
+  "shenzhen→damietta":    { min: 28, max: 32 },
+  "shenzhen→portsaid":    { min: 24, max: 28 },
+  "guangzhou→alexandria": { min: 26, max: 30 },
+  "guangzhou→damietta":   { min: 28, max: 32 },
+  "guangzhou→portsaid":   { min: 24, max: 28 },
+  "qingdao→alexandria":   { min: 30, max: 34 },
+  "qingdao→damietta":     { min: 32, max: 36 },
+  "qingdao→portsaid":     { min: 28, max: 32 },
+  "tianjin→alexandria":   { min: 32, max: 36 },
+  "tianjin→damietta":     { min: 34, max: 38 },
+  "tianjin→portsaid":     { min: 30, max: 34 },
+  "xiamen→alexandria":    { min: 28, max: 32 },
+  "xiamen→portsaid":      { min: 26, max: 30 },
+  "yantian→alexandria":   { min: 26, max: 30 },
+  "yantian→damietta":     { min: 28, max: 32 },
+  "yantian→portsaid":     { min: 24, max: 28 },
+
+  /* ── China → Europe ── */
+  "ningbo→hamburg":       { min: 32, max: 36 },
+  "ningbo→rotterdam":     { min: 32, max: 36 },
+  "ningbo→antwerp":       { min: 32, max: 36 },
+  "ningbo→felixstowe":    { min: 32, max: 36 },
+  "ningbo→piraeus":       { min: 24, max: 28 },
+  "shanghai→hamburg":     { min: 32, max: 36 },
+  "shanghai→rotterdam":   { min: 32, max: 36 },
+  "shanghai→antwerp":     { min: 32, max: 36 },
+  "shanghai→felixstowe":  { min: 32, max: 36 },
+  "shanghai→piraeus":     { min: 24, max: 28 },
+  "shenzhen→hamburg":     { min: 30, max: 34 },
+  "shenzhen→rotterdam":   { min: 30, max: 34 },
+  "shenzhen→piraeus":     { min: 22, max: 26 },
+  "qingdao→hamburg":      { min: 36, max: 40 },
+  "qingdao→rotterdam":    { min: 36, max: 40 },
+
+  /* ── China → US ── */
+  "shanghai→losangeles":  { min: 14, max: 18 },
+  "shanghai→longbeach":   { min: 14, max: 18 },
+  "shanghai→oakland":     { min: 15, max: 19 },
+  "shanghai→seattle":     { min: 13, max: 17 },
+  "shanghai→newyork":     { min: 28, max: 34 },
+  "shanghai→savannah":    { min: 28, max: 34 },
+  "shenzhen→losangeles":  { min: 13, max: 17 },
+  "shenzhen→longbeach":   { min: 13, max: 17 },
+  "shenzhen→newyork":     { min: 27, max: 33 },
+  "ningbo→losangeles":    { min: 14, max: 18 },
+  "ningbo→newyork":       { min: 28, max: 34 },
+
+  /* ── China → Asia / Middle East ── */
+  "shanghai→singapore":   { min: 7,  max: 10 },
+  "shanghai→busan":       { min: 3,  max: 5 },
+  "shanghai→tokyo":       { min: 3,  max: 5 },
+  "shanghai→hochiminh":   { min: 7,  max: 10 },
+  "shanghai→bangkok":     { min: 8,  max: 11 },
+  "shanghai→jakarta":     { min: 10, max: 13 },
+  "shanghai→manila":      { min: 7,  max: 10 },
+  "shanghai→colombo":     { min: 14, max: 18 },
+  "shanghai→jebelali":    { min: 18, max: 22 },   // Dubai
+  "shanghai→dubai":       { min: 18, max: 22 },
+  "shanghai→jeddah":      { min: 20, max: 24 },
+  "shanghai→dammam":      { min: 22, max: 26 },
+  "shanghai→doha":        { min: 20, max: 24 },
+  "shanghai→kolkata":     { min: 14, max: 18 },
+  "shanghai→mumbai":      { min: 18, max: 22 },
+  "ningbo→singapore":     { min: 8,  max: 11 },
+  "ningbo→jebelali":      { min: 18, max: 22 },
+  "ningbo→dubai":         { min: 18, max: 22 },
+  "ningbo→jeddah":        { min: 20, max: 24 },
+
+  /* ── China → Africa (other than Egypt) ── */
+  "shanghai→durban":      { min: 32, max: 38 },
+  "shanghai→capetown":    { min: 35, max: 42 },
+  "shanghai→lagos":       { min: 35, max: 42 },
+  "shanghai→mombasa":     { min: 28, max: 34 },
+  "ningbo→durban":        { min: 32, max: 38 },
+  "ningbo→lagos":         { min: 35, max: 42 },
+  "ningbo→mombasa":       { min: 28, max: 34 },
+};
+
+/* Heuristic checks for the rail / road / air fallbacks. */
+const CN_PORTS = /ningbo|shanghai|shenzhen|guangzhou|qingdao|tianjin|xiamen|dalian|fuzhou|chongqing|chengdu|xian|wuhan|yiwu|yantian/i;
+const EU_HUBS  = /hamburg|rotterdam|antwerp|duisburg|warsaw|berlin|paris|madrid|milan|piraeus|gdansk|prague|budapest|moscow|st\.?\s*petersburg|brest|malaszewicze/i;
+
+type TransitEstimate = { min: number; max: number; source: "route" | "mode" | "fallback" };
+
+function estimateDeliveryTransit(
+  loadingPort: string | null | undefined,
+  dischargePort: string | null | undefined,
+  subType: string | null | undefined,
+  modeName: string | null | undefined,
+  fallbackMin: number | null | undefined,
+  fallbackMax: number | null | undefined,
+): TransitEstimate | null {
+  const code = (subType ?? "").toUpperCase();
+  const name = (modeName ?? "").toLowerCase();
+  const lp = (loadingPort ?? "").trim();
+  const dp = (dischargePort ?? "").trim();
+
+  /* 1) Route-specific sea lane. */
+  const seaModes = new Set(["FCL", "LCL", "RORO", "REEFER", "BREAK BULK"]);
+  if (lp && dp && (seaModes.has(code) || /sea|ocean|vessel/.test(name))) {
+    const key = `${normalisePortKey(lp)}→${normalisePortKey(dp)}`;
+    if (SEA_TRANSIT_DAYS[key]) {
+      return { ...SEA_TRANSIT_DAYS[key], source: "route" };
+    }
+  }
+
+  /* 2) China-Europe rail corridor. */
+  if ((code === "RAIL" || /rail/.test(name)) && CN_PORTS.test(lp) && EU_HUBS.test(dp)) {
+    return { min: 18, max: 25, source: "route" };
+  }
+
+  /* 3) Mode-only fallbacks (route variance is small for these). */
+  if (code === "AIR EXPRESS" || /express|dhl|fedex|ups|tnt/.test(name)) {
+    return { min: 3, max: 5, source: "mode" };
+  }
+  if (code === "AIR CARGO" || code === "AIR" || /air/.test(name)) {
+    return { min: 5, max: 10, source: "mode" };
+  }
+  if (code === "COURIER" || /courier|parcel/.test(name)) {
+    return { min: 3, max: 7, source: "mode" };
+  }
+  if (code === "ROAD FTL" || code === "ROAD LTL" || code === "ROAD" || /road|truck/.test(name)) {
+    return { min: 5, max: 12, source: "mode" };
+  }
+
+  /* 4) Last fallback: DB row's generic typical_transit_days. */
+  if (fallbackMin != null && fallbackMax != null) {
+    return { min: fallbackMin, max: fallbackMax, source: "fallback" };
+  }
+  return null;
+}
+
+/* Formats the "Delivery time" row text exactly as it will appear
+   inside current.terms. */
+function formatDeliveryRow(est: TransitEstimate | null, loadingPort: string): string {
+  if (!est) return "";
+  const range = est.min === est.max ? `~${est.min} days` : `~${est.min}-${est.max} days`;
+  const after = loadingPort ? ` after loading from ${loadingPort}` : ` after loading`;
+  return `${range}${after}`;
+}
+
 interface PaymentTermLite {
   id: string;
   label: string;
@@ -2814,8 +3003,8 @@ const QUICK_FILL_HELP: Record<string, { en: string; zh: string }> = {
     zh: "起算时间 — 生产周期从何时开始计算：收到定金、订单确认或开立信用证。决定生产正式启动的时间点。",
   },
   delivery: {
-    en: "Delivery (auto) — Auto-calculated estimated arrival window at the discharge port = lead time + transit time of the chosen shipping method.",
-    zh: "交货时间 (自动计算) — 自动计算的目的港预计到达时间 = 生产周期 + 所选运输方式的运输时间。",
+    en: "Delivery (estimated transit) — Estimated transit time from the loading port to the discharge port for the chosen shipping mode. Counted FROM the day the vessel sails (after loading), independent of production lead time. Sea routes use a port-pair table (e.g. Ningbo → Alexandria ≈ 28-32 days); air, rail and road use mode-based ranges.",
+    zh: "交货时间 (估算运输) — 所选运输方式下，从装货港至卸货港的预计运输时间。自船舶离港 (装货完成) 之日起算，与生产周期无关。海运按港口对查表 (例如：宁波→亚历山大约 28-32 天)；空运、铁路、公路按运输方式范围估算。",
   },
   documents: {
     en: "Documents Provided — International trade documents the seller will provide with the shipment: commercial invoice, packing list, bill of lading, certificate of origin, etc. Required for customs clearance and L/C payment.",
@@ -3927,21 +4116,44 @@ function TermsQuickFillModal({
       termsLineUpdates: { "Price Type": term ? `${term.code} (${term.name})` : "" },
     });
   };
+  /* Helper: compute the new Delivery row from the current values
+     PLUS the one field that is changing. Returns the formatted
+     row text and the loading port the row should reference. */
+  const computeDelivery = (
+    nextLoadingPort: string,
+    nextDischargePort: string,
+    method: ShippingMethodLite | undefined,
+  ): string => {
+    const est = estimateDeliveryTransit(
+      nextLoadingPort,
+      nextDischargePort,
+      method?.sub_type ?? null,
+      method?.name ?? null,
+      method?.typical_transit_days_min ?? null,
+      method?.typical_transit_days_max ?? null,
+    );
+    return formatDeliveryRow(est, nextLoadingPort);
+  };
+
   const onChangePort = (key: "loadingPort" | "dischargePort", v: string) => {
+    const nextLP = key === "loadingPort" ? v : (current.loadingPort ?? "");
+    const nextDP = key === "dischargePort" ? v : (current.dischargePort ?? "");
     onPatch({
       fields: { [key]: v } as QuickFillPatch["fields"],
-      termsLineUpdates: { [key === "loadingPort" ? "Loading port" : "Discharge port"]: v },
+      termsLineUpdates: {
+        [key === "loadingPort" ? "Loading port" : "Discharge port"]: v,
+        "Delivery time": computeDelivery(nextLP, nextDP, selectedMethod),
+      },
     });
   };
   const onPickMethod = (id: string) => {
     const m = methods.find((t) => t.id === id);
-    const transit =
-      m?.typical_transit_days_min != null && m.typical_transit_days_max != null
-        ? ` (${m.typical_transit_days_min}–${m.typical_transit_days_max} days)`
-        : "";
     onPatch({
       fields: { shippingMethodId: id || undefined },
-      termsLineUpdates: { "Sent by": m ? `${m.name}${transit}` : "" },
+      termsLineUpdates: {
+        "Sent by": m ? (m.name) : "",
+        "Delivery time": computeDelivery(current.loadingPort ?? "", current.dischargePort ?? "", m),
+      },
     });
   };
 
@@ -3949,6 +4161,19 @@ function TermsQuickFillModal({
     const sub = selectedMethod?.sub_type?.trim();
     return !!(sub && CONTAINER_TYPE_APPLIES.has(sub));
   })();
+
+  /* Live estimate shown in the read-only "Delivery (auto)" cell
+     under the Lead-time section. Recomputed on every render so
+     the operator sees the updated number the instant a port or
+     mode changes (before they have to blur the input). */
+  const liveDeliveryEst = estimateDeliveryTransit(
+    current.loadingPort ?? null,
+    current.dischargePort ?? null,
+    selectedMethod?.sub_type ?? null,
+    selectedMethod?.name ?? null,
+    selectedMethod?.typical_transit_days_min ?? null,
+    selectedMethod?.typical_transit_days_max ?? null,
+  );
 
   return (
     <div
@@ -4196,23 +4421,19 @@ function TermsQuickFillModal({
                   type="number" min={0} max={999}
                   value={current.leadTimeDays ?? ""}
                   onChange={(e) => {
+                    /* Lead time = production days from the trigger
+                       event to ready-at-loading-port. Delivery time
+                       is a SEPARATE transit estimate handled by
+                       computeDelivery() above, so we no longer mix
+                       the two here. */
                     const raw = e.target.value;
                     const days = raw === "" ? undefined : Math.max(0, Math.min(999, Number(raw)));
                     const basis = current.leadTimeBasis ?? "after_deposit";
                     const bLabel = LEAD_TIME_BASIS_LABEL[basis];
-                    const tMin = selectedMethod?.typical_transit_days_min ?? null;
-                    const tMax = selectedMethod?.typical_transit_days_max ?? null;
-                    const updates: Record<string, string> = {
-                      "Lead time": days ? `${days} days ${bLabel}` : "",
-                    };
-                    if (days && tMin != null && tMax != null) {
-                      const lo = days + tMin;
-                      const hi = days + tMax;
-                      updates["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
-                    } else {
-                      updates["Delivery time"] = "";
-                    }
-                    onPatch({ fields: { leadTimeDays: days }, termsLineUpdates: updates });
+                    onPatch({
+                      fields: { leadTimeDays: days },
+                      termsLineUpdates: { "Lead time": days ? `${days} days ${bLabel}` : "" },
+                    });
                   }}
                   style={fieldStyle}
                 />
@@ -4223,20 +4444,15 @@ function TermsQuickFillModal({
                   value={current.leadTimeBasis ?? "after_deposit"}
                   placeholder="— Pick a trigger —"
                   onChange={(v) => {
+                    /* Basis only affects the Lead-time wording; the
+                       Delivery transit estimate is independent. */
                     const basis = (v || "after_deposit") as "after_deposit" | "after_order" | "after_lc_opening";
                     const bLabel = LEAD_TIME_BASIS_LABEL[basis];
                     const days = current.leadTimeDays ?? 0;
-                    const tMin = selectedMethod?.typical_transit_days_min ?? null;
-                    const tMax = selectedMethod?.typical_transit_days_max ?? null;
-                    const updates: Record<string, string> = {
-                      "Lead time": days ? `${days} days ${bLabel}` : "",
-                    };
-                    if (days && tMin != null && tMax != null) {
-                      const lo = days + tMin;
-                      const hi = days + tMax;
-                      updates["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
-                    }
-                    onPatch({ fields: { leadTimeBasis: basis }, termsLineUpdates: updates });
+                    onPatch({
+                      fields: { leadTimeBasis: basis },
+                      termsLineUpdates: { "Lead time": days ? `${days} days ${bLabel}` : "" },
+                    });
                   }}
                   options={[
                     { value: "after_deposit",    label: "after receipt of deposit",  help: LEAD_BASIS_HELP_BY_VALUE.after_deposit },
@@ -4246,10 +4462,13 @@ function TermsQuickFillModal({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Delivery (auto)<HelpTip k="delivery" /></label>
+                <label style={labelStyle}>Delivery (auto, after loading)<HelpTip k="delivery" /></label>
                 <div style={{ ...fieldStyle, display: "flex", alignItems: "center", color: "rgba(255,255,255,0.55)", background: "#000000" }}>
-                  {current.leadTimeDays && selectedMethod?.typical_transit_days_min != null && selectedMethod.typical_transit_days_max != null
-                    ? `${current.leadTimeDays + selectedMethod.typical_transit_days_min}–${current.leadTimeDays + selectedMethod.typical_transit_days_max} days`
+                  {liveDeliveryEst
+                    ? (liveDeliveryEst.min === liveDeliveryEst.max
+                        ? `~${liveDeliveryEst.min} days`
+                        : `~${liveDeliveryEst.min}-${liveDeliveryEst.max} days`)
+                      + (current.loadingPort ? ` after loading from ${current.loadingPort}` : " after loading")
                     : "—"}
                 </div>
               </div>
