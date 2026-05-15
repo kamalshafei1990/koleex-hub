@@ -3667,21 +3667,30 @@ function CustomSelect({
         setHoveredHelp(null);
       }
     };
-    /* Close on any scroll / resize so the floating popover
-       doesn't drift away from its trigger. */
-    const onScrollOrResize = () => {
+    /* Close on background scroll / resize so the floating popover
+       doesn't drift away from its trigger -- BUT ignore scroll
+       events that originate inside the popover itself, otherwise
+       scrolling the dropdown's own option list would close it
+       immediately (the capture-phase listener fires before the
+       popover's internal scrollbar moves anything). */
+    const onResize = () => {
+      setOpenRect(null);
+      setHoveredHelp(null);
+    };
+    const onScroll = (e: Event) => {
+      if (popoverRef.current?.contains(e.target as Node)) return;
       setOpenRect(null);
       setHoveredHelp(null);
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onScrollOrResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onScrollOrResize);
-      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
