@@ -912,84 +912,13 @@ export default function QuotationA4Preview({
                     />
                   </Td>
                   <Td align="center">
-                    <div
-                      className={`quot-img-cell${item.image ? " has-img" : ""}`}
-                      onClick={() => fileInputRefs.current[idx]?.click()}
-                      style={{
-                        width: "100%",
-                        /* Lock to a square via aspectRatio rather than a
-                           fixed height — the cell scales with the A4
-                           regardless of zoom level or pixel-ratio. */
-                        aspectRatio: "1 / 1",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: item.image ? "none" : `1px dashed ${T.inkGhost}`,
-                        cursor: "pointer",
-                        position: "relative",
-                        overflow: "hidden",
-                        background: item.image ? "transparent" : "#FAFAFA",
-                        margin: "0 auto",
-                        /* Tighter picture cell (88 → was 110). Slims
-                           every row from ~130 to ~110 px and reclaims
-                           ~140 px of vertical budget across pages 2..N
-                           so the items table never crowds the A4 edge. */
-                        maxWidth: 88,
-                      }}
-                    >
-                      {item.image ? (
-                        <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      ) : (
-                        <span style={{ fontSize: 22, color: T.inkGhost, fontWeight: 300 }}>+</span>
-                      )}
-                      {/* Remove-photo button. Only rendered when a photo is
-                          present. stopPropagation so the click doesn't
-                          bubble up to the cell and open the file picker
-                          instead. Hidden in print via .no-print so the
-                          exported PDF never shows the X chip. */}
-                      {item.image && (
-                        <button
-                          type="button"
-                          className="no-print quot-img-remove"
-                          title="Remove photo"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateItem(idx, "image", "");
-                          }}
-                          style={{
-                            position: "absolute",
-                            top: 2,
-                            right: 2,
-                            width: 18,
-                            height: 18,
-                            borderRadius: 9,
-                            border: "none",
-                            background: "rgba(0,0,0,0.6)",
-                            color: "#fff",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            padding: 0,
-                            fontSize: 12,
-                            lineHeight: 1,
-                            fontWeight: 600,
-                          }}
-                        >
-                          ×
-                        </button>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={(el) => { fileInputRefs.current[idx] = el; }}
-                        style={{ position: "absolute", left: -9999, width: 0, height: 0 }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) handleImageUpload(idx, f);
-                        }}
-                      />
-                    </div>
+                    <PictureCell
+                      idx={idx}
+                      image={item.image}
+                      fileInputRefs={fileInputRefs}
+                      onUpload={(f) => handleImageUpload(idx, f)}
+                      onClear={() => updateItem(idx, "image", "")}
+                    />
                   </Td>
                   <Td align="right">
                     <div
@@ -2099,6 +2028,216 @@ function TermsToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+/* Picture cell for a quotation item row. Owns its drag-over state
+   so each row highlights independently. Three input paths:
+
+     1. Click → opens the hidden file picker (legacy behaviour).
+     2. Drop a file from Finder / Desktop / Photos → file dropped
+        on dataTransfer.files, fed straight to onUpload.
+     3. Drop an image URL from another browser tab → dataTransfer
+        carries a "text/uri-list" or "text/plain" entry. We fetch
+        the URL, convert the response to a File, then upload. If
+        the source server blocks CORS, the fetch throws and we
+        fall back to a friendly alert telling the user to download
+        the image first.
+
+   .no-print on the remove button so the exported PDF doesn't show
+   the × chip. The drag-highlight uses a darker dashed border + a
+   subtle blue tint so the operator can see exactly which row will
+   receive the drop. */
+function PictureCell({
+  idx,
+  image,
+  fileInputRefs,
+  onUpload,
+  onClear,
+}: {
+  idx: number;
+  image: string;
+  fileInputRefs: MutableRefObject<{ [key: number]: HTMLInputElement | null }>;
+  onUpload: (file: File) => void;
+  onClear: () => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  /* dragenter fires for every child element the cursor enters, so
+     we use a counter to know when the cursor has truly left the
+     cell. Without it the highlight flickers as the cursor moves
+     between the inner <img> and the wrapper. */
+  const dragDepth = useRef(0);
+
+  const acceptDropped = async (e: React.DragEvent<HTMLDivElement>) => {
+    /* 1) File drop from disk. */
+    const file = e.dataTransfer.files?.[0];
+    if (file && /^image\//.test(file.type)) {
+      onUpload(file);
+      return;
+    }
+    /* 2) URL drop from another browser tab. dataTransfer surfaces
+       the linked image's URL on a few keys depending on the source
+       browser. */
+    const url =
+      e.dataTransfer.getData("text/uri-list")?.split("\n")[0]?.trim() ||
+      e.dataTransfer.getData("text/plain")?.trim() ||
+      "";
+    if (!url || !/^https?:\/\//i.test(url)) return;
+    try {
+      const res = await fetch(url, { mode: "cors" });
+      if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+      const blob = await res.blob();
+      if (!/^image\//.test(blob.type)) {
+        alert("Dropped link doesn't look like an image.");
+        return;
+      }
+      const name = url.split("/").pop()?.split("?")[0] || "image.jpg";
+      onUpload(new File([blob], name, { type: blob.type }));
+    } catch {
+      /* CORS-blocked cross-origin fetch is the typical failure
+         mode. Tell the user how to recover. */
+      alert(
+        "Couldn't fetch the dragged image. Save it to your desktop first, then drag the file in.",
+      );
+    }
+  };
+
+  return (
+    <div
+      className={`quot-img-cell${image ? " has-img" : ""}`}
+      onClick={() => fileInputRefs.current[idx]?.click()}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragDepth.current += 1;
+        setIsDragOver(true);
+      }}
+      onDragOver={(e) => {
+        /* Critical: prevent the browser's default of navigating to
+           the dropped file. Without preventDefault the page would
+           open the image in place of the editor. */
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setIsDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        dragDepth.current = 0;
+        setIsDragOver(false);
+        void acceptDropped(e);
+      }}
+      style={{
+        width: "100%",
+        aspectRatio: "1 / 1",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: image
+          ? isDragOver
+            ? `2px dashed ${T.ink}`
+            : "none"
+          : `1px dashed ${isDragOver ? T.ink : T.inkGhost}`,
+        cursor: "pointer",
+        position: "relative",
+        overflow: "hidden",
+        background: isDragOver
+          ? "rgba(59,130,246,0.08)"
+          : image
+            ? "transparent"
+            : "#FAFAFA",
+        margin: "0 auto",
+        maxWidth: 88,
+        transition: "background 0.15s ease, border 0.15s ease",
+      }}
+    >
+      {image ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={image}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
+        />
+      ) : (
+        <span
+          style={{
+            fontSize: 22,
+            color: T.inkGhost,
+            fontWeight: 300,
+            pointerEvents: "none",
+          }}
+        >
+          +
+        </span>
+      )}
+      {/* Drop-overlay hint — only renders mid-drag so it doesn't
+          clutter the cell. pointerEvents:none keeps the underlying
+          drop target reachable. */}
+      {isDragOver && (
+        <div
+          className="no-print"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 8,
+            fontWeight: 700,
+            color: T.ink,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            pointerEvents: "none",
+          }}
+        >
+          Drop
+        </div>
+      )}
+      {image && (
+        <button
+          type="button"
+          className="no-print quot-img-remove"
+          title="Remove photo"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            border: "none",
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+            fontSize: 12,
+            lineHeight: 1,
+            fontWeight: 600,
+          }}
+        >
+          ×
+        </button>
+      )}
+      <input
+        type="file"
+        accept="image/*"
+        ref={(el) => { fileInputRefs.current[idx] = el; }}
+        style={{ position: "absolute", left: -9999, width: 0, height: 0 }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onUpload(f);
+          e.currentTarget.value = "";
+        }}
+      />
+    </div>
   );
 }
 
