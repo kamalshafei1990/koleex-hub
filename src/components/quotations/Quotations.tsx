@@ -38,7 +38,7 @@ interface QuotationItem {
   notes: string;
 }
 
-interface Quotation {
+export interface Quotation {
   id: string;
   customerName: string;
   companyName: string;
@@ -120,7 +120,7 @@ function addDays(dateStr: string, days: number): string {
  * Map a server row back into the Quotation shape the UI uses. The
  * server treats `doc` as an opaque JSON blob — that's our UI snapshot.
  */
-function fromRow(row: RemoteDocRow): Quotation {
+export function fromRow(row: RemoteDocRow): Quotation {
   const doc = row.doc as Partial<Quotation>;
   return {
     id: row.id,
@@ -847,6 +847,72 @@ export default function Quotations() {
     document.title = prev;
   }, [current]);
 
+  /* "saving" | "loading" status for the Export-PDF flow so the button
+     can spin while the server renders. PDF generation can take 5-15 s
+     on the first call after deploy (Chromium cold start), so a
+     visible state is important. */
+  const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
+
+  /* ── Export PDF (server-side render) ──
+     Hits /api/quotations/<id>/pdf which spins up headless Chrome,
+     navigates to the chrome-less /quotations/<id>/print page, and
+     snapshots it to PDF. The output is identical on phone, tablet,
+     and laptop — and ready to attach to email. The route requires
+     the quote to be SAVED to the server first (server fetches it by
+     id), so we save automatically if the user is on a fresh draft. */
+  const handleExportPdf = useCallback(async () => {
+    if (!current) return;
+    setPdfState("loading");
+    try {
+      /* Make sure the doc is persisted before asking the server to
+         render it — otherwise the PDF would show the previously-
+         saved state, not the user's latest edits. */
+      if (current.id.length !== 36) {
+        await handleSave("draft");
+      }
+      const refreshed = await loadQuotationsRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const quotationId = match?.id ?? current.id;
+      if (quotationId.length !== 36) {
+        setPdfState("error");
+        alert("Please save the quotation before exporting.");
+        return;
+      }
+      const res = await fetch(
+        `/api/quotations/${encodeURIComponent(quotationId)}/pdf`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const j = await res.json();
+          detail = j?.error || "";
+        } catch { /* ignore */ }
+        setPdfState("error");
+        alert(`Export failed (${res.status})${detail ? `: ${detail}` : ""}`);
+        return;
+      }
+      const blob = await res.blob();
+      const filename = `${current.invoiceNo || "quotation"}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      /* Defer the revoke a tick so the browser actually starts the
+         download before the URL becomes invalid. */
+      setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setPdfState("idle");
+    } catch (e) {
+      setPdfState("error");
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [current, handleSave]);
+
   /* ── Duplicate ──
      Clones the current quote into a fresh draft and drops the user
      straight into the editor. The new draft gets:
@@ -1224,11 +1290,13 @@ export default function Quotations() {
           {t("btn.convertToInvoice")}
         </button>
         <button
-          onClick={handlePrint}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          onClick={handleExportPdf}
+          disabled={pdfState === "loading"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Generate a PDF on the server — same output on every device."
         >
           <DownloadIcon size={14} />
-          {t("btn.exportPDF")}
+          {pdfState === "loading" ? "Rendering…" : t("btn.exportPDF")}
         </button>
         <button
           onClick={handlePrint}

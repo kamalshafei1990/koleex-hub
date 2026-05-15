@@ -22,10 +22,24 @@ import {
 
 const BYPASS_PREFIXES = ["/login", "/auth"];
 
+/* Paths that need chrome-less rendering — same treatment as the
+   /login + /auth flows but matched anywhere in the URL. Right now
+   only the PDF-print routes use this: /quotations/<id>/print and
+   /invoices/<id>/print. Server-side PDF generation snapshots these
+   pages and the Hub chrome (header, sidebar, panels) must NOT be
+   present in the captured output. */
+const BYPASS_SUFFIXES = ["/print"];
+
 function isBypassed(pathname: string | null): boolean {
   if (!pathname) return false;
-  return BYPASS_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/"),
+  if (
+    BYPASS_PREFIXES.some(
+      (p) => pathname === p || pathname.startsWith(p + "/"),
+    )
+  )
+    return true;
+  return BYPASS_SUFFIXES.some(
+    (s) => pathname.endsWith(s) || pathname.endsWith(s + "/"),
   );
 }
 

@@ -452,7 +452,10 @@ export default function QuotationA4Preview({
             />
           </MetaStripCell>
           <MetaStripCell label="Quotation No">
-            <span style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}>
+            <span
+              data-quote-no={current.invoiceNo || undefined}
+              style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}
+            >
               {current.invoiceNo || "—"}
             </span>
           </MetaStripCell>
