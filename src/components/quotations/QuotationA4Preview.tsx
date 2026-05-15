@@ -3044,7 +3044,10 @@ function CustomSelect({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [hoveredHelp, setHoveredHelp] = useState<string | null>(null);
+  /* Track which option is being help-hovered AND its anchor rect
+     so the tooltip can render at fixed coordinates outside the
+     dropdown's overflow:auto clip rect. */
+  const [hoveredHelp, setHoveredHelp] = useState<{ value: string; rect: DOMRect } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3168,7 +3171,7 @@ function CustomSelect({
               )}
               {(grouped[g] ?? []).map((o) => {
                 const selectedHere = o.value === value;
-                const isHovered = hoveredHelp === o.value;
+                const isHovered = hoveredHelp?.value === o.value;
                 return (
                   <div key={o.value} style={{ position: "relative" }}>
                     <button
@@ -3207,42 +3210,31 @@ function CustomSelect({
                       </span>
                       {o.help && (
                         <span
-                          onMouseEnter={(e) => { e.stopPropagation(); setHoveredHelp(o.value); }}
+                          onMouseEnter={(e) => {
+                            e.stopPropagation();
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setHoveredHelp({ value: o.value, rect });
+                          }}
                           onMouseLeave={() => setHoveredHelp(null)}
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            width: 16, height: 16, borderRadius: "50%",
-                            border: "1px solid rgba(255,255,255,0.35)",
-                            color: "rgba(255,255,255,0.75)", background: "transparent",
-                            fontSize: 10, fontWeight: 700, cursor: "help",
+                            width: 18, height: 18, borderRadius: "50%",
+                            border: "1px solid rgba(255,255,255,0.45)",
+                            color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.06)",
+                            fontSize: 11, fontWeight: 700, cursor: "help",
                             flexShrink: 0,
                           }}
                         >?</span>
                       )}
                     </button>
 
-                    {isHovered && o.help && (
-                      <div style={{
-                        position: "absolute",
-                        left: "calc(100% + 8px)",
-                        top: 0,
-                        width: 320,
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "#1f2937",
-                        color: "#ffffff",
-                        border: "1px solid rgba(255,255,255,0.18)",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
-                        fontSize: 11, lineHeight: 1.5,
-                        zIndex: 1300, pointerEvents: "none",
-                        whiteSpace: "normal",
-                      }}>
-                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</div>
-                        <div style={{ marginBottom: 8 }}>{o.help.en}</div>
-                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
-                        <div>{o.help.zh}</div>
-                      </div>
+                    {isHovered && o.help && hoveredHelp && (
+                      <BilingualTooltip
+                        anchorRect={hoveredHelp.rect}
+                        en={o.help.en}
+                        zh={o.help.zh}
+                      />
                     )}
                   </div>
                 );
@@ -3255,72 +3247,92 @@ function CustomSelect({
   );
 }
 
+/* Tiny bilingual EN + 中文 popover used by every help icon in
+   the Quick Fill modal. Rendered with position: fixed so the
+   modal body's overflow:auto cannot clip it, plus an edge-aware
+   coordinate calculation so it never goes off-screen. */
+function BilingualTooltip({
+  anchorRect, en, zh,
+}: { anchorRect: DOMRect; en: string; zh: string }) {
+  const WIDTH = 320;
+  const margin = 8;
+  /* Prefer placing the tooltip directly under the icon. If that
+     pushes it past the right viewport edge, anchor to the right
+     instead so it stays fully visible. */
+  let left = anchorRect.left;
+  if (typeof window !== "undefined" && left + WIDTH + 16 > window.innerWidth) {
+    left = Math.max(8, window.innerWidth - WIDTH - 16);
+  }
+  let top = anchorRect.bottom + margin;
+  /* If the tooltip would fall below the viewport, render it
+     ABOVE the icon instead. */
+  if (typeof window !== "undefined" && top + 180 > window.innerHeight) {
+    top = Math.max(8, anchorRect.top - 180 - margin);
+  }
+  return (
+    <div
+      role="tooltip"
+      style={{
+        position: "fixed",
+        top, left,
+        width: WIDTH,
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "#1f2937",
+        color: "#ffffff",
+        border: "1px solid rgba(255,255,255,0.18)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+        fontSize: 11,
+        lineHeight: 1.5,
+        pointerEvents: "none",
+        textTransform: "none",
+        letterSpacing: 0,
+        fontWeight: 400,
+        whiteSpace: "normal",
+        zIndex: 99999,
+      }}
+    >
+      <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</div>
+      <div style={{ marginBottom: 8 }}>{en}</div>
+      <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
+      <div>{zh}</div>
+    </div>
+  );
+}
+
 /* Small (?) icon that opens a bilingual EN+中文 explanation on
    hover. Used beside every Quick Fill label so the operator does
-   not need to remember what FOB / D/P / CIETAC etc. mean. */
+   not need to remember what FOB / D/P / CIETAC etc. mean.
+   Switched to position:fixed via a captured anchor rect so the
+   tooltip is never clipped by the modal body's overflow:auto. */
 function HelpTip({ k }: { k: keyof typeof QUICK_FILL_HELP }) {
-  const [hover, setHover] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const h = QUICK_FILL_HELP[k];
   return (
     <span
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={(e) => setRect((e.currentTarget as HTMLElement).getBoundingClientRect())}
+      onMouseLeave={() => setRect(null)}
       style={{
-        position: "relative",
         display: "inline-flex",
-        marginLeft: 5,
+        alignItems: "center",
+        justifyContent: "center",
+        width: 15,
+        height: 15,
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.45)",
+        color: "rgba(255,255,255,0.85)",
+        fontSize: 10,
+        fontWeight: 700,
+        cursor: "help",
+        background: "rgba(255,255,255,0.06)",
+        userSelect: "none",
+        marginLeft: 6,
         verticalAlign: "middle",
+        flexShrink: 0,
       }}
     >
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 13,
-          height: 13,
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.35)",
-          color: "rgba(255,255,255,0.75)",
-          fontSize: 9,
-          fontWeight: 700,
-          cursor: "help",
-          background: "transparent",
-          userSelect: "none",
-        }}
-      >
-        ?
-      </span>
-      {hover && (
-        <span
-          role="tooltip"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 1100,
-            width: 320,
-            padding: "10px 12px",
-            borderRadius: 8,
-            background: "#1f2937",
-            color: "#ffffff",
-            border: "1px solid rgba(255,255,255,0.18)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
-            fontSize: 11,
-            lineHeight: 1.5,
-            pointerEvents: "none",
-            textTransform: "none",
-            letterSpacing: 0,
-            fontWeight: 400,
-            whiteSpace: "normal",
-          }}
-        >
-          <span style={{ display: "block", fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</span>
-          <span style={{ display: "block", marginBottom: 8 }}>{h.en}</span>
-          <span style={{ display: "block", fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</span>
-          <span style={{ display: "block" }}>{h.zh}</span>
-        </span>
-      )}
+      ?
+      {rect && <BilingualTooltip anchorRect={rect} en={h.en} zh={h.zh} />}
     </span>
   );
 }
@@ -4169,7 +4181,10 @@ function DocumentsCheckboxList({
 }) {
   interface DocLite { id: string; code: string; name: string; short_name: string | null; description: string | null; category: string; sort_order?: number; }
   const [docs, setDocs] = useState<DocLite[]>([]);
-  const [hoveredHelpId, setHoveredHelpId] = useState<string | null>(null);
+  /* Track hovered doc id + anchor rect so the per-pill tooltip
+     renders via the same fixed-position BilingualTooltip helper
+     and isn't clipped by the modal body's overflow:auto. */
+  const [hoveredHelp, setHoveredHelp] = useState<{ id: string; rect: DOMRect } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch("/api/shipping-documents", { credentials: "include" })
@@ -4297,7 +4312,7 @@ function DocumentsCheckboxList({
                 const label = d.short_name ?? d.code;
                 const checked = value.includes(label);
                 const help = resolveDocumentHelp(d.code, d.short_name, d.description);
-                const isHelpHovered = hoveredHelpId === d.id;
+                const isHelpHovered = hoveredHelp?.id === d.id;
                 return (
                   <div key={d.id} style={{ position: "relative" }}>
                     <button
@@ -4341,36 +4356,30 @@ function DocumentsCheckboxList({
                       </span>
                       {help && (
                         <span
-                          onMouseEnter={(e) => { e.stopPropagation(); setHoveredHelpId(d.id); }}
-                          onMouseLeave={() => setHoveredHelpId(null)}
+                          onMouseEnter={(e) => {
+                            e.stopPropagation();
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setHoveredHelp({ id: d.id, rect });
+                          }}
+                          onMouseLeave={() => setHoveredHelp(null)}
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            width: 16, height: 16, borderRadius: "50%",
-                            border: "1px solid rgba(255,255,255,0.35)",
-                            color: "rgba(255,255,255,0.75)", background: "transparent",
-                            fontSize: 10, fontWeight: 700, cursor: "help",
+                            width: 18, height: 18, borderRadius: "50%",
+                            border: "1px solid rgba(255,255,255,0.45)",
+                            color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.06)",
+                            fontSize: 11, fontWeight: 700, cursor: "help",
                             flexShrink: 0,
                           }}
                         >?</span>
                       )}
                     </button>
-                    {isHelpHovered && help && (
-                      <div style={{
-                        position: "absolute",
-                        left: 0, top: "calc(100% + 6px)",
-                        width: 320, padding: "10px 12px",
-                        borderRadius: 8, background: "#1f2937", color: "#fff",
-                        border: "1px solid rgba(255,255,255,0.18)",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
-                        fontSize: 11, lineHeight: 1.5,
-                        zIndex: 1300, pointerEvents: "none", whiteSpace: "normal",
-                      }}>
-                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</div>
-                        <div style={{ marginBottom: 8 }}>{help.en}</div>
-                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
-                        <div>{help.zh}</div>
-                      </div>
+                    {isHelpHovered && help && hoveredHelp && (
+                      <BilingualTooltip
+                        anchorRect={hoveredHelp.rect}
+                        en={help.en}
+                        zh={help.zh}
+                      />
                     )}
                   </div>
                 );
