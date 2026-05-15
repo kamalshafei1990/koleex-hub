@@ -138,19 +138,25 @@ const STORAGE_KEY = "koleex.invoices-doc.v1";
 const COUNTER_KEY = "koleex.invoices-doc.counter";
 
 /* Default terms shell for a fresh invoice. Mirrors the quotation
-   shell so the same Quick Fill pickers land cleanly. Bold labels
-   match the visual treatment the picker applies on every pick. */
+   shell so the same Quick Fill pickers land cleanly. Each labelled
+   row is its own <div> with a dashed bottom border; the trailing
+   <div> is the free-text notes area. Order matches the quotation
+   editor for cross-doc consistency. */
+const TERMS_ROW_STYLE =
+  `border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;`;
+const TERMS_NOTES_STYLE = `padding: 6px 0; min-height: 28px;`;
 const DEFAULT_TERMS =
-  `<strong>Payment terms:</strong> <br>` +
-  `<strong>Price Type:</strong> <br>` +
-  `<strong>Loading port:</strong> <br>` +
-  `<strong>Discharge port:</strong> <br>` +
-  `<strong>Sent by:</strong> <br>` +
-  `<strong>Shipping marks:</strong> <br>` +
-  `<strong>Lead time:</strong> <br>` +
-  `<strong>Delivery time:</strong> <br>` +
-  `<strong>All prices include tax:</strong> <br>` +
-  `<strong>Total Qty:</strong> `;
+  `<div style="${TERMS_ROW_STYLE}"><strong>Payment terms:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Price Type:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Loading port:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Discharge port:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Sent by:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Lead time:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Delivery time:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Shipping marks:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>All prices include tax:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Total Qty:</strong> </div>` +
+  `<div style="${TERMS_NOTES_STYLE}"><br></div>`;
 
 const EMPTY_ITEM: InvoiceItem = {
   description: "",

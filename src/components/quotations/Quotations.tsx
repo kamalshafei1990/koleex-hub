@@ -163,22 +163,30 @@ export interface Quotation {
 const STORAGE_KEY = "koleex.quotations.v1";
 const COUNTER_KEY = "koleex.quotations.counter";
 
-/* Default terms shell for a fresh quotation. Each line uses one of
-   the Quick Fill canonical keys so a single dropdown pick lands
-   cleanly on the existing line instead of appending a duplicate.
-   Labels are wrapped in <strong> so a brand-new draft already has
-   the bold-label visual treatment the picks reinforce. */
+/* Default terms shell for a fresh quotation. Each labelled row is
+   its own <div> with a dashed bottom border so the rows visually
+   separate from one another and read as a tidy checklist. Quick
+   Fill picks land on the matching row; manual edits work inline.
+   Order is by negotiation priority — payment first, then price
+   formula, then route, then logistics, then admin lines. The
+   trailing <div> is the free-text 'additional notes' area: the
+   operator can keep typing below the last row and a new <div>
+   gets created naturally on Enter. */
+const TERMS_ROW_STYLE =
+  `border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;`;
+const TERMS_NOTES_STYLE = `padding: 6px 0; min-height: 28px;`;
 const DEFAULT_TERMS =
-  `<strong>Payment terms:</strong> <br>` +
-  `<strong>Price Type:</strong> <br>` +
-  `<strong>Loading port:</strong> <br>` +
-  `<strong>Discharge port:</strong> <br>` +
-  `<strong>Sent by:</strong> <br>` +
-  `<strong>Shipping marks:</strong> <br>` +
-  `<strong>Lead time:</strong> <br>` +
-  `<strong>Delivery time:</strong> <br>` +
-  `<strong>All prices include tax:</strong> <br>` +
-  `<strong>Total Qty:</strong> `;
+  `<div style="${TERMS_ROW_STYLE}"><strong>Payment terms:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Price Type:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Loading port:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Discharge port:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Sent by:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Lead time:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Delivery time:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Shipping marks:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>All prices include tax:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Total Qty:</strong> </div>` +
+  `<div style="${TERMS_NOTES_STYLE}"><br></div>`;
 
 const EMPTY_ITEM: QuotationItem = {
   description: "",

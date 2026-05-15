@@ -2279,6 +2279,55 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     return `<strong>${label}:</strong> ${value}`;
   };
 
+  /* DIV-wrapped layout path. The new DEFAULT_TERMS wraps each row
+     in '<div style="..."><strong>Label:</strong> value</div>' so
+     the rows visually separate via border-bottom. We walk each
+     <div>…</div> block, match an alias against the inner text, and
+     rewrite the inner as '<strong>Key:</strong> value' — preserving
+     the outer wrapper (and its style) untouched. Lines that didn't
+     find a match get appended as fresh styled <div> blocks at the
+     end, just before any free-text notes the operator typed. */
+  const divLayout = /<div[^>]*>[\s\S]*?<\/div>/i.test(html);
+  if (divLayout) {
+    const usedKeys = new Set<string>();
+    const divRe = /(<div[^>]*>)([\s\S]*?)(<\/div>)/gi;
+    const rewritten = html.replace(divRe, (full, open: string, inner: string, close: string) => {
+      for (const key of Object.keys(updates)) {
+        if (usedKeys.has(key)) continue;
+        if (keyMatches(inner, key)) {
+          usedKeys.add(key);
+          const value = updates[key] ?? "";
+          /* Rebuild the inner content in the canonical bold format
+             — '<strong>Label:</strong> value'. The outer <div>
+             with its border-bottom styling stays intact. */
+          return `${open}<strong>${key}:</strong> ${value}${close}`;
+        }
+      }
+      return full;
+    });
+    /* Append fresh rows for keys not present anywhere. Inserted
+       just before the trailing free-text <div> if one exists so
+       structured rows stay grouped at the top. */
+    let result = rewritten;
+    const missing = Object.keys(updates).filter((k) => !usedKeys.has(k));
+    for (const k of missing) {
+      if (!updates[k]) continue;
+      const row = `<div style="border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;"><strong>${k}:</strong> ${updates[k]}</div>`;
+      /* Try to insert before the last <div>…</div> (the notes
+         area) so structured rows stay grouped above free text. */
+      const lastDivMatch = result.match(/(<div[^>]*>[\s\S]*<\/div>)\s*$/i);
+      if (lastDivMatch) {
+        const idx = result.lastIndexOf("<div");
+        result = result.slice(0, idx) + row + result.slice(idx);
+      } else {
+        result += row;
+      }
+    }
+    return result;
+  }
+
+  /* Legacy <br>-separated path — same logic as before so older
+     quotes without div wrappers keep working without migration. */
   const usedKeys = new Set<string>();
   const out = segments.map((seg) => {
     if (/^<br/i.test(seg)) return seg;
@@ -2290,16 +2339,11 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     }
     return seg;
   });
-  /* Append a fresh line for any canonical key that didn't find a
-     matching alias in the existing terms. Skip if the new value is
-     empty (the operator cleared the dropdown — nothing to append). */
   const missing = Object.keys(updates).filter((k) => !usedKeys.has(k));
   let result = out.join("");
   for (const k of missing) {
     if (!updates[k]) continue;
     const sep = result && !/<br\s*\/?>\s*$/i.test(result) ? "<br>" : "";
-    /* Bold the canonical label on freshly appended lines so they
-       read consistently with the replaced ones. */
     result += `${sep}<strong>${k}:</strong> ${updates[k]}`;
   }
   return result;
