@@ -1444,22 +1444,17 @@ export default function QuotationA4Preview({
                       with the same selection. .no-print so the
                       exported PDF only shows the resulting text, not
                       the dropdowns themselves. */}
-                  <QuickFillBar
-                    paymentTermId={current.paymentTermId}
-                    incotermId={current.incotermId}
-                    incotermLocation={current.incotermLocation}
-                    loadingPort={current.loadingPort}
-                    dischargePort={current.dischargePort}
-                    shippingMethodId={current.shippingMethodId}
-                    shippingMarks={current.shippingMarks}
-                    containerType={current.containerType}
-                    bankCharges={current.bankCharges}
-                    cancellationPolicy={current.cancellationPolicy}
-                    governingLaw={current.governingLaw}
-                    documentsProvided={current.documentsProvided}
-                    leadTimeDays={current.leadTimeDays}
-                    leadTimeBasis={current.leadTimeBasis}
-                    onChange={(patch) => {
+                  {/* Compact 'Quick Fill' opener — replaces the
+                      cluttered inline picker strip. Clicking opens
+                      a modal with every field organised into
+                      sections (Payment, Route, Shipping, Timing,
+                      Cargo, Documents, Legal). All picks still
+                      land in the matching T&C row in real time;
+                      the modal just hides the controls behind a
+                      single chip until the operator wants them. */}
+                  <TermsQuickFillTrigger
+                    current={current}
+                    onPatch={(patch) => {
                       const next = { ...current, ...patch.fields };
                       if (patch.termsLineUpdates) {
                         next.terms = applyQuickFillToTerms(
@@ -1468,11 +1463,6 @@ export default function QuotationA4Preview({
                         );
                       }
                       setCurrent(next);
-                      /* Force the rich-text terms area to re-sync
-                         even if the operator had it focused when
-                         they used the dropdown. Without this bump
-                         the visible text would lag until the
-                         150 ms blur-grace window fired. */
                       setTermsRevision((v) => v + 1);
                     }}
                   />
@@ -2476,6 +2466,622 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     result += `${sep}<strong>${k}:</strong> ${updates[k]}`;
   }
   return result;
+}
+
+/* Compact 'Quick Fill' button + modal wrapper. Single chip on the
+   Terms card; click → modal opens with the full QuickFillBar laid
+   out as a tidy two-column form instead of a horizontal flex
+   strip. Every existing picker keeps its real-time behaviour;
+   the modal just hides them behind one button until the operator
+   wants to fill the doc. */
+function TermsQuickFillTrigger({
+  current,
+  onPatch,
+}: {
+  current: Quotation;
+  onPatch: (patch: QuickFillPatch) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  /* Quick visual cue of how many fields are already filled so the
+     operator can see at a glance whether the modal has been used. */
+  const filledCount = useMemo(() => {
+    let n = 0;
+    if (current.paymentTermId)        n++;
+    if (current.incotermId)           n++;
+    if (current.loadingPort)          n++;
+    if (current.dischargePort)        n++;
+    if (current.shippingMethodId)     n++;
+    if (current.containerType)        n++;
+    if (current.shippingMarks)        n++;
+    if (current.leadTimeDays)         n++;
+    if (current.bankCharges)          n++;
+    if (current.cancellationPolicy)   n++;
+    if (current.governingLaw)         n++;
+    if ((current.documentsProvided ?? []).length > 0) n++;
+    return n;
+  }, [current]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <div
+      className="no-print"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 10px",
+        borderBottom: `1px solid ${T.border}`,
+        background: T.surface,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 10px",
+          borderRadius: 6,
+          border: `1px solid ${T.border}`,
+          background: T.paper,
+          color: T.ink,
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+        title="Open the Quick Fill panel — pick payment terms, route, shipping, cargo, documents, and legal clauses in one place."
+      >
+        <span>⚡</span>
+        <span>Quick Fill</span>
+        {filledCount > 0 && (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "1px 6px",
+              borderRadius: 4,
+              background: T.black,
+              color: "#fff",
+              marginLeft: 2,
+            }}
+          >
+            {filledCount} filled
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <TermsQuickFillModal
+          current={current}
+          onPatch={onPatch}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* The actual modal — Apple-style overlay + a card with every Quick
+   Fill control organised into labelled sections. Picks land in
+   real time on the doc; the operator clicks Done (or Esc / click-
+   outside) to close. The internal layout reuses the same input
+   styling as the old inline bar so the controls look familiar. */
+function TermsQuickFillModal({
+  current,
+  onPatch,
+  onClose,
+}: {
+  current: Quotation;
+  onPatch: (patch: QuickFillPatch) => void;
+  onClose: () => void;
+}) {
+  const [payCats, setPayCats] = useState<PaymentCatLite[]>([]);
+  const [incoterms, setIncoterms] = useState<IncotermLite[]>([]);
+  const [methods, setMethods] = useState<ShippingMethodLite[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/payment-terms",    { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/incoterms",        { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/shipping-methods", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
+    ]).then(([pt, ic, sm]) => {
+      if (cancelled) return;
+      setPayCats((pt?.categories as PaymentCatLite[] | undefined) ?? []);
+      setIncoterms((ic?.rows as IncotermLite[] | undefined) ?? []);
+      setMethods((sm?.rows as ShippingMethodLite[] | undefined) ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedMethod = useMemo(
+    () => methods.find((m) => m.id === current.shippingMethodId),
+    [methods, current.shippingMethodId],
+  );
+
+  const allPaymentTerms = useMemo(
+    () => payCats.flatMap((c) => c.terms.map((t) => ({ ...t, catName: c.short_name ?? c.name }))),
+    [payCats],
+  );
+
+  const fieldStyle: React.CSSProperties = {
+    width: "100%",
+    height: 32,
+    fontSize: 12,
+    padding: "0 8px",
+    borderRadius: 6,
+    border: "1px solid var(--border-color, #374151)",
+    background: "var(--bg-primary, #111827)",
+    color: "var(--text-primary, #e5e7eb)",
+    outline: "none",
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.06))",
+  };
+  const sectionTitle: React.CSSProperties = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "var(--text-dim, #9ca3af)",
+    marginBottom: 8,
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "var(--text-dim, #9ca3af)",
+    marginBottom: 4,
+    display: "block",
+  };
+
+  // Helpers to package up onPatch calls cleanly per field.
+  const onPickPayment = (id: string) => {
+    const term = allPaymentTerms.find((t) => t.id === id);
+    onPatch({
+      fields: { paymentTermId: id || undefined },
+      termsLineUpdates: { "Payment terms": term?.label ?? "" },
+    });
+  };
+  const onPickIncoterm = (id: string) => {
+    const term = incoterms.find((t) => t.id === id);
+    onPatch({
+      fields: {
+        incotermId: id || undefined,
+        incotermCode: term?.code,
+      },
+      termsLineUpdates: { "Price Type": term ? `${term.code} (${term.name})` : "" },
+    });
+  };
+  const onChangePort = (key: "loadingPort" | "dischargePort", v: string) => {
+    onPatch({
+      fields: { [key]: v } as QuickFillPatch["fields"],
+      termsLineUpdates: { [key === "loadingPort" ? "Loading port" : "Discharge port"]: v },
+    });
+  };
+  const onPickMethod = (id: string) => {
+    const m = methods.find((t) => t.id === id);
+    const transit =
+      m?.typical_transit_days_min != null && m.typical_transit_days_max != null
+        ? ` (${m.typical_transit_days_min}–${m.typical_transit_days_max} days)`
+        : "";
+    onPatch({
+      fields: { shippingMethodId: id || undefined },
+      termsLineUpdates: { "Sent by": m ? `${m.name}${transit}` : "" },
+    });
+  };
+
+  const containerVisible = (() => {
+    const sub = selectedMethod?.sub_type?.trim();
+    return !!(sub && CONTAINER_TYPE_APPLIES.has(sub));
+  })();
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--bg-secondary, #1f2937)",
+          color: "var(--text-primary, #e5e7eb)",
+          width: "100%",
+          maxWidth: 760,
+          maxHeight: "90vh",
+          borderRadius: 14,
+          border: "1px solid var(--border-color, #374151)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 18px",
+            borderBottom: "1px solid var(--border-color, #374151)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Quick Fill — Terms &amp; Conditions</div>
+            <div style={{ fontSize: 11, color: "var(--text-dim, #9ca3af)", marginTop: 2 }}>
+              Pick once; values land in the Terms card as you go.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              fontSize: 22,
+              lineHeight: 1,
+              padding: 4,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", padding: "8px 18px 14px", flex: 1 }}>
+          {/* ── Payment & Pricing ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>Payment &amp; Pricing</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Payment term</label>
+                <select value={current.paymentTermId ?? ""} onChange={(e) => onPickPayment(e.target.value)} style={fieldStyle}>
+                  <option value="">— Pick a payment term —</option>
+                  {payCats.map((cat) => (
+                    <optgroup key={cat.id} label={cat.short_name ?? cat.name}>
+                      {cat.terms.map((t) => (
+                        <option key={t.id} value={t.id}>{t.short_label ?? t.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Price type (Incoterm)</label>
+                <select value={current.incotermId ?? ""} onChange={(e) => onPickIncoterm(e.target.value)} style={fieldStyle}>
+                  <option value="">— Pick an Incoterm —</option>
+                  {incoterms.map((t) => (
+                    <option key={t.id} value={t.id}>{t.code} — {t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Route ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>Shipment Route</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Loading port (origin)</label>
+                <input type="text" placeholder="e.g. Ningbo, China" value={current.loadingPort ?? ""} onChange={(e) => onChangePort("loadingPort", e.target.value)} style={fieldStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Discharge port (destination)</label>
+                <input type="text" placeholder="e.g. Alexandria, Egypt" value={current.dischargePort ?? ""} onChange={(e) => onChangePort("dischargePort", e.target.value)} style={fieldStyle} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Shipping ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>Shipping</div>
+            <div style={{ display: "grid", gridTemplateColumns: containerVisible ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Sent by</label>
+                <select value={current.shippingMethodId ?? ""} onChange={(e) => onPickMethod(e.target.value)} style={fieldStyle}>
+                  <option value="">— Pick a shipping method —</option>
+                  {methods.map((m) => (
+                    <option key={m.id} value={m.id}>{m.short_name ?? m.name}</option>
+                  ))}
+                </select>
+              </div>
+              {containerVisible && (
+                <div>
+                  <label style={labelStyle}>Container type</label>
+                  <select
+                    value={current.containerType ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      onPatch({
+                        fields: { containerType: v || undefined },
+                        termsLineUpdates: { "Container type": v },
+                      });
+                    }}
+                    style={fieldStyle}
+                  >
+                    <option value="">— Pick a container —</option>
+                    {CONTAINER_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label style={labelStyle}>Shipping marks</label>
+                <select
+                  value={current.shippingMarks ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onPatch({
+                      fields: { shippingMarks: v || undefined },
+                      termsLineUpdates: { "Shipping marks": v },
+                    });
+                  }}
+                  style={fieldStyle}
+                >
+                  <option value="">— Pick a rule —</option>
+                  {SHIPPING_MARKS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Timing ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>Timing</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
+              <div>
+                <label style={labelStyle}>Lead time (days)</label>
+                <input
+                  type="number" min={0} max={999}
+                  value={current.leadTimeDays ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const days = raw === "" ? undefined : Math.max(0, Math.min(999, Number(raw)));
+                    const basis = current.leadTimeBasis ?? "after_deposit";
+                    const bLabel = LEAD_TIME_BASIS_LABEL[basis];
+                    const tMin = selectedMethod?.typical_transit_days_min ?? null;
+                    const tMax = selectedMethod?.typical_transit_days_max ?? null;
+                    const updates: Record<string, string> = {
+                      "Lead time": days ? `${days} days ${bLabel}` : "",
+                    };
+                    if (days && tMin != null && tMax != null) {
+                      const lo = days + tMin;
+                      const hi = days + tMax;
+                      updates["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
+                    } else {
+                      updates["Delivery time"] = "";
+                    }
+                    onPatch({ fields: { leadTimeDays: days }, termsLineUpdates: updates });
+                  }}
+                  style={fieldStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Counted from</label>
+                <select
+                  value={current.leadTimeBasis ?? "after_deposit"}
+                  onChange={(e) => {
+                    const basis = e.target.value as "after_deposit" | "after_order" | "after_lc_opening";
+                    const bLabel = LEAD_TIME_BASIS_LABEL[basis];
+                    const days = current.leadTimeDays ?? 0;
+                    const tMin = selectedMethod?.typical_transit_days_min ?? null;
+                    const tMax = selectedMethod?.typical_transit_days_max ?? null;
+                    const updates: Record<string, string> = {
+                      "Lead time": days ? `${days} days ${bLabel}` : "",
+                    };
+                    if (days && tMin != null && tMax != null) {
+                      const lo = days + tMin;
+                      const hi = days + tMax;
+                      updates["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
+                    }
+                    onPatch({ fields: { leadTimeBasis: basis }, termsLineUpdates: updates });
+                  }}
+                  style={fieldStyle}
+                >
+                  <option value="after_deposit">after receipt of deposit</option>
+                  <option value="after_order">after order confirmation</option>
+                  <option value="after_lc_opening">after L/C opening</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Delivery (auto)</label>
+                <div style={{ ...fieldStyle, display: "flex", alignItems: "center", color: "var(--text-dim, #9ca3af)" }}>
+                  {current.leadTimeDays && selectedMethod?.typical_transit_days_min != null && selectedMethod.typical_transit_days_max != null
+                    ? `${current.leadTimeDays + selectedMethod.typical_transit_days_min}–${current.leadTimeDays + selectedMethod.typical_transit_days_max} days`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Documents ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>Documents Provided</div>
+            <DocumentsCheckboxList
+              value={current.documentsProvided ?? []}
+              onChange={(next) => {
+                onPatch({
+                  fields: { documentsProvided: next.length > 0 ? next : undefined },
+                  termsLineUpdates: { "Documents Provided": next.join(", ") },
+                });
+              }}
+            />
+          </div>
+
+          {/* ── Legal ── */}
+          <div style={{ ...sectionStyle, borderBottom: "none" }}>
+            <div style={sectionTitle}>Legal Clauses</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Bank charges</label>
+                <select
+                  value={current.bankCharges ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onPatch({ fields: { bankCharges: v || undefined }, termsLineUpdates: { "Bank Charges": v } });
+                  }}
+                  style={fieldStyle}
+                >
+                  <option value="">— Pick a clause —</option>
+                  {BANK_CHARGES_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Cancellation policy</label>
+                <select
+                  value={current.cancellationPolicy ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onPatch({ fields: { cancellationPolicy: v || undefined }, termsLineUpdates: { "Cancellation Policy": v } });
+                  }}
+                  style={fieldStyle}
+                >
+                  <option value="">— Pick a policy —</option>
+                  {CANCELLATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Governing law / arbitration</label>
+                <select
+                  value={current.governingLaw ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onPatch({ fields: { governingLaw: v || undefined }, termsLineUpdates: { "Governing Law": v } });
+                  }}
+                  style={fieldStyle}
+                >
+                  <option value="">— Pick a jurisdiction —</option>
+                  {GOVERNING_LAW_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            padding: "12px 18px",
+            borderTop: "1px solid var(--border-color, #374151)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "1px solid var(--border-color, #374151)",
+              background: "transparent",
+              color: "inherit",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Inline checkbox list for the Documents section of the modal.
+   Same data source as the old popover DocumentsPicker, but laid
+   out in a grid grouped by category so the operator can see every
+   choice without an extra click. */
+function DocumentsCheckboxList({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  interface DocLite { id: string; code: string; name: string; short_name: string | null; category: string; }
+  const [docs, setDocs] = useState<DocLite[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/shipping-documents", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled) return;
+        setDocs((j?.rows as DocLite[] | undefined) ?? []);
+      });
+    return () => { cancelled = true; };
+  }, []);
+  const grouped = useMemo(() => {
+    const out: Record<string, DocLite[]> = {};
+    for (const d of docs) (out[d.category] ??= []).push(d);
+    return out;
+  }, [docs]);
+  const toggle = (label: string) => {
+    const set = new Set(value);
+    if (set.has(label)) set.delete(label);
+    else set.add(label);
+    onChange([...set]);
+  };
+  if (docs.length === 0) {
+    return <div style={{ fontSize: 11, color: "var(--text-dim, #9ca3af)" }}>Loading documents…</div>;
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6 }}>
+      {Object.entries(grouped).map(([cat, list]) => (
+        <div key={cat} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim, #9ca3af)", fontWeight: 700, marginBottom: 2 }}>{cat}</div>
+          {list.map((d) => {
+            const label = d.short_name ?? d.code;
+            const checked = value.includes(label);
+            return (
+              <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-primary, #e5e7eb)", cursor: "pointer" }} title={d.name}>
+                <input type="checkbox" checked={checked} onChange={() => toggle(label)} style={{ margin: 0 }} />
+                {label}
+              </label>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function QuickFillBar({
