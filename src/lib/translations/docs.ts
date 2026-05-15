@@ -57,6 +57,10 @@ export const docsT: Translations = {
   /* ── Status chip ── */
   "status.draft":        { en: "DRAFT",            zh: "草稿",              ar: "مسودة" },
   "status.final":        { en: "FINAL",            zh: "定稿",              ar: "نهائي" },
+  "status.sent":         { en: "SENT",             zh: "已发送",            ar: "مُرسلة" },
+  "status.accepted":     { en: "ACCEPTED",         zh: "已接受",            ar: "مقبولة" },
+  "status.rejected":     { en: "REJECTED",         zh: "已拒绝",            ar: "مرفوضة" },
+  "status.expired":      { en: "EXPIRED",          zh: "已过期",            ar: "منتهية" },
 
   /* ── Editor header form (top dark row) ── */
   "field.customerName":  { en: "Customer Name (optional)",

@@ -75,9 +75,18 @@ export interface Quotation {
   shipping: number;
   others: number;
   terms: string;
-  status: "draft" | "final";
+  /* Same enum as the parent's Quotation type (Quotations.tsx). The
+     preview doesn't itself dispatch transitions — it only reads
+     status when it needs to gate UI (e.g. hiding the editor chrome
+     on accepted/expired quotes) — so we keep the local type loose
+     to avoid coupling. */
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired";
   createdAt: string;
   updatedAt: string;
+  /* History of status transitions for this quote. Matches the parent
+     type. Optional — never rendered by the preview directly today
+     but propagated through editor saves. */
+  statusHistory?: { status: string; at: string; by?: string }[];
   /* Per-quote authorised stamp + signature URLs. Optional — older
      quotations have these undefined and the editor falls back to the
      dashed-placeholder. See Quotations.tsx for the matching field on

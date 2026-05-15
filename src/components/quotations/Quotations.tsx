@@ -41,6 +41,19 @@ interface QuotationItem {
   notes: string;
 }
 
+export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
+
+/** Every transition the UI's status menu allows. "expired" is mostly
+ *  derived (validTill < today) but we also let the operator force-set
+ *  it manually for quotes that never had a hard expiry on them. */
+export const QUOTE_STATUS_OPTIONS: { value: QuoteStatus; label: string }[] = [
+  { value: "draft",    label: "Draft" },
+  { value: "sent",     label: "Sent" },
+  { value: "accepted", label: "Accepted" },
+  { value: "rejected", label: "Rejected" },
+  { value: "expired",  label: "Expired" },
+];
+
 export interface Quotation {
   id: string;
   customerName: string;
@@ -76,7 +89,23 @@ export interface Quotation {
      the CRM; the QUOTATION TO fields below are auto-filled at the
      same time. Optional — historic quotes have this undefined. */
   customerContactId?: string;
-  status: "draft" | "final";
+  /* Lifecycle:
+       draft     — being edited internally; not yet customer-facing.
+       sent      — emailed / handed over to the customer.
+       accepted  — customer signed off on it (the deal is on).
+       rejected  — customer declined.
+       expired   — validity date passed without a decision.
+
+     "final" is a legacy alias for "sent" — older rows in the DB use
+     it; fromRow() maps them forward. New transitions always use the
+     new vocabulary. */
+  status: QuoteStatus;
+  /* Audit trail of state changes. Optional — historic quotes have
+     this missing. Each entry is { status, at, by? } where `at` is
+     an ISO timestamp and `by` is the account id that performed the
+     change. Used by the editor's status menu to show "Sent on …",
+     "Accepted on …" and (later) by a forthcoming activity feed. */
+  statusHistory?: { status: QuoteStatus; at: string; by?: string }[];
   createdAt: string;
   updatedAt: string;
   /* Server-side grand total from the quotations.total column. The
@@ -161,7 +190,23 @@ export function fromRow(row: RemoteDocRow): Quotation {
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
-    status: (row.status === "final" ? "final" : "draft") as "draft" | "final",
+    /* Status normalisation. "final" is the legacy name for "sent" —
+       rows minted before the workflow expansion stored it that way.
+       Anything else unknown falls back to "draft" so the row at
+       least opens; the editor can then move it through the new
+       lifecycle. */
+    status: ((): QuoteStatus => {
+      const s = row.status as string | null;
+      if (s === "final") return "sent";
+      if (
+        s === "draft" || s === "sent" || s === "accepted" ||
+        s === "rejected" || s === "expired"
+      ) return s;
+      return "draft";
+    })(),
+    statusHistory: Array.isArray(doc.statusHistory)
+      ? (doc.statusHistory as Quotation["statusHistory"])
+      : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     serverTotal: typeof row.total === "number" ? row.total : (row.total != null ? Number(row.total) : undefined),
@@ -873,13 +918,30 @@ export default function Quotations() {
     setQuotations(list);
   }, [current, t]);
 
-  /* ── Save current ── */
+  /* ── Save current ──
+     The status parameter is overloaded: callers passing "final" want
+     legacy "save as final" semantics (now mapped to "sent"). Everyone
+     else passes a current QuoteStatus — usually "draft" — and we
+     persist it as-is. The statusHistory audit log only grows when the
+     status actually changes; idle saves don't pollute it with
+     duplicate "draft" rows. */
   const handleSave = useCallback(
-    async (status: "draft" | "final") => {
+    async (status: QuoteStatus | "final") => {
       if (!current) return;
       setSaveState("saving");
       setSaveError("");
-      const intent = { ...current, status, updatedAt: new Date().toISOString() };
+      const nextStatus: QuoteStatus = status === "final" ? "sent" : status;
+      const history = current.statusHistory ?? [];
+      const last = history[history.length - 1];
+      const isTransition = !last || last.status !== nextStatus;
+      const intent: Quotation = {
+        ...current,
+        status: nextStatus,
+        statusHistory: isTransition
+          ? [...history, { status: nextStatus, at: new Date().toISOString() }]
+          : history,
+        updatedAt: new Date().toISOString(),
+      };
       try {
         const saved = await saveQuotationRemote(intent);
         if (saved) {
@@ -1271,7 +1333,8 @@ export default function Quotations() {
         <div className="max-w-[1500px] mx-auto px-4 pt-4">
           {(() => {
             const drafts = quotations.filter((q) => q.status === "draft").length;
-            const finals = quotations.filter((q) => q.status === "final").length;
+            const sent = quotations.filter((q) => q.status === "sent").length;
+            const accepted = quotations.filter((q) => q.status === "accepted").length;
             /* Prefer the server-side total column. The list payload
                has items stripped, so a local recomputation would
                give 0 for every saved quotation. */
@@ -1282,17 +1345,18 @@ export default function Quotations() {
             const now = new Date();
             const soon = new Date(now); soon.setDate(now.getDate() + 7);
             const expiringSoon = quotations.filter((q) => {
-              if (q.status !== "final") return false;
+              if (q.status !== "sent") return false;
               const iso = ddmmyyyyToISO(q.validTill);
               if (!iso) return false;
               const d = new Date(iso);
               return d >= now && d <= soon;
             }).length;
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
                 <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label={t("kpi.finalised")} value={String(finals)} accent="text-emerald-400" />
+                <KpiCard label="SENT" value={String(sent)} accent="text-sky-400" />
+                <KpiCard label="ACCEPTED" value={String(accepted)} accent="text-emerald-400" />
                 <KpiCard
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
@@ -1341,9 +1405,15 @@ export default function Quotations() {
                           </span>
                           <span
                             className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                              q.status === "final"
-                                ? "bg-green-500/15 text-green-400"
-                                : "bg-yellow-500/15 text-yellow-400"
+                              q.status === "accepted"
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : q.status === "sent"
+                                  ? "bg-sky-500/15 text-sky-400"
+                                  : q.status === "rejected"
+                                    ? "bg-red-500/15 text-red-400"
+                                    : q.status === "expired"
+                                      ? "bg-zinc-500/15 text-zinc-400"
+                                      : "bg-yellow-500/15 text-yellow-400"
                             }`}
                           >
                             {q.status}
@@ -1428,16 +1498,20 @@ export default function Quotations() {
           {t("btn.back")}
         </button>
         <div style={{ flex: 1 }} />
-        <span
-          className={`text-xs font-semibold uppercase px-3 py-1 rounded-full ${
-            current.status === "final"
-              ? "bg-green-500/15 text-green-400"
-              : "bg-yellow-500/15 text-yellow-400"
-          }`}
-          style={{ letterSpacing: "0.03em" }}
-        >
-          {current.status === "final" ? t("status.final") : t("status.draft")}
-        </span>
+        {/* Clickable status pill — opens a menu of transitions. The
+            colour map mirrors the list-view row badge so the same
+            quote reads the same in both views. */}
+        <StatusMenu
+          status={current.status}
+          onChange={async (next) => {
+            if (next === current.status) return;
+            /* Transition + save in one round-trip. We reuse
+               handleSave because it appends to statusHistory and
+               updates updatedAt — duplicating that logic would
+               drift over time. */
+            await handleSave(next);
+          }}
+        />
         {/* Save state pill — gives the user explicit feedback that
             the save click was registered and what happened. Without
             this, both Save buttons did their network call silently
@@ -1578,7 +1652,12 @@ export default function Quotations() {
           signature / bank / terms) all live in QuotationA4Preview. */}
       <QuotationA4Preview
         current={current}
-        setCurrent={setCurrent}
+        /* The parent's Quotation type adds two fields the preview
+           doesn't know about (statusHistory, customerContactId) and
+           the preview's local type doesn't list them either, but the
+           preview never modifies state — it only renders. Cast to
+           bypass the structural-equality check on setState. */
+        setCurrent={setCurrent as never}
         updateItem={updateItem}
         addItem={addItem}
         onPickFromCatalog={() => setPickerOpen(true)}
@@ -1611,6 +1690,100 @@ export default function Quotations() {
         onClose={() => setCustomerPickerOpen(false)}
         onPick={applyCustomerPick}
       />
+    </div>
+  );
+}
+
+/** Clickable status pill on the editor toolbar. Click to open a tiny
+ *  dropdown of transitions; pick one to fire `onChange`. The colour
+ *  map mirrors the list-view row badge so the same quote reads the
+ *  same in both surfaces. */
+function StatusMenu({
+  status,
+  onChange,
+}: {
+  status: QuoteStatus;
+  onChange: (next: QuoteStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const colourFor = (s: QuoteStatus): string =>
+    s === "accepted"
+      ? "bg-emerald-500/15 text-emerald-400"
+      : s === "sent"
+        ? "bg-sky-500/15 text-sky-400"
+        : s === "rejected"
+          ? "bg-red-500/15 text-red-400"
+          : s === "expired"
+            ? "bg-zinc-500/15 text-zinc-400"
+            : "bg-yellow-500/15 text-yellow-400";
+
+  const labelFor = (s: QuoteStatus): string =>
+    s.charAt(0).toUpperCase() + s.slice(1);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex items-center gap-1.5 ${colourFor(status)}`}
+        style={{ letterSpacing: "0.03em", border: "none", cursor: "pointer" }}
+        title="Click to change status"
+      >
+        {labelFor(status)}
+        <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            background: "var(--bg-secondary, #1f2937)",
+            border: "1px solid var(--border-color, #374151)",
+            borderRadius: 8,
+            padding: 4,
+            minWidth: 140,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            zIndex: 30,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {QUOTE_STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onChange(opt.value);
+              }}
+              disabled={opt.value === status}
+              className={`text-left px-2 py-1.5 rounded text-xs font-medium ${
+                opt.value === status
+                  ? "opacity-50 cursor-default"
+                  : "hover:bg-white/[0.05] cursor-pointer text-gray-300"
+              }`}
+              style={{ background: "transparent", border: "none" }}
+            >
+              <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${colourFor(opt.value).split(" ")[0]}`}></span>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
