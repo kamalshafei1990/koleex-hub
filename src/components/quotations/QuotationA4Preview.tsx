@@ -261,10 +261,18 @@ export default function QuotationA4Preview({
      had the rich-text area focused at the moment of the pick. */
   const [termsRevision, setTermsRevision] = useState(0);
 
-  /* Quick Fill modal open state, lifted to the parent so the
-     Shipment & Delivery Details card's "Edit" pill and the older
-     trigger chip both share one modal instance. */
+  /* Quick Fill modal open state + which card's Edit pill opened
+     it. Lifted to the parent so the Shipment Details Edit pill
+     and the Terms & Conditions Edit pill share one modal but
+     each shows only the sections relevant to its card:
+       · "shipment" → Route + Shipping + Timing + Documents
+       · "tc"       → Payment & Pricing + Legal Clauses        */
   const [quickFillOpen, setQuickFillOpen] = useState(false);
+  const [quickFillMode, setQuickFillMode] = useState<"shipment" | "tc">("shipment");
+  const openQuickFill = useCallback((mode: "shipment" | "tc") => {
+    setQuickFillMode(mode);
+    setQuickFillOpen(true);
+  }, []);
 
   /* Helper used both by the Quick Fill modal (when the operator
      picks a value) and by the Terms & Conditions editor (when
@@ -1467,9 +1475,30 @@ export default function QuotationA4Preview({
                     <span>Terms &amp; Conditions</span>
                     <span
                       className="no-print"
-                      style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.7)", textTransform: "none", letterSpacing: 0 }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
                     >
-                      Legal clauses &amp; free text
+                      <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.7)", textTransform: "none", letterSpacing: 0 }}>
+                        Legal clauses &amp; free text
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openQuickFill("tc")}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: T.black,
+                          background: "#fff",
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "3px 10px",
+                          cursor: "pointer",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                        title="Edit payment terms, price type, bank charges, cancellation policy, and governing law via the Quick Fill modal"
+                      >
+                        ⚡ Edit
+                      </button>
                     </span>
                   </div>
                   <div className="pq-terms-value" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -1508,7 +1537,7 @@ export default function QuotationA4Preview({
           <ShipmentDetailsCard
             terms={current.terms ?? ""}
             totalQty={totalQty}
-            onEdit={() => setQuickFillOpen(true)}
+            onEdit={() => openQuickFill("shipment")}
           />
         </div>
 
@@ -1520,6 +1549,7 @@ export default function QuotationA4Preview({
         {quickFillOpen && (
           <TermsQuickFillModal
             current={current}
+            mode={quickFillMode}
             onPatch={applyQuickFillPatch}
             onClose={() => setQuickFillOpen(false)}
           />
@@ -3602,11 +3632,31 @@ function TermsQuickFillModal({
   current,
   onPatch,
   onClose,
+  mode = "shipment",
 }: {
   current: Quotation;
   onPatch: (patch: QuickFillPatch) => void;
   onClose: () => void;
+  /* Which card opened the modal -- controls which sections
+     render so each Edit pill stays focused on its own card:
+       · "shipment" → Route + Shipping + Timing + Documents
+       · "tc"       → Payment & Pricing + Legal Clauses        */
+  mode?: "shipment" | "tc";
 }) {
+  /* Per-mode flags so each section block below can opt-in. */
+  const showPayment    = mode === "tc";
+  const showRoute      = mode === "shipment";
+  const showShipping   = mode === "shipment";
+  const showTiming     = mode === "shipment";
+  const showDocuments  = mode === "shipment";
+  const showLegal      = mode === "tc";
+
+  const modalTitle = mode === "tc"
+    ? "Quick Fill — Terms & Conditions"
+    : "Quick Fill — Shipment Details";
+  const modalSubtitle = mode === "tc"
+    ? "Pick payment, incoterm, and legal clauses. Picks land in the T&C card as you go."
+    : "Pick route, shipping, timing, and documents. Picks land in the Shipment Details card as you go.";
   const [payCats, setPayCats] = useState<PaymentCatLite[]>([]);
   const [incoterms, setIncoterms] = useState<IncotermLite[]>([]);
   const [methods, setMethods] = useState<ShippingMethodLite[]>([]);
@@ -3769,9 +3819,9 @@ function TermsQuickFillModal({
           }}
         >
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>Quick Fill — Terms &amp; Conditions</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{modalTitle}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
-              Pick once; values land in the Terms card as you go. Hover any <strong>?</strong> for an English &amp; 中文 explanation.
+              {modalSubtitle} Hover any <strong>?</strong> for an English &amp; 中文 explanation.
             </div>
           </div>
           <button
@@ -3793,7 +3843,8 @@ function TermsQuickFillModal({
 
         {/* Body */}
         <div style={{ overflowY: "auto", padding: "8px 18px 14px", flex: 1 }}>
-          {/* ── Payment & Pricing ── */}
+          {/* ── Payment & Pricing ── (T&C mode only) */}
+          {showPayment && (
           <div style={sectionStyle}>
             <div style={sectionTitle}>Payment &amp; Pricing</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -3829,8 +3880,10 @@ function TermsQuickFillModal({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ── Route ── */}
+          {/* ── Route ── (shipment mode only) */}
+          {showRoute && (
           <div style={sectionStyle}>
             <div style={sectionTitle}>Shipment Route</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -3844,8 +3897,10 @@ function TermsQuickFillModal({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ── Shipping ── */}
+          {/* ── Shipping ── (shipment mode only) */}
+          {showShipping && (
           <div style={sectionStyle}>
             <div style={sectionTitle}>Shipping</div>
             <div style={{ display: "grid", gridTemplateColumns: containerVisible ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
@@ -3899,8 +3954,10 @@ function TermsQuickFillModal({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ── Timing ── */}
+          {/* ── Timing ── (shipment mode only) */}
+          {showTiming && (
           <div style={sectionStyle}>
             <div style={sectionTitle}>Timing</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
@@ -3969,8 +4026,10 @@ function TermsQuickFillModal({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ── Documents ── */}
+          {/* ── Documents ── (shipment mode only) */}
+          {showDocuments && (
           <div style={sectionStyle}>
             <div style={{ ...sectionTitle, display: "flex", alignItems: "center" }}>
               Documents Provided<HelpTip k="documents" />
@@ -3985,8 +4044,10 @@ function TermsQuickFillModal({
               }}
             />
           </div>
+          )}
 
-          {/* ── Legal ── */}
+          {/* ── Legal ── (T&C mode only) */}
+          {showLegal && (
           <div style={{ ...sectionStyle, borderBottom: "none" }}>
             <div style={sectionTitle}>Legal Clauses</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
@@ -4041,6 +4102,7 @@ function TermsQuickFillModal({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Footer */}
