@@ -1538,6 +1538,18 @@ export default function QuotationA4Preview({
             terms={current.terms ?? ""}
             totalQty={totalQty}
             onEdit={() => openQuickFill("shipment")}
+            onCommit={(canonical, v) => {
+              /* Inline cell edit: write through the same alias
+                 machinery the Quick Fill modal uses, so the
+                 canonical label gets rebuilt in canonical bold
+                 format and the Quick Fill modal will read it
+                 back correctly next time it opens. */
+              setMeta(
+                "terms",
+                applyQuickFillToTerms(current.terms ?? "", { [canonical]: v }),
+              );
+              setTermsRevision((x) => x + 1);
+            }}
           />
         </div>
 
@@ -3043,32 +3055,53 @@ function CustomSelect({
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  /* Dropdown open state PLUS the trigger button's bounding rect
+     at the moment of open. We position the option list with
+     `position: fixed` against that rect so the modal body's
+     overflow-y:auto can never clip it -- exactly the same fix
+     we applied to the hover tooltips. */
+  const [openRect, setOpenRect] = useState<DOMRect | null>(null);
+  const open = openRect !== null;
   /* Track which option is being help-hovered AND its anchor rect
      so the tooltip can render at fixed coordinates outside the
      dropdown's overflow:auto clip rect. */
   const [hoveredHelp, setHoveredHelp] = useState<{ value: string; rect: DOMRect } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setHoveredHelp(null);
-      }
+      const t = e.target as Node;
+      /* Close on click outside BOTH the trigger and the
+         floating popover (popover is a sibling in the DOM tree
+         because it's fixed-positioned). */
+      if (ref.current?.contains(t)) return;
+      if (popoverRef.current?.contains(t)) return;
+      setOpenRect(null);
+      setHoveredHelp(null);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        setOpenRect(null);
         setHoveredHelp(null);
       }
     };
+    /* Close on any scroll / resize so the floating popover
+       doesn't drift away from its trigger. */
+    const onScrollOrResize = () => {
+      setOpenRect(null);
+      setHoveredHelp(null);
+    };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScrollOrResize, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScrollOrResize, true);
     };
   }, [open]);
 
@@ -3095,7 +3128,15 @@ function CustomSelect({
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          if (open) {
+            setOpenRect(null);
+            setHoveredHelp(null);
+          } else {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setOpenRect(rect);
+          }
+        }}
         style={{
           width: "100%",
           height: 34,
@@ -3128,25 +3169,40 @@ function CustomSelect({
         }}>▾</span>
       </button>
 
-      {open && (
-        <div style={{
-          position: "absolute",
-          top: "calc(100% + 4px)",
-          left: 0,
-          right: 0,
-          maxHeight: 340,
+      {open && openRect && (() => {
+        /* Compute the floating popover's coordinates. Default
+           anchor: directly below the trigger. If that would push
+           the bottom of the list off-screen, flip it ABOVE the
+           trigger instead. Width matches the trigger so the
+           popover stays visually aligned. */
+        const POPOVER_MAX_H = 340;
+        const margin = 4;
+        const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
+        const spaceBelow = viewportH - openRect.bottom;
+        const spaceAbove = openRect.top;
+        const flipUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+        const maxH = Math.min(POPOVER_MAX_H, Math.max(160, flipUp ? spaceAbove - 12 : spaceBelow - 12));
+        const top = flipUp ? Math.max(8, openRect.top - maxH - margin) : openRect.bottom + margin;
+        return (
+        <div ref={popoverRef} style={{
+          position: "fixed",
+          top,
+          left: openRect.left,
+          width: openRect.width,
+          maxHeight: maxH,
           overflowY: "auto",
           background: "#0A0A0A",
           border: "1px solid #2a2a2a",
           borderRadius: 8,
           boxShadow: "0 10px 32px rgba(0,0,0,0.5)",
-          zIndex: 1200,
+          zIndex: 99998,
           padding: 4,
+          colorScheme: "dark",
         }}>
           {/* Clear option */}
           <button
             type="button"
-            onClick={() => { onChange(""); setOpen(false); setHoveredHelp(null); }}
+            onClick={() => { onChange(""); setOpenRect(null); setHoveredHelp(null); }}
             style={{
               display: "flex", alignItems: "center", gap: 8,
               width: "100%", padding: "8px 10px", textAlign: "left",
@@ -3176,7 +3232,7 @@ function CustomSelect({
                   <div key={o.value} style={{ position: "relative" }}>
                     <button
                       type="button"
-                      onClick={() => { onChange(o.value); setOpen(false); setHoveredHelp(null); }}
+                      onClick={() => { onChange(o.value); setOpenRect(null); setHoveredHelp(null); }}
                       style={{
                         display: "flex", alignItems: "center", gap: 8,
                         width: "100%", padding: "8px 10px", textAlign: "left",
@@ -3242,7 +3298,8 @@ function CustomSelect({
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -3378,10 +3435,15 @@ function ShipmentDetailsCard({
   terms,
   totalQty,
   onEdit,
+  onCommit,
 }: {
   terms: string;
   totalQty: number;
   onEdit: () => void;
+  /* Commits an inline edit of a single row's value. The parent
+     uses applyQuickFillToTerms to write the new value back into
+     current.terms via the canonical alias. */
+  onCommit: (canonical: string, value: string) => void;
 }) {
   /* Combine current.terms with the auto-injected Total Qty so the
      card renders the same line-up the printed PDF will. */
@@ -3466,18 +3528,38 @@ function ShipmentDetailsCard({
         </span>
       </div>
 
-      {/* Mobile-first CSS rule: collapse the 4-column grid to a
-          2-column (label | value) grid on narrow screens so the
-          labels stay readable instead of crushing the values. */}
+      {/* Mobile-first CSS rule + placeholder pseudo for empty
+          editable cells. Empty contentEditable divs render with
+          an em-dash placeholder via ::before that vanishes the
+          moment the operator types anything. */}
       <style>{`
         @media screen and (max-width: 767px) {
           .pq-shipment-grid { grid-template-columns: auto 1fr !important; }
+        }
+        .pq-detail-cell[contenteditable="true"]:empty::before {
+          content: "—";
+          color: ${T.inkGhost};
+          pointer-events: none;
+        }
+        .pq-detail-cell[contenteditable="true"]:focus {
+          outline: 1px solid ${T.border};
+          background: rgba(0,0,0,0.03);
+          border-radius: 3px;
+        }
+        .pq-detail-cell[contenteditable="true"]:hover {
+          background: rgba(0,0,0,0.025);
+          border-radius: 3px;
+        }
+        @media print {
+          .pq-detail-cell[contenteditable="true"]:empty::before { content: ""; }
         }
       `}</style>
       {/* Grid body — CSS grid, 4 columns on desktop / print, 2 on
           narrow mobile. Each cell is one of:
             · label cell (auto width, ink-grey, semi-bold)
-            · value cell (1fr, ink-black, fills the rest)        */}
+            · value cell (1fr, ink-black, fills the rest, inline-
+              editable contentEditable except for Total Qty
+              which is auto-computed from the items table)      */}
       <div
         className="pq-shipment-grid"
         style={{
@@ -3492,6 +3574,10 @@ function ShipmentDetailsCard({
       >
         {rows.map((r, i) => {
           const isOdd = i % 2 === 0;
+          /* Total Qty is computed from the items table -- inline
+             editing wouldn't stick (the next item edit overrides
+             it). Keep it read-only. */
+          const isReadOnly = r.canonical === "Total Qty";
           return (
             <div
               key={r.canonical}
@@ -3504,30 +3590,105 @@ function ShipmentDetailsCard({
                   padding: "4px 0",
                   borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",
                   whiteSpace: "nowrap",
-                  /* Wrap to a second mini-row on mobile (handled by
-                     the media query in globals if present); on the
-                     printed A4 they always sit in one line. */
                 }}
               >
                 {r.label}
               </div>
-              <div
-                style={{
-                  padding: "4px 0",
-                  borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",
-                  color: r.value ? T.ink : T.inkGhost,
-                  /* Help the right value cell breathe before the
-                     next pair starts. */
-                  paddingInlineEnd: isOdd ? 4 : 0,
-                }}
-              >
-                {r.value || "—"}
-              </div>
+              {isReadOnly ? (
+                <div
+                  style={{
+                    padding: "4px 0",
+                    borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",
+                    color: r.value ? T.ink : T.inkGhost,
+                    paddingInlineEnd: isOdd ? 4 : 0,
+                  }}
+                >
+                  {r.value || "—"}
+                </div>
+              ) : (
+                <ShipmentDetailEditableCell
+                  canonical={r.canonical}
+                  value={r.value}
+                  onCommit={(v) => onCommit(r.canonical, v)}
+                  borderBottom={i < rows.length - 2 ? `1px solid ${T.border}` : "none"}
+                  paddingInlineEnd={isOdd ? 4 : 0}
+                />
+              )}
             </div>
           );
         })}
       </div>
     </div>
+  );
+}
+
+/* Single inline-editable value cell in the Shipment & Delivery
+   Details grid. Uses contentEditable + a non-controlled DOM
+   strategy similar to TermsArea: the parent supplies the
+   current value; we sync it into the DOM only when the cell
+   isn't focused so the operator's keystrokes never get
+   clobbered mid-edit. Commit fires on blur and on Enter. */
+function ShipmentDetailEditableCell({
+  canonical, value, onCommit,
+  borderBottom, paddingInlineEnd,
+}: {
+  canonical: string;
+  value: string;
+  onCommit: (v: string) => void;
+  borderBottom: string;
+  paddingInlineEnd: number;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [focused, setFocused] = useState(false);
+
+  /* Keep the DOM in sync with the prop ONLY when not focused.
+     This mirrors the pattern in TermsArea -- otherwise the
+     parent re-rendering after every keystroke (state lift)
+     would reset the caret. */
+  useEffect(() => {
+    if (!ref.current) return;
+    if (focused) return;
+    if (ref.current.textContent !== (value || "")) {
+      ref.current.textContent = value || "";
+    }
+  }, [value, focused]);
+
+  return (
+    <div
+      ref={ref}
+      className="pq-detail-cell"
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      data-canonical={canonical}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        const newValue = (ref.current?.textContent ?? "").trim();
+        if (newValue !== value) onCommit(newValue);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          ref.current?.blur();
+        }
+        if (e.key === "Escape") {
+          /* Cancel: revert the DOM to the saved value and blur. */
+          if (ref.current) ref.current.textContent = value || "";
+          ref.current?.blur();
+        }
+      }}
+      style={{
+        padding: "4px 6px",
+        borderBottom,
+        paddingInlineEnd,
+        color: value ? T.ink : T.inkGhost,
+        cursor: "text",
+        outline: "none",
+        minWidth: 0,
+        wordBreak: "break-word",
+      }}
+    />
   );
 }
 
