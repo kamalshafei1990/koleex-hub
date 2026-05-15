@@ -13,7 +13,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 
-/* ── Prompt dialog (replaces window.prompt) ─────────────────────────────── */
+/* -- Prompt dialog (replaces window.prompt) ------------------------------- */
 
 export function PromptDialog({
   open,
@@ -131,7 +131,7 @@ export function PromptDialog({
   );
 }
 
-/* ── Confirm dialog (replaces window.confirm) ────────────────────────────── */
+/* -- Confirm dialog (replaces window.confirm) ----------------------------- */
 
 export function ConfirmDialog({
   open,
