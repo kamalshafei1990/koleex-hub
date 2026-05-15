@@ -1150,17 +1150,22 @@ export default function QuotationA4Preview({
 
         {/* ═══════════════════════════════════════════════════════════════
             (g) BOTTOM ROW — totals (left) + terms (right)
+
+            Flex (not a table) so the terms card on the right stretches
+            to match the totals stack on the left even though the two
+            sides have different content lengths. `align-items: stretch`
+            (the flex default) makes both children equal height; the
+            terms body uses `flex: 1` further down to fill whatever the
+            taller side measures.
             ═══════════════════════════════════════════════════════════════ */}
-        <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", marginTop: 4 }}>
-          <tbody>
-            <tr>
-              {/* LEFT: Totals stack. Subtotal + Tax + Shipping +
-                  Other + Grand Total + Total-in-Letters all live
-                  inside ONE rounded wrapper so the bottom-left corner
-                  curves under the in-letters row and the top-right
-                  curves over the Grand-Total bar. The two tables
-                  inside have their own borders stripped. */}
-              <td className="pq-bot-l" style={{ width: "44%", verticalAlign: "top" }}>
+        <div style={{ display: "flex", alignItems: "stretch", gap: 16, marginTop: 4 }}>
+          {/* LEFT: Totals stack. Subtotal + Tax + Shipping + Other +
+              Grand Total + Total-in-Letters all live inside ONE rounded
+              wrapper so the bottom-left corner curves under the
+              in-letters row and the top-right curves over the
+              Grand-Total bar. The two tables inside have their own
+              borders stripped. */}
+          <div className="pq-bot-l" style={{ width: "44%" }}>
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
                 <table cellSpacing={0} style={{ width: "100%", borderCollapse: "collapse", border: "none" }}>
                   <tbody>
@@ -1262,50 +1267,39 @@ export default function QuotationA4Preview({
                   </tbody>
                 </table>
                 </div>
-              </td>
+              </div>
 
-              {/* RIGHT: Terms & Conditions, wrapped in a rounded
-                  container that matches the totals card on the left. */}
-              <td className="pq-bot-r" style={{ width: "56%", paddingLeft: 16, verticalAlign: "top" }}>
-                <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", height: "100%" }}>
-                <table
-                  className="pq-terms-tbl"
-                  cellSpacing={0}
-                  style={{ width: "100%", borderCollapse: "collapse", border: "none", height: "100%" }}
-                >
-                  <tbody>
-                    <tr>
-                      <td
-                        className="pq-terms-label"
-                        style={{
-                          background: T.black,
-                          padding: "6px 12px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          color: "#fff",
-                        }}
-                      >
-                        Terms &amp; Conditions
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="pq-terms-value" style={{ padding: 0, verticalAlign: "top" }}>
-                        <TermsArea
-                          terms={current.terms}
-                          totalQty={totalQty}
-                          onCommit={(v) => setMeta("terms", v)}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              {/* RIGHT: Terms & Conditions. Flex column so the header
+                  stays its natural height and the body grows to fill
+                  whatever vertical space the totals card on the left
+                  consumes — keeping the two cards visually balanced
+                  even when the totals stack adds tax / shipping rows. */}
+              <div className="pq-bot-r" style={{ width: "56%", display: "flex", flexDirection: "column" }}>
+                <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div
+                    className="pq-terms-label"
+                    style={{
+                      background: T.black,
+                      padding: "6px 12px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: "#fff",
+                    }}
+                  >
+                    Terms &amp; Conditions
+                  </div>
+                  <div className="pq-terms-value" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    <TermsArea
+                      terms={current.terms}
+                      totalQty={totalQty}
+                      onCommit={(v) => setMeta("terms", v)}
+                    />
+                  </div>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════
             (h) AUTHORISED STAMP | AUTHORISED SIGNATURE — two separate
@@ -1631,6 +1625,11 @@ function TermsArea({
         lineHeight: 1.65,
         border: "none",
         padding: "10px 12px",
+        /* flex:1 grows the editable area to fill the rounded card so
+           the right side matches the totals card height; minHeight is
+           a floor for the edge case where the totals card is somehow
+           shorter than 90 px. */
+        flex: 1,
         minHeight: 90,
         outline: "none",
         whiteSpace: "pre-wrap",
