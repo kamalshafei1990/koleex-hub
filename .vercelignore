@@ -14,3 +14,15 @@ Koleex Catalog 2025.pdf
 
 # Local one-shot scripts — only needed on a workstation.
 scripts/
+
+# Raw icon-library reference assets — 15k+ SVG files from the Flaticon
+# uicons set. They push the upload over Vercel's 15,000-file limit and
+# nothing in src/ imports from them directly. The actual icons used at
+# runtime live in src/components/icons/ as compiled React components.
+Icons/
+Hub icons/
+Jason Icons/
+
+# IDE / editor metadata + intermediate analysis artifacts.
+.claude/
+catalog Photos/

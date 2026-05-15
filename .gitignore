@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Raw icon-library reference assets (Flaticon uicons set, ~15k SVG
+# files). Source: workstation-only reference. The runtime icons used
+# by the app live in src/components/icons/ as compiled React
+# components. Keeping the raw library untracked keeps deploys under
+# Vercel's 15,000-file upload limit.
+/Icons/
+
+# Large local-only working assets (catalog photos, source PDFs,
+# loose drop-ins). Already in .vercelignore but pin in .gitignore
+# too so nobody accidentally commits them.
+/catalog Photos/
+/Koleex Catalog 2025.pdf
+/Omar Machines Photos/
