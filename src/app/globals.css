@@ -128,8 +128,15 @@ body {
    iOS Safari auto-zooms on any input/textarea/select with font-size
    smaller than 16px. We force all form controls below the md
    breakpoint to 16px. At md+ (≥768px, desktop) we release the rule
-   so existing compact UIs don't get oversized text. */
-@media (max-width: 767px) {
+   so existing compact UIs don't get oversized text.
+
+   `screen and` is critical: without it, this rule ALSO fires during
+   print/Save-as-PDF on mobile (Safari renders the print pipeline at
+   the phone's CSS viewport width, so `max-width: 767px` matches) and
+   blows up every textarea in the quotation preview to 16px, breaking
+   the doc layout. Scoping to `screen` keeps the iOS zoom fix on the
+   editor but lets @media print render at the inline doc sizes. */
+@media screen and (max-width: 767px) {
   input,
   select,
   textarea {

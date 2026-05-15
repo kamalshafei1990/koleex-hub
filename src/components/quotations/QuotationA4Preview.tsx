@@ -574,11 +574,25 @@ export default function QuotationA4Preview({
                 placeholder="Company name"
                 style={{ ...inputResetStyle, fontSize: 12, fontWeight: 700, color: T.ink, letterSpacing: "0.01em" }}
               />
-              {/* Address — full width line under the company name */}
+              {/* Address — full width line under the company name.
+                  Auto-grows to fit content so a long project address
+                  never shows a scrollbar (which was visible in PDF
+                  exports). overflow:hidden + JS scrollHeight sync
+                  works in every browser; field-sizing:content gives
+                  the same behaviour natively on newer Safari/Chrome. */}
               <textarea
+                ref={(el) => {
+                  if (!el) return;
+                  el.style.height = "auto";
+                  el.style.height = `${el.scrollHeight}px`;
+                }}
                 rows={2}
                 value={current.toAddress ?? ""}
-                onChange={(e) => setMeta("toAddress", e.target.value)}
+                onChange={(e) => {
+                  setMeta("toAddress", e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${e.target.scrollHeight}px`;
+                }}
                 placeholder="Address"
                 style={{
                   ...inputResetStyle,
@@ -586,8 +600,10 @@ export default function QuotationA4Preview({
                   lineHeight: 1.5,
                   color: T.inkSoft,
                   resize: "none",
+                  overflow: "hidden",
                   minHeight: 28,
-                }}
+                  fieldSizing: "content",
+                } as React.CSSProperties}
               />
               {/* Inline label-value grid for the remaining structured
                   fields. 105 px label column comfortably fits the
