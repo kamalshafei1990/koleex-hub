@@ -1394,7 +1394,12 @@ export default function QuotationA4Preview({
                           fontWeight: 700,
                           textTransform: "uppercase",
                           letterSpacing: "0.03em",
-                          textAlign: "right",
+                          /* Left-aligned so the long uppercase
+                             words read naturally from where the
+                             label ends. Right-align made the line
+                             feel back-to-front when totals were
+                             long enough to wrap. */
+                          textAlign: "left",
                           borderTop: `1px solid ${T.border}`,
                           padding: "6px 12px",
                         }}
