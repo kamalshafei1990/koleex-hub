@@ -45,6 +45,7 @@ import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
 import IncotermsManager from "@/components/settings/IncotermsManager";
 import PricingTiersManager from "@/components/settings/PricingTiersManager";
+import ShippingMethodsManager from "@/components/settings/ShippingMethodsManager";
 import type { AccountWithLinks } from "@/types/supabase";
 
 type Tab = "profile" | "preferences" | "calendar" | "workspace";
@@ -190,7 +191,7 @@ function SettingsContent() {
    The sub-nav stays compact and Apple-pill-style so it doesn't compete
    visually with the top-level tabs (Workspace / Profile / etc).
    ─────────────────────────────────────────────────────────────────────── */
-type WorkspaceSub = "payment-terms" | "incoterms" | "pricing-tiers";
+type WorkspaceSub = "payment-terms" | "incoterms" | "pricing-tiers" | "shipping-methods";
 
 function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [sub, setSub] = useState<WorkspaceSub>("payment-terms");
@@ -206,10 +207,14 @@ function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         <SubButton active={sub === "pricing-tiers"}  onClick={() => setSub("pricing-tiers")}>
           Pricing Tiers
         </SubButton>
+        <SubButton active={sub === "shipping-methods"} onClick={() => setSub("shipping-methods")}>
+          Shipping Methods
+        </SubButton>
       </nav>
-      {sub === "payment-terms" && <PaymentTermsManager isSuperAdmin={isSuperAdmin} />}
-      {sub === "incoterms"     && <IncotermsManager     isSuperAdmin={isSuperAdmin} />}
-      {sub === "pricing-tiers" && <PricingTiersManager  isSuperAdmin={isSuperAdmin} />}
+      {sub === "payment-terms"    && <PaymentTermsManager   isSuperAdmin={isSuperAdmin} />}
+      {sub === "incoterms"        && <IncotermsManager      isSuperAdmin={isSuperAdmin} />}
+      {sub === "pricing-tiers"    && <PricingTiersManager   isSuperAdmin={isSuperAdmin} />}
+      {sub === "shipping-methods" && <ShippingMethodsManager isSuperAdmin={isSuperAdmin} />}
     </div>
   );
 }
