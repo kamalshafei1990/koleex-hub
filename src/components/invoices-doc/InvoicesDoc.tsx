@@ -2,19 +2,26 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
+import { dialog } from "@/lib/ui-dialog";
+import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
+import ProductPickerModal, { type PickResult } from "@/components/quotations/ProductPickerModal";
+import CustomerPickerModal, { type CustomerPickResult } from "@/components/quotations/CustomerPickerModal";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   INVOICES_DOC_SYNC,
   fetchDocList,
+  fetchDocOne,
   upsertDoc,
   deleteDoc,
   type RemoteDocRow,
@@ -33,7 +40,21 @@ interface InvoiceItem {
   notes: string;
 }
 
-interface Invoice {
+export type InvoiceStatus = "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "cancelled";
+
+/** Every transition the UI's status menu allows. "expired" is mostly
+ *  derived (validTill < today) but we also let the operator force-set
+ *  it manually for quotes that never had a hard expiry on them. */
+export const INVOICE_STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
+  { value: "draft",          label: "Draft" },
+  { value: "sent",           label: "Sent" },
+  { value: "partially_paid", label: "Partially Paid" },
+  { value: "paid",           label: "Paid" },
+  { value: "overdue",        label: "Overdue" },
+  { value: "cancelled",      label: "Cancelled" },
+];
+
+export interface Invoice {
   id: string;
   customerName: string;
   companyName: string;
@@ -41,15 +62,58 @@ interface Invoice {
   date: string;
   clientNo: string;
   validTill: string;
+  /* Legacy free-form field — superseded by toAddress / toAcid /
+     toEmail but kept on the type for older saved docs. */
   quotTo: string;
+  toAddress?: string;
+  toAcid?: string;
+  toPhone?: string;
+  toMobile?: string;
+  toEmail?: string;
+  toWebsite?: string;
   items: InvoiceItem[];
   tax: number;
   shipping: number;
   others: number;
   terms: string;
-  status: "draft" | "final";
+  /* Optional stamp + signature URLs stamped on this quote. Both
+     stored as public Supabase Storage URLs. The doc-builder lets a
+     super-admin attach the tenant's saved stamp/signature with one
+     click (see /api/quotations/saved-assets). Older quotes have
+     these undefined; the editor falls back to the dashed-placeholder
+     in that case. */
+  stampUrl?: string;
+  signatureUrl?: string;
+  /* Contact-table id of the linked CRM customer. The editor's
+     "Link Customer" picker stores this when the user picks from
+     the CRM; the QUOTATION TO fields below are auto-filled at the
+     same time. Optional — historic quotes have this undefined. */
+  customerContactId?: string;
+  /* Lifecycle:
+       draft     — being edited internally; not yet customer-facing.
+       sent      — emailed / handed over to the customer.
+       accepted  — customer signed off on it (the deal is on).
+       rejected  — customer declined.
+       expired   — validity date passed without a decision.
+
+     "final" is a legacy alias for "sent" — older rows in the DB use
+     it; fromRow() maps them forward. New transitions always use the
+     new vocabulary. */
+  status: InvoiceStatus;
+  /* Audit trail of state changes. Optional — historic quotes have
+     this missing. Each entry is { status, at, by? } where `at` is
+     an ISO timestamp and `by` is the account id that performed the
+     change. Used by the editor's status menu to show "Sent on …",
+     "Accepted on …" and (later) by a forthcoming activity feed. */
+  statusHistory?: { status: InvoiceStatus; at: string; by?: string }[];
   createdAt: string;
   updatedAt: string;
+  /* Server-side grand total from the quotations.total column. The
+     list endpoint strips items from the doc payload to keep responses
+     small, so a local recomputation from items always returns 0 for
+     rows fetched in the list view. Use this for the per-row badge
+     and the TOTAL VALUE KPI tile. Undefined for unsaved drafts. */
+  serverTotal?: number;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -97,10 +161,11 @@ function addDays(dateStr: string, days: number): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/** Map a server row into the Invoice UI shape. `doc` holds the full UI
- *  snapshot; the normalized columns (inv_no, customer_id, total,
- *  issue_date, status) stay authoritative. */
-function fromRow(row: RemoteDocRow): Invoice {
+/**
+ * Map a server row back into the Invoice shape the UI uses. The
+ * server treats `doc` as an opaque JSON blob — that's our UI snapshot.
+ */
+export function fromRow(row: RemoteDocRow): Invoice {
   const doc = row.doc as Partial<Invoice>;
   return {
     id: row.id,
@@ -111,24 +176,51 @@ function fromRow(row: RemoteDocRow): Invoice {
     clientNo: doc.clientNo ?? "",
     validTill: doc.validTill ?? addDays(todayDDMMYYYY(), 30),
     quotTo: doc.quotTo ?? "",
+    toAddress: doc.toAddress ?? "",
+    toAcid: doc.toAcid ?? "",
+    toPhone: doc.toPhone ?? "",
+    toMobile: doc.toMobile ?? "",
+    toEmail: doc.toEmail ?? "",
+    toWebsite: doc.toWebsite ?? "",
     items: Array.isArray(doc.items) && doc.items.length > 0 ? doc.items : [{ ...EMPTY_ITEM }],
     tax: Number(doc.tax ?? 0),
     shipping: Number(doc.shipping ?? 0),
     others: Number(doc.others ?? 0),
     terms: doc.terms ?? DEFAULT_TERMS,
-    // Invoices use a richer enum server-side but the doc builder only
-    // cares about draft vs final for the UI button state.
-    status: (row.status === "draft" ? "draft" : "final") as "draft" | "final",
+    stampUrl: doc.stampUrl,
+    signatureUrl: doc.signatureUrl,
+    customerContactId: doc.customerContactId,
+    /* Status normalisation. "final" is the legacy name for "sent" —
+       rows minted before the workflow expansion stored it that way.
+       Anything else unknown falls back to "draft" so the row at
+       least opens; the editor can then move it through the new
+       lifecycle. */
+    status: ((): InvoiceStatus => {
+      const s = row.status as string | null;
+      if (s === "final") return "sent";
+      if (
+        s === "draft" || s === "sent" || s === "partially_paid" ||
+        s === "paid" || s === "overdue" || s === "cancelled"
+      ) return s;
+      return "draft";
+    })(),
+    statusHistory: Array.isArray(doc.statusHistory)
+      ? (doc.statusHistory as Invoice["statusHistory"])
+      : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    serverTotal: typeof row.total === "number" ? row.total : (row.total != null ? Number(row.total) : undefined),
   };
 }
 
+/** Compute the grand total the same way the UI renders it. Mirrors the
+ *  GRAND TOTAL row so the list can show totals without re-rendering. */
 function computeGrandTotal(q: Invoice): number {
   const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
   return +(subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0)).toFixed(2);
 }
 
+/** Parse a DD/MM/YYYY (or DD-MM-YYYY) string into ISO. Best-effort. */
 function ddmmyyyyToISO(s: string): string | null {
   if (!s) return null;
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
@@ -137,29 +229,29 @@ function ddmmyyyyToISO(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
-async function loadInvoicesRemote(): Promise<Invoice[]> {
-  const rows = await fetchDocList(INVOICES_DOC_SYNC);
+async function loadInvoicesRemote(opts: { fresh?: boolean } = {}): Promise<Invoice[]> {
+  const rows = await fetchDocList(INVOICES_DOC_SYNC, opts);
   return rows.map(fromRow);
 }
 
+/** Upsert a single quotation. Returns the server echo (canonical
+ *  id + updatedAt) so the UI can reconcile optimistic state. */
 async function saveInvoiceRemote(q: Invoice): Promise<Invoice | null> {
   const row = await upsertDoc(INVOICES_DOC_SYNC, {
-    id: q.id.length === 36 ? q.id : undefined,
+    id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
     inv_no: q.invoiceNo || undefined,
-    // The server's invoice_status enum uses draft/sent/paid/… — map the
-    // doc builder's "final" → "sent" so overdue detection + AR reports
-    // still make sense against the enum.
-    status: q.status === "final" ? "sent" : "draft",
+    status: q.status,
     currency: "USD",
     issue_date: ddmmyyyyToISO(q.date),
     due_date: ddmmyyyyToISO(q.validTill),
     total: computeGrandTotal(q),
-    doc: q,
+    doc: q, // stash the whole UI snapshot
   });
   return row ? fromRow(row) : null;
 }
 
 async function deleteInvoiceRemote(id: string): Promise<boolean> {
+  // Skip server call if the id isn't a real UUID (local-only legacy row).
   if (id.length !== 36) return true;
   return deleteDoc(INVOICES_DOC_SYNC, id);
 }
@@ -289,9 +381,15 @@ function numberToWords(num: number): string {
 
 const PRINT_AND_DOC_STYLES = `
 /* ── A4 document base ── */
+/* On-screen styling for the A4 page. Print sizing is handled
+   exclusively by @media print below — DO NOT set height here, only
+   min-height (so screen view fills A4 height but print pipeline can
+   override cleanly via !important without competing with inline). */
 .quot-a4-doc {
+  box-sizing: border-box;
   width: 210mm;
   min-height: 297mm;
+  padding: 32px 32px 24px;
   background: #fff;
   color: #000;
   margin: 0 auto 40px;
@@ -301,18 +399,15 @@ const PRINT_AND_DOC_STYLES = `
   font-size: 11px;
   line-height: 1.4;
 }
-.quot-doc-inner { padding: 32px 32px 24px; }
+.quot-doc-inner { padding: 0; }
 
 /* Force black text on white for all children */
-.quot-a4-doc, .quot-a4-doc * { color: #000 !important; }
-.quot-a4-doc .pq-ml,
-.quot-a4-doc .pq-strip-black *,
-.quot-a4-doc .pq-to-label,
-.quot-a4-doc .pq-tbl thead th,
-.quot-a4-doc .pq-grand td,
-.quot-a4-doc .pq-grand *,
-.quot-a4-doc .pq-bank-bar,
-.quot-a4-doc .pq-terms-label { color: #fff !important; }
+/* Set a sensible default text colour on the A4 surface, but do NOT
+   use a wildcard !important rule here — the multi-page editor relies
+   on inline color styles for every black-strip header (meta strip,
+   From / Invoice To, stamp / signature, bank bar, totals) and a
+   wildcard !important would obliterate them. */
+.quot-a4-doc { color: #000; }
 .quot-a4-doc .pq-stamp-box { color: #aaa !important; }
 .quot-a4-doc .pq-footer { color: #555 !important; }
 .quot-a4-doc .pq-strip-gray { color: #333 !important; }
@@ -326,6 +421,18 @@ const PRINT_AND_DOC_STYLES = `
 .quot-a4-doc textarea::placeholder {
   color: #aaa !important;
   -webkit-text-fill-color: #aaa !important;
+}
+/* Internal-notes panel lives OUTSIDE the printed A4 paper in the
+   dark editor area, so its textarea needs WHITE text instead of
+   the black-on-white forced above. Same exemption for its
+   placeholder so the hint reads as light gray on dark. */
+.quot-a4-doc .quot-row-notes textarea {
+  color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+}
+.quot-a4-doc .quot-row-notes textarea::placeholder {
+  color: rgba(255, 255, 255, 0.40) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.40) !important;
 }
 .quot-a4-doc .pq-grand input {
   color: #fff !important;
@@ -421,29 +528,11 @@ const PRINT_AND_DOC_STYLES = `
 }
 .quot-img-cell.has-img { border: none; background: transparent; }
 
-/* Delete button outside table */
-.quot-row-del-btn {
-  position: absolute;
-  top: 50%;
-  right: -28px;
-  transform: translateY(-50%);
-  background: none;
-  border: 1px solid rgba(0,0,0,0.10);
-  color: #999;
-  font-size: 13px;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-  font-weight: 400;
-  border-radius: 50%;
-  z-index: 5;
-}
-.quot-row-del-btn:hover { color: #fff; background: #e74c3c; border-color: #e74c3c; }
+/* The row-action cluster (.quot-row-del-btn) is now positioned and
+   styled inline by QuotationA4Preview — no screen styles here. The
+   print rule below still hides it on the printed page; the screen
+   rule is intentionally omitted so it doesn't clobber the new inline
+   width / height / transform. */
 
 /* Hide number spinners */
 .quot-a4-doc input[type="number"]::-webkit-outer-spin-button,
@@ -453,7 +542,7 @@ const PRINT_AND_DOC_STYLES = `
 }
 .quot-a4-doc input[type="number"] { -moz-appearance: textfield; }
 
-/* Textarea in invoice-to */
+/* Textarea in quotation-to */
 .pq-in-area {
   resize: vertical;
   min-height: 40px;
@@ -478,26 +567,132 @@ const PRINT_AND_DOC_STYLES = `
 }
 .pq-tc-area:focus { background: #f8f8ff; }
 
-/* ── PRINT ── */
+/* ── PRINT ──
+   Strategy (rewritten — the previous visibility:hidden +
+   position:absolute combo collapsed the multi-page document into
+   2 print pages because absolutely-positioned content doesn't
+   paginate across sheets):
+
+   1. Hide chrome with DISPLAY:NONE so it occupies zero space:
+        · <header>, <aside>  → MainHeader + Sidebar
+        · .fixed              → FloatingPanel
+        · .no-print           → editor toolbar
+   2. Reset the Hub layout wrappers (pt-14, shell-content-offset,
+      min-h-screen) so the .quot-a4-stack flows from the top of
+      the page with no leftover header offset / scrollable shell.
+   3. Each .quot-a4-doc is a normal in-flow A4 page with a hard
+      page-break-after — Chrome / Safari / Firefox honour that
+      because the parent is no longer position:absolute.
+   4. @page { size: A4; margin: 0 } so the browser doesn't add
+      print gutters that would shrink the usable width below the
+      doc's 210 mm and force a scale-to-fit. */
 @media print {
-  body * { visibility: hidden !important; }
-  #invoice-a4-preview,
-  #invoice-a4-preview * { visibility: visible !important; }
-  #invoice-a4-preview {
-    position: absolute !important;
-    left: 0;
-    top: 0;
-    width: 210mm !important;
-    margin: 0;
-    padding: 32px 32px 24px;
-    box-shadow: none;
-    border: none;
+  /* Page setup — A4, zero browser margin (the doc has its own
+     32 px / 24 px padding). */
+  @page { size: A4 portrait; margin: 0; }
+
+  /* Reset page chrome */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
     background: #fff !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
   }
-  @page { size: A4; margin: 5mm 8mm; }
-  .no-print { display: none !important; }
+
+  /* Hide every known piece of Hub chrome that should NOT print. */
+  header, aside, .no-print, .fixed { display: none !important; }
   .quot-row-del-btn { display: none !important; }
   .pq-add-btn { display: none !important; }
+
+  /* NUKE all height + overflow constraints inherited from the Hub's
+     Tailwind layout (RootShell uses h-[calc(100vh-0px)],
+     overflow-hidden, min-h-0 on multiple wrappers — those collapse
+     the printable area to a single viewport height and clip the
+     multi-page stack). Forcing every element to have flexible
+     height + visible overflow lets the .quot-a4-doc pages flow
+     naturally through the print pipeline. */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  /* Tailwind-flavoured height utilities — reset to auto so the
+     wrappers stop pinning the viewport at 100vh. */
+  [class*="h-screen"],
+  [class*="h-[calc"],
+  [class*="min-h-screen"],
+  [class*="min-h-0"] {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  [class~="pt-14"] { padding-top: 0 !important; }
+  .shell-content-offset { padding: 0 !important; }
+
+  /* Stack flows naturally — NO position:absolute. */
+  .quot-a4-stack {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm !important;
+    overflow: visible !important;
+  }
+
+  /* Every page sized to fit the SMALLER of A4 (297 mm) and US Letter
+     (279 mm). Picking US-Letter-safe dimensions (275 mm tall) means
+     the doc never overflows regardless of which paper size the
+     printer driver defaults to. On A4 paper the bottom 22 mm will
+     just be white space — acceptable trade-off vs the phantom-blank-
+     page-between-every-real-page bug that hits when the doc is
+     sized for A4 but printed to US Letter.
+
+     On-screen view unaffected (inline style stays at 297 mm — only
+     the print pipeline uses 275 mm). */
+  /* Doc height = 268 mm. Carefully chosen:
+     · US Letter printable area: ~265-270 mm depending on the
+       printer driver's hairline.
+     · A4 printable area: ~280 mm.
+     · 268 mm fits inside US Letter's printable region without
+       overflow (so no blank-after-every-page bug) AND uses enough
+       of the sheet that pages 7-8 don't have huge unused white
+       space at the bottom.
+
+     NO page-break-before — that rule was producing extra blank
+     sheets between docs in Safari. With each doc at a fixed
+     268 mm height and page-break-inside: avoid keeping it
+     together, the browser naturally places each doc on its own
+     sheet. */
+  .quot-a4-doc {
+    box-sizing: border-box !important;
+    display: block !important;
+    position: static !important;
+    width: 210mm !important;
+    height: 268mm !important;
+    min-height: 268mm !important;
+    max-height: 268mm !important;
+    margin: 0 !important;
+    padding: 24px 28px 18px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Items table — never split a single row across sheets and
+     never split the header / footer. The page already fits its
+     items inside one A4 height, but these guards prevent edge
+     cases where a row's image makes it slightly taller than
+     expected. */
+  .pq-tbl,
+  .pq-tbl tr,
+  .pq-tbl thead,
+  .pq-tbl tfoot,
+  .pq-tbl thead tr,
+  .pq-tbl tfoot tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 
   input, textarea, [contenteditable] {
     background: transparent !important;
@@ -515,6 +710,20 @@ const PRINT_AND_DOC_STYLES = `
   .pq-strip-gray { background: #e0e0e0 !important; color: #333 !important; }
   .pq-tfoot-row td { background: #f5f5f5 !important; }
   .pq-bl { background: #f5f5f5 !important; }
+  /* Force the items-table header strip + tfoot summary row to
+     keep their dark backgrounds when printed (Chrome and Safari
+     otherwise strip backgrounds on print). */
+  .pq-tbl thead th,
+  .pq-tbl tfoot td {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+/* Force all browsers to print exact colors so the black header
+   strips don't drop to white. */
+.quot-a4-doc, .quot-a4-doc * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 `;
 
@@ -522,105 +731,74 @@ const PRINT_AND_DOC_STYLES = `
    COMPONENT
    ══════════════════════════════════════════════════════════ */
 
-/** Lightweight payment shape matching /api/invoices/[id]/payments. */
-interface InvPayment {
-  id: string;
-  amount: number;
-  currency: string;
-  method: string | null;
-  reference: string | null;
-  received_at: string;
-  notes: string | null;
-}
-
-export default function InvoicesDoc() {
+export default function Quotations() {
   const { t } = useTranslation(docsT);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [view, setView] = useState<"list" | "editor">("list");
   const [current, setCurrent] = useState<Invoice | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /* Save state for the Save Draft / Save Final buttons. "idle" is the
+     resting state; "saving" while the POST is in flight; "saved" for a
+     brief confirmation flash; "error" if the request failed. Without
+     this, the buttons gave NO visual feedback — users couldn't tell
+     whether a click was registered or whether the save succeeded. */
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string>("");
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
-
-  /* ── Payments sidecar — only populated when the current invoice
-        has a real server UUID (i.e. has been saved at least once). */
-  const [payments, setPayments] = useState<InvPayment[]>([]);
-  const [amountPaid, setAmountPaid] = useState(0);
-  const [balance, setBalance] = useState(0);
-
-  const reloadPayments = useCallback(async (invoiceId: string | null) => {
-    if (!invoiceId || invoiceId.length !== 36) {
-      setPayments([]);
-      setAmountPaid(0);
-      setBalance(0);
-      return;
-    }
-    const [pRes, iRes] = await Promise.all([
-      fetch(`/api/invoices/${invoiceId}/payments`, { credentials: "include" }),
-      fetch(`/api/invoices/${invoiceId}`, { credentials: "include" }),
-    ]);
-    if (pRes.ok) {
-      const json = (await pRes.json()) as { payments: InvPayment[] };
-      setPayments(json.payments ?? []);
-    }
-    if (iRes.ok) {
-      const json = (await iRes.json()) as { invoice: { amount_paid?: number; balance?: number } };
-      setAmountPaid(Number(json.invoice?.amount_paid ?? 0));
-      setBalance(Number(json.invoice?.balance ?? 0));
-    }
-  }, []);
-
-  useEffect(() => {
-    reloadPayments(current?.id ?? null);
-  }, [current?.id, reloadPayments]);
-
-  const handleRecordPayment = useCallback(async () => {
-    if (!current || current.id.length !== 36) {
-      alert(t("alert.saveFirstPayment"));
-      return;
-    }
-    const grand = current.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0)
-      + (Number(current.tax) || 0) + (Number(current.shipping) || 0) + (Number(current.others) || 0);
-    const defaultAmt = Math.max(0, grand - amountPaid);
-    const amt = prompt(`${t("prompt.payAmount")} ${defaultAmt.toFixed(2)}`, defaultAmt.toFixed(2));
-    if (!amt) return;
-    const amount = Number(amt);
-    if (!amount || amount <= 0) return;
-    const method = prompt(t("prompt.payMethod"), "bank_transfer") ?? "other";
-    const reference = prompt(t("prompt.payRef")) ?? "";
-    await fetch(`/api/invoices/${current.id}/payments`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, method, reference: reference || null }),
-    });
-    await reloadPayments(current.id);
-  }, [current, amountPaid, reloadPayments, t]);
+  /* "+ From catalog" picker. Owned by the parent so the modal can
+     stay mounted across A4-page renders without each page mounting
+     its own copy. */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /* "Link customer" picker — same pattern as the product picker:
+     parent owns the modal, the preview triggers it via prop. */
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  /* Tenant-wide saved stamp + signature. Loaded once on editor
+     mount; refreshed after the operator uploads a new one so the
+     "Use saved" button appears immediately. Null until the fetch
+     resolves so the editor doesn't flash a "missing saved asset"
+     state during initial load. */
+  const [savedStampUrl, setSavedStampUrl] = useState<string | null>(null);
+  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string | null>(null);
+  /* Read the super-admin flag straight from the /api/me/bootstrap
+     cache rather than useScopeContext. The latter has a fallback
+     path that re-queries the `accounts` table via the browser anon
+     client, which RLS strips to is_super_admin=false; the bootstrap
+     payload comes from a server route that already knows the truth. */
+  const { data: meBootstrap } = useMeBootstrap();
+  const isSuperAdmin = meBootstrap?.auth?.is_super_admin ?? false;
 
   /* ── Load from Supabase on mount ── */
   useEffect(() => {
     let cancelled = false;
     loadInvoicesRemote().then((list) => {
       if (!cancelled) {
-        setInvoices(list);
+        setQuotations(list);
         setLoaded(true);
       }
     });
     return () => { cancelled = true; };
   }, []);
 
-  /* ── Create new invoice. Kept optimistic until first save — server
-        mints the real UUID + INV number on upsert. */
+  /* ── Create new quotation. Kept as optimistic local-only until the
+        user hits Save; the server mints the real UUID + quote_no at
+        that point. This keeps "New" instant even on slow connections. */
   const handleNew = useCallback(() => {
     const today = todayDDMMYYYY();
     const q: Invoice = {
-      id: generateId(),
+      id: generateId(),          // temp; replaced by UUID on first save
       customerName: "",
       companyName: "",
-      invoiceNo: "",
+      invoiceNo: "",             // server assigns when first saved
       date: today,
       clientNo: "",
       validTill: addDays(today, 30),
       quotTo: "",
+      toAddress: "",
+      toAcid: "",
+      toPhone: "",
+      toMobile: "",
+      toEmail: "",
+      toWebsite: "",
       items: [{ ...EMPTY_ITEM }],
       tax: 0,
       shipping: 0,
@@ -634,48 +812,169 @@ export default function InvoicesDoc() {
     setView("editor");
   }, []);
 
-  /* ── Open existing ── */
-  const handleOpen = useCallback((q: Invoice) => {
+  /* ── Open existing ──
+     The list endpoint strips `items` from the doc payload to keep the
+     response small, so the row coming from the list view has no items.
+     Re-fetch the full quotation by id before mounting the editor —
+     otherwise the items table renders as a single empty placeholder. */
+  const handleOpen = useCallback(async (q: Invoice) => {
+    // Optimistic mount so the editor opens immediately with header data…
     setCurrent({ ...q, items: q.items.map((i) => ({ ...i })) });
     setView("editor");
+    // …then hydrate the full doc (with items) from the detail endpoint.
+    if (q.id.length === 36) {
+      const full = await fetchDocOne(INVOICES_DOC_SYNC, q.id);
+      if (full) {
+        const hydrated = fromRow(full);
+        setCurrent({ ...hydrated, items: hydrated.items.map((i) => ({ ...i })) });
+      }
+    }
   }, []);
 
   /* ── Delete from list ── */
+  /* Track which row's Duplicate button is in flight so the icon can
+     show a small spinner. The full-quote fetch + save round-trip on a
+     long quote (Omar's 50+ items) can take a second on a slow link;
+     without feedback the user double-clicks and ends up with two
+     copies. */
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  /* ── Duplicate from the list view ──
+     The list endpoint strips `items` from the doc to keep the
+     response small, so we MUST re-fetch the full quote before
+     cloning. Then we build a fresh draft (new client id, empty
+     quote_no so the server mints a new KL{YYYY}-{MMDD}, today's
+     date, 30-day validity), save it, refresh the list, and drop
+     the user into the editor on the new copy so they can adjust
+     customer fields straight away. */
+  const handleDuplicateFromList = useCallback(
+    async (id: string) => {
+      if (duplicatingId) return;
+      setDuplicatingId(id);
+      try {
+        const full = await fetchDocOne(INVOICES_DOC_SYNC, id);
+        if (!full) {
+          alert("Could not load the invoice to duplicate.");
+          return;
+        }
+        const source = fromRow(full);
+        const today = todayDDMMYYYY();
+        const copy: Invoice = {
+          ...source,
+          id: generateId(),
+          invoiceNo: "",
+          date: today,
+          validTill: addDays(today, 30),
+          status: "draft",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          serverTotal: undefined,
+          items: source.items.map((it) => ({ ...it })),
+        };
+        const saved = await saveInvoiceRemote(copy);
+        const next = saved ?? copy;
+        const list = await loadInvoicesRemote({ fresh: true });
+        setQuotations(list);
+        /* Open the new draft in the editor — the operator almost
+           always wants to tweak the customer name / address right
+           after duplicating, so the extra click would be friction. */
+        setCurrent(next);
+        setView("editor");
+      } catch (e) {
+        alert(`Duplicate failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setDuplicatingId(null);
+      }
+    },
+    [duplicatingId],
+  );
+
   const handleDeleteFromList = useCallback(
     async (id: string) => {
-      if (!confirm(t("inv.deleteConfirm"))) return;
+      if (!(await dialog.confirm({ message: t("inv.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
+      // Optimistic: remove from local state immediately so the user
+      // sees the row disappear even if the browser HTTP cache is still
+      // holding the pre-delete list.
+      setQuotations((prev) => prev.filter((q) => q.id !== id));
       await deleteInvoiceRemote(id);
-      const list = await loadInvoicesRemote();
-      setInvoices(list);
+      // `fresh: true` bypasses both the in-memory and browser HTTP
+      // cache so the reconciliation read reflects the post-delete state.
+      const list = await loadInvoicesRemote({ fresh: true });
+      setQuotations(list);
     },
-    []
+    [t]
   );
 
   /* ── Delete current (from editor) ── */
   const handleDeleteCurrent = useCallback(async () => {
     if (!current) return;
-    if (!confirm(t("inv.deleteConfirm"))) return;
-    await deleteInvoiceRemote(current.id);
-    const list = await loadInvoicesRemote();
-    setInvoices(list);
+    if (!(await dialog.confirm({ message: t("inv.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
+    const id = current.id;
+    setQuotations((prev) => prev.filter((q) => q.id !== id));
     setCurrent(null);
     setView("list");
-  }, [current]);
+    await deleteInvoiceRemote(id);
+    const list = await loadInvoicesRemote({ fresh: true });
+    setQuotations(list);
+  }, [current, t]);
 
-  /* ── Save current ── */
+  /* ── Save current ──
+     The status parameter is overloaded: callers passing "final" want
+     legacy "save as final" semantics (now mapped to "sent"). Everyone
+     else passes a current InvoiceStatus — usually "draft" — and we
+     persist it as-is. The statusHistory audit log only grows when the
+     status actually changes; idle saves don't pollute it with
+     duplicate "draft" rows. */
   const handleSave = useCallback(
-    async (status: "draft" | "final") => {
+    async (status: InvoiceStatus | "final") => {
       if (!current) return;
-      const intent = { ...current, status, updatedAt: new Date().toISOString() };
-      const saved = await saveInvoiceRemote(intent);
-      if (saved) {
-        setCurrent(saved);
-        const list = await loadInvoicesRemote();
-        setInvoices(list);
+      setSaveState("saving");
+      setSaveError("");
+      const nextStatus: InvoiceStatus = status === "final" ? "sent" : status;
+      const history = current.statusHistory ?? [];
+      const last = history[history.length - 1];
+      const isTransition = !last || last.status !== nextStatus;
+      const intent: Invoice = {
+        ...current,
+        status: nextStatus,
+        statusHistory: isTransition
+          ? [...history, { status: nextStatus, at: new Date().toISOString() }]
+          : history,
+        updatedAt: new Date().toISOString(),
+      };
+      try {
+        const saved = await saveInvoiceRemote(intent);
+        if (saved) {
+          setCurrent(saved);
+          const list = await loadInvoicesRemote({ fresh: true });
+          setQuotations(list);
+          setSaveState("saved");
+          // Reset the "Saved ✓" flash after 2.5 s so the button returns
+          // to its idle label.
+          setTimeout(() => setSaveState("idle"), 2500);
+        } else {
+          // saveInvoiceRemote returns null when the POST returned non-OK.
+          // upsertDoc swallows the error so we have no detail; surface a
+          // generic message and keep the editor unchanged.
+          setSaveState("error");
+          setSaveError("Save failed — server returned an error.");
+          setTimeout(() => setSaveState("idle"), 4000);
+        }
+      } catch (e) {
+        setSaveState("error");
+        setSaveError(e instanceof Error ? e.message : String(e));
+        setTimeout(() => setSaveState("idle"), 4000);
       }
     },
     [current]
   );
+
+  /* ── Convert current to invoice. Uses the server-side helper which
+        clones the doc JSON + mints a fresh INV<year>-NNNN number, then
+        takes the user straight to the Invoices app. ── */
+  const handleConvertToInvoice = useCallback(async () => {
+    /* No-op on the Invoice editor — already an invoice. */
+  }, []);
 
   /* ── Print ── */
   const handlePrint = useCallback(() => {
@@ -684,6 +983,172 @@ export default function InvoicesDoc() {
     document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
     window.print();
     document.title = prev;
+  }, [current]);
+
+  /* "saving" | "loading" state during the brief moment between click
+     and the new window receiving focus. Used to disable the button
+     so a frantic double-click doesn't open two print dialogs. */
+  const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
+
+  /* ── Export PDF ──
+     Opens /quotations/<id>/print?auto=1 in a new window. That page
+     renders the same A4 layout the server-side Puppeteer pipeline
+     uses (210×297 mm, page-break-after each doc) and auto-fires
+     window.print() once every image decodes. The operator picks
+     "Save as PDF" in the native dialog.
+
+     Why not the server-side /api/quotations/<id>/pdf route any
+     more: Vercel cold-start on the Puppeteer function regularly
+     ran ~30 s and occasionally hit the 60 s wall, leaving the
+     user staring at "Rendering…" with no feedback. The new-window
+     route is instant on every device, has no function-timeout
+     failure mode, and produces an identical-quality PDF because
+     the heavy lifting (the A4-fitted print page) is exactly the
+     same. The /api/...pdf endpoint stays in the codebase for a
+     future "email this quote" feature where we genuinely need a
+     server-rendered buffer to attach. */
+  const handleExportPdf = useCallback(async () => {
+    if (!current) return;
+    setPdfState("loading");
+    try {
+      /* Make sure the latest edits are on the server before opening
+         the print window — that page fetches the quote by id. */
+      if (current.id.length !== 36 || current.status === "draft") {
+        await handleSave("draft");
+      }
+      const refreshed = await loadInvoicesRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const quotationId = match?.id ?? current.id;
+      if (quotationId.length !== 36) {
+        setPdfState("error");
+        alert("Please save the invoice before exporting.");
+        setTimeout(() => setPdfState("idle"), 2_000);
+        return;
+      }
+      const url = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      /* Briefly reflect success; the actual render happens in the new
+         window so we don't have anything else to wait on. */
+      setTimeout(() => setPdfState("idle"), 500);
+    } catch (e) {
+      setPdfState("error");
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(() => setPdfState("idle"), 2_000);
+    }
+  }, [current, handleSave]);
+
+  /* ── Send by email ──
+     Opens a print window so the operator can "Save as PDF" the
+     attachment, AND fires a mailto: with To/Subject/Body pre-
+     filled from the quote. We deliberately don't try to attach
+     the PDF programmatically — mailto can't carry binary
+     attachments and rigging up a real SMTP path means adding
+     Resend / SendGrid + an env-var dance. The two-window flow
+     (print tab + Mail composer) gives a near-one-click experience
+     on every platform without that infrastructure.
+
+     Marks the quote as Sent on the way out so the status pill +
+     audit log reflect the action. Skips that side-effect if the
+     quote is already past Sent (Accepted / Rejected). */
+  const handleSendEmail = useCallback(async () => {
+    if (!current) return;
+    const to = (current.toEmail || "").trim();
+    if (!to) {
+      alert("Add the customer's email in the QUOTATION TO card before sending.");
+      return;
+    }
+    try {
+      /* Save first so the print window pulls the latest doc. */
+      const targetStatus: InvoiceStatus =
+        current.status === "paid" ||
+        current.status === "cancelled" ||
+        current.status === "overdue"
+          ? current.status
+          : "sent";
+      if (current.id.length !== 36 || current.status !== targetStatus) {
+        await handleSave(targetStatus);
+      }
+      const refreshed = await loadInvoicesRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const quotationId = match?.id ?? current.id;
+      if (quotationId.length !== 36) {
+        alert("Please save the invoice before sending.");
+        return;
+      }
+
+      /* Build a friendly cover-email skeleton. The operator can
+         tweak it in their mail client before pressing send. */
+      const greetingName = current.customerName?.trim() || "there";
+      const grandTotalNum =
+        current.serverTotal != null && current.serverTotal > 0
+          ? current.serverTotal
+          : computeGrandTotal(current);
+      const subject = `Invoice ${current.invoiceNo || "from Koleex"}${
+        current.companyName ? ` — ${current.companyName}` : ""
+      }`;
+      const body = [
+        `Dear ${greetingName},`,
+        "",
+        `Please find attached our quotation ${current.invoiceNo || ""} ` +
+          `for your review. The total amount is US$ ${fmt(grandTotalNum)}, ` +
+          `valid until ${current.validTill || "the date noted on the quote"}.`,
+        "",
+        "We're happy to discuss any of the items, prices, or delivery terms — just reply to this email or give us a call.",
+        "",
+        "Best regards,",
+        "Koleex Group",
+      ].join("\n");
+
+      /* Open the print window first so the operator's browser is
+         already showing the printable doc when they switch to the
+         email tab to attach the saved PDF. */
+      const printUrl = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      window.open(printUrl, "_blank", "noopener,noreferrer");
+
+      /* Fire the mailto on a small delay so the print window grabs
+         focus first — otherwise some OS mail handlers steal it
+         immediately and the print-as-PDF dialog never opens. */
+      setTimeout(() => {
+        const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+          subject,
+        )}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailto;
+      }, 600);
+    } catch (e) {
+      alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [current, handleSave]);
+
+  /* ── Duplicate ──
+     Clones the current quote into a fresh draft and drops the user
+     straight into the editor. The new draft gets:
+       · A brand-new client-side id so React treats it as a new row.
+       · An empty invoiceNo so the server mints a fresh
+         KL{YYYY}-{MMDD} (date-based) number on first save.
+       · Today's date as the new issue date + a 30-day validity.
+       · Deep-cloned items so edits on the copy don't bleed back
+         into the source quote's state. */
+  const handleDuplicate = useCallback(() => {
+    if (!current) return;
+    const today = todayDDMMYYYY();
+    const copy: Invoice = {
+      ...current,
+      id: generateId(),
+      invoiceNo: "",
+      date: today,
+      validTill: addDays(today, 30),
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      serverTotal: undefined,
+      items: current.items.map((it) => ({ ...it })),
+    };
+    setCurrent(copy);
+    setView("editor");
   }, [current]);
 
   /* ── Item helpers ── */
@@ -703,6 +1168,138 @@ export default function InvoicesDoc() {
     setCurrent({ ...current, items: [...current.items, { ...EMPTY_ITEM }] });
   }, [current]);
 
+  /* Apply a CRM customer pick to the QUOTATION TO card. Fills the
+     editor's company / contact / phone / mobile / email / website
+     fields and stores customerContactId in the doc so we can show
+     a "Linked" indicator on reload. Doesn't touch the legacy
+     schema-level customer_id FK (that targets a different table) —
+     just keeps the link in the doc payload. */
+  const applyCustomerPick = useCallback(
+    (pick: CustomerPickResult) => {
+      if (!current) return;
+      setCurrent({
+        ...current,
+        customerContactId: pick.id,
+        customerName: pick.displayName || current.customerName,
+        companyName: pick.companyName || current.companyName,
+        toAddress: pick.address || current.toAddress,
+        toPhone: pick.phone || current.toPhone,
+        toMobile: pick.mobile || current.toMobile,
+        toEmail: pick.email || current.toEmail,
+        toWebsite: pick.website || current.toWebsite,
+      });
+    },
+    [current],
+  );
+
+  /* Append a new item pre-filled from the catalog picker. If the
+     bottom-most row is still completely blank (typical right after
+     a "+ Add row"), replace it instead of appending — keeps the
+     items list tidy when the user clicks "From catalog" first. */
+  const addItemFromCatalog = useCallback(
+    (pick: PickResult) => {
+      if (!current) return;
+      const fresh: InvoiceItem = {
+        ...EMPTY_ITEM,
+        description: pick.description,
+        model: pick.model,
+        image: pick.imageUrl,
+        unitPrice: pick.unitPrice,
+        qty: 1,
+      };
+      const items = current.items.slice();
+      const last = items[items.length - 1];
+      const lastIsEmpty =
+        last &&
+        !last.description &&
+        !last.model &&
+        !last.image &&
+        !last.unitPrice &&
+        last.qty === 1;
+      if (lastIsEmpty) items[items.length - 1] = fresh;
+      else items.push(fresh);
+      setCurrent({ ...current, items });
+    },
+    [current],
+  );
+
+  /* ── Stamp + Signature handlers ──
+     The editor renders the stamp/signature cards on the last page.
+     A super-admin can either (a) attach the tenant's saved asset
+     with one click or (b) upload a new file (the API replaces the
+     saved asset AND returns the URL we stamp on this quote). All
+     four flows are gated client-side on isSuperAdmin AND server-
+     side on auth.is_super_admin so the UI gate is a hint, not the
+     security perimeter. */
+  useEffect(() => {
+    if (view !== "editor") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/quotations/saved-assets", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          stampUrl: string | null;
+          signatureUrl: string | null;
+        };
+        if (cancelled) return;
+        setSavedStampUrl(json.stampUrl);
+        setSavedSignatureUrl(json.signatureUrl);
+      } catch { /* non-fatal — buttons just degrade to upload-only */ }
+    })();
+    return () => { cancelled = true; };
+  }, [view, current?.id]);
+
+  const attachSavedStamp = useCallback(() => {
+    if (!current || !savedStampUrl) return;
+    setCurrent({ ...current, stampUrl: savedStampUrl });
+  }, [current, savedStampUrl]);
+  const attachSavedSignature = useCallback(() => {
+    if (!current || !savedSignatureUrl) return;
+    setCurrent({ ...current, signatureUrl: savedSignatureUrl });
+  }, [current, savedSignatureUrl]);
+  const clearStamp = useCallback(() => {
+    if (!current) return;
+    setCurrent({ ...current, stampUrl: undefined });
+  }, [current]);
+  const clearSignature = useCallback(() => {
+    if (!current) return;
+    setCurrent({ ...current, signatureUrl: undefined });
+  }, [current]);
+
+  const uploadAsset = useCallback(
+    async (kind: "stamp" | "signature", file: File) => {
+      const form = new FormData();
+      form.append("kind", kind);
+      form.append("file", file);
+      try {
+        const res = await fetch("/api/quotations/saved-assets", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          alert(`Upload failed: ${j.error ?? res.status}`);
+          return;
+        }
+        const json = (await res.json()) as { kind: string; url: string };
+        if (kind === "stamp") {
+          setSavedStampUrl(json.url);
+          if (current) setCurrent({ ...current, stampUrl: json.url });
+        } else {
+          setSavedSignatureUrl(json.url);
+          if (current) setCurrent({ ...current, signatureUrl: json.url });
+        }
+      } catch (e) {
+        alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [current],
+  );
+
   const removeItem = useCallback(
     (idx: number) => {
       if (!current || current.items.length <= 1) return;
@@ -710,6 +1307,20 @@ export default function InvoicesDoc() {
         ...current,
         items: current.items.filter((_, i) => i !== idx),
       });
+    },
+    [current]
+  );
+
+  /* Reorder a row up/down by one slot. Caps at the array bounds so
+     callers don't have to bounds-check before firing. */
+  const moveItem = useCallback(
+    (idx: number, direction: -1 | 1) => {
+      if (!current) return;
+      const target = idx + direction;
+      if (target < 0 || target >= current.items.length) return;
+      const next = current.items.slice();
+      [next[idx], next[target]] = [next[target], next[idx]];
+      setCurrent({ ...current, items: next });
     },
     [current]
   );
@@ -735,7 +1346,7 @@ export default function InvoicesDoc() {
     : 0;
 
   /* ── Sorted list ── */
-  const sortedInvoices = [...invoices].sort(
+  const sortedQuotations = [...quotations].sort(
     (a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
@@ -764,14 +1375,14 @@ export default function InvoicesDoc() {
                 <ArrowLeftIcon className="h-4 w-4" />
               </Link>
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <InvoicesIcon size={16} />
+                <DocumentIcon size={16} />
               </div>
               <div className="flex items-center gap-2.5 min-w-0">
                 <h1 className="text-xl md:text-[22px] font-bold tracking-tight">
                   {t("inv.title")}
                 </h1>
                 <p className="text-[12px] text-[var(--text-dim)]">
-                  {invoices.length} {invoices.length === 1 ? t("inv.singular") : t("inv.plural")}
+                  {quotations.length} {quotations.length === 1 ? t("inv.singular") : t("inv.plural")}
                 </p>
               </div>
             </div>
@@ -788,26 +1399,36 @@ export default function InvoicesDoc() {
         {/* KPI strip */}
         <div className="max-w-[1500px] mx-auto px-4 pt-4">
           {(() => {
-            const drafts = invoices.filter((q) => q.status === "draft").length;
-            const finals = invoices.filter((q) => q.status === "final").length;
-            const total = invoices.reduce((s, q) => s + computeGrandTotal(q), 0);
+            const drafts = quotations.filter((q) => q.status === "draft").length;
+            const sent = quotations.filter((q) => q.status === "sent").length;
+            const paid = quotations.filter((q) => q.status === "paid").length;
+            /* Prefer the server-side total column. The list payload
+               has items stripped, so a local recomputation would
+               give 0 for every saved quotation. */
+            const total = quotations.reduce((s, q) => {
+              const tt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
+              return s + tt;
+            }, 0);
             const now = new Date();
-            const overdueCount = invoices.filter((q) => {
-              if (q.status !== "final") return false;
+            const soon = new Date(now); soon.setDate(now.getDate() + 7);
+            const expiringSoon = quotations.filter((q) => {
+              if (q.status !== "sent") return false;
               const iso = ddmmyyyyToISO(q.validTill);
               if (!iso) return false;
-              return new Date(iso) < now;
+              const d = new Date(iso);
+              return d >= now && d <= soon;
             }).length;
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KpiCard label={t("kpi.total")} value={String(invoices.length)} accent="text-blue-400" />
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
                 <KpiCard label={t("kpi.drafts")} value={String(drafts)} accent="text-amber-400" />
-                <KpiCard label={t("kpi.finalised")} value={String(finals)} accent="text-emerald-400" />
+                <KpiCard label="SENT" value={String(sent)} accent="text-sky-400" />
+                <KpiCard label="PAID" value={String(paid)} accent="text-emerald-400" />
                 <KpiCard
-                  label={t("kpi.totalBilled")}
+                  label={t("kpi.totalValue")}
                   value={fmt(total)}
                   accent="text-[var(--text-primary)]"
-                  sub={overdueCount > 0 ? t("kpi.pastDue").replace("{n}", String(overdueCount)) : undefined}
+                  sub={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
                 />
               </div>
             );
@@ -816,7 +1437,7 @@ export default function InvoicesDoc() {
 
         {/* List */}
         <div className="max-w-[1500px] mx-auto px-4 py-6">
-          {sortedInvoices.length === 0 ? (
+          {sortedQuotations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-500">
               <DocumentIcon size={48} className="mb-4 opacity-40" />
               <p className="text-lg font-medium">{t("inv.none")}</p>
@@ -826,12 +1447,17 @@ export default function InvoicesDoc() {
             </div>
           ) : (
             <div className="grid gap-3">
-              {sortedInvoices.map((q) => {
-                const st = q.items.reduce(
+              {sortedQuotations.map((q) => {
+                /* The list endpoint strips items from the doc payload
+                   to keep responses small, so recomputing here gives 0.
+                   Prefer the server-side `serverTotal` (the row's total
+                   column). Fall back to local compute for unsaved
+                   drafts where serverTotal hasn't been set yet. */
+                const computed = q.items.reduce(
                   (s, i) => s + i.unitPrice * i.qty,
                   0
-                );
-                const gt = st + q.tax + q.shipping + q.others;
+                ) + q.tax + q.shipping + q.others;
+                const gt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computed;
                 return (
                   <div
                     key={q.id}
@@ -846,9 +1472,15 @@ export default function InvoicesDoc() {
                           </span>
                           <span
                             className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                              q.status === "final"
-                                ? "bg-green-500/15 text-green-400"
-                                : "bg-yellow-500/15 text-yellow-400"
+                              q.status === "paid"
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : q.status === "sent"
+                                  ? "bg-sky-500/15 text-sky-400"
+                                  : q.status === "cancelled"
+                                    ? "bg-red-500/15 text-red-400"
+                                    : q.status === "overdue"
+                                      ? "bg-zinc-500/15 text-zinc-400"
+                                      : "bg-yellow-500/15 text-yellow-400"
                             }`}
                           >
                             {q.status}
@@ -866,6 +1498,21 @@ export default function InvoicesDoc() {
                         <span className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">
                           ${fmt(gt)}
                         </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateFromList(q.id);
+                          }}
+                          disabled={duplicatingId === q.id}
+                          className="p-2 rounded-lg text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Duplicate this invoice as a new draft"
+                        >
+                          {duplicatingId === q.id ? (
+                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CopyIcon size={16} />
+                          )}
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -918,34 +1565,76 @@ export default function InvoicesDoc() {
           {t("btn.back")}
         </button>
         <div style={{ flex: 1 }} />
-        <span
-          className={`text-xs font-semibold uppercase px-3 py-1 rounded-full ${
-            current.status === "final"
-              ? "bg-green-500/15 text-green-400"
-              : "bg-yellow-500/15 text-yellow-400"
-          }`}
-          style={{ letterSpacing: "0.03em" }}
-        >
-          {current.status === "final" ? t("status.final") : t("status.draft")}
-        </span>
+        {/* Clickable status pill — opens a menu of transitions. The
+            colour map mirrors the list-view row badge so the same
+            quote reads the same in both views. */}
+        <StatusMenu
+          status={current.status}
+          onChange={async (next) => {
+            if (next === current.status) return;
+            /* Transition + save in one round-trip. We reuse
+               handleSave because it appends to statusHistory and
+               updates updatedAt — duplicating that logic would
+               drift over time. */
+            await handleSave(next);
+          }}
+        />
+        {/* Save state pill — gives the user explicit feedback that
+            the save click was registered and what happened. Without
+            this, both Save buttons did their network call silently
+            and the user couldn't tell if anything was happening. */}
+        {saveState !== "idle" && (
+          <span
+            className={`text-xs font-semibold px-3 py-1 rounded-full ${
+              saveState === "saving" ? "bg-blue-500/15 text-blue-300"
+              : saveState === "saved" ? "bg-green-500/20 text-green-300"
+              : "bg-red-500/20 text-red-300"
+            }`}
+            title={saveError || undefined}
+          >
+            {saveState === "saving" && "Saving…"}
+            {saveState === "saved" && "✓ Saved"}
+            {saveState === "error" && "✕ Save failed"}
+          </span>
+        )}
         <button
           onClick={() => handleSave("draft")}
-          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          disabled={saveState === "saving"}
+          className="px-4 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t("btn.saveDraft")}
+          {saveState === "saving" ? "Saving…" : t("btn.saveDraft")}
         </button>
         <button
           onClick={() => handleSave("final")}
-          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition"
+          disabled={saveState === "saving"}
+          className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t("btn.saveFinal")}
+          {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
         </button>
         <button
-          onClick={handlePrint}
+          onClick={handleDuplicate}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Clone this invoice into a new draft (fresh number, today's date)."
+        >
+          <CopyIcon size={14} />
+          Duplicate
+        </button>
+        <button
+          onClick={handleExportPdf}
+          disabled={pdfState === "loading"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Open a print-ready view in a new window — pick 'Save as PDF' in the print dialog."
         >
           <DownloadIcon size={14} />
-          {t("btn.exportPDF")}
+          {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
+        </button>
+        <button
+          onClick={handleSendEmail}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+          title="Open your mail app pre-filled with the customer's email, quote number, and a cover note. A print window also opens so you can save the PDF and attach it."
+        >
+          <PaperPlaneIcon size={14} />
+          Send
         </button>
         <button
           onClick={handlePrint}
@@ -954,35 +1643,6 @@ export default function InvoicesDoc() {
           <PrintIcon size={14} />
           {t("btn.print")}
         </button>
-
-        {/* Payments chip + record button — only appears once the
-            invoice has a server UUID (balance/amount_paid are
-            authoritative for saved records). */}
-        {current.id.length === 36 && (
-          <>
-            <div
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border ${
-                balance <= 0
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : amountPaid > 0
-                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                    : "bg-[var(--bg-surface)] border-white/[0.06] text-gray-400"
-              }`}
-              title={`${payments.length} payment(s) recorded`}
-            >
-              <CheckCircleIcon size={12} />
-              {t("paid.paid")} ${amountPaid.toFixed(2)} / {t("paid.balance")} ${Math.max(0, balance).toFixed(2)}
-            </div>
-            <button
-              onClick={handleRecordPayment}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
-            >
-              <CheckCircleIcon size={14} />
-              {t("btn.recordPayment")}
-            </button>
-          </>
-        )}
-
         <button
           onClick={handleDeleteCurrent}
           className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-400 bg-[var(--bg-surface)] hover:bg-red-500/20 rounded-lg transition"
@@ -1053,1656 +1713,147 @@ export default function InvoicesDoc() {
         </div>
       </div>
 
-      {/* ── A4 Document (the editing surface) ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          padding: "24px 16px 40px",
-          background: "#0A0A0A",
-        }}
+      {/* ── A4 Document (multi-page editor surface) ──
+          The A4 paper, pagination, items table, action buttons,
+          rich-text toolbar, notes panel, and footer (stamp /
+          signature / bank / terms) all live in QuotationA4Preview. */}
+      <QuotationA4Preview
+        docKind="invoice"
+        /* The Invoice editor reuses the QuotationA4Preview renderer
+           with docKind="invoice" — the renderer's local type wants
+           a quote-shaped object with status: "draft"|"sent"|"accepted"
+           etc., but our Invoice uses the same shape with different
+           status values. Cast both directions so the type-check
+           passes without losing runtime safety (the renderer never
+           writes to setCurrent and never branches on status). */
+        current={current as never}
+        setCurrent={setCurrent as never}
+        updateItem={updateItem}
+        addItem={addItem}
+        onPickFromCatalog={() => setPickerOpen(true)}
+        onPickCustomer={() => setCustomerPickerOpen(true)}
+        savedStampUrl={savedStampUrl}
+        savedSignatureUrl={savedSignatureUrl}
+        isSuperAdmin={isSuperAdmin}
+        onAttachSavedStamp={attachSavedStamp}
+        onAttachSavedSignature={attachSavedSignature}
+        onUploadStamp={(f) => uploadAsset("stamp", f)}
+        onUploadSignature={(f) => uploadAsset("signature", f)}
+        onClearStamp={clearStamp}
+        onClearSignature={clearSignature}
+        removeItem={removeItem}
+        moveItem={moveItem}
+        handleImageUpload={handleImageUpload}
+        fileInputRefs={fileInputRefs}
+        subTotal={subTotal}
+        grandTotal={grandTotal}
+        fmt={fmt}
+        numberToWords={numberToWords}
+      />
+      <ProductPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={addItemFromCatalog}
+      />
+      <CustomerPickerModal
+        open={customerPickerOpen}
+        onClose={() => setCustomerPickerOpen(false)}
+        onPick={applyCustomerPick}
+      />
+    </div>
+  );
+}
+
+/** Clickable status pill on the editor toolbar. Click to open a tiny
+ *  dropdown of transitions; pick one to fire `onChange`. The colour
+ *  map mirrors the list-view row badge so the same quote reads the
+ *  same in both surfaces. */
+function StatusMenu({
+  status,
+  onChange,
+}: {
+  status: InvoiceStatus;
+  onChange: (next: InvoiceStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const colourFor = (s: InvoiceStatus): string =>
+    s === "paid"
+      ? "bg-emerald-500/15 text-emerald-400"
+      : s === "sent"
+        ? "bg-sky-500/15 text-sky-400"
+        : s === "cancelled"
+          ? "bg-red-500/15 text-red-400"
+          : s === "overdue"
+            ? "bg-zinc-500/15 text-zinc-400"
+            : "bg-yellow-500/15 text-yellow-400";
+
+  const labelFor = (s: InvoiceStatus): string =>
+    s.charAt(0).toUpperCase() + s.slice(1);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex items-center gap-1.5 ${colourFor(status)}`}
+        style={{ letterSpacing: "0.03em", border: "none", cursor: "pointer" }}
+        title="Click to change status"
       >
+        {labelFor(status)}
+        <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+      </button>
+      {open && (
         <div
-          id="invoice-a4-preview"
-          className="quot-a4-doc"
-          dir="ltr"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            right: 0,
+            background: "var(--bg-secondary, #1f2937)",
+            border: "1px solid var(--border-color, #374151)",
+            borderRadius: 8,
+            padding: 4,
+            minWidth: 140,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            zIndex: 30,
+            display: "flex",
+            flexDirection: "column",
+          }}
         >
-          <div className="quot-doc-inner">
-            {/* ═══ (a) HEADER ROW ═══ */}
-            <div
-              className="pq-top-header"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "8px 0 12px",
-                margin: 0,
+          {INVOICE_STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onChange(opt.value);
               }}
+              disabled={opt.value === status}
+              className={`text-left px-2 py-1.5 rounded text-xs font-medium ${
+                opt.value === status
+                  ? "opacity-50 cursor-default"
+                  : "hover:bg-white/[0.05] cursor-pointer text-gray-300"
+              }`}
+              style={{ background: "transparent", border: "none" }}
             >
-              <div style={{ width: 170, height: "auto" }}>
-                {/* Logo placeholder - 170px wide */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="170"
-                  height="25.4"
-                  viewBox="0 0 719.83 107.57"
-                  style={{ display: "block" }}
-                >
-                  <path
-                    fill="#000"
-                    d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z"
-                  />
-                  <path
-                    fill="#000"
-                    d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z"
-                  />
-                  <path
-                    fill="#000"
-                    d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z"
-                  />
-                  <path
-                    fill="#000"
-                    d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"
-                  />
-                  <path
-                    fill="#000"
-                    d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z"
-                  />
-                  <path
-                    fill="#000"
-                    d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31Z"
-                  />
-                </svg>
-              </div>
-              <div
-                className="pq-top-title"
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: "#000",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                INVOICE
-              </div>
-            </div>
-
-            {/* ═══ (b) BLACK STRIP ═══ */}
-            <div
-              className="pq-strip-black"
-              style={{
-                background: "#000",
-                color: "#fff",
-                padding: "6px 16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontSize: 8,
-                fontWeight: 600,
-                letterSpacing: "0.02em",
-              }}
-            >
-              <span style={{ color: "#fff" }}>
-                KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.
-              </span>
-              <span style={{ color: "#fff" }}>
-                {"\u79D1\u83B1\u606A\u65AF\u56FD\u9645\u5546\u4E1A\u7BA1\u7406\uFF08\u53F0\u5DDE\uFF09\u6709\u9650\u516C\u53F8"}
-              </span>
-            </div>
-
-            {/* ═══ (c) GRAY STRIP ═══ */}
-            <div
-              className="pq-strip-gray"
-              style={{
-                background: "#e0e0e0",
-                color: "#333",
-                padding: "4px 16px",
-                textAlign: "center",
-                fontSize: 8,
-                fontWeight: 600,
-                letterSpacing: "0.14em",
-                margin: "0 0 16px",
-              }}
-            >
-              SHAPING THE FUTURE.
-            </div>
-
-            {/* ═══ (d) INFO ROW - two tables side by side ═══ */}
-            <div
-              className="pq-info-row"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "stretch",
-                gap: 24,
-                marginBottom: 12,
-              }}
-            >
-              {/* TABLE 1: Meta */}
-              <table
-                className="pq-meta-tbl"
-                cellSpacing={0}
-                style={{
-                  borderCollapse: "collapse",
-                  border: "1px solid #ddd",
-                  width: "48%",
-                  height: "100%",
-                }}
-              >
-                <tbody>
-                  <tr>
-                    <td
-                      className="pq-ml"
-                      style={{
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: "#000",
-                        width: 76,
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      DATE
-                    </td>
-                    <td
-                      className="pq-mv"
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                        fontSize: 11,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        className="pq-in"
-                        placeholder="DD/MM/YYYY"
-                        maxLength={10}
-                        value={current.date}
-                        onChange={(e) => {
-                          const date = e.target.value;
-                          setCurrent({
-                            ...current,
-                            date,
-                            validTill: addDays(date, 30),
-                          });
-                        }}
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-ml"
-                      style={{
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: "#000",
-                        width: 76,
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      INVOICE NO.
-                    </td>
-                    <td
-                      className="pq-mv"
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                        fontSize: 11,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        className="pq-in"
-                        readOnly
-                        value={current.invoiceNo}
-                        style={{ color: "#999" }}
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-ml"
-                      style={{
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: "#000",
-                        width: 76,
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      CLIENT NO.
-                    </td>
-                    <td
-                      className="pq-mv"
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                        fontSize: 11,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        className="pq-in"
-                        placeholder="/"
-                        value={current.clientNo}
-                        onChange={(e) =>
-                          setCurrent({ ...current, clientNo: e.target.value })
-                        }
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-ml"
-                      style={{
-                        fontWeight: 700,
-                        color: "#fff",
-                        background: "#000",
-                        width: 76,
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.03em",
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      VALID TILL
-                    </td>
-                    <td
-                      className="pq-mv"
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                        fontSize: 11,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        className="pq-in"
-                        placeholder="DD/MM/YYYY"
-                        maxLength={10}
-                        value={current.validTill}
-                        onChange={(e) =>
-                          setCurrent({ ...current, validTill: e.target.value })
-                        }
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              {/* TABLE 2: Contact */}
-              <table
-                className="pq-contact-tbl"
-                cellSpacing={0}
-                style={{
-                  borderCollapse: "collapse",
-                  border: "1px solid #ddd",
-                  width: "48%",
-                }}
-              >
-                <tbody>
-                  <tr>
-                    <td
-                      className="pq-cl"
-                      style={{
-                        fontWeight: 700,
-                        width: 56,
-                        fontSize: 11,
-                        textAlign: "right",
-                        paddingRight: 8,
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      Address
-                    </td>
-                    <td
-                      className="pq-cv"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 400,
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      ROOM206, BUILDING88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE
-                      PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG
-                      DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-cl"
-                      style={{
-                        fontWeight: 700,
-                        width: 56,
-                        fontSize: 11,
-                        textAlign: "right",
-                        paddingRight: 8,
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      Phone
-                    </td>
-                    <td
-                      className="pq-cv"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 400,
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      +86057688927796
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-cl"
-                      style={{
-                        fontWeight: 700,
-                        width: 56,
-                        fontSize: 11,
-                        textAlign: "right",
-                        paddingRight: 8,
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      Mobile
-                    </td>
-                    <td
-                      className="pq-cv"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 400,
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      +8613073800720
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-cl"
-                      style={{
-                        fontWeight: 700,
-                        width: 56,
-                        fontSize: 11,
-                        textAlign: "right",
-                        paddingRight: 8,
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      Email
-                    </td>
-                    <td
-                      className="pq-cv"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 400,
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      info@koleexgroup.com
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      className="pq-cl"
-                      style={{
-                        fontWeight: 700,
-                        width: 56,
-                        fontSize: 11,
-                        textAlign: "right",
-                        paddingRight: 8,
-                        whiteSpace: "nowrap",
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      Website
-                    </td>
-                    <td
-                      className="pq-cv"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 400,
-                        border: "1px solid #ddd",
-                        padding: "2px 8px",
-                        verticalAlign: "middle",
-                        height: 24,
-                      }}
-                    >
-                      www.koleexgroup.com
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* ═══ (e) INVOICE TO ═══ */}
-            <div
-              className="pq-to-section"
-              style={{ width: "48%", marginBottom: 16 }}
-            >
-              <div
-                className="pq-to-label"
-                style={{
-                  background: "#000",
-                  color: "#fff",
-                  padding: "5px 10px",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                }}
-              >
-                INVOICE TO
-              </div>
-              <div
-                className="pq-to-value"
-                style={{
-                  border: "1px solid #ddd",
-                  borderTop: "none",
-                  padding: "8px 10px",
-                }}
-              >
-                <textarea
-                  className="pq-in pq-in-area"
-                  rows={3}
-                  placeholder="Company name, contact person, address..."
-                  value={current.quotTo}
-                  onChange={(e) =>
-                    setCurrent({ ...current, quotTo: e.target.value })
-                  }
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 400,
-                    width: "100%",
-                    border: "none",
-                    outline: "none",
-                    fontFamily: "inherit",
-                    resize: "vertical",
-                    minHeight: 40,
-                    lineHeight: 1.5,
-                    background: "transparent",
-                    padding: 0,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* ═══ (f) ITEMS TABLE ═══ */}
-            <table
-              className="pq-tbl"
-              cellSpacing={0}
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                border: "1px solid #ddd",
-                marginTop: 12,
-                tableLayout: "fixed",
-                overflow: "visible",
-              }}
-            >
-              <thead>
-                <tr>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "5%",
-                    }}
-                  >
-                    NO.
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "30%",
-                    }}
-                  >
-                    ITEM
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "13%",
-                    }}
-                  >
-                    MODEL
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "13%",
-                    }}
-                  >
-                    PICTURE
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "10%",
-                    }}
-                  >
-                    UNIT PRICE
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "7%",
-                    }}
-                  >
-                    QTY
-                  </th>
-                  <th
-                    style={{
-                      background: "#000",
-                      color: "#fff",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      padding: "7px 8px",
-                      textAlign: "center",
-                      border: "1px solid #555",
-                      width: "16%",
-                    }}
-                  >
-                    TOTAL
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {current.items.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    style={{ minHeight: 56, height: "auto" }}
-                  >
-                    {/* NO. */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                        textAlign: "center",
-                      }}
-                    >
-                      {idx + 1}
-                    </td>
-                    {/* ITEM - contentEditable rich text */}
-                    <td
-                      className="quot-item-td"
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                        position: "relative",
-                        overflow: "visible",
-                      }}
-                    >
-                      <div
-                        className="quot-item-rich"
-                        contentEditable
-                        suppressContentEditableWarning
-                        data-placeholder="Item description..."
-                        onBlur={(e) =>
-                          updateItem(
-                            idx,
-                            "description",
-                            e.currentTarget.innerHTML
-                          )
-                        }
-                        dangerouslySetInnerHTML={{
-                          __html: item.description,
-                        }}
-                        style={{
-                          minHeight: 32,
-                          width: "100%",
-                          fontSize: 11,
-                          fontFamily: "inherit",
-                          outline: "none",
-                          lineHeight: 1.5,
-                          padding: "2px 0",
-                          wordWrap: "break-word",
-                          overflowWrap: "break-word",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          maxWidth: "100%",
-                        }}
-                      />
-                    </td>
-                    {/* MODEL - contentEditable */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                      }}
-                    >
-                      <div
-                        className="pq-cell-wrap"
-                        contentEditable
-                        suppressContentEditableWarning
-                        data-placeholder="Model"
-                        onBlur={(e) =>
-                          updateItem(
-                            idx,
-                            "model",
-                            e.currentTarget.textContent || ""
-                          )
-                        }
-                        dangerouslySetInnerHTML={{ __html: item.model }}
-                        style={{
-                          minHeight: 16,
-                          width: "100%",
-                          fontSize: 11,
-                          fontFamily: "inherit",
-                          outline: "none",
-                          lineHeight: 1.4,
-                          padding: 0,
-                        }}
-                      />
-                    </td>
-                    {/* PICTURE - click to upload */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                      }}
-                    >
-                      <div
-                        className={`quot-img-cell${item.image ? " has-img" : ""}`}
-                        onClick={() => fileInputRefs.current[idx]?.click()}
-                        style={{
-                          width: "100%",
-                          height: 80,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          border: item.image ? "none" : "1px dashed #ccc",
-                          cursor: "pointer",
-                          position: "relative",
-                          overflow: "hidden",
-                          background: item.image ? "transparent" : "#fafafa",
-                        }}
-                      >
-                        {item.image ? (
-                          <img
-                            src={item.image}
-                            alt=""
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "contain",
-                            }}
-                          />
-                        ) : (
-                          <span
-                            className="quot-img-plus"
-                            style={{ fontSize: 18, color: "#bbb" }}
-                          >
-                            +
-                          </span>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={(el) => {
-                            fileInputRefs.current[idx] = el;
-                          }}
-                          style={{
-                            position: "absolute",
-                            top: -9999,
-                            left: -9999,
-                            width: 0,
-                            height: 0,
-                            overflow: "hidden",
-                          }}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleImageUpload(idx, f);
-                          }}
-                        />
-                      </div>
-                    </td>
-                    {/* UNIT PRICE - contentEditable, right-aligned */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                        textAlign: "right",
-                      }}
-                    >
-                      <div
-                        className="pq-cell-wrap"
-                        contentEditable
-                        suppressContentEditableWarning
-                        data-placeholder="0.00"
-                        onBlur={(e) => {
-                          const val =
-                            parseFloat(
-                              (e.currentTarget.textContent || "0").replace(
-                                /[^0-9.]/g,
-                                ""
-                              )
-                            ) || 0;
-                          updateItem(idx, "unitPrice", val);
-                        }}
-                        style={{
-                          minHeight: 16,
-                          width: "100%",
-                          fontSize: 11,
-                          fontFamily: "inherit",
-                          outline: "none",
-                          lineHeight: 1.4,
-                          padding: 0,
-                          textAlign: "right",
-                        }}
-                      >
-                        {item.unitPrice > 0 ? fmt(item.unitPrice) : ""}
-                      </div>
-                    </td>
-                    {/* QTY - contentEditable, centered */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 11,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        className="pq-cell-wrap"
-                        contentEditable
-                        suppressContentEditableWarning
-                        data-placeholder="1"
-                        onBlur={(e) => {
-                          const val =
-                            parseInt(
-                              (e.currentTarget.textContent || "1").replace(
-                                /[^0-9]/g,
-                                ""
-                              ),
-                              10
-                            ) || 1;
-                          updateItem(idx, "qty", val);
-                        }}
-                        style={{
-                          minHeight: 16,
-                          width: "100%",
-                          fontSize: 11,
-                          fontFamily: "inherit",
-                          outline: "none",
-                          lineHeight: 1.4,
-                          padding: 0,
-                          textAlign: "center",
-                        }}
-                      >
-                        {item.qty > 0 ? String(item.qty) : ""}
-                      </div>
-                    </td>
-                    {/* TOTAL - calculated, right-aligned */}
-                    <td
-                      style={{
-                        padding: "10px 8px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        border: "1px solid #ddd",
-                        verticalAlign: "middle",
-                        textAlign: "right",
-                        whiteSpace: "nowrap",
-                        overflow: "visible",
-                        position: "relative",
-                      }}
-                    >
-                      ${fmt(item.unitPrice * item.qty)}
-                      {/* Delete button outside total cell */}
-                      {current.items.length > 1 && (
-                        <button
-                          className="quot-row-del-btn no-print"
-                          onClick={() => removeItem(idx)}
-                          title="Delete row"
-                          style={{
-                            position: "absolute",
-                            top: "50%",
-                            right: -28,
-                            transform: "translateY(-50%)",
-                            background: "none",
-                            border: "1px solid rgba(0,0,0,0.10)",
-                            color: "#999",
-                            fontSize: 13,
-                            cursor: "pointer",
-                            width: 22,
-                            height: 22,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: 0,
-                            lineHeight: 1,
-                            fontWeight: 400,
-                            borderRadius: "50%",
-                            zIndex: 5,
-                          }}
-                        >
-                          {"\u00D7"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="pq-tfoot-row">
-                  <td
-                    colSpan={5}
-                    style={{
-                      borderTop: "1px solid #ddd",
-                      background: "#f5f5f5",
-                      padding: 8,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                    }}
-                  />
-                  <td
-                    style={{
-                      borderTop: "1px solid #ddd",
-                      background: "#f5f5f5",
-                      padding: 8,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      textAlign: "right",
-                    }}
-                  >
-                    Total
-                  </td>
-                  <td
-                    style={{
-                      borderTop: "1px solid #ddd",
-                      background: "#f5f5f5",
-                      padding: 8,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      textAlign: "right",
-                    }}
-                  >
-                    ${fmt(subTotal)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {/* + Add Item button */}
-            <div
-              className="no-print"
-              style={{ textAlign: "center", padding: "5px 0 8px" }}
-            >
-              <button
-                className="pq-add-btn"
-                onClick={addItem}
-                style={{
-                  background: "#f8f8f8",
-                  border: "1px dashed #ccc",
-                  padding: "6px 24px",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "#888",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                + Add Item
-              </button>
-            </div>
-
-            {/* ═══ (g) BOTTOM SECTION - totals + terms ═══ */}
-            <table
-              className="pq-bot"
-              cellSpacing={0}
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                marginTop: 16,
-              }}
-            >
-              <tbody>
-                <tr>
-                  {/* LEFT: Totals */}
-                  <td
-                    className="pq-bot-l"
-                    style={{
-                      width: "44%",
-                      paddingRight: 16,
-                      verticalAlign: "top",
-                    }}
-                  >
-                    <table
-                      className="pq-tots"
-                      cellSpacing={0}
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        border: "1px solid #ddd",
-                      }}
-                    >
-                      <tbody>
-                        <tr>
-                          <td
-                            className="pq-tl"
-                            style={{
-                              fontWeight: 700,
-                              background: "#f5f5f5",
-                              width: 80,
-                              fontSize: 11,
-                              textTransform: "uppercase",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            SubTotal
-                          </td>
-                          <td
-                            className="pq-tv"
-                            style={{
-                              textAlign: "right",
-                              fontWeight: 400,
-                              fontSize: 11,
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            US$ {fmt(subTotal)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td
-                            className="pq-tl"
-                            style={{
-                              fontWeight: 700,
-                              background: "#f5f5f5",
-                              width: 80,
-                              fontSize: 11,
-                              textTransform: "uppercase",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            Tax
-                          </td>
-                          <td
-                            className="pq-tv"
-                            style={{
-                              textAlign: "right",
-                              fontWeight: 400,
-                              fontSize: 11,
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            <div
-                              className="pq-in-r"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) => {
-                                const val =
-                                  parseFloat(
-                                    (
-                                      e.currentTarget.textContent || "0"
-                                    ).replace(/[^0-9.]/g, "")
-                                  ) || 0;
-                                setCurrent({ ...current, tax: val });
-                              }}
-                              style={{
-                                textAlign: "right",
-                                fontWeight: 400,
-                                fontSize: 11,
-                                width: "100%",
-                                outline: "none",
-                              }}
-                            >
-                              {current.tax > 0 ? String(current.tax) : "0"}
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td
-                            className="pq-tl"
-                            style={{
-                              fontWeight: 700,
-                              background: "#f5f5f5",
-                              width: 80,
-                              fontSize: 11,
-                              textTransform: "uppercase",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            Shipping
-                          </td>
-                          <td
-                            className="pq-tv"
-                            style={{
-                              textAlign: "right",
-                              fontWeight: 400,
-                              fontSize: 11,
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            <div
-                              className="pq-in-r"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) => {
-                                const val =
-                                  parseFloat(
-                                    (
-                                      e.currentTarget.textContent || "0"
-                                    ).replace(/[^0-9.]/g, "")
-                                  ) || 0;
-                                setCurrent({ ...current, shipping: val });
-                              }}
-                              style={{
-                                textAlign: "right",
-                                fontWeight: 400,
-                                fontSize: 11,
-                                width: "100%",
-                                outline: "none",
-                              }}
-                            >
-                              {current.shipping > 0
-                                ? String(current.shipping)
-                                : "0"}
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td
-                            className="pq-tl"
-                            style={{
-                              fontWeight: 700,
-                              background: "#f5f5f5",
-                              width: 80,
-                              fontSize: 11,
-                              textTransform: "uppercase",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            Others
-                          </td>
-                          <td
-                            className="pq-tv"
-                            style={{
-                              textAlign: "right",
-                              fontWeight: 400,
-                              fontSize: 11,
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            <div
-                              className="pq-in-r"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) => {
-                                const val =
-                                  parseFloat(
-                                    (
-                                      e.currentTarget.textContent || "0"
-                                    ).replace(/[^0-9.]/g, "")
-                                  ) || 0;
-                                setCurrent({ ...current, others: val });
-                              }}
-                              style={{
-                                textAlign: "right",
-                                fontWeight: 400,
-                                fontSize: 11,
-                                width: "100%",
-                                outline: "none",
-                              }}
-                            >
-                              {current.others > 0
-                                ? String(current.others)
-                                : "0"}
-                            </div>
-                          </td>
-                        </tr>
-                        {/* Grand Total row */}
-                        <tr className="pq-grand">
-                          <td
-                            className="pq-tl"
-                            style={{
-                              background: "#000",
-                              borderColor: "#000",
-                              padding: "5px 10px",
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: "#fff",
-                            }}
-                          >
-                            Total
-                          </td>
-                          <td
-                            className="pq-tv"
-                            style={{
-                              background: "#000",
-                              borderColor: "#000",
-                              padding: "5px 10px",
-                              fontSize: 14,
-                              fontWeight: 700,
-                              textAlign: "right",
-                              color: "#fff",
-                            }}
-                          >
-                            US$ {fmt(grandTotal)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {/* Total in Letters */}
-                    <table
-                      className="pq-tots"
-                      cellSpacing={0}
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        border: "1px solid #ddd",
-                        marginTop: -1,
-                      }}
-                    >
-                      <tbody>
-                        <tr>
-                          <td
-                            className="pq-tl"
-                            style={{
-                              fontWeight: 700,
-                              background: "#f5f5f5",
-                              width: 80,
-                              fontSize: 11,
-                              textTransform: "uppercase",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            Total in Letters
-                          </td>
-                          <td
-                            className="pq-tv pq-tv-words"
-                            style={{
-                              fontSize: 9,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              textAlign: "right",
-                              border: "1px solid #ddd",
-                              padding: "5px 10px",
-                            }}
-                          >
-                            {numberToWords(grandTotal)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-
-                  {/* RIGHT: Terms & Conditions */}
-                  <td
-                    className="pq-bot-r"
-                    style={{
-                      width: "56%",
-                      paddingLeft: 16,
-                      verticalAlign: "top",
-                    }}
-                  >
-                    <table
-                      className="pq-terms-tbl"
-                      cellSpacing={0}
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        border: "1px solid #ddd",
-                        height: "100%",
-                      }}
-                    >
-                      <tbody>
-                        <tr>
-                          <td
-                            className="pq-terms-label"
-                            style={{
-                              background: "#000",
-                              padding: "5px 10px",
-                              fontSize: 9,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.03em",
-                              color: "#fff",
-                            }}
-                          >
-                            Terms &amp; Conditions
-                          </td>
-                        </tr>
-                        <tr>
-                          <td
-                            className="pq-terms-value"
-                            style={{ padding: 0, verticalAlign: "top" }}
-                          >
-                            <div
-                              className="pq-tc-area"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) =>
-                                setCurrent({
-                                  ...current,
-                                  terms:
-                                    e.currentTarget.innerText ||
-                                    e.currentTarget.textContent ||
-                                    "",
-                                })
-                              }
-                              dangerouslySetInnerHTML={{
-                                __html: current.terms.replace(/\n/g, "<br>"),
-                              }}
-                              style={{
-                                width: "100%",
-                                fontSize: 11,
-                                fontWeight: 400,
-                                lineHeight: 1.6,
-                                border: "none",
-                                padding: "8px 10px",
-                                fontFamily: "inherit",
-                                minHeight: 80,
-                                outline: "none",
-                                wordWrap: "break-word",
-                                overflowWrap: "break-word",
-                                whiteSpace: "pre-wrap",
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ═══ (h) STAMP SECTION ═══ */}
-            <table
-              className="pq-stamp-tbl"
-              cellSpacing={0}
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                marginTop: 16,
-              }}
-            >
-              <tbody>
-                <tr>
-                  <td style={{ width: "65%" }} />
-                  <td>
-                    <div
-                      className="pq-stamp-box"
-                      style={{
-                        width: 150,
-                        height: 60,
-                        border: "1px solid #ccc",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 9,
-                        color: "#aaa",
-                      }}
-                    >
-                      Stamp
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ═══ (i) BANK DETAILS ═══ */}
-            <div
-              className="pq-bank-bar"
-              style={{
-                marginTop: 16,
-                padding: "5px 10px",
-                background: "#000",
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                color: "#fff",
-              }}
-            >
-              RECEIVING U.S DOLLAR PAYMENT AT
-            </div>
-            <table
-              className="pq-bank"
-              cellSpacing={0}
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                border: "1px solid #ddd",
-              }}
-            >
-              <tbody>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    BENEFICIARY BANK
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    AGRICULTURAL BANK OF CHINA, ZHEJIANG BRANCH
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    SWIFT CODE
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    ABOCCNBJ110
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    BENEFICIARY NAME
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO. LTD.
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    BENEFICIARY A/C No.
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    19905814040007205
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    BANK ADDRESS
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    100 JIANGJIN ROAD SHANGCHENG DISTRICT, HANGZHOU, ZHEJIANG,
-                    CHINA
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    className="pq-bl"
-                    style={{
-                      fontWeight: 700,
-                      background: "#f5f5f5",
-                      width: 140,
-                      textTransform: "uppercase",
-                      fontSize: 9,
-                      letterSpacing: "0.02em",
-                      whiteSpace: "nowrap",
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    BENEFICIARY ADDRESS
-                  </td>
-                  <td
-                    className="pq-bv"
-                    style={{
-                      fontSize: 10,
-                      border: "1px solid #ddd",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    ROOM206, BUILDING88, WEST FEIYUE TECHNOLOGICAL INNOVATIVE
-                    PARK, JINGSHUI AN COMMUNITY, XIACHEN STREET, JIAOJIANG
-                    DISTRICT, TAIZHOU CITY, ZHEJIANG PROVINCE, CHINA
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* ═══ (j) FOOTER ═══ */}
-            <div
-              className="pq-footer"
-              style={{
-                marginTop: 16,
-                paddingTop: 10,
-                borderTop: "1px solid #ddd",
-                textAlign: "center",
-                fontSize: 9,
-                lineHeight: 1.7,
-                color: "#555",
-              }}
-            >
-              If you have any questions regarding this invoice, please contact
-              <br />
-              <strong style={{ fontWeight: 700 }}>Mr. Kamal Shafei</strong> /
-              info@koleexgroup.com / +8613073800720
-              <br />
-              Thanks for Choosing Koleex.
-            </div>
-          </div>
-          {/* /quot-doc-inner */}
+              <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${colourFor(opt.value).split(" ")[0]}`}></span>
+              {opt.label}
+            </button>
+          ))}
         </div>
-        {/* /quot-a4-doc */}
-      </div>
+      )}
     </div>
   );
 }
