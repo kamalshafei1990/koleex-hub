@@ -2229,27 +2229,23 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     return list.some((a) => plain.startsWith(a.toLowerCase() + ":"));
   };
 
-  /* Wrap the segment's label (everything up to the first colon) in
-     <strong>...</strong> if it isn't already bold. Idempotent. */
-  const boldifyLabel = (segment: string): string => {
-    const m = segment.match(/^([\s\S]*?)(:[\s\S]*)$/);
-    if (!m) return segment;
-    const [, label, tail] = m;
-    const plain = label.replace(/<[^>]+>/g, "").trim();
-    if (!plain) return segment;
-    const alreadyBold =
-      /<\s*(strong|b)\b/i.test(label) ||
-      /font-weight\s*:\s*(bold|[6-9]\d{2})/i.test(label);
-    if (alreadyBold) return segment;
-    return `<strong>${plain}</strong>${tail}`;
-  };
-
+  /* Rebuild an existing segment in the canonical bold-label format:
+       <strong>Label:</strong> value
+     This guarantees:
+       · the colon is INSIDE the <strong> tag (visually consistent
+         with freshly appended lines)
+       · there's exactly one space between the colon and the value
+       · any leftover HTML from earlier edits (stray </strong>,
+         duplicate spaces, etc.) gets normalised away
+     The plain-text label is extracted from whatever the segment
+     used to be — so an operator-typed 'Payment:' becomes
+     '<strong>Payment:</strong>' on the next pick. */
   const rewriteSegment = (segment: string, _key: string, value: string): string => {
-    const bolded = boldifyLabel(segment);
-    return bolded.replace(
-      /^([\s\S]*?:[\s ]*)([\s\S]*)$/,
-      (_m, prefix) => `${prefix}${value}`,
-    );
+    const m = segment.match(/^([\s\S]*?):[\s\S]*$/);
+    if (!m) return segment;
+    const label = m[1].replace(/<[^>]+>/g, "").trim();
+    if (!label) return segment;
+    return `<strong>${label}:</strong> ${value}`;
   };
 
   const usedKeys = new Set<string>();
