@@ -2528,14 +2528,23 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
    render into two cards. Classification is purely on the row
    label; everything else falls into the 'custom' bucket and
    stays in the editable Terms & Conditions card. */
+/* Shipment & Delivery Details = factual logistics data (cargo,
+   ports, weights, marks, transit times). Terms & Conditions =
+   commercial / legal clauses (payment + incoterm + bank +
+   cancellation + governing law). Payment terms and Price Type
+   are commercial contract clauses -- they belong with the legal
+   T&C rows even though Quick Fill still groups them under
+   "Payment & Pricing" in the modal UI. Delivery Time stays
+   under shipment (it's a logistics fact, like the ports). */
 const INFO_ROW_LABELS: ReadonlyArray<string> = [
-  "Payment terms", "Price Type", "Loading port", "Discharge port",
+  "Loading port", "Discharge port",
   "Sent by", "Container type", "Shipping marks", "Lead time",
   "Delivery time", "Country of Origin", "Net Weight", "Gross Weight",
   "CBM", "Number of Packages", "Documents Provided", "Total Qty",
   "Packing",
 ];
 const LEGAL_ROW_LABELS: ReadonlyArray<string> = [
+  "Payment terms", "Price Type",
   "Bank Charges", "Cancellation Policy", "Governing Law",
 ];
 
@@ -3302,9 +3311,11 @@ type ShipmentDetailRow = {
   value: string;
 };
 
+/* Display order + friendly labels for the Shipment & Delivery
+   Details card. Payment Terms and Price Type are deliberately
+   omitted -- they're commercial contract clauses and render in
+   the Terms & Conditions card instead. */
 const SHIPMENT_DETAIL_LABELS: Record<string, string> = {
-  "Payment terms":      "Payment Terms",
-  "Price Type":         "Price Type",
   "Loading port":       "Loading Port",
   "Discharge port":     "Discharge Port",
   "Sent by":            "Sent By",
