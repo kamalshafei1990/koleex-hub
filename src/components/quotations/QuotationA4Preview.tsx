@@ -25,7 +25,7 @@
    click target, same row-delete affordance.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -260,6 +260,27 @@ export default function QuotationA4Preview({
      this revision so the visible text matches even if the operator
      had the rich-text area focused at the moment of the pick. */
   const [termsRevision, setTermsRevision] = useState(0);
+
+  /* Quick Fill modal open state, lifted to the parent so the
+     Shipment & Delivery Details card's "Edit" pill and the older
+     trigger chip both share one modal instance. */
+  const [quickFillOpen, setQuickFillOpen] = useState(false);
+
+  /* Helper used both by the Quick Fill modal (when the operator
+     picks a value) and by the Terms & Conditions editor (when
+     they type into the legal+custom slice). Centralises the
+     patch logic in one place so both call sites stay in sync. */
+  const applyQuickFillPatch = useCallback((patch: QuickFillPatch) => {
+    setCurrent((prev) => {
+      if (!prev) return prev;
+      const next: Quotation = { ...prev, ...patch.fields };
+      if (patch.termsLineUpdates) {
+        next.terms = applyQuickFillToTerms(prev.terms ?? "", patch.termsLineUpdates);
+      }
+      return next;
+    });
+    setTermsRevision((v) => v + 1);
+  }, [setCurrent]);
 
   /* Items-table 'UNIT PRICE' subtitle. Derived from the picked
      Incoterm + the relevant port — FOB/FAS/EXW reference the
@@ -1417,11 +1438,15 @@ export default function QuotationA4Preview({
                 </div>
               </div>
 
-              {/* RIGHT: Terms & Conditions. Flex column so the header
-                  stays its natural height and the body grows to fill
-                  whatever vertical space the totals card on the left
-                  consumes — keeping the two cards visually balanced
-                  even when the totals stack adds tax / shipping rows. */}
+              {/* RIGHT: Terms & Conditions card — short legal
+                  clauses only (Bank Charges, Cancellation,
+                  Governing Law) plus any free-text the operator
+                  types. Factual shipment data (Payment, ports,
+                  Sent by, weights, etc.) now lives in the
+                  separate Shipment & Delivery Details card
+                  below, keeping each card focused on one job
+                  and stopping the right column from growing
+                  awkwardly tall. */}
               <div className="pq-bot-r" style={{ width: "56%", display: "flex", flexDirection: "column" }}>
                 <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}>
                   <div
@@ -1434,49 +1459,71 @@ export default function QuotationA4Preview({
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
                       color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    Terms &amp; Conditions
+                    <span>Terms &amp; Conditions</span>
+                    <span
+                      className="no-print"
+                      style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.7)", textTransform: "none", letterSpacing: 0 }}
+                    >
+                      Legal clauses &amp; free text
+                    </span>
                   </div>
-                  {/* Quick-fill row — Apple-pill dropdowns that write
-                      formatted lines into the rich-text terms below
-                      AND save the FK id on the doc so it re-opens
-                      with the same selection. .no-print so the
-                      exported PDF only shows the resulting text, not
-                      the dropdowns themselves. */}
-                  {/* Compact 'Quick Fill' opener — replaces the
-                      cluttered inline picker strip. Clicking opens
-                      a modal with every field organised into
-                      sections (Payment, Route, Shipping, Timing,
-                      Cargo, Documents, Legal). All picks still
-                      land in the matching T&C row in real time;
-                      the modal just hides the controls behind a
-                      single chip until the operator wants them. */}
-                  <TermsQuickFillTrigger
-                    current={current}
-                    onPatch={(patch) => {
-                      const next = { ...current, ...patch.fields };
-                      if (patch.termsLineUpdates) {
-                        next.terms = applyQuickFillToTerms(
-                          current.terms,
-                          patch.termsLineUpdates,
-                        );
-                      }
-                      setCurrent(next);
-                      setTermsRevision((v) => v + 1);
-                    }}
-                  />
                   <div className="pq-terms-value" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
                     <TermsArea
-                      terms={current.terms}
+                      terms={legalAndCustomHtml(current.terms ?? "")}
                       totalQty={totalQty}
-                      onCommit={(v) => setMeta("terms", v)}
+                      skipTotalQtyInjection
+                      onCommit={(editedHtml) => {
+                        /* Merge the operator's edits with the
+                           preserved info rows. Info rows are
+                           edited via the Quick Fill modal on
+                           the Shipment Details card; this
+                           editor only owns the legal+custom
+                           slice. */
+                        setMeta("terms", mergeTermSlices(current.terms ?? "", editedHtml));
+                      }}
                       externalRevision={termsRevision}
                     />
                   </div>
                 </div>
               </div>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            (g.2) SHIPMENT & DELIVERY DETAILS — full-width structured
+            grid that lives between the Totals + Terms row above and
+            the Stamp + Signature row below. This card replaces the
+            old "info rows mixed into the Terms editor" mess: every
+            factual piece of cargo / logistics data (payment, ports,
+            sent-by, weights, CBM, packages, documents…) renders as
+            a clean label/value pair in a 4-column grid. The card is
+            read-only display — the ⚡ Edit pill in its header opens
+            the Quick Fill modal where the values are actually set.
+            ═══════════════════════════════════════════════════════════════ */}
+        <div style={{ marginTop: 12 }}>
+          <ShipmentDetailsCard
+            terms={current.terms ?? ""}
+            totalQty={totalQty}
+            onEdit={() => setQuickFillOpen(true)}
+          />
+        </div>
+
+        {/* Quick Fill modal mount — single instance, opened from the
+            Shipment & Delivery Details card's Edit pill. The modal
+            writes both structured FK fields (paymentTermId, etc.)
+            and the matching row in current.terms via the alias
+            machinery so the two cards stay in lock-step. */}
+        {quickFillOpen && (
+          <TermsQuickFillModal
+            current={current}
+            onPatch={applyQuickFillPatch}
+            onClose={() => setQuickFillOpen(false)}
+          />
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════
             (h) AUTHORISED STAMP | AUTHORISED SIGNATURE — two separate
@@ -1820,6 +1867,7 @@ function TermsArea({
   totalQty,
   onCommit,
   externalRevision = 0,
+  skipTotalQtyInjection = false,
 }: {
   terms: string;
   totalQty: number;
@@ -1832,6 +1880,11 @@ function TermsArea({
      blurTimer hasn't fired, so without this we'd swallow the
      external update for 150 ms. */
   externalRevision?: number;
+  /* When true, don't auto-inject the Total Qty row. Used by the
+     Terms & Conditions card after the layout split — Total Qty
+     belongs to the Shipment & Delivery Details card, not the
+     legal-clauses editor. */
+  skipTotalQtyInjection?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [focused, setFocused] = useState(false);
@@ -1844,8 +1897,8 @@ function TermsArea({
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const displayedTerms = useMemo(
-    () => injectTotalQty(terms, totalQty),
-    [terms, totalQty],
+    () => skipTotalQtyInjection ? normaliseTermsForDisplay(terms) : injectTotalQty(terms, totalQty),
+    [terms, totalQty, skipTotalQtyInjection],
   );
 
   /* Track the last externalRevision we synced so we only force-sync
@@ -2468,6 +2521,206 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
   return result;
 }
 
+/* ── Canonical row classification for the two-card terms layout.
+   The Terms editor used to be one big block mixing factual
+   shipment data (Payment, ports, weights, etc.) with legal text
+   (Bank charges, Cancellation, Governing Law). We now split the
+   render into two cards. Classification is purely on the row
+   label; everything else falls into the 'custom' bucket and
+   stays in the editable Terms & Conditions card. */
+const INFO_ROW_LABELS: ReadonlyArray<string> = [
+  "Payment terms", "Price Type", "Loading port", "Discharge port",
+  "Sent by", "Container type", "Shipping marks", "Lead time",
+  "Delivery time", "Country of Origin", "Net Weight", "Gross Weight",
+  "CBM", "Number of Packages", "Documents Provided", "Total Qty",
+  "Packing",
+];
+const LEGAL_ROW_LABELS: ReadonlyArray<string> = [
+  "Bank Charges", "Cancellation Policy", "Governing Law",
+];
+
+/* Same alias map as in applyQuickFillToTerms, exported here so the
+   classifier can recognise legacy labels the operator typed by
+   hand. Keep in sync if you add new aliases above. */
+const TERMS_LABEL_ALIASES: Record<string, string[]> = {
+  "Payment terms":      ["Payment terms", "Payment", "Payment term", "Payment method"],
+  "Price Type":         ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
+  "Sent by":            ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
+  "Container type":     ["Container type", "Container", "Container size"],
+  "Loading port":       ["Loading port", "Port of loading", "POL", "From port", "Origin port", "Port of shipment", "Port of departure"],
+  "Discharge port":     ["Discharge port", "Port of discharge", "POD", "To port", "Destination port", "Port of destination", "Port of arrival"],
+  "Lead time":          ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
+  "Delivery time":      ["Delivery time", "ETA", "ETD", "Estimated arrival", "Estimated departure", "Estimated delivery", "Ready for shipment"],
+  "Shipping marks":     ["Shipping marks", "Shipping mark", "Marks", "Marks and Numbers", "Marks & Numbers", "Case marks", "Carton marks"],
+  "Packing":            ["Packing", "Packaging", "Packing method", "Packing type"],
+  "Country of Origin":  ["Country of Origin", "Country of origin", "Origin", "Made in"],
+  "Net Weight":         ["Net Weight", "Net weight", "N.W.", "NW"],
+  "Gross Weight":       ["Gross Weight", "Gross weight", "G.W.", "GW"],
+  "CBM":                ["CBM", "Volume", "Cubic Meters", "Cubic meters", "M3", "m³"],
+  "Number of Packages": ["Number of Packages", "Number of packages", "No. of Packages", "Total Packages", "Packages"],
+  "Documents Provided": ["Documents Provided", "Documents provided", "Documents", "Docs Provided", "Docs"],
+  "Bank Charges":       ["Bank Charges", "Bank charges", "Banking charges", "Bank Fees"],
+  "Cancellation Policy":["Cancellation Policy", "Cancellation policy", "Cancellation", "Cancel Policy"],
+  "Governing Law":      ["Governing Law", "Governing law", "Applicable law", "Jurisdiction"],
+  "Total Qty":          ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
+};
+
+type ParsedTermRow = {
+  /* Canonical key from the alias table, or null if this row didn't
+     match any known label (it's user free-text). */
+  canonical: string | null;
+  /* Raw label text the operator typed (without trailing colon). */
+  rawLabel: string | null;
+  /* Plain-text value (everything after 'Label:'). */
+  value: string;
+  /* The full <div>…</div> wrapper as it appeared in current.terms.
+     Used to round-trip rows that we render in a different card
+     without losing the operator's formatting. */
+  divHtml: string;
+  /* Inner contents of the <div> — what goes between the wrapper
+     tags. Used when rebuilding the editable Terms slice. */
+  innerHtml: string;
+};
+
+/* Walks the current.terms HTML and returns one entry per row.
+   Works on the new div-wrapped layout (what every fresh quote
+   uses) and on the legacy <br>-separated layout. */
+function parseTermRows(html: string): ParsedTermRow[] {
+  if (!html) return [];
+
+  /* Tries to classify a row's label against the alias table.
+     Returns the canonical key or null. */
+  const classify = (innerText: string): { canonical: string | null; rawLabel: string | null; value: string } => {
+    const plain = innerText.replace(/<[^>]+>/g, "").trim();
+    const m = plain.match(/^([^:]+):\s*(.*)$/);
+    if (!m) return { canonical: null, rawLabel: null, value: plain };
+    const rawLabel = m[1].trim();
+    const value = m[2].trim();
+    const rawLower = rawLabel.toLowerCase();
+    for (const [key, aliases] of Object.entries(TERMS_LABEL_ALIASES)) {
+      if (aliases.some((a) => a.toLowerCase() === rawLower)) {
+        return { canonical: key, rawLabel, value };
+      }
+    }
+    return { canonical: null, rawLabel, value };
+  };
+
+  const divLayout = /<div[^>]*>[\s\S]*?<\/div>/i.test(html);
+  if (divLayout) {
+    const out: ParsedTermRow[] = [];
+    const divRe = /(<div[^>]*>)([\s\S]*?)(<\/div>)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = divRe.exec(html)) !== null) {
+      const full = match[0];
+      const inner = match[2];
+      const { canonical, rawLabel, value } = classify(inner);
+      out.push({ canonical, rawLabel, value, divHtml: full, innerHtml: inner });
+    }
+    return out;
+  }
+
+  /* Legacy <br>-only layout. Each segment becomes a row. */
+  const parts = html.split(/<br\s*\/?>|\n/i);
+  const rowStyle = "border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;";
+  return parts
+    .filter((p) => p.replace(/<[^>]+>/g, "").trim() !== "")
+    .map((inner) => {
+      const { canonical, rawLabel, value } = classify(inner);
+      return {
+        canonical,
+        rawLabel,
+        value,
+        divHtml: `<div style="${rowStyle}">${inner}</div>`,
+        innerHtml: inner,
+      };
+    });
+}
+
+function isInfoRow(r: ParsedTermRow): boolean {
+  return r.canonical != null && INFO_ROW_LABELS.includes(r.canonical);
+}
+function isLegalRow(r: ParsedTermRow): boolean {
+  return r.canonical != null && LEGAL_ROW_LABELS.includes(r.canonical);
+}
+
+/* Splits a terms blob into its three slices. */
+function splitTermRows(html: string): { info: ParsedTermRow[]; legal: ParsedTermRow[]; custom: ParsedTermRow[] } {
+  const rows = parseTermRows(html);
+  const info: ParsedTermRow[] = [];
+  const legal: ParsedTermRow[] = [];
+  const custom: ParsedTermRow[] = [];
+  for (const r of rows) {
+    if (isInfoRow(r)) info.push(r);
+    else if (isLegalRow(r)) legal.push(r);
+    else custom.push(r);
+  }
+  return { info, legal, custom };
+}
+
+/* Reconstructs full current.terms HTML when the operator commits
+   an edit in the Terms & Conditions (legal+custom) card. Info
+   rows from the previous current.terms are preserved by default;
+   if the operator typed an info-labelled row inside the T&C
+   editor (e.g. "Payment: 30 days") it OVERRIDES the saved value
+   instead of being silently swallowed. */
+function mergeTermSlices(previousTerms: string, editedLegalCustomHtml: string): string {
+  const { info: oldInfo } = splitTermRows(previousTerms);
+  const editedSplit = splitTermRows(editedLegalCustomHtml);
+
+  /* Build the final info row list: start from old info, replace
+     any row whose canonical label is also present in the edited
+     content. Edited rows that have no canonical match in old
+     stay as-is in their relative order at the start. */
+  const editedInfoByKey = new Map<string, ParsedTermRow>();
+  for (const r of editedSplit.info) {
+    if (r.canonical) editedInfoByKey.set(r.canonical, r);
+  }
+  const mergedInfo: ParsedTermRow[] = [];
+  const seen = new Set<string>();
+  for (const r of oldInfo) {
+    if (r.canonical && editedInfoByKey.has(r.canonical)) {
+      mergedInfo.push(editedInfoByKey.get(r.canonical)!);
+      seen.add(r.canonical);
+    } else {
+      mergedInfo.push(r);
+    }
+  }
+  /* Append any brand-new info-canonical rows the operator typed
+     that didn't exist in oldInfo. */
+  for (const r of editedSplit.info) {
+    if (r.canonical && !seen.has(r.canonical)) {
+      mergedInfo.push(r);
+      seen.add(r.canonical);
+    }
+  }
+
+  const infoBlock = mergedInfo.map((r) => r.divHtml).join("");
+  const legalCustomBlock = [...editedSplit.legal, ...editedSplit.custom].map((r) => r.divHtml).join("");
+  return infoBlock + legalCustomBlock;
+}
+
+/* Returns the inner HTML for the Terms & Conditions (legal +
+   custom) editor — the subset of current.terms the user can
+   actually edit in the small card. */
+function legalAndCustomHtml(html: string): string {
+  const { legal, custom } = splitTermRows(html);
+  if (legal.length === 0 && custom.length === 0) {
+    /* Empty editor — show one blank free-text row so the
+       operator has somewhere to start typing. */
+    return `<div style="padding: 6px 0; min-height: 28px;"><br></div>`;
+  }
+  return [...legal, ...custom].map((r) => r.divHtml).join("");
+}
+
+/* Lookup helper used by the Shipment & Delivery Details card to
+   pull a value by canonical label from the current.terms blob.
+   Returns "" when the row isn't present. */
+function getTermValue(html: string, canonical: string): string {
+  const rows = parseTermRows(html);
+  for (const r of rows) if (r.canonical === canonical) return r.value;
+  return "";
+}
+
 /* Bilingual (EN + 中文) help copy shown when the operator hovers
    the (?) icon beside each Quick Fill label. Written for non-
    specialist users — explains what each international-trade
@@ -3037,6 +3290,193 @@ function HelpTip({ k }: { k: keyof typeof QUICK_FILL_HELP }) {
    badge. Counts the universal fields only (excludes containerType
    since that field only applies to FCL sea/inland shipments). */
 const QUICK_FILL_TOTAL = 11;
+
+/* The Shipment & Delivery Details card. Renders factual cargo /
+   logistics data in a clean structured grid so it doesn't get
+   mixed in with the legal Terms & Conditions clauses below. The
+   card is read-only display; to change a value the operator
+   clicks the Edit pill which opens the Quick Fill modal. */
+type ShipmentDetailRow = {
+  canonical: string;
+  label: string;
+  value: string;
+};
+
+const SHIPMENT_DETAIL_LABELS: Record<string, string> = {
+  "Payment terms":      "Payment Terms",
+  "Price Type":         "Price Type",
+  "Loading port":       "Loading Port",
+  "Discharge port":     "Discharge Port",
+  "Sent by":            "Sent By",
+  "Container type":     "Container Type",
+  "Shipping marks":     "Shipping Marks",
+  "Lead time":          "Lead Time",
+  "Delivery time":      "Delivery Time",
+  "Country of Origin":  "Country of Origin",
+  "Net Weight":         "Net Weight",
+  "Gross Weight":       "Gross Weight",
+  "CBM":                "CBM",
+  "Number of Packages": "No. of Packages",
+  "Documents Provided": "Documents",
+  "Total Qty":          "Total Qty",
+};
+
+function ShipmentDetailsCard({
+  terms,
+  totalQty,
+  onEdit,
+}: {
+  terms: string;
+  totalQty: number;
+  onEdit: () => void;
+}) {
+  /* Combine current.terms with the auto-injected Total Qty so the
+     card renders the same line-up the printed PDF will. */
+  const rendered = useMemo(
+    () => injectTotalQty(terms, totalQty),
+    [terms, totalQty],
+  );
+
+  /* Build display rows in canonical order (not the operator's
+     row order in the editor) so the card is always laid out
+     consistently. */
+  const rows: ShipmentDetailRow[] = useMemo(() => {
+    const order = Object.keys(SHIPMENT_DETAIL_LABELS);
+    return order.map((canonical) => ({
+      canonical,
+      label: SHIPMENT_DETAIL_LABELS[canonical],
+      value: getTermValue(rendered, canonical),
+    }));
+  }, [rendered]);
+
+  const filledCount = rows.filter((r) => r.value.trim() !== "").length;
+
+  /* Render as a 2-up grid (4 visual columns: label | value | label | value)
+     so 16 rows compress into 8 visual rows on the printed page.
+     Empty values show a soft dash. */
+  return (
+    <div
+      className="pq-shipment-details"
+      style={{
+        border: `1px solid ${T.border}`,
+        borderRadius: 12,
+        overflow: "hidden",
+        background: T.paper,
+      }}
+    >
+      {/* Header bar — same visual grammar as the Terms card. */}
+      <div
+        style={{
+          background: T.black,
+          padding: "6px 12px",
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>Shipment &amp; Delivery Details</span>
+        <span
+          className="no-print"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(255,255,255,0.7)", textTransform: "none", letterSpacing: 0 }}>
+            {filledCount} / {rows.length} filled
+          </span>
+          <button
+            type="button"
+            onClick={onEdit}
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: T.black,
+              background: "#fff",
+              border: "none",
+              borderRadius: 4,
+              padding: "3px 10px",
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+            title="Edit shipment & delivery details via the Quick Fill modal"
+          >
+            ⚡ Edit
+          </button>
+        </span>
+      </div>
+
+      {/* Mobile-first CSS rule: collapse the 4-column grid to a
+          2-column (label | value) grid on narrow screens so the
+          labels stay readable instead of crushing the values. */}
+      <style>{`
+        @media screen and (max-width: 767px) {
+          .pq-shipment-grid { grid-template-columns: auto 1fr !important; }
+        }
+      `}</style>
+      {/* Grid body — CSS grid, 4 columns on desktop / print, 2 on
+          narrow mobile. Each cell is one of:
+            · label cell (auto width, ink-grey, semi-bold)
+            · value cell (1fr, ink-black, fills the rest)        */}
+      <div
+        className="pq-shipment-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "auto 1fr auto 1fr",
+          rowGap: 0,
+          columnGap: 14,
+          padding: "8px 12px",
+          fontSize: 10,
+          lineHeight: 1.4,
+        }}
+      >
+        {rows.map((r, i) => {
+          const isOdd = i % 2 === 0;
+          return (
+            <div
+              key={r.canonical}
+              style={{ display: "contents" }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  color: T.inkSoft,
+                  padding: "4px 0",
+                  borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",
+                  whiteSpace: "nowrap",
+                  /* Wrap to a second mini-row on mobile (handled by
+                     the media query in globals if present); on the
+                     printed A4 they always sit in one line. */
+                }}
+              >
+                {r.label}
+              </div>
+              <div
+                style={{
+                  padding: "4px 0",
+                  borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",
+                  color: r.value ? T.ink : T.inkGhost,
+                  /* Help the right value cell breathe before the
+                     next pair starts. */
+                  paddingInlineEnd: isOdd ? 4 : 0,
+                }}
+              >
+                {r.value || "—"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /* Compact 'Quick Fill' button + modal wrapper. Single chip on the
    Terms card; click → modal opens with the full QuickFillBar laid
