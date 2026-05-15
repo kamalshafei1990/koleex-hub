@@ -25,6 +25,7 @@ const routeKeys: Record<string, string> = {
   "/products": "app.products",
   "/products/new": "app.products",
   "/quotations": "app.quotations",
+  "/invoices": "app.invoices",
   "/price-calculator": "app.price-calculator",
   "/markets": "app.markets",
   "/landed-cost": "app.landed-cost",
