@@ -99,6 +99,13 @@ export interface Invoice {
   dischargePort?: string;
   shippingMethodId?: string;
   shippingMarks?: string;
+  /* Cargo + legal fields surfaced as structured rows in the Terms
+     card. See Quotations.tsx. */
+  containerType?: string;
+  bankCharges?: string;
+  cancellationPolicy?: string;
+  governingLaw?: string;
+  documentsProvided?: string[];
   /* Global discount as a percentage (0-100). See Quotations.tsx. */
   discountPct?: number;
   leadTimeDays?: number;
@@ -138,10 +145,7 @@ const STORAGE_KEY = "koleex.invoices-doc.v1";
 const COUNTER_KEY = "koleex.invoices-doc.counter";
 
 /* Default terms shell for a fresh invoice. Mirrors the quotation
-   shell so the same Quick Fill pickers land cleanly. Each labelled
-   row is its own <div> with a dashed bottom border; the trailing
-   <div> is the free-text notes area. Order matches the quotation
-   editor for cross-doc consistency. */
+   shell so the same Quick Fill pickers land cleanly. */
 const TERMS_ROW_STYLE =
   `border-bottom: 1px dashed rgba(0,0,0,0.12); padding: 3px 0; min-height: 22px;`;
 const TERMS_NOTES_STYLE = `padding: 6px 0; min-height: 28px;`;
@@ -151,10 +155,21 @@ const DEFAULT_TERMS =
   `<div style="${TERMS_ROW_STYLE}"><strong>Loading port:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Discharge port:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Sent by:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Container type:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Lead time:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Delivery time:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Shipping marks:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Packing:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Country of Origin:</strong> Made in China</div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Net Weight:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Gross Weight:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>CBM:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Number of Packages:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Documents Provided:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>All prices include tax:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Bank Charges:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Cancellation Policy:</strong> </div>` +
+  `<div style="${TERMS_ROW_STYLE}"><strong>Governing Law:</strong> </div>` +
   `<div style="${TERMS_ROW_STYLE}"><strong>Total Qty:</strong> </div>` +
   `<div style="${TERMS_NOTES_STYLE}"><br></div>`;
 
@@ -231,6 +246,11 @@ export function fromRow(row: RemoteDocRow): Invoice {
     dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
     shippingMarks: doc.shippingMarks,
+    containerType: doc.containerType,
+    bankCharges: doc.bankCharges,
+    cancellationPolicy: doc.cancellationPolicy,
+    governingLaw: doc.governingLaw,
+    documentsProvided: Array.isArray(doc.documentsProvided) ? doc.documentsProvided : undefined,
     discountPct: typeof doc.discountPct === "number" ? doc.discountPct : undefined,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,

@@ -110,6 +110,11 @@ export interface Quotation {
   dischargePort?: string;
   shippingMethodId?: string;
   shippingMarks?: string;
+  containerType?: string;
+  bankCharges?: string;
+  cancellationPolicy?: string;
+  governingLaw?: string;
+  documentsProvided?: string[];
   discountPct?: number;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
@@ -1447,6 +1452,11 @@ export default function QuotationA4Preview({
                     dischargePort={current.dischargePort}
                     shippingMethodId={current.shippingMethodId}
                     shippingMarks={current.shippingMarks}
+                    containerType={current.containerType}
+                    bankCharges={current.bankCharges}
+                    cancellationPolicy={current.cancellationPolicy}
+                    governingLaw={current.governingLaw}
+                    documentsProvided={current.documentsProvided}
                     leadTimeDays={current.leadTimeDays}
                     leadTimeBasis={current.leadTimeBasis}
                     onChange={(patch) => {
@@ -2211,6 +2221,11 @@ interface QuickFillPatch {
     dischargePort?: string;
     shippingMethodId?: string;
     shippingMarks?: string;
+    containerType?: string;
+    bankCharges?: string;
+    cancellationPolicy?: string;
+    governingLaw?: string;
+    documentsProvided?: string[];
     leadTimeDays?: number;
     leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   };
@@ -2224,6 +2239,68 @@ interface QuickFillPatch {
 const SHIPPING_MARKS_OPTIONS: { value: string; label: string }[] = [
   { value: "As per buyer's instruction", label: "As per buyer's instruction" },
   { value: "No marks",                   label: "No marks" },
+];
+
+/* Container types — only relevant when the shipping method is a
+   sea-mode that loads into a container (FCL / RoRo / Reefer). The
+   Quick Fill picker auto-hides the dropdown for LCL / Air / Road /
+   Rail / Courier where 'container type' doesn't apply. */
+const CONTAINER_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "20' Standard",      label: "20' Standard (≈28 CBM)" },
+  { value: "40' Standard",      label: "40' Standard (≈58 CBM)" },
+  { value: "40' High Cube",     label: "40' High Cube (≈68 CBM)" },
+  { value: "40' HR (Reefer)",   label: "40' HR Reefer" },
+  { value: "45' High Cube",     label: "45' High Cube (≈78 CBM)" },
+  { value: "20' Open Top",      label: "20' Open Top" },
+  { value: "40' Open Top",      label: "40' Open Top" },
+  { value: "20' Flat Rack",     label: "20' Flat Rack" },
+  { value: "40' Flat Rack",     label: "40' Flat Rack" },
+];
+
+/* Container-type only makes sense for these shipping modes / sub-
+   types. For anything else (Air, LCL, Road LTL, Courier, etc.) the
+   picker stays hidden. */
+const CONTAINER_TYPE_APPLIES = new Set([
+  "FCL", "RoRo", "Reefer", "Break Bulk",
+]);
+
+const BANK_CHARGES_OPTIONS: { value: string; label: string }[] = [
+  { value: "All bank charges outside seller's country are for buyer's account",
+    label: "Outside seller — buyer pays" },
+  { value: "All bank charges for buyer's account",
+    label: "All charges — buyer pays" },
+  { value: "Each party pays its own bank charges",
+    label: "Each side pays its own" },
+  { value: "All bank charges for seller's account",
+    label: "All charges — seller pays" },
+];
+
+const CANCELLATION_OPTIONS: { value: string; label: string }[] = [
+  { value: "Deposit is non-refundable once production has started",
+    label: "Deposit non-refundable post-production-start" },
+  { value: "Deposit refundable in full if cancelled before production starts; non-refundable thereafter",
+    label: "Refundable before production / non-refundable after" },
+  { value: "50% of deposit refundable if cancelled within 7 days of order confirmation; non-refundable thereafter",
+    label: "50% refund within 7 days" },
+  { value: "No cancellation accepted after order confirmation",
+    label: "No cancellation accepted" },
+];
+
+const GOVERNING_LAW_OPTIONS: { value: string; label: string }[] = [
+  { value: "Laws of the People's Republic of China; disputes settled by CIETAC arbitration in Beijing",
+    label: "PRC — CIETAC Beijing" },
+  { value: "Laws of the People's Republic of China; disputes settled by Shanghai International Arbitration Centre (SHIAC)",
+    label: "PRC — SHIAC Shanghai" },
+  { value: "English law; disputes settled by LCIA arbitration in London",
+    label: "English law — LCIA London" },
+  { value: "Singapore law; disputes settled by SIAC arbitration in Singapore",
+    label: "Singapore law — SIAC" },
+  { value: "Hong Kong law; disputes settled by HKIAC arbitration in Hong Kong",
+    label: "Hong Kong law — HKIAC" },
+  { value: "ICC Rules of Arbitration; seat to be agreed in writing",
+    label: "ICC arbitration" },
+  { value: "Laws of the Arab Republic of Egypt; jurisdiction of the courts of Cairo",
+    label: "Egyptian law — Cairo courts" },
 ];
 
 const LEAD_TIME_BASIS_LABEL: Record<NonNullable<QuickFillPatch["fields"]["leadTimeBasis"]>, string> = {
@@ -2257,6 +2334,7 @@ interface ShippingMethodLite {
   name: string;
   short_name: string | null;
   mode: string;
+  sub_type: string | null;
   typical_transit_days_min: number | null;
   typical_transit_days_max: number | null;
 }
@@ -2283,15 +2361,26 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
      terms body so a pick replaces an existing line instead of
      appending a duplicate. */
   const aliases: Record<string, string[]> = {
-    "Payment terms":  ["Payment terms", "Payment", "Payment term", "Payment method"],
-    "Price Type":     ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
-    "Sent by":        ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
-    "Loading port":   ["Loading port", "Port of loading", "POL", "From port", "Origin port", "Port of shipment", "Port of departure"],
-    "Discharge port": ["Discharge port", "Port of discharge", "POD", "To port", "Destination port", "Port of destination", "Port of arrival"],
-    "Lead time":      ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
-    "Delivery time":  ["Delivery time", "ETA", "ETD", "Estimated Time of Arrival", "Estimated Time of Departure", "Estimated arrival", "Estimated departure", "Estimated delivery", "Ready for shipment"],
-    "Shipping marks": ["Shipping marks", "Shipping mark", "Marks", "Marks and Numbers", "Marks & Numbers", "Case marks", "Carton marks"],
-    "Total Qty":      ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
+    "Payment terms":      ["Payment terms", "Payment", "Payment term", "Payment method"],
+    "Price Type":         ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
+    "Sent by":            ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
+    "Container type":     ["Container type", "Container", "Container size"],
+    "Loading port":       ["Loading port", "Port of loading", "POL", "From port", "Origin port", "Port of shipment", "Port of departure"],
+    "Discharge port":     ["Discharge port", "Port of discharge", "POD", "To port", "Destination port", "Port of destination", "Port of arrival"],
+    "Lead time":          ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
+    "Delivery time":      ["Delivery time", "ETA", "ETD", "Estimated Time of Arrival", "Estimated Time of Departure", "Estimated arrival", "Estimated departure", "Estimated delivery", "Ready for shipment"],
+    "Shipping marks":     ["Shipping marks", "Shipping mark", "Marks", "Marks and Numbers", "Marks & Numbers", "Case marks", "Carton marks"],
+    "Packing":            ["Packing", "Packaging", "Packing method", "Packing type"],
+    "Country of Origin":  ["Country of Origin", "Country of origin", "Origin", "Made in"],
+    "Net Weight":         ["Net Weight", "Net weight", "N.W.", "NW"],
+    "Gross Weight":       ["Gross Weight", "Gross weight", "G.W.", "GW"],
+    "CBM":                ["CBM", "Volume", "Cubic Meters", "Cubic meters", "M3", "m³"],
+    "Number of Packages": ["Number of Packages", "Number of packages", "No. of Packages", "Total Packages", "Packages"],
+    "Documents Provided": ["Documents Provided", "Documents provided", "Documents", "Docs Provided", "Docs"],
+    "Bank Charges":       ["Bank Charges", "Bank charges", "Banking charges", "Bank Fees"],
+    "Cancellation Policy":["Cancellation Policy", "Cancellation policy", "Cancellation", "Cancel Policy"],
+    "Governing Law":      ["Governing Law", "Governing law", "Applicable law", "Jurisdiction"],
+    "Total Qty":          ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
   };
 
   const keyMatches = (segText: string, key: string): boolean => {
@@ -2397,6 +2486,11 @@ function QuickFillBar({
   dischargePort,
   shippingMethodId,
   shippingMarks,
+  containerType,
+  bankCharges,
+  cancellationPolicy,
+  governingLaw,
+  documentsProvided,
   leadTimeDays,
   leadTimeBasis,
   onChange,
@@ -2409,6 +2503,11 @@ function QuickFillBar({
   dischargePort?: string;
   shippingMethodId?: string;
   shippingMarks?: string;
+  containerType?: string;
+  bankCharges?: string;
+  cancellationPolicy?: string;
+  governingLaw?: string;
+  documentsProvided?: string[];
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   onChange: (patch: QuickFillPatch) => void;
@@ -2649,6 +2748,35 @@ function QuickFillBar({
         ))}
       </select>
 
+      {/* Container type — only shown when the picked shipping
+          method is a container-loading mode (Sea FCL / RoRo /
+          Reefer / Break Bulk). Stays hidden for Air / LCL / Road
+          LTL / Courier etc. where 'container type' doesn't apply. */}
+      {(() => {
+        const sub = (selectedMethod?.sub_type ?? "").trim();
+        const showContainer = sub && CONTAINER_TYPE_APPLIES.has(sub);
+        if (!showContainer) return null;
+        return (
+          <select
+            value={containerType ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({
+                fields: { containerType: v || undefined },
+                termsLineUpdates: { "Container type": v },
+              });
+            }}
+            style={selectStyle}
+            title={containerType || "Pick a container type"}
+          >
+            <option value="">Container…</option>
+            {CONTAINER_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        );
+      })()}
+
       {/* Lead-time + ETD/ETA row — kept on the same flex line so the
           Quick Fill bar stays one strip; wraps on narrow viewports. */}
       <TimingRow
@@ -2658,6 +2786,224 @@ function QuickFillBar({
         selectStyle={selectStyle}
         onChange={onChange}
       />
+
+      {/* Bank charges — boilerplate clause picker. */}
+      <select
+        value={bankCharges ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({
+            fields: { bankCharges: v || undefined },
+            termsLineUpdates: { "Bank Charges": v },
+          });
+        }}
+        style={selectStyle}
+        title={bankCharges || "Pick a bank-charges clause"}
+      >
+        <option value="">Bank charges…</option>
+        {BANK_CHARGES_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+
+      {/* Cancellation policy. */}
+      <select
+        value={cancellationPolicy ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({
+            fields: { cancellationPolicy: v || undefined },
+            termsLineUpdates: { "Cancellation Policy": v },
+          });
+        }}
+        style={selectStyle}
+        title={cancellationPolicy || "Pick a cancellation policy"}
+      >
+        <option value="">Cancellation…</option>
+        {CANCELLATION_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+
+      {/* Governing law / arbitration seat. */}
+      <select
+        value={governingLaw ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({
+            fields: { governingLaw: v || undefined },
+            termsLineUpdates: { "Governing Law": v },
+          });
+        }}
+        style={selectStyle}
+        title={governingLaw || "Pick a governing law / arbitration seat"}
+      >
+        <option value="">Governing law…</option>
+        {GOVERNING_LAW_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+
+      {/* Documents Provided — multi-select widget that pulls from
+          /api/shipping-documents and writes a comma-separated list
+          of short_names into the Documents Provided row. */}
+      <DocumentsPicker
+        value={documentsProvided ?? []}
+        selectStyle={selectStyle}
+        onChange={(next) => {
+          onChange({
+            fields: { documentsProvided: next.length > 0 ? next : undefined },
+            termsLineUpdates: { "Documents Provided": next.join(", ") },
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+/* DocumentsPicker — multi-select dropdown sourced from /api/
+   shipping-documents. Renders a single 'Documents (N)…' chip; on
+   click opens a small popover with checkboxes grouped by category.
+   Picked rows save as their short_name (or code if no short_name)
+   to the doc's documentsProvided[] field. */
+function DocumentsPicker({
+  value,
+  selectStyle,
+  onChange,
+}: {
+  value: string[];
+  selectStyle: React.CSSProperties;
+  onChange: (next: string[]) => void;
+}) {
+  interface DocLite {
+    id: string;
+    code: string;
+    name: string;
+    short_name: string | null;
+    category: string;
+  }
+  const [docs, setDocs] = useState<DocLite[]>([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/shipping-documents", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled) return;
+        setDocs((j?.rows as DocLite[] | undefined) ?? []);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const toggle = (label: string) => {
+    const set = new Set(value);
+    if (set.has(label)) set.delete(label);
+    else set.add(label);
+    onChange([...set]);
+  };
+
+  const grouped = useMemo(() => {
+    const out: Record<string, DocLite[]> = {};
+    for (const d of docs) {
+      (out[d.category] ??= []).push(d);
+    }
+    return out;
+  }, [docs]);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ ...selectStyle, cursor: "pointer", minWidth: 110 }}
+        title={value.length > 0 ? value.join(", ") : "Pick documents to provide"}
+      >
+        {value.length > 0 ? `Documents (${value.length})` : "Documents…"}
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            background: T.paper,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            padding: 8,
+            minWidth: 280,
+            maxWidth: 360,
+            maxHeight: 360,
+            overflowY: "auto",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            zIndex: 50,
+          }}
+        >
+          {Object.keys(grouped).length === 0 && (
+            <div style={{ fontSize: 11, color: T.inkGhost, padding: 8 }}>
+              Loading documents…
+            </div>
+          )}
+          {Object.entries(grouped).map(([cat, list]) => (
+            <div key={cat} style={{ marginBottom: 6 }}>
+              <div
+                style={{
+                  fontSize: 8,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: T.inkGhost,
+                  padding: "4px 6px",
+                  fontWeight: 700,
+                }}
+              >
+                {cat}
+              </div>
+              {list.map((d) => {
+                const label = d.short_name ?? d.code;
+                const checked = value.includes(label);
+                return (
+                  <label
+                    key={d.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "3px 6px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: T.ink,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = T.surface)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(label)}
+                      style={{ margin: 0 }}
+                    />
+                    <span style={{ fontWeight: 600 }}>{label}</span>
+                    <span style={{ color: T.inkGhost, fontSize: 10 }}>
+                      — {d.name}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
