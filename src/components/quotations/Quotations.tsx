@@ -99,6 +99,13 @@ export interface Quotation {
   incotermId?: string;
   incotermLocation?: string;       // e.g. 'Ningbo' for FOB Ningbo
   shippingMethodId?: string;
+  /* Timing block — Lead Time + auto-computed ETD/ETA. The picker
+     writes 'Lead time: 30 days after receipt of deposit' + an ETD/
+     ETA chip into the terms. The basis is one of 'after_deposit',
+     'after_order', 'after_lc_opening'; the picker dropdown maps it
+     to readable text. */
+  leadTimeDays?: number;
+  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   /* Lifecycle:
        draft     — being edited internally; not yet customer-facing.
        sent      — emailed / handed over to the customer.
@@ -209,6 +216,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
     incotermId: doc.incotermId,
     incotermLocation: doc.incotermLocation,
     shippingMethodId: doc.shippingMethodId,
+    leadTimeDays: doc.leadTimeDays,
+    leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
        rows minted before the workflow expansion stored it that way.
        Anything else unknown falls back to "draft" so the row at

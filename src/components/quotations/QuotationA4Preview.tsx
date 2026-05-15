@@ -106,6 +106,8 @@ export interface Quotation {
   incotermId?: string;
   incotermLocation?: string;
   shippingMethodId?: string;
+  leadTimeDays?: number;
+  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
 }
 
 interface Props {
@@ -1404,6 +1406,8 @@ export default function QuotationA4Preview({
                     incotermId={current.incotermId}
                     incotermLocation={current.incotermLocation}
                     shippingMethodId={current.shippingMethodId}
+                    leadTimeDays={current.leadTimeDays}
+                    leadTimeBasis={current.leadTimeBasis}
                     onChange={(patch) => {
                       const next = { ...current, ...patch.fields };
                       if (patch.termsLineUpdates) {
@@ -2141,9 +2145,17 @@ interface QuickFillPatch {
     incotermId?: string;
     incotermLocation?: string;
     shippingMethodId?: string;
+    leadTimeDays?: number;
+    leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   };
   termsLineUpdates?: Record<string, string>;
 }
+
+const LEAD_TIME_BASIS_LABEL: Record<NonNullable<QuickFillPatch["fields"]["leadTimeBasis"]>, string> = {
+  after_deposit:    "after receipt of deposit",
+  after_order:      "after order confirmation",
+  after_lc_opening: "after L/C opening",
+};
 
 interface PaymentTermLite {
   id: string;
@@ -2199,6 +2211,9 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     "Payment terms": ["Payment terms", "Payment", "Payment term", "Payment method"],
     "Price Type":    ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
     "Sent by":       ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
+    "Lead time":     ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
+    "ETD":           ["ETD", "Estimated Time of Departure", "Estimated departure", "Ready for shipment"],
+    "ETA":           ["ETA", "Estimated Time of Arrival", "Estimated arrival", "Estimated delivery", "Delivery time"],
   };
 
   const keyMatches = (segText: string, key: string): boolean => {
@@ -2246,12 +2261,16 @@ function QuickFillBar({
   incotermId,
   incotermLocation,
   shippingMethodId,
+  leadTimeDays,
+  leadTimeBasis,
   onChange,
 }: {
   paymentTermId?: string;
   incotermId?: string;
   incotermLocation?: string;
   shippingMethodId?: string;
+  leadTimeDays?: number;
+  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   onChange: (patch: QuickFillPatch) => void;
 }) {
   const [payCats, setPayCats] = useState<PaymentCatLite[]>([]);
@@ -2439,7 +2458,140 @@ function QuickFillBar({
           </option>
         ))}
       </select>
+
+      {/* Lead-time + ETD/ETA row — kept on the same flex line so the
+          Quick Fill bar stays one strip; wraps on narrow viewports. */}
+      <TimingRow
+        leadTimeDays={leadTimeDays}
+        leadTimeBasis={leadTimeBasis}
+        selectedMethod={selectedMethod}
+        selectStyle={selectStyle}
+        onChange={onChange}
+      />
     </div>
+  );
+}
+
+/* Timing row inside the Quick Fill bar.
+
+   Two inputs:
+     [Lead time: __ d]   [from: deposit ▾]
+
+   When both lead time + a Shipping Method are picked, we also write
+   an ETD/ETA derived from the method's transit window. Writes three
+   lines into the terms:
+     · Lead time: 30 days after receipt of deposit
+     · ETD:       30 days after receipt of deposit
+     · ETA:       48-65 days after receipt of deposit
+
+   The picker doesn't claim concrete calendar dates because the actual
+   trigger (deposit / order / L/C) hasn't happened at quote time — but
+   the relative window is what the customer always asks about. */
+function TimingRow({
+  leadTimeDays,
+  leadTimeBasis,
+  selectedMethod,
+  selectStyle,
+  onChange,
+}: {
+  leadTimeDays?: number;
+  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
+  selectedMethod?: ShippingMethodLite;
+  selectStyle: React.CSSProperties;
+  onChange: (patch: QuickFillPatch) => void;
+}) {
+  const basis = leadTimeBasis ?? "after_deposit";
+  const basisLabel = LEAD_TIME_BASIS_LABEL[basis];
+
+  /* Build the three formatted lines from the current lead time +
+     selected shipping method. Each gets routed to its alias slot
+     so existing 'Lead time:' / 'ETD:' / 'ETA:' lines are replaced
+     in place rather than appended. */
+  const buildLines = (days?: number, basisKey?: typeof basis): Record<string, string> => {
+    const d = days ?? 0;
+    const b = basisKey ?? basis;
+    const bLabel = LEAD_TIME_BASIS_LABEL[b];
+    if (!d) {
+      return { "Lead time": "", "ETD": "", "ETA": "" };
+    }
+    const out: Record<string, string> = {
+      "Lead time": `${d} days ${bLabel}`,
+      "ETD": `${d} days ${bLabel}`,
+    };
+    const tMin = selectedMethod?.typical_transit_days_min ?? null;
+    const tMax = selectedMethod?.typical_transit_days_max ?? null;
+    if (tMin != null && tMax != null) {
+      const lo = d + tMin;
+      const hi = d + tMax;
+      out["ETA"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
+    } else {
+      out["ETA"] = "";
+    }
+    return out;
+  };
+
+  return (
+    <>
+      <input
+        type="number"
+        min={0}
+        max={999}
+        value={leadTimeDays ?? ""}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const days = raw === "" ? undefined : Math.max(0, Math.min(999, Number(raw)));
+          onChange({
+            fields: { leadTimeDays: days },
+            termsLineUpdates: buildLines(days, basis),
+          });
+        }}
+        placeholder="Lead time"
+        style={{
+          ...selectStyle,
+          cursor: "text",
+          minWidth: 70,
+          maxWidth: 90,
+        }}
+        title="Lead time in days (production + ready-for-shipment)"
+      />
+      {leadTimeDays != null && leadTimeDays > 0 && (
+        <span style={{ fontSize: 9, color: T.inkGhost, fontWeight: 600 }}>days</span>
+      )}
+      <select
+        value={basis}
+        onChange={(e) => {
+          const next = e.target.value as typeof basis;
+          onChange({
+            fields: { leadTimeBasis: next },
+            termsLineUpdates: buildLines(leadTimeDays, next),
+          });
+        }}
+        style={selectStyle}
+        title="What triggers the lead-time clock"
+      >
+        <option value="after_deposit">after deposit</option>
+        <option value="after_order">after order</option>
+        <option value="after_lc_opening">after L/C opening</option>
+      </select>
+      {leadTimeDays != null && leadTimeDays > 0 && selectedMethod &&
+        selectedMethod.typical_transit_days_min != null && selectedMethod.typical_transit_days_max != null && (
+          <span
+            style={{
+              fontSize: 9,
+              color: T.inkSoft,
+              fontWeight: 600,
+              padding: "2px 6px",
+              border: `1px solid ${T.border}`,
+              borderRadius: 4,
+              background: T.paper,
+            }}
+            title="Estimated time of arrival — lead time + shipping transit"
+          >
+            ETA: {leadTimeDays + selectedMethod.typical_transit_days_min}–
+            {leadTimeDays + selectedMethod.typical_transit_days_max} d {basisLabel}
+          </span>
+        )}
+    </>
   );
 }
 

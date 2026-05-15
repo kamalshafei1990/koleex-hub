@@ -95,6 +95,8 @@ export interface Invoice {
   incotermId?: string;
   incotermLocation?: string;
   shippingMethodId?: string;
+  leadTimeDays?: number;
+  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   /* Lifecycle:
        draft     — being edited internally; not yet customer-facing.
        sent      — emailed / handed over to the customer.
@@ -202,6 +204,8 @@ export function fromRow(row: RemoteDocRow): Invoice {
     incotermId: doc.incotermId,
     incotermLocation: doc.incotermLocation,
     shippingMethodId: doc.shippingMethodId,
+    leadTimeDays: doc.leadTimeDays,
+    leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
        rows minted before the workflow expansion stored it that way.
        Anything else unknown falls back to "draft" so the row at
