@@ -38,7 +38,7 @@ import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
 import BuildingIcon from "@/components/icons/ui/BuildingIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
-import { useScopeContext } from "@/lib/use-scope";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
@@ -51,7 +51,7 @@ export default function SettingsPage() {
   return (
     <AuthGate
       title="Settings"
-      subtitle="Manage your own profile and preferences"
+      subtitle="System configuration and your account"
     >
       <SettingsContent />
     </AuthGate>
@@ -60,9 +60,26 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
-  const scope = useScopeContext();
-  const isSuperAdmin = scope?.is_super_admin ?? false;
-  const [tab, setTab] = useState<Tab>("profile");
+  /* Read is_super_admin straight off the bootstrap payload — same
+     source useScopeContext reads from, but synchronous once the
+     bootstrap has resolved. Avoids the extra hop through
+     useScopeContext's internal useState which was rendering the
+     hook in null state for too long, hiding the Workspace tab. */
+  const { data: bootstrap } = useMeBootstrap();
+  const isSuperAdmin = bootstrap?.auth?.is_super_admin ?? false;
+  /* Default tab: System-Workspace for super-admins (the page is now
+     system-first), Profile for everyone else. The bootstrap may not
+     be ready on first render, so we also re-target the tab once it
+     resolves — useEffect below. */
+  const [tab, setTab] = useState<Tab>(isSuperAdmin ? "workspace" : "profile");
+  useEffect(() => {
+    if (isSuperAdmin && tab === "profile") {
+      /* Bootstrap resolved after first render — switch the default
+         to Workspace if the operator hasn't already picked a tab. */
+      setTab("workspace");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
 
   if (!account) {
     return (
@@ -92,36 +109,45 @@ function SettingsContent() {
                 <SettingsIcon className="h-4 w-4" />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-                Account Settings
+                System Settings
               </h1>
             </div>
           </div>
           <p className="text-[12px] text-[var(--text-dim)] mb-4 ml-0 md:ml-11">
-            Profile, preferences, and calendar defaults for{" "}
-            <span className="text-[var(--text-primary)] font-medium">
-              @{account.username}
-            </span>
-            . Your username, login email, and password are managed by an administrator.
+            {isSuperAdmin
+              ? "Workspace-wide configuration — payment terms, master data, document defaults — plus your own profile."
+              : <>Your profile, preferences, and calendar defaults. Signed in as <span className="text-[var(--text-primary)] font-medium">@{account.username}</span>.</>}
           </p>
 
-          {/* Tabs */}
+          {/* Tabs — System group first (super-admin only), then My
+              Account group everyone sees. A small visual divider
+              between the two groups keeps the system / personal
+              boundary obvious at a glance. */}
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+            {isSuperAdmin && (
+              <>
+                <span className="hidden md:inline-flex pl-1 pr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                  System
+                </span>
+                <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")} icon={<BuildingIcon size={14} />} label="Workspace" />
+                <span className="mx-2 h-5 w-px bg-[var(--border-subtle)]" aria-hidden />
+                <span className="hidden md:inline-flex pl-1 pr-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                  My Account
+                </span>
+              </>
+            )}
             <TabButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserIcon size={14} />} label="Profile" />
             <TabButton active={tab === "preferences"} onClick={() => setTab("preferences")} icon={<Settings2Icon className="h-3.5 w-3.5" />} label="Preferences" />
             <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")} icon={<CalendarIcon className="h-3.5 w-3.5" />} label="Calendar" />
-            {/* Workspace tab — tenant-wide master data (payment terms,
-                price types, etc.). Super-admin only; everyone else
-                never sees the tab. */}
-            {isSuperAdmin && (
-              <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")} icon={<BuildingIcon size={14} />} label="Workspace" />
-            )}
           </nav>
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body — wider when on a System tab (the master-data grids
+          want the room); 900px column on My-Account tabs since those
+          are form-shaped and read better at that width. */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[900px] mx-auto px-4 md:px-6 lg:px-8 py-6 w-full space-y-4">
+        <div className={`mx-auto px-4 md:px-6 lg:px-8 py-6 w-full space-y-4 ${tab === "workspace" ? "max-w-[1500px]" : "max-w-[900px]"}`}>
           {tab === "profile" && (
             <ProfileSection
               account={account}
