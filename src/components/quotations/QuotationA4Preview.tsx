@@ -3966,6 +3966,7 @@ function TermsQuickFillModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="koleex-quickfill-modal"
         style={{
           background: "#111111",
           color: "#ffffff",
@@ -3981,6 +3982,61 @@ function TermsQuickFillModal({
           colorScheme: "dark",
         }}
       >
+        {/* Force every input / textarea inside the modal to render
+            white text on the dark surface. Inline `style.color` is
+            not enough because:
+              · WebKit ignores `color` on inputs in favour of
+                `-webkit-text-fill-color`
+              · :focus, :hover, and :-webkit-autofill each reset
+                the color back to the user-agent default unless
+                we override them explicitly
+              · Some Chinese-OS Chrome builds add a translucent
+                grey overlay on focus that we have to clear
+            The !important keeps these rules ahead of the inline
+            `style` prop the various inputs already set. */}
+        <style>{`
+          .koleex-quickfill-modal input,
+          .koleex-quickfill-modal textarea,
+          .koleex-quickfill-modal select {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #ffffff !important;
+            background-color: #0A0A0A !important;
+            color-scheme: dark !important;
+          }
+          .koleex-quickfill-modal input:focus,
+          .koleex-quickfill-modal textarea:focus,
+          .koleex-quickfill-modal select:focus {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            background-color: #0A0A0A !important;
+            outline: none !important;
+            border-color: #555555 !important;
+          }
+          .koleex-quickfill-modal input::placeholder,
+          .koleex-quickfill-modal textarea::placeholder {
+            color: rgba(255,255,255,0.35) !important;
+            -webkit-text-fill-color: rgba(255,255,255,0.35) !important;
+            opacity: 1 !important;
+          }
+          .koleex-quickfill-modal input:-webkit-autofill,
+          .koleex-quickfill-modal input:-webkit-autofill:hover,
+          .koleex-quickfill-modal input:-webkit-autofill:focus,
+          .koleex-quickfill-modal input:-webkit-autofill:active {
+            -webkit-text-fill-color: #ffffff !important;
+            -webkit-box-shadow: 0 0 0 1000px #0A0A0A inset !important;
+            box-shadow: 0 0 0 1000px #0A0A0A inset !important;
+            caret-color: #ffffff !important;
+            transition: background-color 9999s ease-out, color 9999s ease-out;
+          }
+          /* Number input spinner buttons in dark mode */
+          .koleex-quickfill-modal input[type="number"]::-webkit-inner-spin-button,
+          .koleex-quickfill-modal input[type="number"]::-webkit-outer-spin-button {
+            filter: invert(1);
+            opacity: 0.5;
+          }
+        `}</style>
+
         {/* Header */}
         <div
           style={{
