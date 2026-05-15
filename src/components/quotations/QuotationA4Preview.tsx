@@ -105,6 +105,8 @@ export interface Quotation {
   paymentTermId?: string;
   incotermId?: string;
   incotermLocation?: string;
+  loadingPort?: string;
+  dischargePort?: string;
   shippingMethodId?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
@@ -1405,6 +1407,8 @@ export default function QuotationA4Preview({
                     paymentTermId={current.paymentTermId}
                     incotermId={current.incotermId}
                     incotermLocation={current.incotermLocation}
+                    loadingPort={current.loadingPort}
+                    dischargePort={current.dischargePort}
                     shippingMethodId={current.shippingMethodId}
                     leadTimeDays={current.leadTimeDays}
                     leadTimeBasis={current.leadTimeBasis}
@@ -2144,6 +2148,8 @@ interface QuickFillPatch {
     paymentTermId?: string;
     incotermId?: string;
     incotermLocation?: string;
+    loadingPort?: string;
+    dischargePort?: string;
     shippingMethodId?: string;
     leadTimeDays?: number;
     leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
@@ -2208,12 +2214,13 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
      terms body so a pick replaces an existing line instead of
      appending a duplicate. */
   const aliases: Record<string, string[]> = {
-    "Payment terms": ["Payment terms", "Payment", "Payment term", "Payment method"],
-    "Price Type":    ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
-    "Sent by":       ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
-    "Lead time":     ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
-    "ETD":           ["ETD", "Estimated Time of Departure", "Estimated departure", "Ready for shipment"],
-    "ETA":           ["ETA", "Estimated Time of Arrival", "Estimated arrival", "Estimated delivery", "Delivery time"],
+    "Payment terms":  ["Payment terms", "Payment", "Payment term", "Payment method"],
+    "Price Type":     ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
+    "Sent by":        ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
+    "Loading port":   ["Loading port", "Port of loading", "POL", "From port", "Origin port", "Port of shipment", "Port of departure"],
+    "Discharge port": ["Discharge port", "Port of discharge", "POD", "To port", "Destination port", "Port of destination", "Port of arrival"],
+    "Lead time":      ["Lead time", "Lead-time", "Production time", "Manufacturing time", "Production lead time"],
+    "Delivery time":  ["Delivery time", "ETA", "ETD", "Estimated Time of Arrival", "Estimated Time of Departure", "Estimated arrival", "Estimated departure", "Estimated delivery", "Ready for shipment"],
   };
 
   const keyMatches = (segText: string, key: string): boolean => {
@@ -2222,12 +2229,25 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     return list.some((a) => plain.startsWith(a.toLowerCase() + ":"));
   };
 
+  /* Wrap the segment's label (everything up to the first colon) in
+     <strong>...</strong> if it isn't already bold. Idempotent. */
+  const boldifyLabel = (segment: string): string => {
+    const m = segment.match(/^([\s\S]*?)(:[\s\S]*)$/);
+    if (!m) return segment;
+    const [, label, tail] = m;
+    const plain = label.replace(/<[^>]+>/g, "").trim();
+    if (!plain) return segment;
+    const alreadyBold =
+      /<\s*(strong|b)\b/i.test(label) ||
+      /font-weight\s*:\s*(bold|[6-9]\d{2})/i.test(label);
+    if (alreadyBold) return segment;
+    return `<strong>${plain}</strong>${tail}`;
+  };
+
   const rewriteSegment = (segment: string, _key: string, value: string): string => {
-    /* Replace whatever follows the colon (possibly inside formatting
-       tags) with the new value. Preserve the leading "Key:" exactly
-       as the operator typed it (capitalisation, surrounding bold/etc). */
-    return segment.replace(
-      /^([\s\S]*?:[\s ]*)([\s\S]*)$/,
+    const bolded = boldifyLabel(segment);
+    return bolded.replace(
+      /^([\s\S]*?:[\s ]*)([\s\S]*)$/,
       (_m, prefix) => `${prefix}${value}`,
     );
   };
@@ -2251,7 +2271,9 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
   for (const k of missing) {
     if (!updates[k]) continue;
     const sep = result && !/<br\s*\/?>\s*$/i.test(result) ? "<br>" : "";
-    result += `${sep}${k}: ${updates[k]}`;
+    /* Bold the canonical label on freshly appended lines so they
+       read consistently with the replaced ones. */
+    result += `${sep}<strong>${k}:</strong> ${updates[k]}`;
   }
   return result;
 }
@@ -2260,6 +2282,8 @@ function QuickFillBar({
   paymentTermId,
   incotermId,
   incotermLocation,
+  loadingPort,
+  dischargePort,
   shippingMethodId,
   leadTimeDays,
   leadTimeBasis,
@@ -2268,6 +2292,8 @@ function QuickFillBar({
   paymentTermId?: string;
   incotermId?: string;
   incotermLocation?: string;
+  loadingPort?: string;
+  dischargePort?: string;
   shippingMethodId?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
@@ -2321,30 +2347,35 @@ function QuickFillBar({
     });
   };
 
+  /* Incoterm pick — Price Type line uses the official code + name
+     only. The route ports are kept on dedicated 'Loading port:' /
+     'Discharge port:' lines (see the loading/discharge inputs
+     below) so the doc reads cleanly even when the operator hasn't
+     filled both ports yet. */
   const onPickIncoterm = (id: string) => {
     const term = incoterms.find((t) => t.id === id);
     if (!term) {
       onChange({ fields: { incotermId: undefined }, termsLineUpdates: { "Price Type": "" } });
       return;
     }
-    const value = `${term.code} (${term.name})${incotermLocation ? ` — ${incotermLocation}` : ""}`;
     onChange({
       fields: { incotermId: id },
-      termsLineUpdates: { "Price Type": value },
+      termsLineUpdates: { "Price Type": `${term.code} (${term.name})` },
     });
   };
 
-  const onChangeLocation = (loc: string) => {
-    const term = selectedIncoterm;
-    if (!term) {
-      onChange({ fields: { incotermLocation: loc } });
-      return;
-    }
+  /* Loading + discharge port handlers. Independent of the Incoterm
+     pick — operator can fill them in either order. */
+  const onChangeLoadingPort = (port: string) => {
     onChange({
-      fields: { incotermLocation: loc },
-      termsLineUpdates: {
-        "Price Type": `${term.code} (${term.name})${loc ? ` — ${loc}` : ""}`,
-      },
+      fields: { loadingPort: port },
+      termsLineUpdates: { "Loading port": port },
+    });
+  };
+  const onChangeDischargePort = (port: string) => {
+    onChange({
+      fields: { dischargePort: port },
+      termsLineUpdates: { "Discharge port": port },
     });
   };
 
@@ -2429,20 +2460,37 @@ function QuickFillBar({
           </option>
         ))}
       </select>
-      {selectedIncoterm && (
-        <input
-          type="text"
-          value={incotermLocation ?? ""}
-          onChange={(e) => onChangeLocation(e.target.value)}
-          placeholder={selectedIncoterm.named_location_label ?? "Named place"}
-          style={{
-            ...selectStyle,
-            cursor: "text",
-            minWidth: 90,
-            maxWidth: 140,
-          }}
-        />
-      )}
+      {/* Loading + discharge port — independent of Incoterm, so the
+          operator can capture the China → Egypt route on every quote
+          regardless of which trade term applies. Writes two lines
+          into the terms ('Loading port: Ningbo, China' and
+          'Discharge port: Alexandria, Egypt'). */}
+      <input
+        type="text"
+        value={loadingPort ?? ""}
+        onChange={(e) => onChangeLoadingPort(e.target.value)}
+        placeholder="From port (e.g. Ningbo, China)"
+        style={{
+          ...selectStyle,
+          cursor: "text",
+          minWidth: 130,
+          maxWidth: 200,
+        }}
+        title="Loading port (origin)"
+      />
+      <input
+        type="text"
+        value={dischargePort ?? ""}
+        onChange={(e) => onChangeDischargePort(e.target.value)}
+        placeholder="To port (e.g. Alexandria, Egypt)"
+        style={{
+          ...selectStyle,
+          cursor: "text",
+          minWidth: 130,
+          maxWidth: 200,
+        }}
+        title="Discharge port (destination)"
+      />
 
       {/* Shipping method */}
       <select
@@ -2507,25 +2555,32 @@ function TimingRow({
      selected shipping method. Each gets routed to its alias slot
      so existing 'Lead time:' / 'ETD:' / 'ETA:' lines are replaced
      in place rather than appended. */
+  /* buildLines now writes only two timing lines:
+       · 'Lead time:' — the production window the operator typed
+       · 'Delivery time:' — combined (lead + transit) when a
+         Shipping Method is also picked
+     The old separate ETD line is dropped — it duplicated the Lead
+     Time value and added noise. The 'Delivery time' canonical key
+     replaces an existing 'Delivery time:' / 'ETA:' / 'ETD:' line
+     via the alias map. */
   const buildLines = (days?: number, basisKey?: typeof basis): Record<string, string> => {
     const d = days ?? 0;
     const b = basisKey ?? basis;
     const bLabel = LEAD_TIME_BASIS_LABEL[b];
     if (!d) {
-      return { "Lead time": "", "ETD": "", "ETA": "" };
+      return { "Lead time": "", "Delivery time": "" };
     }
     const out: Record<string, string> = {
       "Lead time": `${d} days ${bLabel}`,
-      "ETD": `${d} days ${bLabel}`,
     };
     const tMin = selectedMethod?.typical_transit_days_min ?? null;
     const tMax = selectedMethod?.typical_transit_days_max ?? null;
     if (tMin != null && tMax != null) {
       const lo = d + tMin;
       const hi = d + tMax;
-      out["ETA"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
+      out["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
     } else {
-      out["ETA"] = "";
+      out["Delivery time"] = "";
     }
     return out;
   };

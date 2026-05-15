@@ -97,7 +97,16 @@ export interface Quotation {
      All optional — legacy quotes have these undefined. */
   paymentTermId?: string;
   incotermId?: string;
-  incotermLocation?: string;       // e.g. 'Ningbo' for FOB Ningbo
+  /* DEPRECATED — kept for back-compat with quotes saved before the
+     port-pair split. Newer docs use loadingPort + dischargePort. */
+  incotermLocation?: string;
+  /* Shipment route — loading port (origin) and discharge port
+     (destination). Free-text so the operator can include the
+     country ('Ningbo, China' / 'Alexandria, Egypt'). Both can be
+     blank; whichever is set drives the Loading port: / Discharge
+     port: lines in the terms. */
+  loadingPort?: string;
+  dischargePort?: string;
   shippingMethodId?: string;
   /* Timing block — Lead Time + auto-computed ETD/ETA. The picker
      writes 'Lead time: 30 days after receipt of deposit' + an ETD/
@@ -141,11 +150,21 @@ const STORAGE_KEY = "koleex.quotations.v1";
 const COUNTER_KEY = "koleex.quotations.counter";
 
 /* Default terms shell for a fresh quotation. Each line uses one of
-   the Quick Fill canonical keys (Payment terms / Price Type / Sent by)
-   so a single dropdown pick lands cleanly on the existing line
-   instead of appending a duplicate. The free-text lines (Shipping
-   marks / Delivery time / All prices include tax) stay editable. */
-const DEFAULT_TERMS = `Payment terms:\nPrice Type:\nSent by:\nShipping marks:\nDelivery time:\nAll prices include tax:\nTotal Qty:`;
+   the Quick Fill canonical keys so a single dropdown pick lands
+   cleanly on the existing line instead of appending a duplicate.
+   Labels are wrapped in <strong> so a brand-new draft already has
+   the bold-label visual treatment the picks reinforce. */
+const DEFAULT_TERMS =
+  `<strong>Payment terms:</strong> <br>` +
+  `<strong>Price Type:</strong> <br>` +
+  `<strong>Loading port:</strong> <br>` +
+  `<strong>Discharge port:</strong> <br>` +
+  `<strong>Sent by:</strong> <br>` +
+  `<strong>Shipping marks:</strong> <br>` +
+  `<strong>Lead time:</strong> <br>` +
+  `<strong>Delivery time:</strong> <br>` +
+  `<strong>All prices include tax:</strong> <br>` +
+  `<strong>Total Qty:</strong> `;
 
 const EMPTY_ITEM: QuotationItem = {
   description: "",
@@ -215,6 +234,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
     paymentTermId: doc.paymentTermId,
     incotermId: doc.incotermId,
     incotermLocation: doc.incotermLocation,
+    loadingPort: doc.loadingPort,
+    dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,

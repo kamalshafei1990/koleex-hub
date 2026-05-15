@@ -94,6 +94,8 @@ export interface Invoice {
   paymentTermId?: string;
   incotermId?: string;
   incotermLocation?: string;
+  loadingPort?: string;
+  dischargePort?: string;
   shippingMethodId?: string;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
@@ -132,8 +134,19 @@ const STORAGE_KEY = "koleex.invoices-doc.v1";
 const COUNTER_KEY = "koleex.invoices-doc.counter";
 
 /* Default terms shell for a fresh invoice. Mirrors the quotation
-   shell so the same Quick Fill pickers land cleanly. */
-const DEFAULT_TERMS = `Payment terms:\nPrice Type:\nSent by:\nShipping marks:\nDelivery time:\nAll prices include tax:\nTotal Qty:`;
+   shell so the same Quick Fill pickers land cleanly. Bold labels
+   match the visual treatment the picker applies on every pick. */
+const DEFAULT_TERMS =
+  `<strong>Payment terms:</strong> <br>` +
+  `<strong>Price Type:</strong> <br>` +
+  `<strong>Loading port:</strong> <br>` +
+  `<strong>Discharge port:</strong> <br>` +
+  `<strong>Sent by:</strong> <br>` +
+  `<strong>Shipping marks:</strong> <br>` +
+  `<strong>Lead time:</strong> <br>` +
+  `<strong>Delivery time:</strong> <br>` +
+  `<strong>All prices include tax:</strong> <br>` +
+  `<strong>Total Qty:</strong> `;
 
 const EMPTY_ITEM: InvoiceItem = {
   description: "",
@@ -203,6 +216,8 @@ export function fromRow(row: RemoteDocRow): Invoice {
     paymentTermId: doc.paymentTermId,
     incotermId: doc.incotermId,
     incotermLocation: doc.incotermLocation,
+    loadingPort: doc.loadingPort,
+    dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
