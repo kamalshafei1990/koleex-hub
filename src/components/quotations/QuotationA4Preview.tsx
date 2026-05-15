@@ -33,6 +33,7 @@ import BoldIcon from "@/components/icons/ui/BoldIcon";
 import ItalicIcon from "@/components/icons/ui/ItalicIcon";
 import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
 import PaletteIcon from "@/components/icons/ui/PaletteIcon";
+import TypeIcon from "@/components/icons/ui/TypeIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
 /* Mirrors the Quotation type in Quotations.tsx — kept local to avoid
@@ -1551,25 +1552,77 @@ function RoundedTable({ width, children }: { width?: string; children: React.Rea
   );
 }
 
-/* Terms & Conditions box with auto-injected Total Qty.
+/* Terms & Conditions box — rich-text WYSIWYG.
    ──────────────────────────────────────────────────────
-   The terms field is a normal contentEditable so the user can write
-   anything (Payment terms, Shipping, Delivery Time, etc.). On top
-   of that we keep one line in sync with the running sum of every
-   item's qty: "Total Qty: <N>".
+   The terms field is a contentEditable surface with a compact
+   formatting toolbar (Bold / Italic / Underline / Font size / Font
+   colour) that appears whenever the area is focused. The user can
+   style any portion of the text; the doc preview and the printed
+   PDF render the HTML as-is.
 
-   How it works:
-     · `totalQty` is recomputed every time items change (in the
-       parent useMemo).
-     · `displayedTerms` runs a regex over the stored terms string
-       and replaces (or appends, if missing) the "Total Qty:" line
-       with the latest computed value.
-     · We mirror that into the contentEditable's innerHTML through
-       a ref + useEffect — BUT only when the box is NOT focused, so
-       the user's caret doesn't jump while they're typing.
-     · `onBlur` saves whatever the user typed (which now includes
-       the latest computed total) back to current.terms.
-*/
+   "Total Qty: <N>" auto-management:
+     · The parent recomputes `totalQty` whenever items change.
+     · `displayedTerms` runs an HTML-tolerant regex that replaces
+       the existing number (or appends a fresh line if the label
+       isn't there at all) — the regex skips over any formatting
+       tags wrapped around "Total Qty:".
+     · We mirror the result into the contentEditable's innerHTML
+       via a ref + useEffect, ONLY when the box is not focused —
+       otherwise the caret would jump mid-keystroke.
+     · `onBlur` saves the full innerHTML (preserving formatting)
+       back to current.terms.
+
+   Backward compatibility:
+     · Older quotes stored plain text with "\n" newlines. On first
+       render we detect the absence of HTML tags and convert "\n"
+       to "<br>" so the legacy content displays correctly. */
+
+const FONT_SIZE_OPTIONS = [
+  { label: "9", value: "9px" },
+  { label: "10", value: "10px" },
+  { label: "11", value: "11px" },
+  { label: "12", value: "12px" },
+  { label: "14", value: "14px" },
+  { label: "16", value: "16px" },
+  { label: "18", value: "18px" },
+];
+
+const FONT_COLOR_OPTIONS = [
+  "#000000", "#374151", "#6b7280",
+  "#dc2626", "#ea580c", "#ca8a04",
+  "#16a34a", "#0891b2", "#2563eb",
+  "#7c3aed", "#c026d3", "#db2777",
+];
+
+function injectTotalQty(rawTerms: string, totalQty: number): string {
+  /* Detect whether the stored value is plain text (legacy) or HTML.
+     We treat anything with an angle-bracket tag as HTML. Plain text
+     gets its "\n" line breaks converted to <br> for display. */
+  const looksLikeHtml = /<[a-z][\s\S]*>/i.test(rawTerms);
+  const html = looksLikeHtml ? rawTerms : rawTerms.replace(/\n/g, "<br>");
+
+  /* Match the "Total Qty:" label tolerant to formatting tags wrapped
+     around it (<b>, <span style=...>, etc.) and to existing digits
+     after the colon. Captures the label + any whitespace/inline tags
+     between the colon and the number so we can preserve them. <br>
+     and block tags are EXCLUDED from the gap — otherwise a stored
+     "Total Qty: <br>Shipping marks…" gets the number wedged in front
+     of the next line ("Total Qty: <br>185Shipping marks…"). */
+  const labelRe =
+    /(Total Qty:)((?:\s|&nbsp;|<(?!br\b|\/?(?:div|p|li|ul|ol)\b)\/?[^>]+>)*)\d*/i;
+  if (labelRe.test(html)) {
+    return html.replace(labelRe, (_m, label: string, between: string) => {
+      const gap = between.trim() === "" ? " " : between;
+      return `${label}${gap}${totalQty}`;
+    });
+  }
+
+  /* No "Total Qty:" found — append a fresh line at the very end. */
+  const trimmed = html.replace(/(?:<br\s*\/?>\s*|\s)+$/i, "");
+  const sep = trimmed ? "<br>" : "";
+  return `${trimmed}${sep}Total Qty: ${totalQty}`;
+}
+
 function TermsArea({
   terms,
   totalQty,
@@ -1581,60 +1634,326 @@ function TermsArea({
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [focused, setFocused] = useState(false);
+  /* Toolbar visibility is sticky for ~150 ms after blur so clicking a
+     toolbar button (which momentarily moves focus to the button)
+     doesn't make the bar flicker out before the command runs. */
+  const [toolbarOpen, setToolbarOpen] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSizePicker, setShowSizePicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
-  const displayedTerms = useMemo(() => {
-    /* Regex: "Total Qty:" + optional spaces/tabs + anything up to
-       (but not including) the line break. Case-insensitive. */
-    const re = /Total Qty:[ \t]*[^\n\r]*/i;
-    if (re.test(terms)) {
-      return terms.replace(re, `Total Qty: ${totalQty}`);
-    }
-    /* No existing line — append it on a new line (trim handles the
-       case where terms is empty or already ends with a newline). */
-    const trimmed = terms.replace(/\s+$/, "");
-    return trimmed + (trimmed ? "\n" : "") + `Total Qty: ${totalQty}`;
-  }, [terms, totalQty]);
+  const displayedTerms = useMemo(
+    () => injectTotalQty(terms, totalQty),
+    [terms, totalQty],
+  );
 
-  /* Sync the contentEditable's innerHTML when displayedTerms changes
-     and the user is not editing. Skipping the sync while focused
-     prevents the caret from jumping in the middle of a keystroke. */
   useEffect(() => {
     if (!ref.current) return;
     if (focused) return;
-    const next = displayedTerms.replace(/\n/g, "<br>");
-    if (ref.current.innerHTML !== next) {
-      ref.current.innerHTML = next;
+    if (ref.current.innerHTML !== displayedTerms) {
+      ref.current.innerHTML = displayedTerms;
     }
   }, [displayedTerms, focused]);
 
+  /* Save the live HTML into the parent. Called on blur and after
+     every formatting command so an in-flight edit doesn't get lost
+     if the user clicks Save without first blurring the area. */
+  const commit = () => {
+    if (!ref.current) return;
+    onCommit(ref.current.innerHTML);
+  };
+
+  /* `document.execCommand` is officially deprecated but remains the
+     simplest cross-browser path for contentEditable formatting. It
+     still works in every shipping browser; the alternative (custom
+     range manipulation) is several hundred lines for the same UX. */
+  const exec = (cmd: string, value?: string) => {
+    if (!ref.current) return;
+    /* Make sure the selection is still inside our editor — clicking a
+       toolbar button moves focus, but execCommand operates on the
+       active document selection, which we restored just by re-focusing
+       the editor. */
+    ref.current.focus();
+    document.execCommand(cmd, false, value);
+    commit();
+  };
+
+  const applyFontSize = (px: string) => {
+    /* execCommand("fontSize") only takes the legacy 1–7 size keyword.
+       To get pixel-perfect sizing we tag the selection with a class-
+       free <span style="font-size:Npx"> instead. Steps:
+         1) Use a sentinel size of 7 to wrap the selection in <font>.
+         2) Walk those <font> elements and rewrite them as <span> with
+            the desired inline font-size.  */
+    if (!ref.current) return;
+    ref.current.focus();
+    document.execCommand("fontSize", false, "7");
+    const fonts = ref.current.querySelectorAll('font[size="7"]');
+    fonts.forEach((f) => {
+      const span = document.createElement("span");
+      span.style.fontSize = px;
+      span.innerHTML = f.innerHTML;
+      f.replaceWith(span);
+    });
+    commit();
+    setShowSizePicker(false);
+  };
+
+  const applyColor = (color: string) => {
+    exec("foreColor", color);
+    setShowColorPicker(false);
+  };
+
+  const handleBlur = () => {
+    /* Defer blur so a toolbar-button click can run exec() before the
+       toolbar collapses. The button's onMouseDown calls preventDefault
+       to avoid yanking the selection, and we clear this timer if the
+       editor regains focus. */
+    blurTimer.current = setTimeout(() => {
+      setFocused(false);
+      setToolbarOpen(false);
+      setShowSizePicker(false);
+      setShowColorPicker(false);
+      commit();
+    }, 150);
+  };
+
+  const handleFocus = () => {
+    if (blurTimer.current) {
+      clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
+    setFocused(true);
+    setToolbarOpen(true);
+  };
+
+  /* The toolbar's mousedown handler — used by every button. Prevents
+     the default selection-clearing behaviour so the editor's current
+     selection survives the click. */
+  const swallow = (e: React.MouseEvent) => e.preventDefault();
+
   return (
     <div
-      ref={ref}
-      className="pq-tc-area"
-      contentEditable
-      suppressContentEditableWarning
-      onFocus={() => setFocused(true)}
-      onBlur={(e) => {
-        setFocused(false);
-        onCommit(e.currentTarget.innerText || e.currentTarget.textContent || "");
+      style={{ display: "flex", flexDirection: "column", flex: 1 }}
+      onMouseLeave={() => {
+        setShowSizePicker(false);
+        setShowColorPicker(false);
       }}
+    >
+      {/* Toolbar — only rendered while the area has focus. `no-print`
+          keeps it off the exported PDF. */}
+      {toolbarOpen && (
+        <div
+          className="no-print pq-tc-toolbar"
+          onMouseDown={swallow}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 8px",
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surface,
+            fontSize: 11,
+            position: "relative",
+            flexWrap: "wrap",
+          }}
+        >
+          <TermsToolbarButton title="Bold" onClick={() => exec("bold")}>
+            <BoldIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+          <TermsToolbarButton title="Italic" onClick={() => exec("italic")}>
+            <ItalicIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+          <TermsToolbarButton title="Underline" onClick={() => exec("underline")}>
+            <UnderlineIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+
+          <span style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+
+          <TermsToolbarButton
+            title="Font size"
+            onClick={() => {
+              setShowSizePicker((v) => !v);
+              setShowColorPicker(false);
+            }}
+            active={showSizePicker}
+          >
+            <TypeIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+          {showSizePicker && (
+            <div
+              onMouseDown={swallow}
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 96,
+                marginTop: 2,
+                background: T.paper,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                padding: 4,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                display: "flex",
+                gap: 2,
+                zIndex: 5,
+              }}
+            >
+              {FONT_SIZE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => applyFontSize(opt.value)}
+                  style={{
+                    padding: "3px 8px",
+                    borderRadius: 5,
+                    fontSize: 11,
+                    border: "none",
+                    background: "transparent",
+                    color: T.ink,
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = T.surface)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <TermsToolbarButton
+            title="Text colour"
+            onClick={() => {
+              setShowColorPicker((v) => !v);
+              setShowSizePicker(false);
+            }}
+            active={showColorPicker}
+          >
+            <PaletteIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+          {showColorPicker && (
+            <div
+              onMouseDown={swallow}
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 132,
+                marginTop: 2,
+                background: T.paper,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                padding: 6,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                display: "grid",
+                gridTemplateColumns: "repeat(6, 18px)",
+                gap: 4,
+                zIndex: 5,
+              }}
+            >
+              {FONT_COLOR_OPTIONS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => applyColor(c)}
+                  title={c}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 4,
+                    border: `1px solid ${T.border}`,
+                    background: c,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          <span style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+
+          <TermsToolbarButton title="Clear formatting" onClick={() => exec("removeFormat")}>
+            <CrossIcon className="h-3.5 w-3.5" />
+          </TermsToolbarButton>
+        </div>
+      )}
+      <div
+        ref={ref}
+        className="pq-tc-area"
+        contentEditable
+        suppressContentEditableWarning
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onInput={() => {
+          /* Live-save while typing keeps current.terms in sync so a
+             save click before blur captures the latest text. We only
+             commit here when the structure is stable; format commands
+             also call commit() directly. */
+          commit();
+        }}
+        style={{
+          width: "100%",
+          fontSize: 11,
+          fontWeight: 400,
+          lineHeight: 1.65,
+          border: "none",
+          padding: "10px 12px",
+          /* flex:1 grows the editable area to fill the rounded card so
+             the right side matches the totals card height; minHeight is
+             a floor for the edge case where the totals card is somehow
+             shorter than 90 px. */
+          flex: 1,
+          minHeight: 90,
+          outline: "none",
+          whiteSpace: "pre-wrap",
+        }}
+      />
+    </div>
+  );
+}
+
+/* Tiny toolbar button reused by every Terms-area formatting control.
+   Mousedown is swallowed so the click doesn't blur the editor and
+   wipe the active selection before exec() can act on it. */
+function TermsToolbarButton({
+  title,
+  onClick,
+  active,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
       style={{
-        width: "100%",
-        fontSize: 11,
-        fontWeight: 400,
-        lineHeight: 1.65,
+        width: 24,
+        height: 22,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
         border: "none",
-        padding: "10px 12px",
-        /* flex:1 grows the editable area to fill the rounded card so
-           the right side matches the totals card height; minHeight is
-           a floor for the edge case where the totals card is somehow
-           shorter than 90 px. */
-        flex: 1,
-        minHeight: 90,
-        outline: "none",
-        whiteSpace: "pre-wrap",
+        background: active ? "rgba(0,0,0,0.08)" : "transparent",
+        color: "#1f2937",
+        borderRadius: 5,
+        cursor: "pointer",
+        padding: 0,
       }}
-    />
+      onMouseEnter={(e) => {
+        if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)";
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.background = "transparent";
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
