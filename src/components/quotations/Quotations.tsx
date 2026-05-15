@@ -10,6 +10,7 @@ import PrintIcon from "@/components/icons/ui/PrintIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
@@ -751,6 +752,63 @@ export default function Quotations() {
   }, []);
 
   /* ── Delete from list ── */
+  /* Track which row's Duplicate button is in flight so the icon can
+     show a small spinner. The full-quote fetch + save round-trip on a
+     long quote (Omar's 50+ items) can take a second on a slow link;
+     without feedback the user double-clicks and ends up with two
+     copies. */
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+
+  /* ── Duplicate from the list view ──
+     The list endpoint strips `items` from the doc to keep the
+     response small, so we MUST re-fetch the full quote before
+     cloning. Then we build a fresh draft (new client id, empty
+     quote_no so the server mints a new KL{YYYY}-{MMDD}, today's
+     date, 30-day validity), save it, refresh the list, and drop
+     the user into the editor on the new copy so they can adjust
+     customer fields straight away. */
+  const handleDuplicateFromList = useCallback(
+    async (id: string) => {
+      if (duplicatingId) return;
+      setDuplicatingId(id);
+      try {
+        const full = await fetchDocOne(QUOTATIONS_SYNC, id);
+        if (!full) {
+          alert("Could not load the quotation to duplicate.");
+          return;
+        }
+        const source = fromRow(full);
+        const today = todayDDMMYYYY();
+        const copy: Quotation = {
+          ...source,
+          id: generateId(),
+          invoiceNo: "",
+          date: today,
+          validTill: addDays(today, 30),
+          status: "draft",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          serverTotal: undefined,
+          items: source.items.map((it) => ({ ...it })),
+        };
+        const saved = await saveQuotationRemote(copy);
+        const next = saved ?? copy;
+        const list = await loadQuotationsRemote({ fresh: true });
+        setQuotations(list);
+        /* Open the new draft in the editor — the operator almost
+           always wants to tweak the customer name / address right
+           after duplicating, so the extra click would be friction. */
+        setCurrent(next);
+        setView("editor");
+      } catch (e) {
+        alert(`Duplicate failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setDuplicatingId(null);
+      }
+    },
+    [duplicatingId],
+  );
+
   const handleDeleteFromList = useCallback(
     async (id: string) => {
       if (!(await dialog.confirm({ message: t("quot.deleteConfirm"), destructive: true, confirmLabel: "Delete" }))) return;
@@ -1179,6 +1237,21 @@ export default function Quotations() {
                         <span className="text-lg font-semibold text-[var(--text-primary)] tabular-nums">
                           ${fmt(gt)}
                         </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateFromList(q.id);
+                          }}
+                          disabled={duplicatingId === q.id}
+                          className="p-2 rounded-lg text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Duplicate this quotation as a new draft"
+                        >
+                          {duplicatingId === q.id ? (
+                            <SpinnerIcon className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CopyIcon size={16} />
+                          )}
+                        </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
