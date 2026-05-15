@@ -2468,6 +2468,144 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
   return result;
 }
 
+/* Bilingual (EN + 中文) help copy shown when the operator hovers
+   the (?) icon beside each Quick Fill label. Written for non-
+   specialist users — explains what each international-trade
+   term means and gives a concrete example. */
+const QUICK_FILL_HELP: Record<string, { en: string; zh: string }> = {
+  payment: {
+    en: "Payment Term — How and when the buyer pays the seller. T/T (telegraphic transfer), L/C (letter of credit), D/P (documents against payment), CAD (cash against documents), etc. Determines cash-flow timing and which side carries the risk.",
+    zh: "付款条件 — 买方支付货款的方式和时间。例如 T/T 电汇、L/C 信用证、D/P 付款交单、CAD 凭单付款等。决定资金流转时间和双方承担的风险。",
+  },
+  incoterm: {
+    en: "Price Type / Incoterm 2020 — International Commercial Term. Defines who pays for freight, insurance, customs, and exactly when ownership & risk transfer from seller to buyer. e.g. FOB = buyer pays freight; CIF = seller pays freight + insurance up to destination port.",
+    zh: "价格条款 / 国际贸易术语 (Incoterms 2020) — 规定运费、保险、清关费用由哪一方承担，以及货物所有权与风险转移的时间点。例如：FOB = 买方承担运费；CIF = 卖方承担运费和保险至目的港。",
+  },
+  loadingPort: {
+    en: "Loading Port (port of origin) — The port where the goods are loaded onto the main carrier (vessel / aircraft) in the seller's country. Example: Ningbo Port, China.",
+    zh: "装货港 (起运港) — 卖方所在国货物装上主要运输工具（船舶/飞机）的港口。例如：中国宁波港。",
+  },
+  dischargePort: {
+    en: "Discharge Port (destination) — The port where the goods are unloaded in the buyer's country. Example: Alexandria Port, Egypt.",
+    zh: "卸货港 (目的港) — 货物在买方所在国卸船的港口。例如：埃及亚历山大港。",
+  },
+  sentBy: {
+    en: "Shipping Method — Mode of transport: sea (cheapest, slowest), air (fastest, most expensive), rail or road. Determines transit time and freight cost.",
+    zh: "运输方式 — 海运（最便宜，最慢）、空运（最快，最贵）、铁路或公路。决定运输时间与运费。",
+  },
+  container: {
+    en: "Container Type — For sea / inland FCL (Full Container Load) only. Specifies the size and type of container. 20'GP = 20-foot general purpose; 40'HQ = 40-foot high cube; reefer = refrigerated; flat-rack = oversized cargo.",
+    zh: "集装箱类型 — 仅适用于海运或内陆整柜运输。说明集装箱的尺寸和类型。20'GP = 20英尺普通箱；40'HQ = 40英尺高箱；冷藏箱 = 冷冻冷藏；框架箱 = 超大货物。",
+  },
+  marks: {
+    en: "Shipping Marks — Markings printed on the outside of each package: buyer name, destination port, package number, country of origin. Required by customs to identify and route the cargo.",
+    zh: "唛头 / 装运标志 — 印在每件包装外的标识：买方名称、目的港、件号、原产国。海关用以识别和分流货物。",
+  },
+  leadDays: {
+    en: "Lead Time (days) — Production lead time. How many calendar days after the trigger event (deposit / order / L/C opening) until the goods are ready to ship from the factory.",
+    zh: "生产周期 (天) — 从触发条件（收到定金 / 订单确认 / 开立信用证）开始计算，至工厂货物可发运所需的日历天数。",
+  },
+  leadBasis: {
+    en: "Counted From — Which event starts the lead-time clock: receipt of deposit, order confirmation, or L/C opening. Affects when production formally begins.",
+    zh: "起算时间 — 生产周期从何时开始计算：收到定金、订单确认或开立信用证。决定生产正式启动的时间点。",
+  },
+  delivery: {
+    en: "Delivery (auto) — Auto-calculated estimated arrival window at the discharge port = lead time + transit time of the chosen shipping method.",
+    zh: "交货时间 (自动计算) — 自动计算的目的港预计到达时间 = 生产周期 + 所选运输方式的运输时间。",
+  },
+  documents: {
+    en: "Documents Provided — International trade documents the seller will provide with the shipment: commercial invoice, packing list, bill of lading, certificate of origin, etc. Required for customs clearance and L/C payment.",
+    zh: "提供单据 — 卖方随货提供的国际贸易单据：商业发票、装箱单、提单、原产地证书等。用于海关清关与信用证结算。",
+  },
+  bank: {
+    en: "Bank Charges — Who pays the bank fees on each side of the international wire / L/C transfer. OUR = sender pays all charges; SHA = each side pays own; BEN = receiver pays all charges.",
+    zh: "银行费用 — 国际电汇或信用证两端银行手续费的承担方。OUR = 汇款方承担全部；SHA = 各付各的；BEN = 收款方承担全部。",
+  },
+  cancellation: {
+    en: "Cancellation Policy — Rules for cancelling the order after deposit / contract signing: when refunds are permitted, what penalties or restocking fees apply.",
+    zh: "取消订单政策 — 支付定金或签订合同后取消订单的规则：何时可退款，需承担哪些违约金或仓储费。",
+  },
+  governing: {
+    en: "Governing Law / Arbitration — Which country's law applies if a dispute arises, and where it will be arbitrated. CIETAC = China; ICC = International Chamber of Commerce; LCIA = London Court of International Arbitration.",
+    zh: "适用法律 / 仲裁地点 — 发生争议时适用哪一国家的法律，以及在何地仲裁。CIETAC = 中国国际经济贸易仲裁委员会；ICC = 国际商会；LCIA = 伦敦国际仲裁院。",
+  },
+};
+
+/* Small (?) icon that opens a bilingual EN+中文 explanation on
+   hover. Used beside every Quick Fill label so the operator does
+   not need to remember what FOB / D/P / CIETAC etc. mean. */
+function HelpTip({ k }: { k: keyof typeof QUICK_FILL_HELP }) {
+  const [hover, setHover] = useState(false);
+  const h = QUICK_FILL_HELP[k];
+  return (
+    <span
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        marginLeft: 5,
+        verticalAlign: "middle",
+      }}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.35)",
+          color: "rgba(255,255,255,0.75)",
+          fontSize: 9,
+          fontWeight: 700,
+          cursor: "help",
+          background: "transparent",
+          userSelect: "none",
+        }}
+      >
+        ?
+      </span>
+      {hover && (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 1100,
+            width: 320,
+            padding: "10px 12px",
+            borderRadius: 8,
+            background: "#1f2937",
+            color: "#ffffff",
+            border: "1px solid rgba(255,255,255,0.18)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+            fontSize: 11,
+            lineHeight: 1.5,
+            pointerEvents: "none",
+            textTransform: "none",
+            letterSpacing: 0,
+            fontWeight: 400,
+            whiteSpace: "normal",
+          }}
+        >
+          <span style={{ display: "block", fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</span>
+          <span style={{ display: "block", marginBottom: 8 }}>{h.en}</span>
+          <span style={{ display: "block", fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</span>
+          <span style={{ display: "block" }}>{h.zh}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* Total number of Quick Fill fields used by the "N filled from M"
+   badge. Counts the universal fields only (excludes containerType
+   since that field only applies to FCL sea/inland shipments). */
+const QUICK_FILL_TOTAL = 11;
+
 /* Compact 'Quick Fill' button + modal wrapper. Single chip on the
    Terms card; click → modal opens with the full QuickFillBar laid
    out as a tidy two-column form instead of a horizontal flex
@@ -2483,8 +2621,11 @@ function TermsQuickFillTrigger({
 }) {
   const [open, setOpen] = useState(false);
 
-  /* Quick visual cue of how many fields are already filled so the
-     operator can see at a glance whether the modal has been used. */
+  /* Quick visual cue of how many fields are already filled. We
+     count the eleven universal fields (containerType is excluded
+     since it only applies to FCL sea/inland shipments). The
+     badge shows "N filled from 11" so the operator can see how
+     close they are to a fully-specified doc at a glance. */
   const filledCount = useMemo(() => {
     let n = 0;
     if (current.paymentTermId)        n++;
@@ -2492,7 +2633,6 @@ function TermsQuickFillTrigger({
     if (current.loadingPort)          n++;
     if (current.dischargePort)        n++;
     if (current.shippingMethodId)     n++;
-    if (current.containerType)        n++;
     if (current.shippingMarks)        n++;
     if (current.leadTimeDays)         n++;
     if (current.bankCharges)          n++;
@@ -2543,21 +2683,20 @@ function TermsQuickFillTrigger({
       >
         <span>⚡</span>
         <span>Quick Fill</span>
-        {filledCount > 0 && (
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              padding: "1px 6px",
-              borderRadius: 4,
-              background: T.black,
-              color: "#fff",
-              marginLeft: 2,
-            }}
-          >
-            {filledCount} filled
-          </span>
-        )}
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: filledCount > 0 ? T.black : "transparent",
+            color: filledCount > 0 ? "#fff" : T.inkGhost,
+            border: filledCount > 0 ? "none" : `1px solid ${T.border}`,
+            marginLeft: 2,
+          }}
+        >
+          {filledCount} filled from {QUICK_FILL_TOTAL}
+        </span>
       </button>
 
       {open && (
@@ -2616,37 +2755,46 @@ function TermsQuickFillModal({
     [payCats],
   );
 
+  /* Explicit dark-theme hex colors throughout the modal so the
+     inputs stay readable no matter what theme variables the host
+     page resolves to. (The bug we are fixing: a number input
+     inherits browser-default black text when the surrounding
+     CSS variables disagree about light vs dark — adding
+     colorScheme:'dark' on the modal root + explicit hex values
+     guarantees light text on dark background.) */
   const fieldStyle: React.CSSProperties = {
     width: "100%",
-    height: 32,
+    height: 34,
     fontSize: 12,
-    padding: "0 8px",
+    padding: "0 10px",
     borderRadius: 6,
-    border: "1px solid var(--border-color, #374151)",
-    background: "var(--bg-primary, #111827)",
-    color: "var(--text-primary, #e5e7eb)",
+    border: "1px solid #2a2a2a",
+    background: "#0A0A0A",
+    color: "#ffffff",
     outline: "none",
+    colorScheme: "dark",
   };
 
   const sectionStyle: React.CSSProperties = {
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.06))",
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottom: "1px solid rgba(255,255,255,0.06)",
   };
   const sectionTitle: React.CSSProperties = {
     fontSize: 10,
     fontWeight: 700,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
-    color: "var(--text-dim, #9ca3af)",
+    color: "rgba(255,255,255,0.55)",
     marginBottom: 8,
   };
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
     fontWeight: 600,
-    color: "var(--text-dim, #9ca3af)",
+    color: "rgba(255,255,255,0.75)",
     marginBottom: 4,
-    display: "block",
+    display: "flex",
+    alignItems: "center",
   };
 
   // Helpers to package up onPatch calls cleanly per field.
@@ -2707,17 +2855,18 @@ function TermsQuickFillModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--bg-secondary, #1f2937)",
-          color: "var(--text-primary, #e5e7eb)",
+          background: "#111111",
+          color: "#ffffff",
           width: "100%",
-          maxWidth: 760,
+          maxWidth: 820,
           maxHeight: "90vh",
           borderRadius: 14,
-          border: "1px solid var(--border-color, #374151)",
+          border: "1px solid #222222",
           boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          colorScheme: "dark",
         }}
       >
         {/* Header */}
@@ -2727,13 +2876,13 @@ function TermsQuickFillModal({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "14px 18px",
-            borderBottom: "1px solid var(--border-color, #374151)",
+            borderBottom: "1px solid #222222",
           }}
         >
           <div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Quick Fill — Terms &amp; Conditions</div>
-            <div style={{ fontSize: 11, color: "var(--text-dim, #9ca3af)", marginTop: 2 }}>
-              Pick once; values land in the Terms card as you go.
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
+              Pick once; values land in the Terms card as you go. Hover any <strong>?</strong> for an English &amp; 中文 explanation.
             </div>
           </div>
           <button
@@ -2760,7 +2909,7 @@ function TermsQuickFillModal({
             <div style={sectionTitle}>Payment &amp; Pricing</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>Payment term</label>
+                <label style={labelStyle}>Payment term<HelpTip k="payment" /></label>
                 <select value={current.paymentTermId ?? ""} onChange={(e) => onPickPayment(e.target.value)} style={fieldStyle}>
                   <option value="">— Pick a payment term —</option>
                   {payCats.map((cat) => (
@@ -2773,7 +2922,7 @@ function TermsQuickFillModal({
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Price type (Incoterm)</label>
+                <label style={labelStyle}>Price type (Incoterm)<HelpTip k="incoterm" /></label>
                 <select value={current.incotermId ?? ""} onChange={(e) => onPickIncoterm(e.target.value)} style={fieldStyle}>
                   <option value="">— Pick an Incoterm —</option>
                   {incoterms.map((t) => (
@@ -2789,11 +2938,11 @@ function TermsQuickFillModal({
             <div style={sectionTitle}>Shipment Route</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>Loading port (origin)</label>
+                <label style={labelStyle}>Loading port (origin)<HelpTip k="loadingPort" /></label>
                 <input type="text" placeholder="e.g. Ningbo, China" value={current.loadingPort ?? ""} onChange={(e) => onChangePort("loadingPort", e.target.value)} style={fieldStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Discharge port (destination)</label>
+                <label style={labelStyle}>Discharge port (destination)<HelpTip k="dischargePort" /></label>
                 <input type="text" placeholder="e.g. Alexandria, Egypt" value={current.dischargePort ?? ""} onChange={(e) => onChangePort("dischargePort", e.target.value)} style={fieldStyle} />
               </div>
             </div>
@@ -2804,7 +2953,7 @@ function TermsQuickFillModal({
             <div style={sectionTitle}>Shipping</div>
             <div style={{ display: "grid", gridTemplateColumns: containerVisible ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>Sent by</label>
+                <label style={labelStyle}>Sent by<HelpTip k="sentBy" /></label>
                 <select value={current.shippingMethodId ?? ""} onChange={(e) => onPickMethod(e.target.value)} style={fieldStyle}>
                   <option value="">— Pick a shipping method —</option>
                   {methods.map((m) => (
@@ -2814,7 +2963,7 @@ function TermsQuickFillModal({
               </div>
               {containerVisible && (
                 <div>
-                  <label style={labelStyle}>Container type</label>
+                  <label style={labelStyle}>Container type<HelpTip k="container" /></label>
                   <select
                     value={current.containerType ?? ""}
                     onChange={(e) => {
@@ -2834,7 +2983,7 @@ function TermsQuickFillModal({
                 </div>
               )}
               <div>
-                <label style={labelStyle}>Shipping marks</label>
+                <label style={labelStyle}>Shipping marks<HelpTip k="marks" /></label>
                 <select
                   value={current.shippingMarks ?? ""}
                   onChange={(e) => {
@@ -2860,7 +3009,7 @@ function TermsQuickFillModal({
             <div style={sectionTitle}>Timing</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
               <div>
-                <label style={labelStyle}>Lead time (days)</label>
+                <label style={labelStyle}>Lead time (days)<HelpTip k="leadDays" /></label>
                 <input
                   type="number" min={0} max={999}
                   value={current.leadTimeDays ?? ""}
@@ -2887,7 +3036,7 @@ function TermsQuickFillModal({
                 />
               </div>
               <div>
-                <label style={labelStyle}>Counted from</label>
+                <label style={labelStyle}>Counted from<HelpTip k="leadBasis" /></label>
                 <select
                   value={current.leadTimeBasis ?? "after_deposit"}
                   onChange={(e) => {
@@ -2914,8 +3063,8 @@ function TermsQuickFillModal({
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Delivery (auto)</label>
-                <div style={{ ...fieldStyle, display: "flex", alignItems: "center", color: "var(--text-dim, #9ca3af)" }}>
+                <label style={labelStyle}>Delivery (auto)<HelpTip k="delivery" /></label>
+                <div style={{ ...fieldStyle, display: "flex", alignItems: "center", color: "rgba(255,255,255,0.55)", background: "#000000" }}>
                   {current.leadTimeDays && selectedMethod?.typical_transit_days_min != null && selectedMethod.typical_transit_days_max != null
                     ? `${current.leadTimeDays + selectedMethod.typical_transit_days_min}–${current.leadTimeDays + selectedMethod.typical_transit_days_max} days`
                     : "—"}
@@ -2926,7 +3075,9 @@ function TermsQuickFillModal({
 
           {/* ── Documents ── */}
           <div style={sectionStyle}>
-            <div style={sectionTitle}>Documents Provided</div>
+            <div style={{ ...sectionTitle, display: "flex", alignItems: "center" }}>
+              Documents Provided<HelpTip k="documents" />
+            </div>
             <DocumentsCheckboxList
               value={current.documentsProvided ?? []}
               onChange={(next) => {
@@ -2943,7 +3094,7 @@ function TermsQuickFillModal({
             <div style={sectionTitle}>Legal Clauses</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
               <div>
-                <label style={labelStyle}>Bank charges</label>
+                <label style={labelStyle}>Bank charges<HelpTip k="bank" /></label>
                 <select
                   value={current.bankCharges ?? ""}
                   onChange={(e) => {
@@ -2959,7 +3110,7 @@ function TermsQuickFillModal({
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Cancellation policy</label>
+                <label style={labelStyle}>Cancellation policy<HelpTip k="cancellation" /></label>
                 <select
                   value={current.cancellationPolicy ?? ""}
                   onChange={(e) => {
@@ -2975,7 +3126,7 @@ function TermsQuickFillModal({
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Governing law / arbitration</label>
+                <label style={labelStyle}>Governing law / arbitration<HelpTip k="governing" /></label>
                 <select
                   value={current.governingLaw ?? ""}
                   onChange={(e) => {
@@ -2998,23 +3149,28 @@ function TermsQuickFillModal({
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-end",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 8,
             padding: "12px 18px",
-            borderTop: "1px solid var(--border-color, #374151)",
+            borderTop: "1px solid #222222",
+            background: "#0A0A0A",
           }}
         >
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+            Hover any <strong style={{ color: "#fff" }}>?</strong> for an EN + 中文 explanation.
+          </span>
           <button
             type="button"
             onClick={onClose}
             style={{
-              padding: "8px 16px",
+              padding: "8px 18px",
               borderRadius: 8,
-              border: "1px solid var(--border-color, #374151)",
-              background: "transparent",
-              color: "inherit",
+              border: "1px solid #ffffff",
+              background: "#ffffff",
+              color: "#000000",
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: "pointer",
             }}
           >
@@ -3026,10 +3182,24 @@ function TermsQuickFillModal({
   );
 }
 
-/* Inline checkbox list for the Documents section of the modal.
-   Same data source as the old popover DocumentsPicker, but laid
-   out in a grid grouped by category so the operator can see every
-   choice without an extra click. */
+/* Inline document picker for the Documents Provided section of
+   the Quick Fill modal. Renders one card per category (Transport,
+   Commercial, Customs…) with a coloured chip-style header and a
+   responsive grid of selectable pill-buttons inside. Operator can
+   see every available doc + which ones are picked at a glance. */
+const DOC_CAT_ORDER: ReadonlyArray<string> = [
+  "transport", "commercial", "customs", "quality", "special", "financial", "other",
+];
+const DOC_CAT_META: Record<string, { label: string; dot: string }> = {
+  transport:  { label: "Transport",  dot: "#0ea5e9" },  // sky
+  commercial: { label: "Commercial", dot: "#10b981" },  // emerald
+  customs:    { label: "Customs",    dot: "#f59e0b" },  // amber
+  quality:    { label: "Quality",    dot: "#8b5cf6" },  // violet
+  special:    { label: "Special",    dot: "#ec4899" },  // pink
+  financial:  { label: "Financial",  dot: "#3b82f6" },  // blue
+  other:      { label: "Other",      dot: "#6b7280" },  // zinc
+};
+
 function DocumentsCheckboxList({
   value,
   onChange,
@@ -3037,7 +3207,7 @@ function DocumentsCheckboxList({
   value: string[];
   onChange: (next: string[]) => void;
 }) {
-  interface DocLite { id: string; code: string; name: string; short_name: string | null; category: string; }
+  interface DocLite { id: string; code: string; name: string; short_name: string | null; category: string; sort_order?: number; }
   const [docs, setDocs] = useState<DocLite[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -3049,37 +3219,170 @@ function DocumentsCheckboxList({
       });
     return () => { cancelled = true; };
   }, []);
+
   const grouped = useMemo(() => {
     const out: Record<string, DocLite[]> = {};
     for (const d of docs) (out[d.category] ??= []).push(d);
+    for (const k of Object.keys(out)) {
+      out[k].sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+    }
     return out;
   }, [docs]);
+
   const toggle = (label: string) => {
     const set = new Set(value);
     if (set.has(label)) set.delete(label);
     else set.add(label);
     onChange([...set]);
   };
+
+  const setAll = (list: DocLite[], on: boolean) => {
+    const labels = list.map((d) => d.short_name ?? d.code);
+    if (on) {
+      const set = new Set(value);
+      for (const l of labels) set.add(l);
+      onChange([...set]);
+    } else {
+      const remove = new Set(labels);
+      onChange(value.filter((v) => !remove.has(v)));
+    }
+  };
+
   if (docs.length === 0) {
-    return <div style={{ fontSize: 11, color: "var(--text-dim, #9ca3af)" }}>Loading documents…</div>;
+    return <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", padding: "8px 0" }}>Loading documents…</div>;
   }
+
+  const totalSelected = value.length;
+  const orderedCats = DOC_CAT_ORDER.filter((c) => (grouped[c]?.length ?? 0) > 0);
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6 }}>
-      {Object.entries(grouped).map(([cat, list]) => (
-        <div key={cat} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim, #9ca3af)", fontWeight: 700, marginBottom: 2 }}>{cat}</div>
-          {list.map((d) => {
-            const label = d.short_name ?? d.code;
-            const checked = value.includes(label);
-            return (
-              <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-primary, #e5e7eb)", cursor: "pointer" }} title={d.name}>
-                <input type="checkbox" checked={checked} onChange={() => toggle(label)} style={{ margin: 0 }} />
-                {label}
-              </label>
-            );
-          })}
-        </div>
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* summary row */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        fontSize: 10, color: "rgba(255,255,255,0.55)", padding: "2px 2px 4px",
+      }}>
+        <span>{totalSelected > 0 ? `${totalSelected} document${totalSelected > 1 ? "s" : ""} selected` : "Pick the documents you will provide with the shipment"}</span>
+        {totalSelected > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            style={{
+              background: "transparent", border: "1px solid #2a2a2a",
+              color: "rgba(255,255,255,0.75)", borderRadius: 6,
+              padding: "2px 8px", fontSize: 10, cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* category cards */}
+      {orderedCats.map((cat) => {
+        const list = grouped[cat];
+        const meta = DOC_CAT_META[cat] ?? { label: cat, dot: "#6b7280" };
+        const labels = list.map((d) => d.short_name ?? d.code);
+        const selectedInCat = labels.filter((l) => value.includes(l)).length;
+        const allOn = selectedInCat === list.length;
+        return (
+          <div
+            key={cat}
+            style={{
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.02)",
+              padding: 10,
+            }}
+          >
+            {/* card header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              marginBottom: 8,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  display: "inline-block", width: 8, height: 8,
+                  borderRadius: "50%", background: meta.dot,
+                }} />
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: "#fff",
+                  letterSpacing: "0.04em",
+                }}>{meta.label}</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                  {selectedInCat}/{list.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAll(list, !allOn)}
+                style={{
+                  background: "transparent", border: "1px solid #2a2a2a",
+                  color: "rgba(255,255,255,0.7)", borderRadius: 6,
+                  padding: "2px 8px", fontSize: 10, cursor: "pointer", fontWeight: 600,
+                }}
+              >
+                {allOn ? "Unselect" : "Select all"}
+              </button>
+            </div>
+
+            {/* doc pills */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 6,
+            }}>
+              {list.map((d) => {
+                const label = d.short_name ?? d.code;
+                const checked = value.includes(label);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => toggle(label)}
+                    title={d.name}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: checked ? "1px solid #ffffff" : "1px solid #2a2a2a",
+                      background: checked ? "rgba(255,255,255,0.10)" : "transparent",
+                      color: "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "background 0.12s, border 0.12s",
+                    }}
+                  >
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 14, height: 14, borderRadius: 3,
+                      border: checked ? "1px solid #fff" : "1px solid rgba(255,255,255,0.35)",
+                      background: checked ? "#fff" : "transparent",
+                      color: "#000", flexShrink: 0,
+                      fontSize: 10, fontWeight: 900, lineHeight: 1,
+                    }}>
+                      {checked ? "✓" : ""}
+                    </span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: "block", fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>
+                        {label}
+                      </span>
+                      <span style={{
+                        display: "block", fontSize: 10,
+                        color: "rgba(255,255,255,0.5)", lineHeight: 1.3,
+                        marginTop: 1,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {d.name}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
