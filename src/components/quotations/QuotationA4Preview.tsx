@@ -2191,13 +2191,23 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
      reassemble with the same structure. */
   const segments = html.split(/(<br\s*\/?>)/i);
 
-  const keyMatches = (segText: string, key: string): boolean => {
-    /* segment text → strip inline tags, lowercase, compare prefix. */
-    const plain = segText.replace(/<[^>]+>/g, "").trim().toLowerCase();
-    return plain.startsWith(key.toLowerCase() + ":");
+  /* Quick-Fill label aliases. Each canonical picker key has a list
+     of label variants the operator may have already typed in the
+     terms body so a pick replaces an existing line instead of
+     appending a duplicate. */
+  const aliases: Record<string, string[]> = {
+    "Payment terms": ["Payment terms", "Payment", "Payment term", "Payment method"],
+    "Price Type":    ["Price Type", "Price type", "Price", "Incoterm", "Trade term"],
+    "Sent by":       ["Sent by", "Sent via", "Shipped by", "Shipping", "Shipping by", "Shipped via", "Mode of transport"],
   };
 
-  const rewriteSegment = (segment: string, key: string, value: string): string => {
+  const keyMatches = (segText: string, key: string): boolean => {
+    const plain = segText.replace(/<[^>]+>/g, "").trim().toLowerCase();
+    const list = aliases[key] ?? [key];
+    return list.some((a) => plain.startsWith(a.toLowerCase() + ":"));
+  };
+
+  const rewriteSegment = (segment: string, _key: string, value: string): string => {
     /* Replace whatever follows the colon (possibly inside formatting
        tags) with the new value. Preserve the leading "Key:" exactly
        as the operator typed it (capitalisation, surrounding bold/etc). */
@@ -2218,10 +2228,13 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     }
     return seg;
   });
-  /* Append lines for keys that weren't already present. */
+  /* Append a fresh line for any canonical key that didn't find a
+     matching alias in the existing terms. Skip if the new value is
+     empty (the operator cleared the dropdown — nothing to append). */
   const missing = Object.keys(updates).filter((k) => !usedKeys.has(k));
   let result = out.join("");
   for (const k of missing) {
+    if (!updates[k]) continue;
     const sep = result && !/<br\s*\/?>\s*$/i.test(result) ? "<br>" : "";
     result += `${sep}${k}: ${updates[k]}`;
   }

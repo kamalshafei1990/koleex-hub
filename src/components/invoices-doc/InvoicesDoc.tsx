@@ -129,7 +129,9 @@ export interface Invoice {
 const STORAGE_KEY = "koleex.invoices-doc.v1";
 const COUNTER_KEY = "koleex.invoices-doc.counter";
 
-const DEFAULT_TERMS = `Payment terms:\nShipping:\nShipping Mark:\nDelivery Time:\nAll prices Include Tax:\nTotal Qty:`;
+/* Default terms shell for a fresh invoice. Mirrors the quotation
+   shell so the same Quick Fill pickers land cleanly. */
+const DEFAULT_TERMS = `Payment terms:\nPrice Type:\nSent by:\nShipping marks:\nDelivery time:\nAll prices include tax:\nTotal Qty:`;
 
 const EMPTY_ITEM: InvoiceItem = {
   description: "",

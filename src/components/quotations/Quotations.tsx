@@ -133,7 +133,12 @@ export interface Quotation {
 const STORAGE_KEY = "koleex.quotations.v1";
 const COUNTER_KEY = "koleex.quotations.counter";
 
-const DEFAULT_TERMS = `Payment terms:\nShipping:\nShipping Mark:\nDelivery Time:\nAll prices Include Tax:\nTotal Qty:`;
+/* Default terms shell for a fresh quotation. Each line uses one of
+   the Quick Fill canonical keys (Payment terms / Price Type / Sent by)
+   so a single dropdown pick lands cleanly on the existing line
+   instead of appending a duplicate. The free-text lines (Shipping
+   marks / Delivery time / All prices include tax) stay editable. */
+const DEFAULT_TERMS = `Payment terms:\nPrice Type:\nSent by:\nShipping marks:\nDelivery time:\nAll prices include tax:\nTotal Qty:`;
 
 const EMPTY_ITEM: QuotationItem = {
   description: "",
