@@ -43,6 +43,8 @@ import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
 import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
+import IncotermsManager from "@/components/settings/IncotermsManager";
+import PricingTiersManager from "@/components/settings/PricingTiersManager";
 import type { AccountWithLinks } from "@/types/supabase";
 
 type Tab = "profile" | "preferences" | "calendar" | "workspace";
@@ -167,7 +169,7 @@ function SettingsContent() {
             />
           )}
           {tab === "workspace" && isSuperAdmin && (
-            <PaymentTermsManager isSuperAdmin={isSuperAdmin} />
+            <WorkspaceTab isSuperAdmin={isSuperAdmin} />
           )}
         </div>
       </div>
@@ -176,6 +178,65 @@ function SettingsContent() {
 }
 
 /* ─────────────── Tab button ─────────────── */
+
+/* ───────────────────────────────────────────────────────────────────────
+   Workspace tab — sub-navigation for tenant-wide master data.
+
+   Three sections today, each backed by its own admin manager:
+     · Payment Terms — international-trade payment-method catalogue
+     · Incoterms     — ICC 2020 price-formula rules (FOB / CIF / DDP / …)
+     · Pricing Tiers — internal who-is-buying classification
+
+   The sub-nav stays compact and Apple-pill-style so it doesn't compete
+   visually with the top-level tabs (Workspace / Profile / etc).
+   ─────────────────────────────────────────────────────────────────────── */
+type WorkspaceSub = "payment-terms" | "incoterms" | "pricing-tiers";
+
+function WorkspaceTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [sub, setSub] = useState<WorkspaceSub>("payment-terms");
+  return (
+    <div className="space-y-4">
+      <nav className="flex flex-wrap gap-1.5">
+        <SubButton active={sub === "payment-terms"}  onClick={() => setSub("payment-terms")}>
+          Payment Terms
+        </SubButton>
+        <SubButton active={sub === "incoterms"}      onClick={() => setSub("incoterms")}>
+          Incoterms (Price Types)
+        </SubButton>
+        <SubButton active={sub === "pricing-tiers"}  onClick={() => setSub("pricing-tiers")}>
+          Pricing Tiers
+        </SubButton>
+      </nav>
+      {sub === "payment-terms" && <PaymentTermsManager isSuperAdmin={isSuperAdmin} />}
+      {sub === "incoterms"     && <IncotermsManager     isSuperAdmin={isSuperAdmin} />}
+      {sub === "pricing-tiers" && <PricingTiersManager  isSuperAdmin={isSuperAdmin} />}
+    </div>
+  );
+}
+
+function SubButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-[12px] font-medium px-3 py-1.5 rounded-full border transition ${
+        active
+          ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-[var(--bg-inverted)]"
+          : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] bg-[var(--bg-secondary)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function TabButton({
   active, onClick, icon, label,
