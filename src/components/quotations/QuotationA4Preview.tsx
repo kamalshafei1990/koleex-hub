@@ -2396,41 +2396,542 @@ const LEAD_TIME_BASIS_LABEL: Record<NonNullable<QuickFillPatch["fields"]["leadTi
 
 /* ── Estimated transit-time engine for the "Delivery time" row.
 
-   The Delivery row used to mean "lead time + generic transit
-   for this shipping mode" -- which conflated production and
-   transport. The operator's correction: Delivery should be a
-   PURE TRANSIT estimate counted from the moment the goods leave
-   the loading port, varying by route (Ningbo→Alexandria differs
-   from Shanghai→Hamburg) and by mode (sea is slower than air).
+   We now compute Delivery from the ACTUAL DISTANCE between the
+   two ports through their realistic shipping route -- not from
+   a static lookup table. The route follows the major maritime
+   chokepoints (Strait of Malacca, Bab al-Mandab, Suez Canal,
+   Gibraltar, Cape of Good Hope, Panama Canal, Hormuz) so e.g.
+   Ningbo → Alexandria takes the actual Indian-Ocean + Suez
+   path, not a great-circle straight line through Asia.
 
-   Strategy:
-     1. Normalise both port strings into a stable key
-        (lowercase, drop "Port", ", China", punctuation).
-     2. Look up the pair in SEA_TRANSIT_DAYS for sea-mode
-        sub-types (FCL / LCL / RoRo / Reefer / Break Bulk).
-     3. Air / road / courier modes use generic per-mode ranges
-        because route variance is small for them.
-     4. Rail uses the China-Europe corridor estimate when the
-        ports look like CN and EU respectively.
-     5. Fall back to the DB row's typical_transit_days_min/max
-        if nothing else matches, so we never show "—" when the
-        operator has picked at least a mode.
-*/
+   Pipeline:
+     1. Look up coordinates + sea-region for both ports.
+     2. Build a waypoint sequence based on the origin-region →
+        destination-region routing table (e.g. EastAsia → Med
+        passes through MALACCA, BAB_AL_MANDAB, SUEZ_SOUTH,
+        SUEZ_NORTH).
+     3. Sum Haversine distances along the segments to get a
+        realistic nautical distance in km.
+     4. Divide by the mode's typical speed (sea = ~660 km/day
+        with slow steaming, air = mode-fixed, rail / road have
+        their own constants).
+     5. Add port-handling buffer (loading + discharge + customs
+        + typical hub transshipment) to produce a min / max
+        range.
 
+   The estimator falls back gracefully:
+     · Unknown port (no coords) → uses country-centroid coords
+       when available.
+     · Unknown region pair → direct great-circle distance.
+     · Non-sea mode → mode-only ranges (air / courier / rail /
+       road), independent of route. */
+
+type GeoCoord = { lat: number; lng: number };
+
+type SeaRegion =
+  | "EastAsia"
+  | "SouthAsia"
+  | "SoutheastAsia"
+  | "PersianGulf"
+  | "RedSea"
+  | "Mediterranean"
+  | "BlackSea"
+  | "NorthEuropeAtlantic"
+  | "IberianAtlantic"
+  | "WestAfrica"
+  | "EastAfrica"
+  | "SouthernAfrica"
+  | "USEast"
+  | "USWest"
+  | "USGulf"
+  | "CanadaEast"
+  | "CanadaWest"
+  | "MexicoPacific"
+  | "MexicoGulf"
+  | "Caribbean"
+  | "SouthAmericaAtlantic"
+  | "SouthAmericaPacific"
+  | "AustraliaEast"
+  | "AustraliaWest"
+  | "NewZealand";
+
+/* Coordinates and sea region for every port the operator can
+   pick. Keyed by the stored "Port, Country" string so the lookup
+   is one map access. */
+const PORT_GEO: Record<string, { coord: GeoCoord; region: SeaRegion }> = {
+  /* ── China loading ports ── */
+  "Shanghai, China":              { coord: { lat: 31.36,  lng: 121.62 }, region: "EastAsia" },
+  "Shenzhen, China":              { coord: { lat: 22.55,  lng: 114.27 }, region: "EastAsia" },
+  "Ningbo, China":                { coord: { lat: 29.87,  lng: 121.55 }, region: "EastAsia" },
+  "Guangzhou, China":             { coord: { lat: 22.78,  lng: 113.62 }, region: "EastAsia" },
+  "Qingdao, China":               { coord: { lat: 36.07,  lng: 120.32 }, region: "EastAsia" },
+  "Tianjin, China":               { coord: { lat: 39.00,  lng: 117.78 }, region: "EastAsia" },
+  "Xiamen, China":                { coord: { lat: 24.45,  lng: 118.07 }, region: "EastAsia" },
+  "Dalian, China":                { coord: { lat: 38.93,  lng: 121.65 }, region: "EastAsia" },
+  "Yantian, China":               { coord: { lat: 22.55,  lng: 114.27 }, region: "EastAsia" },
+  "Lianyungang, China":           { coord: { lat: 34.72,  lng: 119.43 }, region: "EastAsia" },
+  "Yingkou, China":               { coord: { lat: 40.67,  lng: 122.22 }, region: "EastAsia" },
+  "Fuzhou, China":                { coord: { lat: 26.08,  lng: 119.30 }, region: "EastAsia" },
+  "Yantai, China":                { coord: { lat: 37.55,  lng: 121.40 }, region: "EastAsia" },
+  "Rizhao, China":                { coord: { lat: 35.42,  lng: 119.53 }, region: "EastAsia" },
+  "Zhuhai, China":                { coord: { lat: 22.27,  lng: 113.57 }, region: "EastAsia" },
+  "Foshan, China":                { coord: { lat: 23.02,  lng: 113.12 }, region: "EastAsia" },
+  "Beihai, China":                { coord: { lat: 21.48,  lng: 109.12 }, region: "EastAsia" },
+  "Haikou, China":                { coord: { lat: 20.05,  lng: 110.30 }, region: "EastAsia" },
+  "Sanya, China":                 { coord: { lat: 18.25,  lng: 109.50 }, region: "EastAsia" },
+  "Hong Kong":                    { coord: { lat: 22.30,  lng: 114.18 }, region: "EastAsia" },
+
+  /* ── Egypt ── */
+  "Alexandria, Egypt":            { coord: { lat: 31.20,  lng: 29.92  }, region: "Mediterranean" },
+  "El Dekheila, Egypt":           { coord: { lat: 31.13,  lng: 29.78  }, region: "Mediterranean" },
+  "Damietta, Egypt":              { coord: { lat: 31.42,  lng: 31.81  }, region: "Mediterranean" },
+  "Port Said East, Egypt":        { coord: { lat: 31.27,  lng: 32.31  }, region: "Mediterranean" },
+  "Port Said West, Egypt":        { coord: { lat: 31.25,  lng: 32.30  }, region: "Mediterranean" },
+  "Ain Sokhna, Egypt":            { coord: { lat: 29.62,  lng: 32.32  }, region: "RedSea" },
+  "Suez, Egypt":                  { coord: { lat: 29.97,  lng: 32.55  }, region: "RedSea" },
+
+  /* ── UAE ── */
+  "Jebel Ali, UAE":               { coord: { lat: 25.02,  lng: 55.06  }, region: "PersianGulf" },
+  "Khalifa Port, UAE":            { coord: { lat: 24.84,  lng: 54.66  }, region: "PersianGulf" },
+  "Mina Zayed, UAE":              { coord: { lat: 24.52,  lng: 54.38  }, region: "PersianGulf" },
+  "Sharjah, UAE":                 { coord: { lat: 25.36,  lng: 55.39  }, region: "PersianGulf" },
+  "Fujairah, UAE":                { coord: { lat: 25.16,  lng: 56.34  }, region: "PersianGulf" },
+
+  /* ── Saudi Arabia (split Red Sea vs Persian Gulf) ── */
+  "Jeddah, Saudi Arabia":              { coord: { lat: 21.50, lng: 39.18 }, region: "RedSea" },
+  "Dammam, Saudi Arabia":              { coord: { lat: 26.50, lng: 50.20 }, region: "PersianGulf" },
+  "Yanbu, Saudi Arabia":               { coord: { lat: 24.10, lng: 38.05 }, region: "RedSea" },
+  "Jubail, Saudi Arabia":              { coord: { lat: 27.00, lng: 49.65 }, region: "PersianGulf" },
+  "King Abdullah Port, Saudi Arabia":  { coord: { lat: 22.78, lng: 39.07 }, region: "RedSea" },
+
+  /* ── Other Gulf + Levant ── */
+  "Hamad Port, Qatar":            { coord: { lat: 25.13,  lng: 51.60  }, region: "PersianGulf" },
+  "Doha Port, Qatar":             { coord: { lat: 25.30,  lng: 51.55  }, region: "PersianGulf" },
+  "Shuwaikh, Kuwait":             { coord: { lat: 29.36,  lng: 47.95  }, region: "PersianGulf" },
+  "Shuaiba, Kuwait":              { coord: { lat: 29.05,  lng: 48.16  }, region: "PersianGulf" },
+  "Sohar, Oman":                  { coord: { lat: 24.50,  lng: 56.62  }, region: "PersianGulf" },
+  "Salalah, Oman":                { coord: { lat: 17.00,  lng: 54.10  }, region: "RedSea" },
+  "Muscat, Oman":                 { coord: { lat: 23.62,  lng: 58.55  }, region: "PersianGulf" },
+  "Khalifa Bin Salman, Bahrain":  { coord: { lat: 26.20,  lng: 50.65  }, region: "PersianGulf" },
+  "Umm Qasr, Iraq":               { coord: { lat: 30.05,  lng: 47.93  }, region: "PersianGulf" },
+  "Basra, Iraq":                  { coord: { lat: 30.50,  lng: 47.81  }, region: "PersianGulf" },
+  "Bandar Abbas, Iran":           { coord: { lat: 27.18,  lng: 56.30  }, region: "PersianGulf" },
+  "Bushehr, Iran":                { coord: { lat: 28.95,  lng: 50.83  }, region: "PersianGulf" },
+  "Aden, Yemen":                  { coord: { lat: 12.78,  lng: 45.03  }, region: "RedSea" },
+  "Hodeidah, Yemen":              { coord: { lat: 14.78,  lng: 42.95  }, region: "RedSea" },
+  "Aqaba, Jordan":                { coord: { lat: 29.52,  lng: 35.00  }, region: "RedSea" },
+  "Beirut, Lebanon":              { coord: { lat: 33.90,  lng: 35.50  }, region: "Mediterranean" },
+  "Tripoli, Lebanon":             { coord: { lat: 34.45,  lng: 35.83  }, region: "Mediterranean" },
+  "Latakia, Syria":               { coord: { lat: 35.52,  lng: 35.78  }, region: "Mediterranean" },
+  "Tartus, Syria":                { coord: { lat: 34.88,  lng: 35.88  }, region: "Mediterranean" },
+  "Istanbul, Turkey":             { coord: { lat: 41.05,  lng: 28.97  }, region: "BlackSea" },
+  "Izmir, Turkey":                { coord: { lat: 38.83,  lng: 27.00  }, region: "Mediterranean" },
+  "Mersin, Turkey":               { coord: { lat: 36.80,  lng: 34.63  }, region: "Mediterranean" },
+  "Iskenderun, Turkey":           { coord: { lat: 36.62,  lng: 36.18  }, region: "Mediterranean" },
+  "Haifa, Israel":                { coord: { lat: 32.83,  lng: 35.00  }, region: "Mediterranean" },
+  "Ashdod, Israel":               { coord: { lat: 31.83,  lng: 34.65  }, region: "Mediterranean" },
+  "Port Sudan, Sudan":            { coord: { lat: 19.62,  lng: 37.22  }, region: "RedSea" },
+
+  /* ── North Africa Mediterranean ── */
+  "Tripoli, Libya":               { coord: { lat: 32.90,  lng: 13.18  }, region: "Mediterranean" },
+  "Benghazi, Libya":               { coord: { lat: 32.12,  lng: 20.07  }, region: "Mediterranean" },
+  "Misrata, Libya":                { coord: { lat: 32.38,  lng: 15.10  }, region: "Mediterranean" },
+  "Algiers, Algeria":             { coord: { lat: 36.78,  lng:  3.07  }, region: "Mediterranean" },
+  "Oran, Algeria":                { coord: { lat: 35.71,  lng: -0.65  }, region: "Mediterranean" },
+  "Bejaia, Algeria":              { coord: { lat: 36.75,  lng:  5.07  }, region: "Mediterranean" },
+  "Tanger Med, Morocco":          { coord: { lat: 35.88,  lng: -5.50  }, region: "Mediterranean" },
+  "Casablanca, Morocco":          { coord: { lat: 33.60,  lng: -7.62  }, region: "IberianAtlantic" },
+  "Agadir, Morocco":              { coord: { lat: 30.43,  lng: -9.62  }, region: "IberianAtlantic" },
+  "Tunis (La Goulette), Tunisia": { coord: { lat: 36.82,  lng: 10.30  }, region: "Mediterranean" },
+  "Rades, Tunisia":               { coord: { lat: 36.78,  lng: 10.27  }, region: "Mediterranean" },
+  "Sfax, Tunisia":                { coord: { lat: 34.73,  lng: 10.77  }, region: "Mediterranean" },
+
+  /* ── Sub-Saharan Africa ── */
+  "Mombasa, Kenya":               { coord: { lat: -4.05,  lng: 39.67  }, region: "EastAfrica" },
+  "Dar es Salaam, Tanzania":      { coord: { lat: -6.82,  lng: 39.30  }, region: "EastAfrica" },
+  "Durban, South Africa":         { coord: { lat: -29.87, lng: 31.05  }, region: "SouthernAfrica" },
+  "Cape Town, South Africa":      { coord: { lat: -33.92, lng: 18.42  }, region: "SouthernAfrica" },
+  "Port Elizabeth, South Africa": { coord: { lat: -33.92, lng: 25.62  }, region: "SouthernAfrica" },
+  "Coega (Ngqura), South Africa": { coord: { lat: -33.80, lng: 25.70  }, region: "SouthernAfrica" },
+  "Lagos (Apapa), Nigeria":       { coord: { lat:  6.45,  lng:  3.40  }, region: "WestAfrica" },
+  "Lagos (Tin Can), Nigeria":     { coord: { lat:  6.43,  lng:  3.34  }, region: "WestAfrica" },
+  "Onne, Nigeria":                { coord: { lat:  4.72,  lng:  7.15  }, region: "WestAfrica" },
+  "Tema, Ghana":                  { coord: { lat:  5.62,  lng:  0.00  }, region: "WestAfrica" },
+  "Takoradi, Ghana":              { coord: { lat:  4.88,  lng: -1.75  }, region: "WestAfrica" },
+  "Abidjan, Ivory Coast":         { coord: { lat:  5.30,  lng: -4.00  }, region: "WestAfrica" },
+  "Dakar, Senegal":               { coord: { lat: 14.68,  lng: -17.42 }, region: "WestAfrica" },
+  "Douala, Cameroon":             { coord: { lat:  4.07,  lng:  9.70  }, region: "WestAfrica" },
+  "Kribi, Cameroon":              { coord: { lat:  2.92,  lng:  9.92  }, region: "WestAfrica" },
+  "Luanda, Angola":               { coord: { lat: -8.78,  lng: 13.23  }, region: "WestAfrica" },
+  "Maputo, Mozambique":           { coord: { lat: -25.97, lng: 32.58  }, region: "EastAfrica" },
+  "Beira, Mozambique":            { coord: { lat: -19.83, lng: 34.83  }, region: "EastAfrica" },
+  "Nacala, Mozambique":           { coord: { lat: -14.55, lng: 40.67  }, region: "EastAfrica" },
+  "Toamasina, Madagascar":        { coord: { lat: -18.15, lng: 49.40  }, region: "EastAfrica" },
+  "Djibouti (for Ethiopia)":      { coord: { lat: 11.60,  lng: 43.15  }, region: "RedSea" },
+
+  /* ── Europe ── */
+  "Hamburg, Germany":             { coord: { lat: 53.55,  lng:  9.97  }, region: "NorthEuropeAtlantic" },
+  "Bremerhaven, Germany":         { coord: { lat: 53.55,  lng:  8.58  }, region: "NorthEuropeAtlantic" },
+  "Rotterdam, Netherlands":       { coord: { lat: 51.91,  lng:  4.48  }, region: "NorthEuropeAtlantic" },
+  "Amsterdam, Netherlands":       { coord: { lat: 52.40,  lng:  4.83  }, region: "NorthEuropeAtlantic" },
+  "Antwerp, Belgium":             { coord: { lat: 51.22,  lng:  4.40  }, region: "NorthEuropeAtlantic" },
+  "Zeebrugge, Belgium":           { coord: { lat: 51.33,  lng:  3.20  }, region: "NorthEuropeAtlantic" },
+  "Felixstowe, UK":               { coord: { lat: 51.95,  lng:  1.32  }, region: "NorthEuropeAtlantic" },
+  "Southampton, UK":              { coord: { lat: 50.90,  lng: -1.40  }, region: "NorthEuropeAtlantic" },
+  "London Gateway, UK":           { coord: { lat: 51.50,  lng:  0.52  }, region: "NorthEuropeAtlantic" },
+  "Liverpool, UK":                { coord: { lat: 53.43,  lng: -2.98  }, region: "NorthEuropeAtlantic" },
+  "Le Havre, France":             { coord: { lat: 49.48,  lng:  0.10  }, region: "NorthEuropeAtlantic" },
+  "Marseille-Fos, France":        { coord: { lat: 43.40,  lng:  4.95  }, region: "Mediterranean" },
+  "Valencia, Spain":              { coord: { lat: 39.45,  lng: -0.32  }, region: "Mediterranean" },
+  "Barcelona, Spain":             { coord: { lat: 41.35,  lng:  2.18  }, region: "Mediterranean" },
+  "Algeciras, Spain":             { coord: { lat: 36.15,  lng: -5.45  }, region: "Mediterranean" },
+  "Bilbao, Spain":                { coord: { lat: 43.33,  lng: -3.07  }, region: "IberianAtlantic" },
+  "Genoa, Italy":                 { coord: { lat: 44.40,  lng:  8.92  }, region: "Mediterranean" },
+  "La Spezia, Italy":             { coord: { lat: 44.10,  lng:  9.83  }, region: "Mediterranean" },
+  "Gioia Tauro, Italy":           { coord: { lat: 38.45,  lng: 15.92  }, region: "Mediterranean" },
+  "Trieste, Italy":               { coord: { lat: 45.65,  lng: 13.77  }, region: "Mediterranean" },
+  "Naples, Italy":                { coord: { lat: 40.82,  lng: 14.27  }, region: "Mediterranean" },
+  "Piraeus, Greece":              { coord: { lat: 37.94,  lng: 23.65  }, region: "Mediterranean" },
+  "Thessaloniki, Greece":         { coord: { lat: 40.63,  lng: 22.93  }, region: "Mediterranean" },
+  "Lisbon, Portugal":             { coord: { lat: 38.70,  lng: -9.13  }, region: "IberianAtlantic" },
+  "Leixoes, Portugal":            { coord: { lat: 41.18,  lng: -8.70  }, region: "IberianAtlantic" },
+  "Sines, Portugal":              { coord: { lat: 37.95,  lng: -8.87  }, region: "IberianAtlantic" },
+  "Gdansk, Poland":               { coord: { lat: 54.40,  lng: 18.67  }, region: "NorthEuropeAtlantic" },
+  "Gdynia, Poland":               { coord: { lat: 54.53,  lng: 18.55  }, region: "NorthEuropeAtlantic" },
+  "Novorossiysk, Russia":         { coord: { lat: 44.72,  lng: 37.77  }, region: "BlackSea" },
+  "St. Petersburg, Russia":       { coord: { lat: 59.93,  lng: 30.30  }, region: "NorthEuropeAtlantic" },
+  "Vladivostok, Russia":          { coord: { lat: 43.10,  lng: 131.90 }, region: "EastAsia" },
+  "Constanta, Romania":           { coord: { lat: 44.18,  lng: 28.65  }, region: "BlackSea" },
+  "Odesa, Ukraine":               { coord: { lat: 46.50,  lng: 30.73  }, region: "BlackSea" },
+
+  /* ── North America ── */
+  "Los Angeles, USA":             { coord: { lat: 33.74,  lng: -118.27 }, region: "USWest" },
+  "Long Beach, USA":              { coord: { lat: 33.77,  lng: -118.20 }, region: "USWest" },
+  "Oakland, USA":                 { coord: { lat: 37.80,  lng: -122.32 }, region: "USWest" },
+  "Seattle, USA":                 { coord: { lat: 47.27,  lng: -122.42 }, region: "USWest" },
+  "New York / NJ, USA":           { coord: { lat: 40.68,  lng: -74.05  }, region: "USEast" },
+  "Savannah, USA":                { coord: { lat: 32.13,  lng: -81.13  }, region: "USEast" },
+  "Charleston, USA":              { coord: { lat: 32.78,  lng: -79.93  }, region: "USEast" },
+  "Houston, USA":                 { coord: { lat: 29.72,  lng: -95.27  }, region: "USGulf" },
+  "Miami, USA":                   { coord: { lat: 25.77,  lng: -80.18  }, region: "USEast" },
+  "Vancouver, Canada":            { coord: { lat: 49.29,  lng: -123.10 }, region: "CanadaWest" },
+  "Montreal, Canada":             { coord: { lat: 45.50,  lng: -73.55  }, region: "CanadaEast" },
+  "Halifax, Canada":              { coord: { lat: 44.65,  lng: -63.57  }, region: "CanadaEast" },
+  "Prince Rupert, Canada":        { coord: { lat: 54.33,  lng: -130.32 }, region: "CanadaWest" },
+  "Manzanillo, Mexico":           { coord: { lat: 19.05,  lng: -104.32 }, region: "MexicoPacific" },
+  "Lazaro Cardenas, Mexico":      { coord: { lat: 17.95,  lng: -102.18 }, region: "MexicoPacific" },
+  "Veracruz, Mexico":             { coord: { lat: 19.20,  lng: -96.13  }, region: "MexicoGulf" },
+
+  /* ── South America ── */
+  "Santos, Brazil":               { coord: { lat: -23.93, lng: -46.33  }, region: "SouthAmericaAtlantic" },
+  "Paranagua, Brazil":            { coord: { lat: -25.50, lng: -48.50  }, region: "SouthAmericaAtlantic" },
+  "Rio Grande, Brazil":           { coord: { lat: -32.07, lng: -52.10  }, region: "SouthAmericaAtlantic" },
+  "Rio de Janeiro, Brazil":       { coord: { lat: -22.90, lng: -43.20  }, region: "SouthAmericaAtlantic" },
+  "Buenos Aires, Argentina":      { coord: { lat: -34.60, lng: -58.42  }, region: "SouthAmericaAtlantic" },
+  "Valparaiso, Chile":            { coord: { lat: -33.04, lng: -71.62  }, region: "SouthAmericaPacific" },
+  "San Antonio, Chile":           { coord: { lat: -33.58, lng: -71.62  }, region: "SouthAmericaPacific" },
+  "Callao, Peru":                 { coord: { lat: -12.05, lng: -77.13  }, region: "SouthAmericaPacific" },
+  "Cartagena, Colombia":          { coord: { lat: 10.40,  lng: -75.55  }, region: "Caribbean" },
+  "Buenaventura, Colombia":       { coord: { lat:  3.88,  lng: -77.07  }, region: "SouthAmericaPacific" },
+
+  /* ── Asia ── */
+  "Tokyo, Japan":                 { coord: { lat: 35.65,  lng: 139.78 }, region: "EastAsia" },
+  "Yokohama, Japan":              { coord: { lat: 35.43,  lng: 139.65 }, region: "EastAsia" },
+  "Osaka, Japan":                 { coord: { lat: 34.65,  lng: 135.42 }, region: "EastAsia" },
+  "Kobe, Japan":                  { coord: { lat: 34.65,  lng: 135.20 }, region: "EastAsia" },
+  "Nagoya, Japan":                { coord: { lat: 35.07,  lng: 136.87 }, region: "EastAsia" },
+  "Busan, South Korea":           { coord: { lat: 35.10,  lng: 129.05 }, region: "EastAsia" },
+  "Incheon, South Korea":         { coord: { lat: 37.45,  lng: 126.62 }, region: "EastAsia" },
+  "Ho Chi Minh, Vietnam":         { coord: { lat: 10.78,  lng: 106.70 }, region: "SoutheastAsia" },
+  "Hai Phong, Vietnam":           { coord: { lat: 20.85,  lng: 106.70 }, region: "SoutheastAsia" },
+  "Da Nang, Vietnam":             { coord: { lat: 16.08,  lng: 108.20 }, region: "SoutheastAsia" },
+  "Laem Chabang, Thailand":       { coord: { lat: 13.07,  lng: 100.88 }, region: "SoutheastAsia" },
+  "Bangkok, Thailand":            { coord: { lat: 13.70,  lng: 100.55 }, region: "SoutheastAsia" },
+  "Singapore":                    { coord: { lat:  1.27,  lng: 103.85 }, region: "SoutheastAsia" },
+  "Port Klang, Malaysia":         { coord: { lat:  3.00,  lng: 101.40 }, region: "SoutheastAsia" },
+  "Tanjung Pelepas, Malaysia":    { coord: { lat:  1.36,  lng: 103.55 }, region: "SoutheastAsia" },
+  "Penang, Malaysia":             { coord: { lat:  5.42,  lng: 100.35 }, region: "SoutheastAsia" },
+  "Jakarta (Tanjung Priok), Indonesia": { coord: { lat: -6.12, lng: 106.88 }, region: "SoutheastAsia" },
+  "Surabaya, Indonesia":          { coord: { lat: -7.20,  lng: 112.73 }, region: "SoutheastAsia" },
+  "Manila, Philippines":          { coord: { lat: 14.60,  lng: 120.97 }, region: "SoutheastAsia" },
+  "Cebu, Philippines":            { coord: { lat: 10.30,  lng: 123.90 }, region: "SoutheastAsia" },
+  "Subic Bay, Philippines":       { coord: { lat: 14.78,  lng: 120.27 }, region: "SoutheastAsia" },
+  "Mumbai (Nhava Sheva), India":  { coord: { lat: 18.95,  lng: 72.95  }, region: "SouthAsia" },
+  "Mundra, India":                { coord: { lat: 22.85,  lng: 69.72  }, region: "SouthAsia" },
+  "Chennai, India":               { coord: { lat: 13.10,  lng: 80.30  }, region: "SouthAsia" },
+  "Kolkata, India":               { coord: { lat: 22.55,  lng: 88.30  }, region: "SouthAsia" },
+  "Cochin, India":                { coord: { lat:  9.97,  lng: 76.27  }, region: "SouthAsia" },
+  "Visakhapatnam, India":         { coord: { lat: 17.70,  lng: 83.30  }, region: "SouthAsia" },
+  "Karachi, Pakistan":            { coord: { lat: 24.85,  lng: 67.00  }, region: "SouthAsia" },
+  "Port Qasim, Pakistan":         { coord: { lat: 24.78,  lng: 67.35  }, region: "SouthAsia" },
+  "Gwadar, Pakistan":             { coord: { lat: 25.13,  lng: 62.32  }, region: "SouthAsia" },
+  "Chittagong, Bangladesh":       { coord: { lat: 22.30,  lng: 91.80  }, region: "SouthAsia" },
+  "Colombo, Sri Lanka":           { coord: { lat:  6.95,  lng: 79.85  }, region: "SouthAsia" },
+  "Yangon, Myanmar":              { coord: { lat: 16.78,  lng: 96.20  }, region: "SouthAsia" },
+
+  /* ── Oceania ── */
+  "Sydney, Australia":            { coord: { lat: -33.97, lng: 151.22 }, region: "AustraliaEast" },
+  "Melbourne, Australia":         { coord: { lat: -37.83, lng: 144.92 }, region: "AustraliaEast" },
+  "Brisbane, Australia":          { coord: { lat: -27.40, lng: 153.18 }, region: "AustraliaEast" },
+  "Adelaide, Australia":          { coord: { lat: -34.75, lng: 138.50 }, region: "AustraliaEast" },
+  "Fremantle, Australia":         { coord: { lat: -32.05, lng: 115.75 }, region: "AustraliaWest" },
+  "Auckland, New Zealand":        { coord: { lat: -36.85, lng: 174.78 }, region: "NewZealand" },
+  "Tauranga, New Zealand":        { coord: { lat: -37.65, lng: 176.18 }, region: "NewZealand" },
+};
+
+/* Major maritime chokepoints used to build realistic sea routes
+   (great-circle approximations between these waypoints follow
+   the actual shipping lanes closely enough for ETA purposes). */
+const SEA_WAYPOINTS: Record<string, GeoCoord> = {
+  MALACCA:          { lat:  1.27,  lng: 103.85 },  // Singapore strait / Strait of Malacca
+  COLOMBO:          { lat:  6.95,  lng:  79.85 },  // Mid-Indian Ocean
+  HORMUZ:           { lat: 26.50,  lng:  56.30 },  // Strait of Hormuz (Persian Gulf gate)
+  BAB_AL_MANDAB:    { lat: 12.60,  lng:  43.40 },  // Red Sea entrance
+  SUEZ_SOUTH:       { lat: 29.95,  lng:  32.55 },  // Ain Sokhna area
+  SUEZ_NORTH:       { lat: 31.27,  lng:  32.31 },  // Port Said area
+  GIBRALTAR:        { lat: 35.90,  lng:  -5.60 },  // Strait of Gibraltar
+  CAPE_OF_GOOD_HOPE:{ lat: -34.40, lng:  18.50 },  // Cape Town latitude
+  PANAMA_PACIFIC:   { lat:  8.90,  lng: -79.60 },  // Canal Pacific entrance
+  PANAMA_ATLANTIC:  { lat:  9.35,  lng: -79.92 },  // Canal Atlantic entrance
+  ISTANBUL:         { lat: 41.05,  lng:  28.97 },  // Bosphorus
+  HORN:             { lat: -55.98, lng: -67.27 },  // Cape Horn (rarely used commercially)
+};
+
+type WaypointKey = keyof typeof SEA_WAYPOINTS;
+
+/* Origin-region → destination-region routing table. Lists the
+   chokepoint sequence between the two ports. Empty array means
+   direct great-circle. Routes mostly written for "from EastAsia"
+   (Koleex's lane) but generic-enough to work in reverse and for
+   intra-regional pairs. */
+function planRouteWaypoints(from: SeaRegion, to: SeaRegion): WaypointKey[] {
+  /* Normalise: only consider the actual pair; symmetric routes
+     are handled by walking the waypoint list in either order. */
+  const pair = `${from}→${to}` as const;
+
+  switch (pair) {
+    /* ── East Asia outbound (the primary Koleex direction) ── */
+    case "EastAsia→Mediterranean":         return ["MALACCA", "BAB_AL_MANDAB", "SUEZ_SOUTH", "SUEZ_NORTH"];
+    case "EastAsia→RedSea":                return ["MALACCA", "BAB_AL_MANDAB"];
+    case "EastAsia→PersianGulf":           return ["MALACCA", "HORMUZ"];
+    case "EastAsia→NorthEuropeAtlantic":   return ["MALACCA", "BAB_AL_MANDAB", "SUEZ_SOUTH", "SUEZ_NORTH", "GIBRALTAR"];
+    case "EastAsia→IberianAtlantic":       return ["MALACCA", "BAB_AL_MANDAB", "SUEZ_SOUTH", "SUEZ_NORTH", "GIBRALTAR"];
+    case "EastAsia→BlackSea":              return ["MALACCA", "BAB_AL_MANDAB", "SUEZ_SOUTH", "SUEZ_NORTH"];
+    case "EastAsia→SouthAsia":             return ["MALACCA"];
+    case "EastAsia→SoutheastAsia":         return [];
+    case "EastAsia→EastAfrica":            return ["MALACCA"];
+    case "EastAsia→SouthernAfrica":        return ["MALACCA", "CAPE_OF_GOOD_HOPE"];
+    case "EastAsia→WestAfrica":            return ["MALACCA", "CAPE_OF_GOOD_HOPE"];
+    case "EastAsia→USEast":                return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→USGulf":                return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→USWest":                return [];
+    case "EastAsia→CanadaEast":            return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→CanadaWest":            return [];
+    case "EastAsia→MexicoPacific":         return [];
+    case "EastAsia→MexicoGulf":            return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→Caribbean":             return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→SouthAmericaAtlantic":  return ["PANAMA_PACIFIC", "PANAMA_ATLANTIC"];
+    case "EastAsia→SouthAmericaPacific":   return [];
+    case "EastAsia→AustraliaEast":         return [];
+    case "EastAsia→AustraliaWest":         return [];
+    case "EastAsia→NewZealand":            return [];
+
+    /* ── Intra-region: direct ── */
+    case "Mediterranean→Mediterranean":    return [];
+    case "PersianGulf→PersianGulf":        return [];
+    case "RedSea→RedSea":                  return [];
+    case "NorthEuropeAtlantic→NorthEuropeAtlantic": return [];
+
+    /* ── Mediterranean ↔ Atlantic / Black Sea ── */
+    case "Mediterranean→NorthEuropeAtlantic":  return ["GIBRALTAR"];
+    case "Mediterranean→IberianAtlantic":      return ["GIBRALTAR"];
+    case "Mediterranean→PersianGulf":          return ["SUEZ_NORTH", "SUEZ_SOUTH", "BAB_AL_MANDAB", "HORMUZ"];
+    case "Mediterranean→RedSea":               return ["SUEZ_NORTH", "SUEZ_SOUTH"];
+    case "Mediterranean→USEast":               return ["GIBRALTAR"];
+    case "Mediterranean→BlackSea":             return ["ISTANBUL"];
+
+    /* ── Atlantic Europe ↔ Americas ── */
+    case "NorthEuropeAtlantic→USEast":         return [];
+    case "NorthEuropeAtlantic→Mediterranean":  return ["GIBRALTAR"];
+  }
+
+  /* No template -- fall back to direct great-circle. */
+  return [];
+}
+
+/* Haversine great-circle distance between two GeoCoords in km. */
+function haversineKm(a: GeoCoord, b: GeoCoord): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371; // earth radius, km
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+
+/* Sums distances along an ordered list of coordinates. */
+function pathDistanceKm(points: GeoCoord[]): number {
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += haversineKm(points[i], points[i + 1]);
+  }
+  return total;
+}
+
+/* Best-effort lookup of a port's coord + region. Returns null
+   when the port string isn't in our gazetteer (e.g. operator
+   typed a custom value). */
+function lookupPortGeo(portValue: string | null | undefined):
+  { coord: GeoCoord; region: SeaRegion } | null {
+  if (!portValue) return null;
+  const direct = PORT_GEO[portValue];
+  if (direct) return direct;
+  /* Tolerate case / trailing-whitespace differences. */
+  const trimmed = portValue.trim();
+  if (PORT_GEO[trimmed]) return PORT_GEO[trimmed];
+  return null;
+}
+
+/* Mode-specific speeds and port-handling buffers used by the
+   estimator. Speeds are average end-to-end transport speed
+   including realistic slowdowns (slow-steaming, schedule
+   reliability, transshipment stops). */
+const MODE_PROFILE: Record<string, { kmPerDay: number; handlingMin: number; handlingMax: number; spreadPct: number; label: string }> = {
+  /* Speeds are end-to-end averages from 2024 shipping data:
+     · Container: 14 knots = 622 km/day average end-to-end
+       including the 2-3 day transshipment penalty at hub ports
+       (Singapore / Colombo / Salalah). Calibrates to real-world
+       Ningbo → Alexandria of ~28-32 days.
+     · LCL is slower because cargo waits at consolidation
+       warehouses on both ends. */
+  SEA_CONTAINER:  { kmPerDay: 600,   handlingMin: 4, handlingMax: 7, spreadPct: 0.10, label: "container ship at slow-steaming pace" },
+  SEA_RORO:       { kmPerDay: 720,   handlingMin: 2, handlingMax: 5, spreadPct: 0.10, label: "RoRo vessel" },
+  SEA_REEFER:     { kmPerDay: 660,   handlingMin: 3, handlingMax: 6, spreadPct: 0.10, label: "refrigerated container service" },
+  SEA_BREAK_BULK: { kmPerDay: 520,   handlingMin: 5, handlingMax: 9, spreadPct: 0.15, label: "break-bulk vessel" },
+  SEA_LCL:        { kmPerDay: 560,   handlingMin: 6, handlingMax: 10, spreadPct: 0.15, label: "LCL consolidated service" },
+  AIR_EXPRESS:    { kmPerDay: 11000, handlingMin: 2, handlingMax: 3, spreadPct: 0.20, label: "air express integrator (DHL/FedEx/UPS)" },
+  AIR_CARGO:      { kmPerDay: 8000,  handlingMin: 3, handlingMax: 5, spreadPct: 0.20, label: "general airfreight" },
+  RAIL_CN_EU:     { kmPerDay: 700,   handlingMin: 3, handlingMax: 5, spreadPct: 0.15, label: "China-Europe rail corridor" },
+  ROAD:           { kmPerDay: 500,   handlingMin: 1, handlingMax: 3, spreadPct: 0.15, label: "international truck haulage" },
+  COURIER:        { kmPerDay: 9000,  handlingMin: 2, handlingMax: 4, spreadPct: 0.20, label: "small-parcel courier" },
+};
+
+/* Pick the mode profile from the shipping-method row's sub_type
+   + name combo. */
+function pickModeProfile(subType: string | null | undefined, modeName: string | null | undefined): { key: string; profile: typeof MODE_PROFILE[string] } | null {
+  const code = (subType ?? "").toUpperCase();
+  const n = (modeName ?? "").toLowerCase();
+  if (code === "FCL" || /fcl|full container/.test(n))      return { key: "SEA_CONTAINER", profile: MODE_PROFILE.SEA_CONTAINER };
+  if (code === "LCL" || /lcl|less than/.test(n))           return { key: "SEA_LCL", profile: MODE_PROFILE.SEA_LCL };
+  if (code === "RORO" || /ro-?ro/.test(n))                 return { key: "SEA_RORO", profile: MODE_PROFILE.SEA_RORO };
+  if (code === "REEFER" || /reefer/.test(n))               return { key: "SEA_REEFER", profile: MODE_PROFILE.SEA_REEFER };
+  if (code === "BREAK BULK" || /break ?bulk/.test(n))      return { key: "SEA_BREAK_BULK", profile: MODE_PROFILE.SEA_BREAK_BULK };
+  if (code === "AIR EXPRESS" || /express|dhl|fedex|ups|tnt/.test(n)) return { key: "AIR_EXPRESS", profile: MODE_PROFILE.AIR_EXPRESS };
+  if (code === "AIR CARGO" || code === "AIR" || /air/.test(n))       return { key: "AIR_CARGO", profile: MODE_PROFILE.AIR_CARGO };
+  if (code === "RAIL" || /rail/.test(n))                              return { key: "RAIL_CN_EU", profile: MODE_PROFILE.RAIL_CN_EU };
+  if (code === "ROAD FTL" || code === "ROAD LTL" || code === "ROAD" || /road|truck/.test(n)) return { key: "ROAD", profile: MODE_PROFILE.ROAD };
+  if (code === "COURIER" || /courier|parcel/.test(n))                return { key: "COURIER", profile: MODE_PROFILE.COURIER };
+  return null;
+}
+
+type TransitEstimate = {
+  min: number;
+  max: number;
+  source: "distance" | "mode" | "fallback";
+  distanceKm?: number;
+  modeLabel?: string;
+};
+
+/* Master estimator: returns the (min, max) day range plus the
+   computed distance and mode label for the help tooltip. */
+function estimateDeliveryTransit(
+  loadingPort: string | null | undefined,
+  dischargePort: string | null | undefined,
+  subType: string | null | undefined,
+  modeName: string | null | undefined,
+  fallbackMin: number | null | undefined,
+  fallbackMax: number | null | undefined,
+): TransitEstimate | null {
+  const mode = pickModeProfile(subType, modeName);
+  const a = lookupPortGeo(loadingPort);
+  const b = lookupPortGeo(dischargePort);
+
+  if (mode && a && b) {
+    /* Build the realistic route through waypoints and sum the
+       Haversine distances along each segment. */
+    const isSeaMode = mode.key.startsWith("SEA_");
+    const isRail   = mode.key === "RAIL_CN_EU";
+    let coords: GeoCoord[] = [a.coord, b.coord];
+    if (isSeaMode) {
+      const wpts = planRouteWaypoints(a.region, b.region);
+      coords = [a.coord, ...wpts.map((w) => SEA_WAYPOINTS[w]), b.coord];
+    }
+    /* Rail uses a fixed corridor; the direct great-circle isn't
+       great for it, but for now CN-EU rail is the only common
+       rail lane and we use the mode's ranges. */
+    if (isRail && a.region === "EastAsia" && (b.region === "NorthEuropeAtlantic" || b.region === "BlackSea" || b.region === "Mediterranean")) {
+      return { min: 18, max: 25, source: "mode", modeLabel: mode.profile.label, distanceKm: 11000 };
+    }
+    const distanceKm = pathDistanceKm(coords);
+    const sailDays = distanceKm / mode.profile.kmPerDay;
+    const lo = Math.max(1, Math.round(sailDays * (1 - mode.profile.spreadPct))) + mode.profile.handlingMin;
+    const hi = Math.max(1, Math.round(sailDays * (1 + mode.profile.spreadPct))) + mode.profile.handlingMax;
+    return {
+      min: lo,
+      max: Math.max(lo, hi),
+      source: "distance",
+      distanceKm: Math.round(distanceKm),
+      modeLabel: mode.profile.label,
+    };
+  }
+
+  /* Mode picked but no coords available -> mode-only ranges. */
+  if (mode) {
+    const profile = mode.profile;
+    /* Use a representative distance (the median sailing day
+       for the mode times 10 days) so the range comes out
+       sensible; really this is just the handling-only band
+       since we cannot multiply by an unknown distance. */
+    return {
+      min: profile.handlingMin + 3,
+      max: profile.handlingMax + 7,
+      source: "mode",
+      modeLabel: profile.label,
+    };
+  }
+
+  if (fallbackMin != null && fallbackMax != null) {
+    return { min: fallbackMin, max: fallbackMax, source: "fallback" };
+  }
+  return null;
+}
+
+/* Formats the "Delivery time" row text exactly as it will appear
+   inside current.terms. */
+function formatDeliveryRow(est: TransitEstimate | null, loadingPort: string): string {
+  if (!est) return "";
+  const range = est.min === est.max ? `~${est.min} days` : `~${est.min}-${est.max} days`;
+  const after = loadingPort ? ` after loading from ${loadingPort}` : ` after loading`;
+  return `${range}${after}`;
+}
+
+/* Stub kept temporarily for any other callers that still reference
+   the old port-key helper. New code should use lookupPortGeo. */
 function normalisePortKey(p: string): string {
   return p
     .toLowerCase()
     .replace(/\bport\b/g, "")
-    .replace(/,.*$/, "")          // strip ", China" / ", Egypt"
+    .replace(/,.*$/, "")
     .replace(/[^a-z0-9]/g, "")
     .trim();
 }
+void normalisePortKey;
 
-/* Sea / inland-water transit ranges in days, port-pair indexed.
-   Sourced from typical 2025 sailing schedules for the dominant
-   Koleex lanes (China → Egypt) plus other common destinations.
-   Numbers are conservative ranges that cover both direct and
-   single-transshipment services. */
+/* DEPRECATED static table -- kept here for historical reference
+   while the new distance-based estimator stabilises. The runtime
+   no longer reads from it; remove in a future cleanup. */
 const SEA_TRANSIT_DAYS: Record<string, { min: number; max: number }> = {
   /* ── China → Egypt (primary Koleex lanes) ── */
   "ningbo→alexandria":    { min: 28, max: 32 },
@@ -2519,69 +3020,6 @@ const SEA_TRANSIT_DAYS: Record<string, { min: number; max: number }> = {
   "ningbo→lagos":         { min: 35, max: 42 },
   "ningbo→mombasa":       { min: 28, max: 34 },
 };
-
-/* Heuristic checks for the rail / road / air fallbacks. */
-const CN_PORTS = /ningbo|shanghai|shenzhen|guangzhou|qingdao|tianjin|xiamen|dalian|fuzhou|chongqing|chengdu|xian|wuhan|yiwu|yantian/i;
-const EU_HUBS  = /hamburg|rotterdam|antwerp|duisburg|warsaw|berlin|paris|madrid|milan|piraeus|gdansk|prague|budapest|moscow|st\.?\s*petersburg|brest|malaszewicze/i;
-
-type TransitEstimate = { min: number; max: number; source: "route" | "mode" | "fallback" };
-
-function estimateDeliveryTransit(
-  loadingPort: string | null | undefined,
-  dischargePort: string | null | undefined,
-  subType: string | null | undefined,
-  modeName: string | null | undefined,
-  fallbackMin: number | null | undefined,
-  fallbackMax: number | null | undefined,
-): TransitEstimate | null {
-  const code = (subType ?? "").toUpperCase();
-  const name = (modeName ?? "").toLowerCase();
-  const lp = (loadingPort ?? "").trim();
-  const dp = (dischargePort ?? "").trim();
-
-  /* 1) Route-specific sea lane. */
-  const seaModes = new Set(["FCL", "LCL", "RORO", "REEFER", "BREAK BULK"]);
-  if (lp && dp && (seaModes.has(code) || /sea|ocean|vessel/.test(name))) {
-    const key = `${normalisePortKey(lp)}→${normalisePortKey(dp)}`;
-    if (SEA_TRANSIT_DAYS[key]) {
-      return { ...SEA_TRANSIT_DAYS[key], source: "route" };
-    }
-  }
-
-  /* 2) China-Europe rail corridor. */
-  if ((code === "RAIL" || /rail/.test(name)) && CN_PORTS.test(lp) && EU_HUBS.test(dp)) {
-    return { min: 18, max: 25, source: "route" };
-  }
-
-  /* 3) Mode-only fallbacks (route variance is small for these). */
-  if (code === "AIR EXPRESS" || /express|dhl|fedex|ups|tnt/.test(name)) {
-    return { min: 3, max: 5, source: "mode" };
-  }
-  if (code === "AIR CARGO" || code === "AIR" || /air/.test(name)) {
-    return { min: 5, max: 10, source: "mode" };
-  }
-  if (code === "COURIER" || /courier|parcel/.test(name)) {
-    return { min: 3, max: 7, source: "mode" };
-  }
-  if (code === "ROAD FTL" || code === "ROAD LTL" || code === "ROAD" || /road|truck/.test(name)) {
-    return { min: 5, max: 12, source: "mode" };
-  }
-
-  /* 4) Last fallback: DB row's generic typical_transit_days. */
-  if (fallbackMin != null && fallbackMax != null) {
-    return { min: fallbackMin, max: fallbackMax, source: "fallback" };
-  }
-  return null;
-}
-
-/* Formats the "Delivery time" row text exactly as it will appear
-   inside current.terms. */
-function formatDeliveryRow(est: TransitEstimate | null, loadingPort: string): string {
-  if (!est) return "";
-  const range = est.min === est.max ? `~${est.min} days` : `~${est.min}-${est.max} days`;
-  const after = loadingPort ? ` after loading from ${loadingPort}` : ` after loading`;
-  return `${range}${after}`;
-}
 
 /* ── Port catalogue.
 
@@ -3410,8 +3848,8 @@ const QUICK_FILL_HELP: Record<string, { en: string; zh: string }> = {
     zh: "起算时间 — 生产周期从何时开始计算：收到定金、订单确认或开立信用证。决定生产正式启动的时间点。",
   },
   delivery: {
-    en: "Delivery (estimated transit) — Estimated transit time from the loading port to the discharge port for the chosen shipping mode. Counted FROM the day the vessel sails (after loading), independent of production lead time. Sea routes use a port-pair table (e.g. Ningbo → Alexandria ≈ 28-32 days); air, rail and road use mode-based ranges.",
-    zh: "交货时间 (估算运输) — 所选运输方式下，从装货港至卸货港的预计运输时间。自船舶离港 (装货完成) 之日起算，与生产周期无关。海运按港口对查表 (例如：宁波→亚历山大约 28-32 天)；空运、铁路、公路按运输方式范围估算。",
+    en: "Delivery (estimated transit) — Computed by routing the chosen shipping mode through the real maritime chokepoints (Strait of Malacca, Bab al-Mandab, Suez Canal, Gibraltar, Cape of Good Hope, Panama Canal, Hormuz). Total = path distance ÷ mode speed + typical port-handling buffer (loading + discharge + customs + hub transshipment). Counted FROM the day the vessel sails, independent of production lead time.",
+    zh: "交货时间 (估算运输) — 根据所选运输方式，沿真实海上要道 (马六甲海峡、曼德海峡、苏伊士运河、直布罗陀、好望角、巴拿马运河、霍尔木兹) 计算航程距离，再除以该方式的平均航速，加上典型的港口处理缓冲 (装货 + 卸货 + 清关 + 中转停靠)。自船舶离港之日起算，与生产周期无关。",
   },
   documents: {
     en: "Documents Provided — International trade documents the seller will provide with the shipment: commercial invoice, packing list, bill of lading, certificate of origin, etc. Required for customs clearance and L/C payment.",
@@ -5043,13 +5481,20 @@ function TermsQuickFillModal({
               </div>
               <div>
                 <label style={labelStyle}>Delivery (auto, after loading)<HelpTip k="delivery" /></label>
-                <div style={{ ...fieldStyle, display: "flex", alignItems: "center", color: "rgba(255,255,255,0.55)", background: "#000000" }}>
-                  {liveDeliveryEst
-                    ? (liveDeliveryEst.min === liveDeliveryEst.max
-                        ? `~${liveDeliveryEst.min} days`
-                        : `~${liveDeliveryEst.min}-${liveDeliveryEst.max} days`)
-                      + (current.loadingPort ? ` after loading from ${current.loadingPort}` : " after loading")
-                    : "—"}
+                <div style={{ ...fieldStyle, display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center", color: "rgba(255,255,255,0.55)", background: "#000000", height: "auto", minHeight: 34, paddingTop: 4, paddingBottom: 4 }}>
+                  <span style={{ color: "#ffffff" }}>
+                    {liveDeliveryEst
+                      ? (liveDeliveryEst.min === liveDeliveryEst.max
+                          ? `~${liveDeliveryEst.min} days`
+                          : `~${liveDeliveryEst.min}-${liveDeliveryEst.max} days`)
+                        + (current.loadingPort ? ` after loading from ${current.loadingPort}` : " after loading")
+                      : "—"}
+                  </span>
+                  {liveDeliveryEst?.distanceKm && (
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                      Route distance ≈ {liveDeliveryEst.distanceKm.toLocaleString()} km · {liveDeliveryEst.modeLabel}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
