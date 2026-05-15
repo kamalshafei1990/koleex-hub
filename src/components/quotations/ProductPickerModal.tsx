@@ -73,7 +73,12 @@ export default function ProductPickerModal({
     const t = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/quotations/catalog-search?q=${encodeURIComponent(query)}&limit=60`,
+          /* Pull the full catalog (server caps at 2000) so the
+             picker can find any model, not just the first 60. The
+             list is virtualised only if it gets unwieldy — for now
+             the modal scrolls cleanly through a tenant-sized
+             catalog without UX issues. */
+          `/api/quotations/catalog-search?q=${encodeURIComponent(query)}&limit=2000`,
           { credentials: "include", signal: controller.signal },
         );
         if (!res.ok) {

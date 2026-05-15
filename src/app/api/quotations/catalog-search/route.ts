@@ -66,18 +66,21 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
+  /* Hard cap on what we ever return in one response. Tenants with
+     more SKUs than this would need a scrolled / paginated picker —
+     none today exceed ~2k models, well under the cap. */
   const limit = Math.min(
-    Math.max(1, Number(url.searchParams.get("limit") ?? 40)),
-    100,
+    Math.max(1, Number(url.searchParams.get("limit") ?? 2000)),
+    2000,
   );
 
-  /* Pull a slightly larger set of models than `limit` so we can filter
-     to those whose parent product is visible without re-querying. */
-  const fetchSize = limit * 3;
-
-  /* Run the three queries in parallel. Filtering happens in app code
-     after the join — the dataset (one tenant's catalog) is small
-     enough that this is cheaper than the equivalent SQL view. */
+  /* Three queries in parallel. We deliberately do NOT cap the
+     product_models query — capping it at `limit * 3` meant the
+     server only ever scanned the first ~180 models, so a search
+     for an SKU that lived past that slot returned nothing. The
+     full catalog is small enough (one tenant's products) to load
+     into memory in one pass, and we cap the OUTPUT after the
+     filter so the response payload stays bounded. */
   const productsQuery = supabaseServer
     .from("products")
     .select("id, product_name, status, visible");
@@ -86,8 +89,7 @@ export async function GET(req: Request) {
     .select(
       "id, product_id, model_name, sku, global_price, head_only_price, complete_set_price, visible, status",
     )
-    .order("order", { ascending: true })
-    .limit(fetchSize);
+    .order("order", { ascending: true });
   const mediaQuery = supabaseServer
     .from("product_media")
     .select("product_id, url, order")
