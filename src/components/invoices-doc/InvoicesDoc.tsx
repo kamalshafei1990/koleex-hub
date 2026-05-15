@@ -98,6 +98,8 @@ export interface Invoice {
   dischargePort?: string;
   shippingMethodId?: string;
   shippingMarks?: string;
+  /* Global discount as a percentage (0-100). See Quotations.tsx. */
+  discountPct?: number;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
   /* Lifecycle:
@@ -221,6 +223,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
     dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
     shippingMarks: doc.shippingMarks,
+    discountPct: typeof doc.discountPct === "number" ? doc.discountPct : undefined,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
@@ -247,10 +250,13 @@ export function fromRow(row: RemoteDocRow): Invoice {
 }
 
 /** Compute the grand total the same way the UI renders it. Mirrors the
- *  GRAND TOTAL row so the list can show totals without re-rendering. */
+ *  GRAND TOTAL row so the list can show totals without re-rendering.
+ *  Applies discountPct after summing subtotal + tax + shipping + others. */
 function computeGrandTotal(q: Invoice): number {
   const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
-  return +(subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0)).toFixed(2);
+  const base = subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0);
+  const pct = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
+  return +(base * (1 - pct / 100)).toFixed(2);
 }
 
 /** Parse a DD/MM/YYYY (or DD-MM-YYYY) string into ISO. Best-effort. */
@@ -1370,12 +1376,18 @@ export default function Quotations() {
     [updateItem]
   );
 
-  /* ── Computed totals ── */
+  /* ── Computed totals ──
+     Pre-discount base = subtotal + tax + shipping + others
+     Grand total       = base * (1 - discountPct/100). */
   const subTotal = current
     ? current.items.reduce((s, i) => s + i.unitPrice * i.qty, 0)
     : 0;
   const grandTotal = current
-    ? subTotal + current.tax + current.shipping + current.others
+    ? (() => {
+        const base = subTotal + current.tax + current.shipping + current.others;
+        const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
+        return +(base * (1 - pct / 100)).toFixed(2);
+      })()
     : 0;
 
   /* ── Sorted list ── */

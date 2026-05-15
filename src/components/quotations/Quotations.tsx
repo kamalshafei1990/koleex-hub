@@ -112,6 +112,11 @@ export interface Quotation {
      trade. 'As per buyer's instruction' is the most common (buyer
      supplies exact marks before shipment). */
   shippingMarks?: string;
+  /* Global discount as a percentage (0-100). Applied to
+     (subtotal + tax + shipping + others) on the totals card —
+     reduces the Grand Total live. Stored as a number, not a
+     fraction; 5 means 5%. */
+  discountPct?: number;
   /* Timing block — Lead Time + auto-computed ETD/ETA. The picker
      writes 'Lead time: 30 days after receipt of deposit' + an ETD/
      ETA chip into the terms. The basis is one of 'after_deposit',
@@ -242,6 +247,7 @@ export function fromRow(row: RemoteDocRow): Quotation {
     dischargePort: doc.dischargePort,
     shippingMethodId: doc.shippingMethodId,
     shippingMarks: doc.shippingMarks,
+    discountPct: typeof doc.discountPct === "number" ? doc.discountPct : undefined,
     leadTimeDays: doc.leadTimeDays,
     leadTimeBasis: doc.leadTimeBasis,
     /* Status normalisation. "final" is the legacy name for "sent" —
@@ -268,10 +274,17 @@ export function fromRow(row: RemoteDocRow): Quotation {
 }
 
 /** Compute the grand total the same way the UI renders it. Mirrors the
- *  GRAND TOTAL row so the list can show totals without re-rendering. */
+ *  GRAND TOTAL row so the list can show totals without re-rendering.
+ *  Order of operations:
+ *    (subtotal + tax + shipping + others)  → pre-discount base
+ *    base * (1 - discountPct/100)          → after-discount grand total
+ *  This matches industry practice: the discount applies to the whole
+ *  bill, not just the line items. */
 function computeGrandTotal(q: Quotation): number {
   const subtotal = q.items.reduce((s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0), 0);
-  return +(subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0)).toFixed(2);
+  const base = subtotal + (Number(q.tax) || 0) + (Number(q.shipping) || 0) + (Number(q.others) || 0);
+  const pct = Math.max(0, Math.min(100, Number(q.discountPct) || 0));
+  return +(base * (1 - pct / 100)).toFixed(2);
 }
 
 /** Parse a DD/MM/YYYY (or DD-MM-YYYY) string into ISO. Best-effort. */
@@ -1408,12 +1421,19 @@ export default function Quotations() {
     [updateItem]
   );
 
-  /* ── Computed totals ── */
+  /* ── Computed totals ──
+     Pre-discount base = subtotal + tax + shipping + others
+     Grand total       = base * (1 - discountPct/100)
+     Discount is a global, whole-bill reduction applied last. */
   const subTotal = current
     ? current.items.reduce((s, i) => s + i.unitPrice * i.qty, 0)
     : 0;
   const grandTotal = current
-    ? subTotal + current.tax + current.shipping + current.others
+    ? (() => {
+        const base = subTotal + current.tax + current.shipping + current.others;
+        const pct = Math.max(0, Math.min(100, Number(current.discountPct) || 0));
+        return +(base * (1 - pct / 100)).toFixed(2);
+      })()
     : 0;
 
   /* ── Sorted list ── */

@@ -109,6 +109,7 @@ export interface Quotation {
   dischargePort?: string;
   shippingMethodId?: string;
   shippingMarks?: string;
+  discountPct?: number;
   leadTimeDays?: number;
   leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
 }
@@ -1295,6 +1296,17 @@ export default function QuotationA4Preview({
                       editable
                       rawValue={current.others}
                       onCommit={(v) => setMeta("others", v)}
+                    />
+                    {/* Discount — global %-off applied to
+                        (subtotal + tax + shipping + others). The
+                        right cell shows the computed discount
+                        amount in red so the operator sees the
+                        impact of the % they typed. */}
+                    <DiscountRow
+                      pct={current.discountPct ?? 0}
+                      base={subTotal + current.tax + current.shipping + current.others}
+                      onCommit={(v) => setMeta("discountPct", v)}
+                      fmt={fmt}
                     />
                     {/* Grand total */}
                     <tr className="pq-grand">
@@ -3221,6 +3233,90 @@ function Td({
     >
       {children}
     </td>
+  );
+}
+
+/* Discount row in the totals stack.
+
+   Left cell  : 'DISCOUNT' label.
+   Right cell : editable percentage on the left of the cell, computed
+                discount amount on the right (in red so the operator
+                sees the impact at a glance).
+
+   Sample render with pct=5, base=300,000:
+     │ DISCOUNT │ 5 %         − US$ 15,000.00 │
+
+   Picks land via onCommit which stores the percentage on the doc
+   (current.discountPct). The grand total prop already includes the
+   discount because the parent computes it that way. */
+function DiscountRow({
+  pct,
+  base,
+  onCommit,
+  fmt,
+}: {
+  pct: number;
+  base: number;
+  onCommit: (val: number) => void;
+  fmt: (n: number) => string;
+}) {
+  const amount = +(base * (Math.max(0, Math.min(100, pct)) / 100)).toFixed(2);
+  return (
+    <tr>
+      <td
+        className="pq-tl"
+        style={{
+          fontWeight: 700,
+          background: "#fff",
+          width: 110,
+          fontSize: 10,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          border: `1px solid ${T.border}`,
+          padding: "6px 12px",
+          color: T.ink,
+        }}
+      >
+        Discount
+      </td>
+      <td
+        className="pq-tv"
+        style={{
+          fontSize: 11,
+          textAlign: "right",
+          border: `1px solid ${T.border}`,
+          padding: "6px 12px",
+          fontWeight: 400,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <span
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              const raw = (e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "");
+              const v = Math.max(0, Math.min(100, parseFloat(raw) || 0));
+              onCommit(v);
+            }}
+            style={{ outline: "none", minWidth: 24, textAlign: "right" }}
+          >
+            {pct > 0 ? pct : "0"}
+          </span>
+          <span style={{ color: T.inkGhost, fontWeight: 400 }}>%</span>
+          <span
+            style={{
+              minWidth: 90,
+              textAlign: "right",
+              color: amount > 0 ? "#b91c1c" : T.inkGhost,
+              fontWeight: amount > 0 ? 600 : 400,
+            }}
+          >
+            {amount > 0 ? `− US$ ${fmt(amount)}` : "—"}
+          </span>
+        </span>
+      </td>
+    </tr>
   );
 }
 
