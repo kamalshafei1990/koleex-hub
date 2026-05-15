@@ -230,6 +230,11 @@ export default function QuotationPrintPage({
           grandTotal={grandTotal}
           fmt={fmt}
           numberToWords={numberToWords}
+          /* Print render — everyone sees the stamp/signature images
+             that were stamped on the quote, nobody sees the editor
+             affordances. isSuperAdmin stays false so the action
+             buttons (which are .no-print anyway) don't even mount. */
+          isSuperAdmin={false}
         />
       </div>
     </>

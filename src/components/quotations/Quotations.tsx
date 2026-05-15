@@ -16,6 +16,7 @@ import { docsT } from "@/lib/translations/docs";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationA4Preview from "./QuotationA4Preview";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
@@ -61,6 +62,14 @@ export interface Quotation {
   shipping: number;
   others: number;
   terms: string;
+  /* Optional stamp + signature URLs stamped on this quote. Both
+     stored as public Supabase Storage URLs. The doc-builder lets a
+     super-admin attach the tenant's saved stamp/signature with one
+     click (see /api/quotations/saved-assets). Older quotes have
+     these undefined; the editor falls back to the dashed-placeholder
+     in that case. */
+  stampUrl?: string;
+  signatureUrl?: string;
   status: "draft" | "final";
   createdAt: string;
   updatedAt: string;
@@ -143,6 +152,8 @@ export function fromRow(row: RemoteDocRow): Quotation {
     shipping: Number(doc.shipping ?? 0),
     others: Number(doc.others ?? 0),
     terms: doc.terms ?? DEFAULT_TERMS,
+    stampUrl: doc.stampUrl,
+    signatureUrl: doc.signatureUrl,
     status: (row.status === "final" ? "final" : "draft") as "draft" | "final",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -686,6 +697,20 @@ export default function Quotations() {
      stay mounted across A4-page renders without each page mounting
      its own copy. */
   const [pickerOpen, setPickerOpen] = useState(false);
+  /* Tenant-wide saved stamp + signature. Loaded once on editor
+     mount; refreshed after the operator uploads a new one so the
+     "Use saved" button appears immediately. Null until the fetch
+     resolves so the editor doesn't flash a "missing saved asset"
+     state during initial load. */
+  const [savedStampUrl, setSavedStampUrl] = useState<string | null>(null);
+  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string | null>(null);
+  /* Read the super-admin flag straight from the /api/me/bootstrap
+     cache rather than useScopeContext. The latter has a fallback
+     path that re-queries the `accounts` table via the browser anon
+     client, which RLS strips to is_super_admin=false; the bootstrap
+     payload comes from a server route that already knows the truth. */
+  const { data: meBootstrap } = useMeBootstrap();
+  const isSuperAdmin = meBootstrap?.auth?.is_super_admin ?? false;
 
   /* ── Load from Supabase on mount ── */
   useEffect(() => {
@@ -1031,6 +1056,83 @@ export default function Quotations() {
       if (lastIsEmpty) items[items.length - 1] = fresh;
       else items.push(fresh);
       setCurrent({ ...current, items });
+    },
+    [current],
+  );
+
+  /* ── Stamp + Signature handlers ──
+     The editor renders the stamp/signature cards on the last page.
+     A super-admin can either (a) attach the tenant's saved asset
+     with one click or (b) upload a new file (the API replaces the
+     saved asset AND returns the URL we stamp on this quote). All
+     four flows are gated client-side on isSuperAdmin AND server-
+     side on auth.is_super_admin so the UI gate is a hint, not the
+     security perimeter. */
+  useEffect(() => {
+    if (view !== "editor") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/quotations/saved-assets", {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          stampUrl: string | null;
+          signatureUrl: string | null;
+        };
+        if (cancelled) return;
+        setSavedStampUrl(json.stampUrl);
+        setSavedSignatureUrl(json.signatureUrl);
+      } catch { /* non-fatal — buttons just degrade to upload-only */ }
+    })();
+    return () => { cancelled = true; };
+  }, [view, current?.id]);
+
+  const attachSavedStamp = useCallback(() => {
+    if (!current || !savedStampUrl) return;
+    setCurrent({ ...current, stampUrl: savedStampUrl });
+  }, [current, savedStampUrl]);
+  const attachSavedSignature = useCallback(() => {
+    if (!current || !savedSignatureUrl) return;
+    setCurrent({ ...current, signatureUrl: savedSignatureUrl });
+  }, [current, savedSignatureUrl]);
+  const clearStamp = useCallback(() => {
+    if (!current) return;
+    setCurrent({ ...current, stampUrl: undefined });
+  }, [current]);
+  const clearSignature = useCallback(() => {
+    if (!current) return;
+    setCurrent({ ...current, signatureUrl: undefined });
+  }, [current]);
+
+  const uploadAsset = useCallback(
+    async (kind: "stamp" | "signature", file: File) => {
+      const form = new FormData();
+      form.append("kind", kind);
+      form.append("file", file);
+      try {
+        const res = await fetch("/api/quotations/saved-assets", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          alert(`Upload failed: ${j.error ?? res.status}`);
+          return;
+        }
+        const json = (await res.json()) as { kind: string; url: string };
+        if (kind === "stamp") {
+          setSavedStampUrl(json.url);
+          if (current) setCurrent({ ...current, stampUrl: json.url });
+        } else {
+          setSavedSignatureUrl(json.url);
+          if (current) setCurrent({ ...current, signatureUrl: json.url });
+        }
+      } catch (e) {
+        alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
     },
     [current],
   );
@@ -1446,6 +1548,15 @@ export default function Quotations() {
         updateItem={updateItem}
         addItem={addItem}
         onPickFromCatalog={() => setPickerOpen(true)}
+        savedStampUrl={savedStampUrl}
+        savedSignatureUrl={savedSignatureUrl}
+        isSuperAdmin={isSuperAdmin}
+        onAttachSavedStamp={attachSavedStamp}
+        onAttachSavedSignature={attachSavedSignature}
+        onUploadStamp={(f) => uploadAsset("stamp", f)}
+        onUploadSignature={(f) => uploadAsset("signature", f)}
+        onClearStamp={clearStamp}
+        onClearSignature={clearSignature}
         removeItem={removeItem}
         moveItem={moveItem}
         handleImageUpload={handleImageUpload}

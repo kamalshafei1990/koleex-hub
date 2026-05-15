@@ -78,6 +78,12 @@ export interface Quotation {
   status: "draft" | "final";
   createdAt: string;
   updatedAt: string;
+  /* Per-quote authorised stamp + signature URLs. Optional — older
+     quotations have these undefined and the editor falls back to the
+     dashed-placeholder. See Quotations.tsx for the matching field on
+     the parent's Quotation interface. */
+  stampUrl?: string;
+  signatureUrl?: string;
 }
 
 interface Props {
@@ -94,6 +100,21 @@ interface Props {
      the button is hidden (e.g. when used somewhere without a
      parent-supplied catalog). */
   onPickFromCatalog?: () => void;
+  /* Saved-asset hooks for the Stamp + Signature cards. The parent
+     fetches /api/quotations/saved-assets on mount and passes the
+     URLs (or null) here, plus the handlers that attach/detach an
+     asset on the current quote. Buttons are gated on isSuperAdmin
+     — for everyone else the cards behave like read-only previews
+     (image renders if set, no editor affordance). */
+  savedStampUrl?: string | null;
+  savedSignatureUrl?: string | null;
+  isSuperAdmin?: boolean;
+  onAttachSavedStamp?: () => void;
+  onAttachSavedSignature?: () => void;
+  onUploadStamp?: (file: File) => void;
+  onUploadSignature?: (file: File) => void;
+  onClearStamp?: () => void;
+  onClearSignature?: () => void;
   removeItem: (idx: number) => void;
   moveItem: (idx: number, direction: -1 | 1) => void;
   handleImageUpload: (idx: number, file: File) => void;
@@ -157,6 +178,15 @@ export default function QuotationA4Preview({
   updateItem,
   addItem,
   onPickFromCatalog,
+  savedStampUrl,
+  savedSignatureUrl,
+  isSuperAdmin,
+  onAttachSavedStamp,
+  onAttachSavedSignature,
+  onUploadStamp,
+  onUploadSignature,
+  onClearStamp,
+  onClearSignature,
   removeItem,
   moveItem,
   handleImageUpload,
@@ -1414,29 +1444,27 @@ export default function QuotationA4Preview({
               Authorised Stamp
             </div>
             <div style={{ padding: 12 }}>
-              {/* Bigger stamp area — sized to fit a real Koleex company
-                  stamp (typical Egyptian/Chinese corporate stamps are
-                  40–45 mm circular). 150 px square gives ≈ 40 mm at
-                  96 dpi which matches the physical stamp's footprint. */}
-              <div
-                className="pq-stamp-box"
-                style={{
-                  width: "100%",
-                  height: 150,
-                  border: `1px dashed ${T.inkGhost}`,
-                  borderRadius: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 9,
-                  color: T.inkGhost,
-                  fontWeight: 600,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
+              {/* Stamp area — 150 px square ≈ 40 mm at 96 dpi which is
+                  the standard Egyptian/Chinese corporate-stamp size.
+                  When current.stampUrl is set we render the image
+                  centred inside the same box at object-fit: contain
+                  so the stamp keeps its aspect ratio at real size. */}
+              <StampSignatureBox
+                imageUrl={current.stampUrl}
+                placeholder="Affix Stamp Here"
+                onClear={onClearStamp}
+                isEditable={!!isSuperAdmin}
+                aspectSquare
               >
-                Affix Stamp Here
-              </div>
+                {!current.stampUrl && isSuperAdmin && (
+                  <StampSignatureActions
+                    label="stamp"
+                    savedUrl={savedStampUrl ?? null}
+                    onUseSaved={onAttachSavedStamp}
+                    onUpload={onUploadStamp}
+                  />
+                )}
+              </StampSignatureBox>
             </div>
           </div>
 
@@ -1472,28 +1500,25 @@ export default function QuotationA4Preview({
                 justifyContent: "center",
               }}
             >
-              {/* Bigger blank signature area — matches the stamp card
-                  height. NO Name / Title / Date labels — just the
-                  signature space. A dashed border at the bottom
-                  hints the line where the user will sign. */}
-              <div
-                style={{
-                  width: "100%",
-                  height: 150,
-                  border: `1px dashed ${T.inkGhost}`,
-                  borderRadius: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 9,
-                  color: T.inkGhost,
-                  fontWeight: 600,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
+              {/* Signature area — full width, same 150 px height so the
+                  card matches the stamp card. Renders the signature
+                  image at object-fit: contain so the operator's
+                  handwriting keeps its real proportions. */}
+              <StampSignatureBox
+                imageUrl={current.signatureUrl}
+                placeholder="Sign Here"
+                onClear={onClearSignature}
+                isEditable={!!isSuperAdmin}
               >
-                Sign Here
-              </div>
+                {!current.signatureUrl && isSuperAdmin && (
+                  <StampSignatureActions
+                    label="signature"
+                    savedUrl={savedSignatureUrl ?? null}
+                    onUseSaved={onAttachSavedSignature}
+                    onUpload={onUploadSignature}
+                  />
+                )}
+              </StampSignatureBox>
             </div>
           </div>
         </div>
@@ -2027,6 +2052,187 @@ function TermsToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+/* Shared box for the stamp + signature areas on the last page. When
+   `imageUrl` is set, renders the saved image at object-fit: contain
+   inside the 150 px box (preserves the real stamp's circular shape
+   without stretching). Otherwise renders its `children` (the
+   action buttons + placeholder text). The little × clear button
+   only appears when an image is set AND the viewer is allowed to
+   edit (super admin). It's no-print so it never appears in the
+   exported PDF. */
+function StampSignatureBox({
+  imageUrl,
+  placeholder,
+  onClear,
+  isEditable,
+  aspectSquare,
+  children,
+}: {
+  imageUrl?: string;
+  placeholder: string;
+  onClear?: () => void;
+  isEditable?: boolean;
+  aspectSquare?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: 150,
+        maxWidth: aspectSquare ? 150 : undefined,
+        margin: aspectSquare ? "0 auto" : undefined,
+        border: imageUrl ? "none" : `1px dashed ${T.inkGhost}`,
+        borderRadius: 10,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      {imageUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={imageUrl}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            fontSize: 9,
+            color: T.inkGhost,
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            textAlign: "center",
+          }}
+        >
+          <span>{placeholder}</span>
+          {children}
+        </div>
+      )}
+      {imageUrl && isEditable && onClear && (
+        <button
+          type="button"
+          className="no-print"
+          title="Remove"
+          onClick={onClear}
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            border: "none",
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+            fontSize: 13,
+            lineHeight: 1,
+            fontWeight: 600,
+          }}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* Tiny inline button group for the stamp / signature placeholder.
+   "Use saved" — only rendered when the tenant has a saved asset.
+   "Upload" — always available to super-admins; opens the OS file
+   picker, then hands the file back to the parent which uploads it
+   to /api/quotations/saved-assets (which both saves it tenant-wide
+   AND fills it onto this quote). Wrapped in .no-print so the PDF
+   never captures the buttons. */
+function StampSignatureActions({
+  label,
+  savedUrl,
+  onUseSaved,
+  onUpload,
+}: {
+  label: string;
+  savedUrl: string | null;
+  onUseSaved?: () => void;
+  onUpload?: (file: File) => void;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  return (
+    <div className="no-print" style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+      {savedUrl && onUseSaved && (
+        <button
+          type="button"
+          onClick={onUseSaved}
+          style={{
+            background: T.black,
+            color: "#fff",
+            border: "none",
+            padding: "4px 10px",
+            borderRadius: 6,
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+          }}
+        >
+          Use Saved {label}
+        </button>
+      )}
+      {onUpload && (
+        <>
+          <button
+            type="button"
+            onClick={() => ref.current?.click()}
+            style={{
+              background: "transparent",
+              color: T.ink,
+              border: `1px solid ${T.border}`,
+              padding: "4px 10px",
+              borderRadius: 6,
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            Upload {label}
+          </button>
+          <input
+            ref={ref}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            style={{ position: "absolute", left: -9999, width: 0, height: 0 }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+              e.currentTarget.value = "";
+            }}
+          />
+        </>
+      )}
+    </div>
   );
 }
 
