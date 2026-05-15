@@ -99,6 +99,13 @@ export interface Quotation {
      customers table). Lets the editor remember which CRM record a
      quote was auto-filled from. */
   customerContactId?: string;
+  /* Master-data picks from the Terms quick-fill row. The renderer
+     reads these so the picker dropdowns hydrate with the saved
+     selection when an existing doc is opened. */
+  paymentTermId?: string;
+  incotermId?: string;
+  incotermLocation?: string;
+  shippingMethodId?: string;
 }
 
 interface Props {
@@ -1380,6 +1387,28 @@ export default function QuotationA4Preview({
                   >
                     Terms &amp; Conditions
                   </div>
+                  {/* Quick-fill row — Apple-pill dropdowns that write
+                      formatted lines into the rich-text terms below
+                      AND save the FK id on the doc so it re-opens
+                      with the same selection. .no-print so the
+                      exported PDF only shows the resulting text, not
+                      the dropdowns themselves. */}
+                  <QuickFillBar
+                    paymentTermId={current.paymentTermId}
+                    incotermId={current.incotermId}
+                    incotermLocation={current.incotermLocation}
+                    shippingMethodId={current.shippingMethodId}
+                    onChange={(patch) => {
+                      const next = { ...current, ...patch.fields };
+                      if (patch.termsLineUpdates) {
+                        next.terms = applyQuickFillToTerms(
+                          current.terms,
+                          patch.termsLineUpdates,
+                        );
+                      }
+                      setCurrent(next);
+                    }}
+                  />
                   <div className="pq-terms-value" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
                     <TermsArea
                       terms={current.terms}
@@ -2038,6 +2067,318 @@ function TermsToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Quick-fill bar — three Apple-pill dropdowns above the Terms editor:
+
+     [Payment Term ▾]   [Price Type ▾]   [Sent by ▾]
+
+   Each dropdown pulls from the matching Workspace master list
+   (/api/payment-terms, /api/incoterms, /api/shipping-methods). On
+   pick, the parent gets two things:
+     · `fields`  — { paymentTermId?, incotermId?, shippingMethodId? }
+                   to persist the FK on the doc so re-opening rehydrates.
+     · `termsLineUpdates` — keyed text rewrites that get spliced into
+                   the rich-text terms by `applyQuickFillToTerms` below.
+
+   `.no-print` keeps the bar off the exported PDF — the printed doc
+   only shows the final terms text, not the picker chrome.
+   ───────────────────────────────────────────────────────────────────── */
+
+interface QuickFillPatch {
+  fields: {
+    paymentTermId?: string;
+    incotermId?: string;
+    incotermLocation?: string;
+    shippingMethodId?: string;
+  };
+  termsLineUpdates?: Record<string, string>;
+}
+
+interface PaymentTermLite {
+  id: string;
+  label: string;
+  short_label: string | null;
+  category_id: string;
+}
+interface PaymentCatLite {
+  id: string;
+  short_name: string | null;
+  name: string;
+  terms: PaymentTermLite[];
+}
+interface IncotermLite {
+  id: string;
+  code: string;
+  name: string;
+  named_location_label: string | null;
+  includes_main_carriage: boolean;
+  includes_insurance: boolean;
+}
+interface ShippingMethodLite {
+  id: string;
+  name: string;
+  short_name: string | null;
+  mode: string;
+  typical_transit_days_min: number | null;
+  typical_transit_days_max: number | null;
+}
+
+/* Rewrites a single "Key: value" line in the rich-text terms HTML.
+   The terms field is HTML (post the rich-text upgrade), so we walk
+   <br>-separated segments, find one starting with the key (tolerating
+   inline formatting tags), and replace its trailing content. If no
+   matching line exists we append one. The Total-Qty injection in
+   TermsArea uses the same line-by-line convention. */
+function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string>): string {
+  /* Strip tags only when checking — keep them when rewriting so any
+     bolding the operator did survives. We split on <br> (HTML line
+     breaks the rich-text editor uses) and on "\n" for legacy
+     plain-text values. */
+  const hasHtml = /<[a-z][\s\S]*>/i.test(termsHtml);
+  const html = hasHtml ? termsHtml : termsHtml.replace(/\n/g, "<br>");
+  /* Split into "lines" — keep the <br> separators around so we can
+     reassemble with the same structure. */
+  const segments = html.split(/(<br\s*\/?>)/i);
+
+  const keyMatches = (segText: string, key: string): boolean => {
+    /* segment text → strip inline tags, lowercase, compare prefix. */
+    const plain = segText.replace(/<[^>]+>/g, "").trim().toLowerCase();
+    return plain.startsWith(key.toLowerCase() + ":");
+  };
+
+  const rewriteSegment = (segment: string, key: string, value: string): string => {
+    /* Replace whatever follows the colon (possibly inside formatting
+       tags) with the new value. Preserve the leading "Key:" exactly
+       as the operator typed it (capitalisation, surrounding bold/etc). */
+    return segment.replace(
+      /^([\s\S]*?:[\s ]*)([\s\S]*)$/,
+      (_m, prefix) => `${prefix}${value}`,
+    );
+  };
+
+  const usedKeys = new Set<string>();
+  const out = segments.map((seg) => {
+    if (/^<br/i.test(seg)) return seg;
+    for (const key of Object.keys(updates)) {
+      if (!usedKeys.has(key) && keyMatches(seg, key)) {
+        usedKeys.add(key);
+        return rewriteSegment(seg, key, updates[key]);
+      }
+    }
+    return seg;
+  });
+  /* Append lines for keys that weren't already present. */
+  const missing = Object.keys(updates).filter((k) => !usedKeys.has(k));
+  let result = out.join("");
+  for (const k of missing) {
+    const sep = result && !/<br\s*\/?>\s*$/i.test(result) ? "<br>" : "";
+    result += `${sep}${k}: ${updates[k]}`;
+  }
+  return result;
+}
+
+function QuickFillBar({
+  paymentTermId,
+  incotermId,
+  incotermLocation,
+  shippingMethodId,
+  onChange,
+}: {
+  paymentTermId?: string;
+  incotermId?: string;
+  incotermLocation?: string;
+  shippingMethodId?: string;
+  onChange: (patch: QuickFillPatch) => void;
+}) {
+  const [payCats, setPayCats] = useState<PaymentCatLite[]>([]);
+  const [incoterms, setIncoterms] = useState<IncotermLite[]>([]);
+  const [methods, setMethods] = useState<ShippingMethodLite[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/payment-terms",   { credentials: "include" }).then((r) => r.ok ? r.json() : null),
+      fetch("/api/incoterms",       { credentials: "include" }).then((r) => r.ok ? r.json() : null),
+      fetch("/api/shipping-methods",{ credentials: "include" }).then((r) => r.ok ? r.json() : null),
+    ]).then(([pt, ic, sm]) => {
+      if (cancelled) return;
+      setPayCats((pt?.categories as PaymentCatLite[] | undefined) ?? []);
+      setIncoterms((ic?.rows as IncotermLite[] | undefined) ?? []);
+      setMethods((sm?.rows as ShippingMethodLite[] | undefined) ?? []);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const allPaymentTerms = useMemo(
+    () => payCats.flatMap((c) => c.terms.map((t) => ({ ...t, catName: c.short_name ?? c.name }))),
+    [payCats],
+  );
+  const selectedPayment = useMemo(
+    () => allPaymentTerms.find((t) => t.id === paymentTermId),
+    [allPaymentTerms, paymentTermId],
+  );
+  const selectedIncoterm = useMemo(
+    () => incoterms.find((t) => t.id === incotermId),
+    [incoterms, incotermId],
+  );
+  const selectedMethod = useMemo(
+    () => methods.find((t) => t.id === shippingMethodId),
+    [methods, shippingMethodId],
+  );
+
+  const onPickPayment = (id: string) => {
+    const term = allPaymentTerms.find((t) => t.id === id);
+    if (!term) {
+      onChange({ fields: { paymentTermId: undefined }, termsLineUpdates: { "Payment terms": "" } });
+      return;
+    }
+    onChange({
+      fields: { paymentTermId: id },
+      termsLineUpdates: { "Payment terms": term.label },
+    });
+  };
+
+  const onPickIncoterm = (id: string) => {
+    const term = incoterms.find((t) => t.id === id);
+    if (!term) {
+      onChange({ fields: { incotermId: undefined }, termsLineUpdates: { "Price Type": "" } });
+      return;
+    }
+    const value = `${term.code} (${term.name})${incotermLocation ? ` — ${incotermLocation}` : ""}`;
+    onChange({
+      fields: { incotermId: id },
+      termsLineUpdates: { "Price Type": value },
+    });
+  };
+
+  const onChangeLocation = (loc: string) => {
+    const term = selectedIncoterm;
+    if (!term) {
+      onChange({ fields: { incotermLocation: loc } });
+      return;
+    }
+    onChange({
+      fields: { incotermLocation: loc },
+      termsLineUpdates: {
+        "Price Type": `${term.code} (${term.name})${loc ? ` — ${loc}` : ""}`,
+      },
+    });
+  };
+
+  const onPickMethod = (id: string) => {
+    const m = methods.find((t) => t.id === id);
+    if (!m) {
+      onChange({ fields: { shippingMethodId: undefined }, termsLineUpdates: { "Sent by": "" } });
+      return;
+    }
+    const transit =
+      m.typical_transit_days_min != null && m.typical_transit_days_max != null
+        ? ` (${m.typical_transit_days_min}–${m.typical_transit_days_max} days)`
+        : "";
+    onChange({
+      fields: { shippingMethodId: id },
+      termsLineUpdates: { "Sent by": `${m.name}${transit}` },
+    });
+  };
+
+  /* Compact dropdown styles. Matches Apple-pill aesthetic the rest of
+     the Workspace uses. */
+  const selectStyle: React.CSSProperties = {
+    fontSize: 10,
+    padding: "3px 6px",
+    borderRadius: 5,
+    border: `1px solid ${T.border}`,
+    background: T.surface,
+    color: T.ink,
+    outline: "none",
+    minWidth: 100,
+    maxWidth: 160,
+    cursor: "pointer",
+  };
+
+  return (
+    <div
+      className="no-print pq-tc-quickfill"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "5px 10px",
+        borderBottom: `1px solid ${T.border}`,
+        background: T.surface,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, color: T.inkGhost, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 2 }}>
+        Quick fill
+      </span>
+
+      {/* Payment term */}
+      <select
+        value={paymentTermId ?? ""}
+        onChange={(e) => onPickPayment(e.target.value)}
+        style={selectStyle}
+        title={selectedPayment ? `Payment: ${selectedPayment.label}` : "Pick a payment term"}
+      >
+        <option value="">Payment…</option>
+        {payCats.map((cat) => (
+          <optgroup key={cat.id} label={cat.short_name ?? cat.name}>
+            {cat.terms.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.short_label ?? t.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+
+      {/* Incoterm / price type */}
+      <select
+        value={incotermId ?? ""}
+        onChange={(e) => onPickIncoterm(e.target.value)}
+        style={selectStyle}
+        title={selectedIncoterm ? `${selectedIncoterm.code} — ${selectedIncoterm.name}` : "Pick a price type"}
+      >
+        <option value="">Price type…</option>
+        {incoterms.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.code} — {t.name}
+          </option>
+        ))}
+      </select>
+      {selectedIncoterm && (
+        <input
+          type="text"
+          value={incotermLocation ?? ""}
+          onChange={(e) => onChangeLocation(e.target.value)}
+          placeholder={selectedIncoterm.named_location_label ?? "Named place"}
+          style={{
+            ...selectStyle,
+            cursor: "text",
+            minWidth: 90,
+            maxWidth: 140,
+          }}
+        />
+      )}
+
+      {/* Shipping method */}
+      <select
+        value={shippingMethodId ?? ""}
+        onChange={(e) => onPickMethod(e.target.value)}
+        style={selectStyle}
+        title={selectedMethod ? `Sent by ${selectedMethod.name}` : "Pick a shipping method"}
+      >
+        <option value="">Sent by…</option>
+        {methods.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.short_name ?? m.name}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

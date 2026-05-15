@@ -90,6 +90,15 @@ export interface Quotation {
      the CRM; the QUOTATION TO fields below are auto-filled at the
      same time. Optional — historic quotes have this undefined. */
   customerContactId?: string;
+  /* Master-data references for the Terms quick-fill row. The
+     editor's quick-fill picks store the FK id here so a saved
+     quote can be re-opened with the dropdowns pre-selected; the
+     formatted text is also baked into `terms` for the printed doc.
+     All optional — legacy quotes have these undefined. */
+  paymentTermId?: string;
+  incotermId?: string;
+  incotermLocation?: string;       // e.g. 'Ningbo' for FOB Ningbo
+  shippingMethodId?: string;
   /* Lifecycle:
        draft     — being edited internally; not yet customer-facing.
        sent      — emailed / handed over to the customer.
@@ -191,6 +200,10 @@ export function fromRow(row: RemoteDocRow): Quotation {
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
+    paymentTermId: doc.paymentTermId,
+    incotermId: doc.incotermId,
+    incotermLocation: doc.incotermLocation,
+    shippingMethodId: doc.shippingMethodId,
     /* Status normalisation. "final" is the legacy name for "sent" —
        rows minted before the workflow expansion stored it that way.
        Anything else unknown falls back to "draft" so the row at

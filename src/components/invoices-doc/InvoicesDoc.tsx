@@ -89,6 +89,12 @@ export interface Invoice {
      the CRM; the QUOTATION TO fields below are auto-filled at the
      same time. Optional — historic quotes have this undefined. */
   customerContactId?: string;
+  /* Master-data references for the Terms quick-fill row. Mirror of
+     the Quotation type — see Quotations.tsx. */
+  paymentTermId?: string;
+  incotermId?: string;
+  incotermLocation?: string;
+  shippingMethodId?: string;
   /* Lifecycle:
        draft     — being edited internally; not yet customer-facing.
        sent      — emailed / handed over to the customer.
@@ -190,6 +196,10 @@ export function fromRow(row: RemoteDocRow): Invoice {
     stampUrl: doc.stampUrl,
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
+    paymentTermId: doc.paymentTermId,
+    incotermId: doc.incotermId,
+    incotermLocation: doc.incotermLocation,
+    shippingMethodId: doc.shippingMethodId,
     /* Status normalisation. "final" is the legacy name for "sent" —
        rows minted before the workflow expansion stored it that way.
        Anything else unknown falls back to "draft" so the row at
