@@ -2531,6 +2531,438 @@ const QUICK_FILL_HELP: Record<string, { en: string; zh: string }> = {
   },
 };
 
+/* ── Per-option bilingual help. Keyed by the value of each option
+   so the CustomSelect can render a (?) chip beside the choice and
+   show the EN + 中文 explanation on hover. Coverage:
+     - Incoterms (key = incoterm.code)
+     - Container types (key = CONTAINER_TYPE_OPTIONS.value)
+     - Shipping marks (key = SHIPPING_MARKS_OPTIONS.value)
+     - Bank charges (key = BANK_CHARGES_OPTIONS.value)
+     - Cancellation (key = CANCELLATION_OPTIONS.value)
+     - Governing law (key = GOVERNING_LAW_OPTIONS.value)
+     - Lead-time basis (key = "after_deposit" | "after_order" | "after_lc_opening")
+   For DB-driven lists (payment terms, shipping methods, documents)
+   we use small resolver functions below instead of static maps,
+   since the rows are seeded with codes that match well-known
+   international-trade patterns (T/T, L/C, FCL, LCL, B/L, etc.). */
+type OptHelp = { en: string; zh: string };
+
+const INCOTERM_HELP_BY_CODE: Record<string, OptHelp> = {
+  EXW: { en: "EXW — Ex Works. Buyer collects from the seller's premises and is responsible for export clearance, freight, insurance and import clearance. Minimum seller obligation, maximum buyer risk.", zh: "EXW — 工厂交货。买方自卖方工厂提货，负责出口报关、运输、保险及进口清关。卖方义务最少，买方风险最大。" },
+  FCA: { en: "FCA — Free Carrier. Seller delivers goods, cleared for export, to the carrier nominated by the buyer at a named place. Suitable for any transport mode incl. multimodal.", zh: "FCA — 货交承运人。卖方在指定地点办理出口清关后将货物交给买方指定的承运人。适用于任何运输方式，包括多式联运。" },
+  FAS: { en: "FAS — Free Alongside Ship. Seller delivers when goods are placed alongside the vessel at the named port of shipment. Sea / inland waterway only.", zh: "FAS — 船边交货。卖方在装运港将货物交至船边即完成交货。仅适用于海运 / 内河运输。" },
+  FOB: { en: "FOB — Free On Board. Seller pays freight to the loading port and loads goods on the vessel. Risk transfers when goods are on board. Buyer pays sea freight, insurance and destination charges. Sea only.", zh: "FOB — 装运港船上交货。卖方负责将货物运至装运港并装船。装船后风险转移给买方。买方承担海运费、保险及目的港费用。仅适用于海运。" },
+  CFR: { en: "CFR — Cost and Freight. Seller pays freight to the destination port but risk transfers at the loading port (when goods are on board). Buyer arranges insurance separately. Sea only.", zh: "CFR — 成本加运费。卖方支付至目的港的运费，但风险在装运港装船时转移给买方。买方自行投保。仅适用于海运。" },
+  CIF: { en: "CIF — Cost, Insurance & Freight. Seller pays freight + minimum insurance to destination port. Risk transfers at the loading port (same as CFR / FOB). Sea only.", zh: "CIF — 成本、保险加运费。卖方支付至目的港的运费及最低保险。风险在装运港转移给买方（与 CFR / FOB 同）。仅适用于海运。" },
+  CPT: { en: "CPT — Carriage Paid To. Seller pays freight to a named destination. Risk transfers when goods are handed to the first carrier. Any transport mode.", zh: "CPT — 运费付至。卖方支付至指定目的地的运费。货物交给第一承运人后风险转移给买方。适用于任何运输方式。" },
+  CIP: { en: "CIP — Carriage and Insurance Paid To. Like CPT, but seller also pays insurance to the destination. Any transport mode.", zh: "CIP — 运费及保险费付至。同 CPT，但卖方还承担至目的地的保险。适用于任何运输方式。" },
+  DAP: { en: "DAP — Delivered at Place. Seller bears all risks and costs to deliver goods to a named destination, ready for unloading but not import-cleared.", zh: "DAP — 目的地交货。卖方承担将货物送达指定目的地的全部风险和费用，已可卸货但未办理进口清关。" },
+  DPU: { en: "DPU — Delivered at Place Unloaded. Seller delivers and unloads at the named destination. Seller bears risk until unloading is complete.", zh: "DPU — 卸货地交货。卖方在指定目的地完成卸货后交货。卸货完成前风险由卖方承担。" },
+  DDP: { en: "DDP — Delivered Duty Paid. Maximum seller obligation: seller pays freight + insurance + import duties and clears for import. Buyer just receives the goods.", zh: "DDP — 完税后交货。卖方义务最大：卖方支付运费、保险、进口关税并办理进口清关。买方只需收货。" },
+};
+
+const CONTAINER_HELP_BY_VALUE: Record<string, OptHelp> = {
+  "20' Standard":    { en: "20-foot General Purpose dry container. ≈28 CBM usable, ≈28 t max gross. Most common box; suits heavy / dense cargo where weight limits matter more than volume.", zh: "20 英尺普通干货柜。可用容积约 28 立方米，最大总重约 28 吨。最常见箱型，适合重货 / 高密度货物（重量限制比容积更重要）。" },
+  "40' Standard":    { en: "40-foot General Purpose dry container. ≈58 CBM usable. Suits volume-driven cargo up to ≈26 t.", zh: "40 英尺普通干货柜。可用容积约 58 立方米。适合体积大、重量约 26 吨以内的货物。" },
+  "40' High Cube":   { en: "40-foot High Cube — 30 cm taller than standard 40 ft. ≈68 CBM usable. Best for light / bulky cargo where volume drives cost.", zh: "40 英尺高箱。比普通 40 英尺柜高 30 厘米，可用容积约 68 立方米。最适合轻泡货 / 体积大的货物。" },
+  "40' HR (Reefer)": { en: "40-foot Reefer (refrigerated). Built-in cooling unit, temperature-controlled. For perishables (food, pharma, flowers).", zh: "40 英尺冷藏箱。内置制冷机组，可控温。用于易腐货物（食品、药品、鲜花等）。" },
+  "45' High Cube":   { en: "45-foot High Cube — longest standard ISO container. ≈78 CBM usable. Best for very high-volume light cargo on routes that allow 45 ft equipment.", zh: "45 英尺高箱 — 最长的 ISO 标准箱。可用容积约 78 立方米。最适合体积非常大的轻货，仅限允许 45 英尺箱型的航线。" },
+  "20' Open Top":    { en: "20-foot Open Top — removable tarpaulin roof. For oversized cargo loaded by crane from above (machinery, glass, tall items).", zh: "20 英尺开顶箱 — 可拆卸帆布顶。适合从顶部吊装的超高 / 超大货物（机械设备、玻璃、高大物品）。" },
+  "40' Open Top":    { en: "40-foot Open Top — same concept as 20-OT but longer; for heavy / oversized cargo requiring top loading.", zh: "40 英尺开顶箱 — 概念同 20 英尺开顶，但更长。用于需顶部装载的重型 / 超大货物。" },
+  "20' Flat Rack":   { en: "20-foot Flat Rack — no sides or roof, fixed end-walls. For oversized cargo (vehicles, generators, machinery) too wide for a standard box.", zh: "20 英尺平板架 — 无侧壁无顶，仅有端壁。用于宽度超出普通箱体的超大货物（车辆、发电机、机械）。" },
+  "40' Flat Rack":   { en: "40-foot Flat Rack — 40 ft version of the flat rack, often collapsible. For very long or wide cargo (yachts, pipes, transformers).", zh: "40 英尺平板架 — 通常可折叠。用于超长或超宽货物（游艇、管道、变压器等）。" },
+};
+
+const SHIPPING_MARKS_HELP_BY_VALUE: Record<string, OptHelp> = {
+  "As per buyer's instruction": { en: "Marks printed exactly as the buyer specifies — typically their company logo, an order number, the destination port and a country-of-origin line.", zh: "按买方指示标注唛头 — 通常包括买方公司标识、订单号、目的港及原产国说明。" },
+  "No marks":                   { en: "Goods shipped without external marks. Used when packaging is already branded or when the buyer asks for plain packaging.", zh: "货物外包装不加唛头。适用于包装本身已带品牌，或买方要求素面包装的情况。" },
+};
+
+const BANK_CHARGES_HELP_BY_VALUE: Record<string, OptHelp> = {
+  "All bank charges outside seller's country are for buyer's account": { en: "SHA-style split — seller pays Chinese-side bank fees; the buyer's bank and any intermediary bank fees are on the buyer.", zh: "类 SHA 各付各的 — 卖方承担中国境内银行费用；买方银行及中转行费用由买方承担。" },
+  "All bank charges for buyer's account":                              { en: "Type 'OUR' from the seller's view: the buyer covers every fee — sender's bank, intermediary banks, beneficiary's bank.", zh: "卖方角度的 OUR 模式：所有银行费用（汇出行、中转行、收款行）均由买方承担。" },
+  "Each party pays its own bank charges":                              { en: "SHA — Shared. Each side pays their own bank fees. The cleanest split for most T/T payments.", zh: "SHA — 共担。各自承担本方银行费用。是 T/T 电汇中最常见、最简洁的分摊方式。" },
+  "All bank charges for seller's account":                             { en: "Type 'BEN' from the seller's view: seller pays every fee — typically used to ensure the buyer receives the exact invoice amount.", zh: "卖方角度的 BEN 模式：所有银行费用由卖方承担 — 通常用于确保买方收到与发票完全一致的金额。" },
+};
+
+const CANCELLATION_HELP_BY_VALUE: Record<string, OptHelp> = {
+  "Deposit is non-refundable once production has started":
+    { en: "Standard for made-to-order machinery: once the factory has issued cutting / casting orders the deposit becomes non-refundable because parts are already committed.", zh: "定制机械的标准条款：工厂一旦下达开料 / 铸造指令，定金即不可退还，因相关物料已投入。" },
+  "Deposit refundable in full if cancelled before production starts; non-refundable thereafter":
+    { en: "Generous policy: full refund up to the production-start trigger; nothing back afterwards.", zh: "较宽松的政策：生产开始前可全额退款，生产开始后不再退还。" },
+  "50% of deposit refundable if cancelled within 7 days of order confirmation; non-refundable thereafter":
+    { en: "Cooling-off period: 50 % of the deposit is returnable inside a 7-day window after order confirmation; after that the deposit is locked.", zh: "冷静期政策：订单确认后 7 天内取消可退还 50% 定金；超过 7 天后定金不可退还。" },
+  "No cancellation accepted after order confirmation":
+    { en: "Strictest stance: once the order is confirmed, no cancellation and no refund. Common for high-value LC-backed orders.", zh: "最严格条款：订单确认后不接受取消，定金不退。常见于信用证支持的高额订单。" },
+};
+
+const GOVERNING_LAW_HELP_BY_VALUE: Record<string, OptHelp> = {
+  "Laws of the People's Republic of China; disputes settled by CIETAC arbitration in Beijing":
+    { en: "PRC law + CIETAC (China International Economic and Trade Arbitration Commission) Beijing. The default for Chinese sellers — proceedings in Chinese / English, awards enforceable under the New York Convention.", zh: "适用中国法 + 中国国际经济贸易仲裁委员会 (CIETAC) 北京仲裁。中国卖方常用条款 — 中英文程序，依《纽约公约》可在国际执行。" },
+  "Laws of the People's Republic of China; disputes settled by Shanghai International Arbitration Centre (SHIAC)":
+    { en: "PRC law + SHIAC Shanghai (formerly the Shanghai branch of CIETAC). Same enforceability, Shanghai-based panel.", zh: "适用中国法 + 上海国际仲裁中心 (SHIAC，原 CIETAC 上海分会)。可执行性相同，仲裁庭设于上海。" },
+  "English law; disputes settled by LCIA arbitration in London":
+    { en: "English commercial law + London Court of International Arbitration. Highly predictable, expensive; preferred by Western buyers / banks.", zh: "适用英国商法 + 伦敦国际仲裁院 (LCIA) 仲裁。可预测性高、成本较高，西方买方 / 银行常选。" },
+  "Singapore law; disputes settled by SIAC arbitration in Singapore":
+    { en: "Singapore law + SIAC. Neutral Asia-based seat, fast, English-language, widely enforceable.", zh: "适用新加坡法 + 新加坡国际仲裁中心 (SIAC)。中立亚洲仲裁地，程序快、英文进行，全球可执行。" },
+  "Hong Kong law; disputes settled by HKIAC arbitration in Hong Kong":
+    { en: "Hong Kong law + HKIAC. Bridge between mainland China and common-law world; English / Chinese available; recognised in mainland China.", zh: "适用香港法 + 香港国际仲裁中心 (HKIAC)。连接中国大陆与普通法体系；可用英文 / 中文；裁决在中国大陆可承认。" },
+  "ICC Rules of Arbitration; seat to be agreed in writing":
+    { en: "International Chamber of Commerce (Paris) rules — most widely used international arbitration framework. Seat (physical location) chosen separately.", zh: "国际商会 (ICC，巴黎) 仲裁规则 — 全球最常用的国际仲裁规则。仲裁地另行书面约定。" },
+  "Laws of the Arab Republic of Egypt; jurisdiction of the courts of Cairo":
+    { en: "Egyptian law + Cairo courts (no arbitration). Used when the Egyptian buyer requires home-court jurisdiction. Slower; awards harder to enforce abroad.", zh: "适用埃及法 + 开罗法院管辖（非仲裁）。当埃及买方要求本国管辖时使用。诉讼周期较长，境外执行较难。" },
+};
+
+const LEAD_BASIS_HELP_BY_VALUE: Record<string, OptHelp> = {
+  after_deposit: { en: "The lead-time clock starts the day the seller's bank confirms receipt of the buyer's down-payment (usually 30%). Most common for T/T orders.", zh: "生产周期从卖方银行确认收到买方定金（通常 30%）之日起算。T/T 订单中最常见的起算方式。" },
+  after_order:   { en: "Clock starts on the date the order / proforma is countersigned by both sides. Useful when no deposit is taken (e.g. L/C-only deals).", zh: "生产周期自双方共同签署订单 / 形式发票之日起算。适用于无定金的订单（如纯信用证交易）。" },
+  after_lc_opening: { en: "Clock starts the date the seller's bank receives an authentic, conforming L/C from the buyer's bank. Standard for L/C-backed orders.", zh: "生产周期自卖方银行收到买方银行开立的真实有效信用证之日起算。信用证支持订单的标准做法。" },
+};
+
+/* Resolves help for a payment term row coming from the database.
+   Matches by short_label / label prefix because the row IDs are
+   tenant-specific but the well-known patterns (T/T 30/70, L/C at
+   sight, D/P, etc.) are universal. */
+function resolvePaymentTermHelp(label: string): OptHelp | null {
+  const L = label.toLowerCase();
+  if (/t\/t\s*100|100%\s*advance|t\/t\s*advance/.test(L))
+    return { en: "T/T 100% in advance — Buyer wires the full invoice amount before production starts. Zero credit risk for the seller; maximum risk for the buyer.", zh: "T/T 100% 预付 — 买方在生产前电汇全款。卖方零信用风险；买方承担最大风险。" };
+  if (/t\/t.*30.*70|30\/70/.test(L))
+    return { en: "T/T 30/70 — 30% deposit before production starts, 70% balance before shipment (or against copy B/L). The most common T/T structure for industrial machinery exports.", zh: "T/T 30/70 — 30% 定金生产前付；70% 尾款发货前付（或凭副本提单付）。工业机械出口最常见的电汇付款结构。" };
+  if (/t\/t.*50.*50|50\/50/.test(L))
+    return { en: "T/T 50/50 — Half deposit, half balance. Used for higher-trust relationships or when buyer needs longer financing.", zh: "T/T 50/50 — 50% 定金，50% 尾款。适用于信任度更高的客户或买方需要更长融资期的情况。" };
+  if (/t\/t/.test(L))
+    return { en: "T/T — Telegraphic Transfer (international wire). Cash-based, no document mediation. Risk depends on the split between deposit and balance.", zh: "T/T — 电汇（国际汇款）。现金交易，无单据中介。风险取决于定金与尾款的分配比例。" };
+  if (/l\/c.*sight|at sight/.test(L))
+    return { en: "L/C at sight — Letter of Credit payable upon presentation of conforming documents. Seller gets paid quickly; buyer's bank guarantees payment.", zh: "L/C 即期信用证 — 卖方提交符合规定的单据后即可获付款。卖方收款快；买方银行担保付款。" };
+  if (/l\/c.*30/.test(L))
+    return { en: "L/C 30 days — Usance L/C. Buyer's bank pays the seller 30 days after the bill of lading date. Gives buyer short-term financing.", zh: "L/C 30 天 — 远期信用证。买方银行在提单日后 30 天向卖方付款。为买方提供短期融资。" };
+  if (/l\/c.*60/.test(L))
+    return { en: "L/C 60 days — 60-day usance L/C. Same as 30 days but with longer credit period.", zh: "L/C 60 天 — 60 天远期信用证。同 30 天，但融资期更长。" };
+  if (/l\/c.*90/.test(L))
+    return { en: "L/C 90 days — 90-day usance L/C. Longest common credit period; reserved for trusted buyers / large orders.", zh: "L/C 90 天 — 90 天远期信用证。最长的常见融资期；通常用于信誉良好的买方或大额订单。" };
+  if (/l\/c/.test(L))
+    return { en: "L/C — Letter of Credit. Buyer's bank guarantees payment to the seller against conforming documents. Bank-mediated, lower seller risk than T/T.", zh: "L/C — 信用证。买方银行凭单据符合规定向卖方担保付款。由银行中介，卖方风险低于 T/T。" };
+  if (/d\/p/.test(L))
+    return { en: "D/P — Documents against Payment. Seller's bank releases shipping documents to the buyer only after the buyer pays. No bank guarantee, but buyer cannot clear goods without paying first.", zh: "D/P — 付款交单。卖方银行只在买方付款后才向其放单。无银行担保，但买方不付款则无法清关提货。" };
+  if (/d\/a/.test(L))
+    return { en: "D/A — Documents against Acceptance. Documents released against the buyer's promise to pay at a future date (e.g. 30, 60, 90 days). Higher risk than D/P — buyer can take goods without immediate payment.", zh: "D/A — 承兑交单。买方承兑（承诺到期付款，如 30 / 60 / 90 天）后即可取得单据。风险高于 D/P — 买方无需即付即可取货。" };
+  if (/cad|cash against doc/.test(L))
+    return { en: "CAD — Cash Against Documents. Similar to D/P but the agent collecting payment may be a broker, not a bank. Common for road / land deliveries.", zh: "CAD — 凭单付款。类似 D/P，但收款代理可以是中介机构而非银行。常见于陆运 / 公路交付。" };
+  if (/oa|open account/.test(L))
+    return { en: "OA — Open Account. Seller ships first, buyer pays later (e.g. 30 / 60 / 90 days net). Maximum buyer flexibility, maximum seller risk — only used with very trusted buyers.", zh: "OA — 赊销账户。卖方先发货，买方约定期限（如 30 / 60 / 90 天）后付款。买方最灵活，卖方风险最大 — 仅用于高度信任的客户。" };
+  return null;
+}
+
+/* Resolves help for shipping-method rows by their sub-type code. */
+function resolveShippingMethodHelp(sub: string | null | undefined, name?: string): OptHelp | null {
+  const code = (sub ?? "").toUpperCase();
+  const n = (name ?? "").toLowerCase();
+  if (code === "FCL" || /fcl|full container/.test(n))
+    return { en: "Sea FCL — Full Container Load. The buyer's cargo fills (or is charged as) one whole container. Faster than LCL, cheaper per CBM at high volumes. Standard for machinery exports from China.", zh: "海运整柜 (FCL) — 整柜货物。买方独占整个集装箱（或按整柜计费）。比 LCL 快，大批量时每立方米成本更低。中国机械出口的标准方式。" };
+  if (code === "LCL" || /lcl|less than/.test(n))
+    return { en: "Sea LCL — Less than Container Load. Cargo is consolidated with other shippers' goods. Cheaper for small volumes (<15 CBM), slower and more handling.", zh: "海运拼箱 (LCL) — 拼箱货物。与其他发货人货物拼装在同一集装箱。小批量（<15 立方米）成本更低，但耗时较长、装卸次数更多。" };
+  if (code === "RORO" || /ro-?ro/.test(n))
+    return { en: "Sea RoRo — Roll-on / Roll-off. For vehicles and wheeled machinery driven onto and off the vessel under their own power. No container needed.", zh: "海运滚装 (RoRo) — 滚上 / 滚下。车辆和带轮机械以自身动力上下船。无需集装箱。" };
+  if (code === "REEFER" || /reefer/.test(n))
+    return { en: "Sea Reefer — Refrigerated container service. Temperature-controlled. For perishables (food, pharma).", zh: "海运冷藏 — 冷藏集装箱运输，可控温。用于易腐货物（食品、药品）。" };
+  if (code === "BREAK BULK" || /break bulk|breakbulk/.test(n))
+    return { en: "Break Bulk — Non-containerised general cargo (steel, machinery, oversized items) loaded individually as packages, crates, or pieces.", zh: "件杂货 (Break Bulk) — 非集装箱化普通货物（钢材、机械、超大件），以单件、箱或托盘形式逐件装船。" };
+  if (code === "AIR EXPRESS" || /express|dhl|fedex|ups|tnt/.test(n))
+    return { en: "Air Express — Door-to-door integrator (DHL, FedEx, UPS, TNT). Fastest option (3–5 days), includes customs handling, premium price.", zh: "空运快递 — 国际快递（DHL、FedEx、UPS、TNT 等）一站式门到门服务。最快（3–5 天），含清关服务，价格最高。" };
+  if (code === "AIR CARGO" || code === "AIR" || /air/.test(n))
+    return { en: "Air Cargo — General airfreight. 5–10 days door-to-door. Cheaper than express but customs clearance is the buyer's responsibility at destination.", zh: "空运 — 普通空运货物。门到门约 5–10 天。比快递便宜，但目的港清关由买方负责。" };
+  if (code === "RAIL" || /rail/.test(n))
+    return { en: "Rail — Cross-continent rail freight (e.g. China-Europe via the Belt & Road corridor). Between air and sea on speed and cost. 18–25 days China-Europe.", zh: "铁路运输 — 跨大陆铁路运输（如中欧班列，一带一路通道）。速度与成本介于空运与海运之间。中欧约 18–25 天。" };
+  if (code === "ROAD FTL" || /ftl/.test(n))
+    return { en: "Road FTL — Full Truck Load. Cargo fills (or pays for) one whole truck. Direct, no transshipment.", zh: "公路整车 (FTL) — 整车货物。货物占满（或按整车计费）一辆卡车。直达，无中转。" };
+  if (code === "ROAD LTL" || /ltl/.test(n))
+    return { en: "Road LTL — Less than Truck Load. Consolidated with other shippers' goods. Cheaper for small road shipments, more handling.", zh: "公路零担 (LTL) — 零担货物。与其他发货人货物拼装。小批量公路运输成本更低，但装卸更多。" };
+  if (code === "ROAD" || /road|truck/.test(n))
+    return { en: "Road — Truck haulage. Used for cross-border land deliveries (e.g. Egypt → neighbouring countries) or in combination with sea freight (haulage to / from port).", zh: "公路运输 — 卡车运输。用于跨境陆运（如埃及至邻国）或与海运配合（港口前后段运输）。" };
+  if (code === "COURIER" || /courier/.test(n))
+    return { en: "Courier — Generic small-parcel courier service. For samples, documents, or very small shipments only.", zh: "快递（普通） — 通用小包快递。仅用于样品、文件或极小批量货物。" };
+  return null;
+}
+
+/* Resolves help for shipping-document rows. Uses the row's own
+   description as English copy and adds a Chinese translation
+   keyed by short_name / code for the most common documents. */
+const DOC_ZH_BY_CODE: Record<string, string> = {
+  "B/L":  "海运提单 — 承运人签发的物权凭证 / 货物收据 / 运输合同三合一文件。",
+  "AWB":  "空运提单 — 空运货物的运输合同与收据；不可转让。",
+  "SWB":  "海运记名提单 — 不可转让的海运凭证，加速放货流程。",
+  "Truck CMR": "公路运单 (CMR) — 国际公路货物运输合同凭证。",
+  "Rail CIM":  "铁路运单 (CIM) — 国际铁路货物运输合同凭证。",
+  "Forwarder's Cargo Receipt": "货代收货凭证 (FCR) — 货代收到货物的证明文件，非物权凭证。",
+  "CI":   "商业发票 — 列明货物、价格、买卖双方等关键交易信息的发票，海关申报必备。",
+  "PL":   "装箱单 — 列明每件包装的内容、件数、毛重、净重、体积，海关查验必备。",
+  "PI":   "形式发票 — 正式订单成立前的报价文件，列明价格与条款。",
+  "Contract": "销售合同 — 买卖双方签署的正式交易合同。",
+  "CO":   "原产地证书 — 由商会或贸促会签发，证明货物原产国，用于关税优惠。",
+  "FORM A": "普惠制原产地证书 (FORM A) — 享受发达国家普惠制 (GSP) 关税优惠的原产地证书。",
+  "FTA":  "自贸协定原产地证书 — 享受自贸协定 (FTA) 关税优惠的专用原产地证书。",
+  "Customs Declaration": "出口报关单 — 中国海关货物出口的正式申报单据。",
+  "Fumigation": "熏蒸证书 — 木质包装经熏蒸 / 热处理的证明，木质包装出口必备。",
+  "Inspection": "商检证书 — 装运前货物检验报告（CIQ / SGS / BV 等）。",
+  "Quality Certificate": "质量证书 — 厂方出具的产品出厂质量证明。",
+  "MSDS": "化学品安全说明书 — 危险品 / 化学品运输前必备文件。",
+  "CITES": "濒危物种证书 — 受 CITES 公约管制货物的特殊许可证书。",
+  "Halal": "清真证书 — 食品 / 化妆品等出口至穆斯林国家的清真合规证明。",
+  "Insurance Policy": "保险单 — 货物运输保险的正式凭证，CIF / CIP 条款必备。",
+  "LC Documents": "信用证单据 — 提交至开证行 / 议付行的整套信用证单据。",
+  "Bank Slip": "银行水单 — 电汇或汇款的银行凭证。",
+};
+function resolveDocumentHelp(code: string | null, shortName: string | null, description: string | null): OptHelp | null {
+  const key = (shortName ?? code ?? "").trim();
+  const en = (description ?? "").trim();
+  const zh = DOC_ZH_BY_CODE[key] ?? "";
+  if (!en && !zh) return null;
+  return {
+    en: en || `${key} — international-trade document.`,
+    zh: zh || `${key} — 国际贸易单据。`,
+  };
+}
+
+/* Generic dark-themed dropdown used inside the Quick Fill modal.
+   Renders a button + popover list of options. Each option can
+   carry its own EN+中文 help — a small (?) chip on the right of
+   the row shows the bilingual explanation on hover. Replaces the
+   native <select> so:
+     - the option list inherits our dark theme (no OS-native
+       white-on-black flicker)
+     - per-option help can be shown without leaving the picker. */
+type CustomSelectOption = {
+  value: string;
+  label: string;
+  sublabel?: string;
+  group?: string;
+  help?: OptHelp | null;
+};
+
+function CustomSelect({
+  value,
+  options,
+  onChange,
+  placeholder = "— Pick —",
+}: {
+  value: string;
+  options: CustomSelectOption[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hoveredHelp, setHoveredHelp] = useState<string | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setHoveredHelp(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setHoveredHelp(null);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value);
+
+  /* Preserve insertion order while grouping. */
+  const groupOrder = useMemo(() => {
+    const seen = new Set<string>();
+    const order: string[] = [];
+    for (const o of options) {
+      const g = o.group ?? "";
+      if (!seen.has(g)) { seen.add(g); order.push(g); }
+    }
+    return order;
+  }, [options]);
+
+  const grouped = useMemo(() => {
+    const out: Record<string, CustomSelectOption[]> = {};
+    for (const o of options) (out[o.group ?? ""] ??= []).push(o);
+    return out;
+  }, [options]);
+
+  return (
+    <div ref={ref} style={{ position: "relative", width: "100%" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          height: 34,
+          padding: "0 28px 0 10px",
+          background: "#0A0A0A",
+          color: "#ffffff",
+          WebkitTextFillColor: "#ffffff",
+          border: "1px solid #2a2a2a",
+          borderRadius: 6,
+          textAlign: "left",
+          fontSize: 12,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          position: "relative",
+          outline: "none",
+        }}
+      >
+        <span style={{
+          flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {selected
+            ? selected.label
+            : <span style={{ color: "rgba(255,255,255,0.4)" }}>{placeholder}</span>}
+        </span>
+        <span style={{
+          position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+          color: "rgba(255,255,255,0.5)", fontSize: 10, pointerEvents: "none",
+        }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0,
+          right: 0,
+          maxHeight: 340,
+          overflowY: "auto",
+          background: "#0A0A0A",
+          border: "1px solid #2a2a2a",
+          borderRadius: 8,
+          boxShadow: "0 10px 32px rgba(0,0,0,0.5)",
+          zIndex: 1200,
+          padding: 4,
+        }}>
+          {/* Clear option */}
+          <button
+            type="button"
+            onClick={() => { onChange(""); setOpen(false); setHoveredHelp(null); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              width: "100%", padding: "8px 10px", textAlign: "left",
+              background: "transparent", color: "rgba(255,255,255,0.5)",
+              border: "none", borderRadius: 4, fontSize: 11, cursor: "pointer", fontStyle: "italic",
+            }}
+          >
+            {placeholder}
+          </button>
+
+          {groupOrder.map((g) => (
+            <div key={g || "__none__"}>
+              {g && (
+                <div style={{
+                  fontSize: 9, fontWeight: 700,
+                  color: "rgba(255,255,255,0.4)",
+                  padding: "8px 10px 3px",
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>
+                  {g}
+                </div>
+              )}
+              {(grouped[g] ?? []).map((o) => {
+                const selectedHere = o.value === value;
+                const isHovered = hoveredHelp === o.value;
+                return (
+                  <div key={o.value} style={{ position: "relative" }}>
+                    <button
+                      type="button"
+                      onClick={() => { onChange(o.value); setOpen(false); setHoveredHelp(null); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        width: "100%", padding: "8px 10px", textAlign: "left",
+                        background: selectedHere ? "rgba(255,255,255,0.10)" : "transparent",
+                        color: "#ffffff", WebkitTextFillColor: "#ffffff",
+                        border: "none", borderRadius: 4, fontSize: 12, cursor: "pointer",
+                        fontWeight: selectedHere ? 700 : 500,
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background =
+                          selectedHere ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background =
+                          selectedHere ? "rgba(255,255,255,0.10)" : "transparent";
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {o.label}
+                        </span>
+                        {o.sublabel && (
+                          <span style={{
+                            display: "block", fontSize: 10,
+                            color: "rgba(255,255,255,0.5)", fontWeight: 400,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {o.sublabel}
+                          </span>
+                        )}
+                      </span>
+                      {o.help && (
+                        <span
+                          onMouseEnter={(e) => { e.stopPropagation(); setHoveredHelp(o.value); }}
+                          onMouseLeave={() => setHoveredHelp(null)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 16, height: 16, borderRadius: "50%",
+                            border: "1px solid rgba(255,255,255,0.35)",
+                            color: "rgba(255,255,255,0.75)", background: "transparent",
+                            fontSize: 10, fontWeight: 700, cursor: "help",
+                            flexShrink: 0,
+                          }}
+                        >?</span>
+                      )}
+                    </button>
+
+                    {isHovered && o.help && (
+                      <div style={{
+                        position: "absolute",
+                        left: "calc(100% + 8px)",
+                        top: 0,
+                        width: 320,
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        background: "#1f2937",
+                        color: "#ffffff",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                        fontSize: 11, lineHeight: 1.5,
+                        zIndex: 1300, pointerEvents: "none",
+                        whiteSpace: "normal",
+                      }}>
+                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</div>
+                        <div style={{ marginBottom: 8 }}>{o.help.en}</div>
+                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
+                        <div>{o.help.zh}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* Small (?) icon that opens a bilingual EN+中文 explanation on
    hover. Used beside every Quick Fill label so the operator does
    not need to remember what FOB / D/P / CIETAC etc. mean. */
@@ -2771,6 +3203,12 @@ function TermsQuickFillModal({
     border: "1px solid #2a2a2a",
     background: "#0A0A0A",
     color: "#ffffff",
+    /* Belt-and-braces: some browsers (Safari especially) render
+       input text using -webkit-text-fill-color instead of `color`
+       and may darken a number input's value to black. Pinning both
+       explicitly keeps typed text white. */
+    WebkitTextFillColor: "#ffffff",
+    caretColor: "#ffffff",
     outline: "none",
     colorScheme: "dark",
   };
@@ -2910,25 +3348,33 @@ function TermsQuickFillModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Payment term<HelpTip k="payment" /></label>
-                <select value={current.paymentTermId ?? ""} onChange={(e) => onPickPayment(e.target.value)} style={fieldStyle}>
-                  <option value="">— Pick a payment term —</option>
-                  {payCats.map((cat) => (
-                    <optgroup key={cat.id} label={cat.short_name ?? cat.name}>
-                      {cat.terms.map((t) => (
-                        <option key={t.id} value={t.id}>{t.short_label ?? t.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={current.paymentTermId ?? ""}
+                  placeholder="— Pick a payment term —"
+                  onChange={onPickPayment}
+                  options={payCats.flatMap((cat) =>
+                    cat.terms.map((t) => ({
+                      value: t.id,
+                      label: t.short_label ?? t.label,
+                      sublabel: t.short_label && t.label !== t.short_label ? t.label : undefined,
+                      group: cat.short_name ?? cat.name,
+                      help: resolvePaymentTermHelp(t.short_label ?? t.label),
+                    })),
+                  )}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Price type (Incoterm)<HelpTip k="incoterm" /></label>
-                <select value={current.incotermId ?? ""} onChange={(e) => onPickIncoterm(e.target.value)} style={fieldStyle}>
-                  <option value="">— Pick an Incoterm —</option>
-                  {incoterms.map((t) => (
-                    <option key={t.id} value={t.id}>{t.code} — {t.name}</option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={current.incotermId ?? ""}
+                  placeholder="— Pick an Incoterm —"
+                  onChange={onPickIncoterm}
+                  options={incoterms.map((t) => ({
+                    value: t.id,
+                    label: `${t.code} — ${t.name}`,
+                    help: INCOTERM_HELP_BY_CODE[t.code] ?? null,
+                  }))}
+                />
               </div>
             </div>
           </div>
@@ -2954,52 +3400,51 @@ function TermsQuickFillModal({
             <div style={{ display: "grid", gridTemplateColumns: containerVisible ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Sent by<HelpTip k="sentBy" /></label>
-                <select value={current.shippingMethodId ?? ""} onChange={(e) => onPickMethod(e.target.value)} style={fieldStyle}>
-                  <option value="">— Pick a shipping method —</option>
-                  {methods.map((m) => (
-                    <option key={m.id} value={m.id}>{m.short_name ?? m.name}</option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={current.shippingMethodId ?? ""}
+                  placeholder="— Pick a shipping method —"
+                  onChange={onPickMethod}
+                  options={methods.map((m) => ({
+                    value: m.id,
+                    label: m.short_name ?? m.name,
+                    sublabel: m.short_name && m.name !== m.short_name ? m.name : undefined,
+                    help: resolveShippingMethodHelp(m.sub_type, m.name),
+                  }))}
+                />
               </div>
               {containerVisible && (
                 <div>
                   <label style={labelStyle}>Container type<HelpTip k="container" /></label>
-                  <select
+                  <CustomSelect
                     value={current.containerType ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      onPatch({
-                        fields: { containerType: v || undefined },
-                        termsLineUpdates: { "Container type": v },
-                      });
-                    }}
-                    style={fieldStyle}
-                  >
-                    <option value="">— Pick a container —</option>
-                    {CONTAINER_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                    placeholder="— Pick a container —"
+                    onChange={(v) => onPatch({
+                      fields: { containerType: v || undefined },
+                      termsLineUpdates: { "Container type": v },
+                    })}
+                    options={CONTAINER_TYPE_OPTIONS.map((opt) => ({
+                      value: opt.value,
+                      label: opt.label,
+                      help: CONTAINER_HELP_BY_VALUE[opt.value] ?? null,
+                    }))}
+                  />
                 </div>
               )}
               <div>
                 <label style={labelStyle}>Shipping marks<HelpTip k="marks" /></label>
-                <select
+                <CustomSelect
                   value={current.shippingMarks ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    onPatch({
-                      fields: { shippingMarks: v || undefined },
-                      termsLineUpdates: { "Shipping marks": v },
-                    });
-                  }}
-                  style={fieldStyle}
-                >
-                  <option value="">— Pick a rule —</option>
-                  {SHIPPING_MARKS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  placeholder="— Pick a rule —"
+                  onChange={(v) => onPatch({
+                    fields: { shippingMarks: v || undefined },
+                    termsLineUpdates: { "Shipping marks": v },
+                  })}
+                  options={SHIPPING_MARKS_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    help: SHIPPING_MARKS_HELP_BY_VALUE[opt.value] ?? null,
+                  }))}
+                />
               </div>
             </div>
           </div>
@@ -3037,10 +3482,11 @@ function TermsQuickFillModal({
               </div>
               <div>
                 <label style={labelStyle}>Counted from<HelpTip k="leadBasis" /></label>
-                <select
+                <CustomSelect
                   value={current.leadTimeBasis ?? "after_deposit"}
-                  onChange={(e) => {
-                    const basis = e.target.value as "after_deposit" | "after_order" | "after_lc_opening";
+                  placeholder="— Pick a trigger —"
+                  onChange={(v) => {
+                    const basis = (v || "after_deposit") as "after_deposit" | "after_order" | "after_lc_opening";
                     const bLabel = LEAD_TIME_BASIS_LABEL[basis];
                     const days = current.leadTimeDays ?? 0;
                     const tMin = selectedMethod?.typical_transit_days_min ?? null;
@@ -3055,12 +3501,12 @@ function TermsQuickFillModal({
                     }
                     onPatch({ fields: { leadTimeBasis: basis }, termsLineUpdates: updates });
                   }}
-                  style={fieldStyle}
-                >
-                  <option value="after_deposit">after receipt of deposit</option>
-                  <option value="after_order">after order confirmation</option>
-                  <option value="after_lc_opening">after L/C opening</option>
-                </select>
+                  options={[
+                    { value: "after_deposit",    label: "after receipt of deposit",  help: LEAD_BASIS_HELP_BY_VALUE.after_deposit },
+                    { value: "after_order",      label: "after order confirmation",  help: LEAD_BASIS_HELP_BY_VALUE.after_order },
+                    { value: "after_lc_opening", label: "after L/C opening",         help: LEAD_BASIS_HELP_BY_VALUE.after_lc_opening },
+                  ]}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Delivery (auto)<HelpTip k="delivery" /></label>
@@ -3095,51 +3541,52 @@ function TermsQuickFillModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Bank charges<HelpTip k="bank" /></label>
-                <select
+                <CustomSelect
                   value={current.bankCharges ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    onPatch({ fields: { bankCharges: v || undefined }, termsLineUpdates: { "Bank Charges": v } });
-                  }}
-                  style={fieldStyle}
-                >
-                  <option value="">— Pick a clause —</option>
-                  {BANK_CHARGES_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  placeholder="— Pick a clause —"
+                  onChange={(v) => onPatch({
+                    fields: { bankCharges: v || undefined },
+                    termsLineUpdates: { "Bank Charges": v },
+                  })}
+                  options={BANK_CHARGES_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    sublabel: opt.value !== opt.label ? opt.value : undefined,
+                    help: BANK_CHARGES_HELP_BY_VALUE[opt.value] ?? null,
+                  }))}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Cancellation policy<HelpTip k="cancellation" /></label>
-                <select
+                <CustomSelect
                   value={current.cancellationPolicy ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    onPatch({ fields: { cancellationPolicy: v || undefined }, termsLineUpdates: { "Cancellation Policy": v } });
-                  }}
-                  style={fieldStyle}
-                >
-                  <option value="">— Pick a policy —</option>
-                  {CANCELLATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  placeholder="— Pick a policy —"
+                  onChange={(v) => onPatch({
+                    fields: { cancellationPolicy: v || undefined },
+                    termsLineUpdates: { "Cancellation Policy": v },
+                  })}
+                  options={CANCELLATION_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    help: CANCELLATION_HELP_BY_VALUE[opt.value] ?? null,
+                  }))}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Governing law / arbitration<HelpTip k="governing" /></label>
-                <select
+                <CustomSelect
                   value={current.governingLaw ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    onPatch({ fields: { governingLaw: v || undefined }, termsLineUpdates: { "Governing Law": v } });
-                  }}
-                  style={fieldStyle}
-                >
-                  <option value="">— Pick a jurisdiction —</option>
-                  {GOVERNING_LAW_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  placeholder="— Pick a jurisdiction —"
+                  onChange={(v) => onPatch({
+                    fields: { governingLaw: v || undefined },
+                    termsLineUpdates: { "Governing Law": v },
+                  })}
+                  options={GOVERNING_LAW_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                    help: GOVERNING_LAW_HELP_BY_VALUE[opt.value] ?? null,
+                  }))}
+                />
               </div>
             </div>
           </div>
@@ -3207,8 +3654,9 @@ function DocumentsCheckboxList({
   value: string[];
   onChange: (next: string[]) => void;
 }) {
-  interface DocLite { id: string; code: string; name: string; short_name: string | null; category: string; sort_order?: number; }
+  interface DocLite { id: string; code: string; name: string; short_name: string | null; description: string | null; category: string; sort_order?: number; }
   const [docs, setDocs] = useState<DocLite[]>([]);
+  const [hoveredHelpId, setHoveredHelpId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch("/api/shipping-documents", { credentials: "include" })
@@ -3335,48 +3783,83 @@ function DocumentsCheckboxList({
               {list.map((d) => {
                 const label = d.short_name ?? d.code;
                 const checked = value.includes(label);
+                const help = resolveDocumentHelp(d.code, d.short_name, d.description);
+                const isHelpHovered = hoveredHelpId === d.id;
                 return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => toggle(label)}
-                    title={d.name}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: checked ? "1px solid #ffffff" : "1px solid #2a2a2a",
-                      background: checked ? "rgba(255,255,255,0.10)" : "transparent",
-                      color: "#fff",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "background 0.12s, border 0.12s",
-                    }}
-                  >
-                    <span style={{
-                      display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      width: 14, height: 14, borderRadius: 3,
-                      border: checked ? "1px solid #fff" : "1px solid rgba(255,255,255,0.35)",
-                      background: checked ? "#fff" : "transparent",
-                      color: "#000", flexShrink: 0,
-                      fontSize: 10, fontWeight: 900, lineHeight: 1,
-                    }}>
-                      {checked ? "✓" : ""}
-                    </span>
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ display: "block", fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>
-                        {label}
-                      </span>
+                  <div key={d.id} style={{ position: "relative" }}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(label)}
+                      style={{
+                        width: "100%",
+                        display: "flex", alignItems: "center", gap: 8,
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: checked ? "1px solid #ffffff" : "1px solid #2a2a2a",
+                        background: checked ? "rgba(255,255,255,0.10)" : "transparent",
+                        color: "#fff",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        transition: "background 0.12s, border 0.12s",
+                      }}
+                    >
                       <span style={{
-                        display: "block", fontSize: 10,
-                        color: "rgba(255,255,255,0.5)", lineHeight: 1.3,
-                        marginTop: 1,
-                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: 14, height: 14, borderRadius: 3,
+                        border: checked ? "1px solid #fff" : "1px solid rgba(255,255,255,0.35)",
+                        background: checked ? "#fff" : "transparent",
+                        color: "#000", flexShrink: 0,
+                        fontSize: 10, fontWeight: 900, lineHeight: 1,
                       }}>
-                        {d.name}
+                        {checked ? "✓" : ""}
                       </span>
-                    </span>
-                  </button>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: "block", fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>
+                          {label}
+                        </span>
+                        <span style={{
+                          display: "block", fontSize: 10,
+                          color: "rgba(255,255,255,0.5)", lineHeight: 1.3,
+                          marginTop: 1,
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                        }}>
+                          {d.name}
+                        </span>
+                      </span>
+                      {help && (
+                        <span
+                          onMouseEnter={(e) => { e.stopPropagation(); setHoveredHelpId(d.id); }}
+                          onMouseLeave={() => setHoveredHelpId(null)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            width: 16, height: 16, borderRadius: "50%",
+                            border: "1px solid rgba(255,255,255,0.35)",
+                            color: "rgba(255,255,255,0.75)", background: "transparent",
+                            fontSize: 10, fontWeight: 700, cursor: "help",
+                            flexShrink: 0,
+                          }}
+                        >?</span>
+                      )}
+                    </button>
+                    {isHelpHovered && help && (
+                      <div style={{
+                        position: "absolute",
+                        left: 0, top: "calc(100% + 6px)",
+                        width: 320, padding: "10px 12px",
+                        borderRadius: 8, background: "#1f2937", color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                        fontSize: 11, lineHeight: 1.5,
+                        zIndex: 1300, pointerEvents: "none", whiteSpace: "normal",
+                      }}>
+                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>EN</div>
+                        <div style={{ marginBottom: 8 }}>{help.en}</div>
+                        <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>中文</div>
+                        <div>{help.zh}</div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
