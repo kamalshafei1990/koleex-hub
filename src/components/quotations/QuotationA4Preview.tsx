@@ -118,6 +118,15 @@ interface Props {
   /* Optional handler for the "Link customer" button on the
      QUOTATION TO header. Parent owns the modal. */
   onPickCustomer?: () => void;
+  /* Doc kind — flips the visible labels for the same renderer:
+       "quotation" → "QUOTATION" / "Quotation No" / "Valid Till" /
+                     "Quotation To"
+       "invoice"   → "COMMERCIAL INVOICE" / "Invoice No" / "Due Date" /
+                     "Invoice To"
+     Defaults to "quotation" so existing callers don't need to
+     update. The shared bones (KOLEEX header, items table, totals,
+     stamp / signature) render identically. */
+  docKind?: "quotation" | "invoice";
   /* Saved-asset hooks for the Stamp + Signature cards. The parent
      fetches /api/quotations/saved-assets on mount and passes the
      URLs (or null) here, plus the handlers that attach/detach an
@@ -197,6 +206,7 @@ export default function QuotationA4Preview({
   addItem,
   onPickFromCatalog,
   onPickCustomer,
+  docKind = "quotation",
   savedStampUrl,
   savedSignatureUrl,
   isSuperAdmin,
@@ -413,7 +423,7 @@ export default function QuotationA4Preview({
               letterSpacing: "0.08em",
             }}
           >
-            QUOTATION
+            {docKind === "invoice" ? "COMMERCIAL INVOICE" : "QUOTATION"}
           </div>
         </div>
 
@@ -500,7 +510,7 @@ export default function QuotationA4Preview({
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>
-          <MetaStripCell label="Quotation No">
+          <MetaStripCell label={docKind === "invoice" ? "Invoice No" : "Quotation No"}>
             <span
               data-quote-no={current.invoiceNo || undefined}
               style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}
@@ -508,7 +518,7 @@ export default function QuotationA4Preview({
               {current.invoiceNo || "—"}
             </span>
           </MetaStripCell>
-          <MetaStripCell label="Valid Till">
+          <MetaStripCell label={docKind === "invoice" ? "Due Date" : "Valid Till"}>
             <input
               value={current.validTill}
               onChange={(e) => setMeta("validTill", e.target.value)}
@@ -627,7 +637,7 @@ export default function QuotationA4Preview({
                 gap: 8,
               }}
             >
-              <span>Quotation To</span>
+              <span>{docKind === "invoice" ? "Invoice To" : "Quotation To"}</span>
               {/* Link-to-CRM button. Editor-only (`.no-print`) so the
                   black header strip stays clean on the printed PDF. */}
               {onPickCustomer && (
