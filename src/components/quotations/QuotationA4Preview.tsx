@@ -3025,13 +3025,27 @@ function StampSignatureBox({
   aspectSquare?: boolean;
   children?: React.ReactNode;
 }) {
+  /* Sizing rationale:
+       · STAMP (aspectSquare=true) — locked to 40 mm × 40 mm using
+         physical mm units. This is the Chinese mainland standard
+         for an official company seal (公章) — every legitimate
+         Chinese corporate stamp is 40 mm diameter by regulation.
+         Using mm (not px) guarantees the rendered + printed size
+         is exactly 40 mm regardless of viewport DPI, browser zoom,
+         or print scaling. Important: the uploaded image needs to
+         be a tight crop of the circular seal (no surrounding
+         whitespace), otherwise object-fit:contain shrinks the
+         visible circle below 40 mm.
+       · SIGNATURE (aspectSquare=false) — handwritten signatures
+         have no legal size, so the card uses 40 mm height and
+         full card width as a comfortable signing area. */
   return (
     <div
       style={{
         position: "relative",
-        width: "100%",
-        height: 150,
-        maxWidth: aspectSquare ? 150 : undefined,
+        width: aspectSquare ? "40mm" : "100%",
+        height: aspectSquare ? "40mm" : "40mm",
+        maxWidth: aspectSquare ? "40mm" : undefined,
         margin: aspectSquare ? "0 auto" : undefined,
         border: imageUrl ? "none" : `1px dashed ${T.inkGhost}`,
         borderRadius: 10,
