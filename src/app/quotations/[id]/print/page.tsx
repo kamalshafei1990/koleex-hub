@@ -3,15 +3,21 @@
 /* ---------------------------------------------------------------------------
    /quotations/[id]/print — Print-only render of a single quotation.
 
-   Used by the server-side PDF endpoint (/api/quotations/[id]/pdf): the
-   Puppeteer browser navigates here, waits for `window.__quotation_pdf_ready__`
-   to flip true, then snapshots the page to PDF. The route is also viewable
-   by humans for previewing what the PDF will look like.
+   Two callers:
+     1. /api/quotations/[id]/pdf (server-side Puppeteer) — navigates here
+        and snapshots the page to PDF. Used for the email-attach flow
+        when that ships.
+     2. The editor's "Export PDF" button — opens this page in a new
+        window with `?auto=1`. The page auto-fires window.print() once
+        every image has decoded, so the operator gets the browser's
+        native "Save as PDF" dialog instantly with the same A4 layout
+        the server would produce — no cold-start, no function timeout,
+        works on every device.
 
    Renders the same QuotationA4Preview the editor uses, but with stub
-   callbacks (everything read-only) and absolutely no chrome — no header,
-   no sidebar, no toolbars, no on-screen page-break gaps. The component's
-   own @media print styles already handle final layout.
+   callbacks (everything read-only) and absolutely no chrome. The
+   per-route stylesheet (further down) clamps every doc to exactly
+   210×297 mm so the print dialog's preview matches A4 exactly.
    --------------------------------------------------------------------------- */
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
@@ -54,9 +60,9 @@ export default function QuotationPrintPage({
 
   /* Flag the page as ready once the data is loaded and all <img> tags
      under the doc have finished decoding. The PDF endpoint polls for
-     `window.__quotation_pdf_ready__ === true` before snapshotting, so
-     pages where photos are still streaming in don't capture half-loaded
-     thumbnails. */
+     `window.__quotation_pdf_ready__ === true` before snapshotting,
+     and the "Export PDF" button (when this page is opened with
+     ?auto=1) waits on the same flag before firing window.print(). */
   useEffect(() => {
     if (!quote) return;
     let cancelled = false;
@@ -74,6 +80,20 @@ export default function QuotationPrintPage({
       );
       if (cancelled) return;
       (window as unknown as { __quotation_pdf_ready__?: boolean }).__quotation_pdf_ready__ = true;
+      /* Auto-trigger the browser print dialog when the caller asked
+         for it via `?auto=1`. Defer one animation frame so the
+         layout flush from setting the flag commits first — Safari
+         occasionally captures a half-painted frame otherwise. */
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("auto") === "1") {
+        requestAnimationFrame(() => {
+          /* Give the browser a beat to settle multi-page reflow, then
+             open the print dialog. The operator picks "Save as PDF"
+             — same output as the server route would produce, but
+             instant and with no cold-start cost. */
+          setTimeout(() => window.print(), 100);
+        });
+      }
     };
     /* Small defer to let React commit the layout before we measure. */
     const t = setTimeout(tick, 50);

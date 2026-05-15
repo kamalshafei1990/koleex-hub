@@ -905,27 +905,35 @@ export default function Quotations() {
     document.title = prev;
   }, [current]);
 
-  /* "saving" | "loading" status for the Export-PDF flow so the button
-     can spin while the server renders. PDF generation can take 5-15 s
-     on the first call after deploy (Chromium cold start), so a
-     visible state is important. */
+  /* "saving" | "loading" state during the brief moment between click
+     and the new window receiving focus. Used to disable the button
+     so a frantic double-click doesn't open two print dialogs. */
   const [pdfState, setPdfState] = useState<"idle" | "loading" | "error">("idle");
 
-  /* ── Export PDF (server-side render) ──
-     Hits /api/quotations/<id>/pdf which spins up headless Chrome,
-     navigates to the chrome-less /quotations/<id>/print page, and
-     snapshots it to PDF. The output is identical on phone, tablet,
-     and laptop — and ready to attach to email. The route requires
-     the quote to be SAVED to the server first (server fetches it by
-     id), so we save automatically if the user is on a fresh draft. */
+  /* ── Export PDF ──
+     Opens /quotations/<id>/print?auto=1 in a new window. That page
+     renders the same A4 layout the server-side Puppeteer pipeline
+     uses (210×297 mm, page-break-after each doc) and auto-fires
+     window.print() once every image decodes. The operator picks
+     "Save as PDF" in the native dialog.
+
+     Why not the server-side /api/quotations/<id>/pdf route any
+     more: Vercel cold-start on the Puppeteer function regularly
+     ran ~30 s and occasionally hit the 60 s wall, leaving the
+     user staring at "Rendering…" with no feedback. The new-window
+     route is instant on every device, has no function-timeout
+     failure mode, and produces an identical-quality PDF because
+     the heavy lifting (the A4-fitted print page) is exactly the
+     same. The /api/...pdf endpoint stays in the codebase for a
+     future "email this quote" feature where we genuinely need a
+     server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
     setPdfState("loading");
     try {
-      /* Make sure the doc is persisted before asking the server to
-         render it — otherwise the PDF would show the previously-
-         saved state, not the user's latest edits. */
-      if (current.id.length !== 36) {
+      /* Make sure the latest edits are on the server before opening
+         the print window — that page fetches the quote by id. */
+      if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
       }
       const refreshed = await loadQuotationsRemote({ fresh: true });
@@ -936,38 +944,18 @@ export default function Quotations() {
       if (quotationId.length !== 36) {
         setPdfState("error");
         alert("Please save the quotation before exporting.");
+        setTimeout(() => setPdfState("idle"), 2_000);
         return;
       }
-      const res = await fetch(
-        `/api/quotations/${encodeURIComponent(quotationId)}/pdf`,
-        { credentials: "include" },
-      );
-      if (!res.ok) {
-        let detail = "";
-        try {
-          const j = await res.json();
-          detail = j?.error || "";
-        } catch { /* ignore */ }
-        setPdfState("error");
-        alert(`Export failed (${res.status})${detail ? `: ${detail}` : ""}`);
-        return;
-      }
-      const blob = await res.blob();
-      const filename = `${current.invoiceNo || "quotation"}.pdf`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      /* Defer the revoke a tick so the browser actually starts the
-         download before the URL becomes invalid. */
-      setTimeout(() => URL.revokeObjectURL(url), 1_000);
-      setPdfState("idle");
+      const url = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      /* Briefly reflect success; the actual render happens in the new
+         window so we don't have anything else to wait on. */
+      setTimeout(() => setPdfState("idle"), 500);
     } catch (e) {
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(() => setPdfState("idle"), 2_000);
     }
   }, [current, handleSave]);
 
@@ -1366,10 +1354,10 @@ export default function Quotations() {
           onClick={handleExportPdf}
           disabled={pdfState === "loading"}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Generate a PDF on the server — same output on every device."
+          title="Open a print-ready view in a new window — pick 'Save as PDF' in the print dialog."
         >
           <DownloadIcon size={14} />
-          {pdfState === "loading" ? "Rendering…" : t("btn.exportPDF")}
+          {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
         </button>
         <button
           onClick={handlePrint}
