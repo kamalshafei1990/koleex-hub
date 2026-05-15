@@ -36,13 +36,16 @@ import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import CalendarIcon from "@/components/icons/ui/CalendarRawIcon";
+import BuildingIcon from "@/components/icons/ui/BuildingIcon";
 import { useCurrentAccount, notifyIdentityChanged } from "@/lib/identity";
+import { useScopeContext } from "@/lib/use-scope";
 import { updateAccountAvatar } from "@/lib/accounts-admin";
 import PreferencesTab from "@/components/admin/accounts/tabs/PreferencesTab";
 import CalendarTab from "@/components/admin/accounts/tabs/CalendarTab";
+import PaymentTermsManager from "@/components/settings/PaymentTermsManager";
 import type { AccountWithLinks } from "@/types/supabase";
 
-type Tab = "profile" | "preferences" | "calendar";
+type Tab = "profile" | "preferences" | "calendar" | "workspace";
 
 export default function SettingsPage() {
   return (
@@ -57,6 +60,8 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const { account, refresh } = useCurrentAccount();
+  const scope = useScopeContext();
+  const isSuperAdmin = scope?.is_super_admin ?? false;
   const [tab, setTab] = useState<Tab>("profile");
 
   if (!account) {
@@ -104,6 +109,12 @@ function SettingsContent() {
             <TabButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserIcon size={14} />} label="Profile" />
             <TabButton active={tab === "preferences"} onClick={() => setTab("preferences")} icon={<Settings2Icon className="h-3.5 w-3.5" />} label="Preferences" />
             <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")} icon={<CalendarIcon className="h-3.5 w-3.5" />} label="Calendar" />
+            {/* Workspace tab — tenant-wide master data (payment terms,
+                price types, etc.). Super-admin only; everyone else
+                never sees the tab. */}
+            {isSuperAdmin && (
+              <TabButton active={tab === "workspace"} onClick={() => setTab("workspace")} icon={<BuildingIcon size={14} />} label="Workspace" />
+            )}
           </nav>
         </div>
       </div>
@@ -128,6 +139,9 @@ function SettingsContent() {
               account={account}
               onChanged={() => { notifyIdentityChanged(); refresh(); }}
             />
+          )}
+          {tab === "workspace" && isSuperAdmin && (
+            <PaymentTermsManager isSuperAdmin={isSuperAdmin} />
           )}
         </div>
       </div>
