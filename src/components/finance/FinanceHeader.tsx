@@ -17,8 +17,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import FinanceIcon from "@/components/icons/FinanceIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import FinanceTabs from "@/components/finance/FinanceTabs";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
@@ -72,10 +71,10 @@ export default function FinanceHeader({
             aria-label="Back to Hub"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
           >
-            <ArrowLeftIcon className="h-4 w-4" />
+            <RrIcon name="arrow-left" size={16} />
           </Link>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
-            <FinanceIcon size={16} />
+            <RrIcon name="coins" size={16} />
           </div>
           <div className="flex min-w-0 items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>

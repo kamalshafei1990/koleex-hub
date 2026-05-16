@@ -20,6 +20,7 @@
 import { useId, type ReactNode } from "react";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import RrIcon from "@/components/ui/RrIcon";
 
 /* ---------------------------------------------------------------------------
    1. Tokens
@@ -312,9 +313,9 @@ export function InsightCard({
           <button
             type="button"
             onClick={onCta}
-            className="mt-2 text-[11px] font-medium text-sky-300 hover:text-sky-200"
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-sky-300 hover:text-sky-200"
           >
-            {cta} →
+            {cta} <RrIcon name="arrow-up-right" size={10} />
           </button>
         )}
       </div>

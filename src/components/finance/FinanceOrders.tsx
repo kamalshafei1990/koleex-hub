@@ -12,6 +12,7 @@ import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/PartyPickerModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
+import RrIcon from "@/components/ui/RrIcon";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
@@ -667,7 +668,7 @@ function OrderEditor({
           ].map((s) => (
             <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-400"}`}>
               <span className={`flex h-5 w-5 items-center justify-center rounded-full ${s.done ? "bg-emerald-500/30" : "bg-white/5"}`}>
-                {s.done ? "✓" : s.n}
+                {s.done ? <RrIcon name="check" size={10} /> : s.n}
               </span>
               <span className="whitespace-nowrap">Step {s.n} · {s.label}</span>
             </div>

@@ -6,17 +6,19 @@
    walks the path so /finance/orders/123 keeps "Orders" lit, not just
    /finance/orders. */
 
+import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SegmentedNav } from "@/components/finance/FinanceUiX";
+import RrIcon from "@/components/ui/RrIcon";
 
-const TABS: { key: string; label: string; icon: string }[] = [
-  { key: "/finance",                label: "Dashboard",         icon: "◇" },
-  { key: "/finance/orders",         label: "Orders",            icon: "▣" },
-  { key: "/finance/expenses",       label: "Expense Analytics", icon: "△" },
-  { key: "/finance/customers",      label: "Customers",         icon: "◐" },
-  { key: "/finance/suppliers",      label: "Suppliers",         icon: "◑" },
-  { key: "/finance/payments",       label: "Payments",          icon: "≡" },
-  { key: "/finance/notifications",  label: "Reminders",         icon: "○" },
+const TABS: { key: string; label: string; icon: ReactNode }[] = [
+  { key: "/finance",                label: "Dashboard",         icon: <RrIcon name="coins" size={12} /> },
+  { key: "/finance/orders",         label: "Orders",            icon: <RrIcon name="file-invoice" size={12} /> },
+  { key: "/finance/expenses",       label: "Expense Analytics", icon: <RrIcon name="receipt" size={12} /> },
+  { key: "/finance/customers",      label: "Customers",         icon: <RrIcon name="arrow-down-left" size={12} /> },
+  { key: "/finance/suppliers",      label: "Suppliers",         icon: <RrIcon name="arrow-up-right" size={12} /> },
+  { key: "/finance/payments",       label: "Payments",          icon: <RrIcon name="wallet" size={12} /> },
+  { key: "/finance/notifications",  label: "Reminders",         icon: <RrIcon name="clock" size={12} /> },
 ];
 
 export default function FinanceTabs() {

@@ -9,6 +9,7 @@
 
 import type { FinancePartyRow } from "@/components/finance/PartyPickerModal";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
+import RrIcon from "@/components/ui/RrIcon";
 
 const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
   end_user: "bg-gray-500/15 text-gray-300",
@@ -106,10 +107,10 @@ export default function PartyChip({
           <button
             type="button"
             onClick={onClear}
-            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-rose-400 hover:bg-rose-500/10"
+            className="inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-medium text-rose-400 hover:bg-rose-500/10"
             title="Clear"
           >
-            ✕
+            <RrIcon name="cross" size={10} />
           </button>
         )}
       </div>

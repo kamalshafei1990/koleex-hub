@@ -19,8 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import type { FinancePartyRow } from "@/app/api/finance/parties/route";
 
@@ -131,7 +130,7 @@ export default function PartyPickerModal({
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200">
-            <CrossIcon size={18} />
+            <RrIcon name="cross" size={14} />
           </button>
         </div>
 
@@ -150,7 +149,7 @@ export default function PartyPickerModal({
         <div className="max-h-[420px] overflow-y-auto px-2 pb-3">
           {loading && rows.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-gray-500">
-              <SpinnerIcon className="h-4 w-4 animate-spin" />
+              <RrIcon name="loading" size={14} className="animate-spin" />
               <span className="ml-2 text-sm">Searching contacts…</span>
             </div>
           ) : error ? (

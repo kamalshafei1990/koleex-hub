@@ -721,7 +721,7 @@ type IntelligenceCard = {
   description: string;
   chip?: string;
   severity: InsightSeverity;
-  icon: string;
+  icon: React.ReactNode;
 };
 
 function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
@@ -751,7 +751,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
   const collectionPct = kpi.total_revenue > 0 ? ((kpi.cash_in ?? 0) / kpi.total_revenue) * 100 : 0;
 
   cards.push({
-    icon: "◐",
+    icon: <RrIcon name="wallet" size={16} />,
     title: "Cash velocity",
     description:
       cashNet >= 0
@@ -763,7 +763,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
 
   if (kpi.accounts_receivable > 0 || kpi.total_revenue > 0) {
     cards.push({
-      icon: "↘",
+      icon: <RrIcon name="arrow-down-left" size={16} />,
       title: "Collections on track",
       description: kpi.accounts_receivable > 0
         ? `${fmtMoney(kpi.accounts_receivable, "USD", { compact: true })} still to collect from customers. Customer payments cover ${collectionPct.toFixed(0)}% of revenue so far.`
@@ -781,7 +781,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     const apHeavy = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 1.2;
     const apSevere = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 2;
     cards.push({
-      icon: "↗",
+      icon: <RrIcon name="arrow-up-right" size={16} />,
       title: "Supplier liabilities",
       description: apHeavy
         ? `${fmtMoney(kpi.accounts_payable, "USD", { compact: true })} owed to suppliers — exceeds outstanding receivables.`
@@ -793,7 +793,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
 
   const margin = kpi.gross_margin_pct ?? 0;
   cards.push({
-    icon: "▲",
+    icon: <RrIcon name="shield-check" size={16} />,
     title: "Margin",
     description:
       margin >= 30 ? `Gross margin of ${margin.toFixed(1)}% is comfortably above the 30% benchmark.`
@@ -809,7 +809,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     const share = (topOrder.selling_price / kpi.total_revenue) * 100;
     if (share >= 40) {
       cards.push({
-        icon: "◆",
+        icon: <RrIcon name="info" size={16} />,
         title: "Revenue concentration",
         description: `${topOrder.customer_name || "Top customer"} accounts for ${share.toFixed(0)}% of revenue ${periodLabel}.`,
         chip: share >= 60 ? "Critical concentration" : "Concentration risk",
@@ -821,7 +821,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
   const topCat = kpi.top_expense_categories?.[0];
   if (topCat && topCat.share_pct >= 50) {
     cards.push({
-      icon: "▽",
+      icon: <RrIcon name="receipt" size={16} />,
       title: "Expense concentration",
       description: `${topCat.name} is ${topCat.share_pct.toFixed(0)}% of all operating spend ${periodLabel}.`,
       chip: "Watch",

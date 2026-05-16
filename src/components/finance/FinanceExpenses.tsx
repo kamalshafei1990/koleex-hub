@@ -26,6 +26,7 @@ import { BarChart, DonutChart, HeroKpiCard, MetricCard, formatCompact } from "@/
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
+import RrIcon from "@/components/ui/RrIcon";
 
 export default function FinanceExpenseAnalytics() {
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
@@ -178,7 +179,7 @@ export default function FinanceExpenseAnalytics() {
               href="/expenses"
               className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
             >
-              Open Expenses App ↗
+              <span className="inline-flex items-center gap-1.5">Open Expenses App <RrIcon name="arrow-up-right-from-square" size={12} /></span>
             </Link>
           }
         />
@@ -373,7 +374,7 @@ export default function FinanceExpenseAnalytics() {
               hint="Daily expense entry happens in the Expenses app — open it from the sidebar or the button above."
               action={
                 <Link href="/expenses" className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">
-                  Open Expenses App ↗
+                  <span className="inline-flex items-center gap-1.5">Open Expenses App <RrIcon name="arrow-up-right-from-square" size={12} /></span>
                 </Link>
               }
             />
