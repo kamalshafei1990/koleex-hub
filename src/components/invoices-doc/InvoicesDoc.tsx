@@ -1094,9 +1094,20 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
+
+    /* Open the print window NOW inside the user-gesture stack to
+       avoid the popup blocker (which silently blocks window.open
+       calls that happen after async awaits). Navigate it once the
+       save + refetch resolves. */
+    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    if (!win) {
+      alert("The browser blocked the print window. Please allow popups for this site and try again.");
+      return;
+    }
+
     setPdfState("loading");
     try {
-      /* Make sure the latest edits are on the server before opening
+      /* Make sure the latest edits are on the server before navigating
          the print window — that page fetches the quote by id. */
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
@@ -1107,6 +1118,7 @@ export default function Quotations() {
       );
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
+        win.close();
         setPdfState("error");
         alert("Please save the invoice before exporting.");
         setTimeout(() => setPdfState("idle"), 2_000);
@@ -1114,16 +1126,14 @@ export default function Quotations() {
       }
       /* Route to the dedicated invoice print page so the renderer
          receives docKind="invoice" and shows "COMMERCIAL INVOICE"
-         in the header / "Invoice No" / "Due Date" labels. Using
-         the quotation print page would (a) 404 because invoices
-         live in a different table and (b) display the wrong
-         document headings on the printed PDF. */
+         in the header / "Invoice No" / "Due Date" labels. */
       const url = `/invoices/${encodeURIComponent(quotationId)}/print?auto=1`;
-      window.open(url, "_blank", "noopener,noreferrer");
+      win.location.href = url;
       /* Briefly reflect success; the actual render happens in the new
          window so we don't have anything else to wait on. */
       setTimeout(() => setPdfState("idle"), 500);
     } catch (e) {
+      try { win.close(); } catch { /* already closed */ }
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);
@@ -1150,6 +1160,14 @@ export default function Quotations() {
       alert("Add the customer's email in the QUOTATION TO card before sending.");
       return;
     }
+    /* Open the print window inside the user-gesture stack so the
+       popup blocker doesn't swallow it. Navigate it once we have
+       the canonical id below. */
+    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    if (!win) {
+      alert("The browser blocked the print window. Please allow popups for this site and try again.");
+      return;
+    }
     try {
       /* Save first so the print window pulls the latest doc. */
       const targetStatus: InvoiceStatus =
@@ -1167,6 +1185,7 @@ export default function Quotations() {
       );
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
+        win.close();
         alert("Please save the invoice before sending.");
         return;
       }
@@ -1194,11 +1213,9 @@ export default function Quotations() {
         "Koleex Group",
       ].join("\n");
 
-      /* Open the print window first so the operator's browser is
-         already showing the printable doc when they switch to the
-         email tab to attach the saved PDF. */
+      /* Navigate the already-opened print window to the real URL. */
       const printUrl = `/invoices/${encodeURIComponent(quotationId)}/print?auto=1`;
-      window.open(printUrl, "_blank", "noopener,noreferrer");
+      win.location.href = printUrl;
 
       /* Fire the mailto on a small delay so the print window grabs
          focus first — otherwise some OS mail handlers steal it
@@ -1210,6 +1227,7 @@ export default function Quotations() {
         window.location.href = mailto;
       }, 600);
     } catch (e) {
+      try { win.close(); } catch { /* already closed */ }
       alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [current, handleSave]);

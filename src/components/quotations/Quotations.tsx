@@ -1156,9 +1156,23 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
+
+    /* CRITICAL: open the print window SYNCHRONOUSLY here, while we
+       are still inside the click's user-gesture stack. If we wait
+       for the await chain below (save + refetch) to resolve, the
+       gesture is gone and Chrome/Safari/Firefox silently block
+       window.open as a popup -- the operator sees nothing happen.
+       The trick is to open a blank window first, then navigate it
+       to the real URL once we have the canonical id. */
+    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    if (!win) {
+      alert("The browser blocked the print window. Please allow popups for this site and try again.");
+      return;
+    }
+
     setPdfState("loading");
     try {
-      /* Make sure the latest edits are on the server before opening
+      /* Make sure the latest edits are on the server before navigating
          the print window — that page fetches the quote by id. */
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
@@ -1169,17 +1183,19 @@ export default function Quotations() {
       );
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
+        win.close();
         setPdfState("error");
         alert("Please save the quotation before exporting.");
         setTimeout(() => setPdfState("idle"), 2_000);
         return;
       }
       const url = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
-      window.open(url, "_blank", "noopener,noreferrer");
+      win.location.href = url;
       /* Briefly reflect success; the actual render happens in the new
          window so we don't have anything else to wait on. */
       setTimeout(() => setPdfState("idle"), 500);
     } catch (e) {
+      win.close();
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);
@@ -1206,6 +1222,16 @@ export default function Quotations() {
       alert("Add the customer's email in the QUOTATION TO card before sending.");
       return;
     }
+    /* Same popup-blocker workaround as handleExportPdf: open the
+       print window NOW (inside the click's user-gesture stack)
+       and navigate it to the real URL once the save/refetch
+       resolves. window.open() called after async awaits is
+       silently blocked by every modern browser. */
+    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    if (!win) {
+      alert("The browser blocked the print window. Please allow popups for this site and try again.");
+      return;
+    }
     try {
       /* Save first so the print window pulls the latest doc. */
       const targetStatus: QuoteStatus =
@@ -1223,6 +1249,7 @@ export default function Quotations() {
       );
       const quotationId = match?.id ?? current.id;
       if (quotationId.length !== 36) {
+        win.close();
         alert("Please save the quotation before sending.");
         return;
       }
@@ -1250,11 +1277,10 @@ export default function Quotations() {
         "Koleex Group",
       ].join("\n");
 
-      /* Open the print window first so the operator's browser is
-         already showing the printable doc when they switch to the
-         email tab to attach the saved PDF. */
+      /* Navigate the already-opened print window to the real URL
+         (we opened a blank tab earlier inside the user gesture). */
       const printUrl = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
-      window.open(printUrl, "_blank", "noopener,noreferrer");
+      win.location.href = printUrl;
 
       /* Fire the mailto on a small delay so the print window grabs
          focus first — otherwise some OS mail handlers steal it
@@ -1266,6 +1292,7 @@ export default function Quotations() {
         window.location.href = mailto;
       }, 600);
     } catch (e) {
+      try { win.close(); } catch { /* already closed */ }
       alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [current, handleSave]);
