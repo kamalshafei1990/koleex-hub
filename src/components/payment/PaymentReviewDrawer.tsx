@@ -34,6 +34,7 @@ import AttachmentDropzone from "@/components/attachments/AttachmentDropzone";
 import { isImageMime, isPdfMime } from "@/lib/attachments/client";
 import { fmtMoney } from "@/lib/finance/calc";
 import { approvalTierForAmount, approvalTierExplanation } from "@/lib/finance/payment-thresholds";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 interface Props {
   open: boolean;
@@ -219,19 +220,28 @@ export default function PaymentReviewDrawer({
             {/* Expected vs actual */}
             <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
               <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Expected</div>
+                <div className="inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-gray-500">
+                  <span>Expected</span>
+                  <GuidanceTip guidanceId="payment.expectedAmount" />
+                </div>
                 <div className="mt-0.5 text-[13px] font-medium tabular-nums text-gray-200">
                   {expected != null ? fmtMoney(Number(expected), payment.currency, { compact: true }) : "—"}
                 </div>
               </div>
               <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Actual</div>
+                <div className="inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-gray-500">
+                  <span>Actual</span>
+                  <GuidanceTip guidanceId="payment.actualAmount" />
+                </div>
                 <div className="mt-0.5 text-[13px] font-medium tabular-nums text-gray-200">
                   {actual != null ? fmtMoney(Number(actual), payment.currency, { compact: true }) : "—"}
                 </div>
               </div>
               <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Difference</div>
+                <div className="inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.16em] text-gray-500">
+                  <span>Difference</span>
+                  <GuidanceTip guidanceId="payment.difference" />
+                </div>
                 <div className={
                   "mt-0.5 text-[13px] font-medium tabular-nums " +
                   (diff == null ? "text-gray-500"
@@ -264,7 +274,10 @@ export default function PaymentReviewDrawer({
               <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Reconcile</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Actual amount</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+                    <span>Actual amount</span>
+                    <GuidanceTip guidanceId="payment.actualAmount" />
+                  </span>
                   <input
                     type="number" inputMode="decimal"
                     value={actualAmount}
@@ -274,7 +287,10 @@ export default function PaymentReviewDrawer({
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Bank reference</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+                    <span>Bank reference</span>
+                    <GuidanceTip guidanceId="payment.bankReference" />
+                  </span>
                   <input
                     value={bankReference}
                     onChange={(e) => setBankReference(e.target.value)}

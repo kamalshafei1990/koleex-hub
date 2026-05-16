@@ -295,7 +295,7 @@ export default function ExpensesApp() {
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
           <div className="mt-6">
-            <SectionCard title="Top categories" subtitle="Tap a tile to filter the list below.">
+            <SectionCard title="Top categories" subtitle="Tap a tile to filter the list below." helpId="expense.section.topCategories">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {topCategories.map((c) => {
                   const style = styleForCategory(c.name);
@@ -656,7 +656,10 @@ function ExpenseEditor({
         <div className="space-y-4 px-5 py-5">
           {/* Title — single biggest input, autofocus */}
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">What was this for?</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              <span>What was this for?</span>
+              <GuidanceTip guidanceId="expense.title" />
+            </span>
             <input
               autoFocus
               value={local.title ?? ""}
@@ -669,7 +672,10 @@ function ExpenseEditor({
           {/* Amount + currency on one row */}
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Amount</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <span>Amount</span>
+                <GuidanceTip guidanceId="expense.amount" />
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -692,7 +698,10 @@ function ExpenseEditor({
 
           {/* Category — visual tile picker */}
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Category</div>
+            <div className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              <span>Category</span>
+              <GuidanceTip guidanceId="expense.category" />
+            </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {categories.filter((c) => !c.parent_id).map((c) => {
                 const style = styleForCategory(c.name);
@@ -729,7 +738,10 @@ function ExpenseEditor({
               />
             </label>
             <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Status</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <span>Status</span>
+                <GuidanceTip guidanceId="expense.paymentStatus" />
+              </span>
               <select
                 value={local.payment_status ?? "unpaid"}
                 onChange={(e) => setLocal({ ...local, payment_status: e.target.value as FinanceExpense["payment_status"] })}
@@ -741,7 +753,10 @@ function ExpenseEditor({
               </select>
             </label>
             <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Due date</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <span>Due date</span>
+                <GuidanceTip guidanceId="expense.dueDate" />
+              </span>
               <input
                 type="date"
                 value={local.due_date ?? ""}
@@ -753,7 +768,10 @@ function ExpenseEditor({
 
           {/* Notes */}
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Notes (optional)</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              <span>Notes (optional)</span>
+              <GuidanceTip guidanceId="expense.notes" />
+            </span>
             <input
               value={local.notes ?? ""}
               onChange={(e) => setLocal({ ...local, notes: e.target.value })}

@@ -177,6 +177,7 @@ export default function FinanceOrders() {
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
           <HeroKpiCard
             label="Total Revenue"
+            helpId="finance.revenue"
             value={kpi.totalSelling}
             unit="USD"
             tone="positive"
@@ -185,6 +186,7 @@ export default function FinanceOrders() {
           />
           <HeroKpiCard
             label="Net Profit"
+            helpId="finance.netProfit"
             value={kpi.totalNet}
             unit="USD"
             tone={kpi.totalNet >= 0 ? "info" : "negative"}
@@ -193,8 +195,8 @@ export default function FinanceOrders() {
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
-          <MetricCard label="Collected" value={kpi.totalCollected} unit="USD" hint="Cash banked across orders" loading={loading} />
-          <MetricCard label="Outstanding" value={kpi.totalOutstanding} unit="USD" tone="warning" hint="Still to collect" loading={loading} />
+          <MetricCard label="Collected" helpId="order.collected" value={kpi.totalCollected} unit="USD" hint="Cash banked across orders" loading={loading} />
+          <MetricCard label="Outstanding" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit="USD" tone="warning" hint="Still to collect" loading={loading} />
           <MetricCard label="Orders" value={String(orders.length)} hint="In current view" loading={loading} />
         </div>
 

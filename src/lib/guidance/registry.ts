@@ -727,6 +727,324 @@ const REGISTRY: Record<string, GuidanceEntry> = {
       zh: "财务、客户、供应商、物流、库存、审批、付款及资金各维度均无重大问题。系统主动保持沉默。",
     },
   },
+
+  /* ── Period / mode toggles ─────────────────────────────────── */
+  "finance.period": {
+    id: "finance.period",
+    title: { en: "Period", zh: "周期" },
+    default: {
+      en: "Time window for KPIs and trend charts. Week = last 7 days; Quarter = last 90 days; Year = last 12 months.",
+      zh: "KPI 与走势图的时间窗口。Week = 最近 7 天;Quarter = 最近 90 天;Year = 最近 12 个月。",
+    },
+  },
+  "finance.mode": {
+    id: "finance.mode",
+    title: { en: "View mode", zh: "视图模式" },
+    default: {
+      en: "Operational mode foregrounds daily workflows + queues; Executive mode foregrounds strategic surfaces (runway, concentration, FX).",
+      zh: "运营模式聚焦日常工作流与队列;管理层模式聚焦战略视图(资金跑道、集中度、汇率)。",
+    },
+  },
+
+  /* ── Expense tabs (payment-status filter) ───────────────────── */
+  "expense.tab.all": {
+    id: "expense.tab.all",
+    title: { en: "All expenses", zh: "全部费用" },
+    default: {
+      en: "Every expense in the period, regardless of payment status.",
+      zh: "本期内的全部费用,不区分付款状态。",
+    },
+  },
+  "expense.tab.unpaid": {
+    id: "expense.tab.unpaid",
+    title: { en: "Unpaid", zh: "未付" },
+    default: {
+      en: "Expenses with payment_status ≠ paid. These still need to be settled and will affect cash projection.",
+      zh: "付款状态不为 'paid' 的费用。需后续付清,将影响现金预测。",
+    },
+  },
+  "expense.tab.paid": {
+    id: "expense.tab.paid",
+    title: { en: "Paid", zh: "已付" },
+    default: {
+      en: "Expenses that have been settled. They no longer affect AP or forward cash, but still affect period profit.",
+      zh: "已结算的费用。不再影响应付账款或未来现金,但仍计入本期利润。",
+    },
+  },
+  "expense.tab.overdue": {
+    id: "expense.tab.overdue",
+    title: { en: "Overdue", zh: "已逾期" },
+    default: {
+      en: "Unpaid expenses past their due date. These compound AP pressure and damage supplier relationships.",
+      zh: "已超过到期日仍未付款的费用。会加剧应付账款压力并损害供应商关系。",
+    },
+  },
+  "expense.search": {
+    id: "expense.search",
+    title: { en: "Search", zh: "搜索" },
+    default: {
+      en: "Free-text search across title, notes, and category name. Case-insensitive substring match.",
+      zh: "针对标题、备注和类别名称的全文搜索。不区分大小写,匹配子字符串。",
+    },
+  },
+  "expense.notes": {
+    id: "expense.notes",
+    title: { en: "Notes", zh: "备注" },
+    default: {
+      en: "One-line context, optional. Useful for explaining unusual items or one-off operations to a reviewer.",
+      zh: "可选的一句话备注。便于向审核人说明异常项或一次性操作。",
+    },
+  },
+  "expense.paymentStatus": {
+    id: "expense.paymentStatus",
+    title: { en: "Payment status", zh: "付款状态" },
+    default: {
+      en: "Unpaid / Partial / Paid. Drives overdue detection and AP balance. Independent of approval status.",
+      zh: "未付 / 部分已付 / 已付。决定逾期检测与应付余额。与审批状态相互独立。",
+    },
+  },
+  "expense.section.topCategories": {
+    id: "expense.section.topCategories",
+    title: { en: "Top categories", zh: "主要类别" },
+    default: {
+      en: "Most-used expense categories this period. Click a tile to filter the list below to that bucket.",
+      zh: "本期使用最多的费用类别。点击图块可将下方列表过滤为该类别。",
+    },
+  },
+
+  /* ── Order surfaces ─────────────────────────────────────────── */
+  "order.number": {
+    id: "order.number",
+    title: { en: "Order number", zh: "订单编号" },
+    default: {
+      en: "Auto-generated stable ID (ORD-YYYY-NNNN). Used for cross-referencing in payments, expenses, attachments, and the audit log.",
+      zh: "自动生成的稳定编号 (ORD-YYYY-NNNN)。用于付款、费用、附件与审计日志中的交叉引用。",
+    },
+  },
+  "order.customer": {
+    id: "order.customer",
+    title: { en: "Customer", zh: "客户" },
+    default: {
+      en: "The buyer of this order. Linking to a contact enables customer behaviour analytics + concentration tracking.",
+      zh: "本订单的买家。关联到联系人即可启用客户行为分析与集中度追踪。",
+    },
+  },
+  "order.sellingPrice": {
+    id: "order.sellingPrice",
+    title: { en: "Selling price", zh: "销售价" },
+    default: {
+      en: "The total invoiced to the customer for this order. Source of revenue.",
+      zh: "向客户开票的订单总额。营收来源。",
+    },
+  },
+  "order.status": {
+    id: "order.status",
+    title: { en: "Order status", zh: "订单状态" },
+    default: {
+      en: "Open → in production → shipped → delivered → closed (or cancelled). Drives the operational pipeline view.",
+      zh: "进行中 → 生产中 → 已发运 → 已交付 → 已完成(或已取消)。驱动运营流水线视图。",
+    },
+  },
+  "order.paymentStatus": {
+    id: "order.paymentStatus",
+    title: { en: "Payment status", zh: "付款状态" },
+    default: {
+      en: "Customer-side payment progress on this order: unpaid → partial → paid (or overdue if past due date).",
+      zh: "本订单的客户付款进度:未付 → 部分已付 → 已付(超过到期日则为 'overdue')。",
+    },
+  },
+  "order.dueDate": {
+    id: "order.dueDate",
+    title: { en: "Customer due date", zh: "客户到期日" },
+    default: {
+      en: "When the customer is expected to settle. Powers AR aging buckets + the forward cash projection.",
+      zh: "客户应付清的日期。驱动应收账龄分桶与未来现金预测。",
+    },
+  },
+  "order.collected": {
+    id: "order.collected",
+    title: { en: "Collected", zh: "已收款" },
+    default: {
+      en: "Total customer payments received against this order. Equals selling price when fully paid.",
+      zh: "本订单已收到的客户付款总额。全部收回时等于销售价。",
+    },
+  },
+  "order.outstandingReceivable": {
+    id: "order.outstandingReceivable",
+    title: { en: "Outstanding receivable", zh: "应收余额" },
+    default: {
+      en: "max(0, selling price − collected). The cash you still expect from this customer on this order.",
+      zh: "max(0, 销售价 − 已收款)。本订单上预期仍需收回的款项。",
+    },
+  },
+  "order.outstandingPayable": {
+    id: "order.outstandingPayable",
+    title: { en: "Outstanding payable", zh: "应付余额" },
+    default: {
+      en: "Sum of unpaid supplier costs + unpaid linked expenses on this order. The cash you still owe.",
+      zh: "本订单未付供应商成本与未付关联费用之和。仍需对外支付的金额。",
+    },
+  },
+  "order.taxRefundPct": {
+    id: "order.taxRefundPct",
+    title: { en: "Tax refund %", zh: "退税率" },
+    default: {
+      en: "Export VAT refund rate applied to this order. The refund is added back AFTER gross profit, before net profit.",
+      zh: "适用于本订单的出口退税率。退税金额在毛利之后、净利之前回加。",
+    },
+  },
+  "order.netProfit": {
+    id: "order.netProfit",
+    title: { en: "Net profit (order)", zh: "订单净利润" },
+    default: {
+      en: "Gross profit − linked expenses + tax refund − bank charges. The bottom-line result for THIS order.",
+      zh: "毛利 − 关联费用 + 退税 − 银行费用。本订单的最终净结果。",
+    },
+  },
+  "order.netProfitPct": {
+    id: "order.netProfitPct",
+    title: { en: "Net profit %", zh: "净利率" },
+    default: {
+      en: "Net profit ÷ selling price × 100. Above 15% is strong; below 0 means the order lost money.",
+      zh: "净利润 ÷ 销售价 × 100。15% 以上属优;低于 0 表示亏损。",
+    },
+  },
+  "order.realizedCash": {
+    id: "order.realizedCash",
+    title: { en: "Realized cash", zh: "实际到账现金" },
+    default: {
+      en: "Collected − paid supplier − paid expenses. Actual cash position from this order at this moment.",
+      zh: "已收款 − 已付供应商 − 已付费用。本订单当下的实际现金状况。",
+    },
+  },
+  "order.riskLevel": {
+    id: "order.riskLevel",
+    title: { en: "Order risk", zh: "订单风险" },
+    default: {
+      en: "Composite read of AR exposure, AP exposure, collection %, and aging. Low / Medium / High / Critical.",
+      zh: "综合应收风险、应付风险、回款率与账龄。低 / 中 / 高 / 严重。",
+    },
+  },
+  "order.supplierCost": {
+    id: "order.supplierCost",
+    title: { en: "Supplier cost", zh: "供应商成本" },
+    default: {
+      en: "Total amount owed to suppliers for THIS order. Sum of all supplier-line costs.",
+      zh: "本订单应付给供应商的总额,即所有供应商行成本之和。",
+    },
+  },
+  "order.linkedExpenses": {
+    id: "order.linkedExpenses",
+    title: { en: "Linked expenses", zh: "关联费用" },
+    default: {
+      en: "Operating costs (shipping, customs, packaging, freight, etc.) charged specifically to this order.",
+      zh: "归集到本订单的运营成本(运输、清关、包装、货运等)。",
+    },
+  },
+  "order.zone.booked": {
+    id: "order.zone.booked",
+    title: { en: "Booked", zh: "已记账" },
+    default: {
+      en: "The accounting picture: revenue minus supplier cost and expenses + tax refund. What the order IS on paper.",
+      zh: "记账视角:营收 − 供应商成本与费用 + 退税。账面上本订单的状态。",
+    },
+  },
+  "order.zone.realized": {
+    id: "order.zone.realized",
+    title: { en: "Realized cash", zh: "实际现金" },
+    default: {
+      en: "What actually moved: collected − paid supplier − paid expenses. Bank reality of this order so far.",
+      zh: "实际发生的现金流:已收款 − 已付供应商 − 已付费用。本订单的银行实际进展。",
+    },
+  },
+  "order.zone.exposure": {
+    id: "order.zone.exposure",
+    title: { en: "Exposure", zh: "敞口" },
+    default: {
+      en: "What's still outstanding: AR + AP + collection % + risk level. The forward view of this order.",
+      zh: "尚未结清的部分:应收 + 应付 + 回款率 + 风险等级。本订单的未来视角。",
+    },
+  },
+
+  /* ── Suppliers + customers ─────────────────────────────────── */
+  "supplier.dependency": {
+    id: "supplier.dependency",
+    title: { en: "Supplier dependency", zh: "供应商依赖度" },
+    default: {
+      en: "This supplier's share of total COGS. Above 50% is meaningful single-source risk; above 70% is critical.",
+      zh: "该供应商在 COGS 中的占比。高于 50% 即为单一来源风险;高于 70% 属严重。",
+    },
+  },
+  "supplier.reliability": {
+    id: "supplier.reliability",
+    title: { en: "Supplier reliability", zh: "供应商可靠度" },
+    default: {
+      en: "Composite score based on on-time payment cadence and outstanding-balance behaviour with this supplier.",
+      zh: "基于对该供应商按时付款节奏与未结余额行为的综合评分。",
+    },
+  },
+  "customer.healthScore": {
+    id: "customer.healthScore",
+    title: { en: "Customer health", zh: "客户健康度" },
+    default: {
+      en: "0–100 score: payment delay + late-payment rate + overdue exposure + concentration. Lower = riskier.",
+      zh: "0–100 分:付款延迟 + 逾期率 + 逾期敞口 + 集中度。越低表示风险越大。",
+    },
+  },
+  "customer.collectionDelay": {
+    id: "customer.collectionDelay",
+    title: { en: "Avg collection delay", zh: "平均回款延迟" },
+    default: {
+      en: "Average days between invoice due date and payment received. Trend matters more than absolute value.",
+      zh: "发票到期日与实际收款之间的平均天数。趋势比绝对值更重要。",
+    },
+  },
+  "customer.creditStatus": {
+    id: "customer.creditStatus",
+    title: { en: "Credit status", zh: "信用状态" },
+    default: {
+      en: "Good / Watch / Hold / Blocked. Affects whether new orders for this customer require manager approval.",
+      zh: "良好 / 关注 / 暂停 / 拉黑。决定该客户新订单是否需要经理审批。",
+    },
+  },
+
+  /* ── Attachments ────────────────────────────────────────────── */
+  "attachment.category": {
+    id: "attachment.category",
+    title: { en: "Attachment category", zh: "附件类别" },
+    default: {
+      en: "Receipt / invoice / shipping doc / customs doc / payment screenshot / contract / other. Drives evidence classification.",
+      zh: "票据 / 发票 / 运输单 / 报关单 / 付款截图 / 合同 / 其他。用于凭证分类。",
+    },
+  },
+  "attachment.primary": {
+    id: "attachment.primary",
+    title: { en: "Primary file", zh: "主文件" },
+    default: {
+      en: "Marks ONE attachment as the canonical evidence — its URL is exposed via the primary_receipt_url shortcut.",
+      zh: "将某个附件标记为主要凭证 — 其 URL 通过 primary_receipt_url 快捷字段对外公开。",
+    },
+  },
+
+  /* ── Anomaly chips ──────────────────────────────────────────── */
+  "intelligence.anomaly": {
+    id: "intelligence.anomaly",
+    title: { en: "Anomaly", zh: "异常" },
+    default: {
+      en: "Period-over-period deviation flagged by the materiality gate. Up-arrow = grew; down-arrow = shrank. Severity = how much.",
+      zh: "经实质性闸门检测的环比偏差。↑ 表示增加;↓ 表示减少。严重度对应变化幅度。",
+    },
+  },
+
+  /* ── Period selector / chart ────────────────────────────────── */
+  "finance.section.trendChart": {
+    id: "finance.section.trendChart",
+    title: { en: "Cash flow over time", zh: "现金流走势" },
+    default: {
+      en: "Inflow (revenue), outflow (costs + expenses), and net profit plotted over the period. Slope > absolute value.",
+      zh: "本期的流入(营收)、流出(成本与费用)及净利润走势。斜率比绝对值更重要。",
+    },
+  },
 };
 
 /* ---------------------------------------------------------------------------

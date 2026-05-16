@@ -1,46 +1,49 @@
 "use client";
 
 /* ===========================================================================
-   GuidanceTip — hover-triggered bilingual (EN + 中文) help icon
+   GuidanceTip — hover-triggered bilingual (EN + 中文) help icon.
 
-   Visual + interaction parity with the Quotations Quick-Fill `?` tip:
-     · 15px × 15px outlined circle, 0.85-alpha glyph, calm hover halo
-     · Opens on `mouseenter`, closes on `mouseleave`
-     · Tooltip is position: fixed with an edge-aware coordinate so it
-       is never clipped by an overflow:auto ancestor
-     · Always renders both EN and 中文, with a clear divider
-     · Touch fallback: tap opens the tip, second tap or tap-outside closes
-       (covers iOS / Android where there is no hover)
+   Visual + interaction parity with the Quotations Quick-Fill ? tip.
+
+   Performance + bug-fix pass:
+     · Wrapped in React.memo so a parent re-render does NOT re-render
+       every tip on the page (a dashboard renders 100+ tips; React.memo
+       keeps the cost flat).
+     · Registry lookup memoised via useMemo so each render is a single
+       object reference, never a recomputed object.
+     · Tooltip auto-closes on window scroll or resize — the previous
+       version kept rendering at a stale anchor rect, which felt buggy.
+     · Hover-out has a tiny grace window (60ms) so micro-jitter between
+       the trigger and the tooltip body doesn't flap the popover open/
+       closed at high speed.
    ========================================================================== */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getGuidance } from "@/lib/guidance/registry";
 
 interface Props {
-  /** Registry id, e.g. "treasury.runway". */
   guidanceId: string;
-  /** Optional state value for state-aware variants (e.g. "mismatch"). */
   state?: string;
-  /** Optional override label rendered next to the "?" glyph. */
   label?: string;
-  /** Kept for source compat — both render the same trigger now. */
   size?: "xs" | "sm";
   triggerClassName?: string;
   ariaLabel?: string;
 }
 
-export default function GuidanceTip({
+function GuidanceTipImpl({
   guidanceId, state, label, triggerClassName, ariaLabel,
 }: Props) {
   const [rect, setRect] = useState<DOMRect | null>(null);
-  /* On touch devices `mouseenter` fires only after a tap; we use a
-     manual "stuck" flag so a second tap closes it again. */
+  /* Touch / keyboard: tap to pin open; tap-outside or ESC to close. */
   const [stuck, setStuck] = useState(false);
   const wrapRef = useRef<HTMLSpanElement>(null);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const resolved = getGuidance(guidanceId, state);
+  /* Memoised — the registry never mutates within a session, so caching
+     by (id, state) is free correctness + a measurable win at scale. */
+  const resolved = useMemo(() => getGuidance(guidanceId, state), [guidanceId, state]);
 
-  /* Outside-click closes the stuck (touch-pinned) state. */
+  /* Close on outside click + ESC while stuck. */
   useEffect(() => {
     if (!stuck) return;
     const onClick = (e: MouseEvent) => {
@@ -61,16 +64,47 @@ export default function GuidanceTip({
     };
   }, [stuck]);
 
+  /* Bug fix: when the page scrolls or resizes, the anchor rect goes
+     stale. Close the tooltip on either event — cheap, correct,
+     matches user expectation (the operator already moved their eye). */
+  useEffect(() => {
+    if (!rect) return;
+    const onMove = () => {
+      setRect(null);
+      setStuck(false);
+    };
+    window.addEventListener("scroll", onMove, { passive: true, capture: true });
+    window.addEventListener("resize", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onMove, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [rect]);
+
+  /* Cancel any pending hover-leave on every re-enter so a quick mouse
+     pass between the trigger and the tooltip body doesn't flap. */
+  const cancelLeaveTimer = useCallback(() => {
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current);
+      leaveTimer.current = null;
+    }
+  }, []);
+
   const onEnter = useCallback((e: React.MouseEvent) => {
     if (stuck) return;
+    cancelLeaveTimer();
     setRect((e.currentTarget as HTMLElement).getBoundingClientRect());
-  }, [stuck]);
+  }, [stuck, cancelLeaveTimer]);
+
   const onLeave = useCallback(() => {
     if (stuck) return;
-    setRect(null);
-  }, [stuck]);
+    cancelLeaveTimer();
+    leaveTimer.current = setTimeout(() => setRect(null), 60);
+  }, [stuck, cancelLeaveTimer]);
+
   const onClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    cancelLeaveTimer();
     if (stuck) {
       setStuck(false);
       setRect(null);
@@ -78,10 +112,15 @@ export default function GuidanceTip({
       setRect((e.currentTarget as HTMLElement).getBoundingClientRect());
       setStuck(true);
     }
-  }, [stuck]);
+  }, [stuck, cancelLeaveTimer]);
+
+  /* Clean up the leave timer on unmount so we don't fire setState
+     after the component is gone. */
+  useEffect(() => () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+  }, []);
 
   if (!resolved) {
-    /* Silent degrade — render the label if we have one, otherwise nothing. */
     if (label) return <span className="text-[var(--text-primary)]">{label}</span>;
     return null;
   }
@@ -104,22 +143,7 @@ export default function GuidanceTip({
             setStuck((v) => !v);
           }
         }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 15,
-          height: 15,
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.45)",
-          color: "rgba(255,255,255,0.85)",
-          fontSize: 10,
-          fontWeight: 700,
-          cursor: "help",
-          background: "rgba(255,255,255,0.06)",
-          userSelect: "none",
-          flexShrink: 0,
-        }}
+        style={GLYPH_STYLE}
         className={triggerClassName}
       >
         ?
@@ -137,13 +161,38 @@ export default function GuidanceTip({
   );
 }
 
+/* React.memo so a parent re-render does not propagate work through
+   every tip on the page. The component takes plain props (guidanceId,
+   state, label, etc.) — shallow-equal comparison is correct. */
+const GuidanceTip = memo(GuidanceTipImpl);
+export default GuidanceTip;
+
+/* Hoisted to module scope so the style object reference is stable and
+   doesn't churn through React's reconciler. */
+const GLYPH_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 15,
+  height: 15,
+  borderRadius: "50%",
+  border: "1px solid rgba(255,255,255,0.45)",
+  color: "rgba(255,255,255,0.85)",
+  fontSize: 10,
+  fontWeight: 700,
+  cursor: "help",
+  background: "rgba(255,255,255,0.06)",
+  userSelect: "none",
+  flexShrink: 0,
+};
+
 /* ---------------------------------------------------------------------------
    Bilingual tooltip — fixed-position, edge-aware. Mirrors the
-   Quotations Quick-Fill style exactly: slate-800 surface,
-   single-column EN block then 中文 block, never clipped.
+   Quotations Quick-Fill style: slate-800 surface, EN block then
+   中文 block, never clipped.
    --------------------------------------------------------------------------- */
 
-function BilingualTooltip({
+const BilingualTooltip = memo(function BilingualTooltip({
   anchorRect, titleEn, titleZh, en, zh,
 }: { anchorRect: DOMRect; titleEn: string; titleZh: string; en: string; zh: string }) {
   const WIDTH = 320;
@@ -153,8 +202,8 @@ function BilingualTooltip({
     left = Math.max(8, window.innerWidth - WIDTH - 16);
   }
   let top = anchorRect.bottom + margin;
-  if (typeof window !== "undefined" && top + 200 > window.innerHeight) {
-    top = Math.max(8, anchorRect.top - 200 - margin);
+  if (typeof window !== "undefined" && top + 220 > window.innerHeight) {
+    top = Math.max(8, anchorRect.top - 220 - margin);
   }
   return (
     <div
@@ -179,14 +228,18 @@ function BilingualTooltip({
         zIndex: 99999,
       }}
     >
-      <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>
-        EN · {titleEn}
-      </div>
+      <div style={LABEL_STYLE}>EN · {titleEn}</div>
       <div style={{ marginBottom: 8 }}>{en}</div>
-      <div style={{ fontWeight: 700, fontSize: 9, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", marginBottom: 2 }}>
-        中文 · {titleZh}
-      </div>
+      <div style={LABEL_STYLE}>中文 · {titleZh}</div>
       <div>{zh}</div>
     </div>
   );
-}
+});
+
+const LABEL_STYLE: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: 9,
+  color: "rgba(255,255,255,0.55)",
+  letterSpacing: "0.08em",
+  marginBottom: 2,
+};

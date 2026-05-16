@@ -11,6 +11,7 @@
 
 import type { ReactNode } from "react";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 /* ── KpiCard ──────────────────────────────────────────────────────
    Premium statistic card. Adds a subtle left accent bar, optional
@@ -242,18 +243,25 @@ export function SectionCard({
   subtitle,
   action,
   children,
+  helpId,
 }: {
   title?: string;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
+  helpId?: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5">
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            {title && <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>}
+            {title && (
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                <span>{title}</span>
+                {helpId && <GuidanceTip guidanceId={helpId} />}
+              </h2>
+            )}
             {subtitle && <p className="mt-0.5 text-[11px] text-gray-500">{subtitle}</p>}
           </div>
           {action}

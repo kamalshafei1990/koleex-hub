@@ -94,6 +94,7 @@ export default function FinancePayments() {
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
           <HeroKpiCard
             label="Net Cash This View"
+            helpId="treasury.available"
             value={kpi.net}
             unit="USD"
             tone={kpi.net >= 0 ? "positive" : "negative"}
@@ -102,6 +103,7 @@ export default function FinancePayments() {
           />
           <HeroKpiCard
             label="Pending"
+            helpId="treasury.pending"
             value={kpi.pending}
             unit="USD"
             tone="warning"
@@ -110,8 +112,8 @@ export default function FinancePayments() {
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <MetricCard label="Money In"  value={kpi.inComp}  unit="USD" hint="From customers" loading={loading} />
-          <MetricCard label="Money Out" value={kpi.outComp} unit="USD" hint="To suppliers + bills" loading={loading} />
+          <MetricCard label="Money In"  helpId="finance.cashIn"  value={kpi.inComp}  unit="USD" hint="From customers" loading={loading} />
+          <MetricCard label="Money Out" helpId="finance.cashOut" value={kpi.outComp} unit="USD" hint="To suppliers + bills" loading={loading} />
         </div>
 
         {editing && (
