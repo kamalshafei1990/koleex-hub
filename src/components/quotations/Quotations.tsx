@@ -1191,9 +1191,15 @@ export default function Quotations() {
        page renders, without leaving the editor window. */
     setPdfState("loading");
     try {
-      if (current.id.length !== 36 || current.status === "draft") {
-        await handleSave("draft");
-      }
+      /* ALWAYS save first so the print page fetches the freshest
+         server state. Previously we only saved when status was
+         "draft" or the id wasn't a UUID -- which meant editing
+         an existing Sent / Accepted quote and hitting Export PDF
+         would print a STALE copy (missing all the in-editor
+         edits, including the items table). Preserve the current
+         status so we don't accidentally demote a Sent quote
+         back to Draft. */
+      await handleSave(current.status);
       const refreshed = await loadQuotationsRemote({ fresh: true });
       const match = refreshed.find(
         (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
@@ -1219,7 +1225,11 @@ export default function Quotations() {
         iframe.style.width = "210mm";
         iframe.style.height = "297mm";
         iframe.style.border = "none";
-        iframe.style.visibility = "hidden";
+        /* NOT visibility:hidden -- some browsers (and some
+           printer drivers) skip invisible iframes during print,
+           producing blank output. position:fixed with negative
+           left keeps it offscreen for the user while staying
+           rendered for the print pipeline. */
         document.body.appendChild(iframe);
       }
       /* The dedicated print page sets window.__quotation_pdf_ready__
@@ -1233,7 +1243,11 @@ export default function Quotations() {
       };
       window.addEventListener("afterprint", restore);
 
-      iframe.src = `/quotations/${encodeURIComponent(quotationId)}/print`;
+      /* Cache-bust the iframe URL so a second export of the
+         same doc always re-fetches fresh server state (and so
+         the iframe's `load` event reliably fires even when
+         the URL is otherwise identical to the previous export). */
+      iframe.src = `/quotations/${encodeURIComponent(quotationId)}/print?_t=${Date.now()}`;
       const onLoad = () => {
         iframe!.removeEventListener("load", onLoad);
         const checkReady = () => {

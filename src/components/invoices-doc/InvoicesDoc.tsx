@@ -1111,9 +1111,11 @@ export default function Quotations() {
        tab). */
     setPdfState("loading");
     try {
-      if (current.id.length !== 36 || current.status === "draft") {
-        await handleSave("draft");
-      }
+      /* ALWAYS save first so the print page fetches the freshest
+         server state. Conditionally saving only on draft status
+         meant editing a Sent / Partially-Paid invoice would print
+         a STALE server copy missing the in-editor edits. */
+      await handleSave(current.status);
       const refreshed = await loadInvoicesRemote({ fresh: true });
       const match = refreshed.find(
         (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
@@ -1136,7 +1138,8 @@ export default function Quotations() {
         iframe.style.width = "210mm";
         iframe.style.height = "297mm";
         iframe.style.border = "none";
-        iframe.style.visibility = "hidden";
+        /* No visibility:hidden -- some browsers skip invisible
+           iframes for print. Off-screen via position alone. */
         document.body.appendChild(iframe);
       }
       const prevTitle = document.title;
@@ -1147,7 +1150,9 @@ export default function Quotations() {
       };
       window.addEventListener("afterprint", restore);
 
-      iframe.src = `/invoices/${encodeURIComponent(invoiceId)}/print`;
+      /* Cache-bust so a second export of the same invoice
+         always reloads fresh server data. */
+      iframe.src = `/invoices/${encodeURIComponent(invoiceId)}/print?_t=${Date.now()}`;
       const onLoad = () => {
         iframe!.removeEventListener("load", onLoad);
         const checkReady = () => {
