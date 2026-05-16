@@ -1,14 +1,16 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { SegmentedNav } from "@/components/finance/FinanceUiX";
+import RrIcon from "@/components/ui/RrIcon";
 
 export type ExpensesTabKey = "all" | "unpaid" | "paid" | "overdue";
 
-const TABS: { key: ExpensesTabKey; label: string; icon: string }[] = [
-  { key: "all",     label: "All",     icon: "≡" },
-  { key: "unpaid",  label: "Unpaid",  icon: "○" },
-  { key: "paid",    label: "Paid",    icon: "✓" },
-  { key: "overdue", label: "Overdue", icon: "!" },
+const TABS: { key: ExpensesTabKey; label: string; icon: ReactNode }[] = [
+  { key: "all",     label: "All",     icon: <RrIcon name="document" size={12} /> },
+  { key: "unpaid",  label: "Unpaid",  icon: <RrIcon name="clock" size={12} /> },
+  { key: "paid",    label: "Paid",    icon: <RrIcon name="check" size={12} /> },
+  { key: "overdue", label: "Overdue", icon: <RrIcon name="info" size={12} /> },
 ];
 
 export default function ExpensesTabs({

@@ -18,15 +18,7 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 import { invoicesT } from "@/lib/translations/invoices";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import PlusIcon from "@/components/icons/ui/PlusIcon";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
-import TrashIcon from "@/components/icons/ui/TrashIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
-import DownloadIcon from "@/components/icons/ui/DownloadIcon";
-import InvoicesIcon from "@/components/icons/InvoicesIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import EntityPicker from "@/components/planning/EntityPicker";
 import {
   createInvoice,
@@ -127,11 +119,11 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
               href="/"
               className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
             >
-              <ArrowLeftIcon className="h-4 w-4" />
+              <RrIcon name="arrow-left" size={16} />
             </Link>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
-                <InvoicesIcon className="h-4 w-4" />
+                <RrIcon name="file-invoice" size={16} />
               </div>
               <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
                 {t("app.title")}
@@ -141,7 +133,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
               onClick={() => setFormOpen(true)}
               className="h-9 px-4 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 hover:opacity-90 shrink-0"
             >
-              <PlusIcon size={14} />
+              <RrIcon name="plus" size={14} />
               <span className="hidden sm:inline">{t("action.new")}</span>
             </button>
           </div>
@@ -192,7 +184,7 @@ function InvoiceListView({ onOpen }: { onOpen: (id: string) => void }) {
           {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+              <RrIcon name="loading" size={20} className="text-[var(--text-dim)] animate-spin" />
             </div>
           ) : visible.length === 0 ? (
             <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] py-14 text-center text-[13px] text-[var(--text-dim)]">
@@ -438,7 +430,7 @@ function InvoiceDetailView({
   if (loading || !state) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)] animate-spin" />
+        <RrIcon name="loading" size={20} className="text-[var(--text-dim)] animate-spin" />
       </div>
     );
   }
@@ -461,7 +453,7 @@ function InvoiceDetailView({
               onClick={onBack}
               className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
             >
-              <ArrowLeftIcon className="h-4 w-4" />
+              <RrIcon name="arrow-left" size={16} />
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-[18px] md:text-[20px] font-bold tracking-tight truncate flex items-center gap-2">
@@ -486,7 +478,7 @@ function InvoiceDetailView({
                   onClick={send}
                   className="h-9 px-3 rounded-lg border border-blue-500/40 text-blue-400 text-[12px] font-semibold hover:bg-blue-500/10 flex items-center gap-1.5"
                 >
-                  <PaperPlaneIcon size={12} /> {t("btn.markSent")}
+                  <RrIcon name="paper-plane" size={12} /> {t("btn.markSent")}
                 </button>
               )}
               {!["paid", "cancelled", "void"].includes(inv.status) && (
@@ -494,7 +486,7 @@ function InvoiceDetailView({
                   onClick={() => setPayOpen(true)}
                   className="h-9 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 hover:opacity-90"
                 >
-                  <CheckCircleIcon size={12} /> {t("btn.recordPayment")}
+                  <RrIcon name="check" size={12} /> {t("btn.recordPayment")}
                 </button>
               )}
               {inv.status !== "paid" && inv.balance === 0 && (
@@ -510,13 +502,13 @@ function InvoiceDetailView({
                 className="h-9 w-9 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
                 title={t("btn.print")}
               >
-                <DownloadIcon className="h-3.5 w-3.5" />
+                <RrIcon name="download" size={14} />
               </button>
               <button
                 onClick={del}
                 className="h-9 w-9 rounded-lg border border-[var(--border-subtle)] text-rose-400 hover:bg-rose-500/10 flex items-center justify-center"
               >
-                <TrashIcon className="h-3.5 w-3.5" />
+                <RrIcon name="trash" size={14} />
               </button>
             </div>
           </div>
@@ -565,7 +557,7 @@ function InvoiceDetailView({
                 onClick={addLine}
                 className="h-8 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1.5"
               >
-                <PlusIcon size={11} /> {t("line.add")}
+                <RrIcon name="plus" size={11} /> {t("line.add")}
               </button>
             </div>
           </div>
@@ -779,7 +771,7 @@ function LineEditor({
         onClick={onRemove}
         className="h-9 w-9 rounded-md text-[var(--text-dim)] hover:text-rose-400 flex items-center justify-center"
       >
-        <TrashIcon className="h-3.5 w-3.5" />
+        <RrIcon name="trash" size={14} />
       </button>
 
       {/* Mobile: compact qty/price row under description */}
@@ -848,7 +840,7 @@ function InvoiceFormModal({
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">{t("action.new")}</h2>
           <button onClick={onClose} className="h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center">
-            <CrossIcon size={14} />
+            <RrIcon name="cross" size={14} />
           </button>
         </div>
         <div className="px-5 py-4 space-y-3 overflow-y-auto">
@@ -945,7 +937,7 @@ function PaymentModal({
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)]">
           <h2 className="text-[15px] font-bold">{t("pay.title")}</h2>
           <button onClick={onClose} className="h-7 w-7 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center">
-            <CrossIcon size={14} />
+            <RrIcon name="cross" size={14} />
           </button>
         </div>
         <div className="px-5 py-4 space-y-3">

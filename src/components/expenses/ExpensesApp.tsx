@@ -32,6 +32,7 @@ import {
   styleForCategory,
 } from "@/components/finance/categoryStyles";
 import { fmtMoney } from "@/lib/finance/calc";
+import RrIcon from "@/components/ui/RrIcon";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 /* Phase 2.1 — financial evidence infrastructure. The dropzone is
    imported from AttachmentPreviewDrawer; we only consume the badge
@@ -342,10 +343,11 @@ export default function ExpensesApp() {
             <button
               type="button"
               onClick={() => setCategoryFilter("")}
-              className="rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
               title="Clear category filter"
             >
-              Clear filter ×
+              Clear filter
+              <RrIcon name="cross" size={10} />
             </button>
           )}
         </div>
@@ -651,7 +653,7 @@ function ExpenseEditor({
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">{local.id ? "Edit expense" : "Add expense"}</h2>
             <p className="mt-0.5 text-[11px] text-gray-500">Title + amount + category is enough. Add the rest only if you have it.</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200">✕</button>
+          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200"><RrIcon name="cross" size={12} /></button>
         </div>
         <div className="space-y-4 px-5 py-5">
           {/* Title — single biggest input, autofocus */}

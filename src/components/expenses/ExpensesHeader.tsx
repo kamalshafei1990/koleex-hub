@@ -7,8 +7,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import ExpensesIcon from "@/components/icons/ExpensesIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import ExpensesTabs, { type ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 
 export default function ExpensesHeader({
@@ -35,10 +34,10 @@ export default function ExpensesHeader({
             aria-label="Back to Hub"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
           >
-            <ArrowLeftIcon className="h-4 w-4" />
+            <RrIcon name="arrow-left" size={16} />
           </Link>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
-            <ExpensesIcon size={16} />
+            <RrIcon name="receipt" size={16} />
           </div>
           <div className="flex min-w-0 items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
@@ -51,7 +50,8 @@ export default function ExpensesHeader({
             className="hidden items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-xs font-medium text-[var(--text-dim)] transition hover:text-[var(--text-primary)] sm:inline-flex"
             title="Switch to the executive Expense Analytics view"
           >
-            Finance Analytics ↗
+            Finance Analytics
+            <RrIcon name="arrow-up-right-from-square" size={11} />
           </Link>
           {action}
         </div>

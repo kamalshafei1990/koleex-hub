@@ -9,9 +9,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import InvoicesIcon from "@/components/icons/InvoicesIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
-import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import RrIcon from "@/components/ui/RrIcon";
 import {
   fetchInvoices,
   formatMoney,
@@ -45,7 +43,7 @@ export default function EntityInvoicesStrip({
   if (invoices === null) {
     return (
       <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-4 flex items-center gap-2">
-        <SpinnerIcon className="h-4 w-4 text-[var(--text-dim)] animate-spin" />
+        <RrIcon name="loading" size={14} className="text-[var(--text-dim)] animate-spin" />
         <span className="text-[12px] text-[var(--text-dim)]">Loading invoices…</span>
       </div>
     );
@@ -55,7 +53,7 @@ export default function EntityInvoicesStrip({
     <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2">
-          <InvoicesIcon size={14} className="text-[var(--text-dim)]" />
+          <RrIcon name="file-invoice" size={14} className="text-[var(--text-dim)]" />
           <h3 className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
             {title}
           </h3>
@@ -68,7 +66,7 @@ export default function EntityInvoicesStrip({
           className="text-[11px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center gap-1"
         >
           Open
-          <ExternalLinkIcon size={10} />
+          <RrIcon name="arrow-up-right-from-square" size={10} />
         </Link>
       </div>
 
