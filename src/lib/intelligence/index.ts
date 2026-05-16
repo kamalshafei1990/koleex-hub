@@ -73,6 +73,8 @@ export { buildTreasuryForecast, applyScenarioAssumptions, compareForecasts, find
 export type { ForecastResult, ForecastDiff, ScenarioAssumptions, AppliedAssumption, ForecastDayPoint, LiquidityRisk } from "./treasury-forecast";
 export { buildForecastEvents } from "./treasury-forecast-events";
 export type { ForecastSnapshot } from "./treasury-forecast-events";
+export { buildTreasuryPlansSnapshot } from "./treasury-plans";
+export type { PlansSnapshot } from "./treasury-plans";
 export {
   matchConfidence,
   duplicateMovementConfidence,
@@ -126,6 +128,7 @@ import { buildReconciliationSnapshot } from "./reconciliation";
 import { buildBankImportSnapshot } from "./bank-imports";
 import { buildTreasuryForecast, compareForecasts } from "./treasury-forecast";
 import { buildForecastEvents } from "./treasury-forecast-events";
+import { buildTreasuryPlansSnapshot } from "./treasury-plans";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -157,6 +160,8 @@ export interface IntelligencePicture {
   bankImports: import("./bank-imports").BankImportSnapshot;
   /** Phase 2.8 — treasury forecast snapshot (base case + optional stress). */
   forecast: import("./treasury-forecast-events").ForecastSnapshot;
+  /** Phase 2.9 — treasury plans snapshot (governance + divergence). */
+  plans: import("./treasury-plans").PlansSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -201,6 +206,10 @@ export interface IntelligenceInputs {
      forecast always runs; supplying assumptions runs the stress arm
      and powers the scenario-aware events. */
   forecastAssumptions?: import("./treasury-forecast").ScenarioAssumptions | null;
+  /* Phase 2.9 — treasury plans (optional). When provided the engine
+     computes governance signals (expired, divergence, unreviewed,
+     liquidity risk). */
+  treasuryPlans?: import("@/lib/finance/types").TreasuryPlan[];
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -307,6 +316,13 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     assumptions: input.forecastAssumptions ?? null,
   });
 
+  /* Phase 2.9 — treasury plans governance snapshot. Reads saved
+     plans + the current base forecast to produce divergence events. */
+  const plans = buildTreasuryPlansSnapshot({
+    plans: input.treasuryPlans ?? [],
+    currentForecast: baseForecast,
+  });
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -322,6 +338,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     ...reconciliation.events,
     ...bankImports.events,
     ...forecast.events,
+    ...plans.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -353,6 +370,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     reconciliationCandidates: input.reconciliationCandidates ?? [],
     cashMovements: input.cashMovements ?? [],
     forecast,
+    plans,
   });
 
   const digest = buildExecutiveDigest({
@@ -367,7 +385,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
 
   return {
     customers, suppliers, logistics, inventory, approval, payment, treasury,
-    reconciliation, bankImports, forecast,
+    reconciliation, bankImports, forecast, plans,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

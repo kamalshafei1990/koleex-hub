@@ -81,6 +81,8 @@ export default function FinanceTreasuryForecast() {
   const [risks, setRisks] = useState<LiquidityRisk[]>([]);
   const [assumptions, setAssumptions] = useState<ScenarioAssumptions | null>(null);
   const [preset, setPreset] = useState<ScenarioPreset>("base");
+  const [saveDraft, setSaveDraft] = useState<{ name: string; description: string } | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   /* Run a forecast on the server. */
   const run = useCallback(async (a: ScenarioAssumptions | null) => {
@@ -171,16 +173,116 @@ export default function FinanceTreasuryForecast() {
           title="Treasury Forecast"
           subtitle="Deterministic 90-day cash projection. Apply scenarios to stress-test customer delays, FX shocks, supplier acceleration, and cost shocks."
           action={
-            <button
-              onClick={() => onPreset("base")}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-white/[0.18] disabled:opacity-60"
-            >
-              {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
-              Reset to base
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const def = stress?.assumptions?.[0]?.label ?? "Base case";
+                  setSaveDraft({ name: `${def} · ${new Date().toLocaleDateString()}`, description: "" });
+                }}
+                disabled={!base || loading}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-3 py-2 text-sm font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+              >
+                <RrIcon name="check" size={12} />
+                Save as plan
+              </button>
+              <Link
+                href="/finance/treasury-plans"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-gray-300 hover:border-white/[0.18]"
+              >
+                <RrIcon name="file-invoice" size={12} />
+                Plans
+              </Link>
+              <button
+                onClick={() => onPreset("base")}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[var(--bg-surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:border-white/[0.18] disabled:opacity-60"
+              >
+                {loading ? <RrIcon name="loading" size={12} className="animate-spin" /> : <RrIcon name="recycle" size={12} />}
+                Reset to base
+              </button>
+            </div>
           }
         />
+
+        {/* Save-as-plan drawer */}
+        {saveDraft && base && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center sm:px-4 sm:py-8" onClick={() => setSaveDraft(null)}>
+            <div className="relative w-full max-w-md rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
+                <div>
+                  <h2 className="text-[14px] font-semibold">Save scenario as plan</h2>
+                  <p className="mt-0.5 text-[11px] text-gray-500">Locks the current assumptions + forecast snapshot for executive review.</p>
+                </div>
+                <button onClick={() => setSaveDraft(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-white/[0.06] hover:text-gray-100">
+                  <RrIcon name="cross" size={12} />
+                </button>
+              </div>
+              <div className="space-y-3 px-5 py-4">
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Plan name</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
+                    value={saveDraft.name}
+                    onChange={(e) => setSaveDraft({ ...saveDraft, name: e.target.value })}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Description</span>
+                  <textarea
+                    rows={3}
+                    className="mt-1 w-full resize-none rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
+                    value={saveDraft.description}
+                    placeholder="Why are we saving this scenario? Operator can revisit this later."
+                    onChange={(e) => setSaveDraft({ ...saveDraft, description: e.target.value })}
+                  />
+                </label>
+                <div className="rounded-lg border border-white/[0.05] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px] text-gray-400">
+                  <div className="font-semibold text-[var(--text-primary)]">Snapshot captured</div>
+                  <div className="mt-1">Starting cash · {(stress ?? base).startingCash.toFixed(0)} USD · d90 {(stress ?? base).d90.toFixed(0)} USD · Runway {(stress ?? base).runwayDays ?? "—"}d</div>
+                  <div className="mt-1">Assumptions: {(stress ?? base).assumptions.length === 0 ? "Base case" : (stress ?? base).assumptions.map((a) => a.label).join("; ")}</div>
+                </div>
+              </div>
+              <div className="border-t border-white/[0.06] px-5 py-3">
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => setSaveDraft(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/[0.18]">Cancel</button>
+                  <button
+                    disabled={saveBusy || !saveDraft.name.trim()}
+                    onClick={async () => {
+                      if (!base) return;
+                      setSaveBusy(true);
+                      try {
+                        const res = await fetch("/api/finance/treasury-plans", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            name: saveDraft.name.trim(),
+                            description: saveDraft.description || undefined,
+                            forecast: stress ?? base,
+                            assumptions: assumptions ?? null,
+                          }),
+                        });
+                        if (!res.ok) {
+                          const j = await res.json().catch(() => ({}));
+                          throw new Error((j as { error?: string }).error ?? `HTTP ${res.status}`);
+                        }
+                        setSaveDraft(null);
+                        window.location.href = "/finance/treasury-plans";
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setSaveBusy(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] hover:opacity-90 disabled:opacity-50"
+                  >
+                    {saveBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
+                    Save plan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300">{error}</div>

@@ -417,6 +417,71 @@ export interface FinanceReconciliationCandidate {
   cash_movement?: CashMovement | null;
 }
 
+/* ── Treasury Planning (Phase 2.9) ─────────────────────────────── */
+
+export type TreasuryPlanStatus = "draft" | "under_review" | "approved" | "archived";
+
+export type TreasuryPlanReviewDecision = "approve" | "request_changes" | "archive";
+
+/** Subset of forecast metrics cached on the plan row for fast list
+ *  queries. The full ForecastResult lives in base_forecast_snapshot. */
+export interface TreasuryPlanMetrics {
+  startingCash: number;
+  d7: number;
+  d30: number;
+  d60: number;
+  d90: number;
+  lowestProjected: number;
+  lowestProjectedDate: string | null;
+  firstNegativeDate: string | null;
+  runwayDays: number | null;
+  totalInflow: number;
+  totalOutflow: number;
+}
+
+export interface TreasuryPlan {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  base_forecast_snapshot: Record<string, unknown>;   // ForecastResult-shaped
+  scenario_assumptions: Record<string, unknown>;     // ScenarioAssumptions-shaped
+  projected_metrics: TreasuryPlanMetrics;
+  confidence: number | null;
+  forecast_window_days: number;
+  status: TreasuryPlanStatus;
+  created_by: string | null;
+  reviewed_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  review_notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface TreasuryPlanVersion {
+  id: string;
+  plan_id: string;
+  tenant_id: string;
+  previous_assumptions: Record<string, unknown>;
+  previous_metrics: Record<string, unknown>;
+  diff_summary: Record<string, unknown>;
+  changed_by: string | null;
+  changed_at: string;
+}
+
+export interface TreasuryPlanReview {
+  id: string;
+  plan_id: string;
+  tenant_id: string;
+  reviewer: string | null;
+  decision: TreasuryPlanReviewDecision;
+  notes: string | null;
+  created_at: string;
+}
+
 /* ── Bank Statement Import (Phase 2.6) ─────────────────────────── */
 
 export type BankStatementImportStatus =

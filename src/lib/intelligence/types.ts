@@ -122,7 +122,12 @@ export type OperationalEventKind =
   | "scenario_liquidity_shock"          // applied scenario materially reduces cash
   | "customer_delay_cash_risk"          // customer-delay scenario stresses cash
   | "fx_shock_cash_risk"                // FX-shock scenario stresses cash
-  | "supplier_acceleration_risk";       // supplier-acceleration scenario stresses cash
+  | "supplier_acceleration_risk"        // supplier-acceleration scenario stresses cash
+  /* ── Phase 2.9 — treasury planning + governance ─────────────── */
+  | "treasury_plan_expired"             // approved plan older than threshold
+  | "treasury_plan_vs_actual_divergence"// actual treasury diverges from approved plan
+  | "unreviewed_treasury_plan"          // a plan has been sitting under_review for too long
+  | "approved_plan_liquidity_risk";     // approved plan now predicts negative cash
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =

@@ -114,6 +114,11 @@ function urgencyComponent(e: OperationalEvent): number {
     case "customer_delay_cash_risk":        return 22;
     case "supplier_acceleration_risk":      return 22;
     case "fx_shock_cash_risk":              return 20;
+    /* ── Phase 2.9 planning kinds ── */
+    case "approved_plan_liquidity_risk":       return 44;  // an approved plan turning bad outranks most signals
+    case "treasury_plan_vs_actual_divergence": return 28;
+    case "treasury_plan_expired":              return 14;
+    case "unreviewed_treasury_plan":           return 12;
     default:
       return 8;
   }

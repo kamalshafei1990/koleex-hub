@@ -187,6 +187,16 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
   customer_delay_cash_risk:     (e) => (e.amount ?? 0) >= 5_000,
   fx_shock_cash_risk:           (e) => (e.amount ?? 0) >= 5_000,
   supplier_acceleration_risk:   (e) => (e.amount ?? 0) >= 5_000,
+
+  /* ── Phase 2.9 planning kinds ───────────────────────────────── */
+  /* Plan age in days; engine fires ≥ 30. */
+  treasury_plan_expired:                (e) => (e.magnitude ?? 0) >= 30,
+  /* Plan-vs-actual divergence in reporting USD; ≥ 5K. */
+  treasury_plan_vs_actual_divergence:   (e) => (e.amount ?? 0) >= 5_000,
+  /* Unreviewed plan age in days; ≥ 7. */
+  unreviewed_treasury_plan:             (e) => (e.magnitude ?? 0) >= 7,
+  /* Approved plan now predicts negative cash; fires when lowest ≤ 0. */
+  approved_plan_liquidity_risk:         (e) => (e.amount ?? 0) >= 1,
 };
 
 /**

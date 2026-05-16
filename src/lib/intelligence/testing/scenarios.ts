@@ -28,6 +28,9 @@ import type {
   ReconciliationCandidateType,
   ReconciliationConfidenceLevel,
   ReconciliationCandidateStatus,
+  TreasuryPlan,
+  TreasuryPlanMetrics,
+  TreasuryPlanStatus,
 } from "@/lib/finance/types";
 import type {
   IntelligenceInputs,
@@ -1911,6 +1914,194 @@ export function supplierAccelerationState(): Scenario {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   Phase 2.9 — Treasury Plans scenarios.
+   --------------------------------------------------------------------------- */
+
+function makeTreasuryPlan(spec: {
+  id: string;
+  name: string;
+  status: TreasuryPlanStatus;
+  metrics: TreasuryPlanMetrics;
+  approvedDaysAgo?: number;
+  updatedDaysAgo?: number;
+}): TreasuryPlan {
+  const approved = spec.approvedDaysAgo != null
+    ? isoDate(-spec.approvedDaysAgo) + "T08:00:00Z"
+    : null;
+  const updated = isoDate(-(spec.updatedDaysAgo ?? 0)) + "T08:00:00Z";
+  return {
+    id: spec.id,
+    tenant_id: "tenant-test",
+    name: spec.name,
+    description: null,
+    base_forecast_snapshot: {},
+    scenario_assumptions: {},
+    projected_metrics: spec.metrics,
+    confidence: 0.7,
+    forecast_window_days: 90,
+    status: spec.status,
+    created_by: null,
+    reviewed_by: null,
+    approved_by: spec.status === "approved" ? "u-1" : null,
+    approved_at: approved,
+    review_notes: null,
+    metadata: {},
+    created_at: updated,
+    updated_at: updated,
+    deleted_at: null,
+  };
+}
+
+/* TREASURY_PLAN_HEALTHY_STATE
+   An approved plan that matches today's treasury reality. The
+   divergence event must NOT fire; stale event must NOT fire. */
+export function treasuryPlanHealthyState(): Scenario {
+  const base = healthyState();
+  /* Build the plan with metrics close to what the current forecast
+     will produce given base.inputs. Healthy state has ~680K cash. */
+  const plan = makeTreasuryPlan({
+    id: "tp-healthy",
+    name: "Approved plan · healthy",
+    status: "approved",
+    approvedDaysAgo: 5,
+    updatedDaysAgo: 5,
+    metrics: {
+      startingCash: 320_000,
+      d7: 322_000,
+      d30: 350_000,
+      d60: 360_000,
+      d90: 360_000,
+      lowestProjected: 320_000,
+      lowestProjectedDate: isoDate(2),
+      firstNegativeDate: null,
+      runwayDays: null,
+      totalInflow: 80_000,
+      totalOutflow: 40_000,
+    },
+  });
+  return {
+    name: "TREASURY_PLAN_HEALTHY_STATE",
+    description: "Approved treasury plan aligned with actual state. Plan-divergence + plan-expired events must NOT fire.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({ id: "ba-tp-1", bank_name: "First National", currency: "USD", available_balance: 320_000, is_primary: true }),
+      ],
+      cashMovements: [],
+      treasuryPlans: [plan],
+    },
+    expectations: {
+      digestRange: [0, 4],
+      eventRange: [0, 6],
+      healthRange: [80, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 1,
+      copilotMaxHints: 3,
+      forbidEventKinds: [
+        "treasury_plan_expired",
+        "treasury_plan_vs_actual_divergence",
+        "unreviewed_treasury_plan",
+      ],
+    },
+  };
+}
+
+/* TREASURY_PLAN_DIVERGENCE_STATE
+   Plan locked in a healthy 90-day projection; actual treasury has
+   since deteriorated. Engine must surface
+   treasury_plan_vs_actual_divergence. */
+export function treasuryPlanDivergenceState(): Scenario {
+  /* Start from the stress scenario where the live forecast crosses
+     zero — but freeze a plan that thought d90 = 200K. */
+  const stress = treasuryForecastStressState();
+  const plan = makeTreasuryPlan({
+    id: "tp-divergence",
+    name: "Approved plan · pre-crisis",
+    status: "approved",
+    approvedDaysAgo: 14,
+    updatedDaysAgo: 14,
+    metrics: {
+      startingCash: 60_000,
+      d7: 70_000,
+      d30: 150_000,
+      d60: 200_000,
+      d90: 200_000,
+      lowestProjected: 50_000,
+      lowestProjectedDate: isoDate(3),
+      firstNegativeDate: null,
+      runwayDays: null,
+      totalInflow: 250_000,
+      totalOutflow: 50_000,
+    },
+  });
+  return {
+    name: "TREASURY_PLAN_DIVERGENCE_STATE",
+    description: "Approved plan stored a positive 200K d90 prediction; live forecast now negative. Divergence must fire.",
+    inputs: {
+      ...stress.inputs,
+      treasuryPlans: [plan],
+    },
+    expectations: {
+      digestRange: [1, 6],
+      eventRange: [1, 12],
+      healthRange: [40, 95],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 3,
+      copilotMaxHints: 3,
+      expectEventKinds: ["treasury_plan_vs_actual_divergence"],
+    },
+  };
+}
+
+/* TREASURY_PLAN_STALE_STATE
+   Approved plan ≥ 30 days old. Engine must fire treasury_plan_expired
+   regardless of whether the plan is aligned with actual state. */
+export function treasuryPlanStaleState(): Scenario {
+  const base = healthyState();
+  const plan = makeTreasuryPlan({
+    id: "tp-stale",
+    name: "Approved plan · 45 days old",
+    status: "approved",
+    approvedDaysAgo: 45,
+    updatedDaysAgo: 45,
+    metrics: {
+      startingCash: 320_000,
+      d7: 322_000,
+      d30: 350_000,
+      d60: 360_000,
+      d90: 360_000,
+      lowestProjected: 320_000,
+      lowestProjectedDate: isoDate(-43),
+      firstNegativeDate: null,
+      runwayDays: null,
+      totalInflow: 80_000,
+      totalOutflow: 40_000,
+    },
+  });
+  return {
+    name: "TREASURY_PLAN_STALE_STATE",
+    description: "Approved plan is 45 days old — operator must be nudged to refresh. Stale event must fire.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({ id: "ba-tps-1", bank_name: "First National", currency: "USD", available_balance: 320_000, is_primary: true }),
+      ],
+      cashMovements: [],
+      treasuryPlans: [plan],
+    },
+    expectations: {
+      digestRange: [0, 4],
+      eventRange: [1, 8],
+      healthRange: [80, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 1,
+      copilotMaxHints: 3,
+      expectEventKinds: ["treasury_plan_expired"],
+    },
+  };
+}
+
 export const ALL_SCENARIOS: () => Scenario[] = () => [
   healthyState(),
   moderatePressureState(),
@@ -1930,4 +2121,7 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   treasuryForecastStressState(),
   fxShockState(),
   supplierAccelerationState(),
+  treasuryPlanHealthyState(),
+  treasuryPlanDivergenceState(),
+  treasuryPlanStaleState(),
 ];

@@ -22,6 +22,7 @@ const TABS: { key: string; label: string; icon: ReactNode }[] = [
   { key: "/finance/bank-imports",   label: "Bank Imports",      icon: <RrIcon name="upload" size={12} /> },
   { key: "/finance/reconciliation", label: "Reconciliation",    icon: <RrIcon name="badge-check" size={12} /> },
   { key: "/finance/treasury-forecast", label: "Forecast",       icon: <RrIcon name="arrow-up-right" size={12} /> },
+  { key: "/finance/treasury-plans",    label: "Plans",          icon: <RrIcon name="file-invoice" size={12} /> },
   { key: "/finance/notifications",  label: "Reminders",         icon: <RrIcon name="clock" size={12} /> },
 ];
 

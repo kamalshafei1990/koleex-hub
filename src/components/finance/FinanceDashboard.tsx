@@ -70,6 +70,7 @@ import type {
   FinanceOrder,
   FinancePayment,
   FinanceReconciliationCandidate,
+  TreasuryPlan,
 } from "@/lib/finance/types";
 import {
   buildIncomingTimeline,
@@ -120,6 +121,8 @@ export default function FinanceDashboard() {
   const [reconciliationCandidates, setReconciliationCandidates] = useState<FinanceReconciliationCandidate[]>([]);
   /* Phase 2.6 — bank-statement imports feed 4 new intelligence signals. */
   const [bankStatementImports, setBankStatementImports] = useState<BankStatementImport[]>([]);
+  /* Phase 2.9 — treasury plans feed 4 governance signals. */
+  const [treasuryPlans, setTreasuryPlans] = useState<TreasuryPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* Restore last-used mode from localStorage on mount (client only). */
@@ -138,7 +141,7 @@ export default function FinanceDashboard() {
   const load = useCallback(async (p: DashboardPeriod) => {
     setLoading(true);
     try {
-      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes, importsRes] = await Promise.all([
+      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes, importsRes, plansRes] = await Promise.all([
         fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
         fetch(`/api/finance/orders`, { cache: "no-store" }),
         fetch(`/api/finance/payments`, { cache: "no-store" }),
@@ -146,6 +149,7 @@ export default function FinanceDashboard() {
         fetch(`/api/finance/treasury`,  { cache: "no-store" }),
         fetch(`/api/finance/reconciliation/candidates?status=suggested,rejected&limit=200`, { cache: "no-store" }),
         fetch(`/api/finance/bank-imports`, { cache: "no-store" }),
+        fetch(`/api/finance/treasury-plans`, { cache: "no-store" }),
       ]);
       const j = (await dashRes.json()) as { kpi?: DashboardKpi };
       setKpi(j.kpi ?? null);
@@ -162,6 +166,8 @@ export default function FinanceDashboard() {
       setReconciliationCandidates(Array.isArray(reconBody.candidates) ? reconBody.candidates : []);
       const importsBody = (await importsRes.json().catch(() => ({}))) as { imports?: BankStatementImport[] };
       setBankStatementImports(Array.isArray(importsBody.imports) ? importsBody.imports : []);
+      const plansBody = (await plansRes.json().catch(() => ({}))) as { plans?: TreasuryPlan[] };
+      setTreasuryPlans(Array.isArray(plansBody.plans) ? plansBody.plans : []);
     } catch {
       setKpi(null);
       setOrders([]);
@@ -171,6 +177,7 @@ export default function FinanceDashboard() {
       setCashMovements([]);
       setReconciliationCandidates([]);
       setBankStatementImports([]);
+      setTreasuryPlans([]);
     } finally {
       setLoading(false);
     }
@@ -228,10 +235,11 @@ export default function FinanceDashboard() {
       cashMovements,
       reconciliationCandidates,
       bankStatementImports,
+      treasuryPlans,
       periodDays,
       memory: memoryRef,
     }),
-    [kpi, orders, payments, expenses, bankAccounts, cashMovements, reconciliationCandidates, bankStatementImports, periodDays, memoryRef],
+    [kpi, orders, payments, expenses, bankAccounts, cashMovements, reconciliationCandidates, bankStatementImports, treasuryPlans, periodDays, memoryRef],
   );
   useEffect(() => {
     /* Persist the next-memory snapshot after each successful build so
@@ -1525,6 +1533,7 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
   const t = intel.treasury;
   const r = intel.reconciliation;
   const bi = intel.bankImports;
+  const pl = intel.plans;
   if (t.accounts.length === 0) return null;
   const meaningful =
     t.pressure !== "calm" ||
@@ -1663,6 +1672,38 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
         </span>
         <span className="inline-flex items-center gap-1 text-gray-400">Open <span aria-hidden>→</span></span>
       </Link>
+
+      {/* Phase 2.9 — plans pulse. Surfaces only when a saved plan
+          materially diverges from the current state, is stale, or
+          when reviews are sitting on the backlog. Calm read-only
+          strip with one deep link to /finance/treasury-plans. */}
+      {(pl.activePlan
+        || pl.pendingReviewCount > 0
+        || Math.abs(pl.divergence) >= 5_000) && (
+        <Link
+          href="/finance/treasury-plans"
+          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
+        >
+          <span className="inline-flex items-center gap-2 text-gray-300">
+            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
+            <span className="font-semibold text-gray-200">Treasury plans</span>
+            {pl.activePlan && pl.activePlanAgeDays != null && (
+              <span>· Active plan {pl.activePlanAgeDays}d old</span>
+            )}
+            {Math.abs(pl.divergence) >= 5_000 && (
+              <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
+                Divergence {formatCompactUsd(pl.divergence)} USD
+              </span>
+            )}
+            {pl.pendingReviewCount > 0 && (
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                {pl.pendingReviewCount} awaiting review
+              </span>
+            )}
+          </span>
+          <span className="inline-flex items-center gap-1 text-gray-400">Open <span aria-hidden>→</span></span>
+        </Link>
+      )}
 
       {/* Phase 2.6 — bank-import pulse. Surfaces when imports have
           failed, when an import landed many unreconciled movements,

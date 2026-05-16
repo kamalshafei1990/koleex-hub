@@ -21,6 +21,7 @@ import type {
 import type { ReconciliationSnapshot } from "./reconciliation";
 import type { FinanceReconciliationCandidate, CashMovement } from "@/lib/finance/types";
 import type { ForecastSnapshot } from "./treasury-forecast-events";
+import type { PlansSnapshot } from "./treasury-plans";
 
 interface BuildArgs {
   events: OperationalEvent[];
@@ -46,6 +47,9 @@ interface BuildArgs {
    *  hints with concrete amounts ("Cash turns negative on June 18")
    *  and named parties ("If Malouka delays 30d…"). */
   forecast?: ForecastSnapshot;
+  /** Phase 2.9 — treasury plans snapshot. Drives plan-aware hints
+   *  (divergence vs approved plan, stale plans, unreviewed plans). */
+  plans?: PlansSnapshot;
 }
 
 const SEV_RANK: Record<Severity, number> = { critical: 0, risk: 1, watch: 2, info: 3 };
@@ -61,7 +65,7 @@ function fmtCompactUsd(n: number): string {
 }
 
 export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
-  const { events, correlations, pageContext, reconciliation, reconciliationCandidates, cashMovements, forecast } = args;
+  const { events, correlations, pageContext, reconciliation, reconciliationCandidates, cashMovements, forecast, plans } = args;
   const hints: CopilotHint[] = [];
 
   /* 1) Cross-module correlations FIRST — but only ones that earned
@@ -262,6 +266,40 @@ export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
       hints.push(h);
       known.add(h.key);
     }
+  }
+
+  /* 1d) Plan-aware hints. Phase 2.9.
+        At most 1 plan hint per session. Numbers always concrete. */
+  if (plans && plans.activePlan && hints.length < MAX_HINTS) {
+    const ap = plans.activePlan;
+    const known = new Set(hints.map((h) => h.key));
+    /* Divergence is the most actionable. */
+    if (Math.abs(plans.divergence) >= 5_000) {
+      hints.push({
+        key: "copilot-plan-divergence",
+        module: "treasury",
+        severity: Math.abs(plans.divergence) >= 50_000 ? "risk" : "watch",
+        text: `Approved plan "${ap.name}" diverges by ${fmtCompactUsd(plans.divergence)} USD from current 90-day cash.`,
+        related: { eventKeys: ["plan-divergence"] },
+      });
+    } else if (plans.activePlanAgeDays != null && plans.activePlanAgeDays >= 30) {
+      hints.push({
+        key: "copilot-plan-stale",
+        module: "treasury",
+        severity: plans.activePlanAgeDays >= 90 ? "watch" : "info",
+        text: `Approved treasury plan "${ap.name}" is ${plans.activePlanAgeDays} days old — review or refresh.`,
+        related: { eventKeys: ["plan-expired"] },
+      });
+    } else if (plans.pendingReviewCount > 0 && plans.oldestUnreviewedDays >= 7) {
+      hints.push({
+        key: "copilot-plan-unreviewed",
+        module: "treasury",
+        severity: "watch",
+        text: `${plans.pendingReviewCount} treasury plan${plans.pendingReviewCount === 1 ? "" : "s"} waiting for review; oldest is ${plans.oldestUnreviewedDays}d.`,
+        related: { eventKeys: ["plan-unreviewed"] },
+      });
+    }
+    void known;
   }
 
   /* 2) Page-biased hints — if the user is looking at a specific
