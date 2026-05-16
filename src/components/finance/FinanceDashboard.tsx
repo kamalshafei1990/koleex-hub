@@ -1,39 +1,54 @@
 "use client";
 
 /* ===========================================================================
-   Finance Dashboard  —  Phase 1.4 executive rebuild.
+   Finance Dashboard  —  Phase 1.7 operational-intelligence rebuild.
 
-   Visual story (top → bottom):
+   Two coexisting views inside one page, switched by ModeToggle:
 
-     0. HERO STRIP        Title + period selector + Executive Summary
-                          one-liner (financial-health narrative).
-     1. PRIMARY HEROES    Two huge KPI cards side-by-side — Revenue
-                          and Net Profit — each with inline area chart.
-     2. SECONDARY METRICS Compact row: Cash In · Cash Out · Money to
-                          Collect · Money to Pay · Gross Margin.
-     3. CHART CARD        Full Revenue-vs-Expenses area chart.
-     4. INTELLIGENCE      Insight cards: health, cash velocity,
-                          collection risk, expense pressure.
-     5. PROFIT FLOW       Visual storytelling waterfall.
-     6. TOP INSIGHTS      Top profitable orders + top expense
-                          categories.
+     OPERATIONAL  (default)
+       0. Header (title · health · period · mode)
+       1. Prioritised WorkflowRail (most-pressure first)
+       2. Hero KPIs · secondary metrics
+       3. Trend chart
+       4. Incoming-cash + Supplier-due timelines + Liquidity meter
+       5. AR + AP aging buckets
+       6. Intelligence cards + anomaly signals
+       7. Profit flow waterfall
+       8. Top orders + top categories
 
-   The page is intentionally monochrome-first; accent colour appears
-   only on delta indicators, the single most-important number on each
-   card, and status chips.
+     EXECUTIVE
+       0. Header (same)
+       1. Liquidity / Pressure / CCC strip
+       2. Hero KPIs (compact stat row)
+       3. AR + AP aging
+       4. Concentration exposure (customer + supplier)
+       5. Margin trend + anomaly callouts
+       6. Trend chart (for context, smaller)
+       7. Profit flow waterfall
+
+   No backend, schema, or calc changes — every new surface is derived
+   from data the existing endpoints already return.
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
+  AgingTable,
+  AnomalyChip,
   AreaChart,
   ChartCard,
+  ConcentrationBar,
   HeroKpiCard,
   InsightCard,
+  LiquidityMeter,
   MetricCard,
+  ModeToggle,
   SectionTitle,
+  StatRow,
+  TimelineStrip,
   WorkflowRail,
   formatCompact,
+  type FinanceMode,
   type InsightSeverity,
   type Tone,
   type WorkflowItem,
@@ -41,7 +56,22 @@ import {
 import { PeriodTabs } from "@/components/finance/FinanceUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
-import type { DashboardKpi, DashboardPeriod } from "@/lib/finance/types";
+import type { DashboardKpi, DashboardPeriod, FinanceOrder } from "@/lib/finance/types";
+import {
+  buildCopilotContext,
+  buildIncomingTimeline,
+  buildOutgoingTimeline,
+  computeApAging,
+  computeArAging,
+  computeCCC,
+  computeConcentration,
+  detectAnomalies,
+  prioritiseWorkflow,
+  projectLiquidity,
+  overallPressure,
+  type Pressure,
+  type WorkflowKey,
+} from "@/lib/finance/intelligence";
 
 const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "week",    label: "Week" },
@@ -49,19 +79,42 @@ const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "year",    label: "Year" },
 ];
 
+const MODE_STORAGE_KEY = "koleex-finance-mode";
+
 export default function FinanceDashboard() {
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
+  const [mode, setMode] = useState<FinanceMode>("operational");
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
+  const [orders, setOrders] = useState<FinanceOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Restore last-used mode from localStorage on mount (client only). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(MODE_STORAGE_KEY);
+    if (saved === "operational" || saved === "executive") setMode(saved);
+  }, []);
+  const setModePersist = useCallback((m: FinanceMode) => {
+    setMode(m);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(MODE_STORAGE_KEY, m);
+    }
+  }, []);
 
   const load = useCallback(async (p: DashboardPeriod) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" });
-      const j = (await res.json()) as { kpi?: DashboardKpi };
+      const [dashRes, ordersRes] = await Promise.all([
+        fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
+        fetch(`/api/finance/orders`, { cache: "no-store" }),
+      ]);
+      const j = (await dashRes.json()) as { kpi?: DashboardKpi };
       setKpi(j.kpi ?? null);
+      const ordersBody = (await ordersRes.json().catch(() => ({}))) as { orders?: FinanceOrder[] };
+      setOrders(Array.isArray(ordersBody.orders) ? ordersBody.orders : []);
     } catch {
       setKpi(null);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -81,27 +134,156 @@ export default function FinanceDashboard() {
     };
   }, [kpi]);
 
-  /* Intelligence layer — generate narrative insights from the raw KPIs */
-  const intelligence = useMemo(() => buildIntelligence(kpi, period), [kpi, period]);
+  /* Intelligence layer */
+  const intelligence    = useMemo(() => buildIntelligence(kpi, period), [kpi, period]);
+  const arAging         = useMemo(() => computeArAging(orders), [orders]);
+  const apAging         = useMemo(() => computeApAging(orders), [orders]);
+  const incomingTimeline = useMemo(() => buildIncomingTimeline(orders), [orders]);
+  const outgoingTimeline = useMemo(() => buildOutgoingTimeline(orders), [orders]);
+  const liquidity       = useMemo(
+    () => projectLiquidity(kpi, period, incomingTimeline, outgoingTimeline),
+    [kpi, period, incomingTimeline, outgoingTimeline],
+  );
+  const anomalies       = useMemo(() => detectAnomalies(kpi), [kpi]);
+  const concentration   = useMemo(() => computeConcentration(kpi, orders), [kpi, orders]);
+  const ccc             = useMemo(() => computeCCC(kpi, period), [kpi, period]);
+  const pressure        = useMemo(() => overallPressure(kpi), [kpi]);
+
+  /* Dynamic workflow rail — sorted by current pressure */
+  const workflowItems   = useMemo(
+    () => buildWorkflowItems(kpi, prioritiseWorkflow(kpi)),
+    [kpi],
+  );
+
+  /* Publish proactive Copilot context whenever the operational picture
+     changes. FloatingPanel listens and renders these as suggestion
+     chips in the empty-state, so the Copilot feels situationally aware
+     before the operator types anything. We only publish when there's
+     real data — and we clear on unmount so leaving Finance doesn't
+     leave stale Finance hints in the Copilot on other pages. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hints = buildCopilotContext({
+      kpi,
+      ar: incomingTimeline,
+      ap: outgoingTimeline,
+      liquidity,
+      concentration,
+      anomalies,
+    });
+    window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints: [] } }));
+    };
+  }, [kpi, incomingTimeline, outgoingTimeline, liquidity, concentration, anomalies]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <FinanceHeader
           title="Financial Intelligence"
-          subtitle={intelligence.headline}
+          subtitle={pressureHeadline(pressure, intelligence.headline)}
           health={kpi?.health_status}
-          controls={<PeriodTabs<DashboardPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />}
+          controls={
+            <div className="flex flex-wrap items-center gap-2.5">
+              <PeriodTabs<DashboardPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+              <ModeToggle value={mode} onChange={setModePersist} />
+            </div>
+          }
         />
 
-        {/* ── 0. WORKFLOW RAIL — operate the business, don't just watch */}
-        <div className="mt-5">
-          <WorkflowRail items={buildWorkflowItems(kpi)} />
-        </div>
+        {mode === "operational" ? (
+          <OperationalView
+            kpi={kpi}
+            loading={loading}
+            currency={currency}
+            sparklines={sparklines}
+            period={period}
+            intelligence={intelligence}
+            anomalies={anomalies}
+            workflowItems={workflowItems}
+            arAging={arAging}
+            apAging={apAging}
+            incomingTimeline={incomingTimeline}
+            outgoingTimeline={outgoingTimeline}
+            liquidity={liquidity}
+          />
+        ) : (
+          <ExecutiveView
+            kpi={kpi}
+            loading={loading}
+            currency={currency}
+            sparklines={sparklines}
+            period={period}
+            anomalies={anomalies}
+            arAging={arAging}
+            apAging={apAging}
+            liquidity={liquidity}
+            concentration={concentration}
+            ccc={ccc}
+            pressure={pressure}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* ── 1. PRIMARY HEROES ────────────────────────────────── */}
-        <SectionTitle eyebrow="At a glance" title="Performance this period" />
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+/* ===========================================================================
+   Operational view  —  workflows first, queues, then narrative.
+   ========================================================================== */
+
+function OperationalView({
+  kpi, loading, currency, sparklines, period, intelligence, anomalies,
+  workflowItems, arAging, apAging, incomingTimeline, outgoingTimeline, liquidity,
+}: {
+  kpi: DashboardKpi | null;
+  loading: boolean;
+  currency: string;
+  sparklines: { revenue: number[]; expenses: number[]; net_profit: number[]; labels: string[] };
+  period: DashboardPeriod;
+  intelligence: ReturnType<typeof buildIntelligence>;
+  anomalies: ReturnType<typeof detectAnomalies>;
+  workflowItems: WorkflowItem[];
+  arAging: ReturnType<typeof computeArAging>;
+  apAging: ReturnType<typeof computeApAging>;
+  incomingTimeline: ReturnType<typeof buildIncomingTimeline>;
+  outgoingTimeline: ReturnType<typeof buildOutgoingTimeline>;
+  liquidity: ReturnType<typeof projectLiquidity>;
+}) {
+  /* Top anomalies surfaced inline above the WorkflowRail when meaningful */
+  const topAnomalies = anomalies.filter((a) => a.severity !== "info").slice(0, 3);
+
+  /* Find revenue / net_profit anomalies for inline KPI chips */
+  const revenueAnomaly = anomalies.find((a) => a.key === "delta-revenue");
+  const netProfitAnomaly = anomalies.find((a) => a.key === "delta-net_profit");
+
+  return (
+    <>
+      {/* ── 0. WORKFLOW QUEUE — prioritised by current pressure ─── */}
+      <div className="mt-4">
+        <WorkflowRail items={workflowItems} />
+      </div>
+
+      {/* ── Pressure callout strip (only if material anomalies) ── */}
+      {topAnomalies.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.04] bg-white/[0.012] px-3 py-2">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Pressure</span>
+          {topAnomalies.map((a) => (
+            <AnomalyChip
+              key={a.key}
+              text={a.label}
+              severity={a.severity}
+              direction={a.direction === "up" ? "up" : a.direction === "down" ? "down" : undefined}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── 1. PRIMARY HEROES ────────────────────────────────── */}
+      <SectionTitle eyebrow="At a glance" title="Performance this period" />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="relative">
           <HeroKpiCard
             label="Revenue"
             value={kpi?.total_revenue ?? 0}
@@ -114,6 +296,13 @@ export default function FinanceDashboard() {
             trendCurrency={currency}
             loading={loading}
           />
+          {revenueAnomaly && revenueAnomaly.severity !== "info" && (
+            <div className="absolute right-4 top-4">
+              <AnomalyChip text={revenueAnomaly.label} severity={revenueAnomaly.severity} direction={revenueAnomaly.direction === "up" ? "up" : "down"} />
+            </div>
+          )}
+        </div>
+        <div className="relative">
           <HeroKpiCard
             label="Net Profit"
             value={kpi?.net_profit ?? 0}
@@ -126,133 +315,325 @@ export default function FinanceDashboard() {
             trendCurrency={currency}
             loading={loading}
           />
-        </div>
-
-        {/* ── 2. SECONDARY METRICS ────────────────────────────── */}
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <MetricCard
-            label="Cash In"
-            value={kpi?.cash_in ?? 0}
-            unit={currency}
-            delta={kpi?.delta.cash_in_pct ?? null}
-            hint="Customer payments received"
-            loading={loading}
-          />
-          <MetricCard
-            label="Cash Out"
-            value={kpi?.cash_out ?? 0}
-            unit={currency}
-            delta={kpi?.delta.cash_out_pct ?? null}
-            hint="Suppliers + expenses paid"
-            loading={loading}
-          />
-          <MetricCard
-            label="Money to Collect"
-            value={kpi?.accounts_receivable ?? 0}
-            unit={currency}
-            tone="warning"
-            hint="Outstanding receivables"
-            loading={loading}
-          />
-          <MetricCard
-            label="Money to Pay"
-            value={kpi?.accounts_payable ?? 0}
-            unit={currency}
-            tone="warning"
-            hint="Suppliers + unpaid bills"
-            loading={loading}
-          />
-          <MetricCard
-            label="Gross Margin"
-            value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}` : "—"}
-            unit="%"
-            hint="Gross profit ÷ revenue"
-            tone={
-              (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
-              : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
-              : (kpi?.gross_margin_pct ?? 0) < 0 ? "negative"
-              : "neutral"
-            }
-            loading={loading}
-          />
-        </div>
-
-        {/* ── 3. CHART CARD ────────────────────────────────────── */}
-        <SectionTitle
-          eyebrow="Trend"
-          title="Revenue vs Costs"
-          description={
-            period === "week"
-              ? "Daily breakdown — last 7 days"
-              : period === "quarter"
-                ? "Weekly breakdown — last 90 days"
-                : "Monthly breakdown — last 12 months"
-          }
-        />
-        <ChartCard title="Cash flow over time" subtitle="Revenue is the inflow line; costs + expenses combine into the outflow line.">
-          <AreaChart
-            currency={currency}
-            labels={sparklines.labels}
-            height={300}
-            series={[
-              { name: "Revenue",            values: sparklines.revenue,    tone: "positive" },
-              { name: "Costs + Expenses",   values: sparklines.expenses,   tone: "negative" },
-              { name: "Net profit",         values: sparklines.net_profit, tone: "info" },
-            ]}
-          />
-        </ChartCard>
-
-        {/* ── 4. INTELLIGENCE LAYER ───────────────────────────── */}
-        <SectionTitle eyebrow="Intelligence" title="What the numbers mean" description="Automatic interpretations of this period's signal." />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {intelligence.cards.map((c, i) => (
-            <InsightCard
-              key={i}
-              icon={c.icon}
-              title={c.title}
-              description={c.description}
-              chip={c.chip}
-              severity={c.severity}
-            />
-          ))}
-        </div>
-
-        {/* ── 5. PROFIT FLOW STORY ────────────────────────────── */}
-        <SectionTitle
-          eyebrow="Profit flow"
-          title="From revenue to net profit"
-          description="Gross profit excludes tax refund; refund is added back separately before net profit."
-        />
-        <ProfitFlow
-          revenue={kpi?.total_revenue ?? 0}
-          supplierCost={kpi?.total_supplier_cost ?? 0}
-          expenses={kpi?.total_expenses ?? 0}
-          taxRefund={kpi?.total_tax_refund ?? 0}
-          finCharges={kpi?.total_financial_charges ?? 0}
-          gross={kpi?.gross_profit ?? 0}
-          net={kpi?.net_profit ?? 0}
-          currency={currency}
-        />
-
-        {/* ── 6. TOP INSIGHTS ────────────────────────────────── */}
-        <SectionTitle eyebrow="Top insights" title="Where profit is being made — and where it's leaking" />
-        <div className="grid gap-3 lg:grid-cols-2">
-          <TopOrdersCard kpi={kpi} currency={currency} />
-          <TopCategoriesCard kpi={kpi} currency={currency} />
+          {netProfitAnomaly && netProfitAnomaly.severity !== "info" && (
+            <div className="absolute right-4 top-4">
+              <AnomalyChip text={netProfitAnomaly.label} severity={netProfitAnomaly.severity} direction={netProfitAnomaly.direction === "up" ? "up" : "down"} />
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* ── 2. SECONDARY METRICS ────────────────────────────── */}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricCard label="Cash In"  value={kpi?.cash_in  ?? 0} unit={currency} delta={kpi?.delta.cash_in_pct  ?? null} hint="Customer payments received" loading={loading} />
+        <MetricCard label="Cash Out" value={kpi?.cash_out ?? 0} unit={currency} delta={kpi?.delta.cash_out_pct ?? null} hint="Suppliers + expenses paid" loading={loading} />
+        <MetricCard label="Money to Collect" value={kpi?.accounts_receivable ?? 0} unit={currency} tone="warning" hint="Outstanding receivables" loading={loading} />
+        <MetricCard label="Money to Pay"     value={kpi?.accounts_payable    ?? 0} unit={currency} tone="warning" hint="Suppliers + unpaid bills"   loading={loading} />
+        <MetricCard
+          label="Gross Margin"
+          value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}` : "—"}
+          unit="%"
+          hint="Gross profit ÷ revenue"
+          tone={
+            (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
+            : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
+            : (kpi?.gross_margin_pct ?? 0) < 0 ? "negative"
+            : "neutral"
+          }
+          loading={loading}
+        />
+      </div>
+
+      {/* ── 3. TIMELINES + LIQUIDITY ──────────────────────── */}
+      <SectionTitle eyebrow="Cash radar" title="What's moving in the next 45 days" description="Incoming collections, supplier dues, and forward liquidity." />
+      <div className="grid gap-3 lg:grid-cols-3">
+        <TimelineStrip
+          title="Incoming cash"
+          direction="incoming"
+          currency={currency}
+          events={incomingTimeline}
+        />
+        <TimelineStrip
+          title="Supplier dues"
+          direction="outgoing"
+          currency={currency}
+          events={outgoingTimeline}
+        />
+        <LiquidityMeter
+          d7={liquidity.d7}
+          d30={liquidity.d30}
+          d60={liquidity.d60}
+          inflowShare={liquidity.inflowShare}
+        />
+      </div>
+
+      {/* ── 4. AGING ─────────────────────────────────────── */}
+      <SectionTitle eyebrow="Aging" title="Receivables and payables by age" description="Anything past 30 days is silently flagged." />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <AgingTable title="AR aging" buckets={arAging} currency={currency} totalLabel="Customer side" />
+        <AgingTable title="AP aging" buckets={apAging} currency={currency} totalLabel="Supplier side" />
+      </div>
+
+      {/* ── 5. CHART CARD ────────────────────────────────── */}
+      <SectionTitle
+        eyebrow="Trend"
+        title="Revenue vs Costs"
+        description={
+          period === "week"   ? "Daily breakdown — last 7 days"
+          : period === "quarter" ? "Weekly breakdown — last 90 days"
+          : "Monthly breakdown — last 12 months"
+        }
+      />
+      <ChartCard title="Cash flow over time" subtitle="Revenue is the inflow line; costs + expenses combine into the outflow line.">
+        <AreaChart
+          currency={currency}
+          labels={sparklines.labels}
+          height={280}
+          series={[
+            { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
+            { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
+            { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+          ]}
+        />
+      </ChartCard>
+
+      {/* ── 6. INTELLIGENCE LAYER ───────────────────────── */}
+      <SectionTitle eyebrow="Intelligence" title="What the numbers mean" description="Automatic interpretations of this period's signal." />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {intelligence.cards.map((c, i) => (
+          <InsightCard
+            key={i}
+            icon={c.icon}
+            title={c.title}
+            description={c.description}
+            chip={c.chip}
+            severity={c.severity}
+          />
+        ))}
+      </div>
+
+      {/* ── 7. PROFIT FLOW STORY ────────────────────────── */}
+      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" description="Gross profit excludes tax refund; refund is added back separately before net profit." />
+      <ProfitFlow
+        revenue={kpi?.total_revenue ?? 0}
+        supplierCost={kpi?.total_supplier_cost ?? 0}
+        expenses={kpi?.total_expenses ?? 0}
+        taxRefund={kpi?.total_tax_refund ?? 0}
+        finCharges={kpi?.total_financial_charges ?? 0}
+        gross={kpi?.gross_profit ?? 0}
+        net={kpi?.net_profit ?? 0}
+        currency={currency}
+      />
+
+      {/* ── 8. TOP INSIGHTS ────────────────────────────── */}
+      <SectionTitle eyebrow="Top insights" title="Where profit is being made — and where it's leaking" />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <TopOrdersCard kpi={kpi} currency={currency} />
+        <TopCategoriesCard kpi={kpi} currency={currency} />
+      </div>
+    </>
   );
 }
 
-/* ---------------------------------------------------------------------------
-   Intelligence layer  —  takes the raw KPI payload and produces a
-   short narrative headline + 3-6 InsightCards explaining the business
-   state in plain language. Pure function; easy to evolve.
+/* ===========================================================================
+   Executive view  —  strategic surfaces only. No workflow rail. Calmer.
+   ========================================================================== */
 
-   Phase 1.6: each card now carries an InsightSeverity (positive /
-   neutral / watch / risk / critical) so the InsightCard can render
-   subtle left-rail tint + (on critical) a slow edge pulse.
+function ExecutiveView({
+  kpi, loading, currency, sparklines, period,
+  anomalies, arAging, apAging, liquidity, concentration, ccc, pressure,
+}: {
+  kpi: DashboardKpi | null;
+  loading: boolean;
+  currency: string;
+  sparklines: { revenue: number[]; expenses: number[]; net_profit: number[]; labels: string[] };
+  period: DashboardPeriod;
+  anomalies: ReturnType<typeof detectAnomalies>;
+  arAging: ReturnType<typeof computeArAging>;
+  apAging: ReturnType<typeof computeApAging>;
+  liquidity: ReturnType<typeof projectLiquidity>;
+  concentration: ReturnType<typeof computeConcentration>;
+  ccc: ReturnType<typeof computeCCC>;
+  pressure: Pressure;
+}) {
+  /* Stat row — six executive-grade numbers, compressed. */
+  const stats: { label: string; value: string; hint?: string; tone?: Tone }[] = [
+    {
+      label: "Revenue",
+      value: formatCompact(kpi?.total_revenue ?? 0),
+      hint: `${currency} · ${period}`,
+      tone: "positive",
+    },
+    {
+      label: "Net profit",
+      value: formatCompact(kpi?.net_profit ?? 0),
+      hint: `Margin ${(kpi?.gross_margin_pct ?? 0).toFixed(1)}%`,
+      tone: (kpi?.net_profit ?? 0) >= 0 ? "info" : "negative",
+    },
+    {
+      label: "AR exposure",
+      value: formatCompact(kpi?.accounts_receivable ?? 0),
+      hint: `${arAging.reduce((s, b) => s + b.count, 0)} open`,
+      tone: "warning",
+    },
+    {
+      label: "AP exposure",
+      value: formatCompact(kpi?.accounts_payable ?? 0),
+      hint: `${apAging.reduce((s, b) => s + b.count, 0)} open`,
+      tone: "warning",
+    },
+    {
+      label: "DSO",
+      value: `${ccc.dso.toFixed(0)} d`,
+      hint: "Days sales outstanding",
+    },
+    {
+      label: "CCC",
+      value: `${ccc.ccc.toFixed(0)} d`,
+      hint: ccc.ccc >= 0 ? "Cash cycle gap" : "Cash cycle surplus",
+      tone: ccc.ccc <= 30 ? "positive" : ccc.ccc <= 60 ? "warning" : "negative",
+    },
+  ];
+
+  return (
+    <>
+      {/* ── 0. Pressure narrative ───────────────────── */}
+      <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Executive read</div>
+            <div className="mt-1 text-[14px] text-gray-200">{liquidity.narrative}</div>
+          </div>
+          <PressurePill pressure={pressure} />
+        </div>
+      </div>
+
+      {/* ── 1. STAT ROW — exec KPIs ──────────────── */}
+      <div className="mt-3">
+        <StatRow stats={loading ? stats.map((s) => ({ ...s, value: "—" })) : stats} />
+      </div>
+
+      {/* ── 2. LIQUIDITY + AGING ─────────────────── */}
+      <SectionTitle eyebrow="Liquidity" title="Forward cash window + aging exposure" description="Projection blends steady-state trajectory with scheduled AR/AP." />
+      <div className="grid gap-3 lg:grid-cols-3">
+        <LiquidityMeter
+          d7={liquidity.d7}
+          d30={liquidity.d30}
+          d60={liquidity.d60}
+          inflowShare={liquidity.inflowShare}
+        />
+        <AgingTable title="AR aging" buckets={arAging} currency={currency} />
+        <AgingTable title="AP aging" buckets={apAging} currency={currency} />
+      </div>
+
+      {/* ── 3. CONCENTRATION ─────────────────────── */}
+      <SectionTitle eyebrow="Concentration" title="Revenue + cost-of-goods dependency" description="How exposed the business is to a single counterparty." />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ConcentrationBar
+          label="Top customer share"
+          party={concentration.topCustomer?.name ?? "—"}
+          share={concentration.topCustomer?.share ?? 0}
+          hint={
+            (concentration.topCustomer?.share ?? 0) >= 60 ? "Critical concentration — single counterparty risk."
+            : (concentration.topCustomer?.share ?? 0) >= 40 ? "Material concentration."
+            : "Healthy distribution."
+          }
+          severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
+        />
+        <ConcentrationBar
+          label="Top supplier share"
+          party={concentration.topSupplier?.name ?? "—"}
+          share={concentration.topSupplier?.share ?? 0}
+          hint={
+            (concentration.topSupplier?.share ?? 0) >= 70 ? "Critical dependency — single source of goods."
+            : (concentration.topSupplier?.share ?? 0) >= 50 ? "Significant supplier dependency."
+            : "Diversified supplier base."
+          }
+          severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
+        />
+      </div>
+
+      {/* ── 4. ANOMALY DIGEST ─────────────────────── */}
+      {anomalies.length > 0 && (
+        <>
+          <SectionTitle eyebrow="Anomaly digest" title="Period-over-period deviations" description="Material movements worth a second look." />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {anomalies.slice(0, 6).map((a) => (
+              <InsightCard
+                key={a.key}
+                title={a.label}
+                description={a.detail}
+                severity={a.severity === "risk" ? "risk" : a.severity === "watch" ? "watch" : "neutral"}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── 5. TREND CHART — contextual, smaller ─── */}
+      <SectionTitle eyebrow="Trend" title="Cash flow over time" />
+      <ChartCard title="Revenue · costs · net profit" subtitle="Compressed for adaptive readability when spikes dominate.">
+        <AreaChart
+          currency={currency}
+          labels={sparklines.labels}
+          height={240}
+          series={[
+            { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
+            { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
+            { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+          ]}
+        />
+      </ChartCard>
+
+      {/* ── 6. PROFIT FLOW ──────────────────────── */}
+      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" />
+      <ProfitFlow
+        revenue={kpi?.total_revenue ?? 0}
+        supplierCost={kpi?.total_supplier_cost ?? 0}
+        expenses={kpi?.total_expenses ?? 0}
+        taxRefund={kpi?.total_tax_refund ?? 0}
+        finCharges={kpi?.total_financial_charges ?? 0}
+        gross={kpi?.gross_profit ?? 0}
+        net={kpi?.net_profit ?? 0}
+        currency={currency}
+      />
+    </>
+  );
+}
+
+function PressurePill({ pressure }: { pressure: Pressure }) {
+  const cls =
+    pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
+  : pressure === "risk"     ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+  : pressure === "watch"    ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
+  :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+  const label =
+    pressure === "critical" ? "Critical pressure"
+  : pressure === "risk"     ? "Elevated pressure"
+  : pressure === "watch"    ? "Mild pressure"
+  :                           "Calm";
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${cls}`}>
+      <span aria-hidden className={"h-1.5 w-1.5 rounded-full " + (
+        pressure === "critical" ? "bg-rose-400"
+      : pressure === "risk"     ? "bg-rose-400"
+      : pressure === "watch"    ? "bg-amber-300"
+      :                           "bg-emerald-400"
+      )} />
+      {label}
+    </span>
+  );
+}
+
+function pressureHeadline(pressure: Pressure, fallback: string): string {
+  if (pressure === "critical") return "Critical pressure across multiple dimensions — collection and payment cadence need attention.";
+  if (pressure === "risk")     return "Elevated pressure on cash and exposure. " + fallback;
+  if (pressure === "watch")    return "Mixed signals — minor pressure on at least one financial dimension. " + fallback;
+  return fallback;
+}
+
+/* ---------------------------------------------------------------------------
+   Intelligence layer  —  unchanged from Phase 1.6 (still pure).
    --------------------------------------------------------------------------- */
 type IntelligenceCard = {
   title: string;
@@ -272,7 +653,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
   const periodLabel = period === "week" ? "this week" : period === "quarter" ? "this quarter" : "this year";
   const hasActivity = (kpi.total_revenue ?? 0) > 0 || (kpi.total_expenses ?? 0) > 0;
 
-  /* Headline */
   let headline: string;
   if (!hasActivity) {
     headline = "No financial activity recorded yet — start logging orders, expenses, and payments to see the executive view.";
@@ -289,7 +669,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
   const cashNet = (kpi.cash_in ?? 0) - (kpi.cash_out ?? 0);
   const collectionPct = kpi.total_revenue > 0 ? ((kpi.cash_in ?? 0) / kpi.total_revenue) * 100 : 0;
 
-  /* Cash velocity */
   cards.push({
     icon: "◐",
     title: "Cash velocity",
@@ -301,7 +680,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     severity: cashNet >= 0 ? "positive" : "risk",
   });
 
-  /* Collections */
   if (kpi.accounts_receivable > 0 || kpi.total_revenue > 0) {
     cards.push({
       icon: "↘",
@@ -318,7 +696,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     });
   }
 
-  /* Supplier exposure */
   if (kpi.accounts_payable > 0) {
     const apHeavy = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 1.2;
     const apSevere = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 2;
@@ -333,7 +710,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     });
   }
 
-  /* Margin pressure */
   const margin = kpi.gross_margin_pct ?? 0;
   cards.push({
     icon: "▲",
@@ -347,7 +723,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     severity: margin >= 30 ? "positive" : margin >= 15 ? "neutral" : margin > 0 ? "watch" : "risk",
   });
 
-  /* Top order concentration risk */
   const topOrder = kpi.top_orders?.[0];
   if (topOrder && kpi.total_revenue > 0) {
     const share = (topOrder.selling_price / kpi.total_revenue) * 100;
@@ -362,7 +737,6 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     }
   }
 
-  /* Expense spike */
   const topCat = kpi.top_expense_categories?.[0];
   if (topCat && topCat.share_pct >= 50) {
     cards.push({
@@ -378,72 +752,83 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
 }
 
 /* ---------------------------------------------------------------------------
-   Workflow builder — turns the dashboard KPI snapshot into operational
-   action shortcuts. This is the bridge from "I can observe the
-   business" to "I can OPERATE the business" without leaving the
-   dashboard. Each tile routes the user to the appropriate sub-page
-   pre-filtered, and shows a badge count where there's something to act on.
+   WorkflowRail builder  —  prioritised by current financial pressure.
+
+   Each WorkflowKey from prioritiseWorkflow() maps to a tile with icon
+   + label + hint + amount-badge. The tiles render in pressure order,
+   so the most-urgent operation is always first.
    --------------------------------------------------------------------------- */
-function buildWorkflowItems(kpi: DashboardKpi | null): WorkflowItem[] {
+function buildWorkflowItems(
+  kpi: DashboardKpi | null,
+  priorities: ReturnType<typeof prioritiseWorkflow>,
+): WorkflowItem[] {
   const arAmount = kpi?.accounts_receivable ?? 0;
   const apAmount = kpi?.accounts_payable ?? 0;
-  const items: WorkflowItem[] = [
-    {
-      key: "new-order",
-      label: "New order",
-      hint: "Start a profit run",
-      icon: <span aria-hidden>＋</span>,
-      href: "/finance/orders",
-    },
-    {
-      key: "record-payment",
-      label: "Record payment",
-      hint: "Customer or supplier",
-      icon: <span aria-hidden>≡</span>,
-      href: "/finance/payments",
-    },
-    {
-      key: "add-expense",
-      label: "Add expense",
-      hint: "Fast operational entry",
-      icon: <span aria-hidden>△</span>,
-      href: "/expenses",
-    },
-    {
-      key: "follow-up",
-      label: "Follow up collection",
-      hint: arAmount > 0 ? "AR still open" : "All cleared",
-      icon: <span aria-hidden>↘</span>,
-      href: "/finance/customers",
-      badge: arAmount > 0
-        ? { text: formatCompact(arAmount), tone: "warning" }
-        : { text: "Clear", tone: "positive" },
-    },
-    {
-      key: "pay-suppliers",
-      label: "Pay suppliers",
-      hint: apAmount > 0 ? "AP outstanding" : "Nothing pending",
-      icon: <span aria-hidden>↗</span>,
-      href: "/finance/suppliers",
-      badge: apAmount > 0
-        ? { text: formatCompact(apAmount), tone: "warning" }
-        : { text: "Clear", tone: "positive" },
-    },
-    {
-      key: "reminders",
-      label: "Reminders",
-      hint: "Severity-sorted center",
-      icon: <span aria-hidden>○</span>,
-      href: "/finance/notifications",
-    },
-  ];
-  return items;
+
+  const make = (key: WorkflowKey, pressureLabel: string): WorkflowItem => {
+    switch (key) {
+      case "follow-up": {
+        const pressureTone: Tone =
+          arAmount === 0 ? "positive"
+          : arAmount > 0 && pressureLabel.startsWith("Severe") ? "negative"
+          : arAmount > 0 && pressureLabel.startsWith("Material") ? "negative"
+          : "warning";
+        return {
+          key,
+          label: "Follow up collection",
+          hint: pressureLabel,
+          icon: <span aria-hidden>↘</span>,
+          href: "/finance/customers",
+          badge: arAmount > 0
+            ? { text: formatCompact(arAmount), tone: pressureTone }
+            : { text: "Clear", tone: "positive" },
+        };
+      }
+      case "pay-suppliers": {
+        const pressureTone: Tone =
+          apAmount === 0 ? "positive"
+          : pressureLabel.startsWith("AP exceeds AR materially") ? "negative"
+          : pressureLabel.startsWith("AP exceeds AR margin") ? "negative"
+          : "warning";
+        return {
+          key,
+          label: "Pay suppliers",
+          hint: pressureLabel,
+          icon: <span aria-hidden>↗</span>,
+          href: "/finance/suppliers",
+          badge: apAmount > 0
+            ? { text: formatCompact(apAmount), tone: pressureTone }
+            : { text: "Clear", tone: "positive" },
+        };
+      }
+      case "record-payment":
+        return {
+          key, label: "Record payment", hint: pressureLabel,
+          icon: <span aria-hidden>≡</span>, href: "/finance/payments",
+        };
+      case "add-expense":
+        return {
+          key, label: "Add expense", hint: pressureLabel,
+          icon: <span aria-hidden>△</span>, href: "/expenses",
+        };
+      case "new-order":
+        return {
+          key, label: "New order", hint: pressureLabel,
+          icon: <span aria-hidden>＋</span>, href: "/finance/orders",
+        };
+      case "reminders":
+        return {
+          key, label: "Reminders", hint: pressureLabel,
+          icon: <span aria-hidden>○</span>, href: "/finance/notifications",
+        };
+    }
+  };
+
+  return priorities.map((p) => make(p.key, p.reason));
 }
 
 /* ---------------------------------------------------------------------------
-   ProfitFlow — visual storytelling waterfall.
-   Each step is a card linked by a soft connector. Single accent only
-   on the totals (Gross profit + Net profit) so the eye lands there.
+   ProfitFlow / TopOrdersCard / TopCategoriesCard — unchanged from 1.6.
    --------------------------------------------------------------------------- */
 function ProfitFlow({
   revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
@@ -473,14 +858,14 @@ function ProfitFlow({
             ? "border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-transparent"
             : "border-white/[0.04] bg-white/[0.015]";
         return (
-          <div key={i} className={`rounded-2xl border ${surface} p-4`}>
+          <div key={i} className={`rounded-2xl border ${surface} p-3.5`}>
             <div className="flex items-baseline justify-between gap-1.5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{s.label}</div>
               {s.sign === -1 && !isTotal && (
                 <span className="text-[10px] text-gray-600">−</span>
               )}
             </div>
-            <div className={`mt-2 text-[18px] font-medium tabular-nums tracking-tight ${valueCls}`}>
+            <div className={`mt-1.5 text-[17px] font-medium tabular-nums tracking-tight ${valueCls}`}>
               {s.sign === -1 && s.value !== 0 ? "−" : ""}{formatCompact(Math.abs(s.value))}
               <span className="ml-1 text-[11px] text-gray-500">{currency}</span>
             </div>
@@ -491,10 +876,6 @@ function ProfitFlow({
   );
 }
 
-/* ---------------------------------------------------------------------------
-   TopOrdersCard / TopCategoriesCard — list cards used at the bottom.
-   Monochrome surfaces, accent only on the headline number.
-   --------------------------------------------------------------------------- */
 function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
   const rows = kpi?.top_orders ?? [];
   return (
@@ -504,7 +885,7 @@ function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: 
       ) : (
         <ol className="space-y-1.5">
           {rows.map((o, idx) => (
-            <li key={o.id} className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-3 transition hover:border-white/[0.08]">
+            <li key={o.id} className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-2.5 transition hover:border-white/[0.08]">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-medium text-gray-300">{idx + 1}</span>
                 <div className="min-w-0">
@@ -541,7 +922,7 @@ function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; curren
           {rows.map((c) => {
             const style = styleForCategory(c.name);
             return (
-              <li key={c.name} className="rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-3">
+              <li key={c.name} className="rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="text-base opacity-80">{style.glyph}</span>

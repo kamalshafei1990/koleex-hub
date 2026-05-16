@@ -122,6 +122,27 @@ export default function FloatingPanel() {
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "ai"; text: string }>>([]);
   const [sending, setSending] = useState(false);
 
+  /* ── Contextual Copilot hints (Phase 1.7) ──
+     The active page (e.g. FinanceDashboard) dispatches a CustomEvent
+     describing the operational state — overdue AR, supplier pressure,
+     liquidity narrative. The panel surfaces the top hints as proactive
+     suggestion chips in the Copilot empty-state, so the assistant feels
+     situationally aware before the operator types anything. Calm and
+     monochrome — these are read like an executive briefing, not chat
+     suggestions. */
+  type CopilotHint = { key: string; text: string; severity: "info" | "watch" | "risk" };
+  const [copilotHints, setCopilotHints] = useState<CopilotHint[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ hints: CopilotHint[] }>;
+      const next = Array.isArray(ce.detail?.hints) ? ce.detail.hints.slice(0, 4) : [];
+      setCopilotHints(next);
+    };
+    window.addEventListener("koleex:copilot-context", handler as EventListener);
+    return () => window.removeEventListener("koleex:copilot-context", handler as EventListener);
+  }, []);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -626,10 +647,49 @@ export default function FloatingPanel() {
               <div className="flex flex-col h-full">
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                    <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
                       <AiFaceIcon size={56} animated />
                       <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Koleex Copilot</p>
                       <p className={`text-[11px] mt-1 ${textG}`}>Your operational finance assistant</p>
+
+                      {copilotHints.length > 0 && (
+                        <div className="mt-5 w-full max-w-[320px] text-left">
+                          <div className={`text-[9px] font-semibold uppercase tracking-[0.18em] mb-2 ${dk ? "text-white/35" : "text-black/40"}`}>
+                            Operational read
+                          </div>
+                          <ul className="space-y-1.5">
+                            {copilotHints.map((h) => {
+                              const sev =
+                                h.severity === "risk"
+                                  ? (dk
+                                      ? "border-rose-500/[0.22] bg-rose-500/[0.06]"
+                                      : "border-rose-500/[0.30] bg-rose-500/[0.04]")
+                                  : h.severity === "watch"
+                                    ? (dk
+                                        ? "border-amber-500/[0.22] bg-amber-500/[0.05]"
+                                        : "border-amber-500/[0.30] bg-amber-500/[0.04]")
+                                    : (dk
+                                        ? "border-white/[0.06] bg-white/[0.02]"
+                                        : "border-black/[0.06] bg-black/[0.02]");
+                              return (
+                                <li key={h.key}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAiInput(`Tell me more — ${h.text}`)}
+                                    className={
+                                      "w-full rounded-lg border px-2.5 py-2 text-left text-[11px] leading-snug transition-colors " +
+                                      sev + " " +
+                                      (dk ? "text-white/80 hover:text-white" : "text-black/80 hover:text-black")
+                                    }
+                                  >
+                                    {h.text}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                   {aiMessages.map((m, i) => (

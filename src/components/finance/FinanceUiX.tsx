@@ -328,7 +328,7 @@ export function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <div className="relative isolate overflow-hidden rounded-3xl border border-white/[0.05] bg-gradient-to-br from-white/[0.03] via-transparent to-transparent p-6">
+    <div className="relative isolate overflow-hidden rounded-3xl border border-white/[0.05] bg-gradient-to-br from-white/[0.03] via-transparent to-transparent p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
@@ -336,7 +336,7 @@ export function ChartCard({
         </div>
         {controls}
       </div>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3.5">{children}</div>
     </div>
   );
 }
@@ -652,7 +652,18 @@ export function DonutChart({
   const cy = size / 2;
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
-  let offset = 0;
+  /* Precompute cumulative offsets in an IIFE so the local `let` is
+     contained outside render-state semantics (satisfies React-19
+     react-hooks/immutability rule). */
+  const cumOffsets: number[] = (() => {
+    const result: number[] = [];
+    let running = 0;
+    for (const s of segments) {
+      result.push(running);
+      running += (s.value / total) * c;
+    }
+    return result;
+  })();
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
       <title>{segments.map((s) => `${s.name}: ${formatCompact(s.value)}`).join(" · ")}</title>
@@ -666,7 +677,7 @@ export function DonutChart({
            largest segment first. Each subsequent segment dims. */
         const opacity = 0.30 + 0.45 * (1 - i / Math.max(1, segments.length));
         const stroke = `rgba(255,255,255,${opacity.toFixed(2)})`;
-        const el = (
+        return (
           <circle
             key={i}
             cx={cx} cy={cy} r={r}
@@ -674,12 +685,10 @@ export function DonutChart({
             stroke={stroke}
             strokeWidth={thickness}
             strokeDasharray={`${dash} ${gap}`}
-            strokeDashoffset={-offset}
+            strokeDashoffset={-cumOffsets[i]}
             strokeLinecap="butt"
           />
         );
-        offset += dash;
-        return el;
       })}
       {/* Centre label (rotated back so it reads horizontally). */}
       <g transform={`rotate(90 ${cx} ${cy})`}>
@@ -920,13 +929,16 @@ export function SectionTitle({
   title: string;
   description?: string;
 }) {
+  /* Phase 1.7: tightened from mt-10/mb-4 → mt-7/mb-3.
+     The dashboard now has ~10 sections; the previous spacing wasted
+     vertical budget. This keeps the rhythm without losing readability. */
   return (
-    <div className="mt-10 mb-4">
+    <div className="mt-7 mb-3">
       {eyebrow && (
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{eyebrow}</div>
       )}
-      <h2 className="mt-1 text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
-      {description && <p className="mt-1 text-[12px] text-gray-500">{description}</p>}
+      <h2 className="mt-1 text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
+      {description && <p className="mt-0.5 text-[11.5px] text-gray-500">{description}</p>}
     </div>
   );
 }
@@ -949,3 +961,364 @@ export function formatCompact(n: number): string {
 
 /* Re-export for callers that still want a currency-style label */
 export { fmtMoney };
+
+/* ---------------------------------------------------------------------------
+   ░░░  PHASE 1.7  ░░░  Operational-intelligence primitives.
+
+   These read like the rest of FinanceUiX — monochrome surfaces, single
+   accent strokes, tight typographic rhythm. They are the visual
+   vocabulary the dashboard uses to communicate pressure, timing, and
+   anomaly without raising its voice.
+   --------------------------------------------------------------------------- */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ModeToggle — top-level Operational ↔ Executive switch.
+
+   Two-position segmented control. Lives in the page header. State is
+   owned by the parent (the dashboard) and persisted to localStorage.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export type FinanceMode = "operational" | "executive";
+
+export function ModeToggle({
+  value,
+  onChange,
+}: {
+  value: FinanceMode;
+  onChange: (v: FinanceMode) => void;
+}) {
+  const opts: { key: FinanceMode; label: string; hint: string }[] = [
+    { key: "operational", label: "Operational", hint: "Daily ops" },
+    { key: "executive",   label: "Executive",   hint: "Strategy"  },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Finance view mode"
+      className="relative inline-flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1 backdrop-blur-md"
+    >
+      {opts.map((o) => {
+        const active = o.key === value;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(o.key)}
+            className={
+              "relative rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors " +
+              (active ? "text-[var(--text-primary)]" : "text-gray-400 hover:text-gray-200")
+            }
+            title={o.hint}
+          >
+            {active && (
+              <span aria-hidden className="absolute inset-0 -z-10 rounded-lg bg-white/[0.07] shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]" />
+            )}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   AnomalyChip — inline period-over-period spike indicator.
+
+   Tiny pill rendered next to a metric, a chart, or a list label.
+   Two tones: subtle info, or amber/rose when it's a concerning move.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export function AnomalyChip({
+  text,
+  severity = "info",
+  direction,
+}: {
+  text: string;
+  severity?: "info" | "watch" | "risk";
+  direction?: "up" | "down";
+}) {
+  const cls =
+    severity === "risk"  ? "bg-rose-500/[0.12] text-rose-300 border border-rose-500/[0.18]"
+  : severity === "watch" ? "bg-amber-500/[0.12] text-amber-300 border border-amber-500/[0.18]"
+  :                        "bg-white/[0.05] text-gray-300 border border-white/[0.06]";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${cls}`}>
+      {direction === "up" ? "▲" : direction === "down" ? "▼" : "•"}
+      <span className="tracking-tight">{text}</span>
+    </span>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LiquidityMeter — single horizontal pressure bar.
+
+   Visualises 7/30/60-day cash projection vs. zero. Calm by default,
+   amber/rose if any window dips negative. Compact — designed to live
+   inside an IntelligenceCard sibling on the dashboard.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export function LiquidityMeter({
+  d7,
+  d30,
+  d60,
+  inflowShare,
+}: {
+  d7: number;
+  d30: number;
+  d60: number;
+  inflowShare: number;     // 0..1 — share of inflow vs outflow
+}) {
+  const inflowPct = Math.max(4, Math.min(96, inflowShare * 100));
+  /* Tone per window */
+  const tone = (v: number): string =>
+    v >= 0 ? "text-emerald-300" : "text-rose-300";
+  return (
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex items-baseline justify-between">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Liquidity pressure</div>
+        <div className="text-[10px] text-gray-500">Inflow {inflowPct.toFixed(0)}%</div>
+      </div>
+      {/* Inflow-vs-outflow ratio bar */}
+      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-rose-500/[0.18]">
+        <div className="h-full rounded-full bg-emerald-400/70" style={{ width: `${inflowPct}%` }} />
+      </div>
+      {/* 7/30/60 windows */}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        {([
+          { d: "7 d",  v: d7  },
+          { d: "30 d", v: d30 },
+          { d: "60 d", v: d60 },
+        ] as const).map((w) => (
+          <div key={w.d} className="rounded-lg border border-white/[0.04] bg-white/[0.01] py-2">
+            <div className="text-[9px] uppercase tracking-[0.18em] text-gray-500">{w.d}</div>
+            <div className={`mt-0.5 text-[14px] font-medium tabular-nums tracking-tight ${tone(w.v)}`}>
+              {w.v >= 0 ? "+" : "−"}{formatCompact(Math.abs(w.v))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   AgingTable — 5-bucket AR / AP aging.
+
+   Calm executive view, NOT a 2007 ERP grid. Each bucket is a column
+   with: label · count · amount · subtle horizontal bar (share of total).
+   Critical buckets (61–90, 90+) get a soft rose tint only on the bar.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface AgingBucketView {
+  key: "current" | "1_30" | "31_60" | "61_90" | "90_plus";
+  label: string;
+  amount: number;
+  count: number;
+}
+
+export function AgingTable({
+  title,
+  totalLabel,
+  buckets,
+  currency = "USD",
+}: {
+  title: string;
+  totalLabel?: string;
+  buckets: AgingBucketView[];
+  currency?: string;
+}) {
+  const total = buckets.reduce((s, b) => s + b.amount, 0);
+  const totalCount = buckets.reduce((s, b) => s + b.count, 0);
+  const max = Math.max(1, ...buckets.map((b) => b.amount));
+  /* Critical bucket flags for subtle tint */
+  const critical = (k: AgingBucketView["key"]) => k === "61_90" || k === "90_plus";
+  const watch    = (k: AgingBucketView["key"]) => k === "31_60";
+  return (
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+          <div className="mt-0.5 flex items-baseline gap-1.5">
+            <span className="text-[20px] font-medium tabular-nums tracking-tight text-[var(--text-primary)]">{formatCompact(total)}</span>
+            <span className="text-[11px] text-gray-500">{currency} · {totalCount} {totalCount === 1 ? "line" : "lines"}</span>
+          </div>
+        </div>
+        {totalLabel && <span className="text-[10px] text-gray-600">{totalLabel}</span>}
+      </div>
+      <div className="mt-3 grid grid-cols-5 gap-2">
+        {buckets.map((b) => {
+          const share = total > 0 ? (b.amount / total) * 100 : 0;
+          const barCls = critical(b.key) ? "bg-rose-300/60"
+                       : watch(b.key)    ? "bg-amber-300/60"
+                       : "bg-white/40";
+          const valueCls = critical(b.key) ? "text-rose-300"
+                         : watch(b.key)    ? "text-amber-200"
+                         : "text-gray-200";
+          return (
+            <div key={b.key} className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-2 py-2">
+              <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{b.label}</div>
+              <div className={`mt-1 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>{formatCompact(b.amount)}</div>
+              <div className="mt-1 text-[9px] text-gray-600">{b.count} {b.count === 1 ? "line" : "lines"} · {share.toFixed(0)}%</div>
+              <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                <div className={`h-full ${barCls}`} style={{ width: `${Math.max(3, (b.amount / max) * 100)}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   TimelineStrip — horizontal compressed list of upcoming events.
+
+   Each event is one row: state-dot + days-label + party + amount.
+   Calm, scannable, NOT a calendar. Limited to top N to stay light.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface TimelineEventView {
+  key: string;
+  daysFromNow: number;        // negative = overdue
+  party: string;
+  amount: number;
+  state: "upcoming" | "due_soon" | "overdue" | "settled";
+  reference?: string;
+}
+
+export function TimelineStrip({
+  title,
+  events,
+  direction,
+  currency = "USD",
+  max = 5,
+}: {
+  title: string;
+  events: TimelineEventView[];
+  direction: "incoming" | "outgoing";
+  currency?: string;
+  max?: number;
+}) {
+  const top = events.slice(0, max);
+  const overdueCount = events.filter((e) => e.state === "overdue").length;
+  const dueSoonCount = events.filter((e) => e.state === "due_soon").length;
+  return (
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+          <div className="mt-0.5 text-[11px] text-gray-500">
+            {overdueCount > 0 && (
+              <span className="mr-2 text-rose-300/90">{overdueCount} overdue</span>
+            )}
+            {dueSoonCount > 0 && (
+              <span className="mr-2 text-amber-300/90">{dueSoonCount} due ≤ 7d</span>
+            )}
+            <span className="text-gray-600">{events.length} {events.length === 1 ? "line" : "lines"} on radar</span>
+          </div>
+        </div>
+        <span className="text-[10px] text-gray-600">{direction === "incoming" ? "AR" : "AP"}</span>
+      </div>
+      {top.length === 0 ? (
+        <div className="mt-3 flex h-20 items-center justify-center text-[11px] text-gray-500">
+          Nothing scheduled on this horizon.
+        </div>
+      ) : (
+        <ul className="mt-2.5 divide-y divide-white/[0.04]">
+          {top.map((e) => {
+            const stateCls =
+              e.state === "overdue"  ? { dot: "bg-rose-400",  text: "text-rose-300/90",  label: "Overdue" }
+            : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-200/90", label: "≤ 7 d"   }
+            : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-gray-400",     label: "Settled" }
+            :                          { dot: "bg-white/50",  text: "text-gray-300",     label: e.daysFromNow >= 9_000 ? "Unscheduled" : `${e.daysFromNow}d` };
+            return (
+              <li key={e.key} className="flex items-center gap-3 py-2 transition-colors hover:bg-white/[0.02]">
+                <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateCls.dot}`} />
+                <span className={`w-14 shrink-0 text-[10px] tabular-nums ${stateCls.text}`}>{stateCls.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] text-gray-200">{e.party}</span>
+                  {e.reference && <span className="block truncate font-mono text-[9px] text-gray-600">{e.reference}</span>}
+                </span>
+                <span className={`shrink-0 text-[12px] font-medium tabular-nums ${direction === "incoming" ? "text-emerald-300/90" : "text-rose-300/90"}`}>
+                  {direction === "incoming" ? "+" : "−"}{formatCompact(e.amount)}
+                  <span className="ml-1 text-[9px] text-gray-600">{currency}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ConcentrationBar — single-row exposure visual.
+
+   "X represents 42 % of revenue." Compact, monochrome with a single
+   tint at the bar fill. Used for customer and supplier concentration.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export function ConcentrationBar({
+  label,
+  party,
+  share,
+  hint,
+  severity = "info",
+}: {
+  label: string;
+  party: string;
+  share: number;          // 0..100
+  hint?: string;
+  severity?: "info" | "watch" | "risk";
+}) {
+  const fillCls =
+    severity === "risk"  ? "bg-rose-300/65"
+  : severity === "watch" ? "bg-amber-300/65"
+  :                        "bg-white/45";
+  return (
+    <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex items-baseline justify-between">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</div>
+        <div className={
+          "text-[10px] tabular-nums " +
+          (severity === "risk" ? "text-rose-300" : severity === "watch" ? "text-amber-300" : "text-gray-500")
+        }>{share.toFixed(0)}%</div>
+      </div>
+      <div className="mt-2 truncate text-[13px] font-medium text-[var(--text-primary)]">{party}</div>
+      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.04]">
+        <div className={`h-full ${fillCls}`} style={{ width: `${Math.max(2, Math.min(100, share))}%` }} />
+      </div>
+      {hint && <div className="mt-2 text-[10px] text-gray-500">{hint}</div>}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   StatRow — three-up KPI strip used in Executive mode header.
+
+   Calmer than HeroKpiCard. Numeric-first, label below, single accent
+   on the value. Designed to be informational, not dominating.
+   ───────────────────────────────────────────────────────────────────────── */
+
+export function StatRow({
+  stats,
+}: {
+  stats: { label: string; value: string; hint?: string; tone?: Tone }[];
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      {stats.map((s, i) => (
+        <div key={i} className="rounded-xl border border-white/[0.04] bg-white/[0.012] p-3">
+          <div className={`text-[16px] font-medium tabular-nums tracking-tight ${TONE_TEXT[s.tone ?? "neutral"]}`}>
+            {s.value}
+          </div>
+          <div className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">{s.label}</div>
+          {s.hint && <div className="mt-1 text-[10px] text-gray-600">{s.hint}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
