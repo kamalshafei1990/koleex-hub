@@ -887,7 +887,7 @@ function CategoryPicker({
       </div>
 
       {/* Parent row — colour-coded tiles, one per group */}
-      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
         {parents.map((p) => {
           const style = styleForCategory(p.name);
           const isActive = activeParent === p.id;
@@ -939,7 +939,7 @@ function CategoryPicker({
           </div>
 
           {/* Parent row itself as a fallback tile */}
-          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
             <button
               type="button"
               onClick={() => onChange(activeParent)}
