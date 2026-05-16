@@ -1080,12 +1080,13 @@ export default function QuotationA4Preview({
                         top: "50%",
                         transform: "translateY(-50%)",
                         /* Cluster fully outside the A4 paper frame.
-                           Geometry:
-                             paper inner right padding ..... 32 px
-                             gap from paper outer edge ..... 40 px
+                           Tightened geometry (the 72px gap from
+                           paper to cluster was wasted whitespace
+                           per operator feedback):
+                             gap from paper outer edge ..... 16 px
                              cluster width ................. 40 px
-                           right offset = 32 + 40 + 40 = 112. */
-                        right: -112,
+                           right offset = 16 + 40 = 56. */
+                        right: -56,
                         width: 40,
                         /* Cluster height shrunk 112 → 100 to leave
                            visible vertical breathing space (≈15 px
@@ -1144,13 +1145,15 @@ export default function QuotationA4Preview({
                         top: "50%",
                         transform: "translateY(-50%)",
                         /* Cluster's outer-right edge sits at right
-                           offset 112 (cluster width 40 + 40 gap +
-                           32 paper padding). Notes starts 48 px to
-                           the right of the cluster — generous visual
-                           gap between the two controls — and is
-                           200 px wide.
-                             right_offset = 112 + 48 + 200 = 360. */
-                        right: -360,
+                           offset 56 (16 gap + 40 cluster width).
+                           Notes starts 8 px to the right of the
+                           cluster and is 200 px wide.
+                             right_offset = 56 + 8 + 200 = 264.
+                           Tightened from the old 48 px / -360
+                           layout per operator feedback that the
+                           notes panel was hovering too far from
+                           the items table. */
+                        right: -264,
                         width: 200,
                         /* Matches cluster height; 30 px slack against
                            the ~130 px row leaves ~15 px breathing
@@ -1219,7 +1222,7 @@ export default function QuotationA4Preview({
                     background: "linear-gradient(180deg, #FBFBFB 0%, #F4F4F4 100%)",
                     borderTop: `1px solid ${T.border}`,
                     borderBottom: `1px solid ${T.border}`,
-                    padding: "18px 16px",
+                    padding: "8px 12px",
                   }}
                 >
                   {/* Inline style block scoped to this row so we
@@ -1229,12 +1232,12 @@ export default function QuotationA4Preview({
                     .pq-ghost-row .pq-ghost-cta {
                       display: inline-flex;
                       align-items: center;
-                      gap: 10px;
-                      height: 38px;
-                      padding: 0 18px;
-                      border-radius: 10px;
+                      gap: 8px;
+                      height: 30px;
+                      padding: 0 14px;
+                      border-radius: 8px;
                       border: 1px solid transparent;
-                      font-size: 12px;
+                      font-size: 11.5px;
                       font-weight: 600;
                       letter-spacing: 0.01em;
                       cursor: pointer;
