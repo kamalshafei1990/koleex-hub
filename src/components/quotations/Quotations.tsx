@@ -520,7 +520,7 @@ export function numberToWords(num: number): string {
    PRINT + A4 STYLES
    ══════════════════════════════════════════════════════════ */
 
-const PRINT_AND_DOC_STYLES = `
+export const PRINT_AND_DOC_STYLES = `
 /* ── A4 document base ── */
 /* On-screen styling for the A4 page. Print sizing is handled
    exclusively by @media print below — DO NOT set height here, only

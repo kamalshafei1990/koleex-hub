@@ -20,7 +20,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
 import { fromRow, type Invoice } from "@/components/invoices-doc/InvoicesDoc";
-import { numberToWords } from "@/components/quotations/Quotations";
+import { numberToWords, PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import type { RemoteDocRow } from "@/lib/docs-sync";
 
 export default function InvoicePrintPage({
@@ -142,6 +142,10 @@ export default function InvoicePrintPage({
 
   return (
     <>
+      {/* Editor's full stylesheet — without this the print route
+          renders QuotationA4Preview against browser-default styles,
+          so the PDF looks unstyled vs the editor. */}
+      <style>{PRINT_AND_DOC_STYLES}</style>
       <style>{`
         html, body {
           margin: 0 !important;

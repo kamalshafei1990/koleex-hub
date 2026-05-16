@@ -22,7 +22,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
-import { fromRow, numberToWords, type Quotation } from "@/components/quotations/Quotations";
+import { fromRow, numberToWords, PRINT_AND_DOC_STYLES, type Quotation } from "@/components/quotations/Quotations";
 import type { RemoteDocRow } from "@/lib/docs-sync";
 
 export default function QuotationPrintPage({
@@ -169,7 +169,14 @@ export default function QuotationPrintPage({
 
   return (
     <>
-      {/* PDF-optimised stylesheet — only applies on this route.
+      {/* Editor's full stylesheet — gives the print page ALL the
+          black header strips, table grid lines, input styling,
+          rounded corners, etc. that the editor uses. Without this
+          the print route was rendering QuotationA4Preview against
+          browser-default styles, so the PDF looked completely
+          unstyled compared to the editor. */}
+      <style>{PRINT_AND_DOC_STYLES}</style>
+      {/* PDF-optimised overrides — only applies on this route.
           WYSIWYG goal: the printed PDF must look EXACTLY like the
           on-screen editor. Both surfaces lock to A4 210×297 mm and
           use the same 32 px / 24 px padding so per-page content
