@@ -10,6 +10,8 @@ import {
   SectionCard,
   StatusBadge,
 } from "@/components/finance/FinanceUi";
+import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/PartyPickerModal";
+import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
@@ -57,6 +59,7 @@ export default function FinanceOrders() {
       order: {
         id: undefined,
         order_no: "",
+        customer_id: null,
         customer_name: "",
         order_date: new Date().toISOString().slice(0, 10),
         currency: "USD",
@@ -79,6 +82,7 @@ export default function FinanceOrders() {
       order: {
         id: o.id,
         order_no: o.order_no,
+        customer_id: o.customer_id,
         customer_name: o.customer_name,
         order_date: o.order_date,
         currency: o.currency,
@@ -129,7 +133,14 @@ export default function FinanceOrders() {
   };
 
   if (view === "editor" && draft) {
-    return <OrderEditor draft={draft} setDraft={setDraft} onCancel={() => { setView("list"); setDraft(null); }} onSave={save} />;
+    return (
+      <OrderEditor
+        draft={draft}
+        setDraft={setDraft}
+        onCancel={() => { setView("list"); setDraft(null); }}
+        onSave={save}
+      />
+    );
   }
 
   return (
@@ -309,7 +320,8 @@ interface DraftOrder {
   order: {
     id?: string;
     order_no: string;
-    customer_name: string;
+    customer_id: string | null;            // contacts.id (UUID) from PartyPicker
+    customer_name: string;                 // denormalised display name
     order_date: string;
     currency: string;
     selling_price: number;
@@ -350,6 +362,12 @@ function OrderEditor({
     customer_payments_total: 0,
   });
 
+  /* Picker state — held outside DraftOrder so meta (flag, tier, photo)
+     never leaks into the saved payload. Keyed by contact id. */
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [supplierPickerIndex, setSupplierPickerIndex] = useState<number | null>(null);
+  const [partyMeta, setPartyMeta] = useState<Map<string, FinancePartyRow>>(() => new Map());
+
   const updateOrder = <K extends keyof DraftOrder["order"]>(k: K, v: DraftOrder["order"][K]) => {
     setDraft({ ...draft, order: { ...draft.order, [k]: v } });
   };
@@ -359,8 +377,86 @@ function OrderEditor({
     setDraft({ ...draft, suppliers: draft.suppliers.map((s, idx) => idx === i ? { ...s, ...patch } : s) });
   };
 
+  /* Smart defaults — when a customer is picked, copy the customer's
+     default currency + payment terms into the order if they're still
+     blank. The operator can override afterwards. */
+  const applyCustomerPick = (row: FinancePartyRow) => {
+    setPartyMeta((m) => {
+      const next = new Map(m);
+      next.set(row.id, row);
+      return next;
+    });
+    const next: DraftOrder = {
+      ...draft,
+      order: {
+        ...draft.order,
+        customer_id: row.id,
+        customer_name: row.display_name || row.company || draft.order.customer_name,
+        currency: draft.order.currency === "USD" && row.default_currency ? row.default_currency : draft.order.currency,
+      },
+    };
+    setDraft(next);
+    setCustomerPickerOpen(false);
+  };
+
+  const applySupplierPick = (i: number, row: FinancePartyRow) => {
+    setPartyMeta((m) => {
+      const next = new Map(m);
+      next.set(row.id, row);
+      return next;
+    });
+    setDraft({
+      ...draft,
+      suppliers: draft.suppliers.map((s, idx) =>
+        idx === i
+          ? {
+              ...s,
+              supplier_id: row.id,
+              supplier_name: row.display_name || row.company || s.supplier_name,
+              currency: row.default_currency || s.currency || draft.order.currency,
+            }
+          : s,
+      ),
+    });
+    setSupplierPickerIndex(null);
+  };
+
+  /* Lightweight party data builders for PartyChip — pulls meta from
+     the cache if present, falls back to whatever's on the draft. */
+  const customerChipData: PartyChipData | null = draft.order.customer_id || draft.order.customer_name
+    ? (() => {
+        const meta = draft.order.customer_id ? partyMeta.get(draft.order.customer_id) : null;
+        return meta
+          ? {
+              id: meta.id,
+              name: meta.display_name,
+              company: meta.company,
+              country_code: meta.country_code,
+              customer_tier: meta.customer_tier,
+              photo_url: meta.photo_url,
+              payment_terms: meta.payment_terms,
+              credit_status: meta.credit_status,
+            }
+          : { name: draft.order.customer_name };
+      })()
+    : null;
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* Picker modals */}
+      <PartyPickerModal
+        open={customerPickerOpen}
+        type="customer"
+        onClose={() => setCustomerPickerOpen(false)}
+        onPick={applyCustomerPick}
+      />
+      <PartyPickerModal
+        open={supplierPickerIndex !== null}
+        type="supplier"
+        onClose={() => setSupplierPickerIndex(null)}
+        onPick={(row) => supplierPickerIndex !== null && applySupplierPick(supplierPickerIndex, row)}
+      />
+
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <PageHeader
           title={draft.order.id ? `Edit Order ${draft.order.order_no}` : "New Order"}
@@ -374,18 +470,40 @@ function OrderEditor({
         />
         <div className="mt-5"><FinanceTabs /></div>
 
+        {/* Step indicator */}
+        <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">
+          {[
+            { n: 1, label: "Customer & Selling", done: !!draft.order.customer_id || !!draft.order.customer_name?.trim(), active: !draft.order.customer_id && !draft.order.customer_name?.trim() },
+            { n: 2, label: "Suppliers & Costs",  done: draft.suppliers.some((s) => s.supplier_cost > 0),                                          active: false },
+            { n: 3, label: "Tax & Charges",      done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
+            { n: 4, label: "Save & Track",       done: !!draft.order.id,                                                                          active: false },
+          ].map((s) => (
+            <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-400"}`}>
+              <span className={`flex h-5 w-5 items-center justify-center rounded-full ${s.done ? "bg-emerald-500/30" : "bg-white/5"}`}>
+                {s.done ? "✓" : s.n}
+              </span>
+              <span className="whitespace-nowrap">Step {s.n} · {s.label}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Order header */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <SectionCard title="1 · Order details" subtitle="Customer, date, currency.">
+          <SectionCard title="Step 1 · Customer & Selling" subtitle="Pick a customer from Contacts — currency and terms auto-fill.">
             <div className="grid grid-cols-2 gap-3">
+              <Field label="Customer" wide>
+                <PartyChip
+                  party={customerChipData}
+                  onChange={() => setCustomerPickerOpen(true)}
+                  onClear={() => updateOrder("customer_id", null)}
+                  placeholder="Pick a customer from Contacts…"
+                />
+              </Field>
               <Field label="Order No.">
                 <input value={draft.order.order_no} onChange={(e) => updateOrder("order_no", e.target.value)} placeholder="Auto on save" className={INPUT} />
               </Field>
               <Field label="Order date">
                 <input type="date" value={draft.order.order_date} onChange={(e) => updateOrder("order_date", e.target.value)} className={INPUT} />
-              </Field>
-              <Field label="Customer" wide>
-                <input value={draft.order.customer_name} onChange={(e) => updateOrder("customer_name", e.target.value)} placeholder="Company name" className={INPUT} />
               </Field>
               <Field label="Currency">
                 <select value={draft.order.currency} onChange={(e) => updateOrder("currency", e.target.value)} className={INPUT}>
@@ -400,7 +518,7 @@ function OrderEditor({
             </div>
           </SectionCard>
 
-          <SectionCard title="2 · Money in" subtitle="Selling price, tax refund, due date.">
+          <SectionCard title="Step 3 · Money in & Tax" subtitle="Selling price, tax refund, bank charges, due date.">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Selling price" wide>
                 <input type="number" inputMode="decimal" value={draft.order.selling_price} onChange={(e) => updateOrder("selling_price", Number(e.target.value) || 0)} className={INPUT} />
@@ -451,8 +569,8 @@ function OrderEditor({
         {/* Suppliers */}
         <div className="mt-4">
           <SectionCard
-            title="3 · Suppliers"
-            subtitle="Add every supplier that contributed to this order. The total supplier cost is the sum of these lines."
+            title="Step 2 · Suppliers & Costs"
+            subtitle="Pick each supplier from Contacts. The total supplier cost is the sum of these lines — gross profit updates live."
             action={
               <button type="button" onClick={addSupplier} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-200 hover:border-white/[0.12]">+ Add Supplier</button>
             }
@@ -461,39 +579,56 @@ function OrderEditor({
               <div className="py-6 text-center text-sm text-gray-500">No suppliers yet. Click + Add Supplier to record a cost.</div>
             ) : (
               <div className="space-y-3">
-                {draft.suppliers.map((s, i) => (
-                  <div key={i} className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-3">
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-                      <Field label="Supplier" wide>
-                        <input value={s.supplier_name} onChange={(e) => updateSupplier(i, { supplier_name: e.target.value })} placeholder="Supplier name" className={INPUT} />
-                      </Field>
-                      <Field label="Cost">
-                        <input type="number" inputMode="decimal" value={s.supplier_cost} onChange={(e) => updateSupplier(i, { supplier_cost: Number(e.target.value) || 0 })} className={INPUT} />
-                      </Field>
-                      <Field label="Paid">
-                        <input type="number" inputMode="decimal" value={s.paid_amount} onChange={(e) => updateSupplier(i, { paid_amount: Number(e.target.value) || 0 })} className={INPUT} />
-                      </Field>
-                      <Field label="Status">
-                        <select value={s.payment_status} onChange={(e) => updateSupplier(i, { payment_status: e.target.value as FinanceOrderSupplier["payment_status"] })} className={INPUT}>
-                          {(["unpaid","partial","paid","overdue"] as const).map((st) => <option key={st} value={st}>{st}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Due">
-                        <input type="date" value={s.due_date ?? ""} onChange={(e) => updateSupplier(i, { due_date: e.target.value || null })} className={INPUT} />
-                      </Field>
+                {draft.suppliers.map((s, i) => {
+                  const sMeta = s.supplier_id ? partyMeta.get(s.supplier_id) : null;
+                  const sChip: PartyChipData | null = (s.supplier_id || s.supplier_name)
+                    ? (sMeta
+                        ? { id: sMeta.id, name: sMeta.display_name, company: sMeta.company, country_code: sMeta.country_code, customer_tier: null, photo_url: sMeta.photo_url, payment_terms: sMeta.payment_terms }
+                        : { name: s.supplier_name })
+                    : null;
+                  return (
+                    <div key={i} className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                        <div className="sm:col-span-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Supplier</div>
+                          <div className="mt-1">
+                            <PartyChip
+                              party={sChip}
+                              onChange={() => setSupplierPickerIndex(i)}
+                              onClear={() => updateSupplier(i, { supplier_id: null, supplier_name: "" })}
+                              placeholder="Pick a supplier from Contacts…"
+                              compact
+                            />
+                          </div>
+                        </div>
+                        <Field label="Cost">
+                          <input type="number" inputMode="decimal" value={s.supplier_cost} onChange={(e) => updateSupplier(i, { supplier_cost: Number(e.target.value) || 0 })} className={INPUT} />
+                        </Field>
+                        <Field label="Paid">
+                          <input type="number" inputMode="decimal" value={s.paid_amount} onChange={(e) => updateSupplier(i, { paid_amount: Number(e.target.value) || 0 })} className={INPUT} />
+                        </Field>
+                        <Field label="Status">
+                          <select value={s.payment_status} onChange={(e) => updateSupplier(i, { payment_status: e.target.value as FinanceOrderSupplier["payment_status"] })} className={INPUT}>
+                            {(["unpaid","partial","paid","overdue"] as const).map((st) => <option key={st} value={st}>{st}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Due">
+                          <input type="date" value={s.due_date ?? ""} onChange={(e) => updateSupplier(i, { due_date: e.target.value || null })} className={INPUT} />
+                        </Field>
+                      </div>
+                      <div className="mt-2 flex justify-end">
+                        <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-400 hover:text-rose-300">Remove supplier</button>
+                      </div>
                     </div>
-                    <div className="mt-2 flex justify-end">
-                      <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-400 hover:text-rose-300">Remove supplier</button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </SectionCard>
         </div>
 
         <div className="mt-4">
-          <SectionCard title="4 · Notes" subtitle="Anything operations or finance should remember about this order.">
+          <SectionCard title="Step 4 · Notes & Save" subtitle="Anything operations or finance should remember about this order. Hit Save when ready.">
             <textarea
               value={draft.order.notes}
               onChange={(e) => updateOrder("notes", e.target.value)}

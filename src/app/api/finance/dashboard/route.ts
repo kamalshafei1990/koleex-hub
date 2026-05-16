@@ -76,7 +76,7 @@ export async function GET(req: Request) {
   const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
-      .select("id, selling_price, tax_refund_value, financial_charges, order_date, payment_status")
+      .select("id, order_no, customer_name, currency, selling_price, tax_refund_value, financial_charges, order_date, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("order_date", startISO)
       .lte("order_date", endISO),
@@ -225,6 +225,142 @@ export async function GET(req: Request) {
   /* TREND series. Build buckets — 7 daily / ~13 weekly / 12 monthly. */
   const trend = buildTrend(period, start, end, orders, expenses, total_supplier_cost);
 
+  /* ── Phase 1.1: Top profitable orders + Top expense categories +
+       Expected vs Realized cash. All computed off the same period
+       window so they line up with the KPI cards above. ─────────── */
+  const periodOrderIds = orders.map((o) => (o as { id: string }).id);
+
+  const [periodSuppliersRes, periodLinkedExpRes, periodInPaymentsRes, periodCategoriesRes] = await Promise.all([
+    /* Sum supplier cost + paid supplier per order */
+    periodOrderIds.length
+      ? supabaseServer
+          .from("finance_order_suppliers")
+          .select("order_id, supplier_cost, paid_amount")
+          .eq("tenant_id", auth.tenant_id)
+          .in("order_id", periodOrderIds)
+      : Promise.resolve({ data: [], error: null }),
+    /* Expenses linked to period orders (for net profit per order) */
+    periodOrderIds.length
+      ? supabaseServer
+          .from("finance_expenses")
+          .select("linked_order_id, amount, payment_status")
+          .eq("tenant_id", auth.tenant_id)
+          .in("linked_order_id", periodOrderIds)
+      : Promise.resolve({ data: [], error: null }),
+    /* Customer in-payments for period orders */
+    periodOrderIds.length
+      ? supabaseServer
+          .from("finance_payments")
+          .select("linked_order_id, amount, direction, status")
+          .eq("tenant_id", auth.tenant_id)
+          .eq("direction", "in")
+          .eq("status", "completed")
+          .in("linked_order_id", periodOrderIds)
+      : Promise.resolve({ data: [], error: null }),
+    /* Period expenses joined to category names */
+    supabaseServer
+      .from("finance_expenses")
+      .select("amount, category_id, category:category_id(name), expense_date")
+      .eq("tenant_id", auth.tenant_id)
+      .gte("expense_date", startISO)
+      .lte("expense_date", endISO),
+  ]);
+
+  type Aggs = { supplier_cost: number; paid_supplier: number; linked_exp: number; paid_exp: number; collected: number };
+  const perOrder = new Map<string, Aggs>();
+  const ensure = (id: string): Aggs => {
+    const cur = perOrder.get(id);
+    if (cur) return cur;
+    const n: Aggs = { supplier_cost: 0, paid_supplier: 0, linked_exp: 0, paid_exp: 0, collected: 0 };
+    perOrder.set(id, n);
+    return n;
+  };
+  for (const s of periodSuppliersRes.data ?? []) {
+    const row = s as { order_id: string; supplier_cost: number | string; paid_amount: number | string };
+    const agg = ensure(row.order_id);
+    agg.supplier_cost += Number(row.supplier_cost) || 0;
+    agg.paid_supplier += Number(row.paid_amount) || 0;
+  }
+  for (const e of periodLinkedExpRes.data ?? []) {
+    const row = e as { linked_order_id: string | null; amount: number | string; payment_status: string };
+    if (!row.linked_order_id) continue;
+    const agg = ensure(row.linked_order_id);
+    agg.linked_exp += Number(row.amount) || 0;
+    if (row.payment_status === "paid") agg.paid_exp += Number(row.amount) || 0;
+  }
+  for (const p of periodInPaymentsRes.data ?? []) {
+    const row = p as { linked_order_id: string | null; amount: number | string };
+    if (!row.linked_order_id) continue;
+    const agg = ensure(row.linked_order_id);
+    agg.collected += Number(row.amount) || 0;
+  }
+
+  /* Top orders by net profit (use the corrected chain) */
+  type OrderForRank = {
+    id: string; order_no: string; customer_name: string; selling_price: number | string;
+    tax_refund_value: number | string | null; financial_charges: number | string | null;
+    currency: string | null;
+  };
+  const top_orders = (orders as unknown as OrderForRank[])
+    .map((o) => {
+      const a = perOrder.get(o.id) ?? { supplier_cost: 0, paid_supplier: 0, linked_exp: 0, paid_exp: 0, collected: 0 };
+      const sp = Number(o.selling_price) || 0;
+      const gross = sp - a.supplier_cost;
+      const tax = Number(o.tax_refund_value) || 0;
+      const fc = Number(o.financial_charges) || 0;
+      const net = gross - a.linked_exp + tax - fc;
+      const pct = sp > 0 ? (net / sp) * 100 : 0;
+      return {
+        id: o.id,
+        order_no: o.order_no,
+        customer_name: o.customer_name,
+        selling_price: round2(sp),
+        net_profit: round2(net),
+        net_profit_pct: round2(pct),
+        currency: o.currency || "USD",
+      };
+    })
+    .sort((a, b) => b.net_profit - a.net_profit)
+    .slice(0, 5);
+
+  /* Aggregate cash picture across the period */
+  let collected_total = 0;
+  let paid_supplier_total = 0;
+  let paid_exp_total = 0;
+  for (const a of perOrder.values()) {
+    collected_total += a.collected;
+    paid_supplier_total += a.paid_supplier;
+    paid_exp_total += a.paid_exp;
+  }
+  const expected_vs_realized = {
+    expected_net_profit: round2(net_profit),
+    realized_cash_position: round2(collected_total - paid_supplier_total - paid_exp_total),
+    collected: round2(collected_total),
+    paid_supplier: round2(paid_supplier_total),
+    paid_expenses: round2(paid_exp_total),
+  };
+
+  /* Top expense categories — PostgREST returns embeds as either a
+     single object or an array depending on the FK shape; normalise. */
+  const catMap = new Map<string, { name: string; total: number; count: number }>();
+  for (const e of periodCategoriesRes.data ?? []) {
+    const row = e as { amount: number | string; category: { name: string } | { name: string }[] | null };
+    const cat = Array.isArray(row.category) ? row.category[0] : row.category;
+    const name = cat?.name ?? "Uncategorised";
+    const cur = catMap.get(name) ?? { name, total: 0, count: 0 };
+    cur.total += Number(row.amount) || 0;
+    cur.count += 1;
+    catMap.set(name, cur);
+  }
+  const catArr = Array.from(catMap.values()).sort((a, b) => b.total - a.total);
+  const catGrand = catArr.reduce((s, c) => s + c.total, 0) || 1;
+  const top_expense_categories = catArr.slice(0, 5).map((c) => ({
+    name: c.name,
+    total: round2(c.total),
+    share_pct: round2((c.total / catGrand) * 100),
+    count: c.count,
+  }));
+
   const out: DashboardKpi = {
     total_revenue: round2(total_revenue),
     total_supplier_cost: round2(total_supplier_cost),
@@ -254,6 +390,9 @@ export async function GET(req: Request) {
       cash_out: round2(cash_out - cash_out_prev),
     },
     trend,
+    top_orders,
+    top_expense_categories,
+    expected_vs_realized,
   };
 
   return NextResponse.json({ kpi: out }, {

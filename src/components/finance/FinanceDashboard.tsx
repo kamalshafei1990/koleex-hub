@@ -9,7 +9,8 @@ import {
   SectionCard,
   TrendChart,
 } from "@/components/finance/FinanceUi";
-import { fmtMoney } from "@/lib/finance/calc";
+import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
+import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { DashboardKpi, DashboardPeriod } from "@/lib/finance/types";
 
 const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
@@ -175,6 +176,77 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
+        {/* ── EXPECTED vs REALIZED + TOP ORDERS + TOP CATEGORIES ── */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          {/* Expected vs Realized */}
+          <SectionCard title="Expected vs Realized" subtitle="Booked profit vs cash actually banked.">
+            <div className="grid grid-cols-2 gap-3">
+              <SmallStat label="Expected Net" value={kpi?.expected_vs_realized?.expected_net_profit ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.expected_net_profit ?? 0) >= 0 ? "violet" : "rose"} />
+              <SmallStat label="Realized Cash" value={kpi?.expected_vs_realized?.realized_cash_position ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.realized_cash_position ?? 0) >= 0 ? "emerald" : "rose"} />
+              <SmallStat label="Collected" value={kpi?.expected_vs_realized?.collected ?? 0} currency={currency} accent="emerald" />
+              <SmallStat label="Paid suppliers" value={kpi?.expected_vs_realized?.paid_supplier ?? 0} currency={currency} accent="rose" />
+            </div>
+            <p className="mt-3 text-[11px] text-gray-500">
+              Realized cash = Collected − Paid suppliers − Paid expenses.
+            </p>
+          </SectionCard>
+
+          {/* Top Profitable Orders */}
+          <SectionCard title="Top Profitable Orders" subtitle="Ranked by net profit in this period.">
+            {(kpi?.top_orders ?? []).length === 0 ? (
+              <div className="py-6 text-center text-sm text-gray-500">No orders yet for this period.</div>
+            ) : (
+              <ol className="space-y-2">
+                {(kpi?.top_orders ?? []).map((o, idx) => (
+                  <li key={o.id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[11px] font-semibold text-gray-300">{idx + 1}</span>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{o.customer_name || "—"}</div>
+                        <div className="font-mono text-[10px] text-gray-500">{o.order_no} · {fmtMoney(o.selling_price, o.currency, { compact: true })}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm font-semibold tabular-nums ${o.net_profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtMoney(o.net_profit, o.currency, { compact: true })}</div>
+                      <div className="text-[10px] text-gray-500">{fmtPct(o.net_profit_pct)}</div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </SectionCard>
+
+          {/* Top Expense Categories */}
+          <SectionCard title="Top Expense Categories" subtitle="Biggest spend buckets in this period.">
+            {(kpi?.top_expense_categories ?? []).length === 0 ? (
+              <div className="py-6 text-center text-sm text-gray-500">No expenses recorded for this period.</div>
+            ) : (
+              <ul className="space-y-2">
+                {(kpi?.top_expense_categories ?? []).map((c) => {
+                  const style = styleForCategory(c.name);
+                  return (
+                    <li key={c.name} className={`rounded-lg border ${accentBgClass(style.accent)} bg-[var(--bg-primary)] px-3 py-2`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{style.glyph}</span>
+                          <span className="text-sm font-medium">{c.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold tabular-nums">{fmtMoney(c.total, currency, { compact: true })}</div>
+                          <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? "item" : "items"}</div>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/5">
+                        <div className={`h-full ${accentSolidBg(style.accent)}`} style={{ width: `${Math.max(3, c.share_pct)}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
+
         {/* ── PROFIT WATERFALL ──────────────────────────────────── */}
         <div className="mt-4">
           <SectionCard
@@ -199,6 +271,21 @@ export default function FinanceDashboard() {
           </SectionCard>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SmallStat({ label, value, currency, accent }: { label: string; value: number; currency: string; accent: "emerald" | "rose" | "amber" | "sky" | "violet" }) {
+  const color =
+    accent === "emerald" ? "text-emerald-400"
+    : accent === "rose"  ? "text-rose-400"
+    : accent === "amber" ? "text-amber-400"
+    : accent === "sky"   ? "text-sky-400"
+    : "text-violet-400";
+  return (
+    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+      <div className="text-[9px] uppercase tracking-wider text-gray-500">{label}</div>
+      <div className={`mt-1 text-sm font-semibold tabular-nums ${color}`}>{fmtMoney(value, currency, { compact: true })}</div>
     </div>
   );
 }

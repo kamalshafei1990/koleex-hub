@@ -12,6 +12,38 @@ import {
 import { fmtMoney } from "@/lib/finance/calc";
 import type { FinanceNotification } from "@/lib/finance/types";
 
+/* Severity model — driven by how far past (or before) the due date.
+   We bucket into 4 levels so the UI can colour-code consistently.
+       overdue > 7 days   → critical
+       overdue 1..7 days  → urgent
+       due today or next 3 days → warning
+       due in 4+ days     → normal
+   Returned by severityOf below. */
+type Severity = "normal" | "warning" | "urgent" | "critical";
+
+function severityOf(due: string): Severity {
+  const today = new Date().toISOString().slice(0, 10);
+  if (due < today) {
+    const dueDate = new Date(due);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays > 7 ? "critical" : "urgent";
+  }
+  /* Future-dated: how close? */
+  const dueDate = new Date(due);
+  const now = new Date();
+  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 3) return "warning";
+  return "normal";
+}
+
+const SEVERITY_STYLE: Record<Severity, { ring: string; chip: string; label: string }> = {
+  normal:   { ring: "border-white/[0.06]",       chip: "bg-gray-500/15 text-gray-300",   label: "Normal" },
+  warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-300", label: "Warning" },
+  urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-300",   label: "Urgent" },
+  critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-200", label: "Critical" },
+};
+
 const OFFSET_OPTIONS = [
   { value: 0, label: "Same day" },
   { value: 1, label: "1 day before" },
@@ -47,6 +79,18 @@ export default function FinanceNotifications() {
     overdue: overdue.reduce((s, n) => s + Number(n.amount), 0),
   };
 
+  /* Severity buckets — used by the Reminder Center strip + the
+     "Critical first" sort below. */
+  const bySeverity = useMemo(() => {
+    const buckets: Record<Severity, FinanceNotification[]> = { normal: [], warning: [], urgent: [], critical: [] };
+    for (const n of upcoming) buckets[severityOf(n.due_date)].push(n);
+    return buckets;
+  }, [upcoming]);
+  const sortedUpcoming = useMemo(() => {
+    const order: Severity[] = ["critical", "urgent", "warning", "normal"];
+    return order.flatMap((s) => bySeverity[s]);
+  }, [bySeverity]);
+
   const action = async (id: string, act: "done" | "snooze" | "cancel", snooze_days?: number) => {
     await fetch("/api/finance/notifications", {
       method: "PATCH",
@@ -71,15 +115,39 @@ export default function FinanceNotifications() {
           <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} hint={`${overdue.length} item(s)`} />
         </div>
 
+        {/* Reminder Center — at-a-glance severity strip */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(["critical", "urgent", "warning", "normal"] as const).map((sev) => {
+            const items = bySeverity[sev];
+            const total = items.reduce((s, n) => s + Number(n.amount), 0);
+            const style = SEVERITY_STYLE[sev];
+            return (
+              <div key={sev} className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 ${style.ring}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.chip}`}>{style.label}</span>
+                  <span className="text-xs text-gray-500">{items.length}</span>
+                </div>
+                <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(total, "USD", { compact: true })}</div>
+                <div className="mt-1 text-[10px] text-gray-500">
+                  {sev === "critical" ? "Overdue > 7 days"
+                  : sev === "urgent"   ? "Overdue 1–7 days"
+                  : sev === "warning"  ? "Due in ≤ 3 days"
+                  :                      "Due in 4+ days"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <SectionCard title="Upcoming Reminders" subtitle="Sorted by remind-at date.">
+          <SectionCard title="Upcoming Reminders" subtitle="Critical first — colour-coded by severity.">
             {loading ? (
               <div className="py-6 text-center text-sm text-gray-500">Loading…</div>
-            ) : upcoming.length === 0 ? (
+            ) : sortedUpcoming.length === 0 ? (
               <EmptyState title="Nothing upcoming" hint="Reminders are auto-created when you set a due date on an order or expense." />
             ) : (
               <div className="space-y-3">
-                {upcoming.map((n) => (
+                {sortedUpcoming.map((n) => (
                   <ReminderRow key={n.id} n={n} onAction={action} />
                 ))}
               </div>
@@ -140,32 +208,61 @@ export default function FinanceNotifications() {
 
 function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: string, act: "done" | "snooze" | "cancel", snooze_days?: number) => void }) {
   const today = new Date().toISOString().slice(0, 10);
+  const sev = severityOf(n.due_date);
+  const sevStyle = SEVERITY_STYLE[sev];
   const isOverdue = n.due_date < today;
-  const direction = n.type === "collect" ? "Money to collect" : "Money to pay";
+  const daysFromToday = (() => {
+    const due = new Date(n.due_date);
+    const now = new Date();
+    return Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  })();
+  const dueLabel =
+    daysFromToday === 0 ? "Due today"
+    : daysFromToday > 0 ? `Due in ${daysFromToday} day${daysFromToday === 1 ? "" : "s"}`
+    : `Overdue by ${Math.abs(daysFromToday)} day${Math.abs(daysFromToday) === 1 ? "" : "s"}`;
+
   return (
-    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+    <div className={`rounded-lg border bg-[var(--bg-primary)] p-3 ${sevStyle.ring}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={n.type} />
-            {isOverdue && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-400">Overdue</span>}
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sevStyle.chip}`}>
+              {sevStyle.label}
+            </span>
+            {isOverdue && sev !== "critical" && (
+              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-400">Overdue</span>
+            )}
           </div>
           <div className="mt-1.5 truncate text-sm font-medium">{n.party_name || "—"}</div>
-          <div className="mt-0.5 text-[11px] text-gray-500">Due {n.due_date} · Remind on {n.remind_at}</div>
+          <div className="mt-0.5 text-[11px] text-gray-500">
+            {dueLabel} · Due {n.due_date}
+            {n.reference_type && <span> · {n.reference_type.replace(/_/g, " ")}</span>}
+          </div>
         </div>
         <div className={`text-sm font-semibold tabular-nums ${n.type === "collect" ? "text-emerald-400" : "text-rose-400"}`}>
           {fmtMoney(Number(n.amount), n.currency, { compact: true })}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button onClick={() => onAction(n.id, "done")} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-500/10">Mark Done</button>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <button onClick={() => onAction(n.id, "done")} className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/15">
+          {n.type === "collect" ? "Mark Collected" : "Mark Paid"}
+        </button>
         <button onClick={() => onAction(n.id, "snooze", 1)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">Snooze 1d</button>
-        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">Snooze 7d</button>
-        <button onClick={() => onAction(n.id, "cancel")} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-400 hover:bg-white/10">Cancel</button>
+        <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">3d</button>
+        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">7d</button>
+        <button
+          onClick={() => {
+            const v = prompt("Snooze how many days?");
+            const n_days = v ? parseInt(v, 10) : NaN;
+            if (Number.isFinite(n_days) && n_days > 0) onAction(n.id, "snooze", n_days);
+          }}
+          className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
+        >
+          Custom…
+        </button>
+        <button onClick={() => onAction(n.id, "cancel")} className="ml-auto rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-400 hover:bg-white/10">Cancel</button>
       </div>
-            {(n.reference_type) && (
-        <div className="mt-2 text-[10px] text-gray-500">Linked to {n.reference_type.replace(/_/g, " ")}</div>
-      )}
     </div>
   );
 }

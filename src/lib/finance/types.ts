@@ -227,6 +227,29 @@ export interface DashboardKpi {
     expenses: number;
     net_profit: number;
   }[];
+  /* Phase 1.1 — executive widgets */
+  top_orders: {
+    id: string;
+    order_no: string;
+    customer_name: string;
+    selling_price: number;
+    net_profit: number;
+    net_profit_pct: number;
+    currency: string;
+  }[];
+  top_expense_categories: {
+    name: string;
+    total: number;
+    share_pct: number;
+    count: number;
+  }[];
+  expected_vs_realized: {
+    expected_net_profit: number;
+    realized_cash_position: number;
+    collected: number;
+    paid_supplier: number;
+    paid_expenses: number;
+  };
 }
 
 export type DashboardPeriod = "week" | "quarter" | "year";
