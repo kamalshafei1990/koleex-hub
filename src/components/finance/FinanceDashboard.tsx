@@ -1648,6 +1648,22 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
         </div>
       )}
 
+      {/* Phase 2.8 — forecast quick link. Always visible on the
+          treasury panel when treasury is otherwise meaningful, so the
+          executive can run a stress test in one click. Calm chip
+          treatment, no large widget. */}
+      <Link
+        href="/finance/treasury-forecast"
+        className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
+      >
+        <span className="inline-flex items-center gap-2 text-gray-300">
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+          <span className="font-semibold text-gray-200">Treasury forecast</span>
+          <span>· Run a 90-day cash stress test</span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-gray-400">Open <span aria-hidden>→</span></span>
+      </Link>
+
       {/* Phase 2.6 — bank-import pulse. Surfaces when imports have
           failed, when an import landed many unreconciled movements,
           or when an account hasn't received a statement in 21+ days. */}

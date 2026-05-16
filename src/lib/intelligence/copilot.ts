@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import type { ReconciliationSnapshot } from "./reconciliation";
 import type { FinanceReconciliationCandidate, CashMovement } from "@/lib/finance/types";
+import type { ForecastSnapshot } from "./treasury-forecast-events";
 
 interface BuildArgs {
   events: OperationalEvent[];
@@ -41,14 +42,26 @@ interface BuildArgs {
   /** Optional movement lookup for duplicate-risk callouts that name
    *  the bank account. */
   cashMovements?: CashMovement[];
+  /** Phase 2.8 — treasury forecast snapshot. Drives forecast-aware
+   *  hints with concrete amounts ("Cash turns negative on June 18")
+   *  and named parties ("If Malouka delays 30d…"). */
+  forecast?: ForecastSnapshot;
 }
 
 const SEV_RANK: Record<Severity, number> = { critical: 0, risk: 1, watch: 2, info: 3 };
 const MIN_CORRELATION_CONFIDENCE = 0.6;
 const MAX_HINTS = 3;
 
+function fmtCompactUsd(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2)}M`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(abs >= 10_000 ? 1 : 2)}K`;
+  return `${sign}${abs.toFixed(0)}`;
+}
+
 export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
-  const { events, correlations, pageContext, reconciliation, reconciliationCandidates, cashMovements } = args;
+  const { events, correlations, pageContext, reconciliation, reconciliationCandidates, cashMovements, forecast } = args;
   const hints: CopilotHint[] = [];
 
   /* 1) Cross-module correlations FIRST — but only ones that earned
@@ -168,6 +181,82 @@ export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
 
     /* Inject up to 2 reconciliation hints, dedup against existing. */
     for (const h of reconHints.slice(0, 2)) {
+      if (known.has(h.key)) continue;
+      if (hints.length >= MAX_HINTS) break;
+      hints.push(h);
+      known.add(h.key);
+    }
+  }
+
+  /* 1c) Forecast-aware hints. Phase 2.8.
+        Inject AT MOST 2 hints. Numbers always concrete, never generic. */
+  if (forecast && (forecast.base || forecast.stress)) {
+    const known = new Set(hints.map((h) => h.key));
+    const fHints: CopilotHint[] = [];
+    const base = forecast.base;
+    const stress = forecast.stress;
+    const diff = forecast.diff;
+    const assumptions = forecast.assumptions;
+
+    /* Negative cash on base case — the most actionable hint we can emit. */
+    if (base?.firstNegativeDate && Math.abs(base.lowestProjected) >= 5_000) {
+      fHints.push({
+        key: "copilot-forecast-negative-cash",
+        module: "treasury",
+        severity: base.runwayDays != null && base.runwayDays <= 7 ? "critical" : "risk",
+        text: `Cash projected negative on ${base.firstNegativeDate} — runway ${base.runwayDays ?? "—"}d, low point ${fmtCompactUsd(base.lowestProjected)} USD.`,
+        related: { eventKeys: ["forecast-negative-cash"] },
+      });
+    }
+
+    /* Stress scenario impact — only when materially worse. */
+    if (stress && diff && diff.direction === "deteriorates" && Math.abs(diff.d90Delta) >= 5_000 && assumptions) {
+      const topApplied = stress.assumptions[0];
+      const newNegative = stress.firstNegativeDate && stress.firstNegativeDate !== base?.firstNegativeDate;
+      const text = newNegative
+        ? `${topApplied?.label ?? "Stress scenario"} pushes cash negative on ${stress.firstNegativeDate}.`
+        : `${topApplied?.label ?? "Stress scenario"} reduces 90-day cash by ${fmtCompactUsd(Math.abs(diff.d90Delta))} USD.`;
+      fHints.push({
+        key: "copilot-forecast-stress",
+        module: "treasury",
+        severity: newNegative ? "risk" : "watch",
+        text,
+        related: { eventKeys: ["forecast-shock"] },
+      });
+    }
+
+    /* Customer-delay targeted hint when an obvious driver exists. */
+    if (assumptions?.customerDelay && stress) {
+      const targeted = stress.assumptions.find((a) => a.key === "customer_delay");
+      if (targeted && targeted.cashImpact >= 5_000) {
+        const customerHint = stress.drivers.topInflows[0];
+        if (customerHint) {
+          fHints.push({
+            key: "copilot-forecast-customer-delay",
+            module: "treasury",
+            severity: "watch",
+            text: `If ${customerHint.party} delays ${assumptions.customerDelay.days}d, ${fmtCompactUsd(customerHint.amountReporting)} USD shifts out of the window.`,
+            related: { eventKeys: ["forecast-customer-delay"] },
+          });
+        }
+      }
+    }
+
+    /* Largest liquidity-risk driver — calm summary when nothing
+       above fired but the base case carries a meaningful driver. */
+    if (fHints.length === 0 && base) {
+      const topOut = base.drivers.topOutflows[0];
+      if (topOut && topOut.amountReporting >= 25_000) {
+        fHints.push({
+          key: "copilot-forecast-driver",
+          module: "treasury",
+          severity: "info",
+          text: `Largest outflow in the next ${base.horizonDays}d is ${topOut.party} at ${fmtCompactUsd(topOut.amountReporting)} USD on day ${topOut.daysFromNow}.`,
+        });
+      }
+    }
+
+    for (const h of fHints.slice(0, 2)) {
       if (known.has(h.key)) continue;
       if (hints.length >= MAX_HINTS) break;
       hints.push(h);

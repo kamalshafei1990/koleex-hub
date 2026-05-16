@@ -69,6 +69,10 @@ export { buildPaymentControlSnapshot } from "./payment";
 export { buildTreasurySnapshot } from "./treasury";
 export { buildReconciliationSnapshot } from "./reconciliation";
 export { buildBankImportSnapshot } from "./bank-imports";
+export { buildTreasuryForecast, applyScenarioAssumptions, compareForecasts, findNegativeCashDate, calculateRunwayDays, calculateScenarioImpact, rankLiquidityRisks } from "./treasury-forecast";
+export type { ForecastResult, ForecastDiff, ScenarioAssumptions, AppliedAssumption, ForecastDayPoint, LiquidityRisk } from "./treasury-forecast";
+export { buildForecastEvents } from "./treasury-forecast-events";
+export type { ForecastSnapshot } from "./treasury-forecast-events";
 export {
   matchConfidence,
   duplicateMovementConfidence,
@@ -120,6 +124,8 @@ import { buildPaymentControlSnapshot } from "./payment";
 import { buildTreasurySnapshot } from "./treasury";
 import { buildReconciliationSnapshot } from "./reconciliation";
 import { buildBankImportSnapshot } from "./bank-imports";
+import { buildTreasuryForecast, compareForecasts } from "./treasury-forecast";
+import { buildForecastEvents } from "./treasury-forecast-events";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -149,6 +155,8 @@ export interface IntelligencePicture {
   reconciliation: import("./reconciliation").ReconciliationSnapshot;
   /** Phase 2.6 — bank-statement import snapshot. */
   bankImports: import("./bank-imports").BankImportSnapshot;
+  /** Phase 2.8 — treasury forecast snapshot (base case + optional stress). */
+  forecast: import("./treasury-forecast-events").ForecastSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -189,6 +197,10 @@ export interface IntelligenceInputs {
   reconciliationCandidates?: import("@/lib/finance/types").FinanceReconciliationCandidate[];
   /* Phase 2.6 — bank-statement imports (optional). */
   bankStatementImports?: import("@/lib/finance/types").BankStatementImport[];
+  /* Phase 2.8 — forecast scenario assumptions (optional). The base
+     forecast always runs; supplying assumptions runs the stress arm
+     and powers the scenario-aware events. */
+  forecastAssumptions?: import("./treasury-forecast").ScenarioAssumptions | null;
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -266,6 +278,35 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     accounts: input.bankAccounts ?? [],
   });
 
+  /* Phase 2.8 — treasury forecast. Always runs the base case; runs
+     the stress arm and produces scenario events when the caller
+     supplies forecastAssumptions. */
+  const baseForecast = buildTreasuryForecast({
+    bankAccounts: input.bankAccounts ?? [],
+    orders: input.orders,
+    payments: input.payments,
+    cashMovements: input.cashMovements ?? [],
+    expenses: input.expenses,
+  });
+  let stressForecast: import("./treasury-forecast").ForecastResult | null = null;
+  let forecastDiff: import("./treasury-forecast").ForecastDiff | null = null;
+  if (input.forecastAssumptions) {
+    stressForecast = buildTreasuryForecast({
+      bankAccounts: input.bankAccounts ?? [],
+      orders: input.orders,
+      payments: input.payments,
+      cashMovements: input.cashMovements ?? [],
+      expenses: input.expenses,
+    }, input.forecastAssumptions);
+    forecastDiff = compareForecasts(baseForecast, stressForecast);
+  }
+  const forecast = buildForecastEvents({
+    base: baseForecast,
+    stress: stressForecast,
+    diff: forecastDiff,
+    assumptions: input.forecastAssumptions ?? null,
+  });
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -280,6 +321,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     ...treasury.events,
     ...reconciliation.events,
     ...bankImports.events,
+    ...forecast.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -310,6 +352,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     reconciliation,
     reconciliationCandidates: input.reconciliationCandidates ?? [],
     cashMovements: input.cashMovements ?? [],
+    forecast,
   });
 
   const digest = buildExecutiveDigest({
@@ -324,7 +367,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
 
   return {
     customers, suppliers, logistics, inventory, approval, payment, treasury,
-    reconciliation, bankImports,
+    reconciliation, bankImports, forecast,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

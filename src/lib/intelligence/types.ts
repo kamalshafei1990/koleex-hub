@@ -115,7 +115,14 @@ export type OperationalEventKind =
   | "bank_import_failed"                // an import landed in 'failed' status
   | "duplicate_statement_rows"          // imports producing many duplicate rows
   | "large_unreconciled_import"         // recent import produced large unreconciled batch
-  | "bank_statement_import_gap";        // material delay since last import for an account
+  | "bank_statement_import_gap"         // material delay since last import for an account
+  /* ── Phase 2.8 — treasury forecast + stress ─────────────────── */
+  | "forecast_negative_cash"            // base-case projection crosses zero in horizon
+  | "forecast_runway_risk"              // runway exists but within material window
+  | "scenario_liquidity_shock"          // applied scenario materially reduces cash
+  | "customer_delay_cash_risk"          // customer-delay scenario stresses cash
+  | "fx_shock_cash_risk"                // FX-shock scenario stresses cash
+  | "supplier_acceleration_risk";       // supplier-acceleration scenario stresses cash
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =

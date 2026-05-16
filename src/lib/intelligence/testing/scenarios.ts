@@ -1711,6 +1711,206 @@ export function bankImportState(): Scenario {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   Phase 2.8 — Treasury Forecast scenarios.
+   --------------------------------------------------------------------------- */
+
+/* TREASURY_FORECAST_BASE_STATE
+   Healthy treasury position. Forecast layer should stay silent — no
+   forecast_negative_cash, no forecast_runway_risk. */
+export function treasuryForecastBaseState(): Scenario {
+  const base = healthyState();
+  return {
+    name: "TREASURY_FORECAST_BASE_STATE",
+    description:
+      "Strong cash position + balanced supplier and customer expectations. Forecast layer must stay calm.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-fc-1",
+          bank_name: "First National",
+          currency: "USD",
+          available_balance: 380_000,
+          is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+    },
+    expectations: {
+      digestRange: [0, 4],
+      eventRange: [0, 6],
+      healthRange: [80, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 1,
+      copilotMaxHints: 3,
+      /* Calm baseline — forecast events should NOT fire here. */
+      forbidEventKinds: ["forecast_negative_cash", "forecast_runway_risk"],
+    },
+  };
+}
+
+/* TREASURY_FORECAST_STRESS_STATE
+   Customer delay + thin starting cash + a big supplier obligation
+   together produce a negative-cash projection. The forecast layer
+   must surface forecast_negative_cash + customer_delay_cash_risk. */
+export function treasuryForecastStressState(): Scenario {
+  const base = healthyState();
+  /* Big future supplier obligation in 5 days. */
+  const supplierDueOrder = makeOrder({
+    id: "o-fs-1",
+    order_no: "ORD-2026-0099",
+    customer_id: "c-fs-1",
+    customer_name: "Tanta Mills",
+    selling_price: 200_000,
+    /* Customer pays in 50 days. */
+    due_in_days: 50,
+    outstanding_receivable: 200_000,
+    suppliers: [
+      { id: "s-fs-1", name: "Hangzhou Castings", cost: 240_000, paid: 0, due_in_days: 5 },
+    ],
+  });
+  return {
+    name: "TREASURY_FORECAST_STRESS_STATE",
+    description:
+      "Thin cash + customer collection delayed 30d + a 240K supplier obligation due in 5d. Forecast crosses zero.",
+    inputs: {
+      ...base.inputs,
+      orders: [...base.inputs.orders, supplierDueOrder],
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-fs-1",
+          bank_name: "First National",
+          currency: "USD",
+          available_balance: 60_000,
+          is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+      forecastAssumptions: { customerDelay: { days: 30 } },
+    },
+    expectations: {
+      digestRange: [1, 6],
+      eventRange: [1, 12],
+      healthRange: [40, 95],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 3,
+      copilotMaxHints: 3,
+      expectEventKinds: ["forecast_negative_cash", "customer_delay_cash_risk"],
+    },
+  };
+}
+
+/* FX_SHOCK_STATE
+   Material CNY cash flows in the 90-day window. A −10% FX shock on
+   non-USD flows produces a reporting-currency hit large enough to
+   fire fx_shock_cash_risk. (Distinct from FX_EXPOSURE_STATE which
+   tests the Phase 2.4 static fx_exposure event.) */
+export function fxShockState(): Scenario {
+  const base = healthyState();
+  /* Several CNY cash movements scheduled into the forecast horizon
+     (unreconciled so the engine treats them as forward events). */
+  const cnyMovements: CashMovement[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    cnyMovements.push(makeMovement({
+      id: `cm-fx-${i + 1}`,
+      bank_account_id: "ba-fx-1",
+      movement_type: i % 2 === 0 ? "outgoing" : "incoming",
+      direction: i % 2 === 0 ? "outflow" : "inflow",
+      amount: 600_000 + i * 120_000,
+      currency: "CNY",
+      movement_date: isoDate(10 + i * 6),
+      bank_reference: `CNY-FX-${i + 1}`,
+      counterparty_name: i % 2 === 0 ? "Ningbo Steel" : "Cairo Knits",
+    }));
+  }
+  return {
+    name: "FX_SHOCK_STATE",
+    description:
+      "Six CNY cash movements scheduled in the next 60 days. A −10% FX shock on CNY flows reduces 90-day reporting cash materially.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({ id: "ba-fx-1", bank_name: "ICBC Ningbo",   currency: "CNY", available_balance: 6_000_000, is_primary: true, country: "CN" }),
+        makeBankAccount({ id: "ba-fx-2", bank_name: "First National", currency: "USD", available_balance: 300_000, is_primary: true }),
+      ],
+      cashMovements: cnyMovements,
+      forecastAssumptions: { fxShock: { pct: 10 } },
+    },
+    expectations: {
+      digestRange: [0, 6],
+      eventRange: [1, 14],
+      healthRange: [55, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: ["fx_shock_cash_risk"],
+    },
+  };
+}
+
+/* SUPPLIER_ACCELERATION_STATE
+   Pulling supplier payments 15 days earlier compresses the cash
+   buffer enough to surface supplier_acceleration_risk + erode
+   runway. */
+export function supplierAccelerationState(): Scenario {
+  const base = healthyState();
+  /* Several supplier payments scheduled across the next 60 days. */
+  const heavyAp1 = makeOrder({
+    id: "o-sa-1",
+    order_no: "ORD-2026-0200",
+    customer_id: "c-sa-1",
+    customer_name: "Alexandria Looms",
+    selling_price: 180_000,
+    due_in_days: 45,
+    outstanding_receivable: 180_000,
+    suppliers: [
+      { id: "s-sa-1", name: "Hangzhou Castings", cost: 90_000, paid: 0, due_in_days: 35 },
+    ],
+  });
+  const heavyAp2 = makeOrder({
+    id: "o-sa-2",
+    order_no: "ORD-2026-0201",
+    customer_id: "c-sa-2",
+    customer_name: "Tanta Textiles",
+    selling_price: 90_000,
+    due_in_days: 55,
+    outstanding_receivable: 90_000,
+    suppliers: [
+      { id: "s-sa-2", name: "Wenzhou Drives", cost: 70_000, paid: 0, due_in_days: 40 },
+    ],
+  });
+  return {
+    name: "SUPPLIER_ACCELERATION_STATE",
+    description:
+      "Two supplier obligations in the 30-45 day window. Accelerating them by 15d pulls 160K USD forward and erodes runway.",
+    inputs: {
+      ...base.inputs,
+      orders: [...base.inputs.orders, heavyAp1, heavyAp2],
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-sa-1",
+          bank_name: "First National",
+          currency: "USD",
+          available_balance: 140_000,
+          is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+      forecastAssumptions: { supplierAcceleration: { days: 15 } },
+    },
+    expectations: {
+      digestRange: [0, 6],
+      eventRange: [1, 12],
+      healthRange: [55, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: ["supplier_acceleration_risk"],
+    },
+  };
+}
+
 export const ALL_SCENARIOS: () => Scenario[] = () => [
   healthyState(),
   moderatePressureState(),
@@ -1726,4 +1926,8 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   negativeRunwayState(),
   autoReconciliationState(),
   bankImportState(),
+  treasuryForecastBaseState(),
+  treasuryForecastStressState(),
+  fxShockState(),
+  supplierAccelerationState(),
 ];

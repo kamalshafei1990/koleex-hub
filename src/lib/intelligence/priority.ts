@@ -107,6 +107,13 @@ function urgencyComponent(e: OperationalEvent): number {
     case "large_unreconciled_import":       return 22;
     case "bank_statement_import_gap":       return 14;
     case "duplicate_statement_rows":        return 12;
+    /* ── Phase 2.8 forecast kinds ── */
+    case "forecast_negative_cash":          return 52;  // future cash crisis outranks most signals
+    case "forecast_runway_risk":            return 36;
+    case "scenario_liquidity_shock":        return 26;
+    case "customer_delay_cash_risk":        return 22;
+    case "supplier_acceleration_risk":      return 22;
+    case "fx_shock_cash_risk":              return 20;
     default:
       return 8;
   }

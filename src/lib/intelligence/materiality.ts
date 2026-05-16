@@ -176,6 +176,17 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
   duplicate_statement_rows:     (e) => (e.magnitude ?? 0) >= 1,
   large_unreconciled_import:    (e) => (e.magnitude ?? 0) >= 1,
   bank_statement_import_gap:    (e) => (e.magnitude ?? 0) >= 1,
+
+  /* ── Phase 2.8 forecast kinds ───────────────────────────────── */
+  /* Negative-cash projection: only material when the trough is ≥ USD 5K. */
+  forecast_negative_cash:       (e) => (e.amount ?? 0) >= 5_000,
+  /* Runway within the watch window: engine sets magnitude=days. */
+  forecast_runway_risk:         (e) => (e.magnitude ?? 0) >= 1 && (e.magnitude ?? 0) <= 30,
+  /* Scenario shock: ≥ USD 5K cash impact. */
+  scenario_liquidity_shock:     (e) => (e.amount ?? 0) >= 5_000,
+  customer_delay_cash_risk:     (e) => (e.amount ?? 0) >= 5_000,
+  fx_shock_cash_risk:           (e) => (e.amount ?? 0) >= 5_000,
+  supplier_acceleration_risk:   (e) => (e.amount ?? 0) >= 5_000,
 };
 
 /**
