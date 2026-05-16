@@ -96,6 +96,12 @@ function urgencyComponent(e: OperationalEvent): number {
     case "bank_concentration":            return 16;
     case "excessive_bank_fees":           return 18;
     case "idle_cash":                     return 8;
+    /* ── Phase 2.5 reconciliation kinds ── */
+    case "duplicate_cash_movement_risk":     return 30;  // duplicates corrupt cash position fast
+    case "high_confidence_unconfirmed_match":return 22;  // free win for the operator
+    case "reconciliation_backlog":           return 18;
+    case "partial_match_pressure":           return 18;
+    case "rejected_reconciliation_pattern":  return 14;
     default:
       return 8;
   }

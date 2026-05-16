@@ -104,7 +104,13 @@ export type OperationalEventKind =
   | "transfer_failure"          // failed transfer cash movement
   | "fx_exposure"               // material non-reporting-currency share
   | "idle_cash"                 // surplus cash sitting idle
-  | "overdraft_risk";            // any account at / below zero or near it
+  | "overdraft_risk"            // any account at / below zero or near it
+  /* ── Phase 2.5 — auto-reconciliation engine ─────────────────── */
+  | "high_confidence_unconfirmed_match" // ≥85% candidate awaiting human confirm
+  | "rejected_reconciliation_pattern"   // same pair rejected repeatedly or many rejects this period
+  | "duplicate_cash_movement_risk"      // duplicate-risk candidate(s) outstanding
+  | "reconciliation_backlog"            // queue length exceeds material threshold
+  | "partial_match_pressure";           // sustained partial/under/over candidates pile up
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =

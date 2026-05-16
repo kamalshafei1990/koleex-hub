@@ -355,6 +355,68 @@ export interface CashMovement {
   updated_at: string;
 }
 
+/* ── Reconciliation (Phase 2.5) ────────────────────────────────── */
+
+export type ReconciliationCandidateStatus =
+  | "suggested"
+  | "confirmed"
+  | "rejected"
+  | "expired";
+
+export type ReconciliationCandidateType =
+  | "exact"
+  | "partial"
+  | "overpayment"
+  | "underpayment"
+  | "fee_adjusted"
+  | "duplicate_risk";
+
+export type ReconciliationConfidenceLevel = "high" | "medium" | "low";
+
+/** A single signal that contributed to the match, persisted on the row. */
+export interface ReconciliationMatchedFactor {
+  /** Stable factor key (e.g. "amount", "bank_reference", "direction"). */
+  key: string;
+  /** Display label, already humanised ("Same amount", "Reference match"). */
+  label: string;
+  /** Per-signal score 0..1 — useful for the queue UI's breakdown chip. */
+  score: number;
+}
+
+/** Operator-visible caveat that didn't block the suggestion but is
+ *  worth surfacing (e.g. opposite currency, 12-day gap, partial). */
+export interface ReconciliationWarning {
+  key: string;
+  message: string;
+  severity: "info" | "watch" | "risk";
+}
+
+export interface FinanceReconciliationCandidate {
+  id: string;
+  tenant_id: string;
+  payment_id: string;
+  cash_movement_id: string;
+  confidence: number;                          // 0..1
+  confidence_level: ReconciliationConfidenceLevel;
+  candidate_type: ReconciliationCandidateType;
+  match_reason_summary: string;
+  matched_factors: ReconciliationMatchedFactor[];
+  warnings: ReconciliationWarning[];
+  status: ReconciliationCandidateStatus;
+  suggested_at: string;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  /** Optional joined entities for the queue UI. */
+  payment?: FinancePayment | null;
+  cash_movement?: CashMovement | null;
+}
+
 /* ── Customer / Supplier accounts ──────────────────────────────── */
 export interface FinanceCustomerAccount {
   id: string;

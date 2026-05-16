@@ -67,6 +67,7 @@ export {
 export { buildApprovalSnapshot } from "./approval";
 export { buildPaymentControlSnapshot } from "./payment";
 export { buildTreasurySnapshot } from "./treasury";
+export { buildReconciliationSnapshot } from "./reconciliation";
 export {
   matchConfidence,
   duplicateMovementConfidence,
@@ -116,6 +117,7 @@ import { buildExecutiveDigest } from "./digest";
 import { buildApprovalSnapshot } from "./approval";
 import { buildPaymentControlSnapshot } from "./payment";
 import { buildTreasurySnapshot } from "./treasury";
+import { buildReconciliationSnapshot } from "./reconciliation";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -141,6 +143,8 @@ export interface IntelligencePicture {
   payment: import("./types").PaymentControlSnapshot;
   /** Phase 2.4 — treasury snapshot. */
   treasury: import("./types").TreasurySnapshot;
+  /** Phase 2.5 — reconciliation queue snapshot. */
+  reconciliation: import("./reconciliation").ReconciliationSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -175,6 +179,10 @@ export interface IntelligenceInputs {
      dormant snapshot when both arrays are empty. */
   bankAccounts?: import("@/lib/finance/types").BankAccount[];
   cashMovements?: import("@/lib/finance/types").CashMovement[];
+  /* Phase 2.5 — reconciliation candidates. Optional so callers that
+     don't load the queue continue to work; the engine returns a
+     dormant snapshot when the array is empty. */
+  reconciliationCandidates?: import("@/lib/finance/types").FinanceReconciliationCandidate[];
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -238,6 +246,13 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     orders: input.orders,
   });
 
+  /* Phase 2.5 — reconciliation snapshot. Feeds 5 dedicated event kinds
+     into the shared pipeline so reconciliation pressure competes for
+     dashboard attention alongside the other finance signals. */
+  const reconciliation = buildReconciliationSnapshot({
+    candidates: input.reconciliationCandidates ?? [],
+  });
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -250,6 +265,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     ...approval.events,
     ...payment.events,
     ...treasury.events,
+    ...reconciliation.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -291,6 +307,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
 
   return {
     customers, suppliers, logistics, inventory, approval, payment, treasury,
+    reconciliation,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

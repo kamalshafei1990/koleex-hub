@@ -151,6 +151,25 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
 
   /* Overdraft: always material when fired. */
   overdraft_risk: () => true,
+
+  /* ── Phase 2.5 reconciliation kinds ─────────────────────────────── */
+
+  /* A single high-confidence unconfirmed match already counts (it
+     represents real cash sitting unreconciled). */
+  high_confidence_unconfirmed_match: (e) => (e.magnitude ?? 0) >= 1,
+
+  /* Backlog: ≥ 5 candidates pending. */
+  reconciliation_backlog: (e) => (e.magnitude ?? 0) >= 5,
+
+  /* Duplicate cash movement: any duplicate-risk candidate is material. */
+  duplicate_cash_movement_risk: (e) => (e.magnitude ?? 0) >= 1,
+
+  /* Partial-match pressure: ≥ 3 partial/over/under/fee_adjusted candidates. */
+  partial_match_pressure: (e) => (e.magnitude ?? 0) >= 3,
+
+  /* Rejection pattern: ≥ 5 rejections OR ≥ 2 repeat-rejection pairs.
+     The engine already enforces this; the gate is defense-in-depth. */
+  rejected_reconciliation_pattern: (e) => (e.magnitude ?? 0) >= 2,
 };
 
 /**
