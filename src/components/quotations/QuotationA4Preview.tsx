@@ -2177,8 +2177,14 @@ function TermsArea({
         setShowColorPicker(false);
       }}
     >
-      {/* Toolbar — only rendered while the area has focus. `no-print`
-          keeps it off the exported PDF. */}
+      {/* Toolbar -- restyled to match the floating dark-glass
+          toolbar that hovers above each item-description cell.
+          Same visual grammar (dark blur, white icons) so the
+          operator's eye doesn't have to switch contexts when
+          formatting items vs. terms. Stays pinned at the top
+          of the Terms editor (not floating) so it doesn't
+          obscure the row above. no-print so the toolbar is
+          stripped from the exported PDF. */}
       {toolbarOpen && (
         <div
           className="no-print pq-tc-toolbar"
@@ -2186,13 +2192,18 @@ function TermsArea({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
-            padding: "4px 8px",
-            borderBottom: `1px solid ${T.border}`,
-            background: T.surface,
+            gap: 2,
+            padding: 4,
+            margin: "4px 4px 0",
+            background: "rgba(20, 20, 20, 0.96)",
+            border: "1px solid rgba(255, 255, 255, 0.10)",
+            borderRadius: 12,
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.45)",
+            backdropFilter: "blur(8px)",
             fontSize: 11,
             position: "relative",
             flexWrap: "wrap",
+            zIndex: 5,
           }}
         >
           <TermsToolbarButton title="Bold" onClick={() => exec("bold")}>
@@ -2205,7 +2216,7 @@ function TermsArea({
             <UnderlineIcon className="h-3.5 w-3.5" />
           </TermsToolbarButton>
 
-          <span style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+          <span style={{ width: 1, height: 18, background: "rgba(255, 255, 255, 0.12)", margin: "0 4px" }} />
 
           <TermsToolbarButton
             title="Font size"
@@ -2222,17 +2233,16 @@ function TermsArea({
               onMouseDown={swallow}
               style={{
                 position: "absolute",
-                top: "100%",
+                top: "calc(100% + 6px)",
                 left: 96,
-                marginTop: 2,
-                background: T.paper,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
+                background: "rgba(20, 20, 20, 0.98)",
+                border: "1px solid rgba(255, 255, 255, 0.10)",
+                borderRadius: 10,
                 padding: 4,
-                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.45)",
                 display: "flex",
                 gap: 2,
-                zIndex: 5,
+                zIndex: 6,
               }}
             >
               {FONT_SIZE_OPTIONS.map((opt) => (
@@ -2241,15 +2251,18 @@ function TermsArea({
                   type="button"
                   onClick={() => applyFontSize(opt.value)}
                   style={{
-                    padding: "3px 8px",
-                    borderRadius: 5,
-                    fontSize: 11,
+                    minWidth: 32,
+                    height: 26,
                     border: "none",
                     background: "transparent",
-                    color: T.ink,
+                    color: "rgba(255, 255, 255, 0.85)",
+                    borderRadius: 6,
                     cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "0 8px",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = T.surface)}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   {opt.label}
@@ -2273,18 +2286,17 @@ function TermsArea({
               onMouseDown={swallow}
               style={{
                 position: "absolute",
-                top: "100%",
+                top: "calc(100% + 6px)",
                 left: 132,
-                marginTop: 2,
-                background: T.paper,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
+                background: "rgba(20, 20, 20, 0.98)",
+                border: "1px solid rgba(255, 255, 255, 0.10)",
+                borderRadius: 10,
                 padding: 6,
-                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.45)",
                 display: "grid",
-                gridTemplateColumns: "repeat(6, 18px)",
+                gridTemplateColumns: "repeat(6, 20px)",
                 gap: 4,
-                zIndex: 5,
+                zIndex: 6,
               }}
             >
               {FONT_COLOR_OPTIONS.map((c) => (
@@ -2294,10 +2306,12 @@ function TermsArea({
                   onClick={() => applyColor(c)}
                   title={c}
                   style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 4,
-                    border: `1px solid ${T.border}`,
+                    width: 20,
+                    height: 20,
+                    borderRadius: 6,
+                    border: c.toLowerCase() === "#000000" || c.toLowerCase() === "#0a0a0a"
+                      ? "1px solid rgba(255,255,255,0.18)"
+                      : "none",
                     background: c,
                     cursor: "pointer",
                     padding: 0,
@@ -2307,7 +2321,7 @@ function TermsArea({
             </div>
           )}
 
-          <span style={{ width: 1, height: 14, background: T.border, margin: "0 2px" }} />
+          <span style={{ width: 1, height: 18, background: "rgba(255, 255, 255, 0.12)", margin: "0 4px" }} />
 
           <TermsToolbarButton title="Clear formatting" onClick={() => exec("removeFormat")}>
             <CrossIcon className="h-3.5 w-3.5" />
@@ -2363,6 +2377,10 @@ function TermsToolbarButton({
   active?: boolean;
   children: React.ReactNode;
 }) {
+  /* Visual treatment matches the ItemDescription floating
+     toolbar (ToolBtn): dark glass background, white icon, soft
+     hover lift. Lifted from one shared style block so future
+     tweaks to the toolbar feel propagate to both surfaces. */
   return (
     <button
       type="button"
@@ -2370,20 +2388,21 @@ function TermsToolbarButton({
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       style={{
-        width: 24,
-        height: 22,
+        width: 28,
+        height: 28,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         border: "none",
-        background: active ? "rgba(0,0,0,0.08)" : "transparent",
-        color: "#1f2937",
-        borderRadius: 5,
+        background: active ? "rgba(255, 255, 255, 0.18)" : "transparent",
+        color: "rgba(255, 255, 255, 0.92)",
+        borderRadius: 6,
         cursor: "pointer",
         padding: 0,
+        transition: "background-color 120ms ease",
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = "rgba(0,0,0,0.04)";
+        if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
       }}
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.background = "transparent";
