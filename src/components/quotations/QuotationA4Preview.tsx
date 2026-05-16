@@ -1079,14 +1079,19 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Cluster fully outside the A4 paper frame.
-                           Tightened geometry (the 72px gap from
-                           paper to cluster was wasted whitespace
-                           per operator feedback):
-                             gap from paper outer edge ..... 16 px
-                             cluster width ................. 40 px
-                           right offset = 16 + 40 = 56. */
-                        right: -56,
+                        /* Cluster fully OUTSIDE the A4 paper. The
+                           cluster's parent is the table row whose
+                           right edge already sits 32 px INSIDE
+                           the paper (paper has 32 px right
+                           padding). So:
+                             cluster_left  = row_right + X - 40
+                                           = (paper_right - 32) + X - 40
+                             we want cluster_left = paper_right + 16
+                             → X = 88.
+                           Result: cluster sits cleanly 16 px past
+                           the paper's right edge -- never inside
+                           the paper, never floating far. */
+                        right: -88,
                         width: 40,
                         /* Cluster height shrunk 112 → 100 to leave
                            visible vertical breathing space (≈15 px
@@ -1144,16 +1149,15 @@ export default function QuotationA4Preview({
                         position: "absolute",
                         top: "50%",
                         transform: "translateY(-50%)",
-                        /* Cluster's outer-right edge sits at right
-                           offset 56 (16 gap + 40 cluster width).
-                           Notes starts 8 px to the right of the
-                           cluster and is 200 px wide.
-                             right_offset = 56 + 8 + 200 = 264.
-                           Tightened from the old 48 px / -360
-                           layout per operator feedback that the
-                           notes panel was hovering too far from
-                           the items table. */
-                        right: -264,
+                        /* Notes panel sits 8 px to the right of
+                           the cluster, 200 px wide.
+                             cluster_right = paper_right + 16 + 40
+                                           = paper_right + 56
+                             notes_left    = paper_right + 56 + 8
+                                           = paper_right + 64
+                             notes_right   = paper_right + 264
+                             → X = 264 + 32 (paper padding) = 296. */
+                        right: -296,
                         width: 200,
                         /* Matches cluster height; 30 px slack against
                            the ~130 px row leaves ~15 px breathing
