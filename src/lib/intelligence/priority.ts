@@ -77,6 +77,14 @@ function urgencyComponent(e: OperationalEvent): number {
     case "unresolved_changes_request":    return 16;
     case "approval_concentration":        return 14;
     case "repeated_rejection":            return 18;
+    /* ── Phase 2.3 payment kinds ── */
+    case "payment_mismatch":              return 40;  // bank disagreement is high urgency
+    case "failed_payment":                return 38;
+    case "large_unapproved_payment":      return 32;
+    case "unreconciled_payment":          return 22;
+    case "missing_payment_evidence":      return 18;
+    case "payment_approval_delay":        return 20;
+    case "duplicate_payment_risk":        return 28;
     default:
       return 8;
   }

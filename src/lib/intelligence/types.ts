@@ -30,7 +30,8 @@ export type ModuleKey =
   | "crm"
   | "production"
   | "operations"
-  | "approval";
+  | "approval"
+  | "payment";
 
 /** Calm → Critical scale used uniformly across modules. */
 export type Pressure = "calm" | "watch" | "risk" | "critical";
@@ -83,7 +84,15 @@ export type OperationalEventKind =
   | "approval_concentration"   // single reviewer owns most pending reviews
   | "repeated_rejection"       // an entity hit rejected → changes loop multiple times
   | "unresolved_changes_request" // changes-requested items that haven't been resubmitted
-  | "approval_velocity_drop";  // average approval time deteriorated PoP
+  | "approval_velocity_drop"   // average approval time deteriorated PoP
+  /* ── Phase 2.3 — payment control ────────────────────────────── */
+  | "unreconciled_payment"     // payment closed but bank evidence not matched
+  | "payment_mismatch"         // actual_amount differs from expected materially
+  | "missing_payment_evidence" // paid/received payments without evidence
+  | "payment_approval_delay"   // payments waiting for approval too long
+  | "failed_payment"           // movement_status = failed
+  | "duplicate_payment_risk"   // two same-party same-amount near-date payments
+  | "large_unapproved_payment"; // high-value draft / submitted payment
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =
@@ -385,6 +394,42 @@ export interface ApprovalCycleMetrics {
   rejectionRate: number;
   /** Share that landed in requires_changes at least once (approximated from current status). */
   changesRate: number;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Payment control snapshot (Phase 2.3)
+   ───────────────────────────────────────────────────────────────────── */
+
+export interface PaymentControlSnapshot {
+  /** Materially-filtered events ready to merge into the global stream. */
+  events: OperationalEvent[];
+  /** Pending-approval summary. */
+  pendingApproval: {
+    count: number;
+    totalValue: number;
+    largestValue: number;
+    oldestDays: number;
+  };
+  /** Reconciliation summary. */
+  reconciliation: {
+    unreconciledCount: number;
+    unreconciledValue: number;
+    mismatchCount: number;
+    mismatchValue: number;
+    disputedCount: number;
+  };
+  /** Evidence summary. */
+  evidence: {
+    missingCount: number;
+    missingValue: number;
+  };
+  /** Failed-movement count (movement_status = failed). */
+  failedCount: number;
+  /** Composite 0..100 health. */
+  healthScore: Score;
+  pressure: Pressure;
+  /** One-sentence operational read; "" if nothing material to say. */
+  read: string;
 }
 
 export interface ApprovalIntelligenceSnapshot {

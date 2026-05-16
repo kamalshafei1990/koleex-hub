@@ -36,8 +36,13 @@ export function buildExecutiveDigest(args: {
   const { kpi, events, correlations, customers, suppliers } = args;
   const out: DigestItem[] = [];
 
-  /* 1) BIGGEST PRESSURE — top correlation when confidence is high,
-        otherwise top event by priority. */
+  /* 1) BIGGEST PRESSURE — preferred source is a high-confidence
+        correlation. If none, fall back to the highest-severity event
+        the pipeline kept: critical → risk → watch (highest-priority).
+        Watch-level events ARE still real pressure once they've cleared
+        the materiality gate; the discipline rule says "an empty digest
+        is fine" — but "no digest when material pressure exists" is
+        not fine, that's a false negative. */
   const topCorr = correlations.find((c) => (c.confidence ?? 0) >= 0.6 && c.severity !== "info");
   if (topCorr) {
     out.push({
@@ -52,7 +57,8 @@ export function buildExecutiveDigest(args: {
       state: topCorr.state,
     });
   } else {
-    const topEvent = events.find((e) => e.severity === "critical" || e.severity === "risk");
+    const topEvent = events.find((e) => e.severity === "critical" || e.severity === "risk")
+      ?? events.find((e) => e.severity === "watch");
     if (topEvent) {
       out.push({
         key: `digest-pressure-${topEvent.key}`,

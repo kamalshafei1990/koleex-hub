@@ -223,6 +223,29 @@ export interface FinanceAttachment {
 }
 
 /* ── Payments ───────────────────────────────────────────────────── */
+
+/** Phase 2.3 — broader payment movement lifecycle, independent of
+ *  approval and reconciliation status. The legacy `status` column
+ *  (pending/completed/cancelled/bounced) survives untouched. */
+export type PaymentMovementStatus =
+  | "scheduled"
+  | "pending"
+  | "paid"
+  | "received"
+  | "partially_paid"
+  | "partially_received"
+  | "failed"
+  | "cancelled"
+  | "overdue";
+
+export type ReconciliationStatus =
+  | "unreconciled"
+  | "matched"
+  | "partially_matched"
+  | "mismatch"
+  | "disputed"
+  | "verified";
+
 export interface FinancePayment {
   id: string;
   direction: PaymentDirection;
@@ -241,6 +264,34 @@ export interface FinancePayment {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /* Phase 2.3 — payment control columns. All optional in TS because
+     legacy rows existed before this phase shipped. */
+  movement_status?: PaymentMovementStatus | null;
+  reconciliation_status?: ReconciliationStatus;
+  approval_status?: ApprovalStatus;
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
+  requires_changes_reason?: string | null;
+  review_notes?: string | null;
+  reconciled_at?: string | null;
+  reconciled_by?: string | null;
+  reconciliation_notes?: string | null;
+  bank_reference?: string | null;
+  bank_account?: string | null;
+  expected_amount?: number | null;
+  actual_amount?: number | null;
+  difference_amount?: number | null;
+  payment_evidence_count?: number;
+  primary_payment_evidence_url?: string | null;
+  has_payment_evidence?: boolean;
+  last_evidence_at?: string | null;
 }
 
 /* ── Customer / Supplier accounts ──────────────────────────────── */

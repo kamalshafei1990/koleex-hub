@@ -19,6 +19,7 @@ import type {
   InventorySnapshot,
   LogisticsSnapshot,
   ModuleKey,
+  PaymentControlSnapshot,
   Pressure,
   Score,
   SupplierDependencyProfile,
@@ -194,19 +195,58 @@ export function scoreApprovalHealth(approval: ApprovalIntelligenceSnapshot | nul
 }
 
 /* ---------------------------------------------------------------------------
+   Phase 2.3 — Payment control health dimension.
+   --------------------------------------------------------------------------- */
+
+export function scorePaymentHealth(payment: PaymentControlSnapshot | null): HealthDimension {
+  if (!payment ||
+      (payment.pendingApproval.count === 0 &&
+       payment.reconciliation.unreconciledCount === 0 &&
+       payment.reconciliation.mismatchCount === 0 &&
+       payment.evidence.missingCount === 0 &&
+       payment.failedCount === 0)) {
+    return { module: "payment", score: 100, pressure: "calm",
+      driver: "Cash movements reconciled — no pending approvals, mismatches, or failures." };
+  }
+  const driver = (() => {
+    const bits: string[] = [];
+    if (payment.pendingApproval.count > 0) {
+      bits.push(`${payment.pendingApproval.count} pending approval (${formatCompact(payment.pendingApproval.totalValue)} USD).`);
+    }
+    if (payment.reconciliation.unreconciledCount > 0) {
+      bits.push(`${payment.reconciliation.unreconciledCount} unreconciled (${formatCompact(payment.reconciliation.unreconciledValue)} USD).`);
+    }
+    if (payment.reconciliation.mismatchCount > 0) {
+      bits.push(`${payment.reconciliation.mismatchCount} mismatch${payment.reconciliation.mismatchCount === 1 ? "" : "es"}.`);
+    }
+    if (payment.failedCount > 0) {
+      bits.push(`${payment.failedCount} failed at the bank.`);
+    }
+    return bits.join(" ");
+  })();
+  return {
+    module: "payment",
+    score: payment.healthScore,
+    pressure: payment.pressure,
+    driver,
+  };
+}
+
+/* ---------------------------------------------------------------------------
    Composite.
    --------------------------------------------------------------------------- */
 
 const WEIGHTS: Record<ModuleKey, number> = {
-  finance: 0.30,
-  customer: 0.20,
-  supplier: 0.15,
-  logistics: 0.10,
-  inventory: 0.075,
+  finance: 0.275,
+  customer: 0.18,
+  supplier: 0.14,
+  logistics: 0.09,
+  inventory: 0.07,
   approval: 0.075,    // Phase 2.2.1 — operational review pressure
-  crm: 0.05,
-  production: 0.025,
-  operations: 0.025,
+  payment: 0.10,      // Phase 2.3 — cash control
+  crm: 0.045,
+  production: 0.0125,
+  operations: 0.0125,
 };
 
 export function composeBusinessHealth(dimensions: HealthDimension[]): BusinessHealth {

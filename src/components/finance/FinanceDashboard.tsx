@@ -245,6 +245,7 @@ export default function FinanceDashboard() {
            sees the connected-system reading first. */}
         <CrossModulePressurePanel intel={businessIntelligence} />
         <ApprovalOperationsPanel intel={businessIntelligence} />
+        <PaymentOperationsPanel intel={businessIntelligence} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -1343,4 +1344,100 @@ function formatCompactUsd(n: number): string {
   if (abs >= 1_000_000) return (n / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2) + "M";
   if (abs >= 1_000)     return (n / 1_000).toFixed(abs >= 10_000 ? 1 : 2) + "K";
   return n.toFixed(0);
+}
+
+/* ===========================================================================
+   PaymentOperationsPanel  —  Phase 2.3
+
+   Calm one-block panel that surfaces payment-control state on the
+   dashboard. Mirrors ApprovalOperationsPanel.
+
+     · header: pressure pill + composite health
+     · 4-tile stat row (pending approval · unreconciled · mismatches · missing evidence)
+     · narrative read
+
+   Renders nothing when everything is calm — quiet by default.
+   ========================================================================== */
+
+function PaymentOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+  const p = intel.payment;
+  const meaningful =
+    p.pendingApproval.count >= 1 && p.pendingApproval.totalValue >= 10_000 ||
+    p.reconciliation.unreconciledCount >= 1 ||
+    p.reconciliation.mismatchCount >= 1 ||
+    p.evidence.missingCount >= 2 ||
+    p.failedCount >= 1 ||
+    p.pressure !== "calm";
+  if (!meaningful) return null;
+
+  const pressureCls =
+    p.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
+    : p.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+    : p.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
+    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+  const pressureDot =
+    p.pressure === "critical" ? "bg-rose-400"
+    : p.pressure === "risk"   ? "bg-rose-400"
+    : p.pressure === "watch"  ? "bg-amber-300"
+    :                           "bg-emerald-400";
+  const scoreCls =
+    p.pressure === "critical" ? "text-rose-300"
+    : p.pressure === "risk"   ? "text-rose-300/90"
+    : p.pressure === "watch"  ? "text-amber-300"
+    :                           "text-emerald-300";
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Payment operations</div>
+          {p.read && <div className="mt-1 text-[12px] text-gray-300">{p.read}</div>}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
+            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
+            {p.pressure === "calm" ? "Calm" : p.pressure === "watch" ? "Watch" : p.pressure === "risk" ? "Risk" : "Critical"}
+          </span>
+          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
+            {p.healthScore}
+            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile
+          label="Pending approval"
+          value={p.pendingApproval.count > 0 ? p.pendingApproval.count.toString() : "0"}
+          hint={p.pendingApproval.totalValue > 0 ? `${formatCompactUsd(p.pendingApproval.totalValue)} USD` : undefined}
+          tone={p.pendingApproval.oldestDays >= 14 ? "rose" : p.pendingApproval.oldestDays >= 7 ? "amber" : "neutral"}
+        />
+        <StatTile
+          label="Unreconciled"
+          value={p.reconciliation.unreconciledCount.toString()}
+          hint={p.reconciliation.unreconciledValue > 0 ? `${formatCompactUsd(p.reconciliation.unreconciledValue)} USD` : undefined}
+          tone={p.reconciliation.unreconciledCount >= 5 ? "rose" : p.reconciliation.unreconciledCount >= 1 ? "amber" : "neutral"}
+        />
+        <StatTile
+          label="Mismatches"
+          value={p.reconciliation.mismatchCount.toString()}
+          hint={p.reconciliation.mismatchValue > 0 ? `${formatCompactUsd(p.reconciliation.mismatchValue)} USD diff` : undefined}
+          tone={p.reconciliation.mismatchCount >= 1 ? "rose" : "neutral"}
+        />
+        <StatTile
+          label="Missing evidence"
+          value={p.evidence.missingCount.toString()}
+          hint={p.evidence.missingValue > 0 ? `${formatCompactUsd(p.evidence.missingValue)} USD` : undefined}
+          tone={p.evidence.missingCount >= 5 ? "rose" : p.evidence.missingCount >= 2 ? "amber" : "neutral"}
+        />
+      </div>
+
+      {p.failedCount > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/[0.20] bg-rose-500/[0.04] px-3 py-2 text-[11px] text-rose-200">
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+          <span><span className="font-medium">{p.failedCount}</span> payment{p.failedCount === 1 ? "" : "s"} failed at the bank — recovery required.</span>
+        </div>
+      )}
+    </div>
+  );
 }

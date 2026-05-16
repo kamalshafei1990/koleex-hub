@@ -92,6 +92,33 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
 
   /* Velocity drop: ≥ 50% PoP slowdown. */
   approval_velocity_drop: (e) => (e.magnitude ?? 0) >= 50,
+
+  /* ── Phase 2.3 payment-control kinds ────────────────────────────── */
+
+  /* Approval delay: ≥ 3 pending AND ≥ USD 10K total. */
+  payment_approval_delay: (e) =>
+    (e.magnitude ?? 0) >= 3 && (e.amount ?? 0) >= 10_000,
+
+  /* Large unapproved: ≥ USD 25K. */
+  large_unapproved_payment: (e) => (e.amount ?? 0) >= 25_000,
+
+  /* Mismatch: ≥ 1 line AND USD 100+ aggregate, OR ≥ 3 lines. */
+  payment_mismatch: (e) =>
+    ((e.magnitude ?? 0) >= 1 && (e.amount ?? 0) >= 100) || (e.magnitude ?? 0) >= 3,
+
+  /* Unreconciled: ≥ 2 lines OR ≥ USD 10K single-line. */
+  unreconciled_payment: (e) =>
+    (e.magnitude ?? 0) >= 2 || (e.amount ?? 0) >= 10_000,
+
+  /* Missing evidence: ≥ 2 settled payments without evidence. */
+  missing_payment_evidence: (e) => (e.magnitude ?? 0) >= 2,
+
+  /* Failed: any single failed payment is material. */
+  failed_payment: (e) => (e.magnitude ?? 0) >= 1,
+
+  /* Duplicate risk: any candidate ≥ USD 500 already filtered in
+     engine; the gate is a defense-in-depth pass-through. */
+  duplicate_payment_risk: (e) => (e.magnitude ?? 0) >= 1,
 };
 
 /**

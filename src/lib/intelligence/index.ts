@@ -60,10 +60,12 @@ export {
   scoreLogisticsHealth,
   scoreInventoryHealth,
   scoreApprovalHealth,
+  scorePaymentHealth,
   composeBusinessHealth,
 } from "./health";
 
 export { buildApprovalSnapshot } from "./approval";
+export { buildPaymentControlSnapshot } from "./payment";
 
 export { assessRisk } from "./risk";
 export { buildBusinessCopilotContext } from "./copilot";
@@ -99,6 +101,7 @@ import { prioritise, suppressNoise } from "./priority";
 import { annotateWithMemory, smoothHealth, withHealthScore, type MemoryState } from "./persistence";
 import { buildExecutiveDigest } from "./digest";
 import { buildApprovalSnapshot } from "./approval";
+import { buildPaymentControlSnapshot } from "./payment";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -106,6 +109,7 @@ import {
   scoreFinanceHealth,
   scoreInventoryHealth,
   scoreLogisticsHealth,
+  scorePaymentHealth,
   scoreSupplierHealth,
 } from "./health";
 import { assessRisk } from "./risk";
@@ -118,6 +122,8 @@ export interface IntelligencePicture {
   inventory: InventorySnapshot;
   /** Phase 2.2.1 — approval operations snapshot. */
   approval: import("./types").ApprovalIntelligenceSnapshot;
+  /** Phase 2.3 — payment control snapshot. */
+  payment: import("./types").PaymentControlSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -193,6 +199,12 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
      materiality + noise + priority pipeline. */
   const approval = buildApprovalSnapshot(input.expenses, periodDays);
 
+  /* Phase 2.3 — payment control snapshot. Reads finance_payments with
+     the approval + reconciliation columns. Same architectural pattern
+     as approval — events flow into the shared materiality/priority
+     pipeline; the rich snapshot powers the dedicated dashboard panel. */
+  const payment = buildPaymentControlSnapshot(input.payments);
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -203,6 +215,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
       inventory,
     }),
     ...approval.events,
+    ...payment.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -218,6 +231,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     scoreLogisticsHealth(logistics),
     scoreInventoryHealth(inventory),
     scoreApprovalHealth(approval),
+    scorePaymentHealth(payment),
   ];
   const rawHealth = composeBusinessHealth(dimensions);
   const health = smoothHealth(rawHealth, input.memory ?? null);
@@ -241,7 +255,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
   const nextMemory = withHealthScore(memoryRun.nextMemory, health);
 
   return {
-    customers, suppliers, logistics, inventory, approval,
+    customers, suppliers, logistics, inventory, approval, payment,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

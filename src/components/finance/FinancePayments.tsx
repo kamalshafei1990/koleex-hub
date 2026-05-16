@@ -5,12 +5,31 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
-import type { FinancePayment } from "@/lib/finance/types";
+import type { ApprovalStatus, FinancePayment, ReconciliationStatus } from "@/lib/finance/types";
+/* Phase 2.3 — payment control. */
+import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
+import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
+import PaymentReviewDrawer from "@/components/payment/PaymentReviewDrawer";
 
 export default function FinancePayments() {
   const [rows, setRows] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<FinancePayment> | null>(null);
+  /* Phase 2.3 — review drawer + approver-permission state. */
+  const [reviewPayment, setReviewPayment] = useState<FinancePayment | null>(null);
+  const [canApprove, setCanApprove] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/me/permitted-modules", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        const modules = (j.modules ?? []) as string[];
+        setCanApprove(!!j.is_super_admin || modules.includes("Finance"));
+      })
+      .catch(() => { /* default false */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +185,11 @@ export default function FinancePayments() {
                   </thead>
                   <tbody>
                     {rows.map((p) => (
-                      <tr key={p.id} className="border-t border-white/[0.04] transition hover:bg-white/[0.02]">
+                      <tr
+                        key={p.id}
+                        className="cursor-pointer border-t border-white/[0.04] transition hover:bg-white/[0.02]"
+                        onClick={() => setReviewPayment(p)}
+                      >
                         <td className="py-3 pr-3 text-gray-400 tabular-nums">{p.payment_date}</td>
                         <td className="py-3 pr-3">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${p.direction === "in" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
@@ -178,7 +201,13 @@ export default function FinancePayments() {
                         <td className={`py-3 pr-3 text-right tabular-nums font-semibold ${p.direction === "in" ? "text-emerald-400" : "text-rose-400"}`}>
                           {p.direction === "in" ? "+" : "−"}{fmtMoney(Number(p.amount) || 0, p.currency, { compact: true })}
                         </td>
-                        <td className="py-3 pr-3"><StatusBadge status={p.status} /></td>
+                        <td className="py-3 pr-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <StatusBadge status={p.status} />
+                            <ApprovalBadge status={(p.approval_status ?? "draft") as ApprovalStatus} compact />
+                            <ReconciliationBadge status={(p.reconciliation_status ?? "unreconciled") as ReconciliationStatus} compact />
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -188,6 +217,17 @@ export default function FinancePayments() {
           )}
         </div>
       </div>
+
+      <PaymentReviewDrawer
+        open={!!reviewPayment}
+        onClose={() => setReviewPayment(null)}
+        payment={reviewPayment}
+        canApprove={canApprove}
+        onChange={(next) => {
+          setReviewPayment(next);
+          void load();
+        }}
+      />
     </div>
   );
 }

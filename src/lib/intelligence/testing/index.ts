@@ -12,6 +12,7 @@ export {
   falseSignalState,
   recoveryState,
   approvalPressureState,
+  paymentControlState,
   type Scenario,
   type ScenarioExpectations,
 } from "./scenarios";
