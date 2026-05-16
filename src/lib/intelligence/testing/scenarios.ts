@@ -23,6 +23,10 @@ import type {
   FinanceOrder,
   FinanceOrderSupplier,
   FinancePayment,
+  FinanceReconciliationCandidate,
+  ReconciliationCandidateType,
+  ReconciliationConfidenceLevel,
+  ReconciliationCandidateStatus,
 } from "@/lib/finance/types";
 import type {
   IntelligenceInputs,
@@ -1228,6 +1232,290 @@ export function negativeRunwayState(): Scenario {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   Reconciliation candidate fixture builder (Phase 2.5).
+   --------------------------------------------------------------------------- */
+
+function makeCandidate(spec: {
+  id: string;
+  payment_id: string;
+  cash_movement_id: string;
+  confidence: number;
+  confidence_level: ReconciliationConfidenceLevel;
+  candidate_type: ReconciliationCandidateType;
+  status?: ReconciliationCandidateStatus;
+  match_reason_summary?: string;
+  rejected_at?: string | null;
+}): FinanceReconciliationCandidate {
+  return {
+    id: spec.id,
+    tenant_id: "tenant-test",
+    payment_id: spec.payment_id,
+    cash_movement_id: spec.cash_movement_id,
+    confidence: spec.confidence,
+    confidence_level: spec.confidence_level,
+    candidate_type: spec.candidate_type,
+    match_reason_summary:
+      spec.match_reason_summary ?? `${Math.round(spec.confidence * 100)}% confidence.`,
+    matched_factors: [
+      { key: "amount", label: "Same amount", score: 1 },
+      { key: "direction", label: "Same direction", score: 1 },
+    ],
+    warnings: [],
+    status: spec.status ?? "suggested",
+    suggested_at: isoDate(-1) + "T09:00:00Z",
+    confirmed_at: null,
+    confirmed_by: null,
+    rejected_at: spec.rejected_at ?? null,
+    rejected_by: null,
+    rejection_reason: null,
+    metadata: {},
+    created_at: isoDate(-1) + "T09:00:00Z",
+    updated_at: isoDate(-1) + "T09:00:00Z",
+  };
+}
+
+/* AUTO_RECONCILIATION_STATE — Phase 2.5
+   The reconciliation engine has emitted:
+     · one EXACT high-confidence match (suggested, awaiting confirm)
+     · one PARTIAL match (suggested, partial settlement)
+     · one DUPLICATE-RISK candidate (suggested)
+     · one REJECTED candidate (must NOT reappear in suggested set)
+     · one LOW-confidence pair that the engine never promoted to a row
+       at all (i.e. it was below the 0.35 floor — the harness asserts
+       the digest stays calm and Copilot doesn't echo noise).
+
+   Expectations:
+     · expectEventKinds includes high_confidence_unconfirmed_match,
+       partial_match_pressure, duplicate_cash_movement_risk
+     · forbidEventKinds does NOT need to forbid noise kinds — the
+       materiality gate handles them. Test that rejected pair does
+       not produce a new event by keeping pending counts within the
+       expected band.
+     · health remains in a calm-to-watch band (reconciliation pressure
+       alone is not a critical signal)
+     · copilot surfaces useful hints; we cap at 3 (default). */
+export function autoReconciliationState(): Scenario {
+  const base = healthyState();
+  const movements: CashMovement[] = [
+    /* High-confidence exact match — same amount + reference + date. */
+    makeMovement({
+      id: "cm-rec-1",
+      bank_account_id: "ba-rec-1",
+      movement_type: "incoming",
+      direction: "inflow",
+      amount: 22_000,
+      currency: "USD",
+      movement_date: isoDate(-2),
+      bank_reference: "TT-EXACT-001",
+      counterparty_name: "ACME Spinning",
+    }),
+    /* Partial settlement — bank received only 60% of expected. */
+    makeMovement({
+      id: "cm-rec-2",
+      bank_account_id: "ba-rec-1",
+      movement_type: "incoming",
+      direction: "inflow",
+      amount: 18_000,
+      currency: "USD",
+      movement_date: isoDate(-3),
+      bank_reference: "TT-PARTIAL-002",
+      counterparty_name: "Cairo Knits",
+    }),
+    /* Duplicate movement — same as cm-rec-3, different id. */
+    makeMovement({
+      id: "cm-rec-3",
+      bank_account_id: "ba-rec-1",
+      movement_type: "outgoing",
+      direction: "outflow",
+      amount: 12_000,
+      currency: "USD",
+      movement_date: isoDate(-4),
+      bank_reference: "TT-DUP-003",
+      counterparty_name: "Ningbo Steel",
+    }),
+    makeMovement({
+      id: "cm-rec-4",
+      bank_account_id: "ba-rec-1",
+      movement_type: "outgoing",
+      direction: "outflow",
+      amount: 12_000,
+      currency: "USD",
+      movement_date: isoDate(-4),
+      bank_reference: "TT-DUP-003",
+      counterparty_name: "Ningbo Steel",
+    }),
+  ];
+  const payments: FinancePayment[] = [
+    /* Match for cm-rec-1 (exact, high confidence). */
+    makePayment({
+      id: "p-rec-1",
+      direction: "in",
+      party_type: "customer",
+      party_name: "ACME Spinning",
+      amount: 22_000,
+      currency: "USD",
+      payment_date: isoDate(-2),
+      reference_no: "TT-EXACT-001",
+    }),
+    /* Match for cm-rec-2 (partial — expected 30K, bank got 18K). */
+    makePayment({
+      id: "p-rec-2",
+      direction: "in",
+      party_type: "customer",
+      party_name: "Cairo Knits",
+      amount: 30_000,
+      currency: "USD",
+      payment_date: isoDate(-3),
+      reference_no: "TT-PARTIAL-002",
+    }),
+    /* The supplier-side payment behind the duplicate-risk pair. */
+    makePayment({
+      id: "p-rec-3",
+      direction: "out",
+      party_type: "supplier",
+      party_name: "Ningbo Steel",
+      amount: 12_000,
+      currency: "USD",
+      payment_date: isoDate(-4),
+      reference_no: "TT-DUP-003",
+    }),
+    /* Rejected pair — payment that operator already said "no" to. */
+    makePayment({
+      id: "p-rec-4-rejected",
+      direction: "in",
+      party_type: "customer",
+      party_name: "Tanta Textiles",
+      amount: 9_500,
+      currency: "USD",
+      payment_date: isoDate(-8),
+      reference_no: "TT-REJ-004",
+    }),
+  ];
+  const candidates: FinanceReconciliationCandidate[] = [
+    /* 1. Exact high-confidence — suggested. */
+    makeCandidate({
+      id: "rec-1",
+      payment_id: "p-rec-1",
+      cash_movement_id: "cm-rec-1",
+      confidence: 0.94,
+      confidence_level: "high",
+      candidate_type: "exact",
+      match_reason_summary:
+        "94% confidence, same amount, same USD, reference match, same-day movement.",
+    }),
+    /* 2. Partial — suggested. */
+    makeCandidate({
+      id: "rec-2",
+      payment_id: "p-rec-2",
+      cash_movement_id: "cm-rec-2",
+      confidence: 0.72,
+      confidence_level: "medium",
+      candidate_type: "partial",
+      match_reason_summary:
+        "72% confidence; partial settlement — bank received 60% of expected.",
+    }),
+    /* 3. Partial — second one so partial_match_pressure threshold (≥3) trips. */
+    makeCandidate({
+      id: "rec-2b",
+      payment_id: "p-rec-2",
+      cash_movement_id: "cm-rec-1",
+      confidence: 0.66,
+      confidence_level: "medium",
+      candidate_type: "partial",
+      match_reason_summary: "66% confidence; partial settlement.",
+    }),
+    /* 4. Partial — third one. */
+    makeCandidate({
+      id: "rec-2c",
+      payment_id: "p-rec-3",
+      cash_movement_id: "cm-rec-3",
+      confidence: 0.62,
+      confidence_level: "medium",
+      candidate_type: "underpayment",
+      match_reason_summary: "62% confidence; bank short of payment.",
+    }),
+    /* 5. Duplicate-risk — suggested. */
+    makeCandidate({
+      id: "rec-3",
+      payment_id: "p-rec-3",
+      cash_movement_id: "cm-rec-4",
+      confidence: 0.91,
+      confidence_level: "high",
+      candidate_type: "duplicate_risk",
+      match_reason_summary:
+        "91% confidence; possible duplicate bank movement on Ningbo Steel.",
+    }),
+    /* 6. Rejected pair — operator already said no. The matcher's
+          rescan path skips it; the validator confirms it is NOT in
+          the suggested counts. */
+    makeCandidate({
+      id: "rec-4-rejected",
+      payment_id: "p-rec-4-rejected",
+      cash_movement_id: "cm-rec-1",
+      confidence: 0.61,
+      confidence_level: "medium",
+      candidate_type: "exact",
+      status: "rejected",
+      rejected_at: isoDate(-1) + "T11:00:00Z",
+      match_reason_summary: "61% confidence; rejected by operator.",
+    }),
+    /* 7. Second rejection on the same pair so the "repeat-rejection"
+          signal threshold is exercised (but the materiality gate keeps
+          it from over-firing — the harness only checks the recon
+          snapshot remains internally consistent). */
+    makeCandidate({
+      id: "rec-4-rejected-b",
+      payment_id: "p-rec-4-rejected",
+      cash_movement_id: "cm-rec-1",
+      confidence: 0.55,
+      confidence_level: "medium",
+      candidate_type: "exact",
+      status: "rejected",
+      rejected_at: isoDate(-2) + "T08:00:00Z",
+      match_reason_summary: "55% confidence; rejected by operator (earlier).",
+    }),
+    /* 8. NOTE: the low-confidence pair (0.30) is deliberately NOT a
+          candidate row here — the engine never persisted it because
+          it was below the 0.35 floor. The validator therefore asserts
+          on absence of any low-confidence signal getting through. */
+  ];
+  return {
+    name: "AUTO_RECONCILIATION_STATE",
+    description:
+      "One exact high-confidence match, partial / underpayment matches, a duplicate-risk movement, " +
+      "a previously-rejected pair, and a low-confidence pair that must remain suppressed.",
+    inputs: {
+      ...base.inputs,
+      payments: [...base.inputs.payments, ...payments],
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-rec-1",
+          bank_name: "First National",
+          currency: "USD",
+          available_balance: 220_000,
+          is_primary: true,
+        }),
+      ],
+      cashMovements: movements,
+      reconciliationCandidates: candidates,
+    },
+    expectations: {
+      digestRange: [0, 5],
+      eventRange: [1, 14],
+      healthRange: [60, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: [
+        "high_confidence_unconfirmed_match",
+        "duplicate_cash_movement_risk",
+        "partial_match_pressure",
+      ],
+    },
+  };
+}
+
 export const ALL_SCENARIOS: () => Scenario[] = () => [
   healthyState(),
   moderatePressureState(),
@@ -1241,4 +1529,5 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   fxExposureState(),
   bankMismatchState(),
   negativeRunwayState(),
+  autoReconciliationState(),
 ];

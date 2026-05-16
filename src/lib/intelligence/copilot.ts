@@ -18,6 +18,8 @@ import type {
   OperationalEvent,
   Severity,
 } from "./types";
+import type { ReconciliationSnapshot } from "./reconciliation";
+import type { FinanceReconciliationCandidate, CashMovement } from "@/lib/finance/types";
 
 interface BuildArgs {
   events: OperationalEvent[];
@@ -29,6 +31,16 @@ interface BuildArgs {
     supplierId?: string;
     orderId?: string;
   };
+  /* Phase 2.5 — reconciliation-aware Copilot. Optional so old callers
+     keep compiling; when present we inject up to 1 targeted hint per
+     reconciliation theme so the assistant can say something concrete
+     ("4 high-confidence matches waiting") instead of repeating the
+     generic event detail. */
+  reconciliation?: ReconciliationSnapshot;
+  reconciliationCandidates?: FinanceReconciliationCandidate[];
+  /** Optional movement lookup for duplicate-risk callouts that name
+   *  the bank account. */
+  cashMovements?: CashMovement[];
 }
 
 const SEV_RANK: Record<Severity, number> = { critical: 0, risk: 1, watch: 2, info: 3 };
@@ -36,7 +48,7 @@ const MIN_CORRELATION_CONFIDENCE = 0.6;
 const MAX_HINTS = 3;
 
 export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
-  const { events, correlations, pageContext } = args;
+  const { events, correlations, pageContext, reconciliation, reconciliationCandidates, cashMovements } = args;
   const hints: CopilotHint[] = [];
 
   /* 1) Cross-module correlations FIRST — but only ones that earned
@@ -56,6 +68,111 @@ export function buildBusinessCopilotContext(args: BuildArgs): CopilotHint[] {
           : c.narrative,
       related: { eventKeys: c.sources },
     });
+  }
+
+  /* 1b) Reconciliation-aware hints. Phase 2.5.
+        We inject AT MOST 2 reconciliation hints, only when there's
+        something specific to say — never as filler. The text names
+        the count, the confidence, and (for duplicates) the bank
+        account by name so the operator can act without opening the
+        queue first. */
+  if (reconciliation) {
+    const r = reconciliation;
+    const known = new Set(hints.map((h) => h.key));
+    const reconHints: CopilotHint[] = [];
+
+    /* High-confidence unconfirmed — most actionable single-shot hint. */
+    if (r.highConfidencePendingCount >= 1) {
+      const n = r.highConfidencePendingCount;
+      const sample = (reconciliationCandidates ?? []).find(
+        (c) => c.status === "suggested" && c.confidence_level === "high",
+      );
+      const sampleNote = sample
+        ? ` Top match scored ${Math.round(sample.confidence * 100)}%.`
+        : "";
+      reconHints.push({
+        key: "copilot-recon-high-conf",
+        module: "treasury",
+        severity: n >= 5 ? "risk" : "watch",
+        text: `${n} high-confidence reconciliation match${n === 1 ? "" : "es"} waiting for confirmation.${sampleNote}`,
+        related: { eventKeys: ["recon-high-conf"] },
+      });
+    }
+
+    /* Duplicate movements — name the bank account when we can. */
+    if (r.duplicateRiskCount >= 1 && reconciliationCandidates && cashMovements) {
+      const dup = reconciliationCandidates.find(
+        (c) => c.status === "suggested" && c.candidate_type === "duplicate_risk",
+      );
+      const m = dup?.cash_movement ?? null;
+      const movementId = m?.id ?? dup?.cash_movement_id ?? null;
+      const movement = movementId ? cashMovements.find((mv) => mv.id === movementId) : null;
+      const accountLabel = movement?.counterparty_name || movement?.bank_reference || "a bank account";
+      reconHints.push({
+        key: "copilot-recon-duplicate",
+        module: "treasury",
+        severity: r.duplicateRiskCount >= 3 ? "risk" : "watch",
+        text: `Possible duplicate bank movement on ${accountLabel} — review before reconciling.`,
+        related: { eventKeys: ["recon-duplicate"] },
+      });
+    } else if (r.duplicateRiskCount >= 1) {
+      reconHints.push({
+        key: "copilot-recon-duplicate",
+        module: "treasury",
+        severity: r.duplicateRiskCount >= 3 ? "risk" : "watch",
+        text: `${r.duplicateRiskCount} possible duplicate bank movement${r.duplicateRiskCount === 1 ? "" : "s"} detected — confirm with the bank before reconciling.`,
+        related: { eventKeys: ["recon-duplicate"] },
+      });
+    }
+
+    /* Partial-match pressure — only if it's a sustained pile-up. */
+    if (r.partialPendingCount >= 3 && !reconHints.find((h) => h.key === "copilot-recon-high-conf")) {
+      reconHints.push({
+        key: "copilot-recon-partial",
+        module: "treasury",
+        severity: r.partialPendingCount >= 8 ? "risk" : "watch",
+        text: `${r.partialPendingCount} partial / variance matches in queue — recurring shape suggests systemic discrepancy.`,
+        related: { eventKeys: ["recon-partial"] },
+      });
+    }
+
+    /* Rejection pattern — only if it's worth investigating. */
+    if (r.repeatRejectionPairs >= 2 && !reconHints.find((h) => h.key === "copilot-recon-partial")) {
+      reconHints.push({
+        key: "copilot-recon-rejection-pattern",
+        module: "treasury",
+        severity: r.repeatRejectionPairs >= 3 ? "risk" : "watch",
+        text: `${r.repeatRejectionPairs} payment/movement pairs rejected more than once — investigate ambiguous data.`,
+        related: { eventKeys: ["recon-rejection-pattern"] },
+      });
+    }
+
+    /* Backlog — last because it's the most "summary" of the bunch.
+       Only emits when neither high-confidence nor duplicate-risk is
+       already speaking, so we don't double-count. */
+    if (
+      r.pendingCount >= 10 &&
+      !reconHints.find((h) =>
+        h.key === "copilot-recon-high-conf" || h.key === "copilot-recon-duplicate",
+      )
+    ) {
+      const ageNote = r.oldestPendingDays >= 7 ? `; oldest is ${r.oldestPendingDays}d` : "";
+      reconHints.push({
+        key: "copilot-recon-backlog",
+        module: "treasury",
+        severity: r.pendingCount >= 15 ? "risk" : "watch",
+        text: `Reconciliation queue holds ${r.pendingCount} suggestion${r.pendingCount === 1 ? "" : "s"}${ageNote}.`,
+        related: { eventKeys: ["recon-backlog"] },
+      });
+    }
+
+    /* Inject up to 2 reconciliation hints, dedup against existing. */
+    for (const h of reconHints.slice(0, 2)) {
+      if (known.has(h.key)) continue;
+      if (hints.length >= MAX_HINTS) break;
+      hints.push(h);
+      known.add(h.key);
+    }
   }
 
   /* 2) Page-biased hints — if the user is looking at a specific

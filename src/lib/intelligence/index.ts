@@ -293,6 +293,9 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     events: ranked,
     correlations,
     pageContext: input.pageContext,
+    reconciliation,
+    reconciliationCandidates: input.reconciliationCandidates ?? [],
+    cashMovements: input.cashMovements ?? [],
   });
 
   const digest = buildExecutiveDigest({
