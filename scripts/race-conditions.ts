@@ -106,7 +106,7 @@ async function insertOrThrow(table: string, row: Record<string, unknown>): Promi
   }
 }
 
-async function seedAccount(): Promise<string> {
+async function seedAccount(opts?: { isPrimary?: boolean }): Promise<string> {
   const id = randomUUID();
   await insertOrThrow("finance_bank_accounts", {
     id,
@@ -120,7 +120,9 @@ async function seedAccount(): Promise<string> {
     pending_balance: 0,
     restricted_balance: 0,
     status: "active",
-    is_primary: true,
+    /* Default false so multiple accounts in the same scenario don't
+       collide with the one-primary-per-currency partial unique index. */
+    is_primary: opts?.isPrimary === true,
   });
   return id;
 }
@@ -352,6 +354,110 @@ async function scenario_bank_import_confirm_race() {
   await cleanTestTenant();
 }
 
+async function scenario_db_guardrails() {
+  console.log("\n[7] Phase S.1B database guardrails — invalid inserts must be rejected");
+
+  /* 7a. Invalid currency format. */
+  const accId = randomUUID();
+  const badCurrency = await supabase.from("finance_bank_accounts").insert({
+    id: accId, tenant_id: TEST_TENANT,
+    bank_name: "BadCcy", account_name: "BadCcy",
+    currency: "usd",                          // lowercase — should reject
+    opening_balance: 0, current_balance: 0, available_balance: 0,
+    pending_balance: 0, restricted_balance: 0,
+    status: "active", is_primary: false,
+  });
+  logResult("currency format CHECK rejects lowercase",
+            !!badCurrency.error,
+            badCurrency.error?.message ?? "no error");
+
+  /* 7b. Duplicate primary in same currency. */
+  const acc1 = await seedAccount({ isPrimary: true });
+  const dupePrimary = await supabase.from("finance_bank_accounts").insert({
+    id: randomUUID(), tenant_id: TEST_TENANT,
+    bank_name: "Dupe", account_name: "Dupe Primary",
+    currency: "USD",
+    opening_balance: 0, current_balance: 100, available_balance: 100,
+    pending_balance: 0, restricted_balance: 0,
+    status: "active", is_primary: true,
+  });
+  logResult("partial unique index rejects second primary in same currency",
+            !!dupePrimary.error,
+            dupePrimary.error?.message ?? "no error");
+
+  /* 7c. Far-future movement_date. */
+  const farFuture = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
+  const futureMovement = await supabase.from("finance_cash_movements").insert({
+    tenant_id: TEST_TENANT, bank_account_id: acc1,
+    movement_type: "incoming", direction: "inflow", currency: "USD",
+    amount: 10, movement_date: farFuture,
+    reconciliation_status: "unreconciled", evidence_status: "missing",
+  });
+  logResult("future-date trigger rejects movement > today+365d",
+            !!futureMovement.error,
+            futureMovement.error?.message ?? "no error");
+
+  /* 7d. Inactive-account guard — flip account to archived, try to write. */
+  const acc2 = await seedAccount();
+  await supabase.from("finance_bank_accounts")
+    .update({ status: "archived", is_primary: false })
+    .eq("id", acc2);
+  /* The first account from this scenario (acc1) is the primary USD, so
+     archiving acc2 doesn't conflict with the partial unique index. */
+  const inactiveMovement = await supabase.from("finance_cash_movements").insert({
+    tenant_id: TEST_TENANT, bank_account_id: acc2,
+    movement_type: "incoming", direction: "inflow", currency: "USD",
+    amount: 10, movement_date: new Date().toISOString().slice(0, 10),
+    reconciliation_status: "unreconciled", evidence_status: "missing",
+  });
+  logResult("inactive-account trigger rejects movement on archived account",
+            !!inactiveMovement.error,
+            inactiveMovement.error?.message ?? "no error");
+
+  /* 7e. Audit-table immutability — INSERT then try to UPDATE. */
+  const acc3 = await seedAccount();
+  await supabase.from("finance_bank_accounts")
+    .update({ is_primary: false })
+    .eq("id", acc3);
+  /* Need a payment to attach the audit row to. */
+  const paymentId = randomUUID();
+  await supabase.from("finance_payments").insert({
+    id: paymentId, tenant_id: TEST_TENANT,
+    direction: "in", party_type: "customer", party_name: "Audit Test",
+    amount: 1, currency: "USD",
+    payment_date: new Date().toISOString().slice(0, 10),
+    status: "completed", reconciliation_status: "unreconciled", approval_status: "approved",
+  });
+  const auditRow = await supabase.from("finance_approval_history").insert({
+    tenant_id: TEST_TENANT, entity_type: "payment", entity_id: paymentId,
+    action: "review_note", from_status: "unreconciled", to_status: "unreconciled",
+    actor_id: TEST_ACTOR, notes: "test",
+  }).select("id").single();
+  const auditId = auditRow.data?.id;
+  if (auditId) {
+    const upd = await supabase.from("finance_approval_history")
+      .update({ notes: "tampered" })
+      .eq("id", auditId);
+    logResult("audit table immutable: UPDATE on finance_approval_history rejected",
+              !!upd.error,
+              upd.error?.message ?? "no error");
+  } else {
+    logResult("audit table immutable: setup failed", false, "no audit id");
+  }
+
+  /* 7f. entity_type CHECK now allows 'bank_import' + 'treasury_plan'. */
+  const bankImportEntity = await supabase.from("finance_approval_history").insert({
+    tenant_id: TEST_TENANT, entity_type: "bank_import", entity_id: randomUUID(),
+    action: "approve", from_status: "parsed", to_status: "confirmed",
+    actor_id: TEST_ACTOR, notes: "extension check",
+  });
+  logResult("entity_type CHECK now allows 'bank_import'",
+            !bankImportEntity.error,
+            bankImportEntity.error?.message ?? "ok");
+
+  await cleanTestTenant();
+}
+
 async function scenario_treasury_plan_review_race() {
   console.log("\n[6] Treasury-plan review — approve vs request_changes parallel");
   const planId = randomUUID();
@@ -413,6 +519,7 @@ async function main() {
     await scenario_payment_reconcile_race();
     await scenario_bank_import_confirm_race();
     await scenario_treasury_plan_review_race();
+    await scenario_db_guardrails();
   } catch (e) {
     console.error("Harness error:", e);
     failures += 1;
