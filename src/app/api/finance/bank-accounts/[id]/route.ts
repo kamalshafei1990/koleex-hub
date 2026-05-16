@@ -134,6 +134,9 @@ interface PatchBody {
   status?: BankAccountStatus;
   notes?: string;
   metadata?: Record<string, unknown>;
+  /** Phase S.2 — optimistic concurrency token; when supplied the
+   *  UPDATE pins to it and concurrent edits trigger 409. */
+  expected_updated_at?: string;
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -199,13 +202,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     patch.metadata = md;
   }
 
-  const { data, error } = await supabaseServer
+  /* Phase S.2 — optimistic concurrency. */
+  let query = supabaseServer
     .from("finance_bank_accounts")
     .update(patch)
     .eq("id", id)
-    .eq("tenant_id", auth.tenant_id)
-    .select("*")
-    .single();
+    .eq("tenant_id", auth.tenant_id);
+  if (body.expected_updated_at) {
+    query = query.eq("updated_at", body.expected_updated_at);
+  }
+  const { data, error } = await query.select("*").maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ account: data as BankAccount });
+  if (!data && body.expected_updated_at) {
+    return NextResponse.json(
+      { error: "stale_update", details: "account was modified by another operator" },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ account: (data ?? existing) as BankAccount });
 }

@@ -3,26 +3,27 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { normaliseUploadPath } from "@/lib/server/storage-tenant";
 
 /* POST /api/storage/upload
-   multipart/form-data:
-     file     (required) — the file blob
-     bucket   (required) — storage bucket id
-     path     (required) — object path within the bucket
-     upsert   (optional) — "true" to replace existing object
+   Phase S.2 — tenant isolation hardening.
 
-   Uses the service_role Supabase client, so anon/authenticated writes
-   can be blocked at the storage policy level. Only the bucket whitelist
-   below is allowed — tightens the blast radius if an API caller tries
-   to write into an unexpected bucket.
+   Uploads to a tenant-scoped bucket are forced under
+   `${auth.tenant_id}/...`. If the caller passes a path that's already
+   tenant-prefixed for THEIR tenant, it goes through unchanged. If it
+   has no prefix, the server prepends one. If it starts with a
+   *different* tenant's UUID prefix, the upload is rejected with 403.
+
+   Shared buckets (media, product-images, product-assets) remain
+   pass-through — they store cross-tenant assets.
 */
 
 const ALLOWED_BUCKETS = new Set([
   "media",
   "product-images",
   "product-assets",
-  "discuss-voice", // private bucket for voice notes (see /api/storage/signed-url)
-  "finance-documents", // private bucket for bank-statement imports + finance attachments
+  "discuss-voice",       // legacy: private, not tenant-scoped at path level
+  "finance-documents",   // tenant-scoped (Phase 2.6 + S.2)
 ]);
 
 export async function POST(req: Request) {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   const form = await req.formData();
   const file = form.get("file");
   const bucket = form.get("bucket");
-  const path = form.get("path");
+  const rawPath = form.get("path");
   const upsert = form.get("upsert") === "true";
   const cacheControl =
     (form.get("cacheControl") as string | null) ?? "3600";
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (typeof bucket !== "string" || typeof path !== "string" || !bucket || !path) {
+  if (typeof bucket !== "string" || typeof rawPath !== "string" || !bucket || !rawPath) {
     return NextResponse.json(
       { error: "bucket and path are required" },
       { status: 400 },
@@ -57,6 +58,13 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+
+  /* Phase S.2 — never trust client-provided path on tenant-scoped buckets. */
+  const norm = normaliseUploadPath(bucket, rawPath, auth.tenant_id);
+  if (!norm.ok) {
+    return NextResponse.json({ error: norm.error }, { status: 403 });
+  }
+  const path = norm.path;
 
   const { data, error } = await supabaseServer.storage
     .from(bucket)

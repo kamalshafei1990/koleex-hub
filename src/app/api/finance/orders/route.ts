@@ -202,8 +202,14 @@ export async function POST(req: Request) {
     }
 
     /* Replace supplier rows atomically. Simpler than diffing — Phase 2
-       can switch to a proper upsert-then-delete-missing path. */
-    await supabaseServer.from("finance_order_suppliers").delete().eq("order_id", o.id);
+       can switch to a proper upsert-then-delete-missing path.
+       Phase S.2: tenant_id filter is defence-in-depth even though
+       o.id was already tenant-verified in the SELECT a few lines up. */
+    await supabaseServer
+      .from("finance_order_suppliers")
+      .delete()
+      .eq("order_id", o.id)
+      .eq("tenant_id", auth.tenant_id);
     if (suppliers.length) {
       const rows = suppliers.map((s) => ({
         tenant_id: auth.tenant_id,

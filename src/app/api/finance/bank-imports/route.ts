@@ -117,8 +117,14 @@ export async function POST(req: Request) {
     });
   if (storageErr) {
     console.error("[bank-imports POST storage]", storageErr.message);
-    /* Compensating delete on the import row. */
-    await supabaseServer.from("finance_bank_statement_imports").delete().eq("id", importRow.id);
+    /* Compensating delete on the import row. Tenant filter is defence
+       in depth: importRow was just created by us with auth.tenant_id,
+       but never let writes drop the filter. */
+    await supabaseServer
+      .from("finance_bank_statement_imports")
+      .delete()
+      .eq("id", importRow.id)
+      .eq("tenant_id", auth.tenant_id);
     return NextResponse.json({ error: storageErr.message }, { status: 500 });
   }
 

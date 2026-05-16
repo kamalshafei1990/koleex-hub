@@ -9,6 +9,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { pathBelongsToTenant } from "@/lib/server/storage-tenant";
 import type { AttachmentCategory, AttachmentEntityType, FinanceAttachment } from "@/lib/finance/types";
 
 const BUCKET = "finance-documents";
@@ -51,6 +52,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const deny = await requireModuleAccess(auth, moduleForEntity(att.entity_type));
   if (deny) return deny;
+
+  /* Phase S.2 — defense-in-depth: even though loadAttachment already
+     scoped the row by tenant_id, double-check the storage_path lives
+     under the caller's tenant prefix before minting a signed URL.
+     A future code path that bypasses loadAttachment can't accidentally
+     leak a cross-tenant URL. */
+  if (!pathBelongsToTenant(att.storage_path, auth.tenant_id)) {
+    console.error("[attachments GET] tenant prefix mismatch", { id, tenant: auth.tenant_id });
+    return NextResponse.json({ error: "storage path tenant mismatch" }, { status: 403 });
+  }
 
   const { data: signed } = await supabaseServer.storage
     .from(BUCKET).createSignedUrl(att.storage_path, SIGNED_VIEW_TTL);
@@ -114,6 +125,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .from("finance_attachments")
       .update(update)
       .eq("id", id)
+      .eq("tenant_id", auth.tenant_id)
       .select("*")
       .single();
     if (error) {
@@ -158,6 +170,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     .from("finance_attachments")
     .update({ deleted_at: new Date().toISOString(), deleted_by: auth.account_id })
     .eq("id", id)
+    .eq("tenant_id", auth.tenant_id)
     .select("*")
     .single();
   if (error) {

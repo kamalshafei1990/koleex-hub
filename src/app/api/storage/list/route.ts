@@ -3,16 +3,21 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { assertTenantPath, isTenantScoped } from "@/lib/server/storage-tenant";
 
 const ALLOWED_BUCKETS = new Set([
   "media",
   "product-images",
   "product-assets",
   "discuss-voice",
+  "finance-documents",
 ]);
 
 /* GET /api/storage/list?bucket=X&folder=Y&limit=500
-   Returns storage.objects metadata for files under a folder. */
+   Phase S.2 — for tenant-scoped buckets the folder must be the
+   caller's tenant_id (or a path under it); empty folder rewrites to
+   the caller's tenant prefix so a "list everything" request only
+   ever sees the caller's own files. */
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -29,9 +34,21 @@ export async function GET(req: Request) {
     );
   }
 
+  let effectiveFolder = folder;
+  if (isTenantScoped(bucket)) {
+    if (!effectiveFolder) {
+      effectiveFolder = auth.tenant_id;
+    } else {
+      const violation = assertTenantPath(bucket, effectiveFolder, auth.tenant_id);
+      if (violation) {
+        return NextResponse.json({ error: violation }, { status: 403 });
+      }
+    }
+  }
+
   const { data, error } = await supabaseServer.storage
     .from(bucket)
-    .list(folder, { limit });
+    .list(effectiveFolder, { limit });
   if (error) {
     console.error("[api/storage/list]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });

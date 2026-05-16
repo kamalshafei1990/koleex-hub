@@ -69,6 +69,10 @@ interface PatchBody {
   assumptions?: Record<string, unknown> | null;
   metadata?: Record<string, unknown>;
   review_notes?: string | null;
+  /** Phase S.2 — optimistic concurrency token. When supplied, the
+   *  UPDATE pins to the loaded row's `updated_at`; any concurrent edit
+   *  invalidates this value and the API returns 409. */
+  expected_updated_at?: string;
 }
 
 function diffMetrics(prev: TreasuryPlanMetrics, next: TreasuryPlanMetrics): Record<string, unknown> {
@@ -162,13 +166,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ plan: existing });
   }
-  const { data, error } = await supabaseServer
+
+  /* Phase S.2 — optimistic concurrency. If the client supplied the
+     row's loaded updated_at, pin the UPDATE to it. A concurrent edit
+     between SELECT and UPDATE invalidates this token; RETURNING is
+     empty and we surface 409. Clients that don't supply the token
+     keep the legacy last-write-wins behaviour for compatibility. */
+  let query = supabaseServer
     .from("finance_treasury_plans")
     .update(patch)
     .eq("id", id)
-    .eq("tenant_id", auth.tenant_id)
-    .select("*")
-    .single();
+    .eq("tenant_id", auth.tenant_id);
+  if (body.expected_updated_at) {
+    query = query.eq("updated_at", body.expected_updated_at);
+  }
+  const { data, error } = await query.select("*").maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ plan: data as TreasuryPlan });
+  if (!data && body.expected_updated_at) {
+    return NextResponse.json(
+      { error: "stale_update", details: "plan was modified by another operator" },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ plan: (data ?? existing) as TreasuryPlan });
 }

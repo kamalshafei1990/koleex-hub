@@ -3,17 +3,21 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
+import { assertTenantPath } from "@/lib/server/storage-tenant";
+
+/* POST /api/storage/remove
+   Body: { bucket: string, paths: string[] }
+   Phase S.2 — every path must belong to the caller's tenant when the
+   bucket is tenant-scoped. Cross-tenant deletes are rejected as 403. */
 
 const ALLOWED_BUCKETS = new Set([
   "media",
   "product-images",
   "product-assets",
   "discuss-voice",
+  "finance-documents",
 ]);
 
-/* POST /api/storage/remove
-   Body: { bucket: string, paths: string[] }
-   Deletes a list of objects via the service_role client. */
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -34,6 +38,20 @@ export async function POST(req: Request) {
       { error: "paths must be a non-empty array" },
       { status: 400 },
     );
+  }
+
+  /* Phase S.2 — reject any path that's not under the caller's tenant
+     prefix when the bucket is tenant-scoped. We fail the whole batch
+     so an attacker can't smuggle one cross-tenant path among legitimate
+     ones and have the rest silently succeed. */
+  for (const p of paths) {
+    if (typeof p !== "string" || !p) {
+      return NextResponse.json({ error: "every path must be a non-empty string" }, { status: 400 });
+    }
+    const violation = assertTenantPath(bucket, p, auth.tenant_id);
+    if (violation) {
+      return NextResponse.json({ error: violation }, { status: 403 });
+    }
   }
 
   const { error } = await supabaseServer.storage.from(bucket).remove(paths);
