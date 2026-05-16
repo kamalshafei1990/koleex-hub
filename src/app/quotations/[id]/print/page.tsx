@@ -201,11 +201,11 @@ export default function QuotationPrintPage({
         .quot-a4-doc {
           box-sizing: border-box !important;
           width: 210mm !important;
-          height: 297mm !important;
-          min-height: 297mm !important;
-          max-height: 297mm !important;
+          height: 270mm !important;
+          min-height: 270mm !important;
+          max-height: 270mm !important;
           margin: 0 !important;
-          padding: 32px 32px 24px !important;
+          padding: 24px 28px 18px !important;
           box-shadow: none !important;
           border: none !important;
           background: #fff !important;
@@ -218,13 +218,11 @@ export default function QuotationPrintPage({
           page-break-after: auto !important;
           break-after: auto !important;
         }
-        /* No editor chrome on this route, but kill any stray
-           .no-print elements (toolbars, file inputs etc.) just in
-           case a future change adds one. */
         .no-print { display: none !important; }
-        /* Force A4 paper — the doc was designed at exactly 210×297
-           mm. Auto-sizing to US Letter would scale + add white space. */
-        @page { size: A4; margin: 0; }
+        /* size: auto so the page-box follows the operator's paper
+           pick. Doc is 270 mm tall — fits A4 (297 mm) AND US Letter
+           (279 mm) without the every-other-blank-sheet overflow. */
+        @page { size: auto; margin: 0; }
       `}</style>
       <div className="quot-a4-stack">
         <QuotationA4Preview

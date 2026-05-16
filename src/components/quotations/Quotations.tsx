@@ -526,11 +526,22 @@ export const PRINT_AND_DOC_STYLES = `
    exclusively by @media print below — DO NOT set height here, only
    min-height (so screen view fills A4 height but print pipeline can
    override cleanly via !important without competing with inline). */
+/* Doc sized to fit BOTH A4 (297 mm) AND US Letter (279 mm) so the
+   print pipeline never overflows onto a phantom blank sheet. 270 mm
+   tall x 210 mm wide sits inside both paper sizes' printable area.
+   The editor renders at the SAME 270 mm height so what you see is
+   exactly what the PDF produces (WYSIWYG).
+   overflow:visible (set below) so the row-action floating cluster
+   (sits at right: -88 px past the page edge) stays clickable in
+   the editor. In print the cluster has .no-print so it is hidden;
+   overflow:hidden inside @media print takes care of any spill. */
 .quot-a4-doc {
   box-sizing: border-box;
   width: 210mm;
-  min-height: 297mm;
-  padding: 32px 32px 24px;
+  height: 270mm;
+  min-height: 270mm;
+  max-height: 270mm;
+  padding: 24px 28px 18px;
   background: #fff;
   color: #000;
   margin: 0 auto 40px;
@@ -728,14 +739,13 @@ export const PRINT_AND_DOC_STYLES = `
       print gutters that would shrink the usable width below the
       doc's 210 mm and force a scale-to-fit. */
 @media print {
-  /* Page setup — A4, zero browser margin (the doc has its own
-     32 px / 24 px padding). */
-  /* WYSIWYG: lock paper to A4 so the PDF matches the on-screen
-     editor's 210×297 mm doc exactly. The doc was designed at
-     exact A4 dimensions; auto-paper let US Letter shrink it
-     and break the layout. If an operator must print to US
-     Letter their printer driver will scale. */
-  @page { size: A4; margin: 0; }
+  /* @page size: auto so the page-box follows whatever paper the
+     operator's printer is set to (A4 OR US Letter). Hard-coding
+     A4 here would force a 297 mm page-box even when the printer
+     is on Letter (279 mm), producing every-other-blank physical
+     sheet because each logical A4 page overflows by 18 mm.
+     Doc content is 270 mm tall (set below) — fits both papers. */
+  @page { size: auto; margin: 0; }
 
   /* Reset page chrome */
   html, body {
@@ -782,23 +792,23 @@ export const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* WYSIWYG print geometry — locked to exact A4 (210×297 mm) so
-     the printed PDF matches the on-screen editor 1:1. Each doc
-     gets a hard page-break-after so the next quotation starts on
-     a fresh sheet. The :last-child exception kills a trailing
-     blank sheet after the final doc. Padding matches the editor's
-     screen padding (32 px / 32 px / 24 px) so per-page content
-     boundaries are identical between editor and PDF. */
+  /* Doc sized to fit both A4 and US Letter printable areas
+     (270 mm height). Editor on-screen uses the same 270 mm
+     height (see .quot-a4-doc above) so the printed PDF is
+     bit-for-bit identical to what the operator sees in the
+     editor. Hard page-break-after on every doc except the
+     last so the printer doesn't merge a doc's tail with the
+     next doc's head. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    height: 270mm !important;
+    min-height: 270mm !important;
+    max-height: 270mm !important;
     margin: 0 !important;
-    padding: 32px 32px 24px !important;
+    padding: 24px 28px 18px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;

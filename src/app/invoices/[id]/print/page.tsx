@@ -162,11 +162,11 @@ export default function InvoicePrintPage({
         .quot-a4-doc {
           box-sizing: border-box !important;
           width: 210mm !important;
-          height: 297mm !important;
-          min-height: 297mm !important;
-          max-height: 297mm !important;
+          height: 270mm !important;
+          min-height: 270mm !important;
+          max-height: 270mm !important;
           margin: 0 !important;
-          padding: 32px 32px 24px !important;
+          padding: 24px 28px 18px !important;
           box-shadow: none !important;
           border: none !important;
           background: #fff !important;
@@ -180,9 +180,10 @@ export default function InvoicePrintPage({
           break-after: auto !important;
         }
         .no-print { display: none !important; }
-        /* WYSIWYG: lock paper to A4 so the PDF page matches the
-           on-screen editor's 210×297 mm doc exactly. */
-        @page { size: A4; margin: 0; }
+        /* size: auto so the page-box follows the operator's paper
+           pick. Doc is 270 mm tall — fits A4 (297 mm) AND US Letter
+           (279 mm) without the every-other-blank-sheet overflow. */
+        @page { size: auto; margin: 0; }
       `}</style>
       <div className="quot-a4-stack">
         {/* The renderer's prop signature was declared for the
