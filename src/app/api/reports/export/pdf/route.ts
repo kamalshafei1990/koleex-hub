@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { buildAndAudit } from "@/lib/reports/build";
 import { renderReportHtml } from "@/lib/reports/html-renderer";
+import { pageFooterTemplate } from "@/lib/reports/layout";
 import type { ReportFilters, ReportType } from "@/lib/reports/types";
 
 export const runtime = "nodejs";
@@ -102,11 +103,21 @@ export async function POST(req: Request) {
       { timeout: 8_000, polling: 100 },
     ).catch(() => undefined);
 
+    /* Phase R — enterprise PDF output:
+         · preferCSSPageSize:true so the @page rule in the document
+           drives margins (single source of truth)
+         · displayHeaderFooter:true with a footer template that prints
+           "Page X of Y" + report ID + tenant on EVERY page
+         · empty headerTemplate so the top margin stays clean (the
+           document header is rendered inside the first page) */
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
       preferCSSPageSize: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+      displayHeaderFooter: true,
+      headerTemplate: `<div></div>`,
+      footerTemplate: pageFooterTemplate(built.result.payload),
+      margin: { top: "0", right: "0", bottom: "20mm", left: "0" },
     });
 
     const filename = `${built.result.payload.meta.report_no}.pdf`;

@@ -206,10 +206,13 @@ export async function buildSupplierStatement(ctx: ReportBuildContext): Promise<R
     ],
     sections,
     totals: [
+      { label: "Closing Balance", value: closingBalance, format: "money" },
       { label: "Amount Outstanding", value: Math.max(0, closingBalance), format: "money", emphasized: true },
     ],
     notes: [
-      "Please confirm this statement against your records and raise any discrepancy within 14 days.",
+      "Please reconcile this statement against your ledger and notify us of any discrepancy within 14 days.",
+      "All amounts are shown in the statement currency above. Payments are recognised on settlement date, not initiation date.",
+      "Bank-charges and FX adjustments, where applicable, are accounted for separately and do not appear in this statement.",
     ],
     row_count: movementRows.length,
     total_amount: closingBalance,

@@ -21,7 +21,6 @@ import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import type {
   ReportFilters,
-  ReportPayload,
   ReportTemplateDescriptor,
   ReportType,
 } from "@/lib/reports/types";
@@ -42,7 +41,10 @@ export default function FinanceReports({
   const [customers, setCustomers] = useState<PartyOption[]>([]);
   const [suppliers, setSuppliers] = useState<PartyOption[]>([]);
   const [bankAccounts, setBankAccounts] = useState<PartyOption[]>([]);
-  const [preview, setPreview] = useState<ReportPayload | null>(null);
+  /* Phase R — the preview pane is now an iframe driven by the same
+     renderer that produces the PDF. No more divergent dashboard-y
+     React preview; what the operator sees IS the document. */
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"pdf" | "print" | null>(null);
@@ -92,19 +94,20 @@ export default function FinanceReports({
     setPreviewLoading(true);
     setPreviewError(null);
     try {
-      const res = await fetch("/api/reports/preview", {
+      const res = await fetch("/api/reports/preview-html", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, filters: f }),
       });
-      const j = await res.json();
       if (!res.ok) {
-        setPreview(null);
+        const j = await res.json().catch(() => ({ error: `Preview failed (${res.status})` }));
+        setPreviewHtml(null);
         setPreviewError(j.error ?? `Preview failed (${res.status})`);
         return;
       }
-      setPreview(j.payload as ReportPayload);
+      const html = await res.text();
+      setPreviewHtml(html);
     } catch (e) {
       setPreviewError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -182,8 +185,8 @@ export default function FinanceReports({
           {/* ───────── Type picker ───────── */}
           <SectionCard>
             <div className="space-y-4">
-              <PickerSection title="External · safe to send" templates={externalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreview(null); }} accent="emerald" />
-              <PickerSection title="Internal · operators only" templates={internalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreview(null); }} accent="rose" />
+              <PickerSection title="External · safe to send" templates={externalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreviewHtml(null); }} accent="emerald" />
+              <PickerSection title="Internal · operators only" templates={internalTemplates} active={activeType} onPick={(t) => { setActiveType(t); setPreviewHtml(null); }} accent="rose" />
             </div>
           </SectionCard>
 
@@ -206,16 +209,31 @@ export default function FinanceReports({
             )}
           </SectionCard>
 
-          {/* ───────── Preview ───────── */}
+          {/* ───────── Preview — Phase R: real document, not a
+                dashboard mock. The iframe loads the exact HTML the
+                PDF renderer produces, so what you see IS what gets
+                printed / downloaded. White paper, black ink, A4
+                proportions. */}
           <SectionCard>
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Preview</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Document preview</div>
               {previewLoading && <span className="text-[10px] text-gray-500">Updating…</span>}
             </div>
             {previewError ? (
               <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{previewError}</div>
-            ) : preview ? (
-              <PreviewPanel payload={preview} />
+            ) : previewHtml ? (
+              <div className="overflow-hidden rounded-md border border-white/[0.04] bg-white" style={{ aspectRatio: "210 / 297" }}>
+                <iframe
+                  title="Report preview"
+                  srcDoc={previewHtml}
+                  className="block h-full w-full border-0"
+                  /* sandbox keeps the iframe inert — same-origin so
+                     the @page CSS still drives layout, but no
+                     scripts can navigate the parent. The renderer's
+                     own ready-flag script runs harmlessly inside. */
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              </div>
             ) : (
               <EmptyState title="No preview yet" hint="Pick a report and adjust filters to see a live preview." />
             )}
@@ -394,115 +412,8 @@ function Input({ type = "text", value, onChange, placeholder }: { type?: string;
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-
-function PreviewPanel({ payload }: { payload: ReportPayload }) {
-  const fmtMoney = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return (
-    <div className="space-y-4 text-[12px]">
-      {payload.internal_warning && (
-        <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-300">
-          {payload.internal_warning}
-        </div>
-      )}
-      <div className="border-b border-white/[0.06] pb-3">
-        <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{payload.meta.tenant_name}</div>
-        <div className="mt-1 text-lg font-bold">{payload.meta.title}</div>
-        {payload.meta.subtitle && <div className="text-[11px] text-gray-400">{payload.meta.subtitle}</div>}
-        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-500">
-          <div>Report No: <span className="text-gray-300">{payload.meta.report_no}</span></div>
-          <div>Currency: <span className="text-gray-300">{payload.meta.currency}</span></div>
-          {payload.meta.period && <div className="col-span-2">Period: <span className="text-gray-300">{payload.meta.period.from} → {payload.meta.period.to}</span></div>}
-        </div>
-      </div>
-
-      {payload.recipient && (
-        <div className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] p-3">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{payload.recipient.label}</div>
-          <div className="mt-1 text-[13px] font-semibold">{payload.recipient.name}</div>
-          {payload.recipient.address && <div className="text-[10px] text-gray-400">{payload.recipient.address}</div>}
-          {payload.recipient.contact && <div className="text-[10px] text-gray-400">{payload.recipient.contact}</div>}
-        </div>
-      )}
-
-      {payload.summary.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {payload.summary.map((s) => (
-            <div key={s.label} className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-2">
-              <div className="text-[9px] uppercase tracking-[0.12em] text-gray-500">{s.label}</div>
-              <div className={`mt-1 text-sm font-semibold tabular-nums ${toneClass(s.tone)}`}>
-                {s.format === "money" || s.format === undefined && typeof s.value === "number"
-                  ? typeof s.value === "number" ? fmtMoney(s.value) : s.value
-                  : String(s.value)}
-              </div>
-              {s.hint && <div className="text-[9px] text-gray-500">{s.hint}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {payload.sections.map((sec, i) => (sec.kind === "table" ? (
-        <div key={i}>
-          {sec.title && <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-400">{sec.title}</div>}
-          {sec.rows.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[10px] text-gray-500">{sec.empty_state ?? "Empty"}</div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-white/[0.04]">
-              <table className="min-w-full text-[11px]">
-                <thead>
-                  <tr className="border-b border-white/[0.08]">
-                    {sec.columns.map((c) => (
-                      <th key={c.key} className={`px-2 py-1.5 text-[9px] uppercase tracking-[0.10em] text-gray-500 ${c.align === "right" ? "text-right" : "text-left"}`}>{c.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sec.rows.slice(0, 50).map((r, j) => (
-                    <tr key={j} className="border-b border-white/[0.04]">
-                      {sec.columns.map((c) => {
-                        const v = r[c.key];
-                        const cls = `px-2 py-1.5 ${c.align === "right" ? "text-right tabular-nums" : ""}`;
-                        if (v === null || v === undefined || v === "") return <td key={c.key} className={`${cls} text-gray-500`}>—</td>;
-                        if (c.format === "money") return <td key={c.key} className={cls}>{fmtMoney(Number(v))}</td>;
-                        if (c.format === "percent") return <td key={c.key} className={cls}>{Number(v).toFixed(1)}%</td>;
-                        if (c.format === "date") return <td key={c.key} className={cls}>{String(v)}</td>;
-                        return <td key={c.key} className={cls}>{String(v)}</td>;
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {sec.rows.length > 50 && <div className="px-2 py-1 text-[10px] text-gray-500">Showing first 50 of {sec.rows.length} rows. PDF contains everything.</div>}
-            </div>
-          )}
-        </div>
-      ) : sec.kind === "note" ? (
-        <div key={i} className="text-[11px] text-gray-400">{sec.title && <div className="mb-1 font-semibold text-gray-300">{sec.title}</div>}{sec.body}</div>
-      ) : null))}
-
-      {payload.totals && payload.totals.length > 0 && (
-        <div className="rounded-lg border-t-2 border-white/20 pt-2">
-          {payload.totals.map((t) => (
-            <div key={t.label} className={`flex justify-between ${t.emphasized ? "text-base font-bold" : "text-[12px]"}`}>
-              <span>{t.label}</span>
-              <span className="tabular-nums">{fmtMoney(t.value)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {payload.notes && payload.notes.length > 0 && (
-        <ul className="list-disc space-y-1 pl-4 text-[10px] text-gray-500">
-          {payload.notes.map((n, i) => <li key={i}>{n}</li>)}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function toneClass(tone?: "positive" | "negative" | "neutral" | "warning"): string {
-  if (tone === "positive") return "text-emerald-400";
-  if (tone === "negative") return "text-rose-400";
-  if (tone === "warning") return "text-amber-400";
-  return "text-[var(--text-primary)]";
-}
+/* Phase R — the in-document React preview was removed. The preview
+   now runs through /api/reports/preview-html which uses the same
+   renderer as the PDF route, so what the operator sees IS the
+   document. Dropping the dashboard-style React mock prevents drift
+   between preview and printed output. */

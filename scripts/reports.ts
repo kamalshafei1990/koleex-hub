@@ -244,11 +244,30 @@ async function main() {
         ...baseCtx(TENANT_A),
         filters: { customer_id: bCustomerId, date_from: "2026-01-01", date_to: "2026-12-31" },
       });
-      const movementRows = isolated.sections
-        .filter((s) => s.kind === "table")
-        .flatMap((s) => (s.kind === "table" ? s.rows : []))
-        .filter((r) => r.description !== "Opening balance");
-      ok("12 tenant isolation: B's data invisible to A", movementRows.length === 0, `saw ${movementRows.length} rows`);
+      /* Two checks:
+           a) the Account Activity table has only the opening-balance
+              stub row (no payments / no invoices from tenant B leaked)
+           b) the Outstanding by Age table — always present in the new
+              document layout — shows zeros in every bucket */
+      const activitySection = isolated.sections.find(
+        (s) => s.kind === "table" && s.title === "Account Activity",
+      );
+      const activityRows = (activitySection && activitySection.kind === "table"
+        ? activitySection.rows
+        : []
+      ).filter((r) => r.description !== "Opening balance");
+
+      const agingSection = isolated.sections.find(
+        (s) => s.kind === "table" && s.title === "Outstanding by Age",
+      );
+      const agingLeaked = (agingSection && agingSection.kind === "table" ? agingSection.rows : [])
+        .some((r) => Number(r.amount) !== 0);
+
+      ok(
+        "12 tenant isolation: B's data invisible to A",
+        activityRows.length === 0 && !agingLeaked,
+        `activity=${activityRows.length}, aging_leaked=${agingLeaked}`,
+      );
     } else {
       ok("12 tenant isolation: seed B customer present", false, "seed B did not insert a customer row");
     }

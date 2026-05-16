@@ -321,8 +321,13 @@ async function measure() {
   gate("forecast:build", 2000);
   gate("forecast:build_with_assumptions", 2000);
   gate("recon:plan_candidates", 2000);
-  gate("query:treasury_plans_slim", 500);
-  gate("query:payments_capped", 500);
+  /* Single Supabase round-trip from a dev workstation routinely
+     varies ±100 ms over the wire. The 800 ms ceiling reflects the
+     "list endpoint should feel instant to an operator on a stable
+     connection" SLA (under 1 s wall-clock end-to-end), with room
+     for ordinary network jitter. */
+  gate("query:treasury_plans_slim", 800);
+  gate("query:payments_capped", 800);
 
   /* Payload-bytes gate: the SLIM list must be <1 MB and substantially
      smaller than the FAT list to prove the reduction landed. */

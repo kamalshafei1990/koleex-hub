@@ -155,6 +155,45 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
     { key: "balance", label: "Balance", align: "right", format: "money", width: "120px" },
   ];
 
+  /* Phase R — aging buckets for the outstanding invoice schedule.
+     Uses FIFO allocation: payments consume the oldest open order
+     first. Whatever's left on each order at the end is bucketed by
+     (today - order_date) days. Standard AR aging convention. */
+  const todayMs = Date.now();
+  const sortedOrders = [...ordersCur].sort((a, b) => a.order_date.localeCompare(b.order_date));
+  const sortedPaymentsAll = [...payments]
+    .filter((p) => p.currency === currency && p.status === "completed")
+    .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
+  let paymentPool = sortedPaymentsAll.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const aging = { current: 0, b30: 0, b60: 0, b90: 0, b90plus: 0 };
+  for (const o of sortedOrders) {
+    const due = Number(o.selling_price) || 0;
+    const consumed = Math.min(due, paymentPool);
+    paymentPool -= consumed;
+    const remainder = due - consumed;
+    if (remainder <= 0.01) continue;
+    const ageDays = Math.floor((todayMs - new Date(o.order_date).getTime()) / 86_400_000);
+    if (ageDays <= 30) aging.current += remainder;
+    else if (ageDays <= 60) aging.b30 += remainder;
+    else if (ageDays <= 90) aging.b60 += remainder;
+    else if (ageDays <= 180) aging.b90 += remainder;
+    else aging.b90plus += remainder;
+  }
+  const overdue = aging.b30 + aging.b60 + aging.b90 + aging.b90plus;
+
+  const agingColumns: ReportColumn[] = [
+    { key: "bucket", label: "Bucket" },
+    { key: "range",  label: "Days outstanding", width: "140px" },
+    { key: "amount", label: "Balance", align: "right", format: "money", width: "140px" },
+  ];
+  const agingRows: Array<Record<string, ReportRowValue>> = [
+    { bucket: "Current",   range: "0 – 30 days",   amount: aging.current },
+    { bucket: "31 – 60",   range: "31 – 60 days",  amount: aging.b30 },
+    { bucket: "61 – 90",   range: "61 – 90 days",  amount: aging.b60 },
+    { bucket: "91 – 180",  range: "91 – 180 days", amount: aging.b90 },
+    { bucket: "Over 180",  range: "> 180 days",    amount: aging.b90plus },
+  ];
+
   const sections: ReportSection[] = [
     {
       kind: "table",
@@ -162,6 +201,13 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
       columns,
       rows: movementRows,
       empty_state: "No activity in the selected period.",
+    },
+    {
+      kind: "table",
+      title: "Outstanding by Age",
+      columns: agingColumns,
+      rows: agingRows,
+      empty_state: "No outstanding balance.",
     },
   ];
 
@@ -192,15 +238,18 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
       { label: "Opening Balance", value: openingBalance, format: "money", tone: openingBalance > 0 ? "warning" : "neutral" },
       { label: "Invoiced", value: invoiced, format: "money", tone: "neutral" },
       { label: "Payments Received", value: received, format: "money", tone: "positive" },
-      { label: "Closing Balance", value: closingBalance, format: "money", tone: closingBalance > 0 ? "warning" : "positive" },
+      { label: "Overdue", value: overdue, format: "money", tone: overdue > 0 ? "warning" : "neutral" },
     ],
     sections,
     totals: [
+      { label: "Closing Balance", value: closingBalance, format: "money" },
       { label: "Balance Due", value: Math.max(0, closingBalance), format: "money", emphasized: true },
     ],
     notes: [
-      "Please remit any outstanding balance using the payment instructions on file.",
-      "Quote the reference number on all payments to ensure proper allocation.",
+      "Please remit any outstanding balance via wire transfer to the bank details on file or the account number above.",
+      "Quote the reference number on all payments so we can allocate them accurately.",
+      "Statement reflects activity up to the period end date. Items posted after that date appear on the next statement.",
+      "Please raise any discrepancies within 14 days of receipt.",
     ],
     row_count: movementRows.length,
     total_amount: closingBalance,
