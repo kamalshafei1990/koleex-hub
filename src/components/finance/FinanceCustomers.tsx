@@ -2,13 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import {
-  EmptyState,
-  KpiCard,
-  ProgressBar,
-  SectionCard,
-  StatusBadge,
-} from "@/components/finance/FinanceUi";
+import { EmptyState, ProgressBar, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
 
@@ -44,11 +39,13 @@ export default function FinanceCustomers() {
           subtitle="Revenue, money collected, and money still owed — for every customer you sell to."
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Revenue" value={kpi.revenue} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Collected" value={kpi.collected} currency="USD" accent="teal" loading={loading} />
-          <KpiCard label="Outstanding" value={kpi.outstanding} currency="USD" accent="amber" loading={loading} />
-          <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} />
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard label="Total Revenue" value={kpi.revenue} unit="USD" tone="positive" hint="Across every customer" loading={loading} />
+          <HeroKpiCard label="Outstanding" value={kpi.outstanding} unit="USD" tone="warning" hint="Still to collect from customers" loading={loading} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          <MetricCard label="Collected" value={kpi.collected} unit="USD" hint="Cash banked from customers" loading={loading} />
+          <MetricCard label="Overdue"   value={kpi.overdue}   unit="USD" tone="negative" hint="Past due date" loading={loading} />
         </div>
 
         <div className="mt-6">

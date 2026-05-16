@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
-  KpiCard,
   ProgressBar,
   SectionCard,
   StatusBadge,
 } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/PartyPickerModal";
 import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
@@ -159,12 +159,30 @@ export default function FinanceOrders() {
           }
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <KpiCard label="Total Orders" value={String(orders.length)} accent="indigo" loading={loading} />
-          <KpiCard label="Total Revenue" value={kpi.totalSelling} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Net Profit" value={kpi.totalNet} currency="USD" accent="violet" loading={loading} hint={`Avg margin ${fmtPct(kpi.avgMargin)}`} />
-          <KpiCard label="Collected" value={kpi.totalCollected} currency="USD" accent="teal" loading={loading} />
-          <KpiCard label="Outstanding" value={kpi.totalOutstanding} currency="USD" accent="amber" loading={loading} />
+        {/* Hero cards: Revenue + Net Profit dominate. Smaller metric
+            cards beneath for count / collected / outstanding. */}
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard
+            label="Total Revenue"
+            value={kpi.totalSelling}
+            unit="USD"
+            tone="positive"
+            hint={`${orders.length} order${orders.length === 1 ? "" : "s"} this view`}
+            loading={loading}
+          />
+          <HeroKpiCard
+            label="Net Profit"
+            value={kpi.totalNet}
+            unit="USD"
+            tone={kpi.totalNet >= 0 ? "info" : "negative"}
+            hint={`Average margin ${fmtPct(kpi.avgMargin)}`}
+            loading={loading}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
+          <MetricCard label="Collected" value={kpi.totalCollected} unit="USD" hint="Cash banked across orders" loading={loading} />
+          <MetricCard label="Outstanding" value={kpi.totalOutstanding} unit="USD" tone="warning" hint="Still to collect" loading={loading} />
+          <MetricCard label="Orders" value={String(orders.length)} hint="In current view" loading={loading} />
         </div>
 
         <div className="mt-6">

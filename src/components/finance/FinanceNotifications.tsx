@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import {
-  EmptyState,
-  KpiCard,
-  SectionCard,
-  StatusBadge,
-} from "@/components/finance/FinanceUi";
+import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
 import type { FinanceNotification } from "@/lib/finance/types";
 
@@ -107,10 +103,12 @@ export default function FinanceNotifications() {
           subtitle="Command center for money to collect and money to pay — colour-coded by severity."
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <KpiCard label="Money to Collect" value={kpi.collect} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Money to Pay" value={kpi.pay} currency="USD" accent="orange" loading={loading} />
-          <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} hint={`${overdue.length} item(s)`} />
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard label="Money to Collect" value={kpi.collect} unit="USD" tone="positive" hint="From customers" loading={loading} />
+          <HeroKpiCard label="Money to Pay" value={kpi.pay} unit="USD" tone="warning" hint="To suppliers + bills" loading={loading} />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3">
+          <MetricCard label="Overdue" value={kpi.overdue} unit="USD" tone="negative" hint={`${overdue.length} item${overdue.length === 1 ? "" : "s"} past due`} loading={loading} />
         </div>
 
         {/* Reminder Center — at-a-glance severity strip */}

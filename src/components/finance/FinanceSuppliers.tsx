@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import {
-  EmptyState,
-  KpiCard,
-  ProgressBar,
-  SectionCard,
-} from "@/components/finance/FinanceUi";
+import { EmptyState, ProgressBar, SectionCard } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
@@ -42,10 +38,12 @@ export default function FinanceSuppliers() {
           subtitle="What you've bought from each supplier, what's paid, and what's still owed."
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <KpiCard label="Total Purchases" value={kpi.purchases} currency="USD" accent="blue" loading={loading} />
-          <KpiCard label="Paid" value={kpi.paid} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Outstanding" value={kpi.payable} currency="USD" accent="amber" loading={loading} />
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard label="Total Purchases" value={kpi.purchases} unit="USD" tone="neutral" hint="Across every supplier" loading={loading} />
+          <HeroKpiCard label="Outstanding" value={kpi.payable} unit="USD" tone="warning" hint="Still to pay suppliers" loading={loading} />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3">
+          <MetricCard label="Paid" value={kpi.paid} unit="USD" hint="Cash already wired to suppliers" loading={loading} />
         </div>
 
         <div className="mt-6">

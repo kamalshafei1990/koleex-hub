@@ -21,11 +21,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import {
-  EmptyState,
-  KpiCard,
-  SectionCard,
-} from "@/components/finance/FinanceUi";
+import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
@@ -147,11 +144,13 @@ export default function FinanceExpenseAnalytics() {
           }
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Expenses" value={kpi.total}   currency="USD" accent="fuchsia" loading={loading} />
-          <KpiCard label="Paid"           value={kpi.paid}    currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Unpaid"         value={kpi.unpaid}  currency="USD" accent="amber"   loading={loading} />
-          <KpiCard label="Overdue"        value={kpi.overdue} currency="USD" accent="rose"    loading={loading} />
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard label="Total Expenses" value={kpi.total} unit="USD" tone="neutral" hint="All time, this view" loading={loading} />
+          <HeroKpiCard label="Unpaid" value={kpi.unpaid} unit="USD" tone="warning" hint="Awaiting payment" loading={loading} />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          <MetricCard label="Paid"    value={kpi.paid}    unit="USD" hint="Already settled" loading={loading} />
+          <MetricCard label="Overdue" value={kpi.overdue} unit="USD" tone="negative" hint="Past due date" loading={loading} />
         </div>
 
         {/* By Category */}

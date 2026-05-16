@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import {
-  EmptyState,
-  KpiCard,
-  SectionCard,
-  StatusBadge,
-} from "@/components/finance/FinanceUi";
+import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
+import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
 import type { FinancePayment } from "@/lib/finance/types";
 
@@ -75,11 +71,27 @@ export default function FinancePayments() {
           }
         />
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Money In" value={kpi.inComp} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Money Out" value={kpi.outComp} currency="USD" accent="rose" loading={loading} />
-          <KpiCard label="Net Cash" value={kpi.net} currency="USD" accent={kpi.net >= 0 ? "teal" : "orange"} loading={loading} />
-          <KpiCard label="Pending" value={kpi.pending} currency="USD" accent="amber" loading={loading} />
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <HeroKpiCard
+            label="Net Cash This View"
+            value={kpi.net}
+            unit="USD"
+            tone={kpi.net >= 0 ? "positive" : "negative"}
+            hint="Money in minus money out"
+            loading={loading}
+          />
+          <HeroKpiCard
+            label="Pending"
+            value={kpi.pending}
+            unit="USD"
+            tone="warning"
+            hint="Payments awaiting clearance"
+            loading={loading}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <MetricCard label="Money In"  value={kpi.inComp}  unit="USD" hint="From customers" loading={loading} />
+          <MetricCard label="Money Out" value={kpi.outComp} unit="USD" hint="To suppliers + bills" loading={loading} />
         </div>
 
         {editing && (
