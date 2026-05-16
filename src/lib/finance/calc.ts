@@ -1,25 +1,50 @@
 /* ---------------------------------------------------------------------------
    Finance App — pure calculation helpers
+   ===========================================================================
 
-   All profit / margin math lives here so the API, the dashboard, and the
-   order-detail page compute identical numbers. No I/O — these are
-   stateless functions over typed inputs.
+   PROFIT MODEL  (Phase 1 — corrected after Kamal's 2026-05-16 review)
+   ──────────────────────────────────────────────────────────────────
+   The chain is the standard international-trade P&L sequence:
 
-   PROFIT MODEL
-   ─────────────
-       gross_profit   = selling_price + tax_refund_value
-                      − Σ supplier_cost (across all suppliers on the order)
-       net_profit     = gross_profit − Σ linked_order_expenses
-       net_profit_pct = net_profit / selling_price × 100      (if selling_price > 0)
-       realized_profit
-         = net_profit pro-rated by the share of the selling price that has
-           actually been collected from the customer:
-             customer_paid_share = total_customer_paid / selling_price (clamped 0..1)
-             realized_profit     = net_profit × customer_paid_share
+     1. supplier_total_cost  = Σ supplier_cost across all order_suppliers
+     2. GROSS PROFIT         = selling_price − supplier_total_cost
+                                ⚠ Tax refund is NOT part of gross profit.
+     3. order_expenses       = Σ amount of expenses linked to the order
+     4. tax_refund_value     = % * selling_price OR a typed-in absolute,
+                               appears separately AFTER expenses
+     5. financial_charges    = bank / L-C / FX / wire charges on the
+                               order. Phase 1 treats as 0 if not entered.
+     6. NET PROFIT           = gross_profit − order_expenses
+                                              + tax_refund_value
+                                              − financial_charges
+     7. net_profit_pct       = net_profit / selling_price × 100
 
-   The realized-profit concept is what differentiates "expected" (the
-   number you booked when the order was sold) from "what we've actually
-   banked so far" (revenue actually received minus costs actually paid).
+   CASH MODEL (separate from profit)
+   ──────────────────────────────────
+   "Net profit" is the booked / expected number — it doesn't say what's
+   actually in the bank yet. For that we report a CASH POSITION
+   built from the actual money that has moved:
+
+     collected_amount        = Σ in-payments completed for this order
+     paid_supplier_amount    = Σ paid_amount on order_supplier rows
+     paid_expenses           = Σ expense.amount where status='paid'
+                               on expenses linked to the order
+     realized_cash_position  = collected_amount
+                               − paid_supplier_amount
+                               − paid_expenses
+                               (tax refund cash counted only if received —
+                                Phase 1 keeps this conservative and
+                                excludes it unless explicitly entered)
+
+   Two derived metrics for the UI:
+     outstanding_receivable  = max(0, selling_price − collected_amount)
+     outstanding_payable     = max(0, supplier_total_cost − paid_supplier_amount)
+                               + Σ unpaid order-linked expense amounts
+
+   Why we removed the old "realized_profit = net × collected_ratio"
+   shortcut: it presumed supplier + expense payments would scale 1:1 with
+   customer payments, which is almost never true on T/T-deposit deals.
+   Reporting raw cash is honest and unambiguous.
    --------------------------------------------------------------------------- */
 
 import type {
@@ -32,64 +57,95 @@ import type {
 export interface ProfitInputs {
   selling_price: number;
   tax_refund_value: number;
+  financial_charges: number;
   suppliers: Pick<FinanceOrderSupplier, "supplier_cost" | "paid_amount">[];
   linked_expenses: Pick<FinanceExpense, "amount" | "payment_status">[];
   customer_payments_total: number;
 }
 
 export interface ProfitOutputs {
+  /* The accounting picture */
   total_supplier_cost: number;
   total_order_expenses: number;
+  tax_refund_value: number;
+  financial_charges: number;
   gross_profit: number;
   net_profit: number;
   net_profit_pct: number;
-  realized_profit: number;
-  total_paid_to_suppliers: number;
+  /* The cash picture */
+  collected_amount: number;
+  paid_supplier_amount: number;
+  paid_expenses: number;
+  realized_cash_position: number;
+  outstanding_receivable: number;
+  outstanding_payable: number;
+  /* Convenience */
   customer_paid_share: number;
 }
 
 export function computeOrderProfit(inputs: ProfitInputs): ProfitOutputs {
+  /* ── Profit chain (booked / expected) ────────────────────────── */
   const total_supplier_cost = inputs.suppliers.reduce(
     (s, x) => s + (Number(x.supplier_cost) || 0),
-    0,
-  );
-  const total_paid_to_suppliers = inputs.suppliers.reduce(
-    (s, x) => s + (Number(x.paid_amount) || 0),
     0,
   );
   const total_order_expenses = inputs.linked_expenses.reduce(
     (s, x) => s + (Number(x.amount) || 0),
     0,
   );
-
   const sellingPrice = Number(inputs.selling_price) || 0;
   const taxRefund = Number(inputs.tax_refund_value) || 0;
+  const finCharges = Number(inputs.financial_charges) || 0;
 
-  const gross_profit =
-    sellingPrice + taxRefund - total_supplier_cost;
-  const net_profit = gross_profit - total_order_expenses;
-  const net_profit_pct =
-    sellingPrice > 0 ? (net_profit / sellingPrice) * 100 : 0;
+  /* GROSS PROFIT — tax refund is NOT included here. */
+  const gross_profit = sellingPrice - total_supplier_cost;
 
-  /* Realized profit = how much of the net profit we've actually banked,
-     scaled by the customer's payment progress. A 70%-collected order has
-     realized 70% of its booked net profit even if the rest of the order
-     is still open. Clamp to [0,1] so an over-payment doesn't inflate
-     realized profit past net_profit. */
-  const customer_paid_share =
-    sellingPrice > 0
-      ? Math.max(0, Math.min(1, inputs.customer_payments_total / sellingPrice))
-      : 0;
-  const realized_profit = net_profit * customer_paid_share;
+  /* NET PROFIT — expenses subtracted, refund added back, finance
+     charges (bank / L-C fees) subtracted. */
+  const net_profit =
+    gross_profit - total_order_expenses + taxRefund - finCharges;
+  const net_profit_pct = sellingPrice > 0
+    ? (net_profit / sellingPrice) * 100
+    : 0;
+
+  /* ── Cash chain (realized) ──────────────────────────────────── */
+  const paid_supplier_amount = inputs.suppliers.reduce(
+    (s, x) => s + (Number(x.paid_amount) || 0),
+    0,
+  );
+  const paid_expenses = inputs.linked_expenses
+    .filter((e) => e.payment_status === "paid")
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const unpaid_expenses = inputs.linked_expenses
+    .filter((e) => e.payment_status !== "paid")
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const collected_amount = Math.max(0, Number(inputs.customer_payments_total) || 0);
+  const realized_cash_position =
+    collected_amount - paid_supplier_amount - paid_expenses;
+
+  const outstanding_receivable = Math.max(0, sellingPrice - collected_amount);
+  const outstanding_payable =
+    Math.max(0, total_supplier_cost - paid_supplier_amount) + unpaid_expenses;
+
+  const customer_paid_share = sellingPrice > 0
+    ? Math.max(0, Math.min(1, collected_amount / sellingPrice))
+    : 0;
 
   return {
     total_supplier_cost: round2(total_supplier_cost),
     total_order_expenses: round2(total_order_expenses),
+    tax_refund_value: round2(taxRefund),
+    financial_charges: round2(finCharges),
     gross_profit: round2(gross_profit),
     net_profit: round2(net_profit),
     net_profit_pct: round2(net_profit_pct),
-    realized_profit: round2(realized_profit),
-    total_paid_to_suppliers: round2(total_paid_to_suppliers),
+    collected_amount: round2(collected_amount),
+    paid_supplier_amount: round2(paid_supplier_amount),
+    paid_expenses: round2(paid_expenses),
+    realized_cash_position: round2(realized_cash_position),
+    outstanding_receivable: round2(outstanding_receivable),
+    outstanding_payable: round2(outstanding_payable),
     customer_paid_share: round4(customer_paid_share),
   };
 }

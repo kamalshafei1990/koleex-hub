@@ -111,6 +111,7 @@ export async function GET(req: Request) {
     const profit = computeOrderProfit({
       selling_price: Number(o.selling_price) || 0,
       tax_refund_value: taxRefundValue,
+      financial_charges: Number(o.financial_charges) || 0,
       suppliers: o.suppliers ?? [],
       linked_expenses: linkedExp,
       customer_payments_total: customerPaid,
@@ -118,15 +119,19 @@ export async function GET(req: Request) {
     return {
       ...o,
       tax_refund_value: taxRefundValue,
+      financial_charges: Number(o.financial_charges) || 0,
       suppliers: o.suppliers ?? [],
       total_supplier_cost: profit.total_supplier_cost,
       total_order_expenses: profit.total_order_expenses,
       gross_profit: profit.gross_profit,
       net_profit: profit.net_profit,
       net_profit_pct: profit.net_profit_pct,
-      realized_profit: profit.realized_profit,
-      total_paid: customerPaid,
-      total_outstanding: Math.max(0, (Number(o.selling_price) || 0) - customerPaid),
+      collected_amount: profit.collected_amount,
+      paid_supplier_amount: profit.paid_supplier_amount,
+      paid_expenses: profit.paid_expenses,
+      realized_cash_position: profit.realized_cash_position,
+      outstanding_receivable: profit.outstanding_receivable,
+      outstanding_payable: profit.outstanding_payable,
     };
   });
 
@@ -177,6 +182,7 @@ export async function POST(req: Request) {
         selling_price: Number(o.selling_price) || 0,
         tax_refund_pct: Number(o.tax_refund_pct) || 0,
         tax_refund_value: taxRefundValue,
+        financial_charges: Number(o.financial_charges) || 0,
         expected_profit: o.expected_profit ?? null,
         status: o.status ?? "open",
         payment_status: o.payment_status ?? "unpaid",
@@ -235,6 +241,7 @@ export async function POST(req: Request) {
       selling_price: Number(o.selling_price) || 0,
       tax_refund_pct: Number(o.tax_refund_pct) || 0,
       tax_refund_value: taxRefundValue,
+      financial_charges: Number(o.financial_charges) || 0,
       expected_profit: o.expected_profit ?? null,
       status: o.status ?? "open",
       payment_status: o.payment_status ?? "unpaid",

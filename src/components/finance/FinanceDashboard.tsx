@@ -177,14 +177,25 @@ export default function FinanceDashboard() {
 
         {/* ── PROFIT WATERFALL ──────────────────────────────────── */}
         <div className="mt-4">
-          <SectionCard title="From Revenue to Net Profit" subtitle="How the period's earnings stack up">
+          <SectionCard
+            title="From Revenue to Net Profit"
+            subtitle="Gross profit excludes tax refund — refund is added back separately after expenses."
+          >
             <ProfitWaterfall
               revenue={kpi?.total_revenue ?? 0}
+              supplierCost={kpi?.total_supplier_cost ?? 0}
               expenses={kpi?.total_expenses ?? 0}
+              taxRefund={kpi?.total_tax_refund ?? 0}
+              finCharges={kpi?.total_financial_charges ?? 0}
               gross={kpi?.gross_profit ?? 0}
               net={kpi?.net_profit ?? 0}
               currency={currency}
             />
+            <p className="mt-3 rounded-md bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-gray-400">
+              <strong className="text-gray-300">Expected profit</strong> is the booked number on every order (Revenue − Supplier − Expenses + Tax refund − Bank charges).
+              <strong className="text-gray-300"> Realized cash position</strong> is what's actually banked so far (Collected − Paid supplier − Paid expenses) and lives on each Order card.
+              <strong className="text-gray-300"> Cash flow</strong> (below) is the period's money in vs out across the whole business.
+            </p>
           </SectionCard>
         </div>
       </div>
@@ -210,19 +221,29 @@ function CashRow({ label, value, max, color }: { label: string; value: number; m
 }
 
 function ProfitWaterfall({
-  revenue, expenses, gross, net, currency,
-}: { revenue: number; expenses: number; gross: number; net: number; currency: string }) {
-  const supplierCost = Math.max(0, revenue - gross);
+  revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
+}: {
+  revenue: number; supplierCost: number; expenses: number; taxRefund: number;
+  finCharges: number; gross: number; net: number; currency: string;
+}) {
+  /* CORRECTED CHAIN
+     Revenue → − Supplier cost = Gross → − Expenses + Tax refund − Bank charges = Net */
   const steps = [
-    { label: "Revenue",       value: revenue,       sign: 1,  color: "emerald" as const },
-    { label: "Supplier cost", value: -supplierCost, sign: -1, color: "rose" as const },
-    { label: "Gross profit",  value: gross,         sign: 1,  color: "sky" as const, total: true },
-    { label: "Expenses",      value: -expenses,     sign: -1, color: "rose" as const },
-    { label: "Net profit",    value: net,           sign: 1,  color: "violet" as const, total: true },
+    { label: "Revenue",         value: revenue,      sign: 1,  color: "emerald" as const },
+    { label: "− Supplier cost", value: supplierCost, sign: -1, color: "rose"    as const },
+    { label: "= Gross profit",  value: gross,        sign: 1,  color: "sky"     as const, total: true },
+    { label: "− Order expenses",value: expenses,     sign: -1, color: "rose"    as const },
+    { label: "+ Tax refund",    value: taxRefund,    sign: 1,  color: "emerald" as const },
+    { label: "− Bank charges",  value: finCharges,   sign: -1, color: "rose"    as const },
+    { label: "= Net profit",    value: net,          sign: 1,  color: "violet"  as const, total: true },
   ];
-  const max = Math.max(1, revenue, Math.abs(supplierCost), Math.abs(expenses), Math.abs(gross), Math.abs(net));
+  const max = Math.max(
+    1, revenue,
+    Math.abs(supplierCost), Math.abs(expenses), Math.abs(taxRefund),
+    Math.abs(finCharges), Math.abs(gross), Math.abs(net),
+  );
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
       {steps.map((s, i) => {
         const pct = (Math.abs(s.value) / max) * 100;
         const bg =
@@ -236,7 +257,7 @@ function ProfitWaterfall({
           : s.color === "sky"   ? "text-sky-400"
           : "text-violet-400";
         return (
-          <div key={i} className="relative rounded-xl border border-white/[0.06] bg-[var(--bg-primary)] p-4">
+          <div key={i} className={`relative rounded-xl border border-white/[0.06] bg-[var(--bg-primary)] p-4 ${s.total ? "ring-1 ring-white/10" : ""}`}>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{s.label}</div>
             <div className={`mt-2 text-lg font-semibold tabular-nums ${txt}`}>
               {s.sign < 0 ? "−" : ""}{fmtMoney(Math.abs(s.value), currency, { compact: true })}

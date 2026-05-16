@@ -46,8 +46,8 @@ export default function FinanceOrders() {
   const kpi = useMemo(() => {
     const totalSelling = orders.reduce((s, o) => s + (o.selling_price ?? 0), 0);
     const totalNet = orders.reduce((s, o) => s + (o.net_profit ?? 0), 0);
-    const totalCollected = orders.reduce((s, o) => s + (o.total_paid ?? 0), 0);
-    const totalOutstanding = orders.reduce((s, o) => s + (o.total_outstanding ?? 0), 0);
+    const totalCollected = orders.reduce((s, o) => s + (o.collected_amount ?? 0), 0);
+    const totalOutstanding = orders.reduce((s, o) => s + (o.outstanding_receivable ?? 0), 0);
     const avgMargin = totalSelling > 0 ? (totalNet / totalSelling) * 100 : 0;
     return { totalSelling, totalNet, totalCollected, totalOutstanding, avgMargin };
   }, [orders]);
@@ -63,6 +63,7 @@ export default function FinanceOrders() {
         selling_price: 0,
         tax_refund_pct: 0,
         tax_refund_value: 0,
+        financial_charges: 0,
         status: "open",
         payment_status: "unpaid",
         payment_due_date: "",
@@ -84,6 +85,7 @@ export default function FinanceOrders() {
         selling_price: o.selling_price,
         tax_refund_pct: o.tax_refund_pct,
         tax_refund_value: o.tax_refund_value,
+        financial_charges: o.financial_charges ?? 0,
         status: o.status,
         payment_status: o.payment_status,
         payment_due_date: o.payment_due_date ?? "",
@@ -191,13 +193,24 @@ export default function FinanceOrders() {
    read at a glance.
    ──────────────────────────────────────────────────────────────── */
 function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
+  const ccy = order.currency || "USD";
   const sellingPrice = order.selling_price ?? 0;
   const supplierCost = order.total_supplier_cost ?? 0;
   const expenses = order.total_order_expenses ?? 0;
+  const taxRefund = order.tax_refund_value ?? 0;
+  const finCharges = order.financial_charges ?? 0;
+  const grossProfit = order.gross_profit ?? 0;
   const netProfit = order.net_profit ?? 0;
   const netPct = order.net_profit_pct ?? 0;
-  const collected = order.total_paid ?? 0;
-  const outstanding = order.total_outstanding ?? 0;
+
+  /* Cash picture */
+  const collected = order.collected_amount ?? 0;
+  const paidSupplier = order.paid_supplier_amount ?? 0;
+  const paidExpenses = order.paid_expenses ?? 0;
+  const realizedCash = order.realized_cash_position ?? 0;
+  const outstandingAR = order.outstanding_receivable ?? 0;
+  const outstandingAP = order.outstanding_payable ?? 0;
+
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -216,18 +229,38 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Stat label="Selling price" value={fmtMoney(sellingPrice, order.currency || "USD", { compact: true })} />
-        <Stat label="Supplier cost" value={fmtMoney(supplierCost, order.currency || "USD", { compact: true })} negative />
-        <Stat label="Order expenses" value={fmtMoney(expenses, order.currency || "USD", { compact: true })} negative />
-        <Stat label="Net profit"     value={fmtMoney(netProfit, order.currency || "USD", { compact: true })} accent={netProfit >= 0 ? "emerald" : "rose"} />
-        <Stat label="Margin"         value={fmtPct(netPct)} accent={netPct >= 15 ? "emerald" : netPct >= 0 ? "amber" : "rose"} />
+      {/* Profit waterfall row — Revenue → Net Profit */}
+      <div className="mt-4 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">Expected profit (booked)</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
+          <Stat label="Revenue"        value={fmtMoney(sellingPrice, ccy, { compact: true })} accent="emerald" />
+          <Stat label="− Supplier"     value={fmtMoney(supplierCost, ccy, { compact: true })} accent="rose" />
+          <Stat label="= Gross profit" value={fmtMoney(grossProfit, ccy, { compact: true })} accent={grossProfit >= 0 ? "sky" : "rose"} />
+          <Stat label="− Order expenses" value={fmtMoney(expenses, ccy, { compact: true })} accent="rose" />
+          <Stat label="+ Tax refund"   value={fmtMoney(taxRefund, ccy, { compact: true })} accent="emerald" />
+          <Stat label="− Bank charges" value={fmtMoney(finCharges, ccy, { compact: true })} accent="rose" />
+          <Stat label={`Net (${fmtPct(netPct)})`} value={fmtMoney(netProfit, ccy, { compact: true })} accent={netProfit >= 0 ? "violet" : "rose"} />
+        </div>
       </div>
 
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-[11px] text-gray-400">
-          <span>Collected: <span className="font-semibold text-emerald-400 tabular-nums">{fmtMoney(collected, order.currency || "USD", { compact: true })}</span></span>
-          <span>Outstanding: <span className="font-semibold text-amber-400 tabular-nums">{fmtMoney(outstanding, order.currency || "USD", { compact: true })}</span></span>
+      {/* Cash position row — actual money moved */}
+      <div className="mt-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Realized cash position</div>
+          <div className="text-[10px] text-gray-500">Collected − Paid supplier − Paid expenses</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <Stat label="Collected"        value={fmtMoney(collected, ccy, { compact: true })} accent="emerald" />
+          <Stat label="Paid supplier"    value={fmtMoney(paidSupplier, ccy, { compact: true })} accent="rose" />
+          <Stat label="Paid expenses"    value={fmtMoney(paidExpenses, ccy, { compact: true })} accent="rose" />
+          <Stat label="AR (to collect)"  value={fmtMoney(outstandingAR, ccy, { compact: true })} accent="amber" />
+          <Stat label="AP (to pay)"      value={fmtMoney(outstandingAP, ccy, { compact: true })} accent="amber" />
+        </div>
+        <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400">
+          <span>Cash result so far</span>
+          <span className={`font-semibold tabular-nums ${realizedCash >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            {realizedCash < 0 ? "−" : ""}{fmtMoney(Math.abs(realizedCash), ccy, { compact: true })}
+          </span>
         </div>
         <div className="mt-1.5">
           <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
@@ -235,7 +268,7 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
       </div>
 
       {order.suppliers && order.suppliers.length > 0 && (
-        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {order.suppliers.map((s) => (
             <div key={s.id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2 text-xs">
               <div className="min-w-0">
@@ -251,11 +284,13 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
   );
 }
 
-function Stat({ label, value, negative, accent }: { label: string; value: string; negative?: boolean; accent?: "emerald" | "rose" | "amber" }) {
+function Stat({ label, value, negative, accent }: { label: string; value: string; negative?: boolean; accent?: "emerald" | "rose" | "amber" | "sky" | "violet" }) {
   const color =
     accent === "emerald" ? "text-emerald-400"
     : accent === "rose"  ? "text-rose-400"
     : accent === "amber" ? "text-amber-400"
+    : accent === "sky"   ? "text-sky-400"
+    : accent === "violet"? "text-violet-400"
     : negative ? "text-gray-300" : "text-[var(--text-primary)]";
   return (
     <div>
@@ -280,6 +315,7 @@ interface DraftOrder {
     selling_price: number;
     tax_refund_pct: number;
     tax_refund_value: number;
+    financial_charges: number;
     status: FinanceOrder["status"];
     payment_status: FinanceOrder["payment_status"];
     payment_due_date: string;
@@ -308,6 +344,7 @@ function OrderEditor({
   const profit = computeOrderProfit({
     selling_price: sellingPrice,
     tax_refund_value: taxValue,
+    financial_charges: Number(draft.order.financial_charges) || 0,
     suppliers: draft.suppliers,
     linked_expenses: [],
     customer_payments_total: 0,
@@ -374,6 +411,9 @@ function OrderEditor({
               <Field label="Tax refund value">
                 <input type="number" inputMode="decimal" value={draft.order.tax_refund_value} onChange={(e) => updateOrder("tax_refund_value", Number(e.target.value) || 0)} placeholder={`${taxValue.toFixed(2)} (derived)`} className={INPUT} />
               </Field>
+              <Field label="Bank / L-C / FX charges">
+                <input type="number" inputMode="decimal" value={draft.order.financial_charges} onChange={(e) => updateOrder("financial_charges", Number(e.target.value) || 0)} placeholder="0.00" className={INPUT} />
+              </Field>
               <Field label="Payment status">
                 <select value={draft.order.payment_status} onChange={(e) => updateOrder("payment_status", e.target.value as DraftOrder["order"]["payment_status"])} className={INPUT}>
                   {(["unpaid","partial","paid","overdue"] as const).map((s) => <option key={s} value={s}>{s}</option>)}
@@ -383,16 +423,28 @@ function OrderEditor({
                 <input type="date" value={draft.order.payment_due_date} onChange={(e) => updateOrder("payment_due_date", e.target.value)} className={INPUT} />
               </Field>
             </div>
+            <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-[11px] text-sky-200">
+              Gross profit excludes tax refund. Tax refund is calculated separately and added back before net profit.
+            </p>
           </SectionCard>
 
           <SectionCard title="Profit preview" subtitle="Updates live as you type.">
-            <PreviewRow label="Selling price"   value={sellingPrice} currency={draft.order.currency} accent="emerald" />
-            <PreviewRow label="Tax refund"      value={taxValue} currency={draft.order.currency} accent="emerald" />
-            <div className="my-2 border-t border-white/5" />
-            <PreviewRow label="Supplier cost"   value={profit.total_supplier_cost} currency={draft.order.currency} accent="rose" negative />
-            <PreviewRow label="Gross profit"    value={profit.gross_profit} currency={draft.order.currency} accent="sky" />
-            <PreviewRow label="Net profit"      value={profit.net_profit} currency={draft.order.currency} accent="violet" />
-            <PreviewRow label="Margin"          value={profit.net_profit_pct} currency="%" accent={profit.net_profit_pct >= 15 ? "emerald" : profit.net_profit_pct >= 0 ? "amber" : "rose"} percent />
+            <PreviewRow label="Revenue"            value={sellingPrice} currency={draft.order.currency} accent="emerald" />
+            <PreviewRow label="− Supplier cost"    value={profit.total_supplier_cost} currency={draft.order.currency} accent="rose" negative />
+            <div className="my-1.5 border-t border-white/5" />
+            <PreviewRow label="= Gross profit"     value={profit.gross_profit} currency={draft.order.currency} accent={profit.gross_profit >= 0 ? "sky" : "rose"} />
+            <div className="my-1.5 border-t border-white/5" />
+            <PreviewRow label="− Order expenses (linked)" value={profit.total_order_expenses} currency={draft.order.currency} accent="rose" negative />
+            <PreviewRow label="+ Tax refund"       value={taxValue} currency={draft.order.currency} accent="emerald" />
+            <PreviewRow label="− Bank / L-C charges" value={profit.financial_charges} currency={draft.order.currency} accent="rose" negative />
+            <div className="my-1.5 border-t border-white/5" />
+            <PreviewRow label="= Net profit"       value={profit.net_profit} currency={draft.order.currency} accent="violet" />
+            <PreviewRow label="Margin"             value={profit.net_profit_pct} currency="%" accent={profit.net_profit_pct >= 15 ? "emerald" : profit.net_profit_pct >= 0 ? "amber" : "rose"} percent />
+            <p className="mt-3 rounded-md bg-white/5 px-2 py-1.5 text-[10px] leading-relaxed text-gray-400">
+              This is the <strong>expected</strong> profit (booked).
+              The <strong>realized cash result</strong> is tracked on the order card after save —
+              it uses actual collected payments and paid costs, not a ratio.
+            </p>
           </SectionCard>
         </div>
 

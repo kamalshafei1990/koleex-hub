@@ -62,6 +62,9 @@ export interface FinanceOrder {
   selling_price: number;
   tax_refund_pct: number;
   tax_refund_value: number;
+  /* Bank fees / L-C charges / FX / wire costs on this order. Phase 1
+     reads it as 0 if the operator hasn't entered a value yet. */
+  financial_charges: number;
   expected_profit: number | null;
   status: OrderStatus;
   payment_status: PaymentStatus;
@@ -72,15 +75,19 @@ export interface FinanceOrder {
   created_at: string;
   updated_at: string;
   suppliers?: FinanceOrderSupplier[];
-  /* Derived (computed server-side in the API for the list view) */
-  total_supplier_cost?: number;
-  total_order_expenses?: number;
-  gross_profit?: number;
-  net_profit?: number;
-  net_profit_pct?: number;
-  realized_profit?: number;
-  total_paid?: number;
-  total_outstanding?: number;
+  /* ── Derived: accounting picture (computed server-side) ──────── */
+  total_supplier_cost?: number;       // Σ supplier costs
+  total_order_expenses?: number;      // Σ linked expense amounts
+  gross_profit?: number;              // selling_price − supplier_cost
+  net_profit?: number;                // gross − expenses + tax_refund − fin_charges
+  net_profit_pct?: number;            // net_profit / selling_price × 100
+  /* ── Derived: cash picture ──────────────────────────────────── */
+  collected_amount?: number;          // Σ in-payments completed
+  paid_supplier_amount?: number;      // Σ paid_amount on supplier lines
+  paid_expenses?: number;             // Σ paid expense amounts
+  realized_cash_position?: number;    // collected − paid_supplier − paid_expenses
+  outstanding_receivable?: number;    // max(0, selling_price − collected)
+  outstanding_payable?: number;       // unpaid supplier + unpaid linked expenses
 }
 
 /* ── Expenses ───────────────────────────────────────────────────── */
@@ -185,7 +192,10 @@ export interface FinanceNotification {
 /* ── Dashboard payload ──────────────────────────────────────────── */
 export interface DashboardKpi {
   total_revenue: number;
+  total_supplier_cost: number;
   total_expenses: number;
+  total_tax_refund: number;
+  total_financial_charges: number;
   gross_profit: number;
   net_profit: number;
   cash_in: number;

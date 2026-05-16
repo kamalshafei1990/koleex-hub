@@ -76,13 +76,13 @@ export async function GET(req: Request) {
   const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
-      .select("id, selling_price, tax_refund_value, order_date, payment_status")
+      .select("id, selling_price, tax_refund_value, financial_charges, order_date, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("order_date", startISO)
       .lte("order_date", endISO),
     supabaseServer
       .from("finance_orders")
-      .select("selling_price")
+      .select("selling_price, tax_refund_value, financial_charges")
       .eq("tenant_id", auth.tenant_id)
       .gte("order_date", prevStartISO)
       .lte("order_date", prevEndISO),
@@ -148,9 +148,34 @@ export async function GET(req: Request) {
   );
   const total_expenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const total_expenses_prev = expensesPrev.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const total_tax_refund = orders.reduce(
+    (s, o) => s + (Number((o as { tax_refund_value: number | string | null }).tax_refund_value) || 0),
+    0,
+  );
+  const total_tax_refund_prev = ordersPrev.reduce(
+    (s, o) => s + (Number((o as { tax_refund_value: number | string | null }).tax_refund_value) || 0),
+    0,
+  );
+  const total_financial_charges = orders.reduce(
+    (s, o) => s + (Number((o as { financial_charges: number | string | null }).financial_charges) || 0),
+    0,
+  );
+  const total_financial_charges_prev = ordersPrev.reduce(
+    (s, o) => s + (Number((o as { financial_charges: number | string | null }).financial_charges) || 0),
+    0,
+  );
 
+  /* CORRECTED PROFIT CHAIN (Phase 1 fix)
+       gross_profit = revenue − supplier cost                 (tax refund is NOT in gross)
+       net_profit   = gross − expenses + tax_refund − financial_charges
+     Same chain on the prior-period figure so the delta % is apples-to-apples. */
   const gross_profit = total_revenue - total_supplier_cost;
-  const net_profit = gross_profit - total_expenses;
+  const net_profit =
+    gross_profit - total_expenses + total_tax_refund - total_financial_charges;
+  const gross_profit_prev =
+    total_revenue_prev - 0; /* prev supplier cost not loaded — gross delta is approximate */
+  const net_profit_prev =
+    gross_profit_prev - total_expenses_prev + total_tax_refund_prev - total_financial_charges_prev;
 
   const cash_in = payments
     .filter((p) => p.direction === "in")
@@ -202,7 +227,10 @@ export async function GET(req: Request) {
 
   const out: DashboardKpi = {
     total_revenue: round2(total_revenue),
+    total_supplier_cost: round2(total_supplier_cost),
     total_expenses: round2(total_expenses),
+    total_tax_refund: round2(total_tax_refund),
+    total_financial_charges: round2(total_financial_charges),
     gross_profit: round2(gross_profit),
     net_profit: round2(net_profit),
     cash_in: round2(cash_in),
@@ -212,16 +240,16 @@ export async function GET(req: Request) {
     delta: {
       revenue_pct: pctDelta(total_revenue, total_revenue_prev),
       expenses_pct: pctDelta(total_expenses, total_expenses_prev),
-      gross_profit_pct: pctDelta(gross_profit, total_revenue_prev - 0),
-      net_profit_pct: pctDelta(net_profit, total_revenue_prev - total_expenses_prev),
+      gross_profit_pct: pctDelta(gross_profit, gross_profit_prev),
+      net_profit_pct: pctDelta(net_profit, net_profit_prev),
       cash_in_pct: pctDelta(cash_in, cash_in_prev),
       cash_out_pct: pctDelta(cash_out, cash_out_prev),
     },
     delta_value: {
       revenue: round2(total_revenue - total_revenue_prev),
       expenses: round2(total_expenses - total_expenses_prev),
-      gross_profit: round2(gross_profit - (total_revenue_prev - 0)),
-      net_profit: round2(net_profit - (total_revenue_prev - total_expenses_prev)),
+      gross_profit: round2(gross_profit - gross_profit_prev),
+      net_profit: round2(net_profit - net_profit_prev),
       cash_in: round2(cash_in - cash_in_prev),
       cash_out: round2(cash_out - cash_out_prev),
     },
