@@ -660,13 +660,11 @@ const PRINT_AND_DOC_STYLES = `
 @media print {
   /* Page setup — A4, zero browser margin (the doc has its own
      32 px / 24 px padding). */
-  /* size: auto so the @page geometry follows whatever paper
-     the operator picked in the print dialog. Hard-coding A4
-     while the printer was on US Letter (279 mm) caused the
-     297-mm A4 layout to overflow each physical 279-mm sheet
-     by 18 mm, producing alternating blank sheets in the PDF.
-     Doc content (268 mm) fits inside both A4 and US Letter. */
-  @page { size: auto; margin: 0; }
+  /* WYSIWYG: lock paper to A4 so the PDF matches the on-screen
+     editor's 210×297 mm doc exactly. The doc was designed at
+     exact A4 dimensions; auto-paper let US Letter shrink it
+     and break the layout. */
+  @page { size: A4; margin: 0; }
 
   /* Reset page chrome */
   html, body {
@@ -710,39 +708,23 @@ const PRINT_AND_DOC_STYLES = `
     overflow: visible !important;
   }
 
-  /* Every page sized to fit the SMALLER of A4 (297 mm) and US Letter
-     (279 mm). Picking US-Letter-safe dimensions (275 mm tall) means
-     the doc never overflows regardless of which paper size the
-     printer driver defaults to. On A4 paper the bottom 22 mm will
-     just be white space — acceptable trade-off vs the phantom-blank-
-     page-between-every-real-page bug that hits when the doc is
-     sized for A4 but printed to US Letter.
-
-     On-screen view unaffected (inline style stays at 297 mm — only
-     the print pipeline uses 275 mm). */
-  /* Doc height = 268 mm. Carefully chosen:
-     · US Letter printable area: ~265-270 mm depending on the
-       printer driver's hairline.
-     · A4 printable area: ~280 mm.
-     · 268 mm fits inside US Letter's printable region without
-       overflow (so no blank-after-every-page bug) AND uses enough
-       of the sheet that pages 7-8 don't have huge unused white
-       space at the bottom.
-
-     Use explicit page-break-AFTER on every doc except the last
-     so Safari doesn't draw the next doc as a continuation page
-     of the previous one (which manifested as every-other-page
-     blank in the printed PDF). */
+  /* WYSIWYG print geometry — locked to exact A4 (210×297 mm) so
+     the printed PDF matches the on-screen editor 1:1. Padding
+     matches the editor's screen padding (32 px / 32 px / 24 px)
+     so per-page content boundaries are identical between editor
+     and PDF. Hard page-break-after on every doc except the last
+     so the printer doesn't merge a doc's tail with the next
+     doc's head. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
     position: static !important;
     width: 210mm !important;
-    height: 268mm !important;
-    min-height: 268mm !important;
-    max-height: 268mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
-    padding: 24px 28px 18px !important;
+    padding: 32px 32px 24px !important;
     box-shadow: none !important;
     border: none !important;
     background: #fff !important;

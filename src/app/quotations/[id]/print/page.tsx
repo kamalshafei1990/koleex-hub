@@ -169,20 +169,15 @@ export default function QuotationPrintPage({
 
   return (
     <>
-      {/* PDF-optimised stylesheet — only applies on this route. The
-          editor's @media print rules deliberately shrink each page to
-          268 mm so the doc fits inside US Letter's 279 mm printable
-          area when the user hits the browser Print dialog. That hack
-          doesn't apply to the server-side Puppeteer pipeline (we tell
-          it format: A4 explicitly), so every page renders 29 mm short
-          and the PDF has a thick white strip at the bottom of each
-          sheet.
-
-          On this print route we override the height back to a full
-          A4 297 mm and force a page-break after every <.quot-a4-doc>
-          so Puppeteer's page slicer lands exactly on doc boundaries.
-          We also strip the screen-only shadow, gap, and outer scroll
-          so the captured bitmap is purely the doc surface. */}
+      {/* PDF-optimised stylesheet — only applies on this route.
+          WYSIWYG goal: the printed PDF must look EXACTLY like the
+          on-screen editor. Both surfaces lock to A4 210×297 mm and
+          use the same 32 px / 24 px padding so per-page content
+          boundaries match 1:1. @page size: A4 forces the browser to
+          use A4 paper (not US Letter) regardless of the operator's
+          local printer default — critical for Egyptian/Chinese
+          customers where A4 is the regional standard and the doc
+          was designed against. */}
       <style>{`
         html, body {
           margin: 0 !important;
@@ -199,15 +194,11 @@ export default function QuotationPrintPage({
         .quot-a4-doc {
           box-sizing: border-box !important;
           width: 210mm !important;
-          /* 268mm doc fits in both A4 (297mm) and US Letter
-             (279mm) printable areas, leaving 11-29mm slack at
-             the bottom. Using full A4 297mm previously caused
-             every-other-sheet-blank when saved as US Letter PDF. */
-          height: 268mm !important;
-          min-height: 268mm !important;
-          max-height: 268mm !important;
+          height: 297mm !important;
+          min-height: 297mm !important;
+          max-height: 297mm !important;
           margin: 0 !important;
-          padding: 24px 28px 18px !important;
+          padding: 32px 32px 24px !important;
           box-shadow: none !important;
           border: none !important;
           background: #fff !important;
@@ -224,9 +215,9 @@ export default function QuotationPrintPage({
            .no-print elements (toolbars, file inputs etc.) just in
            case a future change adds one. */
         .no-print { display: none !important; }
-        /* size: auto so the page follows the operator's paper-size
-           pick (A4 OR US Letter). Doc is 268 mm tall, fits in both. */
-        @page { size: auto; margin: 0; }
+        /* Force A4 paper — the doc was designed at exactly 210×297
+           mm. Auto-sizing to US Letter would scale + add white space. */
+        @page { size: A4; margin: 0; }
       `}</style>
       <div className="quot-a4-stack">
         <QuotationA4Preview
