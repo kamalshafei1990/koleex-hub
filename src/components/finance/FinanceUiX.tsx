@@ -405,22 +405,55 @@ export function AreaChartMini({
      gradient by accident. */
   const gradId = `mini-${tone}-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
+  /* Last-point position as a percentage of the SVG box so the HTML
+     overlay can render a *true* round dot regardless of how much the
+     SVG stretches horizontally. */
+  const lastPoint = points[points.length - 1];
+  const lastXPct = (lastPoint.x / W) * 100;
+  const lastYPct = (lastPoint.y / H) * 100;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor={stroke} stopOpacity="0.32" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradId})`} />
-      <path d={path} fill="none" stroke={stroke} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Last-point dot */}
-      {points.length > 0 && (
-        <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="1.6" fill={stroke} />
-      )}
-      <title>{currency ? `${data.length} points · ${currency}` : `${data.length} data points`}</title>
-    </svg>
+    <div className="relative w-full" style={{ height: H }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="absolute inset-0 h-full w-full overflow-visible"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor={stroke} stopOpacity="0.32" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradId})`} />
+        {/* vectorEffect=non-scaling-stroke keeps stroke width constant
+            in real pixels even when the SVG is stretched non-uniformly
+            (preserveAspectRatio="none"). Without this the line looks
+            chunky in wide cards and squashed in narrow ones. */}
+        <path
+          d={path}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        <title>{currency ? `${data.length} points · ${currency}` : `${data.length} data points`}</title>
+      </svg>
+      {/* HTML last-point dot — stays a perfect circle under any aspect
+          ratio because it's positioned via percentages in real pixels,
+          not inside the stretched SVG viewBox. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[var(--bg-secondary)]"
+        style={{
+          left: `${lastXPct}%`,
+          top: `${lastYPct}%`,
+          background: stroke,
+        }}
+      />
+    </div>
   );
 }
 
@@ -501,11 +534,26 @@ export function AreaChart({
   const ticks = 4; /* horizontal grid lines */
   const tickValues = Array.from({ length: ticks + 1 }, (_, i) => min + (range * i) / ticks);
 
+  /* Pre-compute last-point positions per series so we can render true-
+     round HTML dots over the stretched SVG. */
+  const seriesLastPoints = series.map((s) => {
+    const lastIdx = s.values.length - 1;
+    if (lastIdx < 0) return null;
+    const xVB = padX + lastIdx * stepX;
+    const yVB = padY + innerH - ((displayValue(s.values[lastIdx]) - min) / range) * innerH;
+    return {
+      xPct: (xVB / W) * 100,
+      yPct: (yVB / height) * 100,
+      stroke: toneToStroke(s.tone),
+    };
+  });
+
   return (
-    <div className="relative">
+    <div>
+    <div className="relative w-full" style={{ height }}>
       <svg
         viewBox={`0 0 ${W} ${height}`}
-        className="w-full"
+        className="absolute inset-0 h-full w-full"
         preserveAspectRatio="none"
         style={{
           /* Subtle fade-in reveal so charts feel alive when loaded */
@@ -550,7 +598,13 @@ export function AreaChart({
           );
         })}
 
-        {/* Series */}
+        {/* Series.
+
+            vectorEffect="non-scaling-stroke" keeps the curve stroke
+            constant in real pixels even when the SVG is stretched
+            horizontally by preserveAspectRatio="none". Without it the
+            line appears chunky on wide containers and squashed on
+            narrow ones. */}
         {series.map((s, i) => {
           const stroke = toneToStroke(s.tone);
           const pts = s.values.map((v, idx) => ({
@@ -562,14 +616,15 @@ export function AreaChart({
           return (
             <g key={i}>
               <path d={areaPath} fill={`url(#area-grad-${i})`} />
-              <path d={path} fill="none" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              {/* Last-point pulse */}
-              {pts.length > 0 && (
-                <>
-                  <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3.5" fill={stroke} opacity="0.30" />
-                  <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="2"   fill={stroke} />
-                </>
-              )}
+              <path
+                d={path}
+                fill="none"
+                stroke={stroke}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
             </g>
           );
         })}
@@ -586,6 +641,30 @@ export function AreaChart({
           );
         })}
       </svg>
+
+      {/* HTML last-point markers — stay perfectly round under any
+          horizontal stretch because they're positioned via percentages
+          in real CSS pixels, not inside the stretched SVG viewBox. */}
+      {seriesLastPoints.map((p, i) =>
+        p ? (
+          <span
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${p.xPct}%`, top: `${p.yPct}%` }}
+          >
+            <span
+              className="block h-3 w-3 rounded-full opacity-30"
+              style={{ background: p.stroke }}
+            />
+            <span
+              className="absolute left-1/2 top-1/2 block h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-[var(--bg-secondary)]"
+              style={{ background: p.stroke }}
+            />
+          </span>
+        ) : null
+      )}
+    </div>
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-gray-400">
