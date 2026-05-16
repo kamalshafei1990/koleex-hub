@@ -183,23 +183,51 @@ export async function GET(req: Request) {
   const cash_in_prev = paymentsPrev
     .filter((p) => p.direction === "in")
     .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out = payments
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out_prev = paymentsPrev
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
-  /* Accounts receivable / payable are point-in-time, not window-based.
-     AR = sum of selling prices on orders that aren't fully paid.
-     AP = sum of (supplier_cost - paid_amount) across all suppliers
-          + unpaid expense amounts. */
-  const [arRes, apOrderSuppliersRes, apExpensesRes] = await Promise.all([
+  /* CASH OUT — sum of completed out-payments PLUS paid expenses that
+     don't have an explicit payment row. Marking an expense
+     payment_status='paid' is a common shortcut for "I paid this from
+     petty cash / company card / etc." and we want it reflected in
+     Cash Out without forcing the operator to also create a payment
+     row. Same treatment in the previous-window number so the delta
+     stays apples-to-apples. */
+  const cash_out_payments = payments
+    .filter((p) => p.direction === "out")
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const cash_out_paid_expenses = expenses
+    .filter((e) => (e as { payment_status: string }).payment_status === "paid")
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const cash_out = cash_out_payments + cash_out_paid_expenses;
+  const cash_out_payments_prev = paymentsPrev
+    .filter((p) => p.direction === "out")
+    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const cash_out_paid_expenses_prev = expensesPrev
+    .filter((e) => (e as { payment_status?: string }).payment_status === "paid")
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const cash_out_prev = cash_out_payments_prev + cash_out_paid_expenses_prev;
+
+  /* ── Accounts Receivable & Accounts Payable ──
+     Point-in-time, not window-based.
+
+     AR — sum of (selling_price − collected) on orders that aren't fully
+     paid. Old formula summed the full selling_price, which double-
+     counted any deposit the customer had already paid. The corrected
+     formula matches the order-level "outstanding_receivable" field.
+
+     AP — sum of (supplier_cost − paid_amount) across all order
+     supplier lines + unpaid expense amounts. (Already correct.) */
+  const [arOrdersRes, arPaymentsRes, apOrderSuppliersRes, apExpensesRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
-      .select("selling_price, payment_status")
+      .select("id, selling_price, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .neq("payment_status", "paid"),
+    supabaseServer
+      .from("finance_payments")
+      .select("linked_order_id, amount, direction, status")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("direction", "in")
+      .eq("status", "completed"),
     supabaseServer
       .from("finance_order_suppliers")
       .select("supplier_cost, paid_amount")
@@ -211,10 +239,23 @@ export async function GET(req: Request) {
       .neq("payment_status", "paid"),
   ]);
 
-  const accounts_receivable = (arRes.data ?? []).reduce(
-    (s, o) => s + (Number(o.selling_price) || 0),
-    0,
-  );
+  /* AR — pair each unpaid order with its completed in-payments and
+     subtract. max(0, …) so over-payments don't drag AR negative. */
+  const collectedByOrder = new Map<string, number>();
+  for (const p of arPaymentsRes.data ?? []) {
+    const k = (p as { linked_order_id: string | null }).linked_order_id;
+    if (!k) continue;
+    collectedByOrder.set(
+      k,
+      (collectedByOrder.get(k) ?? 0) + (Number((p as { amount: number | string }).amount) || 0),
+    );
+  }
+  const accounts_receivable = (arOrdersRes.data ?? []).reduce((s, o) => {
+    const row = o as { id: string; selling_price: number | string };
+    const sp = Number(row.selling_price) || 0;
+    const collected = collectedByOrder.get(row.id) ?? 0;
+    return s + Math.max(0, sp - collected);
+  }, 0);
   const accounts_payable =
     (apOrderSuppliersRes.data ?? []).reduce(
       (s, x) => s + Math.max(0, (Number(x.supplier_cost) || 0) - (Number(x.paid_amount) || 0)),
