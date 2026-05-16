@@ -342,6 +342,34 @@ async function loadQuotationsRemote(opts: { fresh?: boolean } = {}): Promise<Quo
 /** Upsert a single quotation. Returns the server echo (canonical
  *  id + updatedAt) so the UI can reconcile optimistic state. */
 async function saveQuotationRemote(q: Quotation): Promise<Quotation | null> {
+  /* ── WIPE PROTECTION ──
+     The list endpoint strips `items` to keep the payload small, so a
+     row sourced from the list view always starts in the editor with
+     items=[EMPTY_ITEM]. The full doc hydrates async via /api/quotations/:id.
+     If any save (Export PDF, manual Save, status change) fires BEFORE
+     hydration lands, the editor would persist the stripped state — a
+     50-item quote silently flattens to one empty row.
+     This happened twice to KL2026-1520 ($303k, 50 items). Both times
+     a click on Export PDF / Save raced the hydration fetch.
+     Hard guard: if the doc has a server UUID AND the outgoing items
+     look like the default-blank placeholder, refuse the save. The
+     UI shows an alert instead so the operator knows to wait + retry. */
+  const looksLikeEmptyPlaceholder =
+    Array.isArray(q.items) &&
+    q.items.length === 1 &&
+    !q.items[0]?.description?.trim() &&
+    !q.items[0]?.model?.trim() &&
+    !q.items[0]?.image?.trim() &&
+    (Number(q.items[0]?.unitPrice) || 0) === 0;
+  if (q.id.length === 36 && looksLikeEmptyPlaceholder) {
+    if (typeof window !== "undefined") {
+      console.warn(
+        "[saveQuotationRemote] refused — outgoing items match the empty placeholder shape on a server doc. This means hydration hasn't completed yet. Wait a second and try again.",
+        { id: q.id, quote_no: q.invoiceNo },
+      );
+    }
+    return null;
+  }
   const row = await upsertDoc(QUOTATIONS_SYNC, {
     id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
     quote_no: q.invoiceNo || undefined,

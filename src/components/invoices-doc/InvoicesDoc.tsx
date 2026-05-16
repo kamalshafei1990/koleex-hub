@@ -301,9 +301,31 @@ async function loadInvoicesRemote(opts: { fresh?: boolean } = {}): Promise<Invoi
   return rows.map(fromRow);
 }
 
-/** Upsert a single quotation. Returns the server echo (canonical
+/** Upsert a single invoice. Returns the server echo (canonical
  *  id + updatedAt) so the UI can reconcile optimistic state. */
 async function saveInvoiceRemote(q: Invoice): Promise<Invoice | null> {
+  /* WIPE PROTECTION — see saveQuotationRemote() in Quotations.tsx
+     for the full rationale. Refuse to persist a save where the
+     items array is just the default-blank placeholder on a doc
+     that already exists server-side (UUID id). This catches the
+     race where Export PDF / Save fires before the list-stripped
+     editor hydrates from /api/invoices/doc/:id. */
+  const looksLikeEmptyPlaceholder =
+    Array.isArray(q.items) &&
+    q.items.length === 1 &&
+    !q.items[0]?.description?.trim() &&
+    !q.items[0]?.model?.trim() &&
+    !q.items[0]?.image?.trim() &&
+    (Number(q.items[0]?.unitPrice) || 0) === 0;
+  if (q.id.length === 36 && looksLikeEmptyPlaceholder) {
+    if (typeof window !== "undefined") {
+      console.warn(
+        "[saveInvoiceRemote] refused — outgoing items match the empty placeholder shape on a server doc. Hydration hasn't completed; wait a second and try again.",
+        { id: q.id, inv_no: q.invoiceNo },
+      );
+    }
+    return null;
+  }
   const row = await upsertDoc(INVOICES_DOC_SYNC, {
     id: q.id.length === 36 ? q.id : undefined, // if it's our old local hex id, let server mint a new UUID
     inv_no: q.invoiceNo || undefined,
