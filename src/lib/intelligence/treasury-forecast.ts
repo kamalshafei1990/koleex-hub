@@ -38,29 +38,10 @@ import type {
   FinanceOrder,
   FinancePayment,
 } from "@/lib/finance/types";
-
-/* ────────────────────────────────────────────────────────────────────────
-   Reporting currency + FX translation. Mirrors treasury.ts so the
-   forecast totals line up with the dashboard's treasury panel.
-   ──────────────────────────────────────────────────────────────────────── */
-
-export const REPORTING_CURRENCY = "USD";
-
-const FX_TABLE: Record<string, number> = {
-  USD: 1.0,
-  EUR: 1.08,
-  GBP: 1.26,
-  CNY: 0.139,
-  EGP: 0.020,
-};
-
-function fxRate(currency: string): number {
-  return FX_TABLE[currency] ?? 1.0;
-}
-
-function toReporting(amount: number, currency: string): number {
-  return amount * fxRate(currency);
-}
+/* Phase S.3 — FX translation is now sourced from the shared adapter so
+   forecast totals line up byte-for-byte with the treasury panel. */
+import { REPORTING_CURRENCY, toReporting } from "@/lib/finance/fx";
+export { REPORTING_CURRENCY };
 
 function daysFromToday(iso: string | null | undefined): number | null {
   if (!iso) return null;

@@ -37,30 +37,15 @@ import type {
   TreasuryTimelineItem,
 } from "./types";
 import { clamp01, daysFromToday, stableId } from "./behavior";
+import {
+  REPORTING_CURRENCY,
+  toReporting as translateToReporting,
+} from "@/lib/finance/fx";
 
 const NOW = () => Date.now();
-
-const REPORTING_CURRENCY = "USD";
-
-/* ---------------------------------------------------------------------------
-   FX translation — Phase 2.4 ships a simple, deterministic table so the
-   engine can produce reporting-currency totals without depending on an
-   external API. Operators can override per-movement via
-   exchange_rate / reporting_amount columns; the engine respects those.
-   --------------------------------------------------------------------------- */
-
-const FX_TABLE: Record<string, number> = {
-  USD: 1.0,
-  EUR: 1.08,
-  GBP: 1.26,
-  CNY: 0.139,
-  EGP: 0.020,
-};
-
-function translateToReporting(amount: number, currency: string): number {
-  const rate = FX_TABLE[currency] ?? 1.0;
-  return amount * rate;
-}
+/* Phase 2.4 FX translation is now sourced from the canonical adapter
+   in @/lib/finance/fx so both treasury.ts and treasury-forecast.ts
+   share one rate table + one cash-movement translation rule. */
 
 /* ---------------------------------------------------------------------------
    Cash position per account

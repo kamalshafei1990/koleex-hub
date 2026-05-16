@@ -31,6 +31,10 @@ interface Body {
 }
 
 const DEDUP_LOOKBACK_DAYS = 120;
+/* Phase S.3 — large-import protection. CSVs / XLSX files with more
+   than this many parsable rows are rejected before any row hits the
+   DB. Operators can split a multi-month statement into chunks. */
+const MAX_PARSED_ROWS = 5_000;
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -97,6 +101,62 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: msg }, { status: 422 });
   }
 
+  /* Phase S.3 — large-import protection. Reject before any row hits
+     the rows table so we never half-import a 50K-row statement that
+     would later time out at confirm. */
+  const totalParsedCount = parsed.rows.length + parsed.errorRows.length;
+  if (totalParsedCount > MAX_PARSED_ROWS) {
+    await supabaseServer
+      .from("finance_bank_statement_imports")
+      .update({
+        status: "failed",
+        metadata: {
+          ...importRow.metadata,
+          parse_error: `oversized_import: ${totalParsedCount} rows exceeds ceiling of ${MAX_PARSED_ROWS}`,
+          row_count_attempted: totalParsedCount,
+        },
+      })
+      .eq("id", importRow.id)
+      .eq("tenant_id", auth.tenant_id);
+    return NextResponse.json(
+      {
+        error: "oversized_import",
+        details: `${totalParsedCount} rows exceeds the ceiling of ${MAX_PARSED_ROWS}. Split the statement into chunks and re-upload.`,
+        row_count: totalParsedCount,
+        limit: MAX_PARSED_ROWS,
+      },
+      { status: 413 },
+    );
+  }
+
+  /* Phase S.3 — empty parse: no parsable rows AND no error rows. Flag
+     it explicitly so the operator knows the file wasn't readable
+     (wrong delimiter, missing headers, …) — don't silently proceed
+     with a "successful" parse that imports nothing. */
+  if (totalParsedCount === 0) {
+    await supabaseServer
+      .from("finance_bank_statement_imports")
+      .update({
+        status: "failed",
+        metadata: {
+          ...importRow.metadata,
+          parse_error: "empty_parse: 0 rows extracted",
+          detected_mapping: parsed.detectedMapping,
+          headers: parsed.headers,
+        },
+      })
+      .eq("id", importRow.id)
+      .eq("tenant_id", auth.tenant_id);
+    return NextResponse.json(
+      {
+        error: "empty_parse",
+        details: "The parser could not extract any rows from the file. Verify the headers, delimiter, and encoding.",
+        headers: parsed.headers,
+      },
+      { status: 422 },
+    );
+  }
+
   /* Load recent cash movements in the same account for dedup. */
   const sinceIso = new Date(Date.now() - DEDUP_LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
   const { data: movRows } = await supabaseServer
@@ -108,12 +168,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .limit(1000);
   const existingMovements = (movRows ?? []) as CashMovement[];
 
-  /* Wipe prior rows for this import (idempotent rescan). */
-  await supabaseServer
-    .from("finance_bank_statement_rows")
-    .delete()
-    .eq("import_id", importRow.id)
-    .eq("tenant_id", auth.tenant_id);
+  /* Phase S.3 — atomic delete-then-insert via fn_bank_import_replace_rows.
+     The wipe + insert + status promotion now happen in one PG
+     transaction so a partial failure leaves no orphaned half-rows. */
 
   let duplicateCount = 0;
   const errorCount = parsed.errorRows.length;
@@ -178,40 +235,73 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
   }
 
-  if (rowInserts.length) {
-    const { error: insertErr } = await supabaseServer
-      .from("finance_bank_statement_rows")
-      .insert(rowInserts);
-    if (insertErr) {
-      console.error("[bank-imports parse insert]", insertErr.message);
-      return NextResponse.json({ error: insertErr.message }, { status: 500 });
-    }
-  }
+  /* Phase S.3 — atomic replace: delete prior rows + insert new rows +
+     promote import.status='parsed' + write metadata in one PG tx.
+     A partial-insert failure rolls everything back, so the operator
+     never sees a parsed import with mismatched row counts. */
+  const rowsForRpc = rowInserts.map((r) => ({
+    row_index: r.row_index,
+    raw_data: r.raw_data,
+    movement_date: r.movement_date,
+    value_date: r.value_date,
+    description: r.description,
+    reference: r.reference,
+    counterparty_name: r.counterparty_name,
+    direction: r.direction,
+    amount: r.amount,
+    currency: r.currency,
+    balance_after: r.balance_after,
+    movement_type: r.movement_type,
+    duplicate_status: r.duplicate_status,
+    import_status: r.import_status,
+    matched_cash_movement_id: r.matched_cash_movement_id,
+    error_message: r.error_message,
+    metadata: r.metadata,
+  }));
 
-  /* Patch the import row. */
-  const { data: updated, error: updateErr } = await supabaseServer
-    .from("finance_bank_statement_imports")
-    .update({
-      status: "parsed",
-      row_count: parsed.rows.length + parsed.errorRows.length,
-      duplicate_count: duplicateCount,
-      error_count: errorCount,
-      metadata: {
-        ...importRow.metadata,
-        detected_mapping: parsed.detectedMapping,
-        headers: parsed.headers,
-      },
-    })
-    .eq("id", importRow.id)
-    .eq("tenant_id", auth.tenant_id)
-    .select("*")
-    .single();
-  if (updateErr) {
-    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  const totalCount = parsed.rows.length + parsed.errorRows.length;
+  /* Capture any parser warnings into metadata so the operator can
+     trace WHY rows were dropped. Today the parser exposes errorRows
+     individually; we surface a top-level summary too. */
+  const importMetadata = {
+    ...importRow.metadata,
+    detected_mapping: parsed.detectedMapping,
+    headers: parsed.headers,
+    parse_warnings: parsed.errorRows.length > 0 ? {
+      count: parsed.errorRows.length,
+      first_few: parsed.errorRows.slice(0, 5).map((e) => ({
+        row_index: e.row_index,
+        message: e.error_message,
+      })),
+    } : undefined,
+  };
+
+  const { data: rpcRes, error: rpcErr } = await supabaseServer.rpc(
+    "fn_bank_import_replace_rows",
+    {
+      p_import_id: importRow.id,
+      p_tenant_id: auth.tenant_id,
+      p_rows: rowsForRpc,
+      p_metadata: importMetadata,
+      p_row_count: totalCount,
+      p_duplicate_count: duplicateCount,
+      p_error_count: errorCount,
+    },
+  );
+  if (rpcErr) {
+    console.error("[bank-imports parse rpc]", rpcErr.message);
+    return NextResponse.json({ error: rpcErr.message }, { status: 500 });
+  }
+  const result = (rpcRes ?? {}) as {
+    ok?: boolean; error?: string; code?: number; import?: BankStatementImport;
+  };
+  if (!result.ok) {
+    const status = result.code === 404 ? 404 : 409;
+    return NextResponse.json({ error: result.error ?? "Conflict" }, { status });
   }
 
   return NextResponse.json({
-    import: updated as BankStatementImport,
+    import: result.import as BankStatementImport,
     summary: {
       total: rowInserts.length,
       ready: rowInserts.filter((r) => r.import_status === "ready").length,

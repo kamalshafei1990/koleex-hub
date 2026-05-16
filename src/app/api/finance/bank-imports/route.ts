@@ -15,9 +15,12 @@ import "server-only";
    ========================================================================== */
 
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { BankStatementImport, BankStatementFileType } from "@/lib/finance/types";
+
+const DUP_WINDOW_DAYS = 30;
 
 const ALLOWED_FILE_TYPES: BankStatementFileType[] = ["csv", "xlsx"];
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
@@ -76,11 +79,55 @@ export async function POST(req: Request) {
   /* Verify the bank account exists in this tenant. */
   const { data: account } = await supabaseServer
     .from("finance_bank_accounts")
-    .select("id, tenant_id")
+    .select("id, tenant_id, status")
     .eq("id", bankAccountId)
+    .eq("tenant_id", auth.tenant_id)
     .maybeSingle();
-  if (!account || (account as { tenant_id: string }).tenant_id !== auth.tenant_id) {
+  if (!account) {
     return NextResponse.json({ error: "Bank account not found" }, { status: 404 });
+  }
+  if ((account as { status: string }).status !== "active") {
+    return NextResponse.json(
+      { error: `Cannot import into a ${account.status} bank account` },
+      { status: 409 },
+    );
+  }
+
+  /* Phase S.3 — compute sha256 of the file bytes BEFORE inserting the
+     import row. The hash is used for:
+       · the duplicate-upload guard (below)
+       · replay detection across the rolling 30-day window
+       · provenance (this CSV is byte-identical to import X). */
+  const arrayBuf = await file.arrayBuffer();
+  const buf = Buffer.from(arrayBuf);
+  const fileHash = createHash("sha256").update(buf).digest("hex");
+
+  /* Duplicate guard. We reject re-uploads of an identical file in
+     the active set (uploaded | parsed | confirmed) within 30 days.
+     Cancelled / failed imports do NOT block; operator may retry. */
+  const sinceIso = new Date(Date.now() - DUP_WINDOW_DAYS * 86_400_000).toISOString();
+  const { data: dups } = await supabaseServer
+    .from("finance_bank_statement_imports")
+    .select("id, status, uploaded_at, file_name")
+    .eq("tenant_id", auth.tenant_id)
+    .eq("file_hash", fileHash)
+    .in("status", ["uploaded", "parsed", "confirmed"])
+    .gte("uploaded_at", sinceIso)
+    .order("uploaded_at", { ascending: false })
+    .limit(1);
+  if (dups && dups.length > 0) {
+    const existing = dups[0] as { id: string; status: string; uploaded_at: string; file_name: string };
+    return NextResponse.json(
+      {
+        error: "duplicate_upload",
+        details:
+          `An identical file was uploaded ${Math.round((Date.now() - new Date(existing.uploaded_at).getTime()) / 86_400_000)}d ago (import ${existing.id.slice(0, 8)}, status ${existing.status}). Cancel that import first if you want to re-process.`,
+        existing_import_id: existing.id,
+        existing_status: existing.status,
+        existing_uploaded_at: existing.uploaded_at,
+      },
+      { status: 409 },
+    );
   }
 
   /* Create the row first so we have the import_id for the storage path. */
@@ -92,6 +139,7 @@ export async function POST(req: Request) {
       file_name: file.name,
       file_type: fileType,
       file_size: file.size,
+      file_hash: fileHash,
       status: "uploaded",
       uploaded_by: auth.account_id,
       metadata: {},
@@ -107,8 +155,6 @@ export async function POST(req: Request) {
   const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, "_");
   const storagePath = `${auth.tenant_id}/bank-statements/${importRow.id}/${safeName}`;
 
-  const arrayBuf = await file.arrayBuffer();
-  const buf = Buffer.from(arrayBuf);
   const { error: storageErr } = await supabaseServer.storage
     .from("finance-documents")
     .upload(storagePath, buf, {

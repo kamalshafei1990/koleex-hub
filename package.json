@@ -9,7 +9,8 @@
     "lint": "eslint",
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
     "validate:races": "tsx scripts/race-conditions.ts",
-    "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts"
+    "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",
+    "validate:edge-cases": "tsx scripts/edge-cases.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

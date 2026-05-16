@@ -306,7 +306,36 @@ export function planCandidates(input: PlanInputs): PlannedCandidate[] {
       if (hardRejectPair(m, p)) continue;
       const scores = matchConfidence(m, p);
       if (scores.total < CONFIDENCE_LOW) continue;
-      if (!best || scores.total > best.scores.total) best = { payment: p, scores };
+
+      /* Phase S.3 — deterministic tie-breaking. When two payments
+         tie on composite score (which happens when both share the
+         same bank_reference + same currency + same amount), pick the
+         one whose payment_date is closest to the movement_date. Ties
+         on that go to the oldest-created payment so the answer is
+         repeatable across rescans. */
+      if (!best) {
+        best = { payment: p, scores };
+        continue;
+      }
+      if (scores.total > best.scores.total) {
+        best = { payment: p, scores };
+        continue;
+      }
+      if (scores.total === best.scores.total) {
+        const mDate = new Date(m.movement_date).getTime();
+        const candidateDiff = Math.abs(new Date(p.payment_date).getTime() - mDate);
+        const currentDiff   = Math.abs(new Date(best.payment.payment_date).getTime() - mDate);
+        if (candidateDiff < currentDiff) {
+          best = { payment: p, scores };
+          continue;
+        }
+        if (candidateDiff === currentDiff) {
+          /* Tie-on-tie: oldest payment by created_at wins. */
+          if ((p.created_at ?? "") < (best.payment.created_at ?? "")) {
+            best = { payment: p, scores };
+          }
+        }
+      }
     }
     if (!best) continue;
     const level = bucketConfidence(best.scores.total);
