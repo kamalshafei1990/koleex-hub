@@ -769,11 +769,15 @@ const PRINT_AND_DOC_STYLES = `
        of the sheet that pages 7-8 don't have huge unused white
        space at the bottom.
 
-     NO page-break-before — that rule was producing extra blank
-     sheets between docs in Safari. With each doc at a fixed
-     268 mm height and page-break-inside: avoid keeping it
-     together, the browser naturally places each doc on its own
-     sheet. */
+     Use page-break-AFTER (not -before) on every doc except the
+     last one. -after on each doc forces the next doc to start on
+     a fresh sheet; the :last-child exception keeps the print job
+     from emitting a trailing blank sheet after the final doc.
+     Without an explicit page-break the browser was natural-
+     stacking the docs, and Safari (16+) sometimes drew the next
+     doc as a "second page" of the previous doc -- producing the
+     every-other-page-blank pattern reported in operator print
+     screenshots. */
   .quot-a4-doc {
     box-sizing: border-box !important;
     display: block !important;
@@ -788,8 +792,14 @@ const PRINT_AND_DOC_STYLES = `
     border: none !important;
     background: #fff !important;
     overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  .quot-a4-doc:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   /* Items table — never split a single row across sheets and
