@@ -1094,46 +1094,27 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
-
-    /* Open the print window NOW inside the user-gesture stack to
-       avoid the popup blocker (which silently blocks window.open
-       calls that happen after async awaits). Navigate it once the
-       save + refetch resolves. */
-    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
-    if (!win) {
-      alert("The browser blocked the print window. Please allow popups for this site and try again.");
-      return;
-    }
-
+    /* Same flow as the Quotations editor: save first, set a nice
+       PDF title, then open the browser's NATIVE print dialog on
+       this window. The editor's @media print CSS hides every
+       piece of Hub chrome, so the saved PDF matches the standalone
+       /invoices/:id/print page output -- without opening a new
+       tab or running into popup-blocker issues. */
     setPdfState("loading");
     try {
-      /* Make sure the latest edits are on the server before navigating
-         the print window — that page fetches the quote by id. */
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
       }
-      const refreshed = await loadInvoicesRemote({ fresh: true });
-      const match = refreshed.find(
-        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
-      );
-      const quotationId = match?.id ?? current.id;
-      if (quotationId.length !== 36) {
-        win.close();
-        setPdfState("error");
-        alert("Please save the invoice before exporting.");
-        setTimeout(() => setPdfState("idle"), 2_000);
-        return;
-      }
-      /* Route to the dedicated invoice print page so the renderer
-         receives docKind="invoice" and shows "COMMERCIAL INVOICE"
-         in the header / "Invoice No" / "Due Date" labels. */
-      const url = `/invoices/${encodeURIComponent(quotationId)}/print?auto=1`;
-      win.location.href = url;
-      /* Briefly reflect success; the actual render happens in the new
-         window so we don't have anything else to wait on. */
-      setTimeout(() => setPdfState("idle"), 500);
+      const prev = document.title;
+      document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
+      const restore = () => {
+        document.title = prev;
+        window.removeEventListener("afterprint", restore);
+      };
+      window.addEventListener("afterprint", restore);
+      setPdfState("idle");
+      requestAnimationFrame(() => window.print());
     } catch (e) {
-      try { win.close(); } catch { /* already closed */ }
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);

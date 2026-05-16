@@ -349,7 +349,13 @@ export default function QuotationA4Preview({
      the items table on page 1. */
   const ITEMS_FIRST  = 4;
   const ITEMS_MIDDLE = 8;
-  const ITEMS_LAST   = 3;
+  /* Reduced from 3 to 1 -- the last page now also carries the
+     full-width Shipment & Delivery Details card on top of the
+     totals + T&C row + stamp/signature. Two or three items +
+     the new footer block was pushing the doc past the 268 mm
+     print height, producing overflow / blank trailing sheets.
+     At ITEMS_LAST=1 the footer block always has enough room. */
+  const ITEMS_LAST   = 1;
 
   const pages = useMemo(() => {
     const items = current.items;
@@ -4672,6 +4678,7 @@ function ShipmentDetailsCard({
   return (
     <div
       className="pq-shipment-details"
+      data-filled-count={filledCount}
       style={{
         border: `1px solid ${T.border}`,
         borderRadius: 12,
@@ -4728,10 +4735,11 @@ function ShipmentDetailsCard({
         </span>
       </div>
 
-      {/* Mobile-first CSS rule + placeholder pseudo for empty
-          editable cells. Empty contentEditable divs render with
-          an em-dash placeholder via ::before that vanishes the
-          moment the operator types anything. */}
+      {/* Mobile-first + print-mode adjustments. On PRINT we also
+          hide empty rows entirely so the card collapses to just
+          the populated cells -- otherwise an under-filled card
+          would push the stamp/signature off the bottom of the
+          last A4 sheet and produce an extra blank page. */}
       <style>{`
         @media screen and (max-width: 767px) {
           .pq-shipment-grid { grid-template-columns: auto 1fr !important; }
@@ -4756,6 +4764,29 @@ function ShipmentDetailsCard({
           .pq-detail-cell[contenteditable="true"]:focus {
             outline: none !important;
             background: transparent !important;
+          }
+          /* Hide rows with no value -- the grid collapses since
+             both cells of the contents-wrapper disappear. */
+          .pq-shipment-details .pq-detail-row[data-empty="true"] {
+            display: none !important;
+          }
+          /* If the operator hasn't filled ANY shipment details, the
+             whole card just wastes vertical space on the printed
+             page -- hide it entirely. */
+          .pq-shipment-details[data-filled-count="0"] {
+            display: none !important;
+          }
+          /* Tighter padding for print so the card fits inside
+             the last A4 sheet's remaining vertical budget. */
+          .pq-shipment-grid {
+            padding: 4px 12px !important;
+            font-size: 9px !important;
+            line-height: 1.3 !important;
+          }
+          .pq-shipment-grid .pq-detail-label,
+          .pq-shipment-grid .pq-detail-cell {
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
           }
         }
       `}</style>
@@ -4799,12 +4830,16 @@ function ShipmentDetailsCard({
             r.canonical === "Lead time" ||
             r.canonical === "Delivery time" ||
             r.canonical === "Documents Provided";
+          const isEmpty = r.value.trim() === "";
           return (
             <div
               key={r.canonical}
+              className="pq-detail-row"
+              data-empty={isEmpty ? "true" : "false"}
               style={{ display: "contents" }}
             >
               <div
+                className="pq-detail-label"
                 style={{
                   fontWeight: 700,
                   color: T.inkSoft,
@@ -4817,6 +4852,7 @@ function ShipmentDetailsCard({
               </div>
               {isReadOnly ? (
                 <div
+                  className="pq-detail-cell"
                   style={{
                     padding: "4px 0",
                     borderBottom: i < rows.length - 2 ? `1px solid ${T.border}` : "none",

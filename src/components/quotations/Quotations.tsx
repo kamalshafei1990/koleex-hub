@@ -1156,46 +1156,31 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
-
-    /* CRITICAL: open the print window SYNCHRONOUSLY here, while we
-       are still inside the click's user-gesture stack. If we wait
-       for the await chain below (save + refetch) to resolve, the
-       gesture is gone and Chrome/Safari/Firefox silently block
-       window.open as a popup -- the operator sees nothing happen.
-       The trick is to open a blank window first, then navigate it
-       to the real URL once we have the canonical id. */
-    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
-    if (!win) {
-      alert("The browser blocked the print window. Please allow popups for this site and try again.");
-      return;
-    }
-
+    /* The operator asked for the "old" behaviour: trigger the
+       browser's native print dialog on THIS window (no popup, no
+       new tab). The editor's @media print CSS already hides every
+       piece of Hub chrome, so the printed PDF looks identical to
+       the standalone /print page. We save first so the printed
+       doc reflects the latest edits, then set a friendly title
+       (browsers use it as the default PDF filename), then call
+       window.print(). The title is restored on afterprint. */
     setPdfState("loading");
     try {
-      /* Make sure the latest edits are on the server before navigating
-         the print window — that page fetches the quote by id. */
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
       }
-      const refreshed = await loadQuotationsRemote({ fresh: true });
-      const match = refreshed.find(
-        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
-      );
-      const quotationId = match?.id ?? current.id;
-      if (quotationId.length !== 36) {
-        win.close();
-        setPdfState("error");
-        alert("Please save the quotation before exporting.");
-        setTimeout(() => setPdfState("idle"), 2_000);
-        return;
-      }
-      const url = `/quotations/${encodeURIComponent(quotationId)}/print?auto=1`;
-      win.location.href = url;
-      /* Briefly reflect success; the actual render happens in the new
-         window so we don't have anything else to wait on. */
-      setTimeout(() => setPdfState("idle"), 500);
+      const prev = document.title;
+      document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
+      const restore = () => {
+        document.title = prev;
+        window.removeEventListener("afterprint", restore);
+      };
+      window.addEventListener("afterprint", restore);
+      setPdfState("idle");
+      /* Small defer so React has flushed the loading-state UI
+         repaint before the browser captures the print snapshot. */
+      requestAnimationFrame(() => window.print());
     } catch (e) {
-      win.close();
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);
@@ -1819,7 +1804,7 @@ export default function Quotations() {
           onClick={handleExportPdf}
           disabled={pdfState === "loading"}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Open a print-ready view in a new window — pick 'Save as PDF' in the print dialog."
+          title="Open the browser print dialog and pick 'Save as PDF'."
         >
           <DownloadIcon size={14} />
           {pdfState === "loading" ? "Opening…" : t("btn.exportPDF")}
