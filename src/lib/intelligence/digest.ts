@@ -93,11 +93,18 @@ export function buildExecutiveDigest(args: {
   }
 
   /* 3) BIGGEST DEPENDENCY — top supplier OR top customer share, if
-        material AND not already covered. */
+        material AND not already represented in prior digest items
+        (Phase 2.0.2: dedupe by entity name across kinds, not just by
+        digest key). The supplier_dependency event already in
+        biggest_pressure would otherwise produce a same-entity duplicate. */
+  const alreadyMentioned = (name: string): boolean => {
+    const lower = name.toLowerCase();
+    return out.some((i) => i.headline.toLowerCase().includes(lower));
+  };
   const topSupplier = suppliers[0];
   const topCustomer = customers[0];
   const candidate =
-    topSupplier && topSupplier.cogsShare >= 50
+    topSupplier && topSupplier.cogsShare >= 50 && !alreadyMentioned(topSupplier.name)
       ? {
           key: `digest-dep-supplier-${topSupplier.id}`,
           kind: "biggest_dependency" as const,
@@ -107,7 +114,7 @@ export function buildExecutiveDigest(args: {
           narrative: topSupplier.read,
           magnitude: topSupplier.cogsShare,
         }
-      : topCustomer && topCustomer.revenueShare >= 40
+      : topCustomer && topCustomer.revenueShare >= 40 && !alreadyMentioned(topCustomer.name)
         ? {
             key: `digest-dep-customer-${topCustomer.id}`,
             kind: "biggest_dependency" as const,
@@ -118,7 +125,7 @@ export function buildExecutiveDigest(args: {
             magnitude: topCustomer.revenueShare,
           }
         : null;
-  if (candidate && !out.some((i) => i.key === candidate.key)) {
+  if (candidate) {
     out.push(candidate);
   }
 

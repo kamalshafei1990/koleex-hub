@@ -89,7 +89,10 @@ export function buildLogisticsSnapshot(args: {
   const buckets: LogisticsBucket[] = ORDER.map((b) => {
     const t = totals[b];
     const p = priorTotals[b];
-    const trendPct = p > 0 ? ((t - p) / p) * 100 : (t > 0 ? 100 : 0);
+    /* Phase 2.0.2: when prior is zero we don't claim a 100% spike —
+       that would fire `logistics_spike` for any first-period spend and
+       count as a false positive. New baseline ⇒ unknown trend. */
+    const trendPct = p > 0 ? ((t - p) / p) * 100 : 0;
     return {
       bucket: b,
       total: t,
@@ -101,7 +104,7 @@ export function buildLogisticsSnapshot(args: {
 
   const headlineTrend = priorTotal > 0
     ? ((total - priorTotal) / priorTotal) * 100
-    : (total > 0 ? 100 : 0);
+    : 0;  // unknown when no prior baseline
   const trend = classifyDirection(headlineTrend, 8);
 
   /* Pressure rules: logistics squeezing margins. */
@@ -184,7 +187,10 @@ export function detectExpenseAnomalies(
   for (const [cat, curr] of c) {
     const prev = p.get(cat) ?? 0;
     if (prev === 0 && curr === 0) continue;
-    const pct = prev === 0 ? 100 : ((curr - prev) / prev) * 100;
+    /* Phase 2.0.2: skip categories with no prior baseline — new spend
+       is not the same as anomalous spend. */
+    if (prev === 0) continue;
+    const pct = ((curr - prev) / prev) * 100;
     if (Math.abs(pct) < threshold) continue;
     anomalies.push({
       category: cat,
