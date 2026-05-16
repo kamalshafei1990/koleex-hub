@@ -95,6 +95,41 @@ export interface FinanceOrder {
 /** Phase 2.1 financial-evidence lifecycle for an expense. */
 export type EvidenceStatus = "missing" | "pending" | "partial" | "verified";
 
+/** Phase 2.2 approval lifecycle — orthogonal to payment status. */
+export type ApprovalStatus =
+  | "draft"
+  | "submitted"
+  | "under_review"
+  | "approved"
+  | "partially_approved"
+  | "rejected"
+  | "requires_changes";
+
+export type ApprovalAction =
+  | "submit"
+  | "approve"
+  | "partial_approve"
+  | "reject"
+  | "request_changes"
+  | "reset"
+  | "review_note"
+  | "auto_change";
+
+export interface FinanceApprovalHistoryEntry {
+  id: string;
+  entity_type: "expense" | "payment" | "order";
+  entity_id: string;
+  action: ApprovalAction;
+  from_status: ApprovalStatus | null;
+  to_status: ApprovalStatus | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  notes: string | null;
+  amount_approved: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface FinanceExpense {
   id: string;
   category_id: string | null;
@@ -120,6 +155,20 @@ export interface FinanceExpense {
   has_attachments?: boolean;
   last_attachment_at?: string | null;
   evidence_status?: EvidenceStatus;
+  /* Phase 2.2 — approval workflow columns. */
+  approval_status?: ApprovalStatus;
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
+  requires_changes_reason?: string | null;
+  review_notes?: string | null;
+  approval_level?: number;
 }
 
 /* ── Attachments (Phase 2.1) ────────────────────────────────────── */

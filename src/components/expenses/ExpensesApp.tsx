@@ -38,8 +38,32 @@ import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
    and the drawer at the top level here. */
 import { EvidenceBadge } from "@/components/attachments/EvidenceBadge";
 import AttachmentPreviewDrawer from "@/components/attachments/AttachmentPreviewDrawer";
+/* Phase 2.2 — approval workflow. */
+import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
+import ApprovalReviewDrawer from "@/components/approval/ApprovalReviewDrawer";
+import type { ApprovalStatus } from "@/lib/finance/types";
 
 type TabKey = ExpensesTabKey;
+
+/* Phase 2.2 — approval-state quick filter. Lives next to the existing
+   payment-state tabs so an operator can scan "what needs my attention"
+   without leaving the page. */
+type ApprovalFilterKey =
+  | "all"
+  | "needs_review"     // submitted + under_review (approver view)
+  | "draft"            // operator's drafts not yet submitted
+  | "rejected"
+  | "requires_changes"
+  | "approved";
+
+const APPROVAL_FILTER_LABELS: Record<ApprovalFilterKey, string> = {
+  all:              "Any state",
+  needs_review:     "Needs review",
+  draft:            "Drafts",
+  rejected:         "Rejected",
+  requires_changes: "Changes needed",
+  approved:         "Approved",
+};
 
 const CURRENCIES = ["USD", "EUR", "CNY", "EGP", "GBP"];
 
@@ -54,6 +78,26 @@ export default function ExpensesApp() {
   /* Phase 2.1 — evidence drawer state. Lives at the parent so it can
      anchor to any expense row and survive list re-fetches. */
   const [evidenceExpense, setEvidenceExpense] = useState<FinanceExpense | null>(null);
+  /* Phase 2.2 — approval workflow state. */
+  const [reviewExpense, setReviewExpense] = useState<FinanceExpense | null>(null);
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilterKey>("all");
+  const [canApprove, setCanApprove] = useState(false);
+
+  /* Resolve approve permission once on mount — Finance module presence
+     is the gate. We optimistically hide approver actions while the
+     check is in flight; server still re-validates. */
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/me/permitted-modules", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        const modules = (j.modules ?? []) as string[];
+        setCanApprove(!!j.is_super_admin || modules.includes("Finance"));
+      })
+      .catch(() => { /* leave false */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +114,10 @@ export default function ExpensesApp() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  /* Stable per-mount timestamps. Captured via lazy useState so render
+     stays pure under React-19's react-hooks/purity rule. */
+  const [nowMs] = useState<number>(() => Date.now());
+  const today = useMemo(() => new Date(nowMs).toISOString().slice(0, 10), [nowMs]);
 
   /* Filters: tab + search + category */
   const filtered = useMemo(() => {
@@ -82,6 +129,15 @@ export default function ExpensesApp() {
         if (!isOverdue) return false;
       }
       if (categoryFilter && e.category_id !== categoryFilter) return false;
+      /* Phase 2.2 — approval filter. */
+      if (approvalFilter !== "all") {
+        const a = (e.approval_status ?? "draft") as ApprovalStatus;
+        if (approvalFilter === "needs_review" && a !== "submitted" && a !== "under_review") return false;
+        if (approvalFilter === "draft"            && a !== "draft")            return false;
+        if (approvalFilter === "rejected"         && a !== "rejected")         return false;
+        if (approvalFilter === "requires_changes" && a !== "requires_changes") return false;
+        if (approvalFilter === "approved"         && a !== "approved" && a !== "partially_approved") return false;
+      }
       if (search.trim()) {
         const needle = search.trim().toLowerCase();
         const hay = `${e.title} ${e.notes ?? ""} ${e.category_name ?? ""}`.toLowerCase();
@@ -89,7 +145,23 @@ export default function ExpensesApp() {
       }
       return true;
     });
-  }, [expenses, tab, categoryFilter, search, today]);
+  }, [expenses, tab, categoryFilter, search, today, approvalFilter]);
+
+  /* Counts for the approval filter strip. */
+  const approvalCounts = useMemo(() => {
+    const c: Record<ApprovalFilterKey, number> = {
+      all: expenses.length, needs_review: 0, draft: 0, rejected: 0, requires_changes: 0, approved: 0,
+    };
+    for (const e of expenses) {
+      const a = (e.approval_status ?? "draft") as ApprovalStatus;
+      if (a === "submitted" || a === "under_review") c.needs_review += 1;
+      if (a === "draft")                              c.draft += 1;
+      if (a === "rejected")                           c.rejected += 1;
+      if (a === "requires_changes")                   c.requires_changes += 1;
+      if (a === "approved" || a === "partially_approved") c.approved += 1;
+    }
+    return c;
+  }, [expenses]);
 
   /* Top-line counts shown above the tab strip */
   const counts = useMemo(() => {
@@ -147,6 +219,38 @@ export default function ExpensesApp() {
             </button>
           }
         />
+
+        {/* ── Phase 2.2 — Approval filter strip ─────────────────── */}
+        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mr-1">Approval</span>
+          {(Object.keys(APPROVAL_FILTER_LABELS) as ApprovalFilterKey[]).map((key) => {
+            const active = approvalFilter === key;
+            const count = approvalCounts[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setApprovalFilter(key)}
+                className={
+                  "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors " +
+                  (active
+                    ? "border-white/[0.14] bg-white/[0.08] text-[var(--text-primary)]"
+                    : "border-white/[0.05] bg-white/[0.02] text-gray-400 hover:bg-white/[0.05] hover:text-gray-200")
+                }
+              >
+                <span>{APPROVAL_FILTER_LABELS[key]}</span>
+                {count > 0 && key !== "all" && (
+                  <span className={
+                    "rounded-full px-1 text-[9px] tabular-nums " +
+                    (active ? "bg-white/[0.12] text-gray-200" : "bg-white/[0.04] text-gray-500")
+                  }>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
@@ -224,9 +328,12 @@ export default function ExpensesApp() {
                 <ExpenseRow
                   key={e.id}
                   e={e}
+                  nowMs={nowMs}
+                  todayIso={today}
                   onEdit={() => setEditing(e)}
                   onDelete={() => remove(e.id)}
                   onEvidence={() => setEvidenceExpense(e)}
+                  onReview={() => setReviewExpense(e)}
                 />
               ))}
             </ul>
@@ -255,26 +362,51 @@ export default function ExpensesApp() {
         receiptCount={evidenceExpense?.receipt_count}
         onChange={() => { void load(); }}
       />
+
+      {/* ── Phase 2.2 — APPROVAL REVIEW DRAWER ────────────────── */}
+      <ApprovalReviewDrawer
+        open={!!reviewExpense}
+        onClose={() => setReviewExpense(null)}
+        expense={reviewExpense}
+        canApprove={canApprove}
+        onChange={(next) => {
+          setReviewExpense(next);
+          void load();
+        }}
+      />
     </div>
   );
 }
 
 /* ── ExpenseRow — visual list card with icon, category, status. ── */
 function ExpenseRow({
-  e, onEdit, onDelete, onEvidence,
+  e, onEdit, onDelete, onEvidence, onReview, nowMs, todayIso,
 }: {
   e: FinanceExpense;
   onEdit: () => void;
   onDelete: () => void;
   onEvidence: () => void;
+  onReview: () => void;
+  /** Once-per-mount timestamps from the parent — keeps render pure
+   *  under React-19 react-hooks/purity rules. */
+  nowMs: number;
+  todayIso: string;
 }) {
   const style = styleForCategory(e.category_name);
-  const today = new Date().toISOString().slice(0, 10);
-  const isOverdue = e.payment_status !== "paid" && !!e.due_date && e.due_date < today;
+  const isOverdue = e.payment_status !== "paid" && !!e.due_date && e.due_date < todayIso;
   /* Phase 2.1: evidence status is now the canonical signal. Legacy
      attachment_url falls into "pending" via the migration backfill. */
   const evidenceStatus = e.evidence_status ?? (e.has_attachments || e.attachment_url ? "pending" : "missing");
   const receiptCount = e.receipt_count ?? (e.attachment_url ? 1 : 0);
+  /* Phase 2.2: approval status + waiting age for the review badge. */
+  const approvalStatus = (e.approval_status ?? "draft") as ApprovalStatus;
+  const ageDays = (() => {
+    const ts = e.submitted_at ?? e.reviewed_at;
+    if (!ts) return undefined;
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return undefined;
+    return Math.max(0, Math.floor((nowMs - d.getTime()) / 86_400_000));
+  })();
   return (
     <li className="group">
       <div className={`flex items-center gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.12] ${isOverdue ? "border-rose-500/30" : "border-white/[0.06]"}`}>
@@ -294,6 +426,14 @@ function ExpenseRow({
             >
               <EvidenceBadge status={evidenceStatus} receiptCount={receiptCount} compact />
             </button>
+            <button
+              type="button"
+              onClick={onReview}
+              className="cursor-pointer"
+              title="Open approval review drawer"
+            >
+              <ApprovalBadge status={approvalStatus} ageDays={ageDays} compact />
+            </button>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
             <span>{e.expense_date}</span>
@@ -310,6 +450,7 @@ function ExpenseRow({
             <div className="text-base font-semibold tabular-nums text-rose-300">−{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</div>
           </div>
           <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+            <button onClick={onReview}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Review</button>
             <button onClick={onEvidence} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Evidence</button>
             <button onClick={onEdit}     className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Edit</button>
             <button onClick={onDelete}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-rose-400 hover:border-rose-500/40">Delete</button>
