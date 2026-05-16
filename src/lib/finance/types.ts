@@ -91,6 +91,10 @@ export interface FinanceOrder {
 }
 
 /* ── Expenses ───────────────────────────────────────────────────── */
+
+/** Phase 2.1 financial-evidence lifecycle for an expense. */
+export type EvidenceStatus = "missing" | "pending" | "partial" | "verified";
+
 export interface FinanceExpense {
   id: string;
   category_id: string | null;
@@ -110,6 +114,63 @@ export interface FinanceExpense {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /* Phase 2.1 — financial evidence columns (maintained by DB trigger). */
+  receipt_count?: number;
+  primary_receipt_url?: string | null;
+  has_attachments?: boolean;
+  last_attachment_at?: string | null;
+  evidence_status?: EvidenceStatus;
+}
+
+/* ── Attachments (Phase 2.1) ────────────────────────────────────── */
+
+export type AttachmentEntityType =
+  | "expense"
+  | "payment"
+  | "order"
+  | "supplier"
+  | "customer";
+
+export type AttachmentCategory =
+  | "receipt"
+  | "invoice"
+  | "shipping_doc"
+  | "customs_doc"
+  | "payment_screenshot"
+  | "contract"
+  | "other";
+
+export type OcrStatus = "pending" | "processing" | "done" | "failed" | "skipped";
+
+export interface FinanceAttachment {
+  id: string;
+  entity_type: AttachmentEntityType;
+  entity_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path: string;
+  file_hash: string | null;
+  category: AttachmentCategory;
+  notes: string | null;
+  tags: string[];
+  is_primary: boolean;
+  /* Future OCR — read-only on the client for Phase 2.1. */
+  extracted_text: string | null;
+  ocr_status: OcrStatus;
+  extracted_metadata: Record<string, unknown>;
+  /* Audit trail. */
+  uploaded_by: string | null;
+  uploaded_at: string;
+  deleted_by: string | null;
+  deleted_at: string | null;
+  replaced_by: string | null;
+  replaced_at: string | null;
+  replaces_attachment_id: string | null;
+  created_at: string;
+  updated_at: string;
+  /* Short-lived signed URL added by API for client preview. */
+  signed_url?: string | null;
 }
 
 /* ── Payments ───────────────────────────────────────────────────── */

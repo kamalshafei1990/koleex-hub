@@ -33,6 +33,11 @@ import {
 } from "@/components/finance/categoryStyles";
 import { fmtMoney } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
+/* Phase 2.1 — financial evidence infrastructure. The dropzone is
+   imported from AttachmentPreviewDrawer; we only consume the badge
+   and the drawer at the top level here. */
+import { EvidenceBadge } from "@/components/attachments/EvidenceBadge";
+import AttachmentPreviewDrawer from "@/components/attachments/AttachmentPreviewDrawer";
 
 type TabKey = ExpensesTabKey;
 
@@ -46,6 +51,9 @@ export default function ExpensesApp() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [editing, setEditing] = useState<Partial<FinanceExpense> | null>(null);
+  /* Phase 2.1 — evidence drawer state. Lives at the parent so it can
+     anchor to any expense row and survive list re-fetches. */
+  const [evidenceExpense, setEvidenceExpense] = useState<FinanceExpense | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,7 +220,15 @@ export default function ExpensesApp() {
             />
           ) : (
             <ul className="grid gap-2">
-              {filtered.map((e) => <ExpenseRow key={e.id} e={e} onEdit={() => setEditing(e)} onDelete={() => remove(e.id)} />)}
+              {filtered.map((e) => (
+                <ExpenseRow
+                  key={e.id}
+                  e={e}
+                  onEdit={() => setEditing(e)}
+                  onDelete={() => remove(e.id)}
+                  onEvidence={() => setEvidenceExpense(e)}
+                />
+              ))}
             </ul>
           )}
         </div>
@@ -227,15 +243,38 @@ export default function ExpensesApp() {
           onSaved={() => { setEditing(null); void load(); }}
         />
       )}
+
+      {/* ── Phase 2.1 — EVIDENCE DRAWER ───────────────────────── */}
+      <AttachmentPreviewDrawer
+        open={!!evidenceExpense}
+        onClose={() => setEvidenceExpense(null)}
+        entityType="expense"
+        entityId={evidenceExpense?.id ?? null}
+        title={evidenceExpense?.title ?? "Expense"}
+        evidenceStatus={evidenceExpense?.evidence_status}
+        receiptCount={evidenceExpense?.receipt_count}
+        onChange={() => { void load(); }}
+      />
     </div>
   );
 }
 
 /* ── ExpenseRow — visual list card with icon, category, status. ── */
-function ExpenseRow({ e, onEdit, onDelete }: { e: FinanceExpense; onEdit: () => void; onDelete: () => void }) {
+function ExpenseRow({
+  e, onEdit, onDelete, onEvidence,
+}: {
+  e: FinanceExpense;
+  onEdit: () => void;
+  onDelete: () => void;
+  onEvidence: () => void;
+}) {
   const style = styleForCategory(e.category_name);
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = e.payment_status !== "paid" && !!e.due_date && e.due_date < today;
+  /* Phase 2.1: evidence status is now the canonical signal. Legacy
+     attachment_url falls into "pending" via the migration backfill. */
+  const evidenceStatus = e.evidence_status ?? (e.has_attachments || e.attachment_url ? "pending" : "missing");
+  const receiptCount = e.receipt_count ?? (e.attachment_url ? 1 : 0);
   return (
     <li className="group">
       <div className={`flex items-center gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.12] ${isOverdue ? "border-rose-500/30" : "border-white/[0.06]"}`}>
@@ -247,11 +286,14 @@ function ExpenseRow({ e, onEdit, onDelete }: { e: FinanceExpense; onEdit: () => 
             <span className="truncate text-sm font-medium">{e.title || "Untitled expense"}</span>
             <StatusBadge status={e.payment_status} />
             {isOverdue && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-300">Overdue</span>}
-            {e.attachment_url && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[9px] text-gray-400" title="Has receipt / attachment">
-                📎 Receipt
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={onEvidence}
+              className="cursor-pointer"
+              title="Open evidence drawer"
+            >
+              <EvidenceBadge status={evidenceStatus} receiptCount={receiptCount} compact />
+            </button>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
             <span>{e.expense_date}</span>
@@ -268,8 +310,9 @@ function ExpenseRow({ e, onEdit, onDelete }: { e: FinanceExpense; onEdit: () => 
             <div className="text-base font-semibold tabular-nums text-rose-300">−{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</div>
           </div>
           <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-            <button onClick={onEdit}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Edit</button>
-            <button onClick={onDelete} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-rose-400 hover:border-rose-500/40">Delete</button>
+            <button onClick={onEvidence} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Evidence</button>
+            <button onClick={onEdit}     className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Edit</button>
+            <button onClick={onDelete}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-rose-400 hover:border-rose-500/40">Delete</button>
           </div>
         </div>
       </div>
