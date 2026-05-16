@@ -56,9 +56,14 @@ import {
 import { PeriodTabs } from "@/components/finance/FinanceUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
-import type { DashboardKpi, DashboardPeriod, FinanceOrder } from "@/lib/finance/types";
+import type {
+  DashboardKpi,
+  DashboardPeriod,
+  FinanceExpense,
+  FinanceOrder,
+  FinancePayment,
+} from "@/lib/finance/types";
 import {
-  buildCopilotContext,
   buildIncomingTimeline,
   buildOutgoingTimeline,
   computeApAging,
@@ -72,6 +77,8 @@ import {
   type Pressure,
   type WorkflowKey,
 } from "@/lib/finance/intelligence";
+/* Phase 2.0 — cross-module operational intelligence. */
+import { buildIntelligence as buildBusinessIntelligence } from "@/lib/intelligence";
 
 const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "week",    label: "Week" },
@@ -86,6 +93,11 @@ export default function FinanceDashboard() {
   const [mode, setMode] = useState<FinanceMode>("operational");
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
   const [orders, setOrders] = useState<FinanceOrder[]>([]);
+  /* Phase 2.0: pull payments + expenses so the cross-module intelligence
+     layer can build customer behavior, supplier dependency, logistics
+     buckets, and event correlations. All from existing endpoints. */
+  const [payments, setPayments] = useState<FinancePayment[]>([]);
+  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* Restore last-used mode from localStorage on mount (client only). */
@@ -104,17 +116,25 @@ export default function FinanceDashboard() {
   const load = useCallback(async (p: DashboardPeriod) => {
     setLoading(true);
     try {
-      const [dashRes, ordersRes] = await Promise.all([
+      const [dashRes, ordersRes, paymentsRes, expensesRes] = await Promise.all([
         fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
         fetch(`/api/finance/orders`, { cache: "no-store" }),
+        fetch(`/api/finance/payments`, { cache: "no-store" }),
+        fetch(`/api/finance/expenses`, { cache: "no-store" }),
       ]);
       const j = (await dashRes.json()) as { kpi?: DashboardKpi };
       setKpi(j.kpi ?? null);
       const ordersBody = (await ordersRes.json().catch(() => ({}))) as { orders?: FinanceOrder[] };
       setOrders(Array.isArray(ordersBody.orders) ? ordersBody.orders : []);
+      const paymentsBody = (await paymentsRes.json().catch(() => ({}))) as { payments?: FinancePayment[] };
+      setPayments(Array.isArray(paymentsBody.payments) ? paymentsBody.payments : []);
+      const expensesBody = (await expensesRes.json().catch(() => ({}))) as { expenses?: FinanceExpense[] };
+      setExpenses(Array.isArray(expensesBody.expenses) ? expensesBody.expenses : []);
     } catch {
       setKpi(null);
       setOrders([]);
+      setPayments([]);
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -155,27 +175,41 @@ export default function FinanceDashboard() {
     [kpi],
   );
 
+  /* ── Phase 2.0 cross-module operational intelligence.
+     A single pure-function call returns: customer behavior profiles,
+     supplier dependency profiles, logistics snapshot, inventory adapter
+     state, the event stream, cross-module correlations, composite
+     business health, risk assessment, and business-aware Copilot
+     hints. All derived from the data we already loaded; no new APIs. */
+  const periodDays = period === "week" ? 7 : period === "quarter" ? 90 : 365;
+  const businessIntelligence = useMemo(
+    () => buildBusinessIntelligence({
+      kpi,
+      orders,
+      payments,
+      expenses,
+      periodDays,
+    }),
+    [kpi, orders, payments, expenses, periodDays],
+  );
+
   /* Publish proactive Copilot context whenever the operational picture
      changes. FloatingPanel listens and renders these as suggestion
      chips in the empty-state, so the Copilot feels situationally aware
-     before the operator types anything. We only publish when there's
-     real data — and we clear on unmount so leaving Finance doesn't
-     leave stale Finance hints in the Copilot on other pages. */
+     before the operator types anything. Phase 2.0: hints now come from
+     the cross-module intelligence — correlations first, then events. */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hints = buildCopilotContext({
-      kpi,
-      ar: incomingTimeline,
-      ap: outgoingTimeline,
-      liquidity,
-      concentration,
-      anomalies,
-    });
+    const hints = businessIntelligence.copilotHints.map((h) => ({
+      key: h.key,
+      text: h.text,
+      severity: h.severity === "critical" ? "risk" : h.severity === "info" ? "info" : h.severity,
+    }));
     window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints } }));
     return () => {
       window.dispatchEvent(new CustomEvent("koleex:copilot-context", { detail: { hints: [] } }));
     };
-  }, [kpi, incomingTimeline, outgoingTimeline, liquidity, concentration, anomalies]);
+  }, [businessIntelligence]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -191,6 +225,12 @@ export default function FinanceDashboard() {
             </div>
           }
         />
+
+        {/* ── Phase 2.0 — Cross-module pressure narrative.
+           Calm one-block panel showing business health pulse + the
+           top correlation. Sits in both modes so the operator always
+           sees the connected-system reading first. */}
+        <CrossModulePressurePanel intel={businessIntelligence} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -942,5 +982,131 @@ function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; curren
         </ul>
       )}
     </ChartCard>
+  );
+}
+
+/* ===========================================================================
+   Cross-Module Pressure Panel  —  Phase 2.0
+
+   The "business nervous system" surface. Renders three things:
+
+     1. A composite health number (0..100) + pressure pill.
+     2. A per-module health strip (Finance · Customer · Supplier ·
+        Logistics · Inventory).
+     3. The top cross-module correlation narrative if any — the
+        causal story spanning modules, e.g. "Logistics costs
+        compressing margin." Calm, single sentence.
+
+   Designed to read like a Bloomberg ribbon: dense, monochrome,
+   actionable in 1.5 seconds.
+   ========================================================================== */
+
+function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+  const { health, correlations } = intel;
+  const top = correlations[0];
+
+  /* Quiet state when there's no real signal yet. */
+  if (!intel.events.length && !top && health.composite >= 95) {
+    return null;
+  }
+
+  const compositeCls =
+    health.pressure === "critical" ? "text-rose-300"
+    : health.pressure === "risk"   ? "text-rose-300/90"
+    : health.pressure === "watch"  ? "text-amber-300"
+    :                                "text-emerald-300";
+
+  const pressureChipCls =
+    health.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
+    : health.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+    : health.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
+    :                                "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+
+  const pressureLabel =
+    health.pressure === "critical" ? "Critical"
+    : health.pressure === "risk"   ? "Risk"
+    : health.pressure === "watch"  ? "Watch"
+    :                                "Calm";
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Business nervous system</div>
+          <div className="mt-1 text-[12px] text-gray-300">{health.headline}</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureChipCls}`}>
+            <span aria-hidden className={
+              "h-1.5 w-1.5 rounded-full " + (
+                health.pressure === "critical" ? "bg-rose-400"
+                : health.pressure === "risk"   ? "bg-rose-400"
+                : health.pressure === "watch"  ? "bg-amber-300"
+                :                                "bg-emerald-400"
+              )
+            } />
+            {pressureLabel} pressure
+          </span>
+          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${compositeCls}`}>
+            {health.composite}
+            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Per-module strip */}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {health.dimensions.map((d) => {
+          const tone =
+            d.pressure === "critical" ? "bg-rose-300/55"
+            : d.pressure === "risk"   ? "bg-rose-300/40"
+            : d.pressure === "watch"  ? "bg-amber-300/45"
+            :                           "bg-emerald-300/40";
+          const label =
+            d.module === "finance"   ? "Finance"
+          : d.module === "customer"  ? "Customer"
+          : d.module === "supplier"  ? "Supplier"
+          : d.module === "logistics" ? "Logistics"
+          : d.module === "inventory" ? "Inventory"
+          : d.module === "crm"       ? "Pipeline"
+          : d.module;
+          return (
+            <div key={d.module} className="rounded-lg border border-white/[0.04] bg-white/[0.012] px-2.5 py-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{label}</span>
+                <span className="text-[12px] font-medium tabular-nums text-gray-200">{d.score}</span>
+              </div>
+              <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                <div className={`h-full ${tone}`} style={{ width: `${Math.max(3, Math.min(100, d.score))}%` }} />
+              </div>
+              <div className="mt-1 truncate text-[10px] text-gray-500">{d.driver}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Top cross-module correlation */}
+      {top && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
+          <span aria-hidden className={
+            "mt-1 h-1.5 w-1.5 shrink-0 rounded-full " + (
+              top.severity === "critical" ? "bg-rose-400"
+              : top.severity === "risk"   ? "bg-rose-400"
+              : top.severity === "watch"  ? "bg-amber-300"
+              :                             "bg-white/40"
+            )
+          } />
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold tracking-tight text-gray-200">{top.headline}</div>
+            <div className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{top.narrative}</div>
+          </div>
+          {correlations.length > 1 && (
+            <span className="shrink-0 rounded-full bg-white/[0.05] px-1.5 py-0.5 text-[10px] tabular-nums text-gray-400">
+              +{correlations.length - 1} more
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
