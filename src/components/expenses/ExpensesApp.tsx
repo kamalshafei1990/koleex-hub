@@ -1035,149 +1035,146 @@ function CategoryPicker({
   const childCount = (id: string) => (childrenByParent.get(id) ?? []).length;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-[var(--bg-primary)]">
-      {/* Search strip — spans the full width */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] bg-[var(--bg-secondary)] px-3 py-2">
-        <div className="inline-flex items-center gap-2">
-          <RrIcon name="search" size={12} className="text-gray-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={activeParentObj ? `Filter ${activeParentObj.name.toLowerCase()}…` : "Search categories…"}
-            className="w-44 bg-transparent text-[12px] placeholder-gray-600 focus:outline-none sm:w-64"
-          />
-        </div>
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
-          >
-            <RrIcon name="cross" size={9} />
-            Clear
-          </button>
-        )}
+    <div className="space-y-3">
+      {/* ── Parent group cards (the grid the user liked) ── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4">
+        {parents.map((p) => {
+          const style = styleForCategory(p.name);
+          const isActive = activeParent === p.id;
+          const isSelected = value === p.id || categories.find((c) => c.id === value)?.parent_id === p.id;
+          const subCount = childCount(p.id);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setActiveParent(p.id);
+                setQuery("");
+              }}
+              className={`group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-3 text-left transition-all duration-200 ${
+                isActive
+                  ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]`
+                  : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
+              }`}
+              title={p.name}
+              aria-pressed={isActive}
+            >
+              {/* Decorative glow keyed to the accent — picks up brand colour. */}
+              <div
+                aria-hidden
+                className={`pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full opacity-20 blur-2xl ${accentSolidBg(style.accent)}`}
+              />
+              <div className="flex w-full items-start justify-between gap-2">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accentSolidBg(style.accent)}/30`}>
+                  <RrIcon name={style.icon} size={16} />
+                </span>
+                {isSelected && (
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${accentSolidBg(style.accent)}/50 ring-1 ring-white/20`}>
+                    <RrIcon name="check" size={9} />
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-[12px] font-semibold leading-tight">{p.name}</div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500">
+                  {subCount} {subCount === 1 ? "option" : "options"}
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Master-detail body: parent rail | sub grid */}
-      <div className="grid grid-cols-1 md:grid-cols-[210px_1fr]">
-        {/* Parent rail — horizontal scroller on mobile, vertical rail on desktop */}
-        <div className="border-b border-white/[0.05] bg-[var(--bg-secondary)]/40 md:border-b-0 md:border-r">
-          <div
-            className="flex gap-1 overflow-x-auto p-2 md:max-h-[340px] md:flex-col md:overflow-x-hidden md:overflow-y-auto"
-            role="listbox"
-            aria-label="Category groups"
-          >
-            {parents.map((p) => {
-              const style = styleForCategory(p.name);
-              const isActive = activeParent === p.id;
-              const isSelected = value === p.id || categories.find((c) => c.id === value)?.parent_id === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveParent(p.id);
-                    setQuery("");
-                  }}
-                  className={`group flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all duration-150 md:shrink ${
-                    isActive
-                      ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]`
-                      : "border-transparent text-gray-300 hover:border-white/[0.08] hover:bg-white/[0.03]"
-                  }`}
-                  title={p.name}
-                  role="option"
-                  aria-selected={isActive}
-                >
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${accentBgClass(style.accent)}`}>
-                    <RrIcon name={style.icon} size={13} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[11px] font-semibold leading-tight">{p.name}</span>
-                    <span className="block text-[9px] uppercase tracking-wider text-gray-500">
-                      {childCount(p.id)} options
-                    </span>
-                  </span>
-                  {isSelected && (
-                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${accentSolidBg(style.accent)}/40`}>
-                      <RrIcon name="check" size={8} />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sub-category grid */}
-        <div className="md:max-h-[340px] md:overflow-y-auto">
-          <div className="p-3">
-            {activeParentObj && (
-              <div className="mb-2 flex items-center gap-2">
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentBgClass(activeParentStyle.accent)}`}>
-                  <RrIcon name={activeParentStyle.icon} size={11} />
-                </span>
-                <span className="text-[11px] font-semibold text-[var(--text-primary)]">{activeParentObj.name}</span>
-                <span className="text-[10px] text-gray-500">· {activeChildren.length} sub-categories</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-              {/* "General" parent fallback */}
-              {activeParent && (
-                <button
-                  type="button"
-                  onClick={() => onChange(activeParent)}
-                  className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[12px] font-medium transition-all duration-150 ${
-                    value === activeParent
-                      ? accentActiveClass(activeParentStyle.accent)
-                      : "border-white/[0.05] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.18] hover:bg-white/[0.04]"
-                  }`}
-                  title={`General · ${activeParentObj?.name}`}
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.04]">
-                    <RrIcon name="info" size={11} className="opacity-70" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">General</span>
-                    <span className="block text-[9px] uppercase tracking-wider text-gray-500">{activeParentObj?.name}</span>
-                  </span>
-                </button>
-              )}
-
-              {filteredChildren.map((c) => {
-                const style = styleForCategory(c.name);
-                const active = value === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => onChange(c.id)}
-                    className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[12px] font-medium transition-all duration-150 ${
-                      active
-                        ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]`
-                        : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
-                    }`}
-                    title={c.name}
-                  >
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentSolidBg(style.accent)}/25`}>
-                      <RrIcon name={style.icon} size={11} />
-                    </span>
-                    <span className="block min-w-0 flex-1 truncate">{c.name}</span>
-                    {active && <RrIcon name="check" size={11} className="shrink-0 opacity-80" />}
-                  </button>
-                );
-              })}
-
-              {filteredChildren.length === 0 && query && (
-                <div className="col-span-full rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[11px] text-gray-500">
-                  No sub-categories match &ldquo;{query}&rdquo;.
+      {/* ── Expanded sub-category panel for the active parent ── */}
+      {activeParentObj && (
+        <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-[var(--bg-primary)]">
+          {/* Panel header — shows which group is open + a tiny search */}
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] bg-[var(--bg-secondary)] px-3 py-2.5">
+            <div className="inline-flex min-w-0 items-center gap-2">
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentBgClass(activeParentStyle.accent)}`}>
+                <RrIcon name={activeParentStyle.icon} size={11} />
+              </span>
+              <span className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{activeParentObj.name}</span>
+              <span className="hidden text-[10px] text-gray-500 sm:inline">· choose a sub-category</span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {activeChildren.length > 5 && (
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1">
+                  <RrIcon name="search" size={10} className="text-gray-500" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Filter…"
+                    className="w-24 bg-transparent text-[11px] placeholder-gray-600 focus:outline-none sm:w-32"
+                  />
                 </div>
+              )}
+              {value && (
+                <button
+                  type="button"
+                  onClick={() => onChange("")}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
+                >
+                  <RrIcon name="cross" size={9} />
+                  Clear
+                </button>
               )}
             </div>
           </div>
+
+          {/* Sub-category tile grid — no internal scroll, expands to fit. */}
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4">
+            {/* General · Parent fallback tile */}
+            <button
+              type="button"
+              onClick={() => onChange(activeParent!)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-[12px] font-medium transition-all duration-200 ${
+                value === activeParent
+                  ? accentActiveClass(activeParentStyle.accent)
+                  : "border-dashed border-white/[0.10] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.22] hover:bg-white/[0.04]"
+              }`}
+              title={`General · ${activeParentObj.name}`}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
+                <RrIcon name="info" size={11} className="opacity-70" />
+              </span>
+              <span className="min-w-0 flex-1 truncate">General · {activeParentObj.name}</span>
+              {value === activeParent && <RrIcon name="check" size={11} className="shrink-0 opacity-80" />}
+            </button>
+
+            {filteredChildren.map((c) => {
+              const style = styleForCategory(c.name);
+              const active = value === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onChange(c.id)}
+                  className={`group flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-[12px] font-medium transition-all duration-200 ${
+                    active
+                      ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]`
+                      : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
+                  }`}
+                  title={c.name}
+                  aria-pressed={active}
+                >
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentSolidBg(style.accent)}/25`}>
+                    <RrIcon name={style.icon} size={11} />
+                  </span>
+                  <span className="block min-w-0 flex-1 truncate">{c.name}</span>
+                  {active && <RrIcon name="check" size={11} className="shrink-0 opacity-80" />}
+                </button>
+              );
+            })}
+
+            {filteredChildren.length === 0 && query && (
+              <div className="col-span-full rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[11px] text-gray-500">
+                No sub-categories match &ldquo;{query}&rdquo;.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
