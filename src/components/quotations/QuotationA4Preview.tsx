@@ -1203,6 +1203,94 @@ export default function QuotationA4Preview({
                 </tr>
               );
             })}
+            {/* ── Inline "add row" ghost row ──────────────────────
+                Renders as a faded placeholder row right under the
+                last real item. Two inline buttons sit inside it
+                ("Add empty row" / "Add from catalog"). On print
+                the whole row is hidden via .no-print, so the PDF
+                stays clean. Only emitted on the page that actually
+                ends the items (isLastItemPage) so it never appears
+                mid-document on a multi-page quote. */}
+            {isLastItemPage && (
+              <tr className="no-print" style={{ height: 64 }}>
+                <td
+                  colSpan={7}
+                  style={{
+                    background: "#FAFAFA",
+                    border: `1px dashed ${T.border}`,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: T.inkGhost,
+                      }}
+                    >
+                      + Next row
+                    </span>
+                    <span style={{ flex: "0 0 auto", width: 1, height: 18, background: T.border }} />
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="pq-add-btn"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        height: 28,
+                        padding: "0 12px",
+                        border: `1px solid ${T.border}`,
+                        background: "#fff",
+                        color: T.inkSoft,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        cursor: "pointer",
+                        borderRadius: 4,
+                      }}
+                      title="Add an empty row you can fill manually"
+                    >
+                      + Add empty row
+                    </button>
+                    {onPickFromCatalog && (
+                      <button
+                        type="button"
+                        onClick={onPickFromCatalog}
+                        className="pq-add-btn"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          height: 28,
+                          padding: "0 12px",
+                          border: `1px solid ${T.black}`,
+                          background: T.black,
+                          color: "#fff",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          cursor: "pointer",
+                          borderRadius: 4,
+                        }}
+                        title="Pick a product from the catalogue -- model, name, photo and unit price auto-fill"
+                      >
+                        + Add product (from catalog)
+                      </button>
+                    )}
+                    <span style={{ fontSize: 10, color: T.inkGhost, marginLeft: 4 }}>
+                      pick &ldquo;Add product&rdquo; to auto-fill from the catalogue, or &ldquo;Add empty row&rdquo; for a blank row.
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            )}
           </tbody>
           {/* Items-table summary footer. Renders on the LAST page
               that holds item rows so the totals sit immediately
@@ -1263,57 +1351,12 @@ export default function QuotationA4Preview({
         )}
 
         {isLastPage && (<>
-        {/* Add-row + From-catalog buttons. Empty row is the manual
-            entry path; the catalog picker fills model, name, unit
-            price and image in one click. */}
-        <div className="no-print" style={{ display: "flex", gap: 8, margin: "10px 0 16px" }}>
-          <button
-            type="button"
-            onClick={addItem}
-            className="pq-add-btn"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              height: 28,
-              padding: "0 14px",
-              border: `1px solid ${T.border}`,
-              background: "#fff",
-              color: T.inkSoft,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-            }}
-          >
-            + Add row
-          </button>
-          {onPickFromCatalog && (
-            <button
-              type="button"
-              onClick={onPickFromCatalog}
-              className="pq-add-btn"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                height: 28,
-                padding: "0 14px",
-                border: `1px solid ${T.black}`,
-                background: T.black,
-                color: "#fff",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                cursor: "pointer",
-              }}
-            >
-              + From catalog
-            </button>
-          )}
-        </div>
+        {/* The +Add row / +From catalog buttons used to live as a
+            separate strip here. They now live inline as a faded
+            ghost row inside the items table (see the
+            isLastItemPage block in the <tbody> further up) so the
+            "next row goes here" affordance is in the right place
+            visually -- and disappears entirely on print. */}
 
         {/* ═══════════════════════════════════════════════════════════════
             (g) BOTTOM ROW — totals (left) + terms (right)
