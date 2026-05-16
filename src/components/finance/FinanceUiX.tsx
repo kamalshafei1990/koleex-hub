@@ -830,33 +830,62 @@ export function WorkflowRail({
   items: WorkflowItem[];
   onActivate?: (key: string) => void;
 }) {
+  /* Each card lays out as a 2-row tile: top row carries icon + badge,
+     bottom row carries label + hint. Predictable height regardless of
+     whether a card has a badge or how long its hint is.
+
+     Container is a horizontal scroller on mobile (one swipe to scan
+     everything) and a tidy responsive grid on desktop so 6 items don't
+     cram themselves into a too-narrow rail. */
   return (
-    <div className="overflow-x-auto">
-      <div className="flex items-stretch gap-2 sm:gap-2.5">
+    <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:overflow-x-visible sm:px-0">
+      <div className="flex items-stretch gap-2 sm:grid sm:grid-cols-3 sm:gap-2.5 lg:grid-cols-6">
         {items.map((it) => {
+          const accent = it.badge ? TONE_CHIP_BG[it.badge.tone] : "";
           const inner = (
             <>
-              {it.icon && (
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-[12px] text-gray-300 transition-colors group-hover:bg-white/[0.08] group-hover:text-gray-100">
-                  {it.icon}
-                </span>
-              )}
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[12px] font-medium leading-tight text-gray-200 group-hover:text-white">{it.label}</span>
-                {it.hint && (
-                  <span className="truncate text-[10px] leading-tight text-gray-500">{it.hint}</span>
+              {/* Top row — icon left, badge right. Always present so
+                  the layout matches across cards with/without badges. */}
+              <div className="flex items-center justify-between gap-2">
+                {it.icon ? (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-gray-300 transition-colors group-hover:bg-white/[0.10] group-hover:text-gray-100">
+                    {it.icon}
+                  </span>
+                ) : (
+                  <span aria-hidden className="h-8 w-8" />
                 )}
-              </span>
-              {it.badge && (
-                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${TONE_CHIP_BG[it.badge.tone]}`}>
-                  {it.badge.text}
-                </span>
-              )}
+                {it.badge ? (
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${accent}`}
+                    title={it.badge.text}
+                  >
+                    {it.badge.text}
+                  </span>
+                ) : (
+                  <span aria-hidden className="h-[18px]" />
+                )}
+              </div>
+
+              {/* Bottom row — label + hint. Label allowed to wrap to 2
+                  lines so 'Follow up collection' doesn't get truncated.
+                  Hint clamps to 2 lines so the card height stays bounded. */}
+              <div className="mt-2 min-w-0">
+                <div className="line-clamp-2 text-[12.5px] font-semibold leading-tight text-gray-100 group-hover:text-white">
+                  {it.label}
+                </div>
+                {it.hint && (
+                  <div className="mt-0.5 line-clamp-2 text-[10.5px] leading-snug text-gray-500">
+                    {it.hint}
+                  </div>
+                )}
+              </div>
             </>
           );
+
           const cls =
-            "group flex min-w-[180px] items-center gap-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-white/[0.10] hover:bg-white/[0.04] " +
+            "group flex w-[200px] shrink-0 flex-col rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:border-white/[0.12] hover:bg-white/[0.04] sm:w-auto " +
             (it.disabled ? "pointer-events-none opacity-50" : "");
+
           if (it.href) {
             return (
               <a key={it.key} href={it.href} className={cls}>
