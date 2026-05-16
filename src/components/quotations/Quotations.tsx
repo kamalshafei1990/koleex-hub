@@ -823,6 +823,20 @@ export const PRINT_AND_DOC_STYLES = `
     break-after: auto !important;
   }
 
+  /* Image cells with no uploaded photo — render as completely
+     blank on the PDF (drop the dashed placeholder border AND the
+     "+" upload-affordance glyph). On screen the dashed box with
+     the "+" stays visible so the operator knows they can click
+     to upload; in the printed/PDF output it would just look like
+     a confusing empty box with a plus sign. */
+  .quot-img-cell:not(.has-img) {
+    border: none !important;
+    background: transparent !important;
+  }
+  .quot-img-cell:not(.has-img) > span {
+    display: none !important;
+  }
+
   /* Items table — never split a single row across sheets. Without
      these guards, a row whose ITEM description wraps to 6-7 lines
      (e.g. the "Flatbed Steam Iron Press" spec sheet) can be ~280

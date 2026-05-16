@@ -393,9 +393,13 @@ export default function QuotationA4Preview({
       out.push({ kind: "items", items: items.slice(offset, offset + chunk), startIdx: offset });
       offset += chunk;
     }
-    /* Two footer pages, ALWAYS appended. Together they carry the
-       complete commitment/payment/sign block that used to spill
-       off the bottom of the last items page. */
+    /* Two footer pages, ALWAYS appended. Measured on an empty
+       draft the combined footer stack is ~963 px (fits in 978 px
+       page budget with 15 px headroom) — BUT on a real quote
+       with filled T&C copy and 14-field Shipment Details those
+       sections grow ~200-300 px each, easily pushing the combined
+       stack past the page budget. The two-page split keeps the
+       output reliable across any real-world content size. */
     out.push({ kind: "footer-a", items: [], startIdx: items.length });
     out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;

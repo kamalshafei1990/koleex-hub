@@ -766,6 +766,17 @@ const PRINT_AND_DOC_STYLES = `
     break-after: auto !important;
   }
 
+  /* Image cells with no uploaded photo — render blank in PDF
+     (no dashed border, no "+" affordance). The editor still
+     shows the placeholder so operators know they can click. */
+  .quot-img-cell:not(.has-img) {
+    border: none !important;
+    background: transparent !important;
+  }
+  .quot-img-cell:not(.has-img) > span {
+    display: none !important;
+  }
+
   /* Items table — never split a single row across sheets. Tall
      descriptions (200-char spec sheets wrapped to 6-7 lines) can
      reach ~280 px and force the browser to break inside them at
