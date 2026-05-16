@@ -217,7 +217,7 @@ export default function FinanceExpenseAnalytics() {
                           className="h-2 w-2 shrink-0 rounded-full"
                           style={{ background: `rgba(255,255,255,${opacity.toFixed(2)})` }}
                         />
-                        <span className="text-base">{style.glyph}</span>
+                        <RrIcon name={style.icon} size={14} />
                         <span className="flex-1 truncate text-gray-300">{c.name}</span>
                         <span className="tabular-nums text-gray-500">{c.share.toFixed(0)}%</span>
                         <span className="w-16 text-right font-medium tabular-nums">{formatCompact(c.total)}</span>
@@ -280,7 +280,7 @@ export default function FinanceExpenseAnalytics() {
                       className={`rounded-2xl border ${accentBgClass(style.accent)} bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.15]`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-lg">{style.glyph}</div>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={16} /></div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-300">{c.name}</div>
                           <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
@@ -317,7 +317,7 @@ export default function FinanceExpenseAnalytics() {
                     return (
                       <li key={c.name} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">{style.glyph}</span>
+                          <RrIcon name={style.icon} size={16} />
                           <div>
                             <div className="text-sm font-medium">{c.name}</div>
                             <div className="text-[10px] text-gray-500">This month {fmtMoney(c.thisMonth, "USD", { compact: true })} · last month {fmtMoney(c.lastMonth, "USD", { compact: true })}</div>

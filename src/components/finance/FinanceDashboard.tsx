@@ -1009,7 +1009,7 @@ function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; curren
               <li key={c.name} className="rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-base opacity-80">{style.glyph}</span>
+                    <RrIcon name={style.icon} size={14} className="opacity-80" />
                     <span className="text-sm font-medium">{c.name}</span>
                   </div>
                   <div className="text-right">

@@ -27,6 +27,7 @@ import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
+  accentActiveClass,
   accentBgClass,
   accentSolidBg,
   styleForCategory,
@@ -310,7 +311,7 @@ export default function ExpensesApp() {
                       className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-white/[0.15] ${active ? "border-white/[0.18] bg-white/[0.04] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-xl">{style.glyph}</span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={18} /></span>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12px] font-semibold uppercase tracking-wider text-gray-300">{c.name}</div>
                           <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
@@ -496,8 +497,8 @@ function ExpenseRow({
   return (
     <li className="group">
       <div className={`flex items-center gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 transition hover:border-white/[0.12] ${isOverdue ? "border-rose-500/30" : "border-white/[0.06]"}`}>
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${accentBgClass(style.accent)}`}>
-          {style.glyph}
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${accentBgClass(style.accent)}`}>
+          <RrIcon name={style.icon} size={18} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -698,35 +699,12 @@ function ExpenseEditor({
             </label>
           </div>
 
-          {/* Category — visual tile picker */}
-          <div>
-            <div className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              <span>Category</span>
-              <GuidanceTip guidanceId="expense.category" />
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {categories.filter((c) => !c.parent_id).map((c) => {
-                const style = styleForCategory(c.name);
-                const active = local.category_id === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setLocal({ ...local, category_id: c.id })}
-                    className={
-                      "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-200 " +
-                      (active
-                        ? "border-white/[0.18] bg-white/[0.08] text-[var(--text-primary)]"
-                        : `${accentBgClass(style.accent)} text-gray-300 hover:border-white/[0.15]`)
-                    }
-                  >
-                    <span>{style.glyph}</span>
-                    <span>{c.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Category — grouped picker (parent groups + searchable sub-categories) */}
+          <CategoryPicker
+            categories={categories}
+            value={local.category_id ?? null}
+            onChange={(id) => setLocal({ ...local, category_id: id })}
+          />
 
           {/* Date + status + due date */}
           <div className="grid grid-cols-3 gap-3">
@@ -837,6 +815,171 @@ function ExpenseEditor({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   CategoryPicker — grouped two-step category selector.
+
+   UX:
+     · Top row: the 9 parent categories rendered as colour-coded tiles
+       (icon + name). One stays selected at a time.
+     · Below: searchable sub-category grid for the active parent.
+       Selecting a sub-tile commits the leaf category id.
+     · Selecting a parent without a sub-pick falls back to the parent
+       row itself (matching the legacy behaviour for backward compat).
+   ────────────────────────────────────────────────────────────────── */
+
+function CategoryPicker({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: ExpenseCategory[];
+  value: string | null;
+  onChange: (id: string) => void;
+}) {
+  const parents = useMemo(
+    () => categories.filter((c) => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order),
+    [categories],
+  );
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, ExpenseCategory[]>();
+    for (const c of categories) {
+      if (!c.parent_id) continue;
+      const arr = map.get(c.parent_id) ?? [];
+      arr.push(c);
+      map.set(c.parent_id, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.sort_order - b.sort_order);
+    return map;
+  }, [categories]);
+
+  /* Resolve which parent the current value belongs to so the grid
+     opens to the right group on edit. */
+  const initialParent = useMemo(() => {
+    if (!value) return parents[0]?.id ?? null;
+    const hit = categories.find((c) => c.id === value);
+    if (!hit) return parents[0]?.id ?? null;
+    return hit.parent_id ?? hit.id;
+  }, [value, categories, parents]);
+
+  const [activeParent, setActiveParent] = useState<string | null>(initialParent);
+  const [query, setQuery] = useState("");
+
+  /* Keep the active parent in sync if the picker is reused for a
+     different expense draft. */
+  useEffect(() => {
+    setActiveParent(initialParent);
+  }, [initialParent]);
+
+  const activeChildren = activeParent ? (childrenByParent.get(activeParent) ?? []) : [];
+  const filteredChildren = query.trim()
+    ? activeChildren.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : activeChildren;
+
+  return (
+    <div>
+      <div className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+        <span>Category</span>
+        <GuidanceTip guidanceId="expense.category" />
+      </div>
+
+      {/* Parent row — colour-coded tiles, one per group */}
+      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {parents.map((p) => {
+          const style = styleForCategory(p.name);
+          const isActive = activeParent === p.id;
+          const isSelected = value === p.id || categories.find((c) => c.id === value)?.parent_id === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setActiveParent(p.id);
+                setQuery("");
+              }}
+              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-colors duration-200 ${
+                isActive
+                  ? accentActiveClass(style.accent)
+                  : `${accentBgClass(style.accent)} hover:border-white/[0.18]`
+              }`}
+              title={p.name}
+            >
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${accentSolidBg(style.accent)}/30`}>
+                <RrIcon name={style.icon} size={16} />
+              </span>
+              <span className="line-clamp-2 text-[10px] font-semibold leading-tight">{p.name}</span>
+              {isSelected && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-white/10 px-1.5 py-[1px] text-[8px] font-bold uppercase tracking-wider">
+                  <RrIcon name="check" size={8} /> in use
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-category panel for the active parent */}
+      {activeParent && (
+        <div className="mt-3 rounded-xl border border-white/[0.06] bg-[var(--bg-primary)] p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+              {parents.find((p) => p.id === activeParent)?.name} · pick a sub-category
+            </div>
+            {activeChildren.length > 4 && (
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter…"
+                className="h-7 w-32 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 text-[11px] placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
+              />
+            )}
+          </div>
+
+          {/* Parent row itself as a fallback tile */}
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => onChange(activeParent)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-medium transition-colors duration-200 ${
+                value === activeParent
+                  ? accentActiveClass(styleForCategory(parents.find((p) => p.id === activeParent)?.name).accent)
+                  : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.18]"
+              }`}
+            >
+              <RrIcon name="info" size={11} />
+              <span className="truncate">General · {parents.find((p) => p.id === activeParent)?.name}</span>
+            </button>
+
+            {filteredChildren.map((c) => {
+              const style = styleForCategory(c.name);
+              const active = value === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onChange(c.id)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-medium transition-colors duration-200 ${
+                    active
+                      ? accentActiveClass(style.accent)
+                      : `${accentBgClass(style.accent)} hover:border-white/[0.18]`
+                  }`}
+                  title={c.name}
+                >
+                  <RrIcon name={style.icon} size={11} />
+                  <span className="truncate">{c.name}</span>
+                </button>
+              );
+            })}
+
+            {filteredChildren.length === 0 && query && (
+              <div className="col-span-full px-2 py-2 text-[11px] text-gray-500">No sub-categories match &ldquo;{query}&rdquo;.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
