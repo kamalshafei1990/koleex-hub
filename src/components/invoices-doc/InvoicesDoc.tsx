@@ -1144,10 +1144,32 @@ export default function Quotations() {
        tab). */
     setPdfState("loading");
     try {
+      /* Hydration guard — if `current` still has the stripped
+         placeholder item (user clicked Export PDF before
+         hydration completed), re-fetch the full doc first.
+         See the matching block in Quotations.tsx for full
+         rationale. */
+      let working: Invoice = current;
+      const stripped =
+        working.id.length === 36 &&
+        Array.isArray(working.items) &&
+        working.items.length === 1 &&
+        !working.items[0]?.description?.trim() &&
+        !working.items[0]?.model?.trim() &&
+        !working.items[0]?.image?.trim() &&
+        (Number(working.items[0]?.unitPrice) || 0) === 0;
+      if (stripped) {
+        const full = await fetchDocOne(INVOICES_DOC_SYNC, working.id);
+        if (full) {
+          working = fromRow(full);
+          setCurrent(working);
+        }
+      }
+
       /* Save directly (bypass handleSave's silent-error pill) so
          a failed save aborts the export with a clear alert. */
       const intent: Invoice = {
-        ...current,
+        ...working,
         updatedAt: new Date().toISOString(),
       };
       const saved = await saveInvoiceRemote(intent);

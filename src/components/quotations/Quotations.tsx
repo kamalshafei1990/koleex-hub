@@ -1202,6 +1202,32 @@ export default function Quotations() {
        page renders, without leaving the editor window. */
     setPdfState("loading");
     try {
+      /* ── Hydration guard ──
+         If `current` looks like the optimistic stripped state from
+         the list view (single empty placeholder item on a server
+         UUID doc), the user clicked Export PDF before hydration
+         landed. Re-fetch the full doc from /api/quotations/:id and
+         use THAT for the save → export sequence. Without this, the
+         save guard inside saveQuotationRemote would refuse the
+         save and the operator would see "Save failed before
+         export" even though the underlying data is fine. */
+      let working: Quotation = current;
+      const stripped =
+        working.id.length === 36 &&
+        Array.isArray(working.items) &&
+        working.items.length === 1 &&
+        !working.items[0]?.description?.trim() &&
+        !working.items[0]?.model?.trim() &&
+        !working.items[0]?.image?.trim() &&
+        (Number(working.items[0]?.unitPrice) || 0) === 0;
+      if (stripped) {
+        const full = await fetchDocOne(QUOTATIONS_SYNC, working.id);
+        if (full) {
+          working = fromRow(full);
+          setCurrent(working);
+        }
+      }
+
       /* ALWAYS save first so the print page fetches the freshest
          server state. Bypass handleSave (which swallows errors
          and just flashes a status pill) and call saveQuotation-
@@ -1212,7 +1238,7 @@ export default function Quotations() {
          Preserve the current status so we never demote a Sent
          quote back to Draft. */
       const intent: Quotation = {
-        ...current,
+        ...working,
         updatedAt: new Date().toISOString(),
       };
       const saved = await saveQuotationRemote(intent);

@@ -894,57 +894,38 @@ export default function QuotationA4Preview({
             marginTop: 12,
           }}
         >
-          {/* Items-table header renders on PAGE 1 ONLY. Continuation
-              pages (2..N) start straight with rows — saves vertical
-              space and matches the user's preferred print convention.
-              The column widths set on the <th> still apply to <td>
-              widths in subsequent pages because tableLayout: "fixed"
-              propagates the colgroup measurements. */}
-          {isFirstPage && (
-            <thead>
-              <tr>
-                {/* Column widths measured against worst-case real
-                    data from the Koleex catalogue:
-                    · NO     5%  — 1–2 digits
-                    · ITEM  28% — long descriptions (the only
-                              column that absorbs line breaks)
-                    · MODEL 15% — codes up to 19 chars
-                              (XSO-988LC-4T-24BCTQ)
-                    · PIC   15% — picture cell capped at 110 px
-                              square via aspectRatio
-                    · UPRC  14% — "(FOB NINGBO)" subtitle needs
-                              ~85 px to sit on one line
-                    · QTY    7% — up to 3 digits / footer "235"
-                    · TOTAL 16% — line totals up to "44,368" */}
-                <Th width="5%"  align="center" isFirst>NO.</Th>
-                <Th width="28%" align="center">ITEM</Th>
-                <Th width="15%" align="center">MODEL</Th>
-                <Th width="15%" align="center">PICTURE</Th>
-                <Th width="14%" align="center">
-                  <div>UNIT PRICE</div>
-                  <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
-                    {priceTypeSubtitle}
-                  </div>
-                </Th>
-                <Th width="7%"  align="center">QTY</Th>
-                <Th width="16%" align="center" isLast>TOTAL</Th>
-              </tr>
-            </thead>
-          )}
-          {/* Tableless colgroup on continuation pages — same widths
-              as the thead so cells stay column-aligned with page 1
-              even without a header. */}
-          {!isFirstPage && (
-            <colgroup>
-              <col style={{ width: "5%" }} />
-              <col style={{ width: "28%" }} />
-              <col style={{ width: "15%" }} />
-              <col style={{ width: "15%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "16%" }} />
-            </colgroup>
-          )}
+          {/* Items-table header renders on EVERY page. Continuation
+              pages (2..N) used to skip the thead to save vertical
+              space, but that left the table starting flush at the
+              top of the page — looked "cropped". Repeating the
+              header on every page also makes printed pages self-
+              explanatory: the customer can flip to any sheet and
+              see which column is which. */}
+          <thead>
+            <tr>
+              {/* Column widths measured against worst-case real
+                  data from the Koleex catalogue:
+                  · NO     5%  — 1–2 digits
+                  · ITEM  28% — long descriptions
+                  · MODEL 15% — codes up to 19 chars
+                  · PIC   15% — picture cell capped at 110 px
+                  · UPRC  14% — "(FOB NINGBO)" subtitle
+                  · QTY    7% — up to 3 digits
+                  · TOTAL 16% — line totals */}
+              <Th width="5%"  align="center" isFirst>NO.</Th>
+              <Th width="28%" align="center">ITEM</Th>
+              <Th width="15%" align="center">MODEL</Th>
+              <Th width="15%" align="center">PICTURE</Th>
+              <Th width="14%" align="center">
+                <div>UNIT PRICE</div>
+                <div style={{ fontSize: 8, fontWeight: 600, opacity: 0.85, marginTop: 1, letterSpacing: "0.04em" }}>
+                  {priceTypeSubtitle}
+                </div>
+              </Th>
+              <Th width="7%"  align="center">QTY</Th>
+              <Th width="16%" align="center" isLast>TOTAL</Th>
+            </tr>
+          </thead>
           <tbody>
             {pageItems.map((item, localIdx) => {
               /* `idx` is the GLOBAL item index across all pages, so
