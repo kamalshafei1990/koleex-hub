@@ -168,7 +168,16 @@ const GuidanceTip = memo(GuidanceTipImpl);
 export default GuidanceTip;
 
 /* Hoisted to module scope so the style object reference is stable and
-   doesn't churn through React's reconciler. */
+   doesn't churn through React's reconciler.
+
+   Centering note: a text `?` inherits the font's natural line-height
+   plus a tiny visual-vs-typographic baseline offset, which makes
+   flexbox-centered glyphs look low even though they're technically
+   "centered". The fix is three things together:
+     · line-height: 1               kills the inline-leading padding
+     · padding-top: 1px              compensates the optical baseline
+     · font-feature-settings tnum    tabular-nums prevents glyph drift
+   That makes the `?` sit visually dead-center in the 15×15 circle. */
 const GLYPH_STYLE: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -180,10 +189,13 @@ const GLYPH_STYLE: React.CSSProperties = {
   color: "rgba(255,255,255,0.85)",
   fontSize: 10,
   fontWeight: 700,
+  lineHeight: 1,
+  paddingTop: 1,
   cursor: "help",
   background: "rgba(255,255,255,0.06)",
   userSelect: "none",
   flexShrink: 0,
+  fontFamily: "ui-sans-serif, system-ui, sans-serif",
 };
 
 /* ---------------------------------------------------------------------------
