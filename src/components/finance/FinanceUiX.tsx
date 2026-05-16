@@ -19,6 +19,7 @@
 
 import { useId, type ReactNode } from "react";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 /* ---------------------------------------------------------------------------
    1. Tokens
@@ -59,6 +60,7 @@ export function HeroKpiCard({
   trend,
   trendCurrency,
   loading,
+  helpId,
 }: {
   label: string;
   value: number | string;
@@ -72,6 +74,8 @@ export function HeroKpiCard({
   trend?: number[];
   trendCurrency?: string;
   loading?: boolean;
+  /** Optional guidance-registry id — renders a ? next to the label. */
+  helpId?: string;
 }) {
   const display = typeof value === "string" ? value : formatCompact(value);
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
@@ -94,7 +98,10 @@ export function HeroKpiCard({
       />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</div>
+          <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <span>{label}</span>
+            {helpId && <GuidanceTip guidanceId={helpId} />}
+          </div>
           <div className="mt-2 flex items-baseline gap-2">
             {loading ? (
               <span className="inline-block h-8 w-40 animate-pulse rounded bg-white/5" />
@@ -157,6 +164,7 @@ export function MetricCard({
   hint,
   tone = "neutral",
   loading,
+  helpId,
 }: {
   label: string;
   value: number | string;
@@ -165,12 +173,16 @@ export function MetricCard({
   hint?: string;
   tone?: Tone;
   loading?: boolean;
+  helpId?: string;
 }) {
   const display = typeof value === "string" ? value : formatCompact(value);
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
   return (
     <div className="rounded-xl border border-white/[0.04] bg-white/[0.018] p-3.5 transition hover:border-white/[0.08]">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</div>
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+        <span>{label}</span>
+        {helpId && <GuidanceTip guidanceId={helpId} />}
+      </div>
       <div className="mt-1.5 flex items-baseline gap-1.5">
         {loading ? (
           <span className="inline-block h-5 w-20 animate-pulse rounded bg-white/5" />
@@ -321,17 +333,22 @@ export function ChartCard({
   subtitle,
   controls,
   children,
+  helpId,
 }: {
   title: string;
   subtitle?: string;
   controls?: ReactNode;
   children: ReactNode;
+  helpId?: string;
 }) {
   return (
     <div className="relative isolate overflow-hidden rounded-3xl border border-white/[0.05] bg-gradient-to-br from-white/[0.03] via-transparent to-transparent p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h3>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">
+            <span>{title}</span>
+            {helpId && <GuidanceTip guidanceId={helpId} />}
+          </h3>
           {subtitle && <p className="mt-0.5 text-[11px] text-gray-500">{subtitle}</p>}
         </div>
         {controls}
@@ -924,10 +941,12 @@ export function SectionTitle({
   eyebrow,
   title,
   description,
+  helpId,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
+  helpId?: string;
 }) {
   /* Phase 1.7: tightened from mt-10/mb-4 → mt-7/mb-3.
      The dashboard now has ~10 sections; the previous spacing wasted
@@ -937,7 +956,10 @@ export function SectionTitle({
       {eyebrow && (
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{eyebrow}</div>
       )}
-      <h2 className="mt-1 text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">{title}</h2>
+      <h2 className="mt-1 flex items-center gap-1.5 text-[14px] font-semibold tracking-tight text-[var(--text-primary)]">
+        <span>{title}</span>
+        {helpId && <GuidanceTip guidanceId={helpId} size="sm" />}
+      </h2>
       {description && <p className="mt-0.5 text-[11.5px] text-gray-500">{description}</p>}
     </div>
   );
@@ -1306,7 +1328,7 @@ export function ConcentrationBar({
 export function StatRow({
   stats,
 }: {
-  stats: { label: string; value: string; hint?: string; tone?: Tone }[];
+  stats: { label: string; value: string; hint?: string; tone?: Tone; helpId?: string }[];
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
@@ -1315,7 +1337,10 @@ export function StatRow({
           <div className={`text-[16px] font-medium tabular-nums tracking-tight ${TONE_TEXT[s.tone ?? "neutral"]}`}>
             {s.value}
           </div>
-          <div className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">{s.label}</div>
+          <div className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+            <span>{s.label}</span>
+            {s.helpId && <GuidanceTip guidanceId={s.helpId} />}
+          </div>
           {s.hint && <div className="mt-1 text-[10px] text-gray-600">{s.hint}</div>}
         </div>
       ))}

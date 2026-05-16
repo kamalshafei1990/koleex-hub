@@ -45,6 +45,8 @@ import type { ApprovalStatus } from "@/lib/finance/types";
 /* Micro-polish primitives. */
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import UndoToast from "@/components/ui/UndoToast";
+/* Phase 2.5 — operational guidance. */
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 type TabKey = ExpensesTabKey;
 
@@ -257,7 +259,10 @@ export default function ExpensesApp() {
 
         {/* ── Phase 2.2 — Approval filter strip ─────────────────── */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mr-1">Approval</span>
+          <span className="mr-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">
+            <span>Approval</span>
+            <GuidanceTip guidanceId="approval.status" />
+          </span>
           {(Object.keys(APPROVAL_FILTER_LABELS) as ApprovalFilterKey[]).map((key) => {
             const active = approvalFilter === key;
             const count = approvalCounts[key];

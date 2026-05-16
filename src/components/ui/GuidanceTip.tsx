@@ -24,23 +24,13 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import { getGuidanceLocale, type GuidanceLocale } from "@/lib/guidance/locale";
-import { getLocalizedGuidance } from "@/lib/guidance/registry";
+import { getGuidance } from "@/lib/guidance/registry";
 
 /* ---------------------------------------------------------------------------
-   useSyncExternalStore subscriptions — React-19-blessed pattern for
-   reading runtime values that can change without violating
-   react-hooks/set-state-in-effect.
+   Mobile media-query store — React-19 blessed pattern using
+   useSyncExternalStore so render stays pure (no
+   react-hooks/set-state-in-effect violations).
    --------------------------------------------------------------------------- */
-
-function subscribeLocale(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const handler = () => cb();
-  window.addEventListener("koleex:guidance-locale", handler);
-  return () => window.removeEventListener("koleex:guidance-locale", handler);
-}
-function getLocaleSnapshot(): GuidanceLocale { return getGuidanceLocale(); }
-function getLocaleServerSnapshot(): GuidanceLocale { return "en"; }
 
 function subscribeMobile(cb: () => void): () => void {
   if (typeof window === "undefined" || !window.matchMedia) return () => {};
@@ -77,8 +67,7 @@ export default function GuidanceTip({
   const containerRef = useRef<HTMLSpanElement>(null);
   const reactId = useId();
   const tipId = `guidance-${guidanceId.replace(/[^a-zA-Z0-9_-]/g, "-")}-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  /* React-19 blessed external-store pattern for runtime values. */
-  const locale   = useSyncExternalStore(subscribeLocale, getLocaleSnapshot, getLocaleServerSnapshot);
+  /* React-19 blessed external-store pattern for mobile breakpoint. */
   const isMobile = useSyncExternalStore(subscribeMobile, getMobileSnapshot, getMobileServerSnapshot);
 
   /* Click-outside + ESC. */
@@ -102,30 +91,30 @@ export default function GuidanceTip({
     setOpen((v) => !v);
   }, []);
 
-  /* Resolve content lazily — when registry misses an id we render
-     nothing (silently degrades; no broken UI for unmigrated entries). */
-  const resolved = getLocalizedGuidance(guidanceId, locale, state);
+  /* Resolve bilingual content — both languages always shown in the
+     popover so a Chinese-speaking operator and an English-speaking
+     auditor can both read the same row at the same time. */
+  const resolved = getGuidance(guidanceId, state);
   if (!resolved) {
     if (label) return <span className="text-[var(--text-primary)]">{label}</span>;
     return null;
   }
 
-  const triggerSize = size === "sm" ? "h-4 w-4 text-[10px]" : "h-3.5 w-3.5 text-[9px]";
+  const triggerSize = size === "sm" ? "h-3.5 w-3.5 text-[9px]" : "h-3 w-3 text-[8px]";
 
   return (
     <span ref={containerRef} className="relative inline-flex items-center gap-1">
       {label && <span className="text-inherit">{label}</span>}
       <button
         type="button"
-        aria-label={ariaLabel ?? `Help: ${resolved.title}`}
+        aria-label={ariaLabel ?? `Help: ${resolved.title.en}`}
         aria-expanded={open}
         aria-controls={tipId}
         onClick={handleToggle}
         className={
-          "inline-flex shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-gray-400 transition-colors hover:border-white/[0.18] hover:bg-white/[0.06] hover:text-gray-200 " +
+          "inline-flex shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-gray-500 transition-colors hover:border-white/[0.18] hover:bg-white/[0.06] hover:text-gray-300 " +
           triggerSize + " " +
-          /* 36px hit target via padding on touch devices — picks up
-             via the absolutely-positioned :before pseudo. */
+          /* 36px hit target via :before on touch devices only. */
           "before:absolute before:-inset-3 before:content-[''] sm:before:hidden " +
           (triggerClassName ?? "")
         }
@@ -135,8 +124,8 @@ export default function GuidanceTip({
 
       {open && (
         isMobile
-          ? <GuidancePopoverMobile id={tipId} title={resolved.title} content={resolved.content} onClose={() => setOpen(false)} />
-          : <GuidancePopoverDesktop id={tipId} title={resolved.title} content={resolved.content} />
+          ? <GuidancePopoverMobile id={tipId} titleEn={resolved.title.en} titleZh={resolved.title.zh} contentEn={resolved.content.en} contentZh={resolved.content.zh} onClose={() => setOpen(false)} />
+          : <GuidancePopoverDesktop id={tipId} titleEn={resolved.title.en} titleZh={resolved.title.zh} contentEn={resolved.content.en} contentZh={resolved.content.zh} />
       )}
     </span>
   );
@@ -146,16 +135,18 @@ export default function GuidanceTip({
    Desktop popover — anchored, calm, fixed width.
    --------------------------------------------------------------------------- */
 
-function GuidancePopoverDesktop({
-  id, title, content,
-}: { id: string; title: string; content: string }) {
-  /* Position: bottom-start by default; auto-flip to top when near the
-     viewport's bottom edge.
+interface BilingualPopoverProps {
+  id: string;
+  titleEn: string; titleZh: string;
+  contentEn: string; contentZh: string;
+}
 
-     We use a callback ref so the placement decision happens *during*
-     the DOM-attach step rather than after render, which keeps us
-     compliant with React-19's react-hooks/set-state-in-effect rule
-     (which forbids triggering state updates from inside useEffect). */
+function GuidancePopoverDesktop({
+  id, titleEn, titleZh, contentEn, contentZh,
+}: BilingualPopoverProps) {
+  /* Position: bottom-start by default; auto-flip via a callback-ref
+     measurement so render stays pure under React-19's
+     react-hooks/set-state-in-effect rule. */
   const [placement, setPlacement] = useState<{ above: boolean; left: boolean }>(
     () => ({ above: false, left: false }),
   );
@@ -177,12 +168,18 @@ function GuidancePopoverDesktop({
       id={id}
       role="tooltip"
       className={
-        "absolute z-[150] w-[280px] rounded-xl border border-white/[0.08] bg-[var(--bg-secondary)] px-3 py-2.5 text-[11px] leading-relaxed text-gray-200 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.6)] " +
+        "absolute z-[150] w-[260px] rounded-lg border border-white/[0.08] bg-[var(--bg-secondary)] px-2.5 py-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.55)] " +
         placeCls
       }
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
-      <div className="mt-1 text-[12px] text-gray-200">{content}</div>
+      {/* EN block */}
+      <div className="text-[8px] font-semibold uppercase tracking-[0.16em] text-gray-500">{titleEn}</div>
+      <div className="mt-0.5 text-[10.5px] leading-snug text-gray-200">{contentEn}</div>
+      {/* hairline divider */}
+      <div className="my-1.5 h-px w-full bg-white/[0.06]" aria-hidden />
+      {/* ZH block */}
+      <div className="text-[8px] font-semibold uppercase tracking-[0.16em] text-gray-500">{titleZh}</div>
+      <div className="mt-0.5 text-[10.5px] leading-snug text-gray-200">{contentZh}</div>
     </div>
   );
 }
@@ -193,8 +190,8 @@ function GuidancePopoverDesktop({
    --------------------------------------------------------------------------- */
 
 function GuidancePopoverMobile({
-  id, title, content, onClose,
-}: { id: string; title: string; content: string; onClose: () => void }) {
+  id, titleEn, titleZh, contentEn, contentZh, onClose,
+}: BilingualPopoverProps & { onClose: () => void }) {
   return (
     <div
       role="presentation"
@@ -210,7 +207,7 @@ function GuidancePopoverMobile({
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/[0.10]" aria-hidden />
         <div className="flex items-start justify-between gap-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
+          <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-gray-500">{titleEn} · {titleZh}</div>
           <button
             aria-label="Close"
             onClick={onClose}
@@ -221,7 +218,9 @@ function GuidancePopoverMobile({
             </svg>
           </button>
         </div>
-        <div className="mt-1 text-[13px] leading-relaxed text-gray-200">{content}</div>
+        <div className="mt-1.5 text-[11.5px] leading-relaxed text-gray-200">{contentEn}</div>
+        <div className="my-2 h-px w-full bg-white/[0.06]" aria-hidden />
+        <div className="text-[11.5px] leading-relaxed text-gray-200">{contentZh}</div>
       </div>
     </div>
   );

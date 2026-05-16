@@ -352,11 +352,12 @@ function OperationalView({
       )}
 
       {/* ── 1. PRIMARY HEROES ────────────────────────────────── */}
-      <SectionTitle eyebrow="At a glance" title="Performance this period" />
+      <SectionTitle eyebrow="At a glance" title="Performance this period" helpId="finance.section.atGlance" />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="relative">
           <HeroKpiCard
             label="Revenue"
+            helpId="finance.revenue"
             value={kpi?.total_revenue ?? 0}
             unit={currency}
             delta={kpi?.delta.revenue_pct ?? null}
@@ -376,6 +377,7 @@ function OperationalView({
         <div className="relative">
           <HeroKpiCard
             label="Net Profit"
+            helpId="finance.netProfit"
             value={kpi?.net_profit ?? 0}
             unit={currency}
             delta={kpi?.delta.net_profit_pct ?? null}
@@ -396,12 +398,13 @@ function OperationalView({
 
       {/* ── 2. SECONDARY METRICS ────────────────────────────── */}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricCard label="Cash In"  value={kpi?.cash_in  ?? 0} unit={currency} delta={kpi?.delta.cash_in_pct  ?? null} hint="Customer payments received" loading={loading} />
-        <MetricCard label="Cash Out" value={kpi?.cash_out ?? 0} unit={currency} delta={kpi?.delta.cash_out_pct ?? null} hint="Suppliers + expenses paid" loading={loading} />
-        <MetricCard label="Money to Collect" value={kpi?.accounts_receivable ?? 0} unit={currency} tone="warning" hint="Outstanding receivables" loading={loading} />
-        <MetricCard label="Money to Pay"     value={kpi?.accounts_payable    ?? 0} unit={currency} tone="warning" hint="Suppliers + unpaid bills"   loading={loading} />
+        <MetricCard label="Cash In"  helpId="finance.cashIn"  value={kpi?.cash_in  ?? 0} unit={currency} delta={kpi?.delta.cash_in_pct  ?? null} hint="Customer payments received" loading={loading} />
+        <MetricCard label="Cash Out" helpId="finance.cashOut" value={kpi?.cash_out ?? 0} unit={currency} delta={kpi?.delta.cash_out_pct ?? null} hint="Suppliers + expenses paid" loading={loading} />
+        <MetricCard label="Money to Collect" helpId="finance.accountsReceivable" value={kpi?.accounts_receivable ?? 0} unit={currency} tone="warning" hint="Outstanding receivables" loading={loading} />
+        <MetricCard label="Money to Pay"     helpId="finance.accountsPayable"    value={kpi?.accounts_payable    ?? 0} unit={currency} tone="warning" hint="Suppliers + unpaid bills"   loading={loading} />
         <MetricCard
           label="Gross Margin"
+          helpId="finance.grossMargin"
           value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}` : "—"}
           unit="%"
           hint="Gross profit ÷ revenue"
@@ -416,7 +419,7 @@ function OperationalView({
       </div>
 
       {/* ── 3. TIMELINES + LIQUIDITY ──────────────────────── */}
-      <SectionTitle eyebrow="Cash radar" title="What's moving in the next 45 days" description="Incoming collections, supplier dues, and forward liquidity." />
+      <SectionTitle eyebrow="Cash radar" title="What's moving in the next 45 days" description="Incoming collections, supplier dues, and forward liquidity." helpId="finance.section.cashRadar" />
       <div className="grid gap-3 lg:grid-cols-3">
         <TimelineStrip
           title="Incoming cash"
@@ -439,7 +442,7 @@ function OperationalView({
       </div>
 
       {/* ── 4. AGING ─────────────────────────────────────── */}
-      <SectionTitle eyebrow="Aging" title="Receivables and payables by age" description="Anything past 30 days is silently flagged." />
+      <SectionTitle eyebrow="Aging" title="Receivables and payables by age" description="Anything past 30 days is silently flagged." helpId="finance.section.aging" />
       <div className="grid gap-3 lg:grid-cols-2">
         <AgingTable title="AR aging" buckets={arAging} currency={currency} totalLabel="Customer side" />
         <AgingTable title="AP aging" buckets={apAging} currency={currency} totalLabel="Supplier side" />
@@ -469,7 +472,7 @@ function OperationalView({
       </ChartCard>
 
       {/* ── 6. INTELLIGENCE LAYER ───────────────────────── */}
-      <SectionTitle eyebrow="Intelligence" title="What the numbers mean" description="Automatic interpretations of this period's signal." />
+      <SectionTitle eyebrow="Intelligence" title="What the numbers mean" description="Automatic interpretations of this period's signal." helpId="finance.section.intelligence" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {intelligence.cards.map((c, i) => (
           <InsightCard
@@ -484,7 +487,7 @@ function OperationalView({
       </div>
 
       {/* ── 7. PROFIT FLOW STORY ────────────────────────── */}
-      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" description="Gross profit excludes tax refund; refund is added back separately before net profit." />
+      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" description="Gross profit excludes tax refund; refund is added back separately before net profit." helpId="finance.section.profitFlow" />
       <ProfitFlow
         revenue={kpi?.total_revenue ?? 0}
         supplierCost={kpi?.total_supplier_cost ?? 0}
@@ -497,7 +500,7 @@ function OperationalView({
       />
 
       {/* ── 8. TOP INSIGHTS ────────────────────────────── */}
-      <SectionTitle eyebrow="Top insights" title="Where profit is being made — and where it's leaking" />
+      <SectionTitle eyebrow="Top insights" title="Where profit is being made — and where it's leaking" helpId="finance.section.topInsights" />
       <div className="grid gap-3 lg:grid-cols-2">
         <TopOrdersCard kpi={kpi} currency={currency} />
         <TopCategoriesCard kpi={kpi} currency={currency} />
@@ -528,38 +531,44 @@ function ExecutiveView({
   pressure: Pressure;
 }) {
   /* Stat row — six executive-grade numbers, compressed. */
-  const stats: { label: string; value: string; hint?: string; tone?: Tone }[] = [
+  const stats: { label: string; value: string; hint?: string; tone?: Tone; helpId?: string }[] = [
     {
       label: "Revenue",
+      helpId: "finance.revenue",
       value: formatCompact(kpi?.total_revenue ?? 0),
       hint: `${currency} · ${period}`,
       tone: "positive",
     },
     {
       label: "Net profit",
+      helpId: "finance.netProfit",
       value: formatCompact(kpi?.net_profit ?? 0),
       hint: `Margin ${(kpi?.gross_margin_pct ?? 0).toFixed(1)}%`,
       tone: (kpi?.net_profit ?? 0) >= 0 ? "info" : "negative",
     },
     {
       label: "AR exposure",
+      helpId: "finance.accountsReceivable",
       value: formatCompact(kpi?.accounts_receivable ?? 0),
       hint: `${arAging.reduce((s, b) => s + b.count, 0)} open`,
       tone: "warning",
     },
     {
       label: "AP exposure",
+      helpId: "finance.accountsPayable",
       value: formatCompact(kpi?.accounts_payable ?? 0),
       hint: `${apAging.reduce((s, b) => s + b.count, 0)} open`,
       tone: "warning",
     },
     {
       label: "DSO",
+      helpId: "finance.dso",
       value: `${ccc.dso.toFixed(0)} d`,
       hint: "Days sales outstanding",
     },
     {
       label: "CCC",
+      helpId: "finance.ccc",
       value: `${ccc.ccc.toFixed(0)} d`,
       hint: ccc.ccc >= 0 ? "Cash cycle gap" : "Cash cycle surplus",
       tone: ccc.ccc <= 30 ? "positive" : ccc.ccc <= 60 ? "warning" : "negative",
@@ -585,7 +594,7 @@ function ExecutiveView({
       </div>
 
       {/* ── 2. LIQUIDITY + AGING ─────────────────── */}
-      <SectionTitle eyebrow="Liquidity" title="Forward cash window + aging exposure" description="Projection blends steady-state trajectory with scheduled AR/AP." />
+      <SectionTitle eyebrow="Liquidity" title="Forward cash window + aging exposure" description="Projection blends steady-state trajectory with scheduled AR/AP." helpId="finance.liquidity" />
       <div className="grid gap-3 lg:grid-cols-3">
         <LiquidityMeter
           d7={liquidity.d7}
@@ -598,7 +607,7 @@ function ExecutiveView({
       </div>
 
       {/* ── 3. CONCENTRATION ─────────────────────── */}
-      <SectionTitle eyebrow="Concentration" title="Revenue + cost-of-goods dependency" description="How exposed the business is to a single counterparty." />
+      <SectionTitle eyebrow="Concentration" title="Revenue + cost-of-goods dependency" description="How exposed the business is to a single counterparty." helpId="finance.concentration" />
       <div className="grid gap-3 sm:grid-cols-2">
         <ConcentrationBar
           label="Top customer share"
@@ -907,14 +916,14 @@ function ProfitFlow({
   revenue: number; supplierCost: number; expenses: number; taxRefund: number;
   finCharges: number; gross: number; net: number; currency: string;
 }) {
-  const steps: { label: string; value: number; sign: 1 | -1; total?: boolean; tone: Tone }[] = [
-    { label: "Revenue",        value: revenue,      sign: 1,  tone: "positive" },
-    { label: "Supplier cost",  value: supplierCost, sign: -1, tone: "neutral" },
-    { label: "Gross profit",   value: gross,        sign: 1,  total: true, tone: gross >= 0 ? "info" : "negative" },
-    { label: "Order expenses", value: expenses,     sign: -1, tone: "neutral" },
-    { label: "Tax refund",     value: taxRefund,    sign: 1,  tone: "neutral" },
-    { label: "Bank charges",   value: finCharges,   sign: -1, tone: "neutral" },
-    { label: "Net profit",     value: net,          sign: 1,  total: true, tone: net >= 0 ? "info" : "negative" },
+  const steps: { label: string; value: number; sign: 1 | -1; total?: boolean; tone: Tone; helpId: string }[] = [
+    { label: "Revenue",        helpId: "finance.revenue",        value: revenue,      sign: 1,  tone: "positive" },
+    { label: "Supplier cost",  helpId: "finance.supplierCost",   value: supplierCost, sign: -1, tone: "neutral" },
+    { label: "Gross profit",   helpId: "finance.grossProfit",    value: gross,        sign: 1,  total: true, tone: gross >= 0 ? "info" : "negative" },
+    { label: "Order expenses", helpId: "finance.orderExpenses",  value: expenses,     sign: -1, tone: "neutral" },
+    { label: "Tax refund",     helpId: "finance.taxRefund",      value: taxRefund,    sign: 1,  tone: "neutral" },
+    { label: "Bank charges",   helpId: "finance.bankCharges",    value: finCharges,   sign: -1, tone: "neutral" },
+    { label: "Net profit",     helpId: "finance.netProfit",      value: net,          sign: 1,  total: true, tone: net >= 0 ? "info" : "negative" },
   ];
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -931,7 +940,10 @@ function ProfitFlow({
         return (
           <div key={i} className={`rounded-2xl border ${surface} p-3.5`}>
             <div className="flex items-baseline justify-between gap-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{s.label}</div>
+              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <span>{s.label}</span>
+                <GuidanceTip guidanceId={s.helpId} />
+              </div>
               {s.sign === -1 && !isTotal && (
                 <span className="text-[10px] text-gray-600">−</span>
               )}
@@ -950,7 +962,7 @@ function ProfitFlow({
 function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
   const rows = kpi?.top_orders ?? [];
   return (
-    <ChartCard title="Top profitable orders" subtitle="Ranked by net profit this period.">
+    <ChartCard title="Top profitable orders" subtitle="Ranked by net profit this period." helpId="finance.topOrders">
       {rows.length === 0 ? (
         <div className="py-6 text-center text-sm text-gray-500">No orders yet for this period.</div>
       ) : (
@@ -985,7 +997,7 @@ function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: 
 function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
   const rows = kpi?.top_expense_categories ?? [];
   return (
-    <ChartCard title="Top expense categories" subtitle="Biggest spend buckets this period.">
+    <ChartCard title="Top expense categories" subtitle="Biggest spend buckets this period." helpId="finance.topCategories">
       {rows.length === 0 ? (
         <div className="py-6 text-center text-sm text-gray-500">No expenses recorded for this period.</div>
       ) : (

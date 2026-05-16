@@ -10,6 +10,7 @@ import type { ApprovalStatus, FinancePayment, ReconciliationStatus } from "@/lib
 import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
 import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
 import PaymentReviewDrawer from "@/components/payment/PaymentReviewDrawer";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 export default function FinancePayments() {
   const [rows, setRows] = useState<FinancePayment[]>([]);
@@ -176,11 +177,31 @@ export default function FinancePayments() {
                   <thead className="text-left text-[10px] uppercase tracking-wider text-gray-500">
                     <tr>
                       <th className="py-2 pr-3">Date</th>
-                      <th className="py-2 pr-3">Direction</th>
-                      <th className="py-2 pr-3">Party</th>
-                      <th className="py-2 pr-3">Method</th>
+                      <th className="py-2 pr-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span>Direction</span>
+                          <GuidanceTip guidanceId="payment.direction" />
+                        </span>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span>Party</span>
+                          <GuidanceTip guidanceId="payment.party" />
+                        </span>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span>Method</span>
+                          <GuidanceTip guidanceId="payment.method" />
+                        </span>
+                      </th>
                       <th className="py-2 pr-3 text-right">Amount</th>
-                      <th className="py-2 pr-3">Status</th>
+                      <th className="py-2 pr-3">
+                        <span className="inline-flex items-center gap-1">
+                          <span>Status</span>
+                          <GuidanceTip guidanceId="payment.movementStatus" />
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

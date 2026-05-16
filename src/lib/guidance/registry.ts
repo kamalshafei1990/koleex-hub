@@ -323,6 +323,410 @@ const REGISTRY: Record<string, GuidanceEntry> = {
       zh: "将资金信号与其他模块关联的叙述 — 例如 '收款延迟正在放大正在形成的流动性缺口'。",
     },
   },
+
+  /* ── Finance dashboard — Hero KPIs + secondary metrics ──────── */
+  "finance.revenue": {
+    id: "finance.revenue",
+    title: { en: "Revenue", zh: "营收" },
+    default: {
+      en: "Total selling price across all orders in this window. Not yet adjusted for supplier cost, expenses, tax refund, or bank fees.",
+      zh: "本期内所有订单的销售总额。尚未扣除供应商成本、费用、退税或银行手续费。",
+    },
+  },
+  "finance.netProfit": {
+    id: "finance.netProfit",
+    title: { en: "Net profit", zh: "净利润" },
+    default: {
+      en: "Gross profit − operating expenses + tax refund − bank charges. The bottom-line result for the period.",
+      zh: "毛利 − 运营费用 + 退税 − 银行手续费。本期的最终净结果。",
+    },
+  },
+  "finance.cashIn": {
+    id: "finance.cashIn",
+    title: { en: "Cash in", zh: "现金流入" },
+    default: {
+      en: "Actual payments received from customers in this window. Different from revenue — revenue is sold, cash-in is collected.",
+      zh: "本期内实际收到的客户付款。与营收不同 — 营收是已售,现金流入是已收。",
+    },
+  },
+  "finance.cashOut": {
+    id: "finance.cashOut",
+    title: { en: "Cash out", zh: "现金流出" },
+    default: {
+      en: "Actual payments sent to suppliers + paid expenses in this window. The other half of the cash-velocity equation.",
+      zh: "本期内实际支付给供应商的款项加已付费用。现金流动公式的另一半。",
+    },
+  },
+  "finance.accountsReceivable": {
+    id: "finance.accountsReceivable",
+    title: { en: "Money to collect", zh: "应收账款" },
+    default: {
+      en: "Outstanding customer balances — invoiced but not yet paid. High AR means cash is stuck in receivables.",
+      zh: "未结清的客户余额 — 已开票但尚未收款。AR 高表示现金被应收账款占用。",
+    },
+  },
+  "finance.accountsPayable": {
+    id: "finance.accountsPayable",
+    title: { en: "Money to pay", zh: "应付账款" },
+    default: {
+      en: "Outstanding supplier balances + unpaid bills. Often needs staggered payment scheduling.",
+      zh: "未结清的供应商款项及未付账单。通常需要分批安排付款。",
+    },
+  },
+  "finance.grossMargin": {
+    id: "finance.grossMargin",
+    title: { en: "Gross margin", zh: "毛利率" },
+    default: {
+      en: "Gross profit ÷ revenue × 100. Above 30% is comfortable; 15–30% is acceptable; below 15% is thin operational headroom.",
+      zh: "毛利 ÷ 营收 × 100。30% 以上属健康;15–30% 可接受;低于 15% 运营空间紧张。",
+    },
+  },
+  "finance.healthStatus": {
+    id: "finance.healthStatus",
+    title: { en: "Financial health", zh: "财务健康度" },
+    default: {
+      en: "A quick read of the period: Healthy (profit positive, cash flowing), Watch (some pressure), or Stress (negative profit / major overdue).",
+      zh: "本期的快速指标:健康(盈利、现金流正常)、关注(存在压力)、紧张(亏损或严重逾期)。",
+    },
+  },
+
+  /* ── Profit flow steps ──────────────────────────────────────── */
+  "finance.supplierCost": {
+    id: "finance.supplierCost",
+    title: { en: "Supplier cost", zh: "供应商成本" },
+    default: {
+      en: "Total amount paid (or owed) to suppliers for goods on the orders. The biggest line that comes out of revenue.",
+      zh: "为订单货物向供应商支付(或欠付)的总金额。营收中最大的扣减项。",
+    },
+  },
+  "finance.grossProfit": {
+    id: "finance.grossProfit",
+    title: { en: "Gross profit", zh: "毛利" },
+    default: {
+      en: "Revenue − supplier cost. Does NOT include tax refund or operating expenses.",
+      zh: "营收 − 供应商成本。不含退税或运营费用。",
+    },
+  },
+  "finance.orderExpenses": {
+    id: "finance.orderExpenses",
+    title: { en: "Order expenses", zh: "订单费用" },
+    default: {
+      en: "Operating costs charged to specific orders — typically shipping, customs, packaging, and freight.",
+      zh: "归集到具体订单的运营成本 — 通常包括运输、清关、包装和货运。",
+    },
+  },
+  "finance.taxRefund": {
+    id: "finance.taxRefund",
+    title: { en: "Tax refund", zh: "出口退税" },
+    default: {
+      en: "VAT or export tax refund expected on the period's orders. Added back AFTER gross profit, before net profit.",
+      zh: "本期订单预期的增值税或出口退税。在毛利之后、净利之前回加。",
+    },
+  },
+  "finance.bankCharges": {
+    id: "finance.bankCharges",
+    title: { en: "Bank charges", zh: "银行费用" },
+    default: {
+      en: "Wire fees, L/C charges, FX spreads, and other bank costs on the period's orders. Subtracted at the net-profit line.",
+      zh: "本期订单的电汇费、信用证费、汇兑差价及其他银行成本。在净利节点扣减。",
+    },
+  },
+
+  /* ── Top insights ──────────────────────────────────────────── */
+  "finance.topOrders": {
+    id: "finance.topOrders",
+    title: { en: "Top profitable orders", zh: "最盈利订单" },
+    default: {
+      en: "Orders ranked by net profit in this period. Useful for understanding which customers + product mixes deliver actual bottom-line value.",
+      zh: "本期按净利润排序的订单。可用于了解哪些客户与产品组合带来真正的利润。",
+    },
+  },
+  "finance.topCategories": {
+    id: "finance.topCategories",
+    title: { en: "Top expense categories", zh: "最大支出类别" },
+    default: {
+      en: "Biggest spend buckets this period. Heavy concentration in one category often signals a single-vendor risk or a margin-pressure source.",
+      zh: "本期最大的支出类别。某一类别占比过高,通常意味着单一供应商风险或毛利压力来源。",
+    },
+  },
+
+  /* ── Section headers ───────────────────────────────────────── */
+  "finance.section.atGlance": {
+    id: "finance.section.atGlance",
+    title: { en: "At a glance", zh: "概览" },
+    default: {
+      en: "The two most important numbers in the period: revenue and net profit, with their period-over-period direction.",
+      zh: "本期最重要的两个数字:营收和净利润,以及其环比变化方向。",
+    },
+  },
+  "finance.section.cashRadar": {
+    id: "finance.section.cashRadar",
+    title: { en: "Cash radar", zh: "现金雷达" },
+    default: {
+      en: "Forward 45-day window of expected collections, supplier dues, and the resulting liquidity projection. Operational treasury reading.",
+      zh: "未来 45 天的预期收款、供应商应付款以及由此得出的流动性预测。运营层面的资金视图。",
+    },
+  },
+  "finance.section.aging": {
+    id: "finance.section.aging",
+    title: { en: "Aging", zh: "账龄" },
+    default: {
+      en: "Outstanding receivables and payables bucketed by how old they are. Anything past 30 days needs deliberate attention.",
+      zh: "按账龄分桶的应收应付款。超过 30 天的项需特别关注。",
+    },
+  },
+  "finance.section.trend": {
+    id: "finance.section.trend",
+    title: { en: "Trend", zh: "走势" },
+    default: {
+      en: "Revenue, costs + expenses, and net profit plotted over the period. Look at slope, not absolutes — direction beats magnitude here.",
+      zh: "本期内营收、成本加费用、净利润的走势。重点看斜率,方向比绝对值更重要。",
+    },
+  },
+  "finance.section.profitFlow": {
+    id: "finance.section.profitFlow",
+    title: { en: "Profit flow", zh: "利润流向" },
+    default: {
+      en: "Step-by-step accounting from revenue down to net profit. Each tile is one operational adjustment to the running total.",
+      zh: "从营收到净利润的逐步核算。每个图块代表一个对运行总额的运营调整。",
+    },
+  },
+  "finance.section.topInsights": {
+    id: "finance.section.topInsights",
+    title: { en: "Top insights", zh: "重点洞察" },
+    default: {
+      en: "Where profit is being made (top orders) and where it's leaking (top expense categories). Tells you what to do more of and what to compress.",
+      zh: "利润来源(最盈利订单)和利润流失点(最大支出类别)。告诉你应增加什么、应削减什么。",
+    },
+  },
+  "finance.section.intelligence": {
+    id: "finance.section.intelligence",
+    title: { en: "Intelligence", zh: "智能洞察" },
+    default: {
+      en: "Automatic interpretations of the period's signals. The system has already read the numbers and pulled out what's worth knowing.",
+      zh: "对本期信号的自动解读。系统已经读完数字并提取出值得关注的要点。",
+    },
+  },
+
+  /* ── Executive view stat row labels ─────────────────────────── */
+  "finance.dso": {
+    id: "finance.dso",
+    title: { en: "DSO — days sales outstanding", zh: "DSO — 应收账款周转天数" },
+    default: {
+      en: "Average days from invoice to collection. AR ÷ daily revenue. Lower is better; > 60d means cash is structurally stuck.",
+      zh: "从开票到收款的平均天数。AR ÷ 日营收。越低越好;>60 天表示资金结构性滞留。",
+    },
+  },
+  "finance.ccc": {
+    id: "finance.ccc",
+    title: { en: "CCC — cash conversion cycle", zh: "CCC — 现金转换周期" },
+    default: {
+      en: "Days between paying suppliers and getting paid by customers (DSO − DPO). Lower or negative = the business funds itself; higher = working-capital pressure.",
+      zh: "从付款给供应商到收款的天数差 (DSO − DPO)。越低或为负表示业务自循环;越高表示运营资金压力。",
+    },
+  },
+
+  /* ── Approval workflow actions ──────────────────────────────── */
+  "approval.action.submit": {
+    id: "approval.action.submit",
+    title: { en: "Submit for review", zh: "提交审核" },
+    default: {
+      en: "Move the record from draft to submitted. The next approver in the chain will receive it. You can still see it; you cannot edit it without resetting.",
+      zh: "将记录从草稿状态提交。下一位审批人将收到。提交后仍可查看,但需先重置才能编辑。",
+    },
+  },
+  "approval.action.approve": {
+    id: "approval.action.approve",
+    title: { en: "Approve", zh: "批准" },
+    default: {
+      en: "Clear the record for execution. Approval is recorded in the history with your name and timestamp.",
+      zh: "通过审批以允许执行。批准操作将以你的姓名和时间戳记入审批历史。",
+    },
+  },
+  "approval.action.reject": {
+    id: "approval.action.reject",
+    title: { en: "Reject", zh: "拒绝" },
+    default: {
+      en: "Decline the record. A written reason is required and saved to the audit trail.",
+      zh: "拒绝该记录。必须提供书面理由,并记入审计日志。",
+    },
+  },
+  "approval.action.requestChanges": {
+    id: "approval.action.requestChanges",
+    title: { en: "Request changes", zh: "请求修改" },
+    default: {
+      en: "Send the record back to the submitter with a specific change instruction. They resubmit when fixed.",
+      zh: "退回给提交人并附具体修改要求。修改完成后由提交人重新提交。",
+    },
+  },
+
+  /* ── Expense fields ─────────────────────────────────────────── */
+  "expense.title": {
+    id: "expense.title",
+    title: { en: "Title", zh: "标题" },
+    default: {
+      en: "A short, findable description. Keep it to one line — \"Sea freight to Alexandria\" beats \"Misc cost 2026-05\".",
+      zh: "简短、可检索的描述。控制在一行 — '至亚历山大海运' 优于 '2026-05 杂项'。",
+    },
+  },
+  "expense.amount": {
+    id: "expense.amount",
+    title: { en: "Amount", zh: "金额" },
+    default: {
+      en: "The total expense in the selected currency. The system never auto-converts — pick the currency the bill is in.",
+      zh: "所选币种下的费用总额。系统不会自动换算 — 请选择账单的实际币种。",
+    },
+  },
+  "expense.category": {
+    id: "expense.category",
+    title: { en: "Category", zh: "类别" },
+    default: {
+      en: "The bucket used for analytics, intelligence, and tax mapping. Choose the closest match — \"Other\" is allowed but reduces signal quality.",
+      zh: "用于分析、智能洞察和税务归集的分类。请选择最贴近的一项 — '其他' 可用但会降低信号质量。",
+    },
+  },
+  "expense.dueDate": {
+    id: "expense.dueDate",
+    title: { en: "Due date", zh: "到期日" },
+    default: {
+      en: "When the bill must be paid. Used for overdue detection and forward cash projection. Optional but recommended for unpaid expenses.",
+      zh: "账单需付清的日期。用于逾期检测和现金预测。未付费用建议填写。",
+    },
+  },
+  "expense.linkedOrder": {
+    id: "expense.linkedOrder",
+    title: { en: "Linked order", zh: "关联订单" },
+    default: {
+      en: "Optional — ties the expense to a specific order so its profit calculation deducts it correctly.",
+      zh: "可选 — 将费用关联到具体订单,使该订单的利润计算正确扣减此项。",
+    },
+  },
+
+  /* ── Payment review drawer ──────────────────────────────────── */
+  "payment.direction": {
+    id: "payment.direction",
+    title: { en: "Direction", zh: "方向" },
+    default: {
+      en: "Money in = received from a customer. Money out = sent to a supplier / vendor / tax authority.",
+      zh: "现金流入 = 收款。现金流出 = 向供应商、服务商或税务机关付款。",
+    },
+  },
+  "payment.expectedAmount": {
+    id: "payment.expectedAmount",
+    title: { en: "Expected amount", zh: "预期金额" },
+    default: {
+      en: "What the operator anticipated would land at the bank. Compare to actual amount during reconciliation.",
+      zh: "操作员预期到账的金额。对账时与实际金额对比。",
+    },
+  },
+  "payment.actualAmount": {
+    id: "payment.actualAmount",
+    title: { en: "Actual amount", zh: "实际金额" },
+    default: {
+      en: "What the bank reported. Once set, this is the authoritative figure for reconciliation.",
+      zh: "银行报告的金额。一经填写,即为对账的权威数字。",
+    },
+  },
+  "payment.difference": {
+    id: "payment.difference",
+    title: { en: "Difference", zh: "差额" },
+    default: {
+      en: "Actual − expected. Within 0.01 is a match; outside is a mismatch that needs reconciliation action.",
+      zh: "实际 − 预期。差额在 0.01 内视为一致;超出则为差异,需对账处理。",
+    },
+  },
+  "payment.method": {
+    id: "payment.method",
+    title: { en: "Payment method", zh: "付款方式" },
+    default: {
+      en: "How the money moves: T/T (wire), L/C (letter of credit), cash, cheque, or card. Affects bank fees and clearing timing.",
+      zh: "资金移动方式:电汇 (T/T)、信用证 (L/C)、现金、支票或卡。会影响手续费与清算时间。",
+    },
+  },
+  "payment.party": {
+    id: "payment.party",
+    title: { en: "Party", zh: "交易对手" },
+    default: {
+      en: "The other side of the cash movement — the customer paying us or the supplier we're paying.",
+      zh: "资金往来的对方 — 付款给我们的客户或我们向其付款的供应商。",
+    },
+  },
+  "payment.linkedOrder": {
+    id: "payment.linkedOrder",
+    title: { en: "Linked order", zh: "关联订单" },
+    default: {
+      en: "Which order this payment fulfils, partly or fully. Drives outstanding-balance calculation per order.",
+      zh: "此笔付款部分或全部对应的订单。用于计算订单层级的未结余额。",
+    },
+  },
+
+  /* ── Filter strips ─────────────────────────────────────────── */
+  "expense.filter.needsReview": {
+    id: "expense.filter.needsReview",
+    title: { en: "Needs review", zh: "待审核" },
+    default: {
+      en: "Expenses sitting in submitted or under-review state. This is the approver's inbox.",
+      zh: "处于已提交或审核中状态的费用。这是审批人的收件箱。",
+    },
+  },
+  "expense.filter.drafts": {
+    id: "expense.filter.drafts",
+    title: { en: "Drafts", zh: "草稿" },
+    default: {
+      en: "Expenses you've created but not yet submitted for review. They never move forward until you submit.",
+      zh: "你已创建但尚未提交审核的费用。在你提交前不会进入流程。",
+    },
+  },
+  "expense.filter.rejected": {
+    id: "expense.filter.rejected",
+    title: { en: "Rejected", zh: "已拒绝" },
+    default: {
+      en: "Expenses an approver declined. Open the row to see the reason and decide whether to resubmit or delete.",
+      zh: "审批人已拒绝的费用。打开该行可查看理由,并决定是否重新提交或删除。",
+    },
+  },
+  "expense.filter.changesNeeded": {
+    id: "expense.filter.changesNeeded",
+    title: { en: "Changes needed", zh: "需修改" },
+    default: {
+      en: "Expenses an approver sent back with a specific change request. Fix what was asked and resubmit.",
+      zh: "审批人退回并附具体修改要求的费用。按要求修改后重新提交。",
+    },
+  },
+  "expense.filter.approved": {
+    id: "expense.filter.approved",
+    title: { en: "Approved", zh: "已批准" },
+    default: {
+      en: "Expenses that cleared review. Includes partially-approved items (approved at a reduced amount).",
+      zh: "通过审核的费用,包含部分批准项(按缩减金额获批)。",
+    },
+  },
+
+  /* ── Intelligence panel — workflow rail ─────────────────────── */
+  "intelligence.workflowRail": {
+    id: "intelligence.workflowRail",
+    title: { en: "Operational queue", zh: "运营队列" },
+    default: {
+      en: "Six fast actions ranked by current pressure. The highest-priority action is always first; badges show open volume.",
+      zh: "按当前压力排序的六个快速操作。最紧迫的操作始终居首;徽章显示未处理量。",
+    },
+  },
+  "intelligence.copilot": {
+    id: "intelligence.copilot",
+    title: { en: "Copilot hints", zh: "Copilot 提示" },
+    default: {
+      en: "Up to three proactive operational hints. The Copilot prioritises cross-module narratives over single-module facts.",
+      zh: "最多三条主动运营提示。Copilot 优先呈现跨模块综合判断,而非单模块单项数据。",
+    },
+  },
+  "intelligence.copilotEmpty": {
+    id: "intelligence.copilotEmpty",
+    title: { en: "Calm state", zh: "平稳状态" },
+    default: {
+      en: "Nothing material is happening across Finance, customer, supplier, logistics, inventory, approval, payment, or treasury. The system stays silent on purpose.",
+      zh: "财务、客户、供应商、物流、库存、审批、付款及资金各维度均无重大问题。系统主动保持沉默。",
+    },
+  },
 };
 
 /* ---------------------------------------------------------------------------

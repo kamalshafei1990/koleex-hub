@@ -52,11 +52,12 @@ const STYLES: Record<ReconciliationStatus, { dot: string; cls: string; label: st
 export function ReconciliationBadge({
   status,
   compact = false,
-  withTip = false,
+  withTip = true,
 }: {
   status: ReconciliationStatus | undefined;
   compact?: boolean;
-  /** Phase 2.5 — render a state-aware help tip next to the chip. */
+  /** Phase 2.5 — render a state-aware help tip next to the chip.
+   *  Defaults to true so the badge teaches its state everywhere. */
   withTip?: boolean;
 }) {
   const s = STYLES[status ?? "unreconciled"];
