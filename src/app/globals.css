@@ -326,3 +326,18 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-koleex-edge-pulse { animation: none; }
 }
+
+/* Guidance tip — tiny "?" affordance next to operational labels.
+   Resting state: 0.55-alpha so it fades into the UI. Hover / focus:
+   brighten to 0.92 + a soft halo so the operator knows it's clickable. */
+.koleex-guidance-trigger {
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: 9999px;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+.koleex-guidance-trigger:hover,
+.koleex-guidance-trigger:focus-visible {
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}

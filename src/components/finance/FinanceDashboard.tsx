@@ -58,6 +58,7 @@ import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
 /* Phase 2.5 — operational guidance layer. */
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import RrIcon from "@/components/ui/RrIcon";
 import type {
   BankAccount,
   CashMovement,
@@ -857,7 +858,7 @@ function buildWorkflowItems(
           key,
           label: "Follow up collection",
           hint: pressureLabel,
-          icon: <span aria-hidden>↘</span>,
+          icon: <RrIcon name="arrow-down-left" size={13} />,
           href: "/finance/customers",
           badge: arAmount > 0
             ? { text: formatCompact(arAmount), tone: pressureTone }
@@ -874,7 +875,7 @@ function buildWorkflowItems(
           key,
           label: "Pay suppliers",
           hint: pressureLabel,
-          icon: <span aria-hidden>↗</span>,
+          icon: <RrIcon name="arrow-up-right" size={13} />,
           href: "/finance/suppliers",
           badge: apAmount > 0
             ? { text: formatCompact(apAmount), tone: pressureTone }
@@ -884,22 +885,22 @@ function buildWorkflowItems(
       case "record-payment":
         return {
           key, label: "Record payment", hint: pressureLabel,
-          icon: <span aria-hidden>≡</span>, href: "/finance/payments",
+          icon: <RrIcon name="wallet" size={13} />, href: "/finance/payments",
         };
       case "add-expense":
         return {
           key, label: "Add expense", hint: pressureLabel,
-          icon: <span aria-hidden>△</span>, href: "/expenses",
+          icon: <RrIcon name="receipt" size={13} />, href: "/expenses",
         };
       case "new-order":
         return {
           key, label: "New order", hint: pressureLabel,
-          icon: <span aria-hidden>＋</span>, href: "/finance/orders",
+          icon: <RrIcon name="plus" size={13} />, href: "/finance/orders",
         };
       case "reminders":
         return {
           key, label: "Reminders", hint: pressureLabel,
-          icon: <span aria-hidden>○</span>, href: "/finance/notifications",
+          icon: <RrIcon name="clock" size={13} />, href: "/finance/notifications",
         };
     }
   };

@@ -144,9 +144,15 @@ function GuidanceTipImpl({
           }
         }}
         style={GLYPH_STYLE}
-        className={triggerClassName}
+        className={`koleex-guidance-trigger ${triggerClassName ?? ""}`}
       >
-        ?
+        {/* Inline SVG (fi-rr-interrogation, regular-rounded set).
+            Geometric centering — no font line-height / baseline quirks. */}
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden focusable="false">
+          <path d="M12,0A12,12,0,1,0,24,12,12.013,12.013,0,0,0,12,0Zm0,22A10,10,0,1,1,22,12,10.011,10.011,0,0,1,12,22Z"/>
+          <path d="M12.717,5.063A4,4,0,0,0,8,9a1,1,0,0,0,2,0,2,2,0,0,1,2.371-1.967,2.024,2.024,0,0,1,1.6,1.595,2,2,0,0,1-1,2.125A3.954,3.954,0,0,0,11,14.257V15a1,1,0,0,0,2,0v-.743a1.982,1.982,0,0,1,.93-1.752,4,4,0,0,0-1.213-7.442Z"/>
+          <rect x="11" y="17" width="2" height="2" rx="1"/>
+        </svg>
       </span>
       {rect && (
         <BilingualTooltip
@@ -167,35 +173,23 @@ function GuidanceTipImpl({
 const GuidanceTip = memo(GuidanceTipImpl);
 export default GuidanceTip;
 
-/* Hoisted to module scope so the style object reference is stable and
-   doesn't churn through React's reconciler.
+/* Hoisted to module scope so the style object reference is stable
+   and doesn't churn through React's reconciler.
 
-   Centering note: a text `?` inherits the font's natural line-height
-   plus a tiny visual-vs-typographic baseline offset, which makes
-   flexbox-centered glyphs look low even though they're technically
-   "centered". The fix is three things together:
-     · line-height: 1               kills the inline-leading padding
-     · padding-top: 1px              compensates the optical baseline
-     · font-feature-settings tnum    tabular-nums prevents glyph drift
-   That makes the `?` sit visually dead-center in the 15×15 circle. */
+   The SVG is the whole affordance — geometrically centered, no font
+   metrics, no CSS circle wrapper needed. We just give it a transparent
+   hover halo for affordance discoverability. */
 const GLYPH_STYLE: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   width: 15,
   height: 15,
-  borderRadius: "50%",
-  border: "1px solid rgba(255,255,255,0.45)",
-  color: "rgba(255,255,255,0.85)",
-  fontSize: 10,
-  fontWeight: 700,
-  lineHeight: 1,
-  paddingTop: 1,
+  color: "rgba(255,255,255,0.55)",
   cursor: "help",
-  background: "rgba(255,255,255,0.06)",
   userSelect: "none",
   flexShrink: 0,
-  fontFamily: "ui-sans-serif, system-ui, sans-serif",
+  transition: "color 150ms ease",
 };
 
 /* ---------------------------------------------------------------------------
