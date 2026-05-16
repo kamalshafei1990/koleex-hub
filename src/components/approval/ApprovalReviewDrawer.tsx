@@ -144,8 +144,8 @@ export default function ApprovalReviewDrawer({
               {expense.title || "Expense"}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <ApprovalBadge status={status} ageDays={ageDays} />
-              <EvidenceBadge status={expense.evidence_status} receiptCount={expense.receipt_count} compact />
+              <ApprovalBadge status={status} ageDays={ageDays} withTip />
+              <EvidenceBadge status={expense.evidence_status} receiptCount={expense.receipt_count} compact withTip />
               <span className="text-[10px] text-gray-500">
                 {fmtMoney(Number(expense.amount) || 0, expense.currency, { compact: true })} · {expense.expense_date}
               </span>

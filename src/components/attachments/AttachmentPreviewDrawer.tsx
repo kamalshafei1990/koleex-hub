@@ -154,7 +154,7 @@ export default function AttachmentPreviewDrawer({
             </div>
             <div className="mt-1.5 flex items-center gap-1.5">
               {entityType === "expense" && (
-                <EvidenceBadge status={evidenceLocal} receiptCount={receiptCount ?? attachments.length} />
+                <EvidenceBadge status={evidenceLocal} receiptCount={receiptCount ?? attachments.length} withTip />
               )}
               {entityType !== "expense" && attachments.length > 0 && (
                 <span className="text-[11px] text-gray-500">{attachments.length} file{attachments.length === 1 ? "" : "s"}</span>

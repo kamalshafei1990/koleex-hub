@@ -56,6 +56,8 @@ import {
 import { PeriodTabs } from "@/components/finance/FinanceUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
+/* Phase 2.5 — operational guidance layer. */
+import GuidanceTip from "@/components/ui/GuidanceTip";
 import type {
   BankAccount,
   CashMovement,
@@ -1061,7 +1063,10 @@ function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBus
     <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Business nervous system</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <span>Business nervous system</span>
+            <GuidanceTip guidanceId="intelligence.businessHealth" />
+          </div>
           <div className="mt-1 text-[12px] text-gray-300">{health.headline}</div>
         </div>
         <div className="flex items-center gap-3">
@@ -1247,7 +1252,10 @@ function ApprovalOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
       {/* Header */}
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Approval operations</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <span>Approval operations</span>
+            <GuidanceTip guidanceId="approval.health" />
+          </div>
           {a.read && <div className="mt-1 text-[12px] text-gray-300">{a.read}</div>}
         </div>
         <div className="flex items-center gap-3">
@@ -1328,13 +1336,17 @@ function ApprovalOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
 }
 
 function StatTile({
-  label, value, unit, hint, tone = "neutral",
+  label, value, unit, hint, tone = "neutral", helpId,
 }: {
   label: string;
   value: string;
   unit?: string;
   hint?: string;
   tone?: "neutral" | "amber" | "rose";
+  /** Phase 2.5 — optional guidance-registry id for a "?" affordance
+   *  next to the tile label. Off by default so existing tiles stay
+   *  visually untouched. */
+  helpId?: string;
 }) {
   const valueCls =
     tone === "rose"  ? "text-rose-300"
@@ -1342,7 +1354,10 @@ function StatTile({
     :                    "text-gray-200";
   return (
     <div className="rounded-lg border border-white/[0.04] bg-white/[0.012] px-2.5 py-2">
-      <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{label}</div>
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
+        <span>{label}</span>
+        {helpId && <GuidanceTip guidanceId={helpId} />}
+      </div>
       <div className={`mt-1 text-[15px] font-medium tabular-nums tracking-tight ${valueCls}`}>
         {value}
         {unit && <span className="ml-1 text-[10px] text-gray-500">{unit}</span>}
@@ -1404,7 +1419,10 @@ function PaymentOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusin
     <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Payment operations</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <span>Payment operations</span>
+            <GuidanceTip guidanceId="payment.health" />
+          </div>
           {p.read && <div className="mt-1 text-[12px] text-gray-300">{p.read}</div>}
         </div>
         <div className="flex items-center gap-3">
@@ -1515,7 +1533,10 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
     <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Treasury operations</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <span>Treasury operations</span>
+            <GuidanceTip guidanceId="treasury.health" />
+          </div>
           {t.read && <div className="mt-1 text-[12px] text-gray-300">{t.read}</div>}
         </div>
         <div className="flex items-center gap-3">
@@ -1533,22 +1554,26 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile
           label="Available"
+          helpId="treasury.available"
           value={formatCompactUsd(t.availableCash)}
           unit="USD"
           tone={t.availableCash < 25_000 ? "amber" : "neutral"}
         />
         <StatTile
           label="7-day projection"
+          helpId="treasury.projected"
           value={`${t.projection.d7 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d7))}`}
           tone={t.projection.d7 < 0 ? "rose" : "neutral"}
         />
         <StatTile
           label="30-day projection"
+          helpId="treasury.liquidityGap"
           value={`${t.projection.d30 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d30))}`}
           tone={t.projection.d30 < 0 ? "rose" : "neutral"}
         />
         <StatTile
           label="Runway"
+          helpId="treasury.runway"
           value={runwayLabel}
           hint={t.projection.runwayDays == null ? "Beyond horizon" : "Until cash crosses zero"}
           tone={runwayTone}
@@ -1571,6 +1596,7 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
                 <span className="text-gray-500">FX · </span>
                 {(topNonReporting.share * 100).toFixed(0)}% in {topNonReporting.currency}
               </span>
+              <GuidanceTip guidanceId="treasury.fxExposure" />
             </>
           )}
         </div>

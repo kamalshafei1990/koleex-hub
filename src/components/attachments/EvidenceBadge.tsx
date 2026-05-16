@@ -14,6 +14,7 @@
    ========================================================================== */
 
 import type { EvidenceStatus } from "@/lib/finance/types";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 const STYLES: Record<EvidenceStatus, { dot: string; cls: string; label: string }> = {
   missing: {
@@ -42,14 +43,17 @@ export function EvidenceBadge({
   status,
   receiptCount,
   compact = false,
+  withTip = false,
 }: {
   status: EvidenceStatus | undefined;
   receiptCount?: number;
   compact?: boolean;
+  /** Phase 2.5 — render a state-aware help tip next to the chip. */
+  withTip?: boolean;
 }) {
   const s = STYLES[status ?? "missing"];
   const label = compact ? labelCompact(status ?? "missing") : s.label;
-  return (
+  const chip = (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${s.cls}`}
       title={`${s.label}${receiptCount != null && receiptCount > 0 ? ` · ${receiptCount} file${receiptCount === 1 ? "" : "s"}` : ""}`}
@@ -61,6 +65,13 @@ export function EvidenceBadge({
           {receiptCount}
         </span>
       )}
+    </span>
+  );
+  if (!withTip) return chip;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {chip}
+      <GuidanceTip guidanceId="evidence.status" state={status ?? "missing"} />
     </span>
   );
 }

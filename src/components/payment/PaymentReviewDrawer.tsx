@@ -186,8 +186,8 @@ export default function PaymentReviewDrawer({
               {payment.party_name || "Payment"}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <ApprovalBadge status={status} ageDays={ageDays} />
-              <ReconciliationBadge status={recStatus} />
+              <ApprovalBadge status={status} ageDays={ageDays} withTip />
+              <ReconciliationBadge status={recStatus} withTip />
               <span className="text-[10px] text-gray-500">
                 {fmtMoney(Number(expected) || 0, payment.currency, { compact: true })} · {payment.payment_date}
               </span>

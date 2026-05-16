@@ -11,6 +11,7 @@
    ========================================================================== */
 
 import type { ApprovalStatus } from "@/lib/finance/types";
+import GuidanceTip from "@/components/ui/GuidanceTip";
 
 const STYLES: Record<ApprovalStatus, { dot: string; cls: string; label: string }> = {
   draft: {
@@ -54,15 +55,18 @@ export function ApprovalBadge({
   status,
   compact = false,
   ageDays,
+  withTip = false,
 }: {
   status: ApprovalStatus | undefined;
   compact?: boolean;
   /** Approval age in days — shown for awaiting-review states only. */
   ageDays?: number;
+  /** Phase 2.5 — render a state-aware help tip next to the chip. */
+  withTip?: boolean;
 }) {
   const s = STYLES[status ?? "draft"];
   const showAge = (status === "submitted" || status === "under_review") && ageDays != null && ageDays > 0;
-  return (
+  const chip = (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${s.cls}`}
       title={s.label + (showAge ? ` · ${ageDays}d waiting` : "")}
@@ -74,6 +78,13 @@ export function ApprovalBadge({
           {ageDays}d
         </span>
       )}
+    </span>
+  );
+  if (!withTip) return chip;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {chip}
+      <GuidanceTip guidanceId="approval.status" state={status ?? "draft"} />
     </span>
   );
 }
