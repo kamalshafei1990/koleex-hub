@@ -46,7 +46,7 @@ export default function FinanceCustomers() {
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Total Revenue" value={kpi.revenue} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Collected" value={kpi.collected} currency="USD" accent="emerald" loading={loading} />
+          <KpiCard label="Collected" value={kpi.collected} currency="USD" accent="teal" loading={loading} />
           <KpiCard label="Outstanding" value={kpi.outstanding} currency="USD" accent="amber" loading={loading} />
           <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} />
         </div>

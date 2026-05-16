@@ -78,7 +78,7 @@ export default function FinancePayments() {
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Money In" value={kpi.inComp} currency="USD" accent="emerald" loading={loading} />
           <KpiCard label="Money Out" value={kpi.outComp} currency="USD" accent="rose" loading={loading} />
-          <KpiCard label="Net Cash" value={kpi.net} currency="USD" accent={kpi.net >= 0 ? "emerald" : "rose"} loading={loading} />
+          <KpiCard label="Net Cash" value={kpi.net} currency="USD" accent={kpi.net >= 0 ? "teal" : "orange"} loading={loading} />
           <KpiCard label="Pending" value={kpi.pending} currency="USD" accent="amber" loading={loading} />
         </div>
 

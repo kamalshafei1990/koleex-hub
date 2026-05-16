@@ -15,13 +15,39 @@ import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 /* ── KpiCard ──────────────────────────────────────────────────────
    Premium statistic card. Adds a subtle left accent bar, optional
    trend sparkline, and a refined delta presentation. Used on the
-   dashboard and at the top of every Finance list page. */
+   dashboard and at the top of every Finance list page.
+
+   The accent palette is intentionally wide (12 colours) so every
+   KPI on a page can carry its own visual identity — no two cards
+   on the same screen should share a colour. */
+export type KpiAccent =
+  | "emerald"
+  | "rose"
+  | "amber"
+  | "sky"
+  | "violet"
+  | "blue"
+  | "teal"
+  | "orange"
+  | "fuchsia"
+  | "lime"
+  | "cyan"
+  | "indigo"
+  | "default";
+
 const ACCENT_TEXT: Record<KpiAccent, string> = {
   emerald: "text-emerald-400",
   rose:    "text-rose-400",
   amber:   "text-amber-400",
   sky:     "text-sky-400",
   violet:  "text-violet-400",
+  blue:    "text-blue-400",
+  teal:    "text-teal-400",
+  orange:  "text-orange-400",
+  fuchsia: "text-fuchsia-400",
+  lime:    "text-lime-400",
+  cyan:    "text-cyan-400",
+  indigo:  "text-indigo-400",
   default: "text-[var(--text-primary)]",
 };
 const ACCENT_BAR: Record<KpiAccent, string> = {
@@ -30,10 +56,15 @@ const ACCENT_BAR: Record<KpiAccent, string> = {
   amber:   "bg-gradient-to-b from-amber-400/80 to-amber-600/30",
   sky:     "bg-gradient-to-b from-sky-400/80 to-sky-600/30",
   violet:  "bg-gradient-to-b from-violet-400/80 to-violet-600/30",
+  blue:    "bg-gradient-to-b from-blue-400/80 to-blue-600/30",
+  teal:    "bg-gradient-to-b from-teal-400/80 to-teal-600/30",
+  orange:  "bg-gradient-to-b from-orange-400/80 to-orange-600/30",
+  fuchsia: "bg-gradient-to-b from-fuchsia-400/80 to-fuchsia-600/30",
+  lime:    "bg-gradient-to-b from-lime-400/80 to-lime-600/30",
+  cyan:    "bg-gradient-to-b from-cyan-400/80 to-cyan-600/30",
+  indigo:  "bg-gradient-to-b from-indigo-400/80 to-indigo-600/30",
   default: "bg-gradient-to-b from-white/30 to-white/10",
 };
-
-export type KpiAccent = "emerald" | "rose" | "amber" | "sky" | "violet" | "default";
 
 export function KpiCard({
   label,
@@ -129,6 +160,13 @@ function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
     : accent === "amber" ? "#fbbf24"
     : accent === "sky"   ? "#38bdf8"
     : accent === "violet"? "#a78bfa"
+    : accent === "blue"  ? "#60a5fa"
+    : accent === "teal"  ? "#2dd4bf"
+    : accent === "orange"? "#fb923c"
+    : accent === "fuchsia"? "#e879f9"
+    : accent === "lime"  ? "#a3e635"
+    : accent === "cyan"  ? "#22d3ee"
+    : accent === "indigo"? "#818cf8"
     : "rgba(255,255,255,0.4)";
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-80">

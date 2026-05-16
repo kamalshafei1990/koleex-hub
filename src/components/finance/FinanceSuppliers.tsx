@@ -43,7 +43,7 @@ export default function FinanceSuppliers() {
         />
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <KpiCard label="Total Purchases" value={kpi.purchases} currency="USD" accent="default" loading={loading} />
+          <KpiCard label="Total Purchases" value={kpi.purchases} currency="USD" accent="blue" loading={loading} />
           <KpiCard label="Paid" value={kpi.paid} currency="USD" accent="emerald" loading={loading} />
           <KpiCard label="Outstanding" value={kpi.payable} currency="USD" accent="amber" loading={loading} />
         </div>

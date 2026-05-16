@@ -109,7 +109,7 @@ export default function FinanceNotifications() {
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <KpiCard label="Money to Collect" value={kpi.collect} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Money to Pay" value={kpi.pay} currency="USD" accent="rose" loading={loading} />
+          <KpiCard label="Money to Pay" value={kpi.pay} currency="USD" accent="orange" loading={loading} />
           <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} hint={`${overdue.length} item(s)`} />
         </div>
 

@@ -160,10 +160,10 @@ export default function FinanceOrders() {
         />
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <KpiCard label="Total Orders" value={String(orders.length)} accent="default" loading={loading} />
+          <KpiCard label="Total Orders" value={String(orders.length)} accent="indigo" loading={loading} />
           <KpiCard label="Total Revenue" value={kpi.totalSelling} currency="USD" accent="emerald" loading={loading} />
           <KpiCard label="Net Profit" value={kpi.totalNet} currency="USD" accent="violet" loading={loading} hint={`Avg margin ${fmtPct(kpi.avgMargin)}`} />
-          <KpiCard label="Collected" value={kpi.totalCollected} currency="USD" accent="emerald" loading={loading} />
+          <KpiCard label="Collected" value={kpi.totalCollected} currency="USD" accent="teal" loading={loading} />
           <KpiCard label="Outstanding" value={kpi.totalOutstanding} currency="USD" accent="amber" loading={loading} />
         </div>
 

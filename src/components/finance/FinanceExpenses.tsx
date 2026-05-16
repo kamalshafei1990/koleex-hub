@@ -141,7 +141,7 @@ export default function FinanceExpenses() {
         />
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Expenses" value={kpi.total} currency="USD" accent="rose" loading={loading} />
+          <KpiCard label="Total Expenses" value={kpi.total} currency="USD" accent="fuchsia" loading={loading} />
           <KpiCard label="Paid" value={kpi.paid} currency="USD" accent="emerald" loading={loading} />
           <KpiCard label="Unpaid" value={kpi.unpaid} currency="USD" accent="amber" loading={loading} />
           <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} />

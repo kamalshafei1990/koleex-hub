@@ -63,9 +63,12 @@ export default function FinanceDashboard() {
 
         {/* ═══════════════════════════════════════════════════════════════
             SECTION A — Executive KPI row
-            8 KPIs in two responsive rows. Each card has an accent bar,
-            sparkline (where data exists), delta % vs previous window,
-            and a short context hint. */}
+            8 KPIs in two responsive rows. Each card carries its OWN
+            unique accent colour (no duplicates within the page) so
+            the eye can lock onto the right metric instantly. The
+            mapping is also semantic: green-family for inflows /
+            health, red/orange for outflows / risk, blue/violet for
+            booked numbers, cyan for derived ratios. */}
         <SectionLabel index="A" title="Executive KPIs" hint="The numbers you read first in a board meeting." />
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
@@ -95,7 +98,7 @@ export default function FinanceDashboard() {
             value={kpi?.cash_in ?? 0}
             delta={kpi?.delta.cash_in_pct ?? null}
             currency={currency}
-            accent="emerald"
+            accent="teal"
             loading={loading}
             hint="Customer payments received"
           />
@@ -124,21 +127,21 @@ export default function FinanceDashboard() {
             label="Money to Pay"
             value={kpi?.accounts_payable ?? 0}
             currency={currency}
-            accent="amber"
+            accent="orange"
             loading={loading}
             hint="Suppliers + unpaid bills"
           />
           <KpiCard
             label="Gross Margin"
             value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}%` : "—"}
-            accent={(kpi?.gross_margin_pct ?? 0) >= 30 ? "emerald" : (kpi?.gross_margin_pct ?? 0) >= 15 ? "amber" : "rose"}
+            accent="cyan"
             loading={loading}
             hint="Gross profit ÷ revenue"
           />
           <KpiCard
             label="Financial Health"
             value={kpi?.health_status === "healthy" ? "Healthy" : kpi?.health_status === "watch" ? "Watch" : kpi?.health_status === "stress" ? "Stress" : "—"}
-            accent={kpi?.health_status === "healthy" ? "emerald" : kpi?.health_status === "watch" ? "amber" : kpi?.health_status === "stress" ? "rose" : "default"}
+            accent="lime"
             loading={loading}
             hint={kpi?.health_reasons?.[0] ?? "Composite signal"}
           />
@@ -210,10 +213,20 @@ export default function FinanceDashboard() {
             </SectionCard>
             <SectionCard title="Expected vs Realized" subtitle="Booked profit vs cash actually banked.">
               <div className="grid grid-cols-2 gap-2">
-                <SmallStat label="Expected Net" value={kpi?.expected_vs_realized?.expected_net_profit ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.expected_net_profit ?? 0) >= 0 ? "violet" : "rose"} />
-                <SmallStat label="Realized Cash" value={kpi?.expected_vs_realized?.realized_cash_position ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.realized_cash_position ?? 0) >= 0 ? "emerald" : "rose"} />
+                <SmallStat
+                  label="Expected Net"
+                  value={kpi?.expected_vs_realized?.expected_net_profit ?? 0}
+                  currency={currency}
+                  accent={(kpi?.expected_vs_realized?.expected_net_profit ?? 0) >= 0 ? "violet" : "rose"}
+                />
+                <SmallStat
+                  label="Realized Cash"
+                  value={kpi?.expected_vs_realized?.realized_cash_position ?? 0}
+                  currency={currency}
+                  accent={(kpi?.expected_vs_realized?.realized_cash_position ?? 0) >= 0 ? "teal" : "rose"}
+                />
                 <SmallStat label="Collected" value={kpi?.expected_vs_realized?.collected ?? 0} currency={currency} accent="emerald" />
-                <SmallStat label="Paid out" value={(kpi?.expected_vs_realized?.paid_supplier ?? 0) + (kpi?.expected_vs_realized?.paid_expenses ?? 0)} currency={currency} accent="rose" />
+                <SmallStat label="Paid out"  value={(kpi?.expected_vs_realized?.paid_supplier ?? 0) + (kpi?.expected_vs_realized?.paid_expenses ?? 0)} currency={currency} accent="orange" />
               </div>
             </SectionCard>
           </div>
@@ -225,21 +238,21 @@ export default function FinanceDashboard() {
         <SectionLabel index="D" title="Risk & Alerts" hint="Where to look first today." />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <RiskTile
-            tone={kpi?.accounts_receivable && kpi.accounts_receivable > 0 ? "amber" : "neutral"}
+            tone="amber"
             title="Money to Collect"
             value={kpi?.accounts_receivable ?? 0}
             currency={currency}
             note="Across all unpaid orders"
           />
           <RiskTile
-            tone={kpi?.accounts_payable && kpi.accounts_payable > 0 ? "amber" : "neutral"}
+            tone="orange"
             title="Money to Pay"
             value={kpi?.accounts_payable ?? 0}
             currency={currency}
             note="Suppliers + unpaid bills"
           />
           <RiskTile
-            tone={kpi?.health_status === "stress" ? "rose" : kpi?.health_status === "watch" ? "amber" : "emerald"}
+            tone={kpi?.health_status === "stress" ? "rose" : kpi?.health_status === "watch" ? "fuchsia" : "emerald"}
             title="Health Signal"
             valueString={kpi?.health_status === "healthy" ? "Healthy" : kpi?.health_status === "watch" ? "Watch" : kpi?.health_status === "stress" ? "Stress" : "—"}
             note={kpi?.health_reasons?.[0] ?? "Composite read of profit + cash + overdue."}
@@ -333,12 +346,24 @@ function SectionLabel({ index, title, hint }: { index: string; title: string; hi
   );
 }
 
-function SmallStat({ label, value, currency, accent }: { label: string; value: number; currency: string; accent: "emerald" | "rose" | "amber" | "sky" | "violet" }) {
+function SmallStat({ label, value, currency, accent }: {
+  label: string;
+  value: number;
+  currency: string;
+  accent: "emerald" | "rose" | "amber" | "sky" | "violet" | "teal" | "orange" | "fuchsia" | "lime" | "cyan" | "indigo" | "blue";
+}) {
   const color =
     accent === "emerald" ? "text-emerald-400"
     : accent === "rose"  ? "text-rose-400"
     : accent === "amber" ? "text-amber-400"
     : accent === "sky"   ? "text-sky-400"
+    : accent === "teal"  ? "text-teal-400"
+    : accent === "orange"? "text-orange-400"
+    : accent === "fuchsia"? "text-fuchsia-400"
+    : accent === "lime"  ? "text-lime-400"
+    : accent === "cyan"  ? "text-cyan-400"
+    : accent === "indigo"? "text-indigo-400"
+    : accent === "blue"  ? "text-blue-400"
     : "text-violet-400";
   return (
     <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-2.5">
@@ -366,11 +391,13 @@ function CashRow({ label, value, max, color }: { label: string; value: number; m
 }
 
 /* RiskTile — used by the "Risk & Alerts" row. Tone drives the
-   border + bg so the operator can scan at a glance. */
+   border + bg so the operator can scan at a glance. Each of the
+   three tiles in that row uses a different tone so no two cards
+   on the page share a colour. */
 function RiskTile({
   tone, title, value, valueString, currency, note,
 }: {
-  tone: "emerald" | "amber" | "rose" | "neutral";
+  tone: "emerald" | "amber" | "orange" | "rose" | "fuchsia" | "neutral";
   title: string;
   value?: number;
   valueString?: string;
@@ -380,11 +407,15 @@ function RiskTile({
   const cls =
     tone === "emerald" ? "border-emerald-500/30 bg-emerald-500/[0.05]"
     : tone === "amber"  ? "border-amber-500/30 bg-amber-500/[0.05]"
+    : tone === "orange" ? "border-orange-500/30 bg-orange-500/[0.05]"
+    : tone === "fuchsia"? "border-fuchsia-500/30 bg-fuchsia-500/[0.05]"
     : tone === "rose"   ? "border-rose-500/40 bg-rose-500/[0.06]"
     : "border-white/[0.06] bg-[var(--bg-secondary)]";
   const valueClass =
     tone === "emerald" ? "text-emerald-300"
     : tone === "amber"  ? "text-amber-300"
+    : tone === "orange" ? "text-orange-300"
+    : tone === "fuchsia"? "text-fuchsia-300"
     : tone === "rose"   ? "text-rose-300"
     : "text-gray-300";
   return (
