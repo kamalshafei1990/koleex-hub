@@ -85,6 +85,17 @@ function urgencyComponent(e: OperationalEvent): number {
     case "missing_payment_evidence":      return 18;
     case "payment_approval_delay":        return 20;
     case "duplicate_payment_risk":        return 28;
+    /* ── Phase 2.4 treasury kinds ── */
+    case "overdraft_risk":                return 55;  // bank balance dropping below zero outranks everything else
+    case "negative_runway":               return 50;
+    case "transfer_failure":              return 42;
+    case "liquidity_gap":                 return 36;
+    case "low_cash_buffer":               return 32;
+    case "unreconciled_bank_activity":    return 24;
+    case "fx_exposure":                   return 20;
+    case "bank_concentration":            return 16;
+    case "excessive_bank_fees":           return 18;
+    case "idle_cash":                     return 8;
     default:
       return 8;
   }

@@ -294,6 +294,67 @@ export interface FinancePayment {
   last_evidence_at?: string | null;
 }
 
+/* ── Treasury (Phase 2.4) ──────────────────────────────────────── */
+
+export type BankAccountStatus = "active" | "frozen" | "closed" | "archived";
+
+export interface BankAccount {
+  id: string;
+  bank_name: string;
+  account_name: string;
+  account_number: string | null;
+  iban: string | null;
+  swift_code: string | null;
+  currency: string;
+  country: string | null;
+  opening_balance: number;
+  current_balance: number;
+  available_balance: number;
+  pending_balance: number;
+  restricted_balance: number;
+  status: BankAccountStatus;
+  is_primary: boolean;
+  last_reconciled_at: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CashMovementType =
+  | "incoming"
+  | "outgoing"
+  | "transfer"
+  | "fee"
+  | "fx"
+  | "refund"
+  | "adjustment";
+
+export type CashMovementDirection = "inflow" | "outflow";
+
+export interface CashMovement {
+  id: string;
+  bank_account_id: string;
+  related_payment_id: string | null;
+  movement_type: CashMovementType;
+  direction: CashMovementDirection;
+  currency: string;
+  amount: number;
+  exchange_rate: number | null;
+  reporting_amount: number | null;
+  bank_reference: string | null;
+  external_reference: string | null;
+  counterparty_name: string | null;
+  movement_date: string;
+  cleared_at: string | null;
+  reconciliation_status: ReconciliationStatus;
+  evidence_status: EvidenceStatus;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /* ── Customer / Supplier accounts ──────────────────────────────── */
 export interface FinanceCustomerAccount {
   id: string;

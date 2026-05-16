@@ -57,6 +57,8 @@ import { PeriodTabs } from "@/components/finance/FinanceUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
 import type {
+  BankAccount,
+  CashMovement,
   DashboardKpi,
   DashboardPeriod,
   FinanceExpense,
@@ -105,6 +107,9 @@ export default function FinanceDashboard() {
      buckets, and event correlations. All from existing endpoints. */
   const [payments, setPayments] = useState<FinancePayment[]>([]);
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
+  /* Phase 2.4 — treasury inputs (bank accounts + cash movements). */
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [cashMovements, setCashMovements] = useState<CashMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* Restore last-used mode from localStorage on mount (client only). */
@@ -123,11 +128,12 @@ export default function FinanceDashboard() {
   const load = useCallback(async (p: DashboardPeriod) => {
     setLoading(true);
     try {
-      const [dashRes, ordersRes, paymentsRes, expensesRes] = await Promise.all([
+      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes] = await Promise.all([
         fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
         fetch(`/api/finance/orders`, { cache: "no-store" }),
         fetch(`/api/finance/payments`, { cache: "no-store" }),
         fetch(`/api/finance/expenses`, { cache: "no-store" }),
+        fetch(`/api/finance/treasury`,  { cache: "no-store" }),
       ]);
       const j = (await dashRes.json()) as { kpi?: DashboardKpi };
       setKpi(j.kpi ?? null);
@@ -137,11 +143,16 @@ export default function FinanceDashboard() {
       setPayments(Array.isArray(paymentsBody.payments) ? paymentsBody.payments : []);
       const expensesBody = (await expensesRes.json().catch(() => ({}))) as { expenses?: FinanceExpense[] };
       setExpenses(Array.isArray(expensesBody.expenses) ? expensesBody.expenses : []);
+      const treasuryBody = (await treasuryRes.json().catch(() => ({}))) as { accounts?: BankAccount[]; movements?: CashMovement[] };
+      setBankAccounts(Array.isArray(treasuryBody.accounts) ? treasuryBody.accounts : []);
+      setCashMovements(Array.isArray(treasuryBody.movements) ? treasuryBody.movements : []);
     } catch {
       setKpi(null);
       setOrders([]);
       setPayments([]);
       setExpenses([]);
+      setBankAccounts([]);
+      setCashMovements([]);
     } finally {
       setLoading(false);
     }
@@ -195,10 +206,12 @@ export default function FinanceDashboard() {
       orders,
       payments,
       expenses,
+      bankAccounts,
+      cashMovements,
       periodDays,
       memory: memoryRef,
     }),
-    [kpi, orders, payments, expenses, periodDays, memoryRef],
+    [kpi, orders, payments, expenses, bankAccounts, cashMovements, periodDays, memoryRef],
   );
   useEffect(() => {
     /* Persist the next-memory snapshot after each successful build so
@@ -246,6 +259,7 @@ export default function FinanceDashboard() {
         <CrossModulePressurePanel intel={businessIntelligence} />
         <ApprovalOperationsPanel intel={businessIntelligence} />
         <PaymentOperationsPanel intel={businessIntelligence} />
+        <TreasuryOperationsPanel intel={businessIntelligence} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -1436,6 +1450,141 @@ function PaymentOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusin
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/[0.20] bg-rose-500/[0.04] px-3 py-2 text-[11px] text-rose-200">
           <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
           <span><span className="font-medium">{p.failedCount}</span> payment{p.failedCount === 1 ? "" : "s"} failed at the bank — recovery required.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===========================================================================
+   TreasuryOperationsPanel  —  Phase 2.4
+
+   The calm "real cash" surface. Mirrors PaymentOperationsPanel's
+   visual language exactly so the operator's eye can move across the
+   four control panels (cross-module pressure → approval → payment →
+   treasury) without re-orienting.
+
+   Renders nothing when there are no bank accounts (dormant) AND
+   nothing material is happening. Once connected, surfaces only when
+   the snapshot reports meaningful pressure — quiet by default.
+
+     · header: pressure pill + composite health
+     · 4-tile stat row (available cash · 7d · 30d · runway)
+     · currency exposure bar + bank concentration line
+   ========================================================================== */
+
+function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+  const t = intel.treasury;
+  if (t.accounts.length === 0) return null;
+  const meaningful =
+    t.pressure !== "calm" ||
+    t.projection.runwayDays != null ||
+    t.unreconciledMovements >= 3 ||
+    t.events.length > 0;
+  if (!meaningful) return null;
+
+  const pressureCls =
+    t.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
+    : t.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+    : t.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
+    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+  const pressureDot =
+    t.pressure === "critical" ? "bg-rose-400"
+    : t.pressure === "risk"   ? "bg-rose-400"
+    : t.pressure === "watch"  ? "bg-amber-300"
+    :                           "bg-emerald-400";
+  const scoreCls =
+    t.pressure === "critical" ? "text-rose-300"
+    : t.pressure === "risk"   ? "text-rose-300/90"
+    : t.pressure === "watch"  ? "text-amber-300"
+    :                           "text-emerald-300";
+
+  /* Runway formatting + tone. */
+  const runwayLabel = t.projection.runwayDays == null ? "—" : `${t.projection.runwayDays}d`;
+  const runwayTone =
+    t.projection.runwayDays == null ? "neutral"
+    : t.projection.runwayDays <= 14 ? "rose"
+    : t.projection.runwayDays <= 30 ? "amber"
+    :                                 "neutral";
+
+  /* Top non-reporting currency exposure for the dependency line. */
+  const topNonReporting = t.currencyExposure.find((c) => !c.isReporting);
+  const topAccount = t.accounts[0];
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Treasury operations</div>
+          {t.read && <div className="mt-1 text-[12px] text-gray-300">{t.read}</div>}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
+            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
+            {t.pressure === "calm" ? "Calm" : t.pressure === "watch" ? "Watch" : t.pressure === "risk" ? "Risk" : "Critical"}
+          </span>
+          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
+            {t.healthScore}
+            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile
+          label="Available"
+          value={formatCompactUsd(t.availableCash)}
+          unit="USD"
+          tone={t.availableCash < 25_000 ? "amber" : "neutral"}
+        />
+        <StatTile
+          label="7-day projection"
+          value={`${t.projection.d7 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d7))}`}
+          tone={t.projection.d7 < 0 ? "rose" : "neutral"}
+        />
+        <StatTile
+          label="30-day projection"
+          value={`${t.projection.d30 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d30))}`}
+          tone={t.projection.d30 < 0 ? "rose" : "neutral"}
+        />
+        <StatTile
+          label="Runway"
+          value={runwayLabel}
+          hint={t.projection.runwayDays == null ? "Beyond horizon" : "Until cash crosses zero"}
+          tone={runwayTone}
+        />
+      </div>
+
+      {/* Concentration + FX line — only when there's something to say. */}
+      {(topAccount && topAccount.share >= 0.6) || (topNonReporting && topNonReporting.share >= 0.3) ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2 text-[11px]">
+          {topAccount && topAccount.share >= 0.6 && (
+            <span className="text-gray-300">
+              <span className="text-gray-500">Top account · </span>
+              {topAccount.accountName} <span className="text-gray-500">·</span> {(topAccount.share * 100).toFixed(0)}%
+            </span>
+          )}
+          {topNonReporting && topNonReporting.share >= 0.3 && (
+            <>
+              <span className="text-gray-600">·</span>
+              <span className={topNonReporting.share >= 0.6 ? "text-amber-200" : "text-gray-300"}>
+                <span className="text-gray-500">FX · </span>
+                {(topNonReporting.share * 100).toFixed(0)}% in {topNonReporting.currency}
+              </span>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {/* Bank-failure or overdraft callouts. */}
+      {t.events.some((e) => e.kind === "overdraft_risk" || e.kind === "transfer_failure") && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/[0.20] bg-rose-500/[0.04] px-3 py-2 text-[11px] text-rose-200">
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+          <span>
+            {t.events.find((e) => e.kind === "overdraft_risk")?.label
+              ?? t.events.find((e) => e.kind === "transfer_failure")?.label}
+            <span className="text-rose-200/70"> — recovery action required.</span>
+          </span>
         </div>
       )}
     </div>

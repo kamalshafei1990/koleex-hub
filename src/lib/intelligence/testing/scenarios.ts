@@ -16,6 +16,8 @@
    ========================================================================== */
 
 import type {
+  BankAccount,
+  CashMovement,
   DashboardKpi,
   FinanceExpense,
   FinanceOrder,
@@ -488,10 +490,11 @@ export function highRiskState(): Scenario {
     expectations: {
       digestRange: [3, 5],
       eventRange: [4, 24],
-      /* Composite health under high-risk stress lands in the 50–75
-         band thanks to the EMA smoothing and softened damage. The
+      /* Composite health under high-risk stress lands in the 50–80
+         band thanks to the EMA smoothing, softened damage, and the
+         Phase 2.4 weight rebalance that lifted Treasury to 0.13. The
          individual module scores tell the harsh story. */
-      healthRange: [0, 75],
+      healthRange: [0, 80],
       minCorrelationConfidence: 0.6,
       expectEventKinds: ["overdue_payment", "margin_drop", "logistics_spike", "customer_concentration"],
       forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
@@ -951,6 +954,280 @@ export function paymentControlState(): Scenario {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   Phase 2.4 — Treasury scenarios
+
+   Five deterministic states stress-test the treasury intelligence
+   pipeline. Reused helpers below build bank accounts and cash
+   movements in the same calm, IDs-only style as the rest of the suite.
+   --------------------------------------------------------------------------- */
+
+function makeBankAccount(spec: Partial<BankAccount> & { id: string; bank_name: string; currency: string }): BankAccount {
+  return {
+    id: spec.id,
+    bank_name: spec.bank_name,
+    account_name: spec.account_name ?? `${spec.bank_name} Main`,
+    account_number: spec.account_number ?? null,
+    iban: spec.iban ?? null,
+    swift_code: spec.swift_code ?? null,
+    currency: spec.currency,
+    country: spec.country ?? null,
+    opening_balance: spec.opening_balance ?? 0,
+    current_balance: spec.current_balance ?? spec.available_balance ?? 0,
+    available_balance: spec.available_balance ?? 0,
+    pending_balance: spec.pending_balance ?? 0,
+    restricted_balance: spec.restricted_balance ?? 0,
+    status: spec.status ?? "active",
+    is_primary: spec.is_primary ?? false,
+    last_reconciled_at: spec.last_reconciled_at ?? null,
+    metadata: spec.metadata ?? {},
+    created_at: NOW.toISOString(),
+    updated_at: NOW.toISOString(),
+  };
+}
+
+function makeMovement(spec: Partial<CashMovement> & {
+  id: string; bank_account_id: string;
+  movement_type: CashMovement["movement_type"];
+  direction: CashMovement["direction"];
+  amount: number; currency: string; movement_date: string;
+}): CashMovement {
+  return {
+    id: spec.id,
+    bank_account_id: spec.bank_account_id,
+    related_payment_id: spec.related_payment_id ?? null,
+    movement_type: spec.movement_type,
+    direction: spec.direction,
+    currency: spec.currency,
+    amount: spec.amount,
+    exchange_rate: spec.exchange_rate ?? null,
+    reporting_amount: spec.reporting_amount ?? null,
+    bank_reference: spec.bank_reference ?? null,
+    external_reference: spec.external_reference ?? null,
+    counterparty_name: spec.counterparty_name ?? null,
+    movement_date: spec.movement_date,
+    cleared_at: spec.cleared_at ?? null,
+    reconciliation_status: spec.reconciliation_status ?? "unreconciled",
+    evidence_status: spec.evidence_status ?? "missing",
+    notes: spec.notes ?? null,
+    metadata: spec.metadata ?? {},
+    created_by: null,
+    created_at: NOW.toISOString(),
+    updated_at: NOW.toISOString(),
+  };
+}
+
+/* TREASURY_HEALTHY_STATE
+   Two accounts, healthy buffer, no movements outstanding. The treasury
+   layer should be silent. */
+export function treasuryHealthyState(): Scenario {
+  const base = healthyState();
+  return {
+    name: "TREASURY_HEALTHY_STATE",
+    description: "Healthy bank position across two reporting-currency accounts. Treasury layer should stay calm.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-th-1", bank_name: "First National", currency: "USD",
+          available_balance: 240_000, is_primary: true,
+          last_reconciled_at: isoDate(-2),
+        }),
+        makeBankAccount({
+          id: "ba-th-2", bank_name: "Citi Operating", currency: "USD",
+          available_balance: 120_000,
+        }),
+      ],
+      cashMovements: [],
+    },
+    expectations: {
+      digestRange: [0, 1],
+      eventRange: [0, 1],
+      healthRange: [80, 100],
+      copilotCalm: true,
+      copilotMaxHints: 1,
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      forbidEventKinds: [
+        "low_cash_buffer", "negative_runway", "liquidity_gap",
+        "overdraft_risk", "transfer_failure",
+      ],
+      maxCriticalDigestItems: 0,
+    },
+  };
+}
+
+/* LIQUIDITY_PRESSURE_STATE
+   Available cash is thin AND a USD 50K supplier payment is due in
+   8 days that the timeline projects negatively. */
+export function liquidityPressureState(): Scenario {
+  const base = healthyState();
+  const supplierDueOrder = makeOrder({
+    id: "o-lp-1",
+    order_no: "ORD-2026-0061",
+    customer_id: "c-lp-1",
+    customer_name: "Aswan Heavy",
+    selling_price: 50_000,
+    due_in_days: 18,
+    outstanding_receivable: 18_000,
+    suppliers: [
+      { id: "s-lp-1", name: "Ningbo Cast Co", cost: 38_000, paid: 0, due_in_days: 8 },
+    ],
+  });
+  return {
+    name: "LIQUIDITY_PRESSURE_STATE",
+    description: "Thin cash buffer with a USD 38K supplier obligation due in 8 days. Liquidity-gap signal expected.",
+    inputs: {
+      ...base.inputs,
+      orders: [...base.inputs.orders, supplierDueOrder],
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-lp-1", bank_name: "First National", currency: "USD",
+          available_balance: 12_000, is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+    },
+    expectations: {
+      digestRange: [1, 5],
+      eventRange: [1, 12],
+      healthRange: [40, 92],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: ["low_cash_buffer"],
+    },
+  };
+}
+
+/* FX_EXPOSURE_STATE
+   70% of treasury sits in CNY across two large accounts; reporting
+   currency is USD. Expected: fx_exposure event surfaces; composite
+   health still healthy because cash exists. */
+export function fxExposureState(): Scenario {
+  const base = healthyState();
+  return {
+    name: "FX_EXPOSURE_STATE",
+    description: "70% of cash held in CNY with reporting currency USD. FX exposure event expected.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-fx-1", bank_name: "ICBC Ningbo", currency: "CNY",
+          available_balance: 6_500_000, is_primary: true,
+          country: "CN",
+        }),
+        makeBankAccount({
+          id: "ba-fx-2", bank_name: "BoC Hangzhou", currency: "CNY",
+          available_balance: 2_800_000,
+        }),
+        makeBankAccount({
+          id: "ba-fx-3", bank_name: "First National", currency: "USD",
+          available_balance: 380_000, is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+    },
+    expectations: {
+      digestRange: [0, 4],
+      eventRange: [1, 6],
+      healthRange: [70, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 1,
+      copilotMaxHints: 3,
+      expectEventKinds: ["fx_exposure"],
+    },
+  };
+}
+
+/* BANK_MISMATCH_STATE
+   Several unreconciled cash movements older than 7 days. Expected:
+   unreconciled_bank_activity + a digest entry. */
+export function bankMismatchState(): Scenario {
+  const base = healthyState();
+  const accountId = "ba-bm-1";
+  const movements: CashMovement[] = [];
+  for (let i = 0; i < 5; i++) {
+    movements.push(makeMovement({
+      id: `cm-bm-${i + 1}`,
+      bank_account_id: accountId,
+      movement_type: i % 2 === 0 ? "outgoing" : "incoming",
+      direction: i % 2 === 0 ? "outflow" : "inflow",
+      amount: 4_000 + i * 1_500,
+      currency: "USD",
+      movement_date: isoDate(-(10 + i * 2)),
+      bank_reference: `MT-${1000 + i}`,
+      counterparty_name: i % 2 === 0 ? "Ningbo Steel" : "Cairo Knits",
+    }));
+  }
+  return {
+    name: "BANK_MISMATCH_STATE",
+    description: "Five cash movements unreconciled, all older than 7 days. unreconciled_bank_activity expected.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: [
+        makeBankAccount({
+          id: accountId, bank_name: "First National", currency: "USD",
+          available_balance: 180_000, is_primary: true,
+        }),
+      ],
+      cashMovements: movements,
+    },
+    expectations: {
+      digestRange: [1, 5],
+      eventRange: [1, 12],
+      healthRange: [55, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: ["unreconciled_bank_activity"],
+    },
+  };
+}
+
+/* NEGATIVE_RUNWAY_STATE
+   Available cash low AND a USD 200K supplier payment due in 5 days.
+   The projection should cross zero within the horizon.
+   negative_runway event expected (likely critical/risk). */
+export function negativeRunwayState(): Scenario {
+  const base = healthyState();
+  const supplierDueOrder = makeOrder({
+    id: "o-nr-1",
+    order_no: "ORD-2026-0071",
+    customer_id: "c-nr-1",
+    customer_name: "Tanta Mills",
+    selling_price: 250_000,
+    due_in_days: 60,
+    outstanding_receivable: 250_000,
+    suppliers: [
+      { id: "s-nr-1", name: "Hangzhou Castings", cost: 200_000, paid: 0, due_in_days: 5 },
+    ],
+  });
+  return {
+    name: "NEGATIVE_RUNWAY_STATE",
+    description: "Cash low, USD 200K supplier payment due in 5 days, AR not until day 60. Negative runway expected.",
+    inputs: {
+      ...base.inputs,
+      orders: [...base.inputs.orders, supplierDueOrder],
+      bankAccounts: [
+        makeBankAccount({
+          id: "ba-nr-1", bank_name: "First National", currency: "USD",
+          available_balance: 40_000, is_primary: true,
+        }),
+      ],
+      cashMovements: [],
+    },
+    expectations: {
+      digestRange: [1, 5],
+      eventRange: [2, 12],
+      healthRange: [10, 90],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 3,
+      copilotMaxHints: 3,
+      expectEventKinds: ["negative_runway"],
+    },
+  };
+}
+
 export const ALL_SCENARIOS: () => Scenario[] = () => [
   healthyState(),
   moderatePressureState(),
@@ -959,4 +1236,9 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   recoveryState(),
   approvalPressureState(),
   paymentControlState(),
+  treasuryHealthyState(),
+  liquidityPressureState(),
+  fxExposureState(),
+  bankMismatchState(),
+  negativeRunwayState(),
 ];

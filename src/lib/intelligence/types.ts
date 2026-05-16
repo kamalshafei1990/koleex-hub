@@ -31,7 +31,8 @@ export type ModuleKey =
   | "production"
   | "operations"
   | "approval"
-  | "payment";
+  | "payment"
+  | "treasury";
 
 /** Calm → Critical scale used uniformly across modules. */
 export type Pressure = "calm" | "watch" | "risk" | "critical";
@@ -92,7 +93,18 @@ export type OperationalEventKind =
   | "payment_approval_delay"   // payments waiting for approval too long
   | "failed_payment"           // movement_status = failed
   | "duplicate_payment_risk"   // two same-party same-amount near-date payments
-  | "large_unapproved_payment"; // high-value draft / submitted payment
+  | "large_unapproved_payment" // high-value draft / submitted payment
+  /* ── Phase 2.4 — treasury operations ────────────────────────── */
+  | "low_cash_buffer"          // available cash falls below safety multiple of monthly burn
+  | "liquidity_gap"             // outflow > inflow within a forward window
+  | "negative_runway"           // projected cash crosses zero
+  | "bank_concentration"        // single account holds dominant share
+  | "excessive_bank_fees"       // bank-fee category up sharply
+  | "unreconciled_bank_activity" // cash_movements unreconciled past grace window
+  | "transfer_failure"          // failed transfer cash movement
+  | "fx_exposure"               // material non-reporting-currency share
+  | "idle_cash"                 // surplus cash sitting idle
+  | "overdraft_risk";            // any account at / below zero or near it
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =
@@ -429,6 +441,85 @@ export interface PaymentControlSnapshot {
   healthScore: Score;
   pressure: Pressure;
   /** One-sentence operational read; "" if nothing material to say. */
+  read: string;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Treasury (Phase 2.4)
+   ───────────────────────────────────────────────────────────────────── */
+
+export interface TreasuryTimelineItem {
+  /** Stable key for React + dedupe. */
+  key: string;
+  /** ISO date the event happens / cleared. */
+  date: string;
+  /** Days from today; negative = past. */
+  daysFromNow: number;
+  /** "inflow" or "outflow" of cash. */
+  direction: "inflow" | "outflow";
+  /** Source — supplier_due, customer_collect, payroll, payment, movement, etc. */
+  source: string;
+  party: string;
+  amount: number;
+  currency: string;
+  confidence: number;  // 0..1 — how sure we are it will land
+}
+
+export interface FXExposure {
+  currency: string;
+  totalValue: number;          // value in this currency (native units)
+  reportingValue: number;       // value translated to reporting currency
+  share: number;                // share of total treasury (0..1)
+  /** True when this is the operator's reporting currency itself. */
+  isReporting: boolean;
+}
+
+export interface CashProjection {
+  d7:  number;
+  d30: number;
+  d60: number;
+  /** Number of days until projected cash crosses zero; null = never within horizon. */
+  runwayDays: number | null;
+}
+
+export interface BankAccountSnapshot {
+  id: string;
+  bankName: string;
+  accountName: string;
+  currency: string;
+  available: number;
+  pending: number;
+  restricted: number;
+  total: number;
+  share: number;        // share of total treasury (reporting-currency-translated)
+  unreconciledMovements: number;
+}
+
+export interface TreasurySnapshot {
+  /** Materially-filtered events ready to merge into the global stream. */
+  events: OperationalEvent[];
+  /** Per-account snapshot in reporting currency. */
+  accounts: BankAccountSnapshot[];
+  /** Cash position totals (reporting currency). */
+  totalCash: number;
+  availableCash: number;
+  restrictedCash: number;
+  pendingCash: number;
+  /** Forward projection. */
+  projection: CashProjection;
+  /** Currency-by-currency exposure. */
+  currencyExposure: FXExposure[];
+  /** Forward cash-event timeline. */
+  timeline: TreasuryTimelineItem[];
+  /** Largest single liquidity-risk item the operator should attend to. */
+  largestCashRisk: { label: string; amount: number; daysFromNow: number } | null;
+  /** Bank-concentration metric (largest account share, 0..1). */
+  concentrationShare: number;
+  /** Unreconciled movement count. */
+  unreconciledMovements: number;
+  /** Composite 0..100 treasury health. */
+  healthScore: Score;
+  pressure: Pressure;
   read: string;
 }
 

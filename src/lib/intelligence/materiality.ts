@@ -119,6 +119,38 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
   /* Duplicate risk: any candidate ≥ USD 500 already filtered in
      engine; the gate is a defense-in-depth pass-through. */
   duplicate_payment_risk: (e) => (e.magnitude ?? 0) >= 1,
+
+  /* ── Phase 2.4 treasury kinds ───────────────────────────────────── */
+
+  /* Low cash buffer: only material when available < USD 25K (engine bar). */
+  low_cash_buffer: (e) => (e.amount ?? 0) < 25_000,
+
+  /* Liquidity gap: ≥ USD 5K negative projection. */
+  liquidity_gap: (e) => (e.amount ?? 0) >= 5_000,
+
+  /* Negative runway: any (engine sets severity by horizon). */
+  negative_runway: (e) => (e.magnitude ?? 0) >= 0,
+
+  /* Bank concentration: ≥ 85% in one account. */
+  bank_concentration: (e) => (e.magnitude ?? 0) >= 85,
+
+  /* Excessive fees: ≥ 50% PoP up. */
+  excessive_bank_fees: (e) => (e.magnitude ?? 0) >= 50,
+
+  /* Unreconciled activity: ≥ 3 movements. */
+  unreconciled_bank_activity: (e) => (e.magnitude ?? 0) >= 3,
+
+  /* Transfer failure: any failed transfer. */
+  transfer_failure: (e) => (e.magnitude ?? 0) >= 1,
+
+  /* FX exposure: ≥ 60% non-reporting. */
+  fx_exposure: (e) => (e.magnitude ?? 0) >= 60,
+
+  /* Idle cash: 3× threshold (engine bar). */
+  idle_cash: (e) => (e.magnitude ?? 0) >= 300,
+
+  /* Overdraft: always material when fired. */
+  overdraft_risk: () => true,
 };
 
 /**

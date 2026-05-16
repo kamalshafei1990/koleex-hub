@@ -66,6 +66,19 @@ export {
 
 export { buildApprovalSnapshot } from "./approval";
 export { buildPaymentControlSnapshot } from "./payment";
+export { buildTreasurySnapshot } from "./treasury";
+export {
+  matchConfidence,
+  duplicateMovementConfidence,
+  suggestMatches,
+  amountScore,
+  referenceScore,
+  timingScore,
+  counterpartyScore,
+  directionScore,
+  type MatchScore,
+  type MatchSuggestion,
+} from "./reconcile";
 
 export { assessRisk } from "./risk";
 export { buildBusinessCopilotContext } from "./copilot";
@@ -102,6 +115,7 @@ import { annotateWithMemory, smoothHealth, withHealthScore, type MemoryState } f
 import { buildExecutiveDigest } from "./digest";
 import { buildApprovalSnapshot } from "./approval";
 import { buildPaymentControlSnapshot } from "./payment";
+import { buildTreasurySnapshot } from "./treasury";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -111,6 +125,7 @@ import {
   scoreLogisticsHealth,
   scorePaymentHealth,
   scoreSupplierHealth,
+  scoreTreasuryHealth,
 } from "./health";
 import { assessRisk } from "./risk";
 import { buildBusinessCopilotContext } from "./copilot";
@@ -124,6 +139,8 @@ export interface IntelligencePicture {
   approval: import("./types").ApprovalIntelligenceSnapshot;
   /** Phase 2.3 — payment control snapshot. */
   payment: import("./types").PaymentControlSnapshot;
+  /** Phase 2.4 — treasury snapshot. */
+  treasury: import("./types").TreasurySnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -153,6 +170,11 @@ export interface IntelligenceInputs {
   };
   /** Prior memory state (loaded from localStorage by the caller). */
   memory?: MemoryState | null;
+  /* Phase 2.4 — treasury inputs. Optional so existing callers that
+     don't load bank data continue to work; the engine returns a
+     dormant snapshot when both arrays are empty. */
+  bankAccounts?: import("@/lib/finance/types").BankAccount[];
+  cashMovements?: import("@/lib/finance/types").CashMovement[];
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -205,6 +227,17 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
      pipeline; the rich snapshot powers the dedicated dashboard panel. */
   const payment = buildPaymentControlSnapshot(input.payments);
 
+  /* Phase 2.4 — treasury snapshot. Distinct from `payment`: reads
+     bank accounts (cash position) and cash movements (bank reality)
+     instead of finance_payments (business intent). Events flow
+     through the same shared pipeline. */
+  const treasury = buildTreasurySnapshot({
+    accounts: input.bankAccounts ?? [],
+    movements: input.cashMovements ?? [],
+    payments: input.payments,
+    orders: input.orders,
+  });
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -216,6 +249,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     }),
     ...approval.events,
     ...payment.events,
+    ...treasury.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -232,6 +266,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     scoreInventoryHealth(inventory),
     scoreApprovalHealth(approval),
     scorePaymentHealth(payment),
+    scoreTreasuryHealth(treasury),
   ];
   const rawHealth = composeBusinessHealth(dimensions);
   const health = smoothHealth(rawHealth, input.memory ?? null);
@@ -255,7 +290,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
   const nextMemory = withHealthScore(memoryRun.nextMemory, health);
 
   return {
-    customers, suppliers, logistics, inventory, approval, payment,
+    customers, suppliers, logistics, inventory, approval, payment, treasury,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

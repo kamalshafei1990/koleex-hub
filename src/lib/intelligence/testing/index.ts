@@ -13,6 +13,11 @@ export {
   recoveryState,
   approvalPressureState,
   paymentControlState,
+  treasuryHealthyState,
+  liquidityPressureState,
+  fxExposureState,
+  bankMismatchState,
+  negativeRunwayState,
   type Scenario,
   type ScenarioExpectations,
 } from "./scenarios";

@@ -23,6 +23,7 @@ import type {
   Pressure,
   Score,
   SupplierDependencyProfile,
+  TreasurySnapshot,
 } from "./types";
 import { clamp01 } from "./behavior";
 
@@ -236,17 +237,50 @@ export function scorePaymentHealth(payment: PaymentControlSnapshot | null): Heal
    Composite.
    --------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------
+   Phase 2.4 — Treasury health dimension.
+
+   Treasury is now a senior peer to Finance because *real cash position*
+   is the operating constraint that fails first under stress. We give
+   it a meaningful weight (0.10) but the per-dimension damage in
+   buildTreasurySnapshot is calibrated so a *temporary* dip doesn't
+   collapse composite health unrealistically — the EMA smoothing layer
+   in persistence.ts further dampens single-period swings.
+   --------------------------------------------------------------------------- */
+
+export function scoreTreasuryHealth(treasury: TreasurySnapshot | null): HealthDimension {
+  if (!treasury || treasury.accounts.length === 0) {
+    return { module: "treasury", score: 100, pressure: "calm",
+      driver: "No bank accounts connected — treasury layer dormant." };
+  }
+  const driver = (() => {
+    const bits: string[] = [];
+    bits.push(`${formatCompact(treasury.availableCash)} USD available, ${treasury.accounts.length} account${treasury.accounts.length === 1 ? "" : "s"}.`);
+    if (treasury.projection.runwayDays != null) {
+      bits.push(`Runway ${treasury.projection.runwayDays}d.`);
+    } else if (treasury.projection.d30 < 0) {
+      bits.push(`30-day projection ${formatCompact(treasury.projection.d30)} USD.`);
+    }
+    if (treasury.unreconciledMovements >= 3) {
+      bits.push(`${treasury.unreconciledMovements} unreconciled movements.`);
+    }
+    return bits.join(" ");
+  })();
+  return { module: "treasury", score: treasury.healthScore, pressure: treasury.pressure, driver };
+}
+
 const WEIGHTS: Record<ModuleKey, number> = {
-  finance: 0.275,
-  customer: 0.18,
-  supplier: 0.14,
-  logistics: 0.09,
-  inventory: 0.07,
-  approval: 0.075,    // Phase 2.2.1 — operational review pressure
-  payment: 0.10,      // Phase 2.3 — cash control
-  crm: 0.045,
-  production: 0.0125,
-  operations: 0.0125,
+  finance: 0.235,     // Phase 2.4 rebalance — Treasury takes a senior share
+  customer: 0.15,
+  supplier: 0.12,
+  logistics: 0.075,
+  inventory: 0.065,
+  approval: 0.07,
+  payment: 0.085,
+  treasury: 0.13,     // Phase 2.4 — real cash position
+  crm: 0.04,
+  production: 0.015,
+  operations: 0.015,
 };
 
 export function composeBusinessHealth(dimensions: HealthDimension[]): BusinessHealth {
