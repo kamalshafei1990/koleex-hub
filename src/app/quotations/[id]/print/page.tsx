@@ -199,9 +199,13 @@ export default function QuotationPrintPage({
         .quot-a4-doc {
           box-sizing: border-box !important;
           width: 210mm !important;
-          height: 297mm !important;
-          min-height: 297mm !important;
-          max-height: 297mm !important;
+          /* 268mm doc fits in both A4 (297mm) and US Letter
+             (279mm) printable areas, leaving 11-29mm slack at
+             the bottom. Using full A4 297mm previously caused
+             every-other-sheet-blank when saved as US Letter PDF. */
+          height: 268mm !important;
+          min-height: 268mm !important;
+          max-height: 268mm !important;
           margin: 0 !important;
           padding: 24px 28px 18px !important;
           box-shadow: none !important;
@@ -220,7 +224,9 @@ export default function QuotationPrintPage({
            .no-print elements (toolbars, file inputs etc.) just in
            case a future change adds one. */
         .no-print { display: none !important; }
-        @page { size: A4 portrait; margin: 0; }
+        /* size: auto so the page follows the operator's paper-size
+           pick (A4 OR US Letter). Doc is 268 mm tall, fits in both. */
+        @page { size: auto; margin: 0; }
       `}</style>
       <div className="quot-a4-stack">
         <QuotationA4Preview

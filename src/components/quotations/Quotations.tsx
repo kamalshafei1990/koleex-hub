@@ -702,7 +702,18 @@ const PRINT_AND_DOC_STYLES = `
 @media print {
   /* Page setup — A4, zero browser margin (the doc has its own
      32 px / 24 px padding). */
-  @page { size: A4 portrait; margin: 0; }
+  /* size: auto so the @page geometry follows whatever paper
+     the operator picked in the print dialog. Hard-coding
+     size: A4 here was a real bug: when the printer was on
+     US Letter (8.5 x 11 in = 279 mm tall), Safari laid out
+     the doc against a 297 mm page-box while writing to a
+     279 mm physical sheet -- the 18 mm difference per
+     logical page overflowed onto a second physical sheet,
+     producing the every-other-sheet-blank pattern. Doc
+     content height (268 mm) fits comfortably inside both
+     A4 (297 mm) and US Letter (279 mm), so auto matches
+     either choice without splitting. */
+  @page { size: auto; margin: 0; }
 
   /* Reset page chrome */
   html, body {

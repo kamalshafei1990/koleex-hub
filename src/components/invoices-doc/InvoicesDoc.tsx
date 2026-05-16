@@ -660,7 +660,13 @@ const PRINT_AND_DOC_STYLES = `
 @media print {
   /* Page setup — A4, zero browser margin (the doc has its own
      32 px / 24 px padding). */
-  @page { size: A4 portrait; margin: 0; }
+  /* size: auto so the @page geometry follows whatever paper
+     the operator picked in the print dialog. Hard-coding A4
+     while the printer was on US Letter (279 mm) caused the
+     297-mm A4 layout to overflow each physical 279-mm sheet
+     by 18 mm, producing alternating blank sheets in the PDF.
+     Doc content (268 mm) fits inside both A4 and US Letter. */
+  @page { size: auto; margin: 0; }
 
   /* Reset page chrome */
   html, body {
