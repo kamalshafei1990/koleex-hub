@@ -766,19 +766,24 @@ const PRINT_AND_DOC_STYLES = `
     break-after: auto !important;
   }
 
-  /* Items table — never split a single row across sheets and
-     never split the header / footer. The page already fits its
-     items inside one A4 height, but these guards prevent edge
-     cases where a row's image makes it slightly taller than
-     expected. */
+  /* Items table — never split a single row across sheets. Tall
+     descriptions (200-char spec sheets wrapped to 6-7 lines) can
+     reach ~280 px and force the browser to break inside them at
+     the page boundary, producing an extra mostly-blank sheet
+     containing only the tail of the row's last line. */
   .pq-tbl,
-  .pq-tbl tr,
   .pq-tbl thead,
+  .pq-tbl tbody,
   .pq-tbl tfoot,
+  .pq-tbl tr,
   .pq-tbl thead tr,
-  .pq-tbl tfoot tr {
+  .pq-tbl tbody tr,
+  .pq-tbl tfoot tr,
+  .pq-tbl td,
+  .pq-tbl th {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    -webkit-column-break-inside: avoid !important;
   }
 
   input, textarea, [contenteditable] {

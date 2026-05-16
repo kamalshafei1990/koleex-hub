@@ -364,8 +364,18 @@ export default function QuotationA4Preview({
      Items pages can now use the full ITEMS_MIDDLE budget on the
      LAST items page too (no need to leave room for the footer
      block, which lives on its own pages now). */
+  /* ITEMS_MIDDLE was 8 — fine for normal-length item descriptions
+     but item rows with very long descriptions (e.g. the "Flatbed
+     Steam Iron Press" entry with a 200-char spec sheet wrapped to
+     6-7 lines) are ~200 px tall instead of the usual 110. That
+     pushed the cumulative table height past the 270 mm page
+     boundary and the browser silently split the row across two
+     physical sheets — producing an extra mostly-blank page
+     containing only the tail of the row's last line.
+     7 rows × 110 = 770 px leaves 178 px of slack — enough for ONE
+     tall row of 280 px to fit, OR room for normal padding. */
   const ITEMS_FIRST  = 4;   // header + thead leaves room for ~4 rows
-  const ITEMS_MIDDLE = 8;   // thead + 8 rows comfortably fits
+  const ITEMS_MIDDLE = 7;   // thead + 7 rows comfortably fits even with one tall row
 
   type PageKind = "items" | "footer-a" | "footer-b";
   type PageEntry = { kind: PageKind; items: QuotationItem[]; startIdx: number };
