@@ -14,35 +14,28 @@ import NotificationBell from "./NotificationBell";
 import TenantPicker from "./TenantPicker";
 import KoleexLogo from "./KoleexLogo";
 import { useSidebar } from "./SidebarContext";
+import { APP_REGISTRY } from "@/lib/navigation";
 
-/* ── Route → Translation key mapping ── */
+/* ── Route → translation-key map ──
+   Built once from APP_REGISTRY so every navigable app in the Hub
+   automatically gets a recognised top-bar app-name without a manual
+   entry here. Sorted longest-route first so /finance/orders prefers
+   the Finance entry over a hypothetical shorter prefix match.
+   Legacy entries that aren't in APP_REGISTRY (cat.system buckets,
+   /products/new alias) are merged afterwards. */
+const baseRouteKeys: Record<string, string> = Object.fromEntries(
+  APP_REGISTRY.filter((a) => a.route && a.tKey).map((a) => [a.route, a.tKey]),
+);
 const routeKeys: Record<string, string> = {
-  "/contacts": "app.contacts",
-  "/customers": "app.customers",
-  "/suppliers": "app.suppliers",
-  "/management": "app.management",
-  "/employees": "app.employees",
-  "/products": "app.products",
+  ...baseRouteKeys,
   "/products/new": "app.products",
-  "/quotations": "app.quotations",
-  "/invoices": "app.invoices",
-  "/price-calculator": "app.price-calculator",
-  "/markets": "app.markets",
-  "/landed-cost": "app.landed-cost",
-  "/website": "app.website",
-  "/catalogs": "app.catalogs",
-  "/todo": "app.todo",
-  "/calendar": "app.calendar",
-  "/accounts": "app.accounts",
-  "/brands": "app.brands",
-  "/crm": "app.crm",
-  "/discuss": "app.discuss",
-  "/inbox": "app.inbox",
-  "/ai": "app.ai",
-  "/categories": "cat.system",
-  "/subcategories": "cat.system",
-  "/divisions": "cat.system",
+  "/categories":     "cat.system",
+  "/subcategories":  "cat.system",
+  "/divisions":      "cat.system",
 };
+/* Pre-sorted route list so longest matches win in the startsWith
+   fallback (e.g. /finance/orders → "/finance" beats "/"). */
+const sortedRoutes = Object.keys(routeKeys).sort((a, b) => b.length - a.length);
 
 /* ── Language config ── */
 type Lang = "en" | "zh" | "ar";
@@ -93,9 +86,13 @@ export default function MainHeader() {
   const isHome = pathname === "/";
   const { mobileOpen, setMobileOpen } = useSidebar();
 
-  /* Find current app name from route */
+  /* Find the current app name from route — exact match first, then
+     longest-prefix match so /finance/orders/123 still resolves to
+     "Finance", /expenses/anything resolves to "Expenses", etc. */
   const routeKey = !isHome
-    ? routeKeys[pathname] || routeKeys[Object.keys(routeKeys).find(r => pathname.startsWith(r + "/")) || ""] || null
+    ? routeKeys[pathname]
+      ?? routeKeys[sortedRoutes.find((r) => pathname === r || pathname.startsWith(r + "/")) || ""]
+      ?? null
     : null;
   const appName = routeKey ? t(routeKey) : null;
 

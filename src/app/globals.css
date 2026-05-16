@@ -294,3 +294,22 @@ body {
   width: 0;
   height: 0;
 }
+
+/* ── KOLEEX motion tokens ─────────────────────────────────────────
+   Subtle reveal animations used by Finance + Expenses. Kept brief
+   (480 ms) and ease-out so the UI feels alive without being flashy.
+   Honours prefers-reduced-motion. */
+@keyframes koleex-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes koleex-rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-koleex-fade-in { animation: koleex-fade-in 480ms ease-out both; }
+.animate-koleex-rise-in { animation: koleex-rise-in 520ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-koleex-fade-in,
+  .animate-koleex-rise-in { animation: none; }
+}

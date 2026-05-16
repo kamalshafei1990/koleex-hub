@@ -1,46 +1,46 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   FinanceHeader — premium hero strip used at the top of every Finance
-   page. Provides a consistent executive feel: page title + subtitle on
-   the left, period selector + action button on the right, optional
-   financial-health badge underneath, and the FinanceTabs sub-nav
-   bottom-aligned so navigation feels integrated, not bolted on.
+   FinanceHeader  —  Phase 1.5 alignment with the Koleex Hub native page
+   bar pattern.
 
-   The visual language mirrors the rest of Koleex Hub:
-     · subtle gradient (var(--bg-secondary) → transparent) for depth
-     · rounded-2xl card surface
-     · white/0.06 hairline border
-     · 10/12 px uppercase 0.12em labels for system metadata
+   Replaces the previous custom rounded-3xl gradient hero card with the
+   compact layout every other Hub app uses: back arrow → app icon →
+   h1 page title → small subtitle/count → action button on the right.
+   The global MainHeader already renders "KOLEEX Finance" beside the
+   logo so this bar focuses on the section heading.
+
+   Below the title bar, a thin secondary row carries the FinanceTabs
+   sub-nav (and optional period selector / health badge) — both
+   monochrome, sized to match the other Hub app sub-navs.
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import FinanceIcon from "@/components/icons/FinanceIcon";
 import FinanceTabs from "@/components/finance/FinanceTabs";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
-const HEALTH_STYLE: Record<HealthStatus, { dot: string; chip: string; label: string; hint: string }> = {
+const HEALTH_STYLE: Record<HealthStatus, { dot: string; label: string; hint: string }> = {
   healthy: {
-    dot:  "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]",
-    chip: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    dot:  "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]",
     label: "Healthy",
     hint: "Profit positive, cash flowing, nothing overdue.",
   },
   watch: {
-    dot:  "bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]",
-    chip: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    dot:  "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.55)]",
     label: "Watch",
     hint: "Some overdue items or tight cash position.",
   },
   stress: {
-    dot:  "bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.6)]",
-    chip: "border-rose-500/40 bg-rose-500/10 text-rose-300",
+    dot:  "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.65)]",
     label: "Stress",
     hint: "Negative net profit or major overdue exposure.",
   },
   unknown: {
     dot:  "bg-gray-500",
-    chip: "border-white/[0.08] bg-white/5 text-gray-400",
     label: "—",
     hint: "Not enough activity yet to score.",
   },
@@ -63,55 +63,61 @@ export default function FinanceHeader({
   showTabs?: boolean;
 }) {
   return (
-    <div className="relative">
-      {/* Soft accent gradient sitting behind the header — gives the
-          Finance app its own subtle "look" without departing from the
-          Hub's dark surface. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 rounded-3xl"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 0% 0%, rgba(59,130,246,0.08) 0%, rgba(0,0,0,0) 55%), radial-gradient(80% 60% at 100% 0%, rgba(167,139,250,0.06) 0%, rgba(0,0,0,0) 60%)",
-        }}
-      />
-      <div className="rounded-3xl border border-white/[0.06] bg-[var(--bg-secondary)]/60 px-5 py-5 backdrop-blur-sm sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <h1 className="truncate text-[22px] font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">{title}</h1>
-              {health && health !== "unknown" && (
-                <HealthBadge status={health} />
-              )}
-            </div>
+    <div>
+      {/* ── Native Hub page bar ─────────────────────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/"
+            aria-label="Back to Hub"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+          </Link>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
+            <FinanceIcon size={16} />
+          </div>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight md:text-[22px]">{title}</h1>
             {subtitle && (
-              <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
+              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">{subtitle}</p>
+            )}
+            {health && health !== "unknown" && (
+              <HealthPill status={health} />
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-            {controls}
-            {action}
-          </div>
         </div>
-        {showTabs && (
-          <div className="mt-5">
-            <FinanceTabs />
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {controls}
+          {action}
+        </div>
       </div>
+
+      {/* ── Sub-navigation row ──────────────────────────────────── */}
+      {showTabs && (
+        <div className="mt-5">
+          <FinanceTabs />
+        </div>
+      )}
     </div>
   );
 }
 
-export function HealthBadge({ status }: { status: HealthStatus }) {
+/* Compact health pill used in the title row. The bigger HealthBadge
+   was reserved for the old hero — this lighter version sits inline
+   alongside the title without dominating. */
+export function HealthPill({ status }: { status: HealthStatus }) {
   const s = HEALTH_STYLE[status];
   return (
     <span
       title={s.hint}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${s.chip}`}
+      className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-gray-300"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
       {s.label}
     </span>
   );
 }
+
+/* Re-export legacy badge name in case callers reference it. */
+export { HealthPill as HealthBadge };

@@ -77,18 +77,18 @@ export function HeroKpiCard({
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
 
   return (
-    <div className="relative isolate overflow-hidden rounded-3xl border border-white/[0.05] bg-gradient-to-br from-white/[0.04] via-transparent to-transparent p-7 transition hover:border-white/[0.08]">
-      {/* Soft directional glow */}
+    <div className="group relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-gradient-to-br from-white/[0.04] via-white/[0.01] to-transparent p-6 transition-all duration-300 ease-out hover:-translate-y-[1px] hover:border-white/[0.10] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
+      {/* Soft directional glow — slightly larger + softer to feel premium */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-12 -right-10 -z-10 h-48 w-48 rounded-full blur-3xl"
+        className="pointer-events-none absolute -top-10 -right-8 -z-10 h-44 w-44 rounded-full blur-3xl transition-opacity duration-500 group-hover:opacity-80"
         style={{
           background:
             tone === "positive" ? "rgba(52,211,153,0.10)"
             : tone === "negative" ? "rgba(251,113,133,0.10)"
             : tone === "warning"  ? "rgba(251,191,36,0.08)"
             : tone === "info"     ? "rgba(56,189,248,0.08)"
-            : "rgba(255,255,255,0.04)",
+            : "rgba(255,255,255,0.05)",
         }}
       />
       <div className="flex items-start justify-between gap-4">
@@ -361,22 +361,34 @@ export function AreaChart({
   height?: number;
   currency?: string;
 }) {
-  if (!series.length || !labels.length) {
+  /* Empty-state takes precedence — show a tasteful nothing-here panel
+     rather than rendering a 0-height chart that visually crashes. */
+  const allValues = series.flatMap((s) => s.values);
+  const hasAnyValue = allValues.some((v) => v !== 0);
+  if (!series.length || !labels.length || !hasAnyValue) {
     return (
-      <div className="flex h-64 items-center justify-center text-sm text-gray-500">
-        No data yet for this period.
+      <div className="flex h-64 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/[0.06] bg-white/[0.01] text-sm text-gray-500">
+        <span className="text-[11px] uppercase tracking-[0.18em] text-gray-600">No activity</span>
+        <span>Once orders and expenses flow in, the trend chart appears here.</span>
       </div>
     );
   }
+
   const W = 800;
   const padX = 16;
   const padY = 24;
   const innerW = W - padX * 2;
   const innerH = height - padY * 2;
 
-  const allValues = series.flatMap((s) => s.values);
-  const min = Math.min(...allValues, 0);
-  const max = Math.max(...allValues, 1);
+  /* Adaptive scaling. With sparse demo data a single big spike makes
+     every other point look like a flat line at zero. Instead of using
+     raw min/max we pad the range by 12 % on each side so the curve
+     breathes and the baseline isn't glued to the chart floor. */
+  const rawMin = Math.min(...allValues, 0);
+  const rawMax = Math.max(...allValues, 1);
+  const span = Math.max(1, rawMax - rawMin);
+  const min = rawMin === 0 ? 0 : rawMin - span * 0.06;
+  const max = rawMax + span * 0.12;
   const range = max - min || 1;
   const stepX = innerW / Math.max(1, labels.length - 1);
 
@@ -385,7 +397,15 @@ export function AreaChart({
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${height}`} className="w-full" preserveAspectRatio="none">
+      <svg
+        viewBox={`0 0 ${W} ${height}`}
+        className="w-full"
+        preserveAspectRatio="none"
+        style={{
+          /* Subtle fade-in reveal so charts feel alive when loaded */
+          animation: "koleex-fade-in 480ms ease-out both",
+        }}
+      >
         <defs>
           {series.map((s, i) => {
             const stroke = toneToStroke(s.tone);
