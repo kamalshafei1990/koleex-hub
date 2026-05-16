@@ -1192,19 +1192,31 @@ export default function Quotations() {
     setPdfState("loading");
     try {
       /* ALWAYS save first so the print page fetches the freshest
-         server state. Previously we only saved when status was
-         "draft" or the id wasn't a UUID -- which meant editing
-         an existing Sent / Accepted quote and hitting Export PDF
-         would print a STALE copy (missing all the in-editor
-         edits, including the items table). Preserve the current
-         status so we don't accidentally demote a Sent quote
-         back to Draft. */
-      await handleSave(current.status);
+         server state. Bypass handleSave (which swallows errors
+         and just flashes a status pill) and call saveQuotation-
+         Remote directly -- if the save fails we MUST abort the
+         export, otherwise the iframe would render a stale or
+         empty copy of the doc and the operator would think the
+         PDF is broken when really the save just didn't happen.
+         Preserve the current status so we never demote a Sent
+         quote back to Draft. */
+      const intent: Quotation = {
+        ...current,
+        updatedAt: new Date().toISOString(),
+      };
+      const saved = await saveQuotationRemote(intent);
+      if (!saved) {
+        setPdfState("error");
+        alert("Save failed before export. Please click Save and try Export PDF again.");
+        setTimeout(() => setPdfState("idle"), 2_500);
+        return;
+      }
+      setCurrent(saved);
       const refreshed = await loadQuotationsRemote({ fresh: true });
       const match = refreshed.find(
-        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+        (q) => q.id === saved.id || q.invoiceNo === saved.invoiceNo,
       );
-      const quotationId = match?.id ?? current.id;
+      const quotationId = match?.id ?? saved.id;
       if (quotationId.length !== 36) {
         setPdfState("error");
         alert("Please save the quotation before exporting.");

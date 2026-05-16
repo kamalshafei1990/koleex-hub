@@ -1111,16 +1111,25 @@ export default function Quotations() {
        tab). */
     setPdfState("loading");
     try {
-      /* ALWAYS save first so the print page fetches the freshest
-         server state. Conditionally saving only on draft status
-         meant editing a Sent / Partially-Paid invoice would print
-         a STALE server copy missing the in-editor edits. */
-      await handleSave(current.status);
+      /* Save directly (bypass handleSave's silent-error pill) so
+         a failed save aborts the export with a clear alert. */
+      const intent: Invoice = {
+        ...current,
+        updatedAt: new Date().toISOString(),
+      };
+      const saved = await saveInvoiceRemote(intent);
+      if (!saved) {
+        setPdfState("error");
+        alert("Save failed before export. Please click Save and try Export PDF again.");
+        setTimeout(() => setPdfState("idle"), 2_500);
+        return;
+      }
+      setCurrent(saved);
       const refreshed = await loadInvoicesRemote({ fresh: true });
       const match = refreshed.find(
-        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+        (q) => q.id === saved.id || q.invoiceNo === saved.invoiceNo,
       );
-      const invoiceId = match?.id ?? current.id;
+      const invoiceId = match?.id ?? saved.id;
       if (invoiceId.length !== 36) {
         setPdfState("error");
         alert("Please save the invoice before exporting.");
