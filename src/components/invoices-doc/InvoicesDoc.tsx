@@ -1598,15 +1598,11 @@ export default function Quotations() {
               const tt = q.serverTotal != null && q.serverTotal > 0 ? q.serverTotal : computeGrandTotal(q);
               return s + tt;
             }, 0);
-            const now = new Date();
-            const soon = new Date(now); soon.setDate(now.getDate() + 7);
-            const expiringSoon = quotations.filter((q) => {
-              if (q.status !== "sent") return false;
-              const iso = ddmmyyyyToISO(q.validTill);
-              if (!iso) return false;
-              const d = new Date(iso);
-              return d >= now && d <= soon;
-            }).length;
+            /* No "expiring soon" KPI on invoices — invoices don't have
+               a Due Date (payment timing lives in the Payment Terms
+               milestone, not a single date), so an expiry counter
+               would be misleading. Kept as 5 cards but dropped the
+               "expiring soon" sub-line on the totalValue card. */
             return (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <KpiCard label={t("kpi.total")} value={String(quotations.length)} accent="text-blue-400" />
@@ -1617,7 +1613,6 @@ export default function Quotations() {
                   label={t("kpi.totalValue")}
                   value={fmt(total)}
                   accent="text-[var(--text-primary)]"
-                  sub={expiringSoon > 0 ? t("kpi.expiringSoon").replace("{n}", String(expiringSoon)) : undefined}
                 />
               </div>
             );
@@ -1679,15 +1674,8 @@ export default function Quotations() {
                           {q.customerName || t("list.unnamedCustomer")}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
-                          <span>
-                            <span className="text-gray-600">Issued:</span> {q.date}
-                          </span>
-                          {q.validTill && (
-                            <span>
-                              <span className="text-gray-600">Due:</span> {q.validTill}
-                            </span>
-                          )}
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {q.date}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">

@@ -566,11 +566,19 @@ export default function QuotationA4Preview({
             phone numbers + invoice number.
             ═══════════════════════════════════════════════════════════════ */}
 
-        {/* ── Meta strip (4 equal columns) ── */}
+        {/* ── Meta strip ──
+            Quotations: 4 columns (Date · Quotation No · Valid Till · Client No).
+            Invoices:    3 columns (Date · Invoice No · Client No).
+            Due Date is intentionally NOT on the invoice — international
+            commercial invoices express payment timing through the
+            Payment Terms milestone (e.g. "30% T/T advance + 70% against
+            BL copy"), not a single calendar date. The validTill data
+            field is kept on the model for back-compat + internal AR
+            tracking, but no longer surfaced on the printed CI. */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: docKind === "invoice" ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
             border: `1px solid ${T.border}`,
             borderRadius: 12,
             overflow: "hidden",
@@ -595,14 +603,16 @@ export default function QuotationA4Preview({
               {current.invoiceNo || "—"}
             </span>
           </MetaStripCell>
-          <MetaStripCell label={docKind === "invoice" ? "Due Date" : "Valid Till"}>
-            <input
-              value={current.validTill}
-              onChange={(e) => setMeta("validTill", e.target.value)}
-              placeholder="DD/MM/YYYY"
-              style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
-            />
-          </MetaStripCell>
+          {docKind !== "invoice" && (
+            <MetaStripCell label="Valid Till">
+              <input
+                value={current.validTill}
+                onChange={(e) => setMeta("validTill", e.target.value)}
+                placeholder="DD/MM/YYYY"
+                style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+              />
+            </MetaStripCell>
+          )}
           <MetaStripCell label="Client No" isLast>
             <input
               value={current.clientNo}
