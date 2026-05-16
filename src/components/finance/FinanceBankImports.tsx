@@ -17,7 +17,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
@@ -36,6 +36,8 @@ type StepKey = "pick" | "upload" | "preview" | "done";
 
 export default function FinanceBankImports() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedAccountId = searchParams.get("account");
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [imports, setImports] = useState<BankStatementImport[]>([]);
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -58,7 +60,12 @@ export default function FinanceBankImports() {
       const a: BankAccount[] = Array.isArray(t.accounts) ? t.accounts : [];
       setAccounts(a);
       setImports(Array.isArray(imp.imports) ? imp.imports : []);
-      if (a.length > 0 && !accountId) setAccountId(a[0].id);
+      if (!accountId) {
+        const fromQuery = preselectedAccountId && a.find((x) => x.id === preselectedAccountId)
+          ? preselectedAccountId
+          : a[0]?.id ?? null;
+        if (fromQuery) setAccountId(fromQuery);
+      }
     }).catch((e) => setError(e instanceof Error ? e.message : String(e)));
     return () => { cancelled = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
