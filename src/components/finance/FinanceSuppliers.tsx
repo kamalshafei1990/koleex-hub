@@ -5,6 +5,7 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, ProgressBar, SectionCard } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
+import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
 export default function FinanceSuppliers() {
@@ -22,6 +23,27 @@ export default function FinanceSuppliers() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  /* Phase R.1 — generate an external account statement for one
+     supplier. Same flow as the customer statement: print export →
+     opens auto-print page in a new tab. */
+  const [generating, setGenerating] = useState<string | null>(null);
+  const generateStatement = useCallback(async (supplierId: string) => {
+    setGenerating(supplierId);
+    try {
+      const res = await fetch("/api/reports/export/print", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "supplier_statement", filters: { supplier_id: supplierId } }),
+      });
+      const j = await res.json();
+      if (!res.ok) { alert(j.error ?? `Failed (${res.status})`); return; }
+      window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
+    } finally {
+      setGenerating(null);
+    }
+  }, []);
 
   const kpi = useMemo(() => {
     const purchases = rows.reduce((s, r) => s + (r.total_purchases ?? 0), 0);
@@ -70,6 +92,17 @@ export default function FinanceSuppliers() {
                       <span>{r.total_purchases ? (((r.paid_amount ?? 0) / r.total_purchases) * 100).toFixed(0) : 0}%</span>
                     </div>
                     <div className="mt-1"><ProgressBar value={r.paid_amount ?? 0} max={r.total_purchases ?? 0} color="emerald" /></div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => void generateStatement(r.supplier_id)}
+                      disabled={generating === r.supplier_id}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
+                    >
+                      <RrIcon name="file-invoice" size={12} />
+                      {generating === r.supplier_id ? "Preparing…" : "Generate Supplier Statement"}
+                    </button>
                   </div>
                 </div>
               ))}

@@ -10,7 +10,8 @@
     "validate:intelligence": "tsx scripts/validate-intelligence.ts",
     "validate:races": "tsx scripts/race-conditions.ts",
     "validate:tenant-isolation": "tsx scripts/tenant-isolation.ts",
-    "validate:edge-cases": "tsx scripts/edge-cases.ts"
+    "validate:edge-cases": "tsx scripts/edge-cases.ts",
+    "validate:reports": "NODE_OPTIONS=--conditions=react-server tsx scripts/reports.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",
@@ -48,6 +49,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.0",
     "typescript": "^5"

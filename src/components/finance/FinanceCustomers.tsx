@@ -5,6 +5,7 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, ProgressBar, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
+import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
 
 export default function FinanceCustomers() {
@@ -22,6 +23,28 @@ export default function FinanceCustomers() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  /* Phase R.1 — generate an external account statement for one
+     customer. Calls the print export endpoint to record the audit
+     row, then opens the chrome-less print view in a new tab so the
+     browser's own Save-as-PDF dialog appears. */
+  const [generating, setGenerating] = useState<string | null>(null);
+  const generateStatement = useCallback(async (customerId: string) => {
+    setGenerating(customerId);
+    try {
+      const res = await fetch("/api/reports/export/print", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "customer_statement", filters: { customer_id: customerId } }),
+      });
+      const j = await res.json();
+      if (!res.ok) { alert(j.error ?? `Failed (${res.status})`); return; }
+      window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
+    } finally {
+      setGenerating(null);
+    }
+  }, []);
 
   const kpi = useMemo(() => {
     const revenue = rows.reduce((s, r) => s + (r.total_revenue ?? 0), 0);
@@ -85,6 +108,17 @@ export default function FinanceCustomers() {
                       ⚠ {fmtMoney(r.overdue_amount ?? 0, r.default_currency, { compact: true })} overdue — past due date.
                     </div>
                   )}
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => void generateStatement(r.customer_id)}
+                      disabled={generating === r.customer_id}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
+                    >
+                      <RrIcon name="file-invoice" size={12} />
+                      {generating === r.customer_id ? "Preparing…" : "Generate Account Statement"}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
