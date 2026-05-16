@@ -23,6 +23,8 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ExpensesHeader from "@/components/expenses/ExpensesHeader";
+import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import {
   accentBgClass,
@@ -32,13 +34,7 @@ import {
 import { fmtMoney } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 
-type TabKey = "all" | "unpaid" | "paid" | "overdue";
-const TABS: { key: TabKey; label: string; tone: string }[] = [
-  { key: "all",     label: "All",     tone: "text-gray-300" },
-  { key: "unpaid",  label: "Unpaid",  tone: "text-amber-300" },
-  { key: "paid",    label: "Paid",    tone: "text-emerald-300" },
-  { key: "overdue", label: "Overdue", tone: "text-rose-300" },
-];
+type TabKey = ExpensesTabKey;
 
 const CURRENCIES = ["USD", "EUR", "CNY", "EGP", "GBP"];
 
@@ -127,34 +123,22 @@ export default function ExpensesApp() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        {/* ── HEADER ─────────────────────────────────────────────── */}
-        <div className="relative">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 rounded-3xl"
-            style={{
-              background:
-                "radial-gradient(120% 80% at 0% 0%, rgba(251,113,133,0.08) 0%, rgba(0,0,0,0) 55%), radial-gradient(80% 60% at 100% 0%, rgba(251,191,36,0.06) 0%, rgba(0,0,0,0) 60%)",
-            }}
-          />
-          <div className="rounded-3xl border border-white/[0.06] bg-[var(--bg-secondary)]/60 px-5 py-5 backdrop-blur-sm sm:px-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)] sm:text-2xl">Expenses</h1>
-                <p className="mt-1 text-sm text-gray-400">Fast daily expense entry. Add receipts, track what&apos;s paid, what&apos;s due.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={startNew}
-                  className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
-                >
-                  + Add Expense
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ExpensesHeader
+          title="Expenses"
+          subtitle="Fast daily expense entry. Add receipts, track what&apos;s paid, what&apos;s due."
+          tab={tab}
+          onTabChange={setTab}
+          counts={counts}
+          action={
+            <button
+              type="button"
+              onClick={startNew}
+              className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
+            >
+              + Add Expense
+            </button>
+          }
+        />
 
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
@@ -191,48 +175,27 @@ export default function ExpensesApp() {
           </div>
         )}
 
-        {/* ── FILTERS BAR ─────────────────────────────────────────── */}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {TABS.map((t) => {
-              const count = t.key === "all" ? counts.all : t.key === "unpaid" ? counts.unpaid : t.key === "paid" ? counts.paid : counts.overdue;
-              const active = tab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={
-                    "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition " +
-                    (active
-                      ? "border-white/[0.12] bg-white/[0.06] text-[var(--text-primary)]"
-                      : "border-white/[0.04] bg-[var(--bg-secondary)] text-gray-400 hover:text-gray-200")
-                  }
-                >
-                  <span className={t.tone}>{t.label}</span>
-                  <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-500">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-1 items-center gap-2 sm:max-w-md sm:justify-end">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search expenses…"
-              className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none sm:max-w-[280px]"
-            />
-            {categoryFilter && (
-              <button
-                type="button"
-                onClick={() => setCategoryFilter("")}
-                className="rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
-                title="Clear category filter"
-              >
-                Clear filter ×
-              </button>
-            )}
-          </div>
+        {/* ── SEARCH / FILTER BAR ─────────────────────────────────
+            (The All/Unpaid/Paid/Overdue tabs now live in the header
+            so this row only carries free-text search + the active
+            category-filter chip.) */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search expenses…"
+            className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none sm:max-w-[280px]"
+          />
+          {categoryFilter && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("")}
+              className="rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
+              title="Clear category filter"
+            >
+              Clear filter ×
+            </button>
+          )}
         </div>
 
         {/* ── EXPENSE LIST ───────────────────────────────────────── */}

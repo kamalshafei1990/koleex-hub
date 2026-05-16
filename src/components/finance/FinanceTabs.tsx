@@ -25,19 +25,19 @@ const TABS = [
 export default function FinanceTabs() {
   const pathname = usePathname();
   return (
-    <div className="overflow-x-auto">
-      <div className="inline-flex rounded-xl border border-white/[0.06] bg-[var(--bg-secondary)] p-1">
+    <nav aria-label="Finance sections" className="overflow-x-auto">
+      <div className="inline-flex items-center gap-1 rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] p-1 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
         {TABS.map((t) => {
-          const active = pathname === t.href;
+          const active = pathname === t.href || (t.href !== "/finance" && pathname.startsWith(t.href));
           return (
             <Link
               key={t.href}
               href={t.href}
               className={
-                "rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition " +
+                "rounded-lg px-3.5 py-1.5 text-[12px] font-medium whitespace-nowrap transition " +
                 (active
-                  ? "bg-white/10 text-[var(--text-primary)]"
-                  : "text-gray-400 hover:text-gray-200")
+                  ? "bg-white/[0.10] text-[var(--text-primary)] shadow-sm"
+                  : "text-gray-400 hover:bg-white/[0.04] hover:text-gray-200")
               }
             >
               {t.label}
@@ -45,6 +45,6 @@ export default function FinanceTabs() {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
