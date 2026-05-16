@@ -11,6 +11,7 @@ export {
   highRiskState,
   falseSignalState,
   recoveryState,
+  approvalPressureState,
   type Scenario,
   type ScenarioExpectations,
 } from "./scenarios";

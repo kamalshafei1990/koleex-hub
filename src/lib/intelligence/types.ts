@@ -29,7 +29,8 @@ export type ModuleKey =
   | "inventory"
   | "crm"
   | "production"
-  | "operations";
+  | "operations"
+  | "approval";
 
 /** Calm → Critical scale used uniformly across modules. */
 export type Pressure = "calm" | "watch" | "risk" | "critical";
@@ -75,7 +76,14 @@ export type OperationalEventKind =
   | "liquidity_pressure"       // forward cash window negative
   | "expense_anomaly"          // an expense category jumped period-over-period
   | "deal_stalled"             // CRM stage stagnation (future hook)
-  | "revenue_decline";         // revenue down period-over-period
+  | "revenue_decline"          // revenue down period-over-period
+  /* ── Phase 2.2.1 — approval operations ──────────────────────── */
+  | "approval_backlog"         // count of pending reviews exceeds threshold
+  | "review_delay"             // an item has been waiting > N days
+  | "approval_concentration"   // single reviewer owns most pending reviews
+  | "repeated_rejection"       // an entity hit rejected → changes loop multiple times
+  | "unresolved_changes_request" // changes-requested items that haven't been resubmitted
+  | "approval_velocity_drop";  // average approval time deteriorated PoP
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =
@@ -327,4 +335,75 @@ export interface DigestItem {
   magnitude?: number;
   state?: SignalState;
   confidence?: number;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Approval operations (Phase 2.2.1)
+
+   Operational read of the approval workflow — aging, backlog,
+   reviewer workload, cycle velocity. The shape composes with the rest
+   of the intelligence layer: events flow into the regular stream,
+   health adds an "approval" dimension to BusinessHealth, and the
+   dashboard renders a calm panel from this snapshot.
+   ───────────────────────────────────────────────────────────────────── */
+
+export type ApprovalAgingBucketKey = "lt_1d" | "1_3d" | "4_7d" | "8_14d" | "14_plus";
+
+export interface ApprovalAgingBucket {
+  key: ApprovalAgingBucketKey;
+  label: string;
+  count: number;
+  totalValue: number;
+}
+
+export interface ReviewerWorkload {
+  /** account id when known; "unassigned" when no reviewer has touched it. */
+  reviewerId: string | "unassigned";
+  reviewerName: string;
+  /** Pending items currently waiting on this reviewer. */
+  pendingCount: number;
+  /** Total value of pending items on this reviewer. */
+  pendingValue: number;
+  /** Approved within the rolling window (for velocity scoring). */
+  approvedCount: number;
+  /** Rejected within the rolling window. */
+  rejectedCount: number;
+  /** Avg submit → approve days within the rolling window. */
+  avgLatencyDays: number;
+  /** Share of total backlog (0..1). */
+  backlogShare: number;
+}
+
+export interface ApprovalCycleMetrics {
+  /** Average days from submit to a terminal decision (approved/rejected). */
+  avgCycleDays: number;
+  /** Avg cycle in the prior comparable window. */
+  priorAvgCycleDays: number;
+  /** PoP percent change. Positive = slower. */
+  trendPct: number;
+  /** Share of decisions that were rejections (0..1). */
+  rejectionRate: number;
+  /** Share that landed in requires_changes at least once (approximated from current status). */
+  changesRate: number;
+}
+
+export interface ApprovalIntelligenceSnapshot {
+  /** Materially-filtered events ready to merge into the global stream. */
+  events: OperationalEvent[];
+  /** Per-bucket aging table. */
+  aging: ApprovalAgingBucket[];
+  /** Backlog summary (count + value + oldest waiting days). */
+  backlog: {
+    count: number;
+    totalValue: number;
+    oldestDays: number;
+  };
+  /** Reviewer-level distribution. Sorted by pendingCount desc. */
+  workload: ReviewerWorkload[];
+  cycle: ApprovalCycleMetrics;
+  /** Composite 0..100 approval-operations health. */
+  healthScore: Score;
+  pressure: Pressure;
+  /** One-sentence operational read; "" if nothing material to say. */
+  read: string;
 }

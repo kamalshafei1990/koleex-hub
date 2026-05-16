@@ -567,6 +567,141 @@ export function falseSignalState(): Scenario {
   };
 }
 
+/* APPROVAL_PRESSURE_STATE
+   Backlog of 8 pending expenses, one stuck in review for 22 days,
+   reviewer concentration on a single account. The approval engine
+   should fire backlog + review_delay + concentration events, and the
+   approval health dimension should drag the composite into "watch". */
+export function approvalPressureState(): Scenario {
+  const reviewerA = "00000000-0000-0000-0000-aaaaaaaaaaaa";
+  const reviewerB = "00000000-0000-0000-0000-bbbbbbbbbbbb";
+  const submitter = "00000000-0000-0000-0000-cccccccccccc";
+
+  /* Build 8 pending expenses concentrated on reviewerA, with the
+     oldest waiting 22 days and the rest fresh. Then 6 historical
+     approved expenses with healthy cycle, plus 2 rejected so the
+     rejection rate stays under the 30% bar (avoids triggering the
+     separate repeated_rejection signal). */
+  const expenses: FinanceExpense[] = [];
+
+  /* Oldest pending — 22 days in review on reviewerA. */
+  expenses.push({
+    id: "e-ap-1",
+    category_id: null, subcategory_id: null,
+    category_name: "Logistics",
+    title: "Heavy machinery freight",
+    amount: 18_500,
+    currency: "USD",
+    expense_date: isoDate(-25),
+    payment_status: "unpaid",
+    due_date: null,
+    linked_order_id: null, linked_supplier_id: null,
+    linked_customer_id: null, linked_project_id: null,
+    attachment_url: null, notes: null,
+    created_at: isoDate(-25) + "T00:00:00Z",
+    updated_at: isoDate(-25) + "T00:00:00Z",
+    approval_status: "submitted",
+    submitted_at: isoDate(-22),
+    submitted_by: submitter,
+    reviewed_at: null, reviewed_by: reviewerA,
+    approved_at: null, approved_by: null,
+    rejected_at: null, rejected_by: null,
+    rejection_reason: null, requires_changes_reason: null, review_notes: null,
+    approval_level: 0,
+    evidence_status: "pending", has_attachments: true, receipt_count: 1,
+  });
+
+  /* 7 more pending — all on reviewerA, spread across short waits. */
+  for (let i = 0; i < 7; i++) {
+    const waitDays = (i + 1) * 2;
+    expenses.push({
+      id: `e-ap-${i + 2}`,
+      category_id: null, subcategory_id: null,
+      category_name: "Office",
+      title: `Office expense ${i + 1}`,
+      amount: 1_200 + i * 400,
+      currency: "USD",
+      expense_date: isoDate(-(waitDays + 1)),
+      payment_status: "unpaid",
+      due_date: null,
+      linked_order_id: null, linked_supplier_id: null,
+      linked_customer_id: null, linked_project_id: null,
+      attachment_url: null, notes: null,
+      created_at: isoDate(-(waitDays + 1)) + "T00:00:00Z",
+      updated_at: isoDate(-(waitDays + 1)) + "T00:00:00Z",
+      approval_status: "submitted",
+      submitted_at: isoDate(-waitDays),
+      submitted_by: submitter,
+      reviewed_at: null, reviewed_by: reviewerA,
+      approved_at: null, approved_by: null,
+      rejected_at: null, rejected_by: null,
+      rejection_reason: null, requires_changes_reason: null, review_notes: null,
+      approval_level: 0,
+    });
+  }
+
+  /* 6 historical approved expenses with healthy cycle (~1.5 d). */
+  for (let i = 0; i < 6; i++) {
+    const submitted = -(30 + i * 4);
+    const approved  = submitted + 2;
+    expenses.push({
+      id: `e-ap-h-${i}`,
+      category_id: null, subcategory_id: null,
+      category_name: "Office",
+      title: `Prior approved ${i + 1}`,
+      amount: 800 + i * 200,
+      currency: "USD",
+      expense_date: isoDate(submitted - 1),
+      payment_status: "paid",
+      due_date: null,
+      linked_order_id: null, linked_supplier_id: null,
+      linked_customer_id: null, linked_project_id: null,
+      attachment_url: null, notes: null,
+      created_at: isoDate(submitted - 1) + "T00:00:00Z",
+      updated_at: isoDate(approved) + "T00:00:00Z",
+      approval_status: "approved",
+      submitted_at: isoDate(submitted),
+      submitted_by: submitter,
+      reviewed_at: isoDate(approved),
+      reviewed_by: reviewerB,
+      approved_at: isoDate(approved),
+      approved_by: reviewerB,
+      rejected_at: null, rejected_by: null,
+      rejection_reason: null, requires_changes_reason: null, review_notes: null,
+      approval_level: 0,
+    });
+  }
+
+  /* Build a base healthy KPI shape so the rest of the engine stays calm. */
+  const base = healthyState().inputs.kpi!;
+
+  return {
+    name: "APPROVAL_PRESSURE_STATE",
+    description: "Backlog of 8 pending reviews, one 22 days old, concentrated on a single reviewer.",
+    inputs: {
+      kpi: base,
+      orders: [],
+      payments: [],
+      expenses,
+      periodDays: 90,
+    },
+    expectations: {
+      digestRange: [1, 5],
+      eventRange: [1, 12],
+      /* Approval is one of six health dimensions with a ~7.5% weight,
+         so isolated approval pressure cannot drag the composite into
+         the lower bands while everything else stays healthy. The
+         signal lives in the events + digest, not in the headline
+         number — which is exactly the discipline this phase enforces. */
+      healthRange: [60, 98],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 2,
+      copilotMaxHints: 3,
+      expectEventKinds: ["approval_backlog", "review_delay", "approval_concentration"],
+    },
+  };
+}
+
 /* E — RECOVERY_STATE
    Previously bad signals are now de-escalating. We simulate "prior memory"
    by attaching it through the IntelligenceInputs.memory channel. */
@@ -620,4 +755,5 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   highRiskState(),
   falseSignalState(),
   recoveryState(),
+  approvalPressureState(),
 ];

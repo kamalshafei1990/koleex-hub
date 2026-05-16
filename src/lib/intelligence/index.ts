@@ -59,8 +59,11 @@ export {
   scoreSupplierHealth,
   scoreLogisticsHealth,
   scoreInventoryHealth,
+  scoreApprovalHealth,
   composeBusinessHealth,
 } from "./health";
+
+export { buildApprovalSnapshot } from "./approval";
 
 export { assessRisk } from "./risk";
 export { buildBusinessCopilotContext } from "./copilot";
@@ -95,8 +98,10 @@ import { applyMaterialityGate, normaliseSeverity } from "./materiality";
 import { prioritise, suppressNoise } from "./priority";
 import { annotateWithMemory, smoothHealth, withHealthScore, type MemoryState } from "./persistence";
 import { buildExecutiveDigest } from "./digest";
+import { buildApprovalSnapshot } from "./approval";
 import {
   composeBusinessHealth,
+  scoreApprovalHealth,
   scoreCustomerHealth,
   scoreFinanceHealth,
   scoreInventoryHealth,
@@ -111,6 +116,8 @@ export interface IntelligencePicture {
   suppliers: SupplierDependencyProfile[];
   logistics: LogisticsSnapshot;
   inventory: InventorySnapshot;
+  /** Phase 2.2.1 — approval operations snapshot. */
+  approval: import("./types").ApprovalIntelligenceSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -180,14 +187,23 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
      7) Correlations — score with confidence; low-confidence dropped.
      8) Health composed, then EMA-smoothed against prior run.
      9) Risk + Copilot + Executive digest off the curated stream.       */
-  const raw = synthesizeEvents({
-    kpi: input.kpi,
-    orders: input.orders,
-    customers,
-    suppliers,
-    logistics,
-    inventory,
-  });
+  /* Phase 2.2.1 — approval operations snapshot. Built independently
+     from the rest so other consumers (dashboard panel) can read it
+     directly; the events are merged into the global stream before the
+     materiality + noise + priority pipeline. */
+  const approval = buildApprovalSnapshot(input.expenses, periodDays);
+
+  const raw = [
+    ...synthesizeEvents({
+      kpi: input.kpi,
+      orders: input.orders,
+      customers,
+      suppliers,
+      logistics,
+      inventory,
+    }),
+    ...approval.events,
+  ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
   const normalised = normaliseSeverity(merged);
@@ -201,6 +217,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     scoreSupplierHealth(suppliers),
     scoreLogisticsHealth(logistics),
     scoreInventoryHealth(inventory),
+    scoreApprovalHealth(approval),
   ];
   const rawHealth = composeBusinessHealth(dimensions);
   const health = smoothHealth(rawHealth, input.memory ?? null);
@@ -224,7 +241,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
   const nextMemory = withHealthScore(memoryRun.nextMemory, health);
 
   return {
-    customers, suppliers, logistics, inventory,
+    customers, suppliers, logistics, inventory, approval,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

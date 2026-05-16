@@ -12,6 +12,7 @@
 
 import type { DashboardKpi } from "@/lib/finance/types";
 import type {
+  ApprovalIntelligenceSnapshot,
   BusinessHealth,
   CustomerBehaviorProfile,
   HealthDimension,
@@ -164,15 +165,45 @@ export function scoreInventoryHealth(inventory: InventorySnapshot | undefined): 
 }
 
 /* ---------------------------------------------------------------------------
+   Phase 2.2.1 — Approval operations health dimension.
+
+   Scoring comes pre-computed from buildApprovalSnapshot(); we just
+   wrap it into a HealthDimension with a deterministic driver line.
+   --------------------------------------------------------------------------- */
+
+export function scoreApprovalHealth(approval: ApprovalIntelligenceSnapshot | null): HealthDimension {
+  if (!approval || approval.backlog.count === 0) {
+    return {
+      module: "approval",
+      score: 100,
+      pressure: "calm",
+      driver: "No pending reviews — approval queue is empty.",
+    };
+  }
+  const a = approval;
+  const driver = (() => {
+    const bits: string[] = [];
+    bits.push(`${a.backlog.count} pending review${a.backlog.count === 1 ? "" : "s"} (${formatCompact(a.backlog.totalValue)} USD).`);
+    if (a.backlog.oldestDays >= 7) bits.push(`Oldest waiting ${a.backlog.oldestDays}d.`);
+    if (a.cycle.trendPct >= 50 && a.cycle.avgCycleDays >= 4) {
+      bits.push(`Cycle ${a.cycle.avgCycleDays.toFixed(1)}d (↑ ${a.cycle.trendPct.toFixed(0)}%).`);
+    }
+    return bits.join(" ");
+  })();
+  return { module: "approval", score: a.healthScore, pressure: a.pressure, driver };
+}
+
+/* ---------------------------------------------------------------------------
    Composite.
    --------------------------------------------------------------------------- */
 
 const WEIGHTS: Record<ModuleKey, number> = {
-  finance: 0.35,
+  finance: 0.30,
   customer: 0.20,
   supplier: 0.15,
   logistics: 0.10,
-  inventory: 0.10,
+  inventory: 0.075,
+  approval: 0.075,    // Phase 2.2.1 — operational review pressure
   crm: 0.05,
   production: 0.025,
   operations: 0.025,

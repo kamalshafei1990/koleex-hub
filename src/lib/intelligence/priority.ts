@@ -64,6 +64,19 @@ function urgencyComponent(e: OperationalEvent): number {
     case "customer_concentration":
     case "supplier_dependency":
       return 12;
+    /* ── Phase 2.2.1 approval kinds ── */
+    case "review_delay": {
+      const days = e.magnitude ?? 0;
+      if (days >= 21) return 45;
+      if (days >= 14) return 32;
+      if (days >= 7)  return 18;
+      return 6;
+    }
+    case "approval_backlog":              return 22;
+    case "approval_velocity_drop":        return 24;
+    case "unresolved_changes_request":    return 16;
+    case "approval_concentration":        return 14;
+    case "repeated_rejection":            return 18;
     default:
       return 8;
   }

@@ -67,6 +67,31 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
 
   /* Expense anomaly: 40% PoP movement AND at least USD 5K. */
   expense_anomaly: (e) => Math.abs(e.magnitude ?? 0) >= 40 && (e.amount ?? 0) >= 5_000,
+
+  /* ── Phase 2.2.1 approval kinds ────────────────────────────────── */
+
+  /* Backlog: at least 5 pending AND either ≥ 10 items OR ≥ USD 5K
+     value. The engine already enforces this; the gate is the
+     trust-but-verify layer that drops anything weaker. */
+  approval_backlog: (e) =>
+    (e.magnitude ?? 0) >= 5 &&
+    ((e.magnitude ?? 0) >= 10 || (e.amount ?? 0) >= 5_000),
+
+  /* Review delay: only material at ≥ 7 days waiting. */
+  review_delay: (e) => (e.magnitude ?? 0) >= 7,
+
+  /* Concentration: ≥ 60% of queue on one reviewer (engine emits
+     magnitude as a 0..100 percentage). */
+  approval_concentration: (e) => (e.magnitude ?? 0) >= 60,
+
+  /* Repeated rejection: rejection rate ≥ 30 (percent, engine emits as int). */
+  repeated_rejection: (e) => (e.magnitude ?? 0) >= 30,
+
+  /* Unresolved changes: ≥ 2 items stuck. */
+  unresolved_changes_request: (e) => (e.magnitude ?? 0) >= 2,
+
+  /* Velocity drop: ≥ 50% PoP slowdown. */
+  approval_velocity_drop: (e) => (e.magnitude ?? 0) >= 50,
 };
 
 /**

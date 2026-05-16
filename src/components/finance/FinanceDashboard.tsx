@@ -244,6 +244,7 @@ export default function FinanceDashboard() {
            top correlation. Sits in both modes so the operator always
            sees the connected-system reading first. */}
         <CrossModulePressurePanel intel={businessIntelligence} />
+        <ApprovalOperationsPanel intel={businessIntelligence} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -1176,4 +1177,162 @@ function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBus
       )}
     </div>
   );
+}
+
+/* ===========================================================================
+   ApprovalOperationsPanel  —  Phase 2.2.1
+
+   Calm one-block panel that surfaces approval-operations state on the
+   dashboard. Mirrors the CrossModulePressurePanel vocabulary:
+
+     · header: title + approval-health number + pressure pill
+     · backlog stat row (count · value · oldest · cycle time)
+     · 5-bucket aging mini-table
+     · top reviewer line (only when material concentration exists)
+
+   The panel **renders nothing** when there's no operational pressure
+   and no backlog — keeps the dashboard quiet by default.
+   ========================================================================== */
+
+function ApprovalOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+  const a = intel.approval;
+  /* Quiet state — nothing material to say. */
+  if (a.backlog.count === 0 && a.pressure === "calm") return null;
+
+  const pressureCls =
+    a.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
+    : a.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+    : a.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
+    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+  const pressureDot =
+    a.pressure === "critical" ? "bg-rose-400"
+    : a.pressure === "risk"   ? "bg-rose-400"
+    : a.pressure === "watch"  ? "bg-amber-300"
+    :                           "bg-emerald-400";
+  const scoreCls =
+    a.pressure === "critical" ? "text-rose-300"
+    : a.pressure === "risk"   ? "text-rose-300/90"
+    : a.pressure === "watch"  ? "text-amber-300"
+    :                           "text-emerald-300";
+
+  /* Top reviewer is only meaningful when at least 5 are pending. */
+  const top = a.workload[0];
+  const showTopReviewer = !!top && top.reviewerName !== "Unassigned" && a.backlog.count >= 5;
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Approval operations</div>
+          {a.read && <div className="mt-1 text-[12px] text-gray-300">{a.read}</div>}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
+            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
+            {a.pressure === "calm" ? "Calm" : a.pressure === "watch" ? "Watch" : a.pressure === "risk" ? "Risk" : "Critical"}
+          </span>
+          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
+            {a.healthScore}
+            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stat row */}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile label="Pending" value={a.backlog.count.toString()} />
+        <StatTile label="Held value" value={formatCompactUsd(a.backlog.totalValue)} unit="USD" />
+        <StatTile
+          label="Oldest"
+          value={a.backlog.oldestDays > 0 ? `${a.backlog.oldestDays}d` : "—"}
+          tone={a.backlog.oldestDays >= 14 ? "rose" : a.backlog.oldestDays >= 7 ? "amber" : "neutral"}
+        />
+        <StatTile
+          label="Cycle"
+          value={a.cycle.avgCycleDays > 0 ? `${a.cycle.avgCycleDays.toFixed(1)}d` : "—"}
+          hint={a.cycle.trendPct >= 8 ? `↑ ${a.cycle.trendPct.toFixed(0)}% vs prior` : undefined}
+          tone={a.cycle.trendPct >= 50 ? "amber" : "neutral"}
+        />
+      </div>
+
+      {/* Aging mini-grid */}
+      {a.backlog.count > 0 && (
+        <div className="mt-3 grid grid-cols-5 gap-2">
+          {a.aging.map((b) => {
+            const critical = b.key === "14_plus" || b.key === "8_14d";
+            const watch    = b.key === "4_7d";
+            const valueCls = critical ? "text-rose-300" : watch ? "text-amber-200" : "text-gray-200";
+            const barCls   = critical ? "bg-rose-300/60" : watch ? "bg-amber-300/60" : "bg-white/40";
+            const maxValue = Math.max(1, ...a.aging.map((x) => x.totalValue));
+            return (
+              <div key={b.key} className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-2 py-1.5">
+                <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{b.label}</div>
+                <div className={`mt-0.5 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>
+                  {b.count}
+                </div>
+                <div className="mt-0.5 text-[9px] text-gray-600 tabular-nums">{formatCompactUsd(b.totalValue)}</div>
+                <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                  <div className={`h-full ${barCls}`} style={{ width: `${Math.max(3, (b.totalValue / maxValue) * 100)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Top reviewer concentration line */}
+      {showTopReviewer && top && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2">
+          <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${(top.backlogShare ?? 0) >= 0.8 ? "bg-rose-400" : (top.backlogShare ?? 0) >= 0.6 ? "bg-amber-300" : "bg-white/40"}`} />
+          <div className="min-w-0 flex-1 text-[11px] text-gray-300">
+            <span className="font-medium">{top.reviewerName}</span>
+            <span className="text-gray-500"> · </span>
+            <span className="tabular-nums">{top.pendingCount} pending</span>
+            <span className="text-gray-500"> · </span>
+            <span className="tabular-nums">{Math.round((top.backlogShare ?? 0) * 100)}% of queue</span>
+            {top.avgLatencyDays > 0 && (
+              <>
+                <span className="text-gray-500"> · </span>
+                <span className="tabular-nums">avg {top.avgLatencyDays.toFixed(1)}d</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatTile({
+  label, value, unit, hint, tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  hint?: string;
+  tone?: "neutral" | "amber" | "rose";
+}) {
+  const valueCls =
+    tone === "rose"  ? "text-rose-300"
+    : tone === "amber" ? "text-amber-200"
+    :                    "text-gray-200";
+  return (
+    <div className="rounded-lg border border-white/[0.04] bg-white/[0.012] px-2.5 py-2">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{label}</div>
+      <div className={`mt-1 text-[15px] font-medium tabular-nums tracking-tight ${valueCls}`}>
+        {value}
+        {unit && <span className="ml-1 text-[10px] text-gray-500">{unit}</span>}
+      </div>
+      {hint && <div className="mt-0.5 text-[10px] text-gray-500">{hint}</div>}
+    </div>
+  );
+}
+
+function formatCompactUsd(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return (n / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2) + "M";
+  if (abs >= 1_000)     return (n / 1_000).toFixed(abs >= 10_000 ? 1 : 2) + "K";
+  return n.toFixed(0);
 }
