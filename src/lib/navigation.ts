@@ -174,7 +174,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "markets",          tKey: "app.markets",          name: "Markets",           icon: MarketsIcon,   route: "/markets",          active: true  },
 
   /* ── Finance ── */
-  { id: "finance",          tKey: "app.finance",          name: "Finance",           icon: FinanceIcon,   route: "/finance",          active: false },
+  { id: "finance",          tKey: "app.finance",          name: "Finance",           icon: FinanceIcon,   route: "/finance",          active: true,  newSince: "2026-05-16" },
   { id: "expenses",         tKey: "app.expenses",         name: "Expenses",          icon: ExpensesIcon,  route: "/expenses",         active: false },
 
   /* ── People ── */
