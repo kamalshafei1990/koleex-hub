@@ -7,10 +7,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/* Finance sub-nav.
+   Note: "Expense Analytics" links to /finance/expenses (the executive
+   insights view). Daily expense ENTRY happens in the separate Expenses
+   app at /expenses — accessed from the main sidebar — so junior finance
+   can be granted entry without seeing the Finance module. */
 const TABS = [
   { href: "/finance",                label: "Dashboard" },
   { href: "/finance/orders",         label: "Orders" },
-  { href: "/finance/expenses",       label: "Expenses" },
+  { href: "/finance/expenses",       label: "Expense Analytics" },
   { href: "/finance/customers",      label: "Customers" },
   { href: "/finance/suppliers",      label: "Suppliers" },
   { href: "/finance/payments",       label: "Payments" },

@@ -1,22 +1,39 @@
 "use client";
 
+/* ---------------------------------------------------------------------------
+   Finance · Expense Analytics  ( /finance/expenses )
+
+   Phase 1.3 refocus: this page is NO LONGER a data-entry surface. It's
+   the executive analytics view over the same finance_expenses table
+   that the Expenses app at /expenses writes into. Two apps, one table.
+
+   Daily entry → /expenses (separate sidebar app, gated on "Expenses").
+   Strategic view → /finance/expenses (this page, gated on "Finance").
+
+   What this page shows:
+     · KPI strip — totals + paid + unpaid + overdue
+     · By-category tile grid with month-over-month trend arrows
+     · Recent increases + unusual expenses insights
+     · Order-linked expense impact (which orders absorb the most spend)
+     · Open Expenses App button → /expenses
+   --------------------------------------------------------------------------- */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
   SectionCard,
-  StatusBadge,
 } from "@/components/finance/FinanceUi";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 
-export default function FinanceExpenses() {
+export default function FinanceExpenseAnalytics() {
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Partial<FinanceExpense> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,7 +61,6 @@ export default function FinanceExpenses() {
     return { total, paid, unpaid, overdue };
   }, [expenses]);
 
-  /* Build per-category breakdown + month-over-month delta for insights. */
   const categoryBreakdown = useMemo(() => {
     const today = new Date();
     const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -72,9 +88,6 @@ export default function FinanceExpenses() {
   }, [expenses]);
 
   const insights = useMemo(() => {
-    /* "Recent increases" — categories where this-month spend grew vs last
-       month by more than 25%. "Unusual" — expenses that are 3× the median
-       of their category. */
     const recent = categoryBreakdown.filter((c) => c.delta_pct != null && c.delta_pct > 25);
     const median = (xs: number[]) => {
       if (xs.length === 0) return 0;
@@ -98,58 +111,50 @@ export default function FinanceExpenses() {
     return { recent, unusual };
   }, [categoryBreakdown, expenses]);
 
-  const startNew = () => setEditing({
-    title: "",
-    amount: 0,
-    currency: "USD",
-    expense_date: new Date().toISOString().slice(0, 10),
-    payment_status: "unpaid",
-    category_id: null,
-  });
-
-  const save = async () => {
-    if (!editing) return;
-    if (!editing.title?.trim() || !editing.amount) {
-      alert("Please add a title and amount.");
-      return;
+  /* Order-impact analysis — which orders absorb the most expense
+     dollars. This is exactly the kind of insight that doesn't belong
+     in the operational Expenses app but matters for the executive view. */
+  const orderImpact = useMemo(() => {
+    const map = new Map<string, { order_id: string; total: number; count: number }>();
+    for (const e of expenses) {
+      if (!e.linked_order_id) continue;
+      const cur = map.get(e.linked_order_id) ?? { order_id: e.linked_order_id, total: 0, count: 0 };
+      cur.total += Number(e.amount) || 0;
+      cur.count += 1;
+      map.set(e.linked_order_id, cur);
     }
-    const r = await fetch("/api/finance/expenses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editing),
-    });
-    if (!r.ok) { alert("Save failed"); return; }
-    setEditing(null);
-    void load();
-  };
+    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [expenses]);
 
-  const remove = async (id: string) => {
-    if (!confirm("Delete this expense?")) return;
-    await fetch(`/api/finance/expenses/${id}`, { method: "DELETE" });
-    void load();
-  };
+  /* Surface unused category list for future drill-down filters (e.g. a
+     "Click a category to filter" affordance Phase 2 may add). Keep
+     the variable referenced so the compiler doesn't strip it. */
+  void categories;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Expenses"
-          subtitle="Record what the business spends — by category, with links to orders and suppliers."
+          title="Expense Analytics"
+          subtitle="Where the money goes — by category, by order, by trend. Daily entry lives in the Expenses app."
           action={
-            <button onClick={startNew} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] hover:opacity-90 active:scale-95">+ New Expense</button>
+            <Link
+              href="/expenses"
+              className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
+            >
+              Open Expenses App ↗
+            </Link>
           }
         />
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Expenses" value={kpi.total} currency="USD" accent="fuchsia" loading={loading} />
-          <KpiCard label="Paid" value={kpi.paid} currency="USD" accent="emerald" loading={loading} />
-          <KpiCard label="Unpaid" value={kpi.unpaid} currency="USD" accent="amber" loading={loading} />
-          <KpiCard label="Overdue" value={kpi.overdue} currency="USD" accent="rose" loading={loading} />
+          <KpiCard label="Total Expenses" value={kpi.total}   currency="USD" accent="fuchsia" loading={loading} />
+          <KpiCard label="Paid"           value={kpi.paid}    currency="USD" accent="emerald" loading={loading} />
+          <KpiCard label="Unpaid"         value={kpi.unpaid}  currency="USD" accent="amber"   loading={loading} />
+          <KpiCard label="Overdue"        value={kpi.overdue} currency="USD" accent="rose"    loading={loading} />
         </div>
 
-        {/* Visual category cards — one tile per category with glyph, color,
-            share of total, and month-over-month trend arrow. Click filters
-            the table below. */}
+        {/* By Category */}
         {categoryBreakdown.length > 0 && (
           <div className="mt-6">
             <SectionCard
@@ -191,11 +196,11 @@ export default function FinanceExpenses() {
           </div>
         )}
 
-        {/* Insights — recent increases + unusual expenses */}
-        {(insights.recent.length > 0 || insights.unusual.length > 0) && (
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {/* Insights row */}
+        {(insights.recent.length > 0 || insights.unusual.length > 0 || orderImpact.length > 0) && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {insights.recent.length > 0 && (
-              <SectionCard title="Recent increases" subtitle="Categories where this-month spend grew >25% vs last month.">
+              <SectionCard title="Recent Increases" subtitle="Categories whose spend grew >25 % this month.">
                 <ul className="space-y-2">
                   {insights.recent.map((c) => {
                     const style = styleForCategory(c.name);
@@ -208,9 +213,7 @@ export default function FinanceExpenses() {
                             <div className="text-[10px] text-gray-500">This month {fmtMoney(c.thisMonth, "USD", { compact: true })} · last month {fmtMoney(c.lastMonth, "USD", { compact: true })}</div>
                           </div>
                         </div>
-                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
-                          ▲ {fmtPct(c.delta_pct ?? 0)}
-                        </span>
+                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
                       </li>
                     );
                   })}
@@ -218,7 +221,7 @@ export default function FinanceExpenses() {
               </SectionCard>
             )}
             {insights.unusual.length > 0 && (
-              <SectionCard title="Unusual expenses" subtitle="Items 3× larger than the median for their category.">
+              <SectionCard title="Unusual Expenses" subtitle="Items 3× larger than the median of their category.">
                 <ul className="space-y-2">
                   {insights.unusual.slice(0, 6).map((e) => (
                     <li key={e.id} className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2">
@@ -232,120 +235,42 @@ export default function FinanceExpenses() {
                 </ul>
               </SectionCard>
             )}
+            {orderImpact.length > 0 && (
+              <SectionCard title="Order-Linked Impact" subtitle="Orders absorbing the most expense spend.">
+                <ul className="space-y-2">
+                  {orderImpact.map((o, idx) => (
+                    <li key={o.order_id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{idx + 1}</span>
+                        <div className="min-w-0">
+                          <div className="font-mono text-[11px] font-medium">{o.order_id.slice(0, 8)}…</div>
+                          <div className="text-[10px] text-gray-500">{o.count} {o.count === 1 ? "expense" : "expenses"} linked</div>
+                        </div>
+                      </div>
+                      <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, "USD", { compact: true })}</span>
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
+            )}
           </div>
         )}
 
-        {editing && (
+        {/* When the tenant has no expenses yet, point them at the Expenses app */}
+        {!loading && expenses.length === 0 && (
           <div className="mt-6">
-            <SectionCard
-              title={editing.id ? "Edit expense" : "New expense"}
-              action={
-                <div className="flex gap-2">
-                  <button onClick={() => setEditing(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
-                  <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30">Save</button>
-                </div>
-              }
-            >
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Field label="Title" wide>
-                  <input value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="e.g. Sea freight Q2" className={INPUT} />
-                </Field>
-                <Field label="Amount">
-                  <input type="number" inputMode="decimal" value={editing.amount ?? 0} onChange={(e) => setEditing({ ...editing, amount: Number(e.target.value) || 0 })} className={INPUT} />
-                </Field>
-                <Field label="Currency">
-                  <select value={editing.currency ?? "USD"} onChange={(e) => setEditing({ ...editing, currency: e.target.value })} className={INPUT}>
-                    {["USD","EUR","CNY","EGP","GBP"].map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                </Field>
-                <Field label="Date">
-                  <input type="date" value={editing.expense_date ?? ""} onChange={(e) => setEditing({ ...editing, expense_date: e.target.value })} className={INPUT} />
-                </Field>
-                <Field label="Category">
-                  <select value={editing.category_id ?? ""} onChange={(e) => setEditing({ ...editing, category_id: e.target.value || null })} className={INPUT}>
-                    <option value="">—</option>
-                    {categories.filter((c) => !c.parent_id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="Status">
-                  <select value={editing.payment_status ?? "unpaid"} onChange={(e) => setEditing({ ...editing, payment_status: e.target.value as FinanceExpense["payment_status"] })} className={INPUT}>
-                    {(["unpaid","partial","paid","overdue"] as const).map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </Field>
-                <Field label="Due date">
-                  <input type="date" value={editing.due_date ?? ""} onChange={(e) => setEditing({ ...editing, due_date: e.target.value || null })} className={INPUT} />
-                </Field>
-                <Field label="Linked supplier">
-                  <input value={editing.linked_supplier_id ?? ""} onChange={(e) => setEditing({ ...editing, linked_supplier_id: e.target.value || null })} placeholder="Supplier name or ID" className={INPUT} />
-                </Field>
-                <Field label="Notes" wide>
-                  <input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} className={INPUT} />
-                </Field>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        <div className="mt-6">
-          {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading expenses…</div></SectionCard>
-          ) : expenses.length === 0 ? (
             <EmptyState
               title="No expenses recorded yet"
-              hint="Track shipping costs, customs duties, banking fees, marketing spend and more."
-              action={<button onClick={startNew} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">+ Record First Expense</button>}
+              hint="Daily expense entry happens in the Expenses app — open it from the sidebar or the button above."
+              action={
+                <Link href="/expenses" className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">
+                  Open Expenses App ↗
+                </Link>
+              }
             />
-          ) : (
-            <SectionCard>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-left text-[10px] uppercase tracking-wider text-gray-500">
-                    <tr>
-                      <th className="py-2 pr-3">Date</th>
-                      <th className="py-2 pr-3">Title</th>
-                      <th className="py-2 pr-3">Category</th>
-                      <th className="py-2 pr-3 text-right">Amount</th>
-                      <th className="py-2 pr-3">Status</th>
-                      <th className="py-2 pr-3">Due</th>
-                      <th className="py-2 pr-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenses.map((e) => (
-                      <tr key={e.id} className="border-t border-white/[0.04] transition hover:bg-white/[0.02]">
-                        <td className="py-3 pr-3 text-gray-400 tabular-nums">{e.expense_date}</td>
-                        <td className="py-3 pr-3">
-                          <div className="font-medium">{e.title || "—"}</div>
-                          {e.notes && <div className="text-[11px] text-gray-500">{e.notes}</div>}
-                        </td>
-                        <td className="py-3 pr-3 text-gray-400">{e.category_name ?? "—"}</td>
-                        <td className="py-3 pr-3 text-right tabular-nums font-semibold text-rose-400">−{fmtMoney(e.amount, e.currency, { compact: true })}</td>
-                        <td className="py-3 pr-3"><StatusBadge status={e.payment_status} /></td>
-                        <td className="py-3 pr-3 text-gray-400 tabular-nums">{e.due_date ?? "—"}</td>
-                        <td className="py-3 pr-3 text-right">
-                          <button onClick={() => setEditing(e)} className="text-[11px] text-gray-400 hover:text-gray-200">Edit</button>
-                          <button onClick={() => remove(e.id)} className="ml-3 text-[11px] text-rose-400 hover:text-rose-300">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </SectionCard>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-const INPUT = "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none";
-
-function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
-  return (
-    <label className={`flex flex-col gap-1 ${wide ? "col-span-2" : ""}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{label}</span>
-      {children}
-    </label>
   );
 }
