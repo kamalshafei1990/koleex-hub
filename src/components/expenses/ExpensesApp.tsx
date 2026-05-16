@@ -646,176 +646,327 @@ function ExpenseEditor({
     }
   };
 
+  /* Live preview of the selected category — drives both the modal
+     header accent stripe and the category section title chip. */
+  const selectedCat = local.category_id
+    ? categories.find((c) => c.id === local.category_id) ?? null
+    : null;
+  const selectedParent = selectedCat?.parent_id
+    ? categories.find((c) => c.id === selectedCat.parent_id) ?? null
+    : selectedCat;
+  const selectedStyle = styleForCategory(selectedCat?.name);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm px-4 py-12" onClick={onClose}>
-      <div className="relative w-full max-w-xl rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">{local.id ? "Edit expense" : "Add expense"}</h2>
-            <p className="mt-0.5 text-[11px] text-gray-500">Title + amount + category is enough. Add the rest only if you have it.</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200"><RrIcon name="cross" size={12} /></button>
-        </div>
-        <div className="space-y-4 px-5 py-5">
-          {/* Title — single biggest input, autofocus */}
-          <label className="block">
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              <span>What was this for?</span>
-              <GuidanceTip guidanceId="expense.title" />
-            </span>
-            <input
-              autoFocus
-              value={local.title ?? ""}
-              onChange={(e) => setLocal({ ...local, title: e.target.value })}
-              placeholder="e.g. Sea freight to Alexandria"
-              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-            />
-          </label>
-
-          {/* Amount + currency on one row */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                <span>Amount</span>
-                <GuidanceTip guidanceId="expense.amount" />
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md px-0 py-0 sm:items-center sm:px-4 sm:py-10"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_72px_rgba(0,0,0,0.6)] sm:rounded-2xl"
+        style={{ maxHeight: "min(92vh, 880px)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ─── Sticky header ─── */}
+        <div
+          className="relative shrink-0 border-b border-white/[0.06]"
+          style={{
+            background: `linear-gradient(180deg, ${selectedStyle ? "rgba(255,255,255,0.02)" : "transparent"} 0%, transparent 100%)`,
+          }}
+        >
+          {/* Accent stripe — picks up the chosen category's accent. */}
+          <div className={`absolute inset-x-0 top-0 h-[2px] ${accentSolidBg(selectedStyle.accent)} opacity-70`} />
+          <div className="flex items-start justify-between gap-3 px-5 py-4 sm:px-6">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${accentBgClass(selectedStyle.accent)}`}>
+                <RrIcon name={selectedStyle.icon} size={16} />
               </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={local.amount ?? 0}
-                onChange={(e) => setLocal({ ...local, amount: Number(e.target.value) || 0 })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base tabular-nums placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Currency</span>
-              <select
-                value={local.currency ?? "USD"}
-                onChange={(e) => setLocal({ ...local, currency: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-sm focus:border-white/[0.22] focus:outline-none"
-              >
-                {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </label>
-          </div>
-
-          {/* Category — grouped picker (parent groups + searchable sub-categories) */}
-          <CategoryPicker
-            categories={categories}
-            value={local.category_id ?? null}
-            onChange={(id) => setLocal({ ...local, category_id: id })}
-          />
-
-          {/* Date + status + due date */}
-          <div className="grid grid-cols-3 gap-3">
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Date</span>
-              <input
-                type="date"
-                value={local.expense_date ?? ""}
-                onChange={(e) => setLocal({ ...local, expense_date: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                <span>Status</span>
-                <GuidanceTip guidanceId="expense.paymentStatus" />
-              </span>
-              <select
-                value={local.payment_status ?? "unpaid"}
-                onChange={(e) => setLocal({ ...local, payment_status: e.target.value as FinanceExpense["payment_status"] })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
-              >
-                <option value="unpaid">Unpaid</option>
-                <option value="partial">Partial</option>
-                <option value="paid">Paid</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-                <span>Due date</span>
-                <GuidanceTip guidanceId="expense.dueDate" />
-              </span>
-              <input
-                type="date"
-                value={local.due_date ?? ""}
-                onChange={(e) => setLocal({ ...local, due_date: e.target.value || null })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
-              />
-            </label>
-          </div>
-
-          {/* Notes */}
-          <label className="block">
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              <span>Notes (optional)</span>
-              <GuidanceTip guidanceId="expense.notes" />
-            </span>
-            <input
-              value={local.notes ?? ""}
-              onChange={(e) => setLocal({ ...local, notes: e.target.value })}
-              placeholder="One-line context"
-              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-            />
-          </label>
-
-          {/* Advanced (collapsed by default) */}
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((v) => !v)}
-            className="text-[11px] text-gray-400 hover:text-gray-200"
-          >
-            {advancedOpen ? "− Hide" : "+ Show"} more options (link to order / supplier / receipt URL)
-          </button>
-          {advancedOpen && (
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 p-3">
-              <label className="col-span-2 block">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Legacy receipt URL</span>
-                <input
-                  value={local.attachment_url ?? ""}
-                  onChange={(e) => setLocal({ ...local, attachment_url: e.target.value || null })}
-                  placeholder="https://… (most teams now use the Evidence drawer instead)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Linked supplier</span>
-                <input
-                  value={local.linked_supplier_id ?? ""}
-                  onChange={(e) => setLocal({ ...local, linked_supplier_id: e.target.value || null })}
-                  placeholder="Supplier id (optional)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Linked customer</span>
-                <input
-                  value={local.linked_customer_id ?? ""}
-                  onChange={(e) => setLocal({ ...local, linked_customer_id: e.target.value || null })}
-                  placeholder="Customer id (optional)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-                />
-              </label>
+              <div className="min-w-0">
+                <h2 className="truncate text-[15px] font-semibold text-[var(--text-primary)]">
+                  {local.id ? "Edit expense" : "Add expense"}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-gray-500">
+                  Title, amount, and a category — done in 20 seconds. The rest is optional.
+                </p>
+              </div>
             </div>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-5 py-3">
-          {/* Inline error — replaces native alert() so the calm vibe survives. */}
-          <div className="min-w-0 flex-1 text-[11px] text-rose-300/90">{error ?? ""}</div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button onClick={onClose} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
             <button
-              onClick={save}
-              disabled={saving}
-              className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-xs font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+              onClick={onClose}
+              aria-label="Close"
+              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-white/[0.06] hover:text-gray-100"
             >
-              {saving ? "Saving…" : wasNew ? "Save & attach receipt" : "Save expense"}
+              <RrIcon name="cross" size={14} />
             </button>
+          </div>
+        </div>
+
+        {/* ─── Scrollable body ─── */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="space-y-6">
+            {/* ── Section 1: Basics ─────────────────────────────── */}
+            <Section title="Basics" hint="What it was and how much it cost.">
+              <div className="space-y-3">
+                <FieldLabel label="What was this for?" helpId="expense.title" required>
+                  <input
+                    autoFocus
+                    value={local.title ?? ""}
+                    onChange={(e) => setLocal({ ...local, title: e.target.value })}
+                    placeholder="e.g. Sea freight to Alexandria"
+                    className={INPUT_LG}
+                  />
+                </FieldLabel>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <FieldLabel label="Amount" helpId="expense.amount" required>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={local.amount ?? 0}
+                        onChange={(e) => setLocal({ ...local, amount: Number(e.target.value) || 0 })}
+                        className={`${INPUT_LG} tabular-nums`}
+                      />
+                    </FieldLabel>
+                  </div>
+                  <FieldLabel label="Currency">
+                    <select
+                      value={local.currency ?? "USD"}
+                      onChange={(e) => setLocal({ ...local, currency: e.target.value })}
+                      className={INPUT_LG}
+                    >
+                      {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </FieldLabel>
+                </div>
+              </div>
+            </Section>
+
+            {/* ── Section 2: Category (the star of the show) ────── */}
+            <Section
+              title="Category"
+              hint="Pick a group on the left, then a specific sub-category."
+              right={
+                selectedCat ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${accentBgClass(selectedStyle.accent)}`}
+                  >
+                    <RrIcon name={selectedStyle.icon} size={11} />
+                    {selectedParent && selectedParent.id !== selectedCat.id ? (
+                      <>
+                        <span className="opacity-60">{selectedParent.name}</span>
+                        <span className="opacity-40">·</span>
+                        <span>{selectedCat.name}</span>
+                      </>
+                    ) : (
+                      <span>{selectedCat.name}</span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-dashed border-white/[0.12] px-2 py-0.5 text-[11px] text-gray-500">
+                    No category selected
+                  </span>
+                )
+              }
+            >
+              <CategoryPicker
+                categories={categories}
+                value={local.category_id ?? null}
+                onChange={(id) => setLocal({ ...local, category_id: id })}
+              />
+            </Section>
+
+            {/* ── Section 3: Schedule ───────────────────────────── */}
+            <Section title="Schedule" hint="When the cost was incurred and when it's due.">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <FieldLabel label="Date">
+                  <input
+                    type="date"
+                    value={local.expense_date ?? ""}
+                    onChange={(e) => setLocal({ ...local, expense_date: e.target.value })}
+                    className={INPUT}
+                  />
+                </FieldLabel>
+                <FieldLabel label="Status" helpId="expense.paymentStatus">
+                  <select
+                    value={local.payment_status ?? "unpaid"}
+                    onChange={(e) => setLocal({ ...local, payment_status: e.target.value as FinanceExpense["payment_status"] })}
+                    className={INPUT}
+                  >
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </FieldLabel>
+                <FieldLabel label="Due date" helpId="expense.dueDate">
+                  <input
+                    type="date"
+                    value={local.due_date ?? ""}
+                    onChange={(e) => setLocal({ ...local, due_date: e.target.value || null })}
+                    className={INPUT}
+                  />
+                </FieldLabel>
+              </div>
+            </Section>
+
+            {/* ── Section 4: Notes ──────────────────────────────── */}
+            <Section title="Notes" hint="Optional — one line of context if it'll help your future self.">
+              <FieldLabel label="Notes" helpId="expense.notes">
+                <input
+                  value={local.notes ?? ""}
+                  onChange={(e) => setLocal({ ...local, notes: e.target.value })}
+                  placeholder="One-line context"
+                  className={INPUT}
+                />
+              </FieldLabel>
+            </Section>
+
+            {/* ── Section 5: Advanced (collapsed by default) ────── */}
+            <div className="rounded-xl border border-white/[0.05] bg-[var(--bg-primary)]/40">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left text-[12px] font-medium text-gray-300 transition hover:text-gray-100"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <RrIcon name={advancedOpen ? "cross" : "plus"} size={11} className="opacity-70" />
+                  Advanced options
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                  link to order / supplier / receipt URL
+                </span>
+              </button>
+              {advancedOpen && (
+                <div className="grid grid-cols-1 gap-3 border-t border-white/[0.05] px-4 py-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <FieldLabel label="Legacy receipt URL">
+                      <input
+                        value={local.attachment_url ?? ""}
+                        onChange={(e) => setLocal({ ...local, attachment_url: e.target.value || null })}
+                        placeholder="https://… (most teams now use the Evidence drawer instead)"
+                        className={INPUT}
+                      />
+                    </FieldLabel>
+                  </div>
+                  <FieldLabel label="Linked supplier">
+                    <input
+                      value={local.linked_supplier_id ?? ""}
+                      onChange={(e) => setLocal({ ...local, linked_supplier_id: e.target.value || null })}
+                      placeholder="Supplier id (optional)"
+                      className={INPUT}
+                    />
+                  </FieldLabel>
+                  <FieldLabel label="Linked customer">
+                    <input
+                      value={local.linked_customer_id ?? ""}
+                      onChange={(e) => setLocal({ ...local, linked_customer_id: e.target.value || null })}
+                      placeholder="Customer id (optional)"
+                      className={INPUT}
+                    />
+                  </FieldLabel>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Sticky footer ─── */}
+        <div className="shrink-0 border-t border-white/[0.06] bg-[var(--bg-secondary)] px-5 py-3 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {error ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-300">
+                  <RrIcon name="info" size={10} />
+                  {error}
+                </span>
+              ) : (
+                <span className="text-[11px] text-gray-500">
+                  {selectedCat ? `Category · ${selectedCat.name}` : "Pick a category to make reporting cleaner."}
+                </span>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={onClose}
+                className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 transition hover:border-white/[0.18] hover:text-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-inverted)] px-4 py-2 text-xs font-semibold text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+              >
+                {saving ? (
+                  <>
+                    <RrIcon name="loading" size={11} className="animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <RrIcon name="check" size={11} />
+                    {wasNew ? "Save & attach receipt" : "Save expense"}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Tiny presentational helpers for the editor ─────────────────── */
+
+const INPUT =
+  "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 transition focus:border-white/[0.22] focus:outline-none focus:ring-1 focus:ring-white/[0.08]";
+
+const INPUT_LG =
+  "w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-gray-600 transition focus:border-white/[0.22] focus:outline-none focus:ring-1 focus:ring-white/[0.08]";
+
+function Section({
+  title,
+  hint,
+  right,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">{title}</h3>
+          {hint && <p className="mt-0.5 text-[11px] text-gray-500">{hint}</p>}
+        </div>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FieldLabel({
+  label,
+  helpId,
+  required,
+  children,
+}: {
+  label: string;
+  helpId?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+        <span>{label}</span>
+        {required && <span className="text-rose-400">*</span>}
+        {helpId && <GuidanceTip guidanceId={helpId} />}
+      </span>
+      <span className="mt-1 block">{children}</span>
+    </label>
   );
 }
 
@@ -879,107 +1030,154 @@ function CategoryPicker({
     ? activeChildren.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase()))
     : activeChildren;
 
+  const activeParentObj = activeParent ? parents.find((p) => p.id === activeParent) ?? null : null;
+  const activeParentStyle = styleForCategory(activeParentObj?.name);
+  const childCount = (id: string) => (childrenByParent.get(id) ?? []).length;
+
   return (
-    <div>
-      <div className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-        <span>Category</span>
-        <GuidanceTip guidanceId="expense.category" />
+    <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-[var(--bg-primary)]">
+      {/* Search strip — spans the full width */}
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] bg-[var(--bg-secondary)] px-3 py-2">
+        <div className="inline-flex items-center gap-2">
+          <RrIcon name="search" size={12} className="text-gray-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={activeParentObj ? `Filter ${activeParentObj.name.toLowerCase()}…` : "Search categories…"}
+            className="w-44 bg-transparent text-[12px] placeholder-gray-600 focus:outline-none sm:w-64"
+          />
+        </div>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
+          >
+            <RrIcon name="cross" size={9} />
+            Clear
+          </button>
+        )}
       </div>
 
-      {/* Parent row — colour-coded tiles, one per group */}
-      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-        {parents.map((p) => {
-          const style = styleForCategory(p.name);
-          const isActive = activeParent === p.id;
-          const isSelected = value === p.id || categories.find((c) => c.id === value)?.parent_id === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                setActiveParent(p.id);
-                setQuery("");
-              }}
-              className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-colors duration-200 ${
-                isActive
-                  ? accentActiveClass(style.accent)
-                  : `${accentBgClass(style.accent)} hover:border-white/[0.18]`
-              }`}
-              title={p.name}
-            >
-              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${accentSolidBg(style.accent)}/30`}>
-                <RrIcon name={style.icon} size={16} />
-              </span>
-              <span className="line-clamp-2 text-[10px] font-semibold leading-tight">{p.name}</span>
-              {isSelected && (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-white/10 px-1.5 py-[1px] text-[8px] font-bold uppercase tracking-wider">
-                  <RrIcon name="check" size={8} /> in use
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Sub-category panel for the active parent */}
-      {activeParent && (
-        <div className="mt-3 rounded-xl border border-white/[0.06] bg-[var(--bg-primary)] p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-              {parents.find((p) => p.id === activeParent)?.name} · pick a sub-category
-            </div>
-            {activeChildren.length > 4 && (
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter…"
-                className="h-7 w-32 rounded-md border border-white/[0.06] bg-[var(--bg-secondary)] px-2 text-[11px] placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
-              />
-            )}
-          </div>
-
-          {/* Parent row itself as a fallback tile */}
-          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => onChange(activeParent)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-medium transition-colors duration-200 ${
-                value === activeParent
-                  ? accentActiveClass(styleForCategory(parents.find((p) => p.id === activeParent)?.name).accent)
-                  : "border-white/[0.06] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.18]"
-              }`}
-            >
-              <RrIcon name="info" size={11} />
-              <span className="truncate">General · {parents.find((p) => p.id === activeParent)?.name}</span>
-            </button>
-
-            {filteredChildren.map((c) => {
-              const style = styleForCategory(c.name);
-              const active = value === c.id;
+      {/* Master-detail body: parent rail | sub grid */}
+      <div className="grid grid-cols-1 md:grid-cols-[210px_1fr]">
+        {/* Parent rail — horizontal scroller on mobile, vertical rail on desktop */}
+        <div className="border-b border-white/[0.05] bg-[var(--bg-secondary)]/40 md:border-b-0 md:border-r">
+          <div
+            className="flex gap-1 overflow-x-auto p-2 md:max-h-[340px] md:flex-col md:overflow-x-hidden md:overflow-y-auto"
+            role="listbox"
+            aria-label="Category groups"
+          >
+            {parents.map((p) => {
+              const style = styleForCategory(p.name);
+              const isActive = activeParent === p.id;
+              const isSelected = value === p.id || categories.find((c) => c.id === value)?.parent_id === p.id;
               return (
                 <button
-                  key={c.id}
+                  key={p.id}
                   type="button"
-                  onClick={() => onChange(c.id)}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-medium transition-colors duration-200 ${
-                    active
-                      ? accentActiveClass(style.accent)
-                      : `${accentBgClass(style.accent)} hover:border-white/[0.18]`
+                  onClick={() => {
+                    setActiveParent(p.id);
+                    setQuery("");
+                  }}
+                  className={`group flex shrink-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all duration-150 md:shrink ${
+                    isActive
+                      ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]`
+                      : "border-transparent text-gray-300 hover:border-white/[0.08] hover:bg-white/[0.03]"
                   }`}
-                  title={c.name}
+                  title={p.name}
+                  role="option"
+                  aria-selected={isActive}
                 >
-                  <RrIcon name={style.icon} size={11} />
-                  <span className="truncate">{c.name}</span>
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${accentBgClass(style.accent)}`}>
+                    <RrIcon name={style.icon} size={13} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-semibold leading-tight">{p.name}</span>
+                    <span className="block text-[9px] uppercase tracking-wider text-gray-500">
+                      {childCount(p.id)} options
+                    </span>
+                  </span>
+                  {isSelected && (
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${accentSolidBg(style.accent)}/40`}>
+                      <RrIcon name="check" size={8} />
+                    </span>
+                  )}
                 </button>
               );
             })}
-
-            {filteredChildren.length === 0 && query && (
-              <div className="col-span-full px-2 py-2 text-[11px] text-gray-500">No sub-categories match &ldquo;{query}&rdquo;.</div>
-            )}
           </div>
         </div>
-      )}
+
+        {/* Sub-category grid */}
+        <div className="md:max-h-[340px] md:overflow-y-auto">
+          <div className="p-3">
+            {activeParentObj && (
+              <div className="mb-2 flex items-center gap-2">
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentBgClass(activeParentStyle.accent)}`}>
+                  <RrIcon name={activeParentStyle.icon} size={11} />
+                </span>
+                <span className="text-[11px] font-semibold text-[var(--text-primary)]">{activeParentObj.name}</span>
+                <span className="text-[10px] text-gray-500">· {activeChildren.length} sub-categories</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {/* "General" parent fallback */}
+              {activeParent && (
+                <button
+                  type="button"
+                  onClick={() => onChange(activeParent)}
+                  className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[12px] font-medium transition-all duration-150 ${
+                    value === activeParent
+                      ? accentActiveClass(activeParentStyle.accent)
+                      : "border-white/[0.05] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.18] hover:bg-white/[0.04]"
+                  }`}
+                  title={`General · ${activeParentObj?.name}`}
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.04]">
+                    <RrIcon name="info" size={11} className="opacity-70" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">General</span>
+                    <span className="block text-[9px] uppercase tracking-wider text-gray-500">{activeParentObj?.name}</span>
+                  </span>
+                </button>
+              )}
+
+              {filteredChildren.map((c) => {
+                const style = styleForCategory(c.name);
+                const active = value === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => onChange(c.id)}
+                    className={`group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[12px] font-medium transition-all duration-150 ${
+                      active
+                        ? `${accentActiveClass(style.accent)} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]`
+                        : `${accentBgClass(style.accent)} hover:border-white/[0.22] hover:brightness-110`
+                    }`}
+                    title={c.name}
+                  >
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accentSolidBg(style.accent)}/25`}>
+                      <RrIcon name={style.icon} size={11} />
+                    </span>
+                    <span className="block min-w-0 flex-1 truncate">{c.name}</span>
+                    {active && <RrIcon name="check" size={11} className="shrink-0 opacity-80" />}
+                  </button>
+                );
+              })}
+
+              {filteredChildren.length === 0 && query && (
+                <div className="col-span-full rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[11px] text-gray-500">
+                  No sub-categories match &ldquo;{query}&rdquo;.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
