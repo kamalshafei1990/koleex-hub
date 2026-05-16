@@ -1176,30 +1176,85 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
-    /* The operator asked for the "old" behaviour: trigger the
-       browser's native print dialog on THIS window (no popup, no
-       new tab). The editor's @media print CSS already hides every
-       piece of Hub chrome, so the printed PDF looks identical to
-       the standalone /print page. We save first so the printed
-       doc reflects the latest edits, then set a friendly title
-       (browsers use it as the default PDF filename), then call
-       window.print(). The title is restored on afterprint. */
+    /* Print via a HIDDEN IFRAME pointing at the dedicated
+       /quotations/<id>/print page. The dedicated page is a
+       standalone route with NO Hub shell -- its print CSS is
+       minimal and known-correct, producing one clean A4 sheet
+       per logical doc page.
+
+       The editor's own @media print CSS has to suppress the
+       entire Hub layout (nav, sidebars, scroll wrappers,
+       Tailwind h-screen + overflow-hidden, etc.), and on Safari
+       16+ that interaction was reliably producing every-other-
+       sheet-blank in the saved PDF. Using an iframe sidesteps
+       all of it: we print exactly what the standalone print
+       page renders, without leaving the editor window. */
     setPdfState("loading");
     try {
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
       }
-      const prev = document.title;
+      const refreshed = await loadQuotationsRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const quotationId = match?.id ?? current.id;
+      if (quotationId.length !== 36) {
+        setPdfState("error");
+        alert("Please save the quotation before exporting.");
+        setTimeout(() => setPdfState("idle"), 2_000);
+        return;
+      }
+      /* Build / reuse a hidden iframe. We re-use a single iframe
+         across multiple exports so the first export pays the
+         cost; subsequent exports reload the same iframe. */
+      const IFRAME_ID = "koleex-pdf-export-frame";
+      let iframe = document.getElementById(IFRAME_ID) as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = IFRAME_ID;
+        iframe.style.position = "fixed";
+        iframe.style.left = "-10000px";
+        iframe.style.top = "0";
+        iframe.style.width = "210mm";
+        iframe.style.height = "297mm";
+        iframe.style.border = "none";
+        iframe.style.visibility = "hidden";
+        document.body.appendChild(iframe);
+      }
+      /* The dedicated print page sets window.__quotation_pdf_ready__
+         once images + fonts have loaded. We watch for it, then
+         invoke the iframe's print(). */
+      const prevTitle = document.title;
       document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
       const restore = () => {
-        document.title = prev;
+        document.title = prevTitle;
         window.removeEventListener("afterprint", restore);
       };
       window.addEventListener("afterprint", restore);
-      setPdfState("idle");
-      /* Small defer so React has flushed the loading-state UI
-         repaint before the browser captures the print snapshot. */
-      requestAnimationFrame(() => window.print());
+
+      iframe.src = `/quotations/${encodeURIComponent(quotationId)}/print`;
+      const onLoad = () => {
+        iframe!.removeEventListener("load", onLoad);
+        const checkReady = () => {
+          const win = iframe!.contentWindow as
+            | (Window & { __quotation_pdf_ready__?: boolean })
+            | null;
+          if (win?.__quotation_pdf_ready__) {
+            try {
+              win.focus();
+              win.print();
+            } catch (err) {
+              alert(`Print failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+            setPdfState("idle");
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        };
+        checkReady();
+      };
+      iframe.addEventListener("load", onLoad);
     } catch (e) {
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);

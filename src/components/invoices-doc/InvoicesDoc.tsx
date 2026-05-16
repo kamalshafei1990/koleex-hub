@@ -1101,26 +1101,74 @@ export default function Quotations() {
      server-rendered buffer to attach. */
   const handleExportPdf = useCallback(async () => {
     if (!current) return;
-    /* Same flow as the Quotations editor: save first, set a nice
-       PDF title, then open the browser's NATIVE print dialog on
-       this window. The editor's @media print CSS hides every
-       piece of Hub chrome, so the saved PDF matches the standalone
-       /invoices/:id/print page output -- without opening a new
-       tab or running into popup-blocker issues. */
+    /* Print via a HIDDEN IFRAME pointing at /invoices/<id>/print.
+       The dedicated print page has a clean print CSS that
+       produces correct A4 / US-Letter output; printing the
+       editor's window directly was tangling with the Hub
+       layout's print CSS in Safari and producing every-other-
+       sheet-blank in the saved PDF. The iframe sidesteps that
+       and keeps the operator on the editor (no popup, no new
+       tab). */
     setPdfState("loading");
     try {
       if (current.id.length !== 36 || current.status === "draft") {
         await handleSave("draft");
       }
-      const prev = document.title;
+      const refreshed = await loadInvoicesRemote({ fresh: true });
+      const match = refreshed.find(
+        (q) => q.id === current.id || q.invoiceNo === current.invoiceNo,
+      );
+      const invoiceId = match?.id ?? current.id;
+      if (invoiceId.length !== 36) {
+        setPdfState("error");
+        alert("Please save the invoice before exporting.");
+        setTimeout(() => setPdfState("idle"), 2_000);
+        return;
+      }
+      const IFRAME_ID = "koleex-pdf-export-frame";
+      let iframe = document.getElementById(IFRAME_ID) as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = IFRAME_ID;
+        iframe.style.position = "fixed";
+        iframe.style.left = "-10000px";
+        iframe.style.top = "0";
+        iframe.style.width = "210mm";
+        iframe.style.height = "297mm";
+        iframe.style.border = "none";
+        iframe.style.visibility = "hidden";
+        document.body.appendChild(iframe);
+      }
+      const prevTitle = document.title;
       document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
       const restore = () => {
-        document.title = prev;
+        document.title = prevTitle;
         window.removeEventListener("afterprint", restore);
       };
       window.addEventListener("afterprint", restore);
-      setPdfState("idle");
-      requestAnimationFrame(() => window.print());
+
+      iframe.src = `/invoices/${encodeURIComponent(invoiceId)}/print`;
+      const onLoad = () => {
+        iframe!.removeEventListener("load", onLoad);
+        const checkReady = () => {
+          const win = iframe!.contentWindow as
+            | (Window & { __quotation_pdf_ready__?: boolean })
+            | null;
+          if (win?.__quotation_pdf_ready__) {
+            try {
+              win.focus();
+              win.print();
+            } catch (err) {
+              alert(`Print failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+            setPdfState("idle");
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        };
+        checkReady();
+      };
+      iframe.addEventListener("load", onLoad);
     } catch (e) {
       setPdfState("error");
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
