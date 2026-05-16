@@ -599,6 +599,7 @@ export default function QuotationA4Preview({
             <input
               value={current.validTill}
               onChange={(e) => setMeta("validTill", e.target.value)}
+              placeholder="DD/MM/YYYY"
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>

@@ -1679,8 +1679,15 @@ export default function Quotations() {
                           {q.customerName || t("list.unnamedCustomer")}
                           {q.companyName ? ` - ${q.companyName}` : ""}
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {q.date}
+                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-3 flex-wrap">
+                          <span>
+                            <span className="text-gray-600">Issued:</span> {q.date}
+                          </span>
+                          {q.validTill && (
+                            <span>
+                              <span className="text-gray-600">Due:</span> {q.validTill}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
