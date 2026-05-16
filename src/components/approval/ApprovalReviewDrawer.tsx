@@ -20,11 +20,13 @@ import type {
   ApprovalAction,
   ApprovalStatus,
   FinanceApprovalHistoryEntry,
+  FinanceAttachment,
   FinanceExpense,
 } from "@/lib/finance/types";
 import { ApprovalBadge } from "./ApprovalBadge";
 import { EvidenceBadge } from "@/components/attachments/EvidenceBadge";
 import { fmtMoney } from "@/lib/finance/calc";
+import { isImageMime, isPdfMime } from "@/lib/attachments/client";
 
 interface Props {
   open: boolean;
@@ -45,21 +47,39 @@ export default function ApprovalReviewDrawer({
   const [reason, setReason] = useState("");
   const [reasonMode, setReasonMode] = useState<null | "reject" | "request_changes">(null);
   const [error, setError] = useState<string | null>(null);
+  /* UX-validation pass: attachments load inline so the reviewer can
+     see the actual receipt without closing this drawer and opening
+     the evidence drawer separately. Eliminates drawer-switching for
+     the manager flow. */
+  const [attachments, setAttachments] = useState<FinanceAttachment[]>([]);
+  const [activeAttachmentIdx, setActiveAttachmentIdx] = useState(0);
   /* Once-per-mount timestamp — used for badge "Xd waiting" math without
      calling Date.now() during render. */
   const [nowMs] = useState<number>(() => Date.now());
 
-  /* Load history whenever a new expense opens. */
+  /* Load history + attachments in parallel whenever a new expense
+     opens. Embedded receipts are a key UX improvement — the reviewer
+     reads the proof and the audit trail in one pass, no drawer
+     switching. */
   useEffect(() => {
     if (!open || !expense?.id) return;
     let cancelled = false;
     setLoading(true);
-    void fetch(`/api/finance/expenses/${expense.id}/approval`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled) setHistory((j.history ?? []) as FinanceApprovalHistoryEntry[]);
+    setActiveAttachmentIdx(0);
+    void Promise.all([
+      fetch(`/api/finance/expenses/${expense.id}/approval`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/finance/attachments?entity_type=expense&entity_id=${expense.id}`, { cache: "no-store" }).then((r) => r.json()),
+    ])
+      .then(([histJson, attJson]) => {
+        if (cancelled) return;
+        setHistory((histJson?.history ?? []) as FinanceApprovalHistoryEntry[]);
+        setAttachments((attJson?.attachments ?? []) as FinanceAttachment[]);
       })
-      .catch(() => { if (!cancelled) setHistory([]); })
+      .catch(() => {
+        if (cancelled) return;
+        setHistory([]);
+        setAttachments([]);
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [open, expense?.id]);
@@ -115,7 +135,7 @@ export default function ApprovalReviewDrawer({
     <div className="fixed inset-0 z-[200] flex">
       <button aria-label="Close" onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-[2px]" />
 
-      <aside className="flex h-full w-full max-w-[560px] flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)]">
+      <aside className="flex h-full w-full flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] sm:max-w-[560px]">
         {/* Header */}
         <header className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
           <div className="min-w-0 flex-1">
@@ -172,6 +192,86 @@ export default function ApprovalReviewDrawer({
               </div>
             )}
           </section>
+
+          {/* ── Inline evidence preview — the reviewer reads the proof
+                without leaving this drawer. Thumbnail strip up top
+                + inline image/PDF of the active selection beneath. */}
+          {attachments.length > 0 && (
+            <section className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                  Evidence · {attachments.length} file{attachments.length === 1 ? "" : "s"}
+                </div>
+                {attachments[activeAttachmentIdx]?.signed_url && (
+                  <a
+                    href={attachments[activeAttachmentIdx].signed_url!}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-[10px] text-gray-300 hover:text-white"
+                  >
+                    Open full →
+                  </a>
+                )}
+              </div>
+              {attachments.length > 1 && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto">
+                  {attachments.map((a, i) => {
+                    const isImg = isImageMime(a.file_type);
+                    const active = i === activeAttachmentIdx;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setActiveAttachmentIdx(i)}
+                        className={
+                          "h-12 w-12 shrink-0 overflow-hidden rounded-md border transition-colors " +
+                          (active ? "border-white/[0.25] bg-white/[0.06]" : "border-white/[0.05] bg-white/[0.02] hover:border-white/[0.12]")
+                        }
+                        title={a.file_name}
+                      >
+                        {isImg && a.signed_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.signed_url} alt={a.file_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-[9px] font-semibold tracking-wider text-gray-400">
+                            {isPdfMime(a.file_type) ? "PDF" : "FILE"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {(() => {
+                const active = attachments[activeAttachmentIdx];
+                if (!active || !active.signed_url) return null;
+                if (isImageMime(active.file_type)) {
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={active.signed_url}
+                      alt={active.file_name}
+                      className="mt-2 max-h-[360px] w-full rounded-md bg-black/40 object-contain"
+                    />
+                  );
+                }
+                if (isPdfMime(active.file_type)) {
+                  return (
+                    <iframe
+                      src={active.signed_url}
+                      className="mt-2 h-[360px] w-full rounded-md bg-black/40"
+                      title={active.file_name}
+                    />
+                  );
+                }
+                return (
+                  <div className="mt-2 rounded-md bg-black/30 px-3 py-4 text-center text-[11px] text-gray-500">
+                    Inline preview not available. Open the file in a new tab.
+                  </div>
+                );
+              })()}
+            </section>
+          )}
 
           {/* Approval history timeline */}
           <section>

@@ -1196,8 +1196,16 @@ function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBus
 
 function ApprovalOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
   const a = intel.approval;
-  /* Quiet state — nothing material to say. */
-  if (a.backlog.count === 0 && a.pressure === "calm") return null;
+  /* UX-validation pass: avoid surfacing a dedicated panel for trivial
+     backlogs. The events stream + Copilot already carry small backlog
+     signals where they belong (digest / Copilot hints); the panel
+     surfaces only when there's something a CFO would actually scan
+     for — backlog ≥ 3 OR an item ≥ 7 days old OR non-calm pressure. */
+  const meaningful =
+    a.backlog.count >= 3 ||
+    a.backlog.oldestDays >= 7 ||
+    a.pressure !== "calm";
+  if (!meaningful) return null;
 
   const pressureCls =
     a.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"

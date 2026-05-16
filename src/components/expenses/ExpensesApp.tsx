@@ -347,7 +347,16 @@ export default function ExpensesApp() {
           draft={editing}
           categories={categories}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); void load(); }}
+          onSaved={(saved, wasNew) => {
+            setEditing(null);
+            void load();
+            /* UX-validation pass: a junior finance employee who just
+               created an expense almost always wants to attach the
+               receipt next. Auto-opening the evidence drawer removes
+               the "find the row → hover → click Evidence" friction
+               and saves 2 interactions (typically 5–8 seconds). */
+            if (wasNew && saved) setEvidenceExpense(saved);
+          }}
         />
       )}
 
@@ -360,7 +369,24 @@ export default function ExpensesApp() {
         title={evidenceExpense?.title ?? "Expense"}
         evidenceStatus={evidenceExpense?.evidence_status}
         receiptCount={evidenceExpense?.receipt_count}
+        approvalStatus={evidenceExpense?.approval_status}
         onChange={() => { void load(); }}
+        onSubmitForReview={async () => {
+          if (!evidenceExpense?.id) return;
+          /* Fire-and-forget submit. Server enforces the state machine,
+             so we trust it; on success we close the evidence drawer
+             and refresh the list. The operator's flow stops here —
+             everything else is the manager's job. */
+          const res = await fetch(`/api/finance/expenses/${evidenceExpense.id}/approval`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "submit" }),
+          });
+          if (res.ok) {
+            setEvidenceExpense(null);
+            void load();
+          }
+        }}
       />
 
       {/* ── Phase 2.2 — APPROVAL REVIEW DRAWER ────────────────── */}
@@ -449,15 +475,66 @@ function ExpenseRow({
           <div className="text-right">
             <div className="text-base font-semibold tabular-nums text-rose-300">−{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</div>
           </div>
-          <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-            <button onClick={onReview}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Review</button>
-            <button onClick={onEvidence} className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Evidence</button>
-            <button onClick={onEdit}     className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 hover:border-white/[0.12]">Edit</button>
-            <button onClick={onDelete}   className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-rose-400 hover:border-rose-500/40">Delete</button>
+          {/* UX-validation pass: hover-only actions are invisible on
+              touch devices. We now keep an always-visible Edit + kebab
+              cluster. Primary actions (Review / Evidence) are reachable
+              by tapping the badges to the left of the title — those
+              already serve as primary touch targets on mobile. */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onEdit}
+              className="rounded-md border border-white/[0.05] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05]"
+              title="Edit expense"
+            >
+              Edit
+            </button>
+            <RowKebab onEvidence={onEvidence} onReview={onReview} onDelete={onDelete} />
           </div>
         </div>
       </div>
     </li>
+  );
+}
+
+/* ── RowKebab — overflow menu for less-frequent actions.
+   Touch-friendly (44px tap target via padding) and dismisses on
+   outside click. Replaces the hover-only action cluster which was
+   invisible on phones and tablets. */
+function RowKebab({
+  onEvidence, onReview, onDelete,
+}: {
+  onEvidence: () => void;
+  onReview: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="More actions"
+        onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v); }}
+        className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.05] bg-white/[0.02] text-gray-400 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-gray-100"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+      </button>
+      {open && (
+        <div
+          onClick={(ev) => ev.stopPropagation()}
+          className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]"
+        >
+          <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">Open review</button>
+          <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">Open evidence</button>
+          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-white/[0.05] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">Delete expense</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -473,15 +550,23 @@ function ExpenseEditor({
   draft: Partial<FinanceExpense>;
   categories: ExpenseCategory[];
   onClose: () => void;
-  onSaved: () => void;
+  /** UX-validation pass: surfaces the saved row + isNew flag so the
+   *  parent can auto-open the evidence drawer for fresh expenses. */
+  onSaved: (saved: FinanceExpense | null, wasNew: boolean) => void;
 }) {
   const [local, setLocal] = useState<Partial<FinanceExpense>>(draft);
   const [saving, setSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(!!draft.linked_order_id || !!draft.linked_supplier_id || !!draft.attachment_url);
+  /* Inline error state — replaces native alert() so the calm enterprise
+     vibe survives a validation miss. */
+  const [error, setError] = useState<string | null>(null);
+
+  const wasNew = !draft.id;
 
   const save = async () => {
-    if (!local.title?.trim()) { alert("Please add a title."); return; }
-    if (!Number(local.amount) || Number(local.amount) <= 0) { alert("Amount must be greater than zero."); return; }
+    setError(null);
+    if (!local.title?.trim()) { setError("Add a short title so this expense is findable later."); return; }
+    if (!Number(local.amount) || Number(local.amount) <= 0) { setError("Amount must be greater than zero."); return; }
     setSaving(true);
     try {
       const r = await fetch("/api/expenses", {
@@ -489,8 +574,12 @@ function ExpenseEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(local),
       });
-      if (!r.ok) { alert("Save failed"); return; }
-      onSaved();
+      if (!r.ok) {
+        setError("Save failed — try again.");
+        return;
+      }
+      const body = (await r.json().catch(() => ({}))) as { expense?: FinanceExpense };
+      onSaved(body.expense ?? null, wasNew);
     } finally {
       setSaving(false);
     }
@@ -626,11 +715,11 @@ function ExpenseEditor({
           {advancedOpen && (
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)]/40 p-3">
               <label className="col-span-2 block">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Receipt URL</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Legacy receipt URL</span>
                 <input
                   value={local.attachment_url ?? ""}
                   onChange={(e) => setLocal({ ...local, attachment_url: e.target.value || null })}
-                  placeholder="https://… (Phase 2 will allow direct upload)"
+                  placeholder="https://… (most teams now use the Evidence drawer instead)"
                   className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
                 />
               </label>
@@ -655,15 +744,19 @@ function ExpenseEditor({
             </div>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-white/[0.06] px-5 py-3">
-          <button onClick={onClose} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="rounded-lg bg-emerald-500/20 px-4 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save expense"}
-          </button>
+        <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-5 py-3">
+          {/* Inline error — replaces native alert() so the calm vibe survives. */}
+          <div className="min-w-0 flex-1 text-[11px] text-rose-300/90">{error ?? ""}</div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button onClick={onClose} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="rounded-lg bg-[var(--bg-inverted)] px-4 py-1.5 text-xs font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            >
+              {saving ? "Saving…" : wasNew ? "Save & attach receipt" : "Save expense"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

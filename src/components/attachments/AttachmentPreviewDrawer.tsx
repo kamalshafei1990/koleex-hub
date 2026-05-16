@@ -37,12 +37,21 @@ interface Props {
   /** Current evidence status (expense only). */
   evidenceStatus?: EvidenceStatus;
   receiptCount?: number;
+  /** UX-validation pass: current approval status from the parent —
+   *  when an expense is in `draft` (or `requires_changes`) and now
+   *  carries at least one attachment, the drawer surfaces a
+   *  "Submit for review" shortcut so the operator never has to
+   *  switch drawers. */
+  approvalStatus?: "draft" | "submitted" | "under_review" | "approved" | "partially_approved" | "rejected" | "requires_changes";
   /** Called whenever the attachment set changes so parent can refetch. */
   onChange?: () => void;
+  /** Submit-for-review callback. Wired when entityType==="expense". */
+  onSubmitForReview?: () => void;
 }
 
 export default function AttachmentPreviewDrawer({
-  open, onClose, entityType, entityId, title, evidenceStatus, receiptCount, onChange,
+  open, onClose, entityType, entityId, title, evidenceStatus, receiptCount,
+  approvalStatus, onChange, onSubmitForReview,
 }: Props) {
   const [attachments, setAttachments] = useState<FinanceAttachment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,8 +126,8 @@ export default function AttachmentPreviewDrawer({
       {/* Click-away shade — uses the same hairline pattern as the rest of Hub. */}
       <button aria-label="Close" onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-[2px]" />
 
-      {/* Drawer */}
-      <aside className="flex h-full w-full max-w-[560px] flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)]">
+      {/* Drawer — full-width on phones, 560px on tablet+. */}
+      <aside className="flex h-full w-full flex-col border-l border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] sm:max-w-[560px]">
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-white/[0.05] px-4 py-3">
           <div className="min-w-0 flex-1">
@@ -209,8 +218,23 @@ export default function AttachmentPreviewDrawer({
 
         {/* Footer — evidence-status controls (expense only). */}
         {entityType === "expense" && attachments.length > 0 && (
-          <footer className="border-t border-white/[0.05] px-4 py-3">
-            <div className="flex items-center gap-2">
+          <footer className="space-y-2 border-t border-white/[0.05] px-4 py-3">
+            {/* UX-validation pass: submit-for-review shortcut. When an
+                expense is in draft (or sent back for changes) AND now
+                carries a receipt, surface the next operational step
+                here instead of forcing the operator to close this
+                drawer, find the row, open the review drawer, and click
+                Submit. Eliminates 3 interactions. */}
+            {onSubmitForReview && (approvalStatus === "draft" || approvalStatus === "requires_changes") && (
+              <button
+                type="button"
+                onClick={onSubmitForReview}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-sky-500/[0.28] bg-sky-500/[0.10] px-3 py-1.5 text-[12px] font-medium text-sky-200 transition-colors hover:bg-sky-500/[0.16]"
+              >
+                {approvalStatus === "requires_changes" ? "Resubmit for review" : "Submit for review"}
+              </button>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Mark</span>
               <button
                 type="button"
