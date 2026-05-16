@@ -42,6 +42,9 @@ import AttachmentPreviewDrawer from "@/components/attachments/AttachmentPreviewD
 import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
 import ApprovalReviewDrawer from "@/components/approval/ApprovalReviewDrawer";
 import type { ApprovalStatus } from "@/lib/finance/types";
+/* Micro-polish primitives. */
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import UndoToast from "@/components/ui/UndoToast";
 
 type TabKey = ExpensesTabKey;
 
@@ -82,6 +85,10 @@ export default function ExpensesApp() {
   const [reviewExpense, setReviewExpense] = useState<FinanceExpense | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilterKey>("all");
   const [canApprove, setCanApprove] = useState(false);
+  /* Micro-polish — confirm + deferred-delete (undo) state. */
+  const [confirmDelete, setConfirmDelete] = useState<FinanceExpense | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDeleteTitle, setPendingDeleteTitle] = useState<string>("");
 
   /* Resolve approve permission once on mount — Finance module presence
      is the gate. We optimistically hide approver actions while the
@@ -128,6 +135,10 @@ export default function ExpensesApp() {
         const isOverdue = e.payment_status !== "paid" && e.due_date && e.due_date < today;
         if (!isOverdue) return false;
       }
+      /* Hide rows currently in the undo-grace window so the operator
+         experiences an instant delete; the real API call fires when
+         the toast expires. */
+      if (pendingDeleteId === e.id) return false;
       if (categoryFilter && e.category_id !== categoryFilter) return false;
       /* Phase 2.2 — approval filter. */
       if (approvalFilter !== "all") {
@@ -145,7 +156,7 @@ export default function ExpensesApp() {
       }
       return true;
     });
-  }, [expenses, tab, categoryFilter, search, today, approvalFilter]);
+  }, [expenses, tab, categoryFilter, search, today, approvalFilter, pendingDeleteId]);
 
   /* Counts for the approval filter strip. */
   const approvalCounts = useMemo(() => {
@@ -194,10 +205,34 @@ export default function ExpensesApp() {
     category_id: null,
   });
 
-  const remove = async (id: string) => {
-    if (!confirm("Delete this expense?")) return;
-    await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    void load();
+  /* Micro-polish — Hub-native delete flow.
+     1. Operator clicks Delete on a row → opens ConfirmDialog.
+     2. Operator confirms → row vanishes optimistically, Undo toast
+        appears. The actual DELETE is deferred ~5 s by UndoToast's
+        timer; Undo cancels it; expire fires the real API call.
+     This pattern replaces the native confirm() interrupt without
+     adding a recycle bin — the data dies once the toast expires. */
+  const askDelete = (e: FinanceExpense) => setConfirmDelete(e);
+  const startDeferredDelete = () => {
+    if (!confirmDelete) return;
+    setPendingDeleteId(confirmDelete.id);
+    setPendingDeleteTitle(confirmDelete.title || "Expense");
+    setConfirmDelete(null);
+  };
+  const undoDeferredDelete = () => {
+    setPendingDeleteId(null);
+    setPendingDeleteTitle("");
+  };
+  const commitDeferredDelete = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    setPendingDeleteTitle("");
+    try {
+      await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+    } finally {
+      void load();
+    }
   };
 
   return (
@@ -266,7 +301,7 @@ export default function ExpensesApp() {
                       key={c.name}
                       type="button"
                       onClick={() => setCategoryFilter(active ? "" : (cat?.id ?? ""))}
-                      className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition hover:border-white/[0.15] ${active ? "ring-2 ring-emerald-500/40 border-emerald-500/30" : accentBgClass(style.accent)}`}
+                      className={`rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors duration-200 hover:border-white/[0.15] ${active ? "border-white/[0.18] bg-white/[0.04] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : accentBgClass(style.accent)}`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-xl">{style.glyph}</span>
@@ -296,7 +331,7 @@ export default function ExpensesApp() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search expenses…"
-            className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none sm:max-w-[280px]"
+            className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none sm:max-w-[280px]"
           />
           {categoryFilter && (
             <button
@@ -331,7 +366,7 @@ export default function ExpensesApp() {
                   nowMs={nowMs}
                   todayIso={today}
                   onEdit={() => setEditing(e)}
-                  onDelete={() => remove(e.id)}
+                  onDelete={() => askDelete(e)}
                   onEvidence={() => setEvidenceExpense(e)}
                   onReview={() => setReviewExpense(e)}
                 />
@@ -399,6 +434,24 @@ export default function ExpensesApp() {
           setReviewExpense(next);
           void load();
         }}
+      />
+
+      {/* ── Micro-polish — Hub-native delete confirmation + Undo. ── */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={confirmDelete ? `Delete "${confirmDelete.title || "expense"}"?` : ""}
+        description="You'll have 5 seconds to undo. Receipts and approval history will be removed once the timer expires."
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={startDeferredDelete}
+      />
+      <UndoToast
+        open={!!pendingDeleteId}
+        message={`Deleted "${pendingDeleteTitle}"`}
+        onUndo={undoDeferredDelete}
+        onExpire={() => { void commitDeferredDelete(); }}
       />
     </div>
   );
@@ -604,7 +657,7 @@ function ExpenseEditor({
               value={local.title ?? ""}
               onChange={(e) => setLocal({ ...local, title: e.target.value })}
               placeholder="e.g. Sea freight to Alexandria"
-              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
             />
           </label>
 
@@ -617,7 +670,7 @@ function ExpenseEditor({
                 inputMode="decimal"
                 value={local.amount ?? 0}
                 onChange={(e) => setLocal({ ...local, amount: Number(e.target.value) || 0 })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base tabular-nums placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-base tabular-nums placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
               />
             </label>
             <label className="block">
@@ -625,7 +678,7 @@ function ExpenseEditor({
               <select
                 value={local.currency ?? "USD"}
                 onChange={(e) => setLocal({ ...local, currency: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-sm focus:border-emerald-500/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2.5 text-sm focus:border-white/[0.22] focus:outline-none"
               >
                 {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
               </select>
@@ -645,10 +698,10 @@ function ExpenseEditor({
                     type="button"
                     onClick={() => setLocal({ ...local, category_id: c.id })}
                     className={
-                      "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition " +
+                      "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-200 " +
                       (active
-                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
-                        : `${accentBgClass(style.accent)} hover:border-white/[0.15]`)
+                        ? "border-white/[0.18] bg-white/[0.08] text-[var(--text-primary)]"
+                        : `${accentBgClass(style.accent)} text-gray-300 hover:border-white/[0.15]`)
                     }
                   >
                     <span>{style.glyph}</span>
@@ -667,7 +720,7 @@ function ExpenseEditor({
                 type="date"
                 value={local.expense_date ?? ""}
                 onChange={(e) => setLocal({ ...local, expense_date: e.target.value })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
               />
             </label>
             <label className="block">
@@ -675,7 +728,7 @@ function ExpenseEditor({
               <select
                 value={local.payment_status ?? "unpaid"}
                 onChange={(e) => setLocal({ ...local, payment_status: e.target.value as FinanceExpense["payment_status"] })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
               >
                 <option value="unpaid">Unpaid</option>
                 <option value="partial">Partial</option>
@@ -688,7 +741,7 @@ function ExpenseEditor({
                 type="date"
                 value={local.due_date ?? ""}
                 onChange={(e) => setLocal({ ...local, due_date: e.target.value || null })}
-                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-emerald-500/50 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:border-white/[0.22] focus:outline-none"
               />
             </label>
           </div>
@@ -700,7 +753,7 @@ function ExpenseEditor({
               value={local.notes ?? ""}
               onChange={(e) => setLocal({ ...local, notes: e.target.value })}
               placeholder="One-line context"
-              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
             />
           </label>
 
@@ -720,7 +773,7 @@ function ExpenseEditor({
                   value={local.attachment_url ?? ""}
                   onChange={(e) => setLocal({ ...local, attachment_url: e.target.value || null })}
                   placeholder="https://… (most teams now use the Evidence drawer instead)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
                 />
               </label>
               <label className="block">
@@ -729,7 +782,7 @@ function ExpenseEditor({
                   value={local.linked_supplier_id ?? ""}
                   onChange={(e) => setLocal({ ...local, linked_supplier_id: e.target.value || null })}
                   placeholder="Supplier id (optional)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
                 />
               </label>
               <label className="block">
@@ -738,7 +791,7 @@ function ExpenseEditor({
                   value={local.linked_customer_id ?? ""}
                   onChange={(e) => setLocal({ ...local, linked_customer_id: e.target.value || null })}
                   placeholder="Customer id (optional)"
-                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none"
                 />
               </label>
             </div>

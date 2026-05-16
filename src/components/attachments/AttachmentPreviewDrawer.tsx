@@ -26,6 +26,7 @@ import type {
   FinanceAttachment,
 } from "@/lib/finance/types";
 import { isImageMime, isPdfMime } from "@/lib/attachments/client";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface Props {
   open: boolean;
@@ -58,6 +59,9 @@ export default function AttachmentPreviewDrawer({
   const [active, setActive] = useState<FinanceAttachment | null>(null);
   const [duplicateWarn, setDuplicateWarn] = useState<{ file_name: string } | null>(null);
   const [evidenceLocal, setEvidenceLocal] = useState<EvidenceStatus | undefined>(evidenceStatus);
+  /* Hub-native delete confirmation in place of native confirm(). */
+  const [confirmTarget, setConfirmTarget] = useState<FinanceAttachment | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { setEvidenceLocal(evidenceStatus); }, [evidenceStatus]);
 
@@ -85,12 +89,25 @@ export default function AttachmentPreviewDrawer({
     onChange?.();
   }, [load, onChange]);
 
-  const handleDelete = useCallback(async (a: FinanceAttachment) => {
-    if (!confirm(`Remove "${a.file_name}"? Audit trail will be preserved.`)) return;
-    await fetch(`/api/finance/attachments/${a.id}`, { method: "DELETE" });
-    void load();
-    onChange?.();
-  }, [load, onChange]);
+  /* The list calls this; we don't fire DELETE here — we hand the
+     attachment to the Hub-native ConfirmDialog and wait for an
+     explicit confirmation. The audit trail is preserved (soft delete
+     server-side), so no undo toast is needed in this flow. */
+  const handleDelete = useCallback((a: FinanceAttachment) => {
+    setConfirmTarget(a);
+  }, []);
+  const performDelete = useCallback(async () => {
+    if (!confirmTarget) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/finance/attachments/${confirmTarget.id}`, { method: "DELETE" });
+      setConfirmTarget(null);
+      void load();
+      onChange?.();
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirmTarget, load, onChange]);
 
   const handleMakePrimary = useCallback(async (a: FinanceAttachment) => {
     await fetch(`/api/finance/attachments/${a.id}`, {
@@ -276,6 +293,17 @@ export default function AttachmentPreviewDrawer({
           </footer>
         )}
       </aside>
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title={confirmTarget ? `Remove "${confirmTarget.file_name}"?` : ""}
+        description="The file will be hidden from this entity, but the audit trail (who uploaded it and when) is preserved."
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        destructive
+        busy={deleting}
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={() => { void performDelete(); }}
+      />
     </div>
   );
 }

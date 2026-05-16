@@ -10,6 +10,7 @@ import {
 } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/PartyPickerModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
@@ -30,6 +31,9 @@ export default function FinanceOrders() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "editor">("list");
   const [draft, setDraft] = useState<DraftOrder | null>(null);
+  /* Hub-native delete confirmation in place of native confirm(). */
+  const [confirmDeleteOrder, setConfirmDeleteOrder] = useState<FinanceOrder | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,10 +129,19 @@ export default function FinanceOrders() {
     void load();
   };
 
-  const deleteOrder = async (id: string) => {
-    if (!confirm("Delete this order? This cannot be undone.")) return;
-    const r = await fetch(`/api/finance/orders/${id}`, { method: "DELETE" });
-    if (r.ok) void load();
+  /* Open the confirmation dialog; the actual DELETE happens after the
+     operator confirms — see performDeleteOrder. */
+  const askDeleteOrder = (o: FinanceOrder) => setConfirmDeleteOrder(o);
+  const performDeleteOrder = async () => {
+    if (!confirmDeleteOrder) return;
+    setDeletingOrder(true);
+    try {
+      const r = await fetch(`/api/finance/orders/${confirmDeleteOrder.id}`, { method: "DELETE" });
+      if (r.ok) void load();
+    } finally {
+      setDeletingOrder(false);
+      setConfirmDeleteOrder(null);
+    }
   };
 
   if (view === "editor" && draft) {
@@ -204,11 +217,23 @@ export default function FinanceOrders() {
             />
           ) : (
             <div className="grid gap-3">
-              {orders.map((o) => <OrderRowCard key={o.id} order={o} onEdit={() => editExisting(o)} onDelete={() => deleteOrder(o.id)} />)}
+              {orders.map((o) => <OrderRowCard key={o.id} order={o} onEdit={() => editExisting(o)} onDelete={() => askDeleteOrder(o)} />)}
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmDeleteOrder}
+        title={confirmDeleteOrder ? `Delete order ${confirmDeleteOrder.order_no}?` : ""}
+        description="This removes the order, its supplier lines, and any linked profit calculations. This cannot be undone."
+        confirmLabel="Delete order"
+        cancelLabel="Keep"
+        destructive
+        busy={deletingOrder}
+        onCancel={() => setConfirmDeleteOrder(null)}
+        onConfirm={() => { void performDeleteOrder(); }}
+      />
     </div>
   );
 }
