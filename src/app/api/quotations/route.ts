@@ -99,7 +99,15 @@ export async function GET(req: Request) {
 
   if (status !== "all") q = q.eq("status", status);
   if (customerId) q = q.eq("customer_id", customerId);
-  if (search) q = q.or(`quote_no.ilike.%${search}%`);
+  if (search) {
+    /* Use the typed .ilike() (with column + pattern as separate
+       args) instead of interpolating the user's text into the raw
+       PostgREST .or() filter string. The previous form let a
+       search of `foo,bar.ilike.<anything>` inject additional
+       filter clauses (PostgREST .or() parses commas + dots as
+       separators). */
+    q = q.ilike("quote_no", `%${search}%`);
+  }
 
   q = q.order("updated_at", { ascending: false }).order("created_at", { ascending: false });
 

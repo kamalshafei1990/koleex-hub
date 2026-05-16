@@ -417,7 +417,7 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
-function numberToWords(num: number): string {
+export function numberToWords(num: number): string {
   if (!num || num === 0) return "ZERO USD ONLY";
   const ones = [
     "",
@@ -936,10 +936,18 @@ export default function Quotations() {
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
+      const requestedId = q.id;
       const full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+      /* Guard against a late response overwriting a NEWER open.
+         If the operator clicked row A then quickly clicked row B,
+         A's fetch can resolve after B's setCurrent — without this
+         check the editor would silently revert to A's data. */
       if (full) {
         const hydrated = fromRow(full);
-        setCurrent({ ...hydrated, items: hydrated.items.map((i) => ({ ...i })) });
+        setCurrent((prev) => {
+          if (prev?.id && prev.id !== requestedId) return prev;
+          return { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+        });
       }
     }
   }, []);
@@ -1111,8 +1119,17 @@ export default function Quotations() {
     if (!current) return;
     const prev = document.title;
     document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
+    /* Use `afterprint` to restore the title; Safari's window.print()
+       is non-blocking, so the previous synchronous restore was
+       sometimes running BEFORE the print dialog read the title --
+       resulting in the default app name appearing in the saved
+       PDF filename. The listener fires once and removes itself. */
+    const restore = () => {
+      document.title = prev;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
     window.print();
-    document.title = prev;
   }, [current]);
 
   /* "saving" | "loading" state during the brief moment between click
@@ -1471,8 +1488,15 @@ export default function Quotations() {
      Pre-discount base = subtotal + tax + shipping + others
      Grand total       = base * (1 - discountPct/100)
      Discount is a global, whole-bill reduction applied last. */
+  /* Number-coerce because legacy rows (saved before fromRow's
+     Number() coercion) can carry strings in unitPrice / qty; a
+     string concatenation would produce "01.5" etc. and break
+     the editor totals + the printed PDF. */
   const subTotal = current
-    ? current.items.reduce((s, i) => s + i.unitPrice * i.qty, 0)
+    ? current.items.reduce(
+        (s, i) => s + (Number(i.unitPrice) || 0) * (Number(i.qty) || 0),
+        0,
+      )
     : 0;
   const grandTotal = current
     ? (() => {

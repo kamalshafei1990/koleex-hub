@@ -894,10 +894,17 @@ export default function Quotations() {
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
+      const requestedId = q.id;
       const full = await fetchDocOne(INVOICES_DOC_SYNC, q.id);
+      /* Skip the hydration if the operator switched to a different
+         row before our fetch resolved (otherwise A's late response
+         would overwrite B's freshly-opened editor state). */
       if (full) {
         const hydrated = fromRow(full);
-        setCurrent({ ...hydrated, items: hydrated.items.map((i) => ({ ...i })) });
+        setCurrent((prev) => {
+          if (prev?.id && prev.id !== requestedId) return prev;
+          return { ...hydrated, items: hydrated.items.map((i) => ({ ...i })) };
+        });
       }
     }
   }, []);
@@ -1052,8 +1059,15 @@ export default function Quotations() {
     if (!current) return;
     const prev = document.title;
     document.title = `${current.customerName} - ${current.companyName} - ${current.invoiceNo}`;
+    /* Restore on `afterprint` -- Safari's window.print() is async,
+       so a synchronous restore was sometimes losing the doc title
+       in the saved PDF filename. */
+    const restore = () => {
+      document.title = prev;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
     window.print();
-    document.title = prev;
   }, [current]);
 
   /* "saving" | "loading" state during the brief moment between click

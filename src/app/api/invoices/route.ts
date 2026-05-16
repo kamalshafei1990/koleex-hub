@@ -53,7 +53,7 @@ export async function GET(req: Request) {
        subtotal, tax_total, discount_total, total, amount_paid, balance,
        notes, terms, linked_quotation_id, linked_project_id,
        created_by_account_id, created_at, updated_at, paid_at,
-       customer:customer_id ( id, display_name, company_name )`,
+       customer:customer_id ( id, display_name:name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
 

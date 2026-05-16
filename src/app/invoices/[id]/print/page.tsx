@@ -20,6 +20,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
 import { fromRow, type Invoice } from "@/components/invoices-doc/InvoicesDoc";
+import { numberToWords } from "@/components/quotations/Quotations";
 import type { RemoteDocRow } from "@/lib/docs-sync";
 
 export default function InvoicePrintPage({
@@ -72,6 +73,11 @@ export default function InvoicePrintPage({
               }),
         ),
       );
+      /* Await webfont load so the printed PDF doesn't fall back
+         to the system typeface on slow networks. */
+      if (typeof document !== "undefined" && "fonts" in document) {
+        try { await document.fonts.ready; } catch { /* ignore */ }
+      }
       if (cancelled) return;
       (window as unknown as { __quotation_pdf_ready__?: boolean }).__quotation_pdf_ready__ = true;
       const params = new URLSearchParams(window.location.search);
@@ -116,11 +122,8 @@ export default function InvoicePrintPage({
 
   const fmt = (n: number) =>
     n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const numberToWords = (n: number) => {
-    return `${Math.floor(n).toLocaleString("en-US")} USD AND ${Math.round((n % 1) * 100)
-      .toString()
-      .padStart(2, "0")} CENTS ONLY`;
-  };
+  /* numberToWords imported from Quotations.tsx — same helper the
+     editor uses so the printed "Total in Letters" line matches. */
 
   if (error) {
     return (

@@ -21,7 +21,14 @@ export async function GET(_req: Request, { params }: RouteCtx) {
 
   const { data, error } = await supabaseServer
     .from("invoices")
-    .select(`*, customer:customer_id ( id, display_name, company_name, emails, phones, addresses )`)
+    /* The `customers` table has `name` (NOT display_name) and singular
+       email / phone / address columns. We alias `name AS display_name`
+       so every downstream consumer (InvoicesApp, ProjectsApp, etc.)
+       that reads `customer.display_name` keeps working without
+       changes. The plural emails/phones/addresses fields don't exist
+       on customers -- they live on the `people` table -- so we drop
+       them here. */
+    .select(`*, customer:customer_id ( id, display_name:name, company_name )`)
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .maybeSingle();

@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: RouteCtx) {
       .from("invoices")
       .select(
         `*,
-         customer:customer_id ( id, display_name, company_name, emails, phones, addresses )`,
+         customer:customer_id ( id, display_name:name, company_name )`,
       )
       .eq("id", id)
       .eq("tenant_id", auth.tenant_id)

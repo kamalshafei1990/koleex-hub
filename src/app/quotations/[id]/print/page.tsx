@@ -22,7 +22,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import QuotationA4Preview from "@/components/quotations/QuotationA4Preview";
-import { fromRow, type Quotation } from "@/components/quotations/Quotations";
+import { fromRow, numberToWords, type Quotation } from "@/components/quotations/Quotations";
 import type { RemoteDocRow } from "@/lib/docs-sync";
 
 export default function QuotationPrintPage({
@@ -78,6 +78,12 @@ export default function QuotationPrintPage({
               }),
         ),
       );
+      /* Also wait for web fonts to finish loading so the printed PDF
+         renders in the doc's intended typeface (Inter / Geist) instead
+         of the system fallback. */
+      if (typeof document !== "undefined" && "fonts" in document) {
+        try { await document.fonts.ready; } catch { /* ignore */ }
+      }
       if (cancelled) return;
       (window as unknown as { __quotation_pdf_ready__?: boolean }).__quotation_pdf_ready__ = true;
       /* Auto-trigger the browser print dialog when the caller asked
@@ -142,14 +148,9 @@ export default function QuotationPrintPage({
 
   const fmt = (n: number) =>
     n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const numberToWords = (n: number) => {
-    /* Lightweight USD-amount-in-words. Mirrors Quotations.tsx's helper
-       in spirit; full enterprise i18n lives there but we only need the
-       printed string here. */
-    return `${Math.floor(n).toLocaleString("en-US")} USD AND ${Math.round((n % 1) * 100)
-      .toString()
-      .padStart(2, "0")} CENTS ONLY`;
-  };
+  /* Use the canonical word-form helper exported from Quotations.tsx
+     so the printed "Total in Letters" line matches the editor
+     exactly (the old inline stub here used digits, not words). */
 
   if (error) {
     return (

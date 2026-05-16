@@ -1543,11 +1543,34 @@ export default function QuotationA4Preview({
                  machinery the Quick Fill modal uses, so the
                  canonical label gets rebuilt in canonical bold
                  format and the Quick Fill modal will read it
-                 back correctly next time it opens. */
-              setMeta(
-                "terms",
-                applyQuickFillToTerms(current.terms ?? "", { [canonical]: v }),
-              );
+                 back correctly next time it opens. ALSO update
+                 the matching structured FK field where one
+                 exists -- otherwise the items-table subtitle
+                 (FOB Ningbo, etc.), Quick Fill modal, and the
+                 country picker would all keep stale values
+                 while only the printed row reflects the new
+                 text. The map below covers the four free-text
+                 fields that have a 1:1 structured counterpart;
+                 read-only (Sent by, Lead time, Delivery time,
+                 Documents) and FK-only fields are NOT in the
+                 map and inline edit is disabled for them. */
+              const STRUCT_FIELD: Partial<Record<string, keyof Quotation>> = {
+                "Loading port":    "loadingPort",
+                "Discharge port":  "dischargePort",
+                "Shipping marks":  "shippingMarks",
+                "Container type":  "containerType",
+              };
+              setCurrent((prev) => {
+                if (!prev) return prev;
+                const next: Quotation = { ...prev };
+                next.terms = applyQuickFillToTerms(prev.terms ?? "", { [canonical]: v });
+                const fieldName = STRUCT_FIELD[canonical];
+                if (fieldName) {
+                  (next as unknown as Record<string, unknown>)[fieldName] =
+                    v ? v : undefined;
+                }
+                return next;
+              });
               setTermsRevision((x) => x + 1);
             }}
           />
@@ -4759,7 +4782,23 @@ function ShipmentDetailsCard({
           /* Total Qty is computed from the items table -- inline
              editing wouldn't stick (the next item edit overrides
              it). Keep it read-only. */
-          const isReadOnly = r.canonical === "Total Qty";
+          /* Read-only inline cells (must use Quick Fill to change):
+             · Sent by, Lead time -- coupled with structured FK +
+               counted-from basis; can't be re-parsed from free text.
+             · Delivery time -- auto-computed from route + mode.
+             · Documents Provided -- backed by a string[] field that
+               doesn't round-trip cleanly through plain text.
+             · Total Qty -- always derived from the items table.
+             The free-text cargo fields (Country of Origin, weights,
+             CBM, packages) and the four 1:1 free-text fields
+             (Loading port, Discharge port, Container type, Shipping
+             marks) stay editable.                                   */
+          const isReadOnly =
+            r.canonical === "Total Qty" ||
+            r.canonical === "Sent by" ||
+            r.canonical === "Lead time" ||
+            r.canonical === "Delivery time" ||
+            r.canonical === "Documents Provided";
           return (
             <div
               key={r.canonical}
@@ -5151,6 +5190,12 @@ function TermsQuickFillModal({
         "Delivery time": computeDelivery(nextLP, nextDP, selectedMethod),
       },
     });
+    /* Clearing the discharge port also drops the manual country
+       override -- otherwise the country dropdown stays stuck on the
+       last-picked country with no port selected, which looks broken. */
+    if (key === "dischargePort" && !v) {
+      setManualDischargeCountry(null);
+    }
   };
   const onPickMethod = (id: string) => {
     const m = methods.find((t) => t.id === id);
@@ -5183,7 +5228,13 @@ function TermsQuickFillModal({
 
   return (
     <div
-      onClick={onClose}
+      onClick={(e) => {
+        /* Only close on a CLICK that lands on the backdrop itself.
+           Without the e.target === e.currentTarget check, a future
+           child component that bubbles a click event (with no
+           stopPropagation) would inadvertently close the modal. */
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="no-print"
       style={{
         position: "fixed",

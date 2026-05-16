@@ -21,7 +21,14 @@ async function nextInvoiceNumber(tenantId: string): Promise<string> {
     .order("inv_no", { ascending: false })
     .limit(1);
   const last = data?.[0]?.inv_no as string | undefined;
-  const nextSeq = last ? Number(last.replace(prefix, "")) + 1 : 1;
+  /* Defensive parse: a stray manually-edited inv_no (e.g. "INV2026-A1")
+     or a year rollover that ordered alphabetically would otherwise
+     yield NaN here, producing the literal "INVxxxx-NaN" for every
+     new invoice this tenant creates. Fall back to 0 on a non-numeric
+     suffix so the next sequence starts at 0001. */
+  const tail = last ? last.replace(prefix, "") : "";
+  const parsed = /^\d+$/.test(tail) ? Number(tail) : NaN;
+  const nextSeq = Number.isFinite(parsed) ? parsed + 1 : 1;
   return `${prefix}${String(nextSeq).padStart(4, "0")}`;
 }
 
@@ -42,7 +49,7 @@ export async function GET(req: Request) {
       `id, tenant_id, inv_no, customer_id, status, currency,
        issue_date, due_date, total, amount_paid, balance,
        doc, created_at, updated_at, paid_at,
-       customer:customer_id ( id, display_name, company_name )`,
+       customer:customer_id ( id, display_name:name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);
 
