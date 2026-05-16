@@ -888,6 +888,30 @@ export default function Quotations() {
     };
     setCurrent(q);
     setView("editor");
+    /* Preview the next invoice number from the server so the operator
+       sees "INV2026-0042" in the header instead of "—" until first
+       save. The actual number is minted authoritatively server-side
+       on POST; this preview matches in 99% of cases (race window is
+       a near-simultaneous create by another operator). If the fetch
+       fails, we just leave the field blank — non-blocking. */
+    (async () => {
+      try {
+        const res = await fetch("/api/invoices/doc/next-number", { cache: "no-store" });
+        if (!res.ok) return;
+        const { inv_no } = (await res.json()) as { inv_no?: string };
+        if (!inv_no) return;
+        setCurrent((prev) => {
+          /* Only apply if the operator is still on this fresh draft
+             (no save yet → id is the temp client id we generated)
+             and they haven't already typed something into the field. */
+          if (!prev || prev.id !== q.id) return prev;
+          if (prev.invoiceNo && prev.invoiceNo.length > 0) return prev;
+          return { ...prev, invoiceNo: inv_no };
+        });
+      } catch {
+        /* Non-blocking — leave blank if preview fails. */
+      }
+    })();
   }, []);
 
   /* ── Open existing ──
