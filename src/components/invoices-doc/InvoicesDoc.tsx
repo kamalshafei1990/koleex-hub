@@ -677,25 +677,21 @@ const PRINT_AND_DOC_STYLES = `
   .quot-row-del-btn { display: none !important; }
   .pq-add-btn { display: none !important; }
 
-  /* NUKE all height + overflow constraints inherited from the Hub's
-     Tailwind layout (RootShell uses h-[calc(100vh-0px)],
-     overflow-hidden, min-h-0 on multiple wrappers — those collapse
-     the printable area to a single viewport height and clip the
-     multi-page stack). Forcing every element to have flexible
-     height + visible overflow lets the .quot-a4-doc pages flow
-     naturally through the print pipeline. */
-  * {
-    overflow: visible !important;
-    max-height: none !important;
-  }
-  /* Tailwind-flavoured height utilities — reset to auto so the
-     wrappers stop pinning the viewport at 100vh. */
+  /* NUKE the Tailwind h-screen / overflow-hidden wrappers from
+     the Hub shell so the multi-page doc stack can render its
+     full height without being clipped to one viewport. Scoped
+     to those specific wrappers -- the previous * wildcard
+     blanketed every descendant of the docs and made Safari
+     compute the doc's intrinsic content height, reserving TWO
+     A4 sheets per doc. */
   [class*="h-screen"],
   [class*="h-[calc"],
   [class*="min-h-screen"],
-  [class*="min-h-0"] {
+  [class*="min-h-0"],
+  [class*="overflow-hidden"] {
     height: auto !important;
     min-height: 0 !important;
+    overflow: visible !important;
   }
   [class~="pt-14"] { padding-top: 0 !important; }
   .shell-content-offset { padding: 0 !important; }
