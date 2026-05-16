@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
-  PageHeader,
   ProgressBar,
   SectionCard,
   StatusBadge,
@@ -146,7 +145,7 @@ export default function FinanceOrders() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Order Profitability"
           subtitle="Track selling price, supplier costs, and realised profit on every order."
           action={
@@ -159,7 +158,6 @@ export default function FinanceOrders() {
             </button>
           }
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard label="Total Orders" value={String(orders.length)} accent="default" loading={loading} />
@@ -222,75 +220,190 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
   const outstandingAR = order.outstanding_receivable ?? 0;
   const outstandingAP = order.outstanding_payable ?? 0;
 
+  /* Risk signal — drives an inline badge so a junior op can scan the
+     list and flag "needs attention now". Tiered:
+       low margin   → net_profit_pct < 0 OR <8% on a sizable order
+       overdue AR   → payment_due_date past, AR outstanding
+       large unpaid AP → AP > 50% of selling price
+       otherwise on-track */
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = order.payment_due_date && order.payment_due_date < today && order.payment_status !== "paid";
+  const lowMargin = netPct < 8;
+  const heavyAP = sellingPrice > 0 && outstandingAP / sellingPrice > 0.5;
+  const risk: "ok" | "watch" | "alert" =
+    overdue || netPct < 0 ? "alert"
+    : lowMargin || heavyAP ? "watch"
+    : "ok";
+  const riskStyle =
+    risk === "alert" ? { chip: "border-rose-500/40 bg-rose-500/15 text-rose-300", label: overdue ? "Overdue" : "Negative margin" }
+    : risk === "watch" ? { chip: "border-amber-500/30 bg-amber-500/15 text-amber-300", label: lowMargin ? "Low margin" : "Heavy AP" }
+    : { chip: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", label: "On track" };
+
+  /* Collection percentage for the progress ring */
+  const collectionPct = sellingPrice > 0 ? Math.min(100, (collected / sellingPrice) * 100) : 0;
+
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-sm font-semibold text-emerald-400">{order.order_no}</span>
+    <div className="group overflow-hidden rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] transition hover:border-white/[0.12]">
+      {/* ── HEADER STRIP ─────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.04] px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[13px] font-semibold tracking-tight text-emerald-300">{order.order_no}</span>
             <StatusBadge status={order.status} />
             <StatusBadge status={order.payment_status} />
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${riskStyle.chip}`}>
+              {riskStyle.label}
+            </span>
           </div>
-          <p className="mt-1 text-base font-medium">{order.customer_name || "—"}</p>
-          <p className="mt-0.5 text-xs text-gray-500">{order.order_date}{order.payment_due_date ? `  ·  Due ${order.payment_due_date}` : ""}</p>
+          <div className="mt-2 flex items-center gap-2 text-[15px] font-medium">
+            <span className="truncate">{order.customer_name || "—"}</span>
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">
+            {order.order_date}
+            {order.payment_due_date && (
+              <span>{`  ·  Due ${order.payment_due_date}`}</span>
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onEdit} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/[0.12]">Edit</button>
-          <button type="button" onClick={onDelete} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">Delete</button>
-        </div>
-      </div>
-
-      {/* Profit waterfall row — Revenue → Net Profit */}
-      <div className="mt-4 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
-        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">Expected profit (booked)</div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
-          <Stat label="Revenue"        value={fmtMoney(sellingPrice, ccy, { compact: true })} accent="emerald" />
-          <Stat label="− Supplier"     value={fmtMoney(supplierCost, ccy, { compact: true })} accent="rose" />
-          <Stat label="= Gross profit" value={fmtMoney(grossProfit, ccy, { compact: true })} accent={grossProfit >= 0 ? "sky" : "rose"} />
-          <Stat label="− Order expenses" value={fmtMoney(expenses, ccy, { compact: true })} accent="rose" />
-          <Stat label="+ Tax refund"   value={fmtMoney(taxRefund, ccy, { compact: true })} accent="emerald" />
-          <Stat label="− Bank charges" value={fmtMoney(finCharges, ccy, { compact: true })} accent="rose" />
-          <Stat label={`Net (${fmtPct(netPct)})`} value={fmtMoney(netProfit, ccy, { compact: true })} accent={netProfit >= 0 ? "violet" : "rose"} />
-        </div>
-      </div>
-
-      {/* Cash position row — actual money moved */}
-      <div className="mt-3 rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-[10px] uppercase tracking-wider text-gray-500">Realized cash position</div>
-          <div className="text-[10px] text-gray-500">Collected − Paid supplier − Paid expenses</div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Stat label="Collected"        value={fmtMoney(collected, ccy, { compact: true })} accent="emerald" />
-          <Stat label="Paid supplier"    value={fmtMoney(paidSupplier, ccy, { compact: true })} accent="rose" />
-          <Stat label="Paid expenses"    value={fmtMoney(paidExpenses, ccy, { compact: true })} accent="rose" />
-          <Stat label="AR (to collect)"  value={fmtMoney(outstandingAR, ccy, { compact: true })} accent="amber" />
-          <Stat label="AP (to pay)"      value={fmtMoney(outstandingAP, ccy, { compact: true })} accent="amber" />
-        </div>
-        <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400">
-          <span>Cash result so far</span>
-          <span className={`font-semibold tabular-nums ${realizedCash >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-            {realizedCash < 0 ? "−" : ""}{fmtMoney(Math.abs(realizedCash), ccy, { compact: true })}
-          </span>
-        </div>
-        <div className="mt-1.5">
-          <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
-        </div>
-      </div>
-
-      {order.suppliers && order.suppliers.length > 0 && (
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {order.suppliers.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2 text-xs">
-              <div className="min-w-0">
-                <div className="truncate font-medium text-gray-200">{s.supplier_name || "Unnamed supplier"}</div>
-                <div className="text-[10px] text-gray-500">Paid {fmtMoney(s.paid_amount, s.currency, { compact: true })} of {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
-              </div>
-              <StatusBadge status={s.payment_status} />
+        {/* Big net profit summary — the headline of the card */}
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Net profit</div>
+            <div className={`text-xl font-semibold tabular-nums ${netProfit >= 0 ? "text-violet-300" : "text-rose-400"}`}>
+              {fmtMoney(netProfit, ccy, { compact: true })}
             </div>
-          ))}
+            <div className={`text-[11px] ${netPct >= 15 ? "text-emerald-400" : netPct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+              {fmtPct(netPct)} margin
+            </div>
+          </div>
+          {/* Collection progress ring */}
+          <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub="collected" />
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onEdit} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/[0.12]">Edit</button>
+            <button type="button" onClick={onDelete} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── BODY — two-panel layout ─────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-3 px-5 py-4 lg:grid-cols-2">
+        {/* Expected profit (booked) */}
+        <div className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Expected profit · booked</div>
+            <span className="text-[10px] text-gray-500">Excludes paid status</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Revenue"     value={fmtMoney(sellingPrice, ccy, { compact: true })} accent="emerald" />
+            <Stat label="− Supplier"  value={fmtMoney(supplierCost, ccy, { compact: true })} accent="rose" />
+            <Stat label="− Expenses"  value={fmtMoney(expenses, ccy, { compact: true })} accent="rose" />
+            <Stat label="+ Tax refund" value={fmtMoney(taxRefund, ccy, { compact: true })} accent="emerald" />
+          </div>
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-2 text-xs">
+            <span className="text-gray-400">− Bank charges</span>
+            <span className="font-semibold tabular-nums text-rose-300">{fmtMoney(finCharges, ccy, { compact: true })}</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2 text-xs">
+            <span className="font-medium text-sky-200">Gross profit</span>
+            <span className="font-semibold tabular-nums text-sky-200">{fmtMoney(grossProfit, ccy, { compact: true })}</span>
+          </div>
+        </div>
+
+        {/* Realized cash position */}
+        <div className="rounded-xl border border-white/[0.04] bg-[var(--bg-primary)] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Realized cash · actual</div>
+            <span className={`text-[11px] font-semibold tabular-nums ${realizedCash >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+              {realizedCash < 0 ? "−" : ""}{fmtMoney(Math.abs(realizedCash), ccy, { compact: true })}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Collected"     value={fmtMoney(collected, ccy, { compact: true })} accent="emerald" />
+            <Stat label="Paid supplier" value={fmtMoney(paidSupplier, ccy, { compact: true })} accent="rose" />
+            <Stat label="Paid expenses" value={fmtMoney(paidExpenses, ccy, { compact: true })} accent="rose" />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-amber-300/70">AR · to collect</div>
+              <div className="mt-0.5 font-semibold tabular-nums text-amber-300">{fmtMoney(outstandingAR, ccy, { compact: true })}</div>
+            </div>
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-amber-300/70">AP · to pay</div>
+              <div className="mt-0.5 font-semibold tabular-nums text-amber-300">{fmtMoney(outstandingAP, ccy, { compact: true })}</div>
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-[10px] text-gray-500">
+              <span>Customer collection progress</span>
+              <span>{collectionPct.toFixed(0)}%</span>
+            </div>
+            <div className="mt-1">
+              <ProgressBar value={collected} max={sellingPrice} color={collected >= sellingPrice ? "emerald" : "amber"} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SUPPLIERS STRIP ──────────────────────────────────────── */}
+      {order.suppliers && order.suppliers.length > 0 && (
+        <div className="border-t border-white/[0.04] bg-[var(--bg-primary)]/40 px-5 py-3">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">Suppliers · {order.suppliers.length}</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {order.suppliers.map((s) => {
+              const supplierPct = s.supplier_cost > 0 ? Math.min(100, (s.paid_amount / s.supplier_cost) * 100) : 0;
+              return (
+                <div key={s.id} className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-medium text-gray-200">{s.supplier_name || "Unnamed supplier"}</div>
+                      <div className="text-[10px] text-gray-500">{fmtMoney(s.paid_amount, s.currency, { compact: true })} of {fmtMoney(s.supplier_cost, s.currency, { compact: true })}</div>
+                    </div>
+                    <StatusBadge status={s.payment_status} />
+                  </div>
+                  <div className="mt-1.5">
+                    <ProgressBar value={s.paid_amount} max={s.supplier_cost} color={supplierPct >= 100 ? "emerald" : "sky"} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ProgressRing — small circular progress indicator used in the
+   order card header. Stroke fills clockwise from 0..360deg based on
+   pct. Pure SVG, no library. */
+function ProgressRing({ pct, label, sub }: { pct: number; label: string; sub: string }) {
+  const r = 22;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.max(0, Math.min(100, pct)) / 100) * c;
+  const color =
+    pct >= 100 ? "#34d399"
+    : pct >= 50 ? "#fbbf24"
+    : pct > 0   ? "#fb923c"
+    : "rgba(255,255,255,0.2)";
+  return (
+    <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center">
+      <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+        <circle
+          cx="28" cy="28" r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 400ms ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
+        <span className="text-[10px] font-semibold text-gray-200">{label}</span>
+        <span className="text-[7px] uppercase tracking-wide text-gray-500">{sub}</span>
+      </div>
     </div>
   );
 }
@@ -458,7 +571,7 @@ function OrderEditor({
       />
 
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title={draft.order.id ? `Edit Order ${draft.order.order_no}` : "New Order"}
           subtitle="Capture the selling price, every supplier cost, and let Koleex compute the profit automatically."
           action={
@@ -468,7 +581,6 @@ function OrderEditor({
             </div>
           }
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         {/* Step indicator */}
         <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">

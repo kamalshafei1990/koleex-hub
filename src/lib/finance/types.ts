@@ -190,6 +190,8 @@ export interface FinanceNotification {
 }
 
 /* ── Dashboard payload ──────────────────────────────────────────── */
+export type FinancialHealth = "healthy" | "watch" | "stress" | "unknown";
+
 export interface DashboardKpi {
   total_revenue: number;
   total_supplier_cost: number;
@@ -197,11 +199,16 @@ export interface DashboardKpi {
   total_tax_refund: number;
   total_financial_charges: number;
   gross_profit: number;
+  /* Gross margin as a percentage of revenue */
+  gross_margin_pct: number;
   net_profit: number;
   cash_in: number;
   cash_out: number;
   accounts_receivable: number;
   accounts_payable: number;
+  /* Phase 1.3 — composite financial-health signal */
+  health_status: FinancialHealth;
+  health_reasons: string[];
   /* Period-over-period delta percentages (current vs previous window) */
   delta: {
     revenue_pct: number | null;

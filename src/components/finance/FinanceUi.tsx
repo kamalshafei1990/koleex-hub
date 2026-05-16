@@ -13,29 +13,52 @@ import type { ReactNode } from "react";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 
 /* ── KpiCard ──────────────────────────────────────────────────────
-   Large statistic with delta indicator + sub-label + optional trend
-   sparkline. Used on the dashboard and at the top of every list page. */
+   Premium statistic card. Adds a subtle left accent bar, optional
+   trend sparkline, and a refined delta presentation. Used on the
+   dashboard and at the top of every Finance list page. */
+const ACCENT_TEXT: Record<KpiAccent, string> = {
+  emerald: "text-emerald-400",
+  rose:    "text-rose-400",
+  amber:   "text-amber-400",
+  sky:     "text-sky-400",
+  violet:  "text-violet-400",
+  default: "text-[var(--text-primary)]",
+};
+const ACCENT_BAR: Record<KpiAccent, string> = {
+  emerald: "bg-gradient-to-b from-emerald-400/80 to-emerald-600/30",
+  rose:    "bg-gradient-to-b from-rose-400/80 to-rose-600/30",
+  amber:   "bg-gradient-to-b from-amber-400/80 to-amber-600/30",
+  sky:     "bg-gradient-to-b from-sky-400/80 to-sky-600/30",
+  violet:  "bg-gradient-to-b from-violet-400/80 to-violet-600/30",
+  default: "bg-gradient-to-b from-white/30 to-white/10",
+};
+
+export type KpiAccent = "emerald" | "rose" | "amber" | "sky" | "violet" | "default";
+
 export function KpiCard({
   label,
   value,
   delta,
   deltaValue,
   currency,
-  accent,
+  accent = "default",
   hint,
   loading,
   invertDelta,
+  sparkline,
 }: {
   label: string;
   value: number | string;
   delta?: number | null;
   deltaValue?: number;
   currency?: string;
-  accent?: "emerald" | "rose" | "amber" | "sky" | "violet" | "default";
+  accent?: KpiAccent;
   hint?: string;
   loading?: boolean;
   /* For expenses-style metrics where a DROP is good and a RISE is bad */
   invertDelta?: boolean;
+  /* Optional small sparkline drawn on the right side of the value row */
+  sparkline?: number[];
 }) {
   const numericValue = typeof value === "number" ? value : null;
   const display =
@@ -45,47 +68,72 @@ export function KpiCard({
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
   const goodDirection = invertDelta ? deltaSign < 0 : deltaSign > 0;
   const neutralDelta = deltaSign === 0;
-  const accentClass = (() => {
-    switch (accent) {
-      case "emerald": return "text-emerald-400";
-      case "rose":    return "text-rose-400";
-      case "amber":   return "text-amber-400";
-      case "sky":     return "text-sky-400";
-      case "violet":  return "text-violet-400";
-      default:        return "text-[var(--text-primary)]";
-    }
-  })();
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{label}</div>
-      <div className={`mt-3 text-2xl font-semibold tabular-nums ${accentClass}`}>
-        {loading ? <span className="inline-block h-6 w-32 animate-pulse rounded bg-white/5" /> : display}
-      </div>
-      {(delta != null || hint) && (
-        <div className="mt-3 flex items-center gap-2 text-[11px]">
-          {delta != null && (
-            <span
-              className={
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold " +
-                (neutralDelta
-                  ? "bg-white/5 text-gray-400"
-                  : goodDirection
-                    ? "bg-emerald-500/15 text-emerald-400"
-                    : "bg-rose-500/15 text-rose-400")
-              }
-              title={
-                deltaValue != null && currency
-                  ? `${deltaValue > 0 ? "+" : ""}${fmtMoney(deltaValue, currency, { compact: true })} vs previous period`
-                  : undefined
-              }
-            >
-              {neutralDelta ? "—" : deltaSign > 0 ? "▲" : "▼"} {fmtPct(delta)}
-            </span>
+    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.12] hover:bg-[var(--bg-secondary)]/90">
+      {/* Left accent bar — subtle visual cue for the metric family */}
+      <div className={`absolute left-0 top-4 bottom-4 w-[3px] rounded-r ${ACCENT_BAR[accent]}`} />
+      <div className="ml-1.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{label}</div>
+          {sparkline && sparkline.length > 1 && (
+            <Sparkline data={sparkline} accent={accent} />
           )}
-          {hint && <span className="text-gray-500">{hint}</span>}
         </div>
-      )}
+        <div className={`mt-2.5 text-[26px] leading-tight font-semibold tabular-nums ${ACCENT_TEXT[accent]}`}>
+          {loading ? <span className="inline-block h-7 w-32 animate-pulse rounded bg-white/5" /> : display}
+        </div>
+        {(delta != null || hint) && (
+          <div className="mt-2.5 flex items-center gap-2 text-[11px]">
+            {delta != null && (
+              <span
+                className={
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold " +
+                  (neutralDelta
+                    ? "bg-white/5 text-gray-400"
+                    : goodDirection
+                      ? "bg-emerald-500/15 text-emerald-400"
+                      : "bg-rose-500/15 text-rose-400")
+                }
+                title={
+                  deltaValue != null && currency
+                    ? `${deltaValue > 0 ? "+" : ""}${fmtMoney(deltaValue, currency, { compact: true })} vs previous period`
+                    : undefined
+                }
+              >
+                {neutralDelta ? "—" : deltaSign > 0 ? "▲" : "▼"} {fmtPct(delta)}
+              </span>
+            )}
+            {hint && <span className="text-gray-500">{hint}</span>}
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+/* Tiny inline trend line — renders 1×40 px SVG path. Pure visual,
+   no labels. Accent colour pulled from the KPI card's accent. */
+function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
+  const W = 64;
+  const H = 22;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const step = W / Math.max(1, data.length - 1);
+  const points = data
+    .map((v, i) => `${(i * step).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
+    .join(" ");
+  const stroke =
+    accent === "emerald" ? "#34d399"
+    : accent === "rose"  ? "#fb7185"
+    : accent === "amber" ? "#fbbf24"
+    : accent === "sky"   ? "#38bdf8"
+    : accent === "violet"? "#a78bfa"
+    : "rgba(255,255,255,0.4)";
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-80">
+      <polyline points={points} stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
   );
 }
 

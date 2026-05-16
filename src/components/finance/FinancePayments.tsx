@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
-  PageHeader,
   SectionCard,
   StatusBadge,
 } from "@/components/finance/FinanceUi";
@@ -65,7 +64,7 @@ export default function FinancePayments() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Payments"
           subtitle="Money in from customers and money out to suppliers — partial, full, pending, all in one ledger."
           action={
@@ -75,7 +74,6 @@ export default function FinancePayments() {
             </div>
           }
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Money In" value={kpi.inComp} currency="USD" accent="emerald" loading={loading} />

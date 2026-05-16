@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
-  PageHeader,
   SectionCard,
   StatusBadge,
 } from "@/components/finance/FinanceUi";
@@ -103,11 +102,10 @@ export default function FinanceNotifications() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Reminders"
-          subtitle="Money to collect from customers and money to pay to suppliers — with your chosen lead time."
+          subtitle="Command center for money to collect and money to pay — colour-coded by severity."
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <KpiCard label="Money to Collect" value={kpi.collect} currency="USD" accent="emerald" loading={loading} />

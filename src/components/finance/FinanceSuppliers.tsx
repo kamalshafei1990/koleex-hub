@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
-  PageHeader,
   ProgressBar,
   SectionCard,
 } from "@/components/finance/FinanceUi";
@@ -38,11 +37,10 @@ export default function FinanceSuppliers() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Supplier Accounts"
           subtitle="What you've bought from each supplier, what's paid, and what's still owed."
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <KpiCard label="Total Purchases" value={kpi.purchases} currency="USD" accent="default" loading={loading} />

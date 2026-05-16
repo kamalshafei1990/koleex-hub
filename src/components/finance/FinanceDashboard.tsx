@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   KpiCard,
-  PageHeader,
   PeriodTabs,
   SectionCard,
   TrendChart,
@@ -41,21 +40,34 @@ export default function FinanceDashboard() {
 
   const currency = "USD";
 
+  /* Build mini-sparkline arrays from the trend series so the KPI
+     cards can render a tiny line graph. */
+  const sparklines = useMemo(() => {
+    const t = kpi?.trend ?? [];
+    return {
+      revenue: t.map((d) => d.revenue),
+      expenses: t.map((d) => d.expenses),
+      net_profit: t.map((d) => d.net_profit),
+    };
+  }, [kpi]);
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Financial Intelligence"
-          subtitle="Real-time view of revenue, costs, cash and outstanding balances."
-          action={<PeriodTabs<DashboardPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />}
+          subtitle="Executive view of revenue, profit, cash and outstanding balances."
+          health={kpi?.health_status}
+          controls={<PeriodTabs<DashboardPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />}
         />
 
-        <div className="mt-5">
-          <FinanceTabs />
-        </div>
-
-        {/* ── KPI ROW 1 — profitability ─────────────────────────── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION A — Executive KPI row
+            8 KPIs in two responsive rows. Each card has an accent bar,
+            sparkline (where data exists), delta % vs previous window,
+            and a short context hint. */}
+        <SectionLabel index="A" title="Executive KPIs" hint="The numbers you read first in a board meeting." />
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Total Revenue"
             value={kpi?.total_revenue ?? 0}
@@ -65,27 +77,7 @@ export default function FinanceDashboard() {
             accent="emerald"
             loading={loading}
             hint="vs previous period"
-          />
-          <KpiCard
-            label="Total Expenses"
-            value={kpi?.total_expenses ?? 0}
-            delta={kpi?.delta.expenses_pct ?? null}
-            deltaValue={kpi?.delta_value.expenses}
-            currency={currency}
-            accent="rose"
-            invertDelta
-            loading={loading}
-            hint="vs previous period"
-          />
-          <KpiCard
-            label="Gross Profit"
-            value={kpi?.gross_profit ?? 0}
-            delta={kpi?.delta.gross_profit_pct ?? null}
-            deltaValue={kpi?.delta_value.gross_profit}
-            currency={currency}
-            accent="sky"
-            loading={loading}
-            hint="Revenue − Supplier cost"
+            sparkline={sparklines.revenue}
           />
           <KpiCard
             label="Net Profit"
@@ -95,12 +87,9 @@ export default function FinanceDashboard() {
             currency={currency}
             accent="violet"
             loading={loading}
-            hint="Gross − Operating expenses"
+            hint="Gross − Exp + Tax − Bank"
+            sparkline={sparklines.net_profit}
           />
-        </div>
-
-        {/* ── KPI ROW 2 — cash + AR/AP ──────────────────────────── */}
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Cash In"
             value={kpi?.cash_in ?? 0}
@@ -120,6 +109,9 @@ export default function FinanceDashboard() {
             loading={loading}
             hint="Supplier + expense payments"
           />
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Money to Collect"
             value={kpi?.accounts_receivable ?? 0}
@@ -134,12 +126,55 @@ export default function FinanceDashboard() {
             currency={currency}
             accent="amber"
             loading={loading}
-            hint="Outstanding to suppliers + bills"
+            hint="Suppliers + unpaid bills"
+          />
+          <KpiCard
+            label="Gross Margin"
+            value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}%` : "—"}
+            accent={(kpi?.gross_margin_pct ?? 0) >= 30 ? "emerald" : (kpi?.gross_margin_pct ?? 0) >= 15 ? "amber" : "rose"}
+            loading={loading}
+            hint="Gross profit ÷ revenue"
+          />
+          <KpiCard
+            label="Financial Health"
+            value={kpi?.health_status === "healthy" ? "Healthy" : kpi?.health_status === "watch" ? "Watch" : kpi?.health_status === "stress" ? "Stress" : "—"}
+            accent={kpi?.health_status === "healthy" ? "emerald" : kpi?.health_status === "watch" ? "amber" : kpi?.health_status === "stress" ? "rose" : "default"}
+            loading={loading}
+            hint={kpi?.health_reasons?.[0] ?? "Composite signal"}
           />
         </div>
 
-        {/* ── TREND CHART ───────────────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION B — Profit Story
+            Visual waterfall from Revenue to Net Profit. */}
+        <SectionLabel index="B" title="Profit Story" hint="How revenue becomes net profit, step by step." />
+        <div className="mt-3">
+          <SectionCard
+            subtitle="Gross profit excludes tax refund — refund is added back separately after expenses."
+          >
+            <ProfitWaterfall
+              revenue={kpi?.total_revenue ?? 0}
+              supplierCost={kpi?.total_supplier_cost ?? 0}
+              expenses={kpi?.total_expenses ?? 0}
+              taxRefund={kpi?.total_tax_refund ?? 0}
+              finCharges={kpi?.total_financial_charges ?? 0}
+              gross={kpi?.gross_profit ?? 0}
+              net={kpi?.net_profit ?? 0}
+              currency={currency}
+            />
+            <p className="mt-3 rounded-md bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-gray-400">
+              <strong className="text-gray-300">Expected profit</strong> is the booked number on every order.
+              <strong className="text-gray-300"> Realized cash</strong> is what&apos;s actually banked so far (Collected − Paid supplier − Paid expenses).
+              <strong className="text-gray-300"> Cash Flow</strong> below tracks money in vs out across the whole business this period.
+            </p>
+          </SectionCard>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION C — Cash Position
+            Trend chart + cash bars + expected vs realized. */}
+        <SectionLabel index="C" title="Cash Position" hint="What's moving in, what's moving out, what's actually banked." />
+        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <SectionCard
               title="Revenue vs Costs"
@@ -160,55 +195,83 @@ export default function FinanceDashboard() {
               )}
             </SectionCard>
           </div>
-          <div>
-            <SectionCard title="Cash Flow This Period" subtitle="Money in vs money out">
-              <div className="space-y-4">
+          <div className="grid grid-rows-2 gap-3">
+            <SectionCard title="Cash Flow" subtitle="Money in vs money out">
+              <div className="space-y-3.5">
                 <CashRow label="Money In" value={kpi?.cash_in ?? 0} max={Math.max(kpi?.cash_in ?? 0, kpi?.cash_out ?? 0, 1)} color="emerald" />
                 <CashRow label="Money Out" value={kpi?.cash_out ?? 0} max={Math.max(kpi?.cash_in ?? 0, kpi?.cash_out ?? 0, 1)} color="rose" />
-                <div className="mt-4 border-t border-white/5 pt-4">
-                  <div className="text-[10px] uppercase tracking-wider text-gray-500">Net cash</div>
-                  <div className={`mt-1 text-xl font-semibold tabular-nums ${(kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                <div className="mt-2 border-t border-white/5 pt-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500">Net cash this period</div>
+                  <div className={`mt-0.5 text-xl font-semibold tabular-nums ${(kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {fmtMoney((kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0), currency, { compact: true })}
                   </div>
                 </div>
               </div>
             </SectionCard>
+            <SectionCard title="Expected vs Realized" subtitle="Booked profit vs cash actually banked.">
+              <div className="grid grid-cols-2 gap-2">
+                <SmallStat label="Expected Net" value={kpi?.expected_vs_realized?.expected_net_profit ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.expected_net_profit ?? 0) >= 0 ? "violet" : "rose"} />
+                <SmallStat label="Realized Cash" value={kpi?.expected_vs_realized?.realized_cash_position ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.realized_cash_position ?? 0) >= 0 ? "emerald" : "rose"} />
+                <SmallStat label="Collected" value={kpi?.expected_vs_realized?.collected ?? 0} currency={currency} accent="emerald" />
+                <SmallStat label="Paid out" value={(kpi?.expected_vs_realized?.paid_supplier ?? 0) + (kpi?.expected_vs_realized?.paid_expenses ?? 0)} currency={currency} accent="rose" />
+              </div>
+            </SectionCard>
           </div>
         </div>
 
-        {/* ── EXPECTED vs REALIZED + TOP ORDERS + TOP CATEGORIES ── */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          {/* Expected vs Realized */}
-          <SectionCard title="Expected vs Realized" subtitle="Booked profit vs cash actually banked.">
-            <div className="grid grid-cols-2 gap-3">
-              <SmallStat label="Expected Net" value={kpi?.expected_vs_realized?.expected_net_profit ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.expected_net_profit ?? 0) >= 0 ? "violet" : "rose"} />
-              <SmallStat label="Realized Cash" value={kpi?.expected_vs_realized?.realized_cash_position ?? 0} currency={currency} accent={(kpi?.expected_vs_realized?.realized_cash_position ?? 0) >= 0 ? "emerald" : "rose"} />
-              <SmallStat label="Collected" value={kpi?.expected_vs_realized?.collected ?? 0} currency={currency} accent="emerald" />
-              <SmallStat label="Paid suppliers" value={kpi?.expected_vs_realized?.paid_supplier ?? 0} currency={currency} accent="rose" />
-            </div>
-            <p className="mt-3 text-[11px] text-gray-500">
-              Realized cash = Collected − Paid suppliers − Paid expenses.
-            </p>
-          </SectionCard>
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION D — Risk & Alerts
+            Live health reasons + AR/AP tile to focus operator attention. */}
+        <SectionLabel index="D" title="Risk & Alerts" hint="Where to look first today." />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <RiskTile
+            tone={kpi?.accounts_receivable && kpi.accounts_receivable > 0 ? "amber" : "neutral"}
+            title="Money to Collect"
+            value={kpi?.accounts_receivable ?? 0}
+            currency={currency}
+            note="Across all unpaid orders"
+          />
+          <RiskTile
+            tone={kpi?.accounts_payable && kpi.accounts_payable > 0 ? "amber" : "neutral"}
+            title="Money to Pay"
+            value={kpi?.accounts_payable ?? 0}
+            currency={currency}
+            note="Suppliers + unpaid bills"
+          />
+          <RiskTile
+            tone={kpi?.health_status === "stress" ? "rose" : kpi?.health_status === "watch" ? "amber" : "emerald"}
+            title="Health Signal"
+            valueString={kpi?.health_status === "healthy" ? "Healthy" : kpi?.health_status === "watch" ? "Watch" : kpi?.health_status === "stress" ? "Stress" : "—"}
+            note={kpi?.health_reasons?.[0] ?? "Composite read of profit + cash + overdue."}
+          />
+        </div>
 
-          {/* Top Profitable Orders */}
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION E — Top Insights
+            Top profitable orders and biggest expense buckets. */}
+        <SectionLabel index="E" title="Top Insights" hint="Where profit is being made — and where it's leaking." />
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <SectionCard title="Top Profitable Orders" subtitle="Ranked by net profit in this period.">
             {(kpi?.top_orders ?? []).length === 0 ? (
               <div className="py-6 text-center text-sm text-gray-500">No orders yet for this period.</div>
             ) : (
               <ol className="space-y-2">
                 {(kpi?.top_orders ?? []).map((o, idx) => (
-                  <li key={o.id} className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2">
+                  <li key={o.id} className="group flex items-center justify-between rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] px-3 py-2.5 transition hover:border-white/[0.10]">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[11px] font-semibold text-gray-300">{idx + 1}</span>
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-[11px] font-semibold text-emerald-300">{idx + 1}</span>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{o.customer_name || "—"}</div>
-                        <div className="font-mono text-[10px] text-gray-500">{o.order_no} · {fmtMoney(o.selling_price, o.currency, { compact: true })}</div>
+                        <div className="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-gray-500">
+                          <span>{o.order_no}</span>
+                          <span>·</span>
+                          <span>{fmtMoney(o.selling_price, o.currency, { compact: true })}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className={`text-sm font-semibold tabular-nums ${o.net_profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>{fmtMoney(o.net_profit, o.currency, { compact: true })}</div>
-                      <div className="text-[10px] text-gray-500">{fmtPct(o.net_profit_pct)}</div>
+                      <div className={`text-[10px] ${o.net_profit_pct >= 15 ? "text-emerald-400" : o.net_profit_pct >= 0 ? "text-amber-400" : "text-rose-400"}`}>{fmtPct(o.net_profit_pct)}</div>
                     </div>
                   </li>
                 ))}
@@ -216,7 +279,6 @@ export default function FinanceDashboard() {
             )}
           </SectionCard>
 
-          {/* Top Expense Categories */}
           <SectionCard title="Top Expense Categories" subtitle="Biggest spend buckets in this period.">
             {(kpi?.top_expense_categories ?? []).length === 0 ? (
               <div className="py-6 text-center text-sm text-gray-500">No expenses recorded for this period.</div>
@@ -225,18 +287,21 @@ export default function FinanceDashboard() {
                 {(kpi?.top_expense_categories ?? []).map((c) => {
                   const style = styleForCategory(c.name);
                   return (
-                    <li key={c.name} className={`rounded-lg border ${accentBgClass(style.accent)} bg-[var(--bg-primary)] px-3 py-2`}>
+                    <li key={c.name} className={`rounded-lg border ${accentBgClass(style.accent)} bg-[var(--bg-primary)]/50 px-3 py-2.5`}>
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{style.glyph}</span>
-                          <span className="text-sm font-medium">{c.name}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{style.glyph}</span>
+                          <div>
+                            <div className="text-sm font-medium">{c.name}</div>
+                            <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "item" : "items"}</div>
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm font-semibold tabular-nums">{fmtMoney(c.total, currency, { compact: true })}</div>
-                          <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? "item" : "items"}</div>
+                          <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% of spend</div>
                         </div>
                       </div>
-                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/5">
+                      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
                         <div className={`h-full ${accentSolidBg(style.accent)}`} style={{ width: `${Math.max(3, c.share_pct)}%` }} />
                       </div>
                     </li>
@@ -246,31 +311,24 @@ export default function FinanceDashboard() {
             )}
           </SectionCard>
         </div>
-
-        {/* ── PROFIT WATERFALL ──────────────────────────────────── */}
-        <div className="mt-4">
-          <SectionCard
-            title="From Revenue to Net Profit"
-            subtitle="Gross profit excludes tax refund — refund is added back separately after expenses."
-          >
-            <ProfitWaterfall
-              revenue={kpi?.total_revenue ?? 0}
-              supplierCost={kpi?.total_supplier_cost ?? 0}
-              expenses={kpi?.total_expenses ?? 0}
-              taxRefund={kpi?.total_tax_refund ?? 0}
-              finCharges={kpi?.total_financial_charges ?? 0}
-              gross={kpi?.gross_profit ?? 0}
-              net={kpi?.net_profit ?? 0}
-              currency={currency}
-            />
-            <p className="mt-3 rounded-md bg-white/[0.03] px-3 py-2 text-[11px] leading-relaxed text-gray-400">
-              <strong className="text-gray-300">Expected profit</strong> is the booked number on every order (Revenue − Supplier − Expenses + Tax refund − Bank charges).
-              <strong className="text-gray-300"> Realized cash position</strong> is what's actually banked so far (Collected − Paid supplier − Paid expenses) and lives on each Order card.
-              <strong className="text-gray-300"> Cash flow</strong> (below) is the period's money in vs out across the whole business.
-            </p>
-          </SectionCard>
-        </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Section label — a small letter + title row that separates the
+   dashboard into named blocks. Matches the way executive dashboards
+   in finance apps usually structure content. */
+function SectionLabel({ index, title, hint }: { index: string; title: string; hint?: string }) {
+  return (
+    <div className="mt-8 flex items-end justify-between gap-3 border-b border-white/[0.04] pb-2">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.06] bg-[var(--bg-secondary)] text-[10px] font-semibold text-gray-400">
+          {index}
+        </span>
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-gray-300">{title}</h2>
+      </div>
+      {hint && <p className="hidden text-[11px] text-gray-500 sm:block">{hint}</p>}
     </div>
   );
 }
@@ -283,7 +341,7 @@ function SmallStat({ label, value, currency, accent }: { label: string; value: n
     : accent === "sky"   ? "text-sky-400"
     : "text-violet-400";
   return (
-    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-3">
+    <div className="rounded-lg border border-white/[0.04] bg-[var(--bg-primary)] p-2.5">
       <div className="text-[9px] uppercase tracking-wider text-gray-500">{label}</div>
       <div className={`mt-1 text-sm font-semibold tabular-nums ${color}`}>{fmtMoney(value, currency, { compact: true })}</div>
     </div>
@@ -307,14 +365,45 @@ function CashRow({ label, value, max, color }: { label: string; value: number; m
   );
 }
 
+/* RiskTile — used by the "Risk & Alerts" row. Tone drives the
+   border + bg so the operator can scan at a glance. */
+function RiskTile({
+  tone, title, value, valueString, currency, note,
+}: {
+  tone: "emerald" | "amber" | "rose" | "neutral";
+  title: string;
+  value?: number;
+  valueString?: string;
+  currency?: string;
+  note?: string;
+}) {
+  const cls =
+    tone === "emerald" ? "border-emerald-500/30 bg-emerald-500/[0.05]"
+    : tone === "amber"  ? "border-amber-500/30 bg-amber-500/[0.05]"
+    : tone === "rose"   ? "border-rose-500/40 bg-rose-500/[0.06]"
+    : "border-white/[0.06] bg-[var(--bg-secondary)]";
+  const valueClass =
+    tone === "emerald" ? "text-emerald-300"
+    : tone === "amber"  ? "text-amber-300"
+    : tone === "rose"   ? "text-rose-300"
+    : "text-gray-300";
+  return (
+    <div className={`rounded-2xl border p-5 ${cls}`}>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{title}</div>
+      <div className={`mt-2 text-2xl font-semibold tabular-nums ${valueClass}`}>
+        {valueString ?? fmtMoney(value ?? 0, currency ?? "USD", { compact: true })}
+      </div>
+      {note && <p className="mt-1.5 text-[11px] text-gray-400">{note}</p>}
+    </div>
+  );
+}
+
 function ProfitWaterfall({
   revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
 }: {
   revenue: number; supplierCost: number; expenses: number; taxRefund: number;
   finCharges: number; gross: number; net: number; currency: string;
 }) {
-  /* CORRECTED CHAIN
-     Revenue → − Supplier cost = Gross → − Expenses + Tax refund − Bank charges = Net */
   const steps = [
     { label: "Revenue",         value: revenue,      sign: 1,  color: "emerald" as const },
     { label: "− Supplier cost", value: supplierCost, sign: -1, color: "rose"    as const },

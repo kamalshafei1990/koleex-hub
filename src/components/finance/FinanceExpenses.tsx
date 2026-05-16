@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import FinanceTabs from "@/components/finance/FinanceTabs";
+import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
   KpiCard,
-  PageHeader,
   SectionCard,
   StatusBadge,
 } from "@/components/finance/FinanceUi";
@@ -133,14 +132,13 @@ export default function FinanceExpenses() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
-        <PageHeader
+        <FinanceHeader
           title="Expenses"
           subtitle="Record what the business spends — by category, with links to orders and suppliers."
           action={
             <button onClick={startNew} className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] hover:opacity-90 active:scale-95">+ New Expense</button>
           }
         />
-        <div className="mt-5"><FinanceTabs /></div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Total Expenses" value={kpi.total} currency="USD" accent="rose" loading={loading} />
