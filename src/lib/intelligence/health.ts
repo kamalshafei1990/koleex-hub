@@ -31,6 +31,15 @@ const PRESSURE_FROM_SCORE = (score: Score): Pressure => {
   return "critical";
 };
 
+function formatCompact(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "−" : "";
+  if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2) + "M";
+  if (abs >= 1_000)     return sign + (abs / 1_000).toFixed(abs >= 10_000 ? 1 : 2) + "K";
+  return sign + abs.toFixed(0);
+}
+
 /* ---------------------------------------------------------------------------
    Per-module scorers — each returns a HealthDimension.
    --------------------------------------------------------------------------- */
@@ -42,26 +51,38 @@ export function scoreFinanceHealth(kpi: DashboardKpi | null): HealthDimension {
   let score = 100;
   const margin = kpi.gross_margin_pct ?? 0;
   const cashNet = (kpi.cash_in ?? 0) - (kpi.cash_out ?? 0);
+  /* Phase 2.0.1: gentler tiering on AP/AR — same boundaries but
+     smaller damage to reduce overreaction on a single-period gap. */
   const apHeavy = kpi.accounts_payable > kpi.accounts_receivable * 1.3;
   const apSevere = kpi.accounts_payable > kpi.accounts_receivable * 2;
 
-  if (margin < 0) score -= 35;
-  else if (margin < 10) score -= 22;
-  else if (margin < 20) score -= 10;
+  /* Margin damage softened: previous −22 at <10% was too punishing
+     for a single bucket; we now penalise more gently and let the
+     composite weighting (35% finance) carry the signal. */
+  if (margin < 0) score -= 28;
+  else if (margin < 10) score -= 16;
+  else if (margin < 20) score -= 7;
 
-  if (cashNet < 0) score -= 12;
-  if (apSevere) score -= 18;
-  else if (apHeavy) score -= 10;
+  if (cashNet < 0) score -= 8;            // was −12
+  if (apSevere) score -= 14;              // was −18
+  else if (apHeavy) score -= 7;            // was −10
 
-  if (kpi.health_status === "stress") score -= 12;
-  else if (kpi.health_status === "watch") score -= 6;
+  /* Existing health_status signal kept but softened (−10 / −5). */
+  if (kpi.health_status === "stress") score -= 10;
+  else if (kpi.health_status === "watch") score -= 5;
 
   score = clamp01(score);
-  const driver =
-    score >= 80 ? "Margin and cash position healthy."
-    : score >= 60 ? "Margin or cash showing mild pressure."
-    : score >= 40 ? "Material financial pressure — margin, AR, or AP."
-    : "Severe financial pressure across multiple dimensions.";
+  /* Phase 2.0.1: drivers reference the actual numbers driving the
+     score, not vague qualitative phrases. */
+  const driver = (() => {
+    if (margin < 0) return `Gross margin negative at ${margin.toFixed(1)}%.`;
+    if (apSevere) return `AP ${formatCompact(kpi.accounts_payable)} exceeds AR ${formatCompact(kpi.accounts_receivable)} by 2× — liquidity tight.`;
+    if (margin < 10) return `Gross margin compressed at ${margin.toFixed(1)}%.`;
+    if (apHeavy) return `AP exceeds AR — working-capital pressure.`;
+    if (margin < 20) return `Gross margin ${margin.toFixed(1)}% — room to improve.`;
+    if (cashNet < 0) return `Cash out exceeds cash in for the period.`;
+    return `Margin ${margin.toFixed(1)}%, cash net positive.`;
+  })();
 
   return { module: "finance", score: Math.round(score), pressure: PRESSURE_FROM_SCORE(score), driver };
 }

@@ -77,8 +77,15 @@ import {
   type Pressure,
   type WorkflowKey,
 } from "@/lib/finance/intelligence";
-/* Phase 2.0 — cross-module operational intelligence. */
-import { buildIntelligence as buildBusinessIntelligence } from "@/lib/intelligence";
+/* Phase 2.0 — cross-module operational intelligence.
+   Phase 2.0.1 — adds the memory-aware pipeline (materiality gate,
+   noise suppression, persistence annotation, executive digest). */
+import {
+  buildIntelligence as buildBusinessIntelligence,
+  loadMemory,
+  saveMemory,
+  type MemoryState,
+} from "@/lib/intelligence";
 
 const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "week",    label: "Week" },
@@ -176,12 +183,12 @@ export default function FinanceDashboard() {
   );
 
   /* ── Phase 2.0 cross-module operational intelligence.
-     A single pure-function call returns: customer behavior profiles,
-     supplier dependency profiles, logistics snapshot, inventory adapter
-     state, the event stream, cross-module correlations, composite
-     business health, risk assessment, and business-aware Copilot
-     hints. All derived from the data we already loaded; no new APIs. */
+     Phase 2.0.1 wires the calibration pipeline: load prior memory →
+     build picture (materiality + suppression + priority + persistence
+     annotation + correlation confidence + EMA-smoothed health +
+     executive digest) → persist memory for the next run. */
   const periodDays = period === "week" ? 7 : period === "quarter" ? 90 : 365;
+  const memoryRef = useMemo<MemoryState | null>(() => loadMemory(), []);
   const businessIntelligence = useMemo(
     () => buildBusinessIntelligence({
       kpi,
@@ -189,9 +196,15 @@ export default function FinanceDashboard() {
       payments,
       expenses,
       periodDays,
+      memory: memoryRef,
     }),
-    [kpi, orders, payments, expenses, periodDays],
+    [kpi, orders, payments, expenses, periodDays, memoryRef],
   );
+  useEffect(() => {
+    /* Persist the next-memory snapshot after each successful build so
+       the next run can reason about persistence + smooth the health. */
+    if (!loading) saveMemory(businessIntelligence.nextMemory);
+  }, [businessIntelligence, loading]);
 
   /* Publish proactive Copilot context whenever the operational picture
      changes. FloatingPanel listens and renders these as suggestion
@@ -1002,11 +1015,11 @@ function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; curren
    ========================================================================== */
 
 function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
-  const { health, correlations } = intel;
+  const { health, correlations, digest } = intel;
   const top = correlations[0];
 
   /* Quiet state when there's no real signal yet. */
-  if (!intel.events.length && !top && health.composite >= 95) {
+  if (!intel.events.length && !top && digest.length === 0 && health.composite >= 95) {
     return null;
   }
 
@@ -1085,8 +1098,62 @@ function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBus
         })}
       </div>
 
-      {/* Top cross-module correlation */}
-      {top && (
+      {/* Executive digest — 3-5 curated narratives.
+         Phase 2.0.1: each digest item carries a kind chip
+         (PRESSURE / RISK / DEPENDENCY / IMPROVEMENT / OPPORTUNITY)
+         and a confidence/state marker when relevant. The system stays
+         silent if nothing material is happening — no padding hints. */}
+      {digest.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {digest.map((d) => {
+            const sevDot =
+              d.severity === "critical" ? "bg-rose-400"
+              : d.severity === "risk"   ? "bg-rose-400"
+              : d.severity === "watch"  ? "bg-amber-300"
+              :                           "bg-white/40";
+            const kindLabel =
+              d.kind === "biggest_pressure"    ? "Pressure"
+              : d.kind === "biggest_risk"       ? "Risk"
+              : d.kind === "biggest_dependency" ? "Dependency"
+              : d.kind === "biggest_improvement"? "Improving"
+              :                                    "Opportunity";
+            const kindCls =
+              d.kind === "biggest_improvement"  ? "bg-emerald-500/[0.10] text-emerald-300/90 border-emerald-500/[0.18]"
+              : d.kind === "biggest_opportunity" ? "bg-white/[0.05] text-gray-300 border-white/[0.06]"
+              : d.severity === "risk" || d.severity === "critical"
+                ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
+                : "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]";
+            return (
+              <li key={d.key} className="flex items-start gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
+                <span aria-hidden className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${sevDot}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] ${kindCls}`}>
+                      {kindLabel}
+                    </span>
+                    {d.state === "worsening" && (
+                      <span className="rounded-full bg-rose-500/[0.10] px-1.5 py-0.5 text-[9px] font-medium text-rose-300/90">Worsening</span>
+                    )}
+                    {d.state === "recurring" && (
+                      <span className="rounded-full bg-white/[0.05] px-1.5 py-0.5 text-[9px] font-medium text-gray-400">Persisting</span>
+                    )}
+                    {d.confidence != null && d.confidence >= 0.85 && (
+                      <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-gray-500">
+                        {Math.round(d.confidence * 100)}% conf
+                      </span>
+                    )}
+                    <span className="text-[11px] font-semibold tracking-tight text-gray-200">{d.headline}</span>
+                  </div>
+                  <div className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{d.narrative}</div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Top cross-module correlation when no curated digest, as a fallback. */}
+      {digest.length === 0 && top && (
         <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
           <span aria-hidden className={
             "mt-1 h-1.5 w-1.5 shrink-0 rounded-full " + (

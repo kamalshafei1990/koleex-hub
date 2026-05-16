@@ -55,16 +55,19 @@ export function synthesizeEvents(args: {
 
   /* ── Finance: liquidity, margin, revenue ─────────────── */
   if (kpi) {
-    if (kpi.delta.revenue_pct != null && kpi.delta.revenue_pct <= -20) {
+    if (kpi.delta.revenue_pct != null && kpi.delta.revenue_pct <= -25) {
+      const decline = Math.abs(kpi.delta.revenue_pct);
+      const amount = Math.abs(kpi.delta_value.revenue ?? 0);
       out.push(ev({
         key: "fin-revenue-decline",
         source: "finance",
         kind: "revenue_decline",
-        severity: kpi.delta.revenue_pct <= -40 ? "risk" : "watch",
+        severity: decline >= 40 ? "risk" : "watch",
         direction: "down",
-        magnitude: Math.abs(kpi.delta.revenue_pct),
-        label: `Revenue ↓ ${Math.abs(kpi.delta.revenue_pct).toFixed(0)}%`,
-        detail: "Revenue declined materially versus the prior period.",
+        magnitude: decline,
+        amount,
+        label: `Revenue ↓ ${decline.toFixed(0)}%`,
+        detail: `Revenue dropped ${decline.toFixed(0)}% (${formatCompact(amount)} USD) versus the prior period — top-of-funnel under pressure.`,
       }));
     }
     if ((kpi.gross_margin_pct ?? 0) < 15) {
@@ -78,21 +81,23 @@ export function synthesizeEvents(args: {
         magnitude: margin,
         label: `Gross margin ${margin.toFixed(1)}%`,
         detail: margin < 0
-          ? "Gross margin is negative — revenue is not covering supplier costs."
-          : "Gross margin compressed below the 15% threshold.",
+          ? "Gross margin is negative — revenue is not covering supplier cost on this period's orders."
+          : `Gross margin compressed to ${margin.toFixed(1)}% — supplier cost or expense growth is outpacing pricing.`,
       }));
     }
-    /* Liquidity pressure — simple heuristic: AP > AR materially. */
+    /* Liquidity pressure — AP > AR materially AND absolute gap ≥ 25K
+       (the materiality filter strips smaller gaps regardless). */
     if (kpi.accounts_payable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 1.4) {
+      const gap = kpi.accounts_payable - kpi.accounts_receivable;
       out.push(ev({
         key: "fin-liquidity",
         source: "finance",
         kind: "liquidity_pressure",
         severity: kpi.accounts_payable > kpi.accounts_receivable * 2 ? "risk" : "watch",
-        magnitude: kpi.accounts_payable - kpi.accounts_receivable,
+        magnitude: gap,
         amount: kpi.accounts_payable,
-        label: "AP exceeds AR materially",
-        detail: "Outgoing obligations exceed scheduled receivables — liquidity window tightening.",
+        label: `AP exceeds AR by ${formatCompact(gap)}`,
+        detail: `Outgoing obligations (${formatCompact(kpi.accounts_payable)} USD) exceed scheduled receivables (${formatCompact(kpi.accounts_receivable)} USD) by ${formatCompact(gap)}. Forward liquidity window tightening unless collections accelerate.`,
       }));
     }
   }

@@ -208,28 +208,31 @@ function buildCustomerRead(args: {
 }): string {
   const { name, collection, overdueRatio, revenueShare } = args;
   const bits: string[] = [];
+
+  /* Phase 2.0.1: every clause must reference a real operational
+     number. No "slightly behind", no "appears stable" — those are
+     calm-state fallbacks the digest can choose to suppress entirely. */
   if (collection.label === "Severe")
     bits.push(`${name} averages ${collection.averageDelayDays.toFixed(0)} days late on payments.`);
   else if (collection.label === "Late")
-    bits.push(`${name} typically pays ${collection.averageDelayDays.toFixed(0)} days late.`);
-  else if (collection.label === "Slow")
-    bits.push(`${name} runs slightly behind on payment cadence.`);
+    bits.push(`${name} settles invoices ${collection.averageDelayDays.toFixed(0)} days past due on average.`);
+  else if (collection.label === "Slow" && collection.averageDelayDays >= 5)
+    bits.push(`${name} runs ${collection.averageDelayDays.toFixed(0)} days behind the due date on average.`);
   else if (collection.label === "Reliable")
-    bits.push(`${name} pays reliably on or near due date.`);
-  else
-    bits.push(`Insufficient payment history for ${name}.`);
+    bits.push(`${name} settles invoices within ${Math.max(0, Math.round(collection.averageDelayDays))} days of due.`);
+  /* Unknown / no data: stay silent rather than emit filler. */
 
-  if (collection.trend === "up" && collection.delayTrendDays > 3) {
-    bits.push(`Collection speed declined ${collection.delayTrendDays.toFixed(0)} days vs prior 90 days.`);
-  } else if (collection.trend === "down" && collection.delayTrendDays < -3) {
-    bits.push(`Collection speed improved ${Math.abs(collection.delayTrendDays).toFixed(0)} days vs prior 90 days.`);
+  if (collection.trend === "up" && collection.delayTrendDays >= 5) {
+    bits.push(`Cadence deteriorated ${collection.delayTrendDays.toFixed(0)} days versus the prior 90-day window.`);
+  } else if (collection.trend === "down" && collection.delayTrendDays <= -5) {
+    bits.push(`Cadence improved ${Math.abs(collection.delayTrendDays).toFixed(0)} days versus the prior 90-day window.`);
   }
 
   if (revenueShare >= 40) {
-    bits.push(`Concentration: ${revenueShare.toFixed(0)}% of revenue.`);
+    bits.push(`Represents ${revenueShare.toFixed(0)}% of period revenue — single-counterparty concentration.`);
   }
   if (overdueRatio >= 0.2) {
-    bits.push(`Overdue exposure ${(overdueRatio * 100).toFixed(0)}% of their revenue.`);
+    bits.push(`${(overdueRatio * 100).toFixed(0)}% of their revenue is currently overdue.`);
   }
   return bits.join(" ");
 }

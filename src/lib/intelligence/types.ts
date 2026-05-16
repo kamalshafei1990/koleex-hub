@@ -77,6 +77,14 @@ export type OperationalEventKind =
   | "deal_stalled"             // CRM stage stagnation (future hook)
   | "revenue_decline";         // revenue down period-over-period
 
+/** Lifecycle state assigned by the persistence layer. */
+export type SignalState =
+  | "new"          // appeared this run, no prior memory
+  | "recurring"   // appeared in prior run(s) at similar severity
+  | "worsening"   // recurring + severity escalated
+  | "improving"   // recurring + severity de-escalated
+  | "resolved";    // had history but didn't appear this run (carried briefly)
+
 export interface OperationalEvent {
   /** Stable id so renderers can dedupe and key. */
   key: string;
@@ -102,6 +110,12 @@ export interface OperationalEvent {
   detail: string;
   /** UTC timestamp the signal was synthesised. */
   ts: number;
+  /** Phase 2.0.1 — composite priority used to rank for visibility. */
+  priority?: number;
+  /** Phase 2.0.1 — lifecycle state from persistence layer. */
+  state?: SignalState;
+  /** Phase 2.0.1 — number of consecutive runs this signal has appeared in. */
+  persistence?: number;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -259,6 +273,12 @@ export interface CrossModuleCorrelation {
   narrative: string;
   /** Optional money/percentage attached to the correlation. */
   magnitude?: number;
+  /** Phase 2.0.1 — 0..1 confidence. Correlations below 0.55 are filtered. */
+  confidence?: number;
+  /** Phase 2.0.1 — supporting evidence count (signals that corroborate). */
+  evidenceCount?: number;
+  /** Phase 2.0.1 — lifecycle state if any source signal is persistent. */
+  state?: SignalState;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -278,4 +298,33 @@ export interface CopilotHint {
     supplierId?: string;
     orderId?: string;
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Executive digest  (Phase 2.0.1)
+
+   A curated 3–5 item list of the most consequential narratives for the
+   period. Items are picked from events + correlations + behavior
+   profiles via a discipline filter so the digest reads like an analyst
+   briefing, not an analytics dump.
+   ───────────────────────────────────────────────────────────────────── */
+
+export type DigestKind =
+  | "biggest_pressure"
+  | "biggest_risk"
+  | "biggest_dependency"
+  | "biggest_improvement"
+  | "biggest_opportunity";
+
+export interface DigestItem {
+  key: string;
+  kind: DigestKind;
+  severity: Severity;
+  module: ModuleKey;
+  headline: string;
+  narrative: string;
+  /** Optional money / percentage that anchors the item. */
+  magnitude?: number;
+  state?: SignalState;
+  confidence?: number;
 }

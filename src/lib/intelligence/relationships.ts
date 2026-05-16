@@ -40,6 +40,40 @@ function maxSeverity(a: Severity, b: Severity): Severity {
 }
 
 /* ---------------------------------------------------------------------------
+   Confidence scoring  (Phase 2.0.1)
+
+   A correlation's confidence is a function of:
+     · severity of the supporting signals (worse = more confident the
+       narrative reflects real pressure, not noise)
+     · evidence count (3rd corroborating signal lifts confidence sharply)
+     · whether ALL supporting signals are individually material
+
+   The result is on 0..1. The pipeline discards correlations below 0.55.
+   --------------------------------------------------------------------------- */
+
+const SEVERITY_CONFIDENCE: Record<Severity, number> = {
+  critical: 0.95,
+  risk: 0.75,
+  watch: 0.55,
+  info: 0.35,
+};
+
+function scoreConfidence(supporting: OperationalEvent[]): number {
+  if (supporting.length === 0) return 0;
+  /* Base = max-severity confidence. */
+  const base = Math.max(...supporting.map((e) => SEVERITY_CONFIDENCE[e.severity]));
+  /* Corroboration bonus: +0.08 per additional supporting signal beyond
+     the first, capped at +0.20. */
+  const bonus = Math.min(0.20, Math.max(0, supporting.length - 1) * 0.08);
+  /* Persistence bonus: any supporting signal with persistence ≥ 2 adds
+     +0.06. (Caps the same way.) */
+  const persistent = supporting.some((e) => (e.persistence ?? 0) >= 2);
+  return Math.min(1, base + bonus + (persistent ? 0.06 : 0));
+}
+
+const MIN_CONFIDENCE = 0.55;
+
+/* ---------------------------------------------------------------------------
    Rule set.
 
    Each rule looks for a pair (or trio) of event kinds. When matched it
@@ -54,19 +88,45 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
 
   const hasAny = (kind: string) => (idx.byKind.get(kind)?.length ?? 0) > 0;
   const firstOf = (kind: string): OperationalEvent | undefined => idx.byKind.get(kind)?.[0];
+  const allOf = (kind: string): OperationalEvent[] => idx.byKind.get(kind) ?? [];
 
-  /* 1) Logistics spike + margin drop = logistics-driven margin compression. */
+  const emit = (
+    args: Omit<CrossModuleCorrelation, "confidence" | "evidenceCount"> & { supporting: OperationalEvent[] },
+  ): void => {
+    const { supporting, ...rest } = args;
+    const confidence = scoreConfidence(supporting);
+    if (confidence < MIN_CONFIDENCE) return;
+    /* Resolve a stable state for the correlation — worsening if ANY
+       support is worsening, improving if ALL non-info supports are
+       improving. */
+    let state: CrossModuleCorrelation["state"] = undefined;
+    if (supporting.some((e) => e.state === "worsening")) state = "worsening";
+    else if (supporting.length > 0 && supporting.every((e) => e.state === "improving" || e.state === "resolved")) state = "improving";
+    else if (supporting.some((e) => e.state === "recurring")) state = "recurring";
+    out.push({
+      ...rest,
+      confidence: Math.round(confidence * 100) / 100,
+      evidenceCount: supporting.length,
+      state,
+    });
+  };
+
+  /* 1) Logistics spike + margin drop = logistics-driven margin compression.
+     Strengthens if there's ALSO a logistics expense_anomaly. */
   if (hasAny("logistics_spike") && hasAny("margin_drop")) {
     const log = firstOf("logistics_spike")!;
     const mar = firstOf("margin_drop")!;
-    out.push({
+    const corroborating = allOf("expense_anomaly").filter((e) => /freight|shipping|customs|logistics/i.test(e.entity?.name ?? ""));
+    const supporting = [log, mar, ...corroborating];
+    emit({
       key: stableId(["corr", "logistics-margin"]),
-      sources: [log.key, mar.key],
+      sources: supporting.map((s) => s.key),
       affects: ["finance", "logistics"] as ModuleKey[],
       severity: maxSeverity(log.severity, mar.severity),
       headline: "Logistics costs compressing margin",
       narrative: `Logistics spend is up ${(log.magnitude ?? 0).toFixed(0)}% versus the prior period and gross margin sits at ${(mar.magnitude ?? 0).toFixed(1)}%. The freight pressure is a likely driver of the margin compression.`,
       magnitude: log.magnitude,
+      supporting,
     });
   }
 
@@ -75,13 +135,15 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   if (collDelays.length > 0 && hasAny("liquidity_pressure")) {
     const liq = firstOf("liquidity_pressure")!;
     const headName = collDelays[0].entity?.name ?? "Customers";
-    out.push({
+    const supporting = [...collDelays, liq];
+    emit({
       key: stableId(["corr", "collection-liquidity"]),
-      sources: [...collDelays.map((e) => e.key), liq.key],
+      sources: supporting.map((s) => s.key),
       affects: ["finance", "customer"] as ModuleKey[],
       severity: maxSeverity(liq.severity, collDelays[0].severity),
       headline: "Slowing collections tightening liquidity",
       narrative: `${headName} ${collDelays.length > 1 ? "and others " : ""}are paying slower than the prior 90 days while AP exceeds AR. Liquidity window is contracting because cash is stuck in receivables.`,
+      supporting,
     });
   }
 
@@ -90,18 +152,18 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   const overdue = idx.byKind.get("overdue_payment") ?? [];
   if (concentration.length > 0 && overdue.length > 0) {
     const top = concentration[0];
-    /* If the overdue events share the same customer as the concentration
-       event, the narrative is much stronger. */
     const matched = overdue.filter((o) => o.entity?.name === top.entity?.name);
     if (matched.length > 0) {
-      out.push({
+      const supporting = [top, ...matched];
+      emit({
         key: stableId(["corr", "concentration-overdue", top.entity?.id ?? top.entity?.name ?? "x"]),
-        sources: [top.key, ...matched.map((m) => m.key)],
+        sources: supporting.map((s) => s.key),
         affects: ["finance", "customer"] as ModuleKey[],
         severity: "risk",
         headline: "Top customer is also late paying",
-        narrative: `${top.entity?.name ?? "Top customer"} represents ${(top.magnitude ?? 0).toFixed(0)}% of revenue and has overdue invoices. Concentrated counterparty + collection risk.`,
+        narrative: `${top.entity?.name ?? "Top customer"} represents ${(top.magnitude ?? 0).toFixed(0)}% of revenue and has overdue invoices. Concentration + collection risk on the same counterparty.`,
         magnitude: top.magnitude,
+        supporting,
       });
     }
   }
@@ -110,13 +172,15 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   if (hasAny("supplier_dependency") && hasAny("margin_drop")) {
     const dep = firstOf("supplier_dependency")!;
     const mar = firstOf("margin_drop")!;
-    out.push({
+    const supporting = [dep, mar];
+    emit({
       key: stableId(["corr", "supplier-margin", dep.entity?.name ?? "x"]),
-      sources: [dep.key, mar.key],
+      sources: supporting.map((s) => s.key),
       affects: ["finance", "supplier"] as ModuleKey[],
       severity: maxSeverity(dep.severity, mar.severity),
       headline: "Supplier dependency amplifying margin risk",
       narrative: `${dep.entity?.name ?? "A single supplier"} absorbs ${(dep.magnitude ?? 0).toFixed(0)}% of COGS and gross margin is compressed at ${(mar.magnitude ?? 0).toFixed(1)}%. Any further price move from this supplier will compound the margin pressure.`,
+      supporting,
     });
   }
 
@@ -124,13 +188,15 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   if (hasAny("supplier_overdue") && hasAny("liquidity_pressure")) {
     const ovr = firstOf("supplier_overdue")!;
     const liq = firstOf("liquidity_pressure")!;
-    out.push({
+    const supporting = [ovr, liq];
+    emit({
       key: stableId(["corr", "supplier-overdue-liquidity"]),
-      sources: [ovr.key, liq.key],
+      sources: supporting.map((s) => s.key),
       affects: ["supplier", "finance"] as ModuleKey[],
       severity: maxSeverity(ovr.severity, liq.severity),
       headline: "Supplier payments slipping under cash pressure",
-      narrative: "Outgoing supplier payments are running past due while liquidity is tight. Worth staggering remaining AP and accelerating top AR to avoid relationship strain.",
+      narrative: "Outgoing supplier payments are running past due while liquidity is tight. Stagger remaining AP and accelerate top AR to avoid relationship strain.",
+      supporting,
     });
   }
 
@@ -138,13 +204,15 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   if (hasAny("revenue_decline") && (idx.byKind.get("collection_delay")?.length ?? 0) > 0) {
     const rev = firstOf("revenue_decline")!;
     const col = firstOf("collection_delay")!;
-    out.push({
+    const supporting = [rev, col];
+    emit({
       key: stableId(["corr", "revenue-collection"]),
-      sources: [rev.key, col.key],
+      sources: supporting.map((s) => s.key),
       affects: ["finance", "customer", "crm"] as ModuleKey[],
       severity: maxSeverity(rev.severity, col.severity),
       headline: "Revenue softening while collections slow",
-      narrative: "Both the top of the funnel and the cash conversion are decelerating. Cross-check pipeline health (CRM) and AR aging (Finance).",
+      narrative: "Top-of-funnel and cash conversion are decelerating together. Cross-check pipeline health (CRM) and AR aging (Finance) before adjusting commercial terms.",
+      supporting,
     });
   }
 
@@ -152,17 +220,21 @@ export function correlate(events: OperationalEvent[]): CrossModuleCorrelation[] 
   if (hasAny("inventory_shortage") && hasAny("revenue_decline")) {
     const inv = firstOf("inventory_shortage")!;
     const rev = firstOf("revenue_decline")!;
-    out.push({
+    const supporting = [inv, rev];
+    emit({
       key: stableId(["corr", "inventory-revenue"]),
-      sources: [inv.key, rev.key],
+      sources: supporting.map((s) => s.key),
       affects: ["inventory", "finance"] as ModuleKey[],
       severity: maxSeverity(inv.severity, rev.severity),
       headline: "Stock shortage may be limiting revenue",
       narrative: "Multiple SKUs are below safety stock while revenue is declining. Check whether unfulfilled demand is leaving through the back door.",
+      supporting,
     });
   }
 
-  /* Sort: critical → risk → watch, then by magnitude proxy if present. */
+  /* Sort: critical → risk → watch, then descending confidence. */
   const sevRank: Record<Severity, number> = { critical: 0, risk: 1, watch: 2, info: 3 };
-  return out.sort((a, b) => sevRank[a.severity] - sevRank[b.severity]);
+  return out.sort((a, b) =>
+    sevRank[a.severity] - sevRank[b.severity] || (b.confidence ?? 0) - (a.confidence ?? 0)
+  );
 }

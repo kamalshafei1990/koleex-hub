@@ -14,6 +14,14 @@ export {
   mean, median, stddev, daysBetween, daysFromToday,
   classifyDirection, clamp01, softHealth, pctChange, safePct, stableId,
 } from "./behavior";
+export { signalPriorityScore, prioritise, suppressNoise } from "./priority";
+export { isMaterial, applyMaterialityGate, normaliseSeverity } from "./materiality";
+export {
+  annotateWithMemory, smoothHealth, withHealthScore,
+  loadMemory, saveMemory, emptyMemory,
+  type MemoryState, type AnnotatedRun,
+} from "./persistence";
+export { buildExecutiveDigest } from "./digest";
 
 export {
   buildCustomerProfiles,
@@ -83,6 +91,10 @@ import { buildLogisticsSnapshot, splitByPeriod } from "./logistics";
 import { computeInventorySnapshot, type InventoryRecord } from "./inventory";
 import { synthesizeEvents } from "./events";
 import { correlate } from "./relationships";
+import { applyMaterialityGate, normaliseSeverity } from "./materiality";
+import { prioritise, suppressNoise } from "./priority";
+import { annotateWithMemory, smoothHealth, withHealthScore, type MemoryState } from "./persistence";
+import { buildExecutiveDigest } from "./digest";
 import {
   composeBusinessHealth,
   scoreCustomerHealth,
@@ -100,10 +112,16 @@ export interface IntelligencePicture {
   logistics: LogisticsSnapshot;
   inventory: InventorySnapshot;
   events: OperationalEvent[];
+  /** Resolved carry-over events surfaced for one run after they clear. */
+  resolved: OperationalEvent[];
   correlations: CrossModuleCorrelation[];
   health: BusinessHealth;
   risk: RiskAssessment;
   copilotHints: CopilotHint[];
+  /** Top 3-5 curated narratives — executive digest layer. */
+  digest: import("./types").DigestItem[];
+  /** Memory snapshot to persist for the next run. */
+  nextMemory: MemoryState;
 }
 
 export interface IntelligenceInputs {
@@ -120,6 +138,8 @@ export interface IntelligenceInputs {
     supplierId?: string;
     orderId?: string;
   };
+  /** Prior memory state (loaded from localStorage by the caller). */
+  memory?: MemoryState | null;
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -150,7 +170,17 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     orders: input.orders,
   });
 
-  const events = synthesizeEvents({
+  /* ── Phase 2.0.1 quality-controlled pipeline ──
+     1) Raw synthesis from all modules.
+     2) Materiality gate — drop signals a finance manager wouldn't care about.
+     3) Noise suppression — merge same-topic clusters into one signal.
+     4) Severity normalisation.
+     5) Persistence annotation — new / recurring / worsening / improving.
+     6) Priority scoring — rank by impact + urgency + severity + persistence.
+     7) Correlations — score with confidence; low-confidence dropped.
+     8) Health composed, then EMA-smoothed against prior run.
+     9) Risk + Copilot + Executive digest off the curated stream.       */
+  const raw = synthesizeEvents({
     kpi: input.kpi,
     orders: input.orders,
     customers,
@@ -158,7 +188,12 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     logistics,
     inventory,
   });
-  const correlations = correlate(events);
+  const material   = applyMaterialityGate(raw);
+  const merged     = suppressNoise(material);
+  const normalised = normaliseSeverity(merged);
+  const memoryRun  = annotateWithMemory(normalised, input.memory ?? null);
+  const ranked     = prioritise(memoryRun.events);
+  const correlations = correlate(ranked);
 
   const dimensions = [
     scoreFinanceHealth(input.kpi),
@@ -167,14 +202,32 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     scoreLogisticsHealth(logistics),
     scoreInventoryHealth(inventory),
   ];
-  const health = composeBusinessHealth(dimensions);
-  const risk = assessRisk({ events, customers, suppliers });
+  const rawHealth = composeBusinessHealth(dimensions);
+  const health = smoothHealth(rawHealth, input.memory ?? null);
+
+  const risk = assessRisk({ events: ranked, customers, suppliers });
 
   const copilotHints = buildBusinessCopilotContext({
-    events,
+    events: ranked,
     correlations,
     pageContext: input.pageContext,
   });
 
-  return { customers, suppliers, logistics, inventory, events, correlations, health, risk, copilotHints };
+  const digest = buildExecutiveDigest({
+    kpi: input.kpi,
+    events: ranked,
+    correlations,
+    customers,
+    suppliers,
+  });
+
+  const nextMemory = withHealthScore(memoryRun.nextMemory, health);
+
+  return {
+    customers, suppliers, logistics, inventory,
+    events: ranked,
+    resolved: memoryRun.resolved,
+    correlations,
+    health, risk, copilotHints, digest, nextMemory,
+  };
 }

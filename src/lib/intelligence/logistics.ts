@@ -131,16 +131,19 @@ function buildLogisticsRead(args: {
   const { total, headlineTrend, shareOfOpex, buckets } = args;
   if (total === 0) return "No logistics spend recorded for this window.";
   const bits: string[] = [];
-  if (headlineTrend >= 25) bits.push(`Logistics spend is ${headlineTrend.toFixed(0)}% above the prior period.`);
-  else if (headlineTrend >= 10) bits.push(`Logistics spend is ${headlineTrend.toFixed(0)}% higher than the prior period.`);
-  else if (headlineTrend <= -10) bits.push(`Logistics spend is ${Math.abs(headlineTrend).toFixed(0)}% lower than the prior period.`);
-  if (shareOfOpex >= 30) bits.push(`Represents ${shareOfOpex.toFixed(0)}% of operating spend.`);
-  /* Call out the spiking bucket if there is one. */
+  /* Phase 2.0.1: only report meaningful moves (≥10%). Otherwise no
+     trend clause — silence is preferred to a "spend is stable" filler. */
+  if (headlineTrend >= 25) bits.push(`Logistics spend ${headlineTrend.toFixed(0)}% above the prior period.`);
+  else if (headlineTrend >= 10) bits.push(`Logistics spend ${headlineTrend.toFixed(0)}% higher than the prior period.`);
+  else if (headlineTrend <= -10) bits.push(`Logistics spend ${Math.abs(headlineTrend).toFixed(0)}% lower than the prior period.`);
+  if (shareOfOpex >= 30) bits.push(`${shareOfOpex.toFixed(0)}% of operating spend.`);
+  /* Call out the spiking bucket if there is one (≥ 25% bump). */
   const spiking = [...buckets].sort((a, b) => b.trendPct - a.trendPct)[0];
   if (spiking && spiking.trendPct >= 25) {
-    bits.push(`${capitalise(spiking.bucket)} is up ${spiking.trendPct.toFixed(0)}% — main driver.`);
+    bits.push(`${capitalise(spiking.bucket)} is up ${spiking.trendPct.toFixed(0)}% — primary driver.`);
   }
-  if (bits.length === 0) bits.push(`Logistics spend stable.`);
+  /* If nothing concrete fires we return empty — caller decides whether
+     to suppress the tile or fall back. */
   return bits.join(" ");
 }
 

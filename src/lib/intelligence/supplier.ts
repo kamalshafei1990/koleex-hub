@@ -166,13 +166,15 @@ function buildSupplierRead(args: {
 }): string {
   const { name, cogsShare, outstanding, reliability } = args;
   const bits: string[] = [];
-  if (cogsShare >= 70) bits.push(`${name} absorbs ${cogsShare.toFixed(0)}% of procurement spend — critical dependency.`);
+  /* Phase 2.0.1: only surface clauses anchored on a concrete number. */
+  if (cogsShare >= 70) bits.push(`${name} absorbs ${cogsShare.toFixed(0)}% of procurement spend — single-source dependency.`);
   else if (cogsShare >= 50) bits.push(`${name} represents ${cogsShare.toFixed(0)}% of procurement spend.`);
   else if (cogsShare >= 30) bits.push(`${name} is ${cogsShare.toFixed(0)}% of procurement spend.`);
-  if (outstanding > 0) bits.push(`Open balance of ${formatCompact(outstanding)} USD.`);
-  if (reliability < 50) bits.push(`Payment cadence is strained.`);
-  else if (reliability >= 90) bits.push(`Payments to this supplier are consistently on time.`);
-  if (bits.length === 0) bits.push(`${name} is a diversified, low-dependency relationship.`);
+  if (outstanding > 0) bits.push(`Open balance ${formatCompact(outstanding)} USD.`);
+  if (reliability < 50) bits.push(`Out-payment cadence is running late versus due dates — relationship friction risk.`);
+  else if (reliability >= 90 && cogsShare >= 30) bits.push(`Payments consistently on or before due date.`);
+  /* If no clause fires, return empty — the consumer will fall back to a
+     calm phrase or suppress the entry entirely. */
   return bits.join(" ");
 }
 
