@@ -32,8 +32,11 @@ import {
   InsightCard,
   MetricCard,
   SectionTitle,
+  WorkflowRail,
   formatCompact,
+  type InsightSeverity,
   type Tone,
+  type WorkflowItem,
 } from "@/components/finance/FinanceUiX";
 import { PeriodTabs } from "@/components/finance/FinanceUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
@@ -90,6 +93,11 @@ export default function FinanceDashboard() {
           health={kpi?.health_status}
           controls={<PeriodTabs<DashboardPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />}
         />
+
+        {/* ── 0. WORKFLOW RAIL — operate the business, don't just watch */}
+        <div className="mt-5">
+          <WorkflowRail items={buildWorkflowItems(kpi)} />
+        </div>
 
         {/* ── 1. PRIMARY HEROES ────────────────────────────────── */}
         <SectionTitle eyebrow="At a glance" title="Performance this period" />
@@ -204,7 +212,7 @@ export default function FinanceDashboard() {
               title={c.title}
               description={c.description}
               chip={c.chip}
-              chipTone={c.chipTone}
+              severity={c.severity}
             />
           ))}
         </div>
@@ -241,12 +249,24 @@ export default function FinanceDashboard() {
    Intelligence layer  —  takes the raw KPI payload and produces a
    short narrative headline + 3-6 InsightCards explaining the business
    state in plain language. Pure function; easy to evolve.
+
+   Phase 1.6: each card now carries an InsightSeverity (positive /
+   neutral / watch / risk / critical) so the InsightCard can render
+   subtle left-rail tint + (on critical) a slow edge pulse.
    --------------------------------------------------------------------------- */
+type IntelligenceCard = {
+  title: string;
+  description: string;
+  chip?: string;
+  severity: InsightSeverity;
+  icon: string;
+};
+
 function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
   if (!kpi) {
     return {
       headline: "Loading executive view…",
-      cards: [] as { title: string; description: string; chip?: string; chipTone?: Tone; icon: string }[],
+      cards: [] as IntelligenceCard[],
     };
   }
   const periodLabel = period === "week" ? "this week" : period === "quarter" ? "this quarter" : "this year";
@@ -265,8 +285,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     headline = `Healthy ${periodLabel} · Net profit ${formatCompact(kpi.net_profit)} USD · Gross margin ${margin.toFixed(1)}%.`;
   }
 
-  /* Cards */
-  const cards: { title: string; description: string; chip?: string; chipTone?: Tone; icon: string }[] = [];
+  const cards: IntelligenceCard[] = [];
   const cashNet = (kpi.cash_in ?? 0) - (kpi.cash_out ?? 0);
   const collectionPct = kpi.total_revenue > 0 ? ((kpi.cash_in ?? 0) / kpi.total_revenue) * 100 : 0;
 
@@ -279,7 +298,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
         ? `Cash in exceeds cash out by ${fmtMoney(cashNet, "USD", { compact: true })} ${periodLabel}.`
         : `Cash out exceeds cash in by ${fmtMoney(Math.abs(cashNet), "USD", { compact: true })} ${periodLabel} — watch the bank balance.`,
     chip: cashNet >= 0 ? "Positive" : "Negative",
-    chipTone: cashNet >= 0 ? "positive" : "negative",
+    severity: cashNet >= 0 ? "positive" : "risk",
   });
 
   /* Collections */
@@ -291,21 +310,26 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
         ? `${fmtMoney(kpi.accounts_receivable, "USD", { compact: true })} still to collect from customers. Customer payments cover ${collectionPct.toFixed(0)}% of revenue so far.`
         : "All issued orders have been fully collected.",
       chip: kpi.accounts_receivable === 0 ? "Clear" : collectionPct >= 70 ? "On track" : "Lagging",
-      chipTone: kpi.accounts_receivable === 0 ? "positive" : collectionPct >= 70 ? "warning" : "negative",
+      severity: kpi.accounts_receivable === 0
+        ? "positive"
+        : collectionPct >= 70 ? "neutral"
+        : collectionPct >= 40 ? "watch"
+        : "risk",
     });
   }
 
   /* Supplier exposure */
   if (kpi.accounts_payable > 0) {
     const apHeavy = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 1.2;
+    const apSevere = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 2;
     cards.push({
       icon: "↗",
       title: "Supplier liabilities",
       description: apHeavy
         ? `${fmtMoney(kpi.accounts_payable, "USD", { compact: true })} owed to suppliers — exceeds outstanding receivables.`
         : `${fmtMoney(kpi.accounts_payable, "USD", { compact: true })} owed to suppliers + unpaid bills.`,
-      chip: apHeavy ? "Heavy" : "Manageable",
-      chipTone: apHeavy ? "warning" : "neutral",
+      chip: apSevere ? "Critical" : apHeavy ? "Heavy" : "Manageable",
+      severity: apSevere ? "critical" : apHeavy ? "watch" : "neutral",
     });
   }
 
@@ -320,7 +344,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
       : margin > 0 ? `Gross margin compressed to ${margin.toFixed(1)}% — review supplier costs.`
       : `Gross margin is negative this period — revenue isn't covering supplier costs.`,
     chip: margin >= 30 ? "Strong" : margin >= 15 ? "Healthy" : margin > 0 ? "Compressed" : "Loss",
-    chipTone: margin >= 30 ? "positive" : margin >= 15 ? "info" : margin > 0 ? "warning" : "negative",
+    severity: margin >= 30 ? "positive" : margin >= 15 ? "neutral" : margin > 0 ? "watch" : "risk",
   });
 
   /* Top order concentration risk */
@@ -332,8 +356,8 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
         icon: "◆",
         title: "Revenue concentration",
         description: `${topOrder.customer_name || "Top customer"} accounts for ${share.toFixed(0)}% of revenue ${periodLabel}.`,
-        chip: "Concentration risk",
-        chipTone: "warning",
+        chip: share >= 60 ? "Critical concentration" : "Concentration risk",
+        severity: share >= 60 ? "risk" : "watch",
       });
     }
   }
@@ -346,11 +370,74 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
       title: "Expense concentration",
       description: `${topCat.name} is ${topCat.share_pct.toFixed(0)}% of all operating spend ${periodLabel}.`,
       chip: "Watch",
-      chipTone: "warning",
+      severity: "watch",
     });
   }
 
   return { headline, cards };
+}
+
+/* ---------------------------------------------------------------------------
+   Workflow builder — turns the dashboard KPI snapshot into operational
+   action shortcuts. This is the bridge from "I can observe the
+   business" to "I can OPERATE the business" without leaving the
+   dashboard. Each tile routes the user to the appropriate sub-page
+   pre-filtered, and shows a badge count where there's something to act on.
+   --------------------------------------------------------------------------- */
+function buildWorkflowItems(kpi: DashboardKpi | null): WorkflowItem[] {
+  const arAmount = kpi?.accounts_receivable ?? 0;
+  const apAmount = kpi?.accounts_payable ?? 0;
+  const items: WorkflowItem[] = [
+    {
+      key: "new-order",
+      label: "New order",
+      hint: "Start a profit run",
+      icon: <span aria-hidden>＋</span>,
+      href: "/finance/orders",
+    },
+    {
+      key: "record-payment",
+      label: "Record payment",
+      hint: "Customer or supplier",
+      icon: <span aria-hidden>≡</span>,
+      href: "/finance/payments",
+    },
+    {
+      key: "add-expense",
+      label: "Add expense",
+      hint: "Fast operational entry",
+      icon: <span aria-hidden>△</span>,
+      href: "/expenses",
+    },
+    {
+      key: "follow-up",
+      label: "Follow up collection",
+      hint: arAmount > 0 ? "AR still open" : "All cleared",
+      icon: <span aria-hidden>↘</span>,
+      href: "/finance/customers",
+      badge: arAmount > 0
+        ? { text: formatCompact(arAmount), tone: "warning" }
+        : { text: "Clear", tone: "positive" },
+    },
+    {
+      key: "pay-suppliers",
+      label: "Pay suppliers",
+      hint: apAmount > 0 ? "AP outstanding" : "Nothing pending",
+      icon: <span aria-hidden>↗</span>,
+      href: "/finance/suppliers",
+      badge: apAmount > 0
+        ? { text: formatCompact(apAmount), tone: "warning" }
+        : { text: "Clear", tone: "positive" },
+    },
+    {
+      key: "reminders",
+      label: "Reminders",
+      hint: "Severity-sorted center",
+      icon: <span aria-hidden>○</span>,
+      href: "/finance/notifications",
+    },
+  ];
+  return items;
 }
 
 /* ---------------------------------------------------------------------------

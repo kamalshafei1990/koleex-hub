@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
-import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
+import { BarChart, DonutChart, HeroKpiCard, MetricCard, formatCompact } from "@/components/finance/FinanceUiX";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
@@ -108,6 +108,45 @@ export default function FinanceExpenseAnalytics() {
     return { recent, unusual };
   }, [categoryBreakdown, expenses]);
 
+  /* Monthly spend trend — last 6 months. Bar-chart friendly. */
+  const monthlyTrend = useMemo(() => {
+    const now = new Date();
+    const buckets: { key: string; label: string; from: Date; to: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        label: d.toLocaleDateString("en-US", { month: "short" }),
+        from: d, to: next,
+      });
+    }
+    const totals = buckets.map((b) => 0);
+    for (const e of expenses) {
+      if (!e.expense_date) continue;
+      const d = new Date(e.expense_date);
+      const i = buckets.findIndex((b) => d >= b.from && d < b.to);
+      if (i >= 0) totals[i] += Number(e.amount) || 0;
+    }
+    return buckets.map((b, i) => ({ label: b.label, value: totals[i] }));
+  }, [expenses]);
+
+  /* Top vendors / suppliers — by total spend. Keyed off
+     linked_supplier_id with a fallback to "Unlinked" so the bucket
+     of unattributed expenses doesn't get lost. */
+  const topVendors = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; total: number; count: number; lastDate: string }>();
+    for (const e of expenses) {
+      const key = e.linked_supplier_id ?? "—";
+      const cur = map.get(key) ?? { key, name: e.linked_supplier_id ?? "Unlinked", total: 0, count: 0, lastDate: e.expense_date };
+      cur.total += Number(e.amount) || 0;
+      cur.count += 1;
+      if (e.expense_date && (!cur.lastDate || e.expense_date > cur.lastDate)) cur.lastDate = e.expense_date;
+      map.set(key, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+  }, [expenses]);
+
   /* Order-impact analysis — which orders absorb the most expense
      dollars. This is exactly the kind of insight that doesn't belong
      in the operational Expenses app but matters for the executive view. */
@@ -153,7 +192,78 @@ export default function FinanceExpenseAnalytics() {
           <MetricCard label="Overdue" value={kpi.overdue} unit="USD" tone="negative" hint="Past due date" loading={loading} />
         </div>
 
-        {/* By Category */}
+        {/* ── Operational analytics row: Donut · Monthly · Top vendors  */}
+        {categoryBreakdown.length > 0 && (
+          <div className="mt-6 grid gap-3 lg:grid-cols-3">
+            {/* Donut — category distribution */}
+            <SectionCard title="Category distribution" subtitle="Share of total spend, monochrome by intensity.">
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                <div className="shrink-0">
+                  <DonutChart
+                    segments={categoryBreakdown.map((c) => ({ name: c.name, value: c.total }))}
+                    centerLabel="Total"
+                    centerValue={formatCompact(categoryBreakdown.reduce((s, c) => s + c.total, 0))}
+                  />
+                </div>
+                <ul className="flex w-full min-w-0 flex-1 flex-col gap-1.5">
+                  {categoryBreakdown.slice(0, 6).map((c, i) => {
+                    const style = styleForCategory(c.name);
+                    const opacity = 0.30 + 0.45 * (1 - i / Math.max(1, categoryBreakdown.length));
+                    return (
+                      <li key={c.name} className="flex items-center gap-3 text-[12px]">
+                        <span
+                          aria-hidden
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: `rgba(255,255,255,${opacity.toFixed(2)})` }}
+                        />
+                        <span className="text-base">{style.glyph}</span>
+                        <span className="flex-1 truncate text-gray-300">{c.name}</span>
+                        <span className="tabular-nums text-gray-500">{c.share.toFixed(0)}%</span>
+                        <span className="w-16 text-right font-medium tabular-nums">{formatCompact(c.total)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </SectionCard>
+
+            {/* Monthly bar trend */}
+            <SectionCard title="Monthly spend" subtitle="Last 6 months. Latest highlighted.">
+              <BarChart data={monthlyTrend} highlightLast />
+              <div className="mt-3 flex items-baseline justify-between text-[11px] text-gray-500">
+                <span>This month</span>
+                <span className="text-base font-medium tabular-nums text-[var(--text-primary)]">
+                  {formatCompact(monthlyTrend[monthlyTrend.length - 1]?.value ?? 0)}
+                </span>
+              </div>
+            </SectionCard>
+
+            {/* Top vendors */}
+            <SectionCard title="Top vendors" subtitle="Ranked by total spend.">
+              {topVendors.length === 0 ? (
+                <div className="py-6 text-center text-[12px] text-gray-500">No supplier-linked expenses yet.</div>
+              ) : (
+                <ol className="space-y-1.5">
+                  {topVendors.map((v, idx) => (
+                    <li key={v.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.04] bg-white/[0.018] px-3 py-2 text-[12px]">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-medium text-gray-300">{idx + 1}</span>
+                        <span className="truncate text-gray-200">{v.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium tabular-nums">{formatCompact(v.total)}</div>
+                        <div className="text-[10px] text-gray-500">{v.count} {v.count === 1 ? "expense" : "expenses"}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </SectionCard>
+          </div>
+        )}
+
+        {/* By Category — pre-existing tile grid retained below for
+            quick drill-down (each tile carries trend % vs last month). */}
         {categoryBreakdown.length > 0 && (
           <div className="mt-6">
             <SectionCard

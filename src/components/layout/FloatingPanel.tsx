@@ -447,17 +447,15 @@ export default function FloatingPanel() {
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
-          className={`absolute bottom-[56px] end-0 w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden ${
-            tab === "ai" && !closing ? "panel-neon-border" : `border ${border}`
-          } ${bg}`}
+          className={`absolute bottom-[56px] end-0 w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
           style={{
-            boxShadow: tab === "ai" && !closing
-              ? dk
-                ? "0 8px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,212,255,0.08), 0 0 40px rgba(123,97,255,0.06)"
-                : "0 8px 40px rgba(0,0,0,0.15), 0 0 20px rgba(0,212,255,0.06), 0 0 40px rgba(123,97,255,0.04)"
-              : dk
-                ? "0 8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)"
-                : "0 8px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.04)",
+            /* Calm enterprise shadow — same regardless of tab so the
+               Copilot panel reads as a Hub surface, not a chatbot
+               toy. Removed the cyan/violet glow that was leftover
+               from the older "AI" branding. */
+            boxShadow: dk
+              ? "0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)"
+              : "0 12px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)",
             transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
             opacity: closing ? 0 : 1,
             transform: closing ? "translateY(8px) scale(0.97)" : "translateY(0) scale(1)",
@@ -486,17 +484,12 @@ export default function FloatingPanel() {
                   onClick={() => setTab("ai")}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[9px] text-[12px] font-semibold transition-all duration-300 ${
                     tab === "ai"
-                      ? "shadow-sm"
+                      ? dk ? "bg-white/[0.10] text-white shadow-sm" : "bg-black/[0.08] text-black shadow-sm"
                       : dk ? "text-white/35 hover:text-white/55" : "text-black/35 hover:text-black/55"
                   }`}
-                  style={tab === "ai" ? {
-                    background: dk
-                      ? "linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.12), rgba(255,110,199,0.06))"
-                      : "linear-gradient(135deg, rgba(0,212,255,0.10), rgba(123,97,255,0.08))",
-                  } : undefined}
                 >
-                  <AiFaceIcon size={16} className={tab === "ai" ? "ai-lottie-glow" : "opacity-40"} animated={tab === "ai"} />
-                  <span className={tab === "ai" ? "ai-neon-text" : ""}>AI</span>
+                  <AiFaceIcon size={14} className={tab === "ai" ? "opacity-90" : "opacity-40"} animated={tab === "ai"} />
+                  <span>Copilot</span>
                 </button>
                 <button
                   onClick={() => { setTab("discuss"); setActiveChannel(null); }}
@@ -634,9 +627,9 @@ export default function FloatingPanel() {
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                      <AiFaceIcon size={64} animated />
-                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Koleex AI</p>
-                      <p className={`text-[11px] mt-1 ${textG}`}>Ask anything about your business data</p>
+                      <AiFaceIcon size={56} animated />
+                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Koleex Copilot</p>
+                      <p className={`text-[11px] mt-1 ${textG}`}>Your operational finance assistant</p>
                     </div>
                   )}
                   {aiMessages.map((m, i) => (
@@ -694,7 +687,7 @@ export default function FloatingPanel() {
               }`}>
                 <input
                   type="text"
-                  placeholder={tab === "ai" ? "Ask Koleex AI..." : "Type a message..."}
+                  placeholder={tab === "ai" ? "Ask Koleex Copilot…" : "Type a message…"}
                   value={tab === "ai" ? aiInput : msgInput}
                   onChange={(e) => tab === "ai" ? setAiInput(e.target.value) : setMsgInput(e.target.value)}
                   onKeyDown={(e) => {
