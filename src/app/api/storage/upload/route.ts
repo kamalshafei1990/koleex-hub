@@ -22,6 +22,7 @@ const ALLOWED_BUCKETS = new Set([
   "product-images",
   "product-assets",
   "discuss-voice", // private bucket for voice notes (see /api/storage/signed-url)
+  "finance-documents", // private bucket for bank-statement imports + finance attachments
 ]);
 
 export async function POST(req: Request) {

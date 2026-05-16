@@ -417,6 +417,89 @@ export interface FinanceReconciliationCandidate {
   cash_movement?: CashMovement | null;
 }
 
+/* ── Bank Statement Import (Phase 2.6) ─────────────────────────── */
+
+export type BankStatementImportStatus =
+  | "uploaded"
+  | "parsed"
+  | "confirmed"
+  | "failed"
+  | "cancelled";
+
+export type BankStatementFileType = "csv" | "xlsx";
+
+export type BankStatementRowDuplicateStatus = "new" | "possible_duplicate" | "duplicate";
+export type BankStatementRowImportStatus = "ready" | "skipped" | "imported" | "error";
+
+/** A persisted bank-statement file. Lifecycle: uploaded → parsed → confirmed. */
+export interface BankStatementImport {
+  id: string;
+  tenant_id: string;
+  bank_account_id: string;
+  file_name: string;
+  file_type: BankStatementFileType;
+  file_size: number;
+  storage_path: string | null;
+  status: BankStatementImportStatus;
+  row_count: number;
+  imported_count: number;
+  duplicate_count: number;
+  error_count: number;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One parsed line from a bank statement. Survives in the audit trail
+ *  after the cash movement is created so the operator can trace any
+ *  movement back to its source row. */
+export interface BankStatementRow {
+  id: string;
+  tenant_id: string;
+  import_id: string;
+  bank_account_id: string;
+  row_index: number;
+  raw_data: Record<string, unknown>;
+  movement_date: string | null;
+  value_date: string | null;
+  description: string | null;
+  reference: string | null;
+  counterparty_name: string | null;
+  direction: CashMovementDirection | null;
+  amount: number | null;
+  currency: string | null;
+  balance_after: number | null;
+  movement_type: CashMovementType | null;
+  duplicate_status: BankStatementRowDuplicateStatus;
+  import_status: BankStatementRowImportStatus;
+  matched_cash_movement_id: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Detected column mapping the parser produces. Saved into the import
+ *  metadata so a future re-parse uses the same mapping. */
+export interface BankStatementColumnMapping {
+  date?: string;
+  value_date?: string;
+  description?: string;
+  reference?: string;
+  debit?: string;
+  credit?: string;
+  amount?: string;
+  direction?: string;
+  balance?: string;
+  counterparty?: string;
+  currency?: string;
+}
+
 /* ── Customer / Supplier accounts ──────────────────────────────── */
 export interface FinanceCustomerAccount {
   id: string;

@@ -68,6 +68,7 @@ export { buildApprovalSnapshot } from "./approval";
 export { buildPaymentControlSnapshot } from "./payment";
 export { buildTreasurySnapshot } from "./treasury";
 export { buildReconciliationSnapshot } from "./reconciliation";
+export { buildBankImportSnapshot } from "./bank-imports";
 export {
   matchConfidence,
   duplicateMovementConfidence,
@@ -118,6 +119,7 @@ import { buildApprovalSnapshot } from "./approval";
 import { buildPaymentControlSnapshot } from "./payment";
 import { buildTreasurySnapshot } from "./treasury";
 import { buildReconciliationSnapshot } from "./reconciliation";
+import { buildBankImportSnapshot } from "./bank-imports";
 import {
   composeBusinessHealth,
   scoreApprovalHealth,
@@ -145,6 +147,8 @@ export interface IntelligencePicture {
   treasury: import("./types").TreasurySnapshot;
   /** Phase 2.5 — reconciliation queue snapshot. */
   reconciliation: import("./reconciliation").ReconciliationSnapshot;
+  /** Phase 2.6 — bank-statement import snapshot. */
+  bankImports: import("./bank-imports").BankImportSnapshot;
   events: OperationalEvent[];
   /** Resolved carry-over events surfaced for one run after they clear. */
   resolved: OperationalEvent[];
@@ -183,6 +187,8 @@ export interface IntelligenceInputs {
      don't load the queue continue to work; the engine returns a
      dormant snapshot when the array is empty. */
   reconciliationCandidates?: import("@/lib/finance/types").FinanceReconciliationCandidate[];
+  /* Phase 2.6 — bank-statement imports (optional). */
+  bankStatementImports?: import("@/lib/finance/types").BankStatementImport[];
 }
 
 export function buildIntelligence(input: IntelligenceInputs): IntelligencePicture {
@@ -253,6 +259,13 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     candidates: input.reconciliationCandidates ?? [],
   });
 
+  /* Phase 2.6 — bank-statement import snapshot. */
+  const bankImports = buildBankImportSnapshot({
+    imports: input.bankStatementImports ?? [],
+    recentImportMovements: input.cashMovements ?? [],
+    accounts: input.bankAccounts ?? [],
+  });
+
   const raw = [
     ...synthesizeEvents({
       kpi: input.kpi,
@@ -266,6 +279,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
     ...payment.events,
     ...treasury.events,
     ...reconciliation.events,
+    ...bankImports.events,
   ];
   const material   = applyMaterialityGate(raw);
   const merged     = suppressNoise(material);
@@ -310,7 +324,7 @@ export function buildIntelligence(input: IntelligenceInputs): IntelligencePictur
 
   return {
     customers, suppliers, logistics, inventory, approval, payment, treasury,
-    reconciliation,
+    reconciliation, bankImports,
     events: ranked,
     resolved: memoryRun.resolved,
     correlations,

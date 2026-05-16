@@ -102,6 +102,11 @@ function urgencyComponent(e: OperationalEvent): number {
     case "reconciliation_backlog":           return 18;
     case "partial_match_pressure":           return 18;
     case "rejected_reconciliation_pattern":  return 14;
+    /* ── Phase 2.6 bank-import kinds ── */
+    case "bank_import_failed":              return 28;  // operator must hear about a failed parse
+    case "large_unreconciled_import":       return 22;
+    case "bank_statement_import_gap":       return 14;
+    case "duplicate_statement_rows":        return 12;
     default:
       return 8;
   }

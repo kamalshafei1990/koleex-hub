@@ -62,6 +62,7 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import RrIcon from "@/components/ui/RrIcon";
 import type {
   BankAccount,
+  BankStatementImport,
   CashMovement,
   DashboardKpi,
   DashboardPeriod,
@@ -117,6 +118,8 @@ export default function FinanceDashboard() {
   const [cashMovements, setCashMovements] = useState<CashMovement[]>([]);
   /* Phase 2.5 — reconciliation queue feeds the new intelligence signals. */
   const [reconciliationCandidates, setReconciliationCandidates] = useState<FinanceReconciliationCandidate[]>([]);
+  /* Phase 2.6 — bank-statement imports feed 4 new intelligence signals. */
+  const [bankStatementImports, setBankStatementImports] = useState<BankStatementImport[]>([]);
   const [loading, setLoading] = useState(true);
 
   /* Restore last-used mode from localStorage on mount (client only). */
@@ -135,13 +138,14 @@ export default function FinanceDashboard() {
   const load = useCallback(async (p: DashboardPeriod) => {
     setLoading(true);
     try {
-      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes] = await Promise.all([
+      const [dashRes, ordersRes, paymentsRes, expensesRes, treasuryRes, reconRes, importsRes] = await Promise.all([
         fetch(`/api/finance/dashboard?period=${p}`, { cache: "no-store" }),
         fetch(`/api/finance/orders`, { cache: "no-store" }),
         fetch(`/api/finance/payments`, { cache: "no-store" }),
         fetch(`/api/finance/expenses`, { cache: "no-store" }),
         fetch(`/api/finance/treasury`,  { cache: "no-store" }),
         fetch(`/api/finance/reconciliation/candidates?status=suggested,rejected&limit=200`, { cache: "no-store" }),
+        fetch(`/api/finance/bank-imports`, { cache: "no-store" }),
       ]);
       const j = (await dashRes.json()) as { kpi?: DashboardKpi };
       setKpi(j.kpi ?? null);
@@ -156,6 +160,8 @@ export default function FinanceDashboard() {
       setCashMovements(Array.isArray(treasuryBody.movements) ? treasuryBody.movements : []);
       const reconBody = (await reconRes.json().catch(() => ({}))) as { candidates?: FinanceReconciliationCandidate[] };
       setReconciliationCandidates(Array.isArray(reconBody.candidates) ? reconBody.candidates : []);
+      const importsBody = (await importsRes.json().catch(() => ({}))) as { imports?: BankStatementImport[] };
+      setBankStatementImports(Array.isArray(importsBody.imports) ? importsBody.imports : []);
     } catch {
       setKpi(null);
       setOrders([]);
@@ -164,6 +170,7 @@ export default function FinanceDashboard() {
       setBankAccounts([]);
       setCashMovements([]);
       setReconciliationCandidates([]);
+      setBankStatementImports([]);
     } finally {
       setLoading(false);
     }
@@ -220,10 +227,11 @@ export default function FinanceDashboard() {
       bankAccounts,
       cashMovements,
       reconciliationCandidates,
+      bankStatementImports,
       periodDays,
       memory: memoryRef,
     }),
-    [kpi, orders, payments, expenses, bankAccounts, cashMovements, reconciliationCandidates, periodDays, memoryRef],
+    [kpi, orders, payments, expenses, bankAccounts, cashMovements, reconciliationCandidates, bankStatementImports, periodDays, memoryRef],
   );
   useEffect(() => {
     /* Persist the next-memory snapshot after each successful build so
@@ -1516,13 +1524,15 @@ function PaymentOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusin
 function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
   const t = intel.treasury;
   const r = intel.reconciliation;
+  const bi = intel.bankImports;
   if (t.accounts.length === 0) return null;
   const meaningful =
     t.pressure !== "calm" ||
     t.projection.runwayDays != null ||
     t.unreconciledMovements >= 3 ||
     t.events.length > 0 ||
-    r.pendingCount > 0;
+    r.pendingCount > 0 ||
+    bi.events.length > 0;
   if (!meaningful) return null;
 
   const pressureCls =
@@ -1636,6 +1646,35 @@ function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusi
             <span className="text-rose-200/70"> — recovery action required.</span>
           </span>
         </div>
+      )}
+
+      {/* Phase 2.6 — bank-import pulse. Surfaces when imports have
+          failed, when an import landed many unreconciled movements,
+          or when an account hasn't received a statement in 21+ days. */}
+      {bi.events.length > 0 && (
+        <Link
+          href="/finance/bank-imports"
+          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
+        >
+          <span className="inline-flex items-center gap-2 text-gray-300">
+            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
+            <span className="font-semibold text-gray-200">{bi.failedImportCount + bi.largeUnreconciledImportCount + bi.duplicateHeavyImportCount + bi.importGapAccounts}</span>
+            <span>bank-import signal{(bi.failedImportCount + bi.largeUnreconciledImportCount + bi.duplicateHeavyImportCount + bi.importGapAccounts) === 1 ? "" : "s"}</span>
+            {bi.failedImportCount > 0 && (
+              <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">{bi.failedImportCount} failed</span>
+            )}
+            {bi.largeUnreconciledImportCount > 0 && (
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">{bi.largeUnreconciledImportCount} large unreconciled</span>
+            )}
+            {bi.importGapAccounts > 0 && (
+              <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300">{bi.importGapAccounts} gap</span>
+            )}
+          </span>
+          <span className="inline-flex items-center gap-1 text-gray-400">
+            Open imports
+            <span aria-hidden>→</span>
+          </span>
+        </Link>
       )}
 
       {/* Phase 2.5 — reconciliation pulse. Surfaces only when the queue

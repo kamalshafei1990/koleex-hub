@@ -110,7 +110,12 @@ export type OperationalEventKind =
   | "rejected_reconciliation_pattern"   // same pair rejected repeatedly or many rejects this period
   | "duplicate_cash_movement_risk"      // duplicate-risk candidate(s) outstanding
   | "reconciliation_backlog"            // queue length exceeds material threshold
-  | "partial_match_pressure";           // sustained partial/under/over candidates pile up
+  | "partial_match_pressure"            // sustained partial/under/over candidates pile up
+  /* ── Phase 2.6 — bank statement import ───────────────────────── */
+  | "bank_import_failed"                // an import landed in 'failed' status
+  | "duplicate_statement_rows"          // imports producing many duplicate rows
+  | "large_unreconciled_import"         // recent import produced large unreconciled batch
+  | "bank_statement_import_gap";        // material delay since last import for an account
 
 /** Lifecycle state assigned by the persistence layer. */
 export type SignalState =

@@ -17,6 +17,7 @@
 
 import type {
   BankAccount,
+  BankStatementImport,
   CashMovement,
   DashboardKpi,
   FinanceExpense,
@@ -1516,6 +1517,200 @@ export function autoReconciliationState(): Scenario {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   Bank-statement import fixture builder (Phase 2.6).
+   --------------------------------------------------------------------------- */
+
+function makeBankImport(spec: {
+  id: string;
+  bank_account_id: string;
+  status: BankStatementImport["status"];
+  row_count?: number;
+  imported_count?: number;
+  duplicate_count?: number;
+  error_count?: number;
+  uploaded_days_ago?: number;
+  confirmed_days_ago?: number;
+  file_name?: string;
+  file_type?: BankStatementImport["file_type"];
+}): BankStatementImport {
+  const uploaded = spec.uploaded_days_ago != null ? isoDate(-spec.uploaded_days_ago) + "T08:00:00Z" : isoDate(-1) + "T08:00:00Z";
+  const confirmed = spec.confirmed_days_ago != null ? isoDate(-spec.confirmed_days_ago) + "T09:00:00Z" : null;
+  return {
+    id: spec.id,
+    tenant_id: "tenant-test",
+    bank_account_id: spec.bank_account_id,
+    file_name: spec.file_name ?? "statement.csv",
+    file_type: spec.file_type ?? "csv",
+    file_size: 4096,
+    storage_path: `tenant-test/bank-statements/${spec.id}/statement.csv`,
+    status: spec.status,
+    row_count: spec.row_count ?? 0,
+    imported_count: spec.imported_count ?? 0,
+    duplicate_count: spec.duplicate_count ?? 0,
+    error_count: spec.error_count ?? 0,
+    uploaded_by: null,
+    uploaded_at: uploaded,
+    confirmed_by: null,
+    confirmed_at: confirmed,
+    notes: null,
+    metadata: {},
+    created_at: uploaded,
+    updated_at: uploaded,
+  };
+}
+
+/* BANK_IMPORT_STATE — Phase 2.6
+   Mixes real-life import outcomes:
+     · one confirmed import that produced many unreconciled movements
+       within the last 7 days → large_unreconciled_import
+     · one failed import within the last 30 days → bank_import_failed
+     · one duplicate-heavy import → duplicate_statement_rows
+     · one bank account that has not received a statement in 21+ days
+       → bank_statement_import_gap
+     · 3 new cash movements from the recent import
+     · 1 duplicate row, 1 possible duplicate (modelled implicitly via
+       the import's duplicate_count + duplicate-flagged movements)
+     · 1 rejected reconciliation candidate that must remain rejected */
+export function bankImportState(): Scenario {
+  const base = healthyState();
+  const acctActive  = "ba-bi-1";
+  const acctIdle    = "ba-bi-2";
+
+  const accounts: BankAccount[] = [
+    makeBankAccount({
+      id: acctActive, bank_name: "First National", currency: "USD",
+      available_balance: 320_000, is_primary: true,
+    }),
+    makeBankAccount({
+      id: acctIdle, bank_name: "ICBC Ningbo", currency: "CNY",
+      available_balance: 2_400_000,
+    }),
+  ];
+
+  /* 12 unreconciled movements on the active account, all from the
+     recent confirmed import → triggers large_unreconciled_import. */
+  const importedMovements: CashMovement[] = [];
+  for (let i = 0; i < 12; i++) {
+    importedMovements.push(makeMovement({
+      id: `cm-bi-${i + 1}`,
+      bank_account_id: acctActive,
+      movement_type: i % 2 === 0 ? "incoming" : "outgoing",
+      direction: i % 2 === 0 ? "inflow" : "outflow",
+      amount: 4_000 + i * 250,
+      currency: "USD",
+      movement_date: isoDate(-(2 + i)),
+      bank_reference: `IMP-${1000 + i}`,
+      counterparty_name: i % 2 === 0 ? "ACME Spinning" : "Ningbo Steel",
+      reconciliation_status: "unreconciled",
+      metadata: { bank_import_id: "imp-confirmed-recent" },
+    }));
+  }
+
+  /* Existing rejected candidate that must not reappear in suggested. */
+  const candidates: FinanceReconciliationCandidate[] = [
+    {
+      id: "rec-rej-1",
+      tenant_id: "tenant-test",
+      payment_id: "p-existing",
+      cash_movement_id: "cm-bi-1",
+      confidence: 0.62,
+      confidence_level: "medium",
+      candidate_type: "exact",
+      match_reason_summary: "62% confidence; rejected by operator.",
+      matched_factors: [],
+      warnings: [],
+      status: "rejected",
+      suggested_at: isoDate(-3) + "T08:00:00Z",
+      confirmed_at: null,
+      confirmed_by: null,
+      rejected_at: isoDate(-1) + "T08:00:00Z",
+      rejected_by: null,
+      rejection_reason: null,
+      metadata: {},
+      created_at: isoDate(-3) + "T08:00:00Z",
+      updated_at: isoDate(-1) + "T08:00:00Z",
+    },
+  ];
+
+  const imports: BankStatementImport[] = [
+    /* Recent confirmed import — produces 12 unreconciled movements
+       → large_unreconciled_import event. */
+    makeBankImport({
+      id: "imp-confirmed-recent",
+      bank_account_id: acctActive,
+      status: "confirmed",
+      row_count: 14,
+      imported_count: 12,
+      duplicate_count: 1,        // 1 hard duplicate not booked
+      error_count: 1,            // 1 parse error
+      uploaded_days_ago: 2,
+      confirmed_days_ago: 2,
+      file_name: "Apr-USD-statement.csv",
+    }),
+    /* Failed import — operator must hear about it. */
+    makeBankImport({
+      id: "imp-failed",
+      bank_account_id: acctActive,
+      status: "failed",
+      row_count: 0,
+      uploaded_days_ago: 5,
+      file_name: "May-malformed.xlsx",
+      file_type: "xlsx",
+    }),
+    /* Duplicate-heavy import — 6 of 12 rows were duplicates. */
+    makeBankImport({
+      id: "imp-dup-heavy",
+      bank_account_id: acctActive,
+      status: "confirmed",
+      row_count: 12,
+      imported_count: 6,
+      duplicate_count: 6,
+      uploaded_days_ago: 9,
+      confirmed_days_ago: 9,
+      file_name: "Apr-USD-resend.csv",
+    }),
+    /* No import for acctIdle in 25 days → bank_statement_import_gap. */
+    makeBankImport({
+      id: "imp-old-cny",
+      bank_account_id: acctIdle,
+      status: "confirmed",
+      row_count: 20,
+      imported_count: 20,
+      uploaded_days_ago: 25,
+      confirmed_days_ago: 25,
+      file_name: "Mar-CNY-statement.csv",
+    }),
+  ];
+
+  return {
+    name: "BANK_IMPORT_STATE",
+    description:
+      "One confirmed import landed 12 unreconciled movements; one import failed; one was duplicate-heavy; one CNY account has no statement in 25 days. Rejected candidates must NOT reappear.",
+    inputs: {
+      ...base.inputs,
+      bankAccounts: accounts,
+      cashMovements: importedMovements,
+      reconciliationCandidates: candidates,
+      bankStatementImports: imports,
+    },
+    expectations: {
+      digestRange: [0, 6],
+      eventRange: [1, 18],
+      healthRange: [50, 100],
+      forbiddenPhrases: FORBIDDEN_GENERIC_PHRASES,
+      maxCriticalDigestItems: 3,
+      copilotMaxHints: 3,
+      expectEventKinds: [
+        "bank_import_failed",
+        "large_unreconciled_import",
+        "duplicate_statement_rows",
+        "bank_statement_import_gap",
+      ],
+    },
+  };
+}
+
 export const ALL_SCENARIOS: () => Scenario[] = () => [
   healthyState(),
   moderatePressureState(),
@@ -1530,4 +1725,5 @@ export const ALL_SCENARIOS: () => Scenario[] = () => [
   bankMismatchState(),
   negativeRunwayState(),
   autoReconciliationState(),
+  bankImportState(),
 ];

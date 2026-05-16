@@ -170,6 +170,12 @@ const RULES: Partial<Record<OperationalEventKind, Rule>> = {
   /* Rejection pattern: ≥ 5 rejections OR ≥ 2 repeat-rejection pairs.
      The engine already enforces this; the gate is defense-in-depth. */
   rejected_reconciliation_pattern: (e) => (e.magnitude ?? 0) >= 2,
+
+  /* ── Phase 2.6 bank-import kinds ────────────────────────────── */
+  bank_import_failed:           (e) => (e.magnitude ?? 0) >= 1,
+  duplicate_statement_rows:     (e) => (e.magnitude ?? 0) >= 1,
+  large_unreconciled_import:    (e) => (e.magnitude ?? 0) >= 1,
+  bank_statement_import_gap:    (e) => (e.magnitude ?? 0) >= 1,
 };
 
 /**
