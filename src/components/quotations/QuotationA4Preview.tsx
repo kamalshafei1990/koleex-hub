@@ -1203,90 +1203,130 @@ export default function QuotationA4Preview({
                 </tr>
               );
             })}
-            {/* ── Inline "add row" ghost row ──────────────────────
-                Renders as a faded placeholder row right under the
-                last real item. Two inline buttons sit inside it
-                ("Add empty row" / "Add from catalog"). On print
-                the whole row is hidden via .no-print, so the PDF
-                stays clean. Only emitted on the page that actually
-                ends the items (isLastItemPage) so it never appears
-                mid-document on a multi-page quote. */}
+            {/* ── Inline "next row" placeholder ─────────────────
+                Sits as the last row of the items table on the
+                page that ends the items list. Hosts a primary
+                "Add product" CTA (catalog picker) and a quieter
+                secondary "Add empty row" pill. Designed to read
+                as a soft, premium placeholder -- not a stack of
+                command-bar buttons. Hidden on print via no-print
+                so the saved PDF stays clean. */}
             {isLastItemPage && (
-              <tr className="no-print" style={{ height: 64 }}>
+              <tr className="no-print pq-ghost-row">
                 <td
                   colSpan={7}
                   style={{
-                    background: "#FAFAFA",
-                    border: `1px dashed ${T.border}`,
-                    padding: "10px 12px",
+                    background: "linear-gradient(180deg, #FBFBFB 0%, #F4F4F4 100%)",
+                    borderTop: `1px solid ${T.border}`,
+                    borderBottom: `1px solid ${T.border}`,
+                    padding: "18px 16px",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        color: T.inkGhost,
-                      }}
-                    >
-                      + Next row
-                    </span>
-                    <span style={{ flex: "0 0 auto", width: 1, height: 18, background: T.border }} />
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      className="pq-add-btn"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        height: 28,
-                        padding: "0 12px",
-                        border: `1px solid ${T.border}`,
-                        background: "#fff",
-                        color: T.inkSoft,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        cursor: "pointer",
-                        borderRadius: 4,
-                      }}
-                      title="Add an empty row you can fill manually"
-                    >
-                      + Add empty row
-                    </button>
+                  {/* Inline style block scoped to this row so we
+                      can use :hover / :focus-visible without
+                      reaching for the global stylesheet. */}
+                  <style>{`
+                    .pq-ghost-row .pq-ghost-cta {
+                      display: inline-flex;
+                      align-items: center;
+                      gap: 10px;
+                      height: 38px;
+                      padding: 0 18px;
+                      border-radius: 10px;
+                      border: 1px solid transparent;
+                      font-size: 12px;
+                      font-weight: 600;
+                      letter-spacing: 0.01em;
+                      cursor: pointer;
+                      transition: transform 0.12s ease, box-shadow 0.16s ease,
+                                  background 0.16s ease, color 0.16s ease,
+                                  border-color 0.16s ease;
+                      font-family: inherit;
+                    }
+                    .pq-ghost-row .pq-ghost-cta:focus-visible {
+                      outline: 2px solid #2563EB;
+                      outline-offset: 2px;
+                    }
+                    /* Primary -- pick from catalog */
+                    .pq-ghost-row .pq-ghost-cta--primary {
+                      background: #0A0A0A;
+                      color: #FFFFFF;
+                      box-shadow: 0 1px 0 rgba(0,0,0,0.05),
+                                  0 4px 14px rgba(0,0,0,0.12);
+                    }
+                    .pq-ghost-row .pq-ghost-cta--primary:hover {
+                      transform: translateY(-1px);
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.08),
+                                  0 8px 24px rgba(0,0,0,0.18);
+                    }
+                    .pq-ghost-row .pq-ghost-cta--primary:active {
+                      transform: translateY(0);
+                      box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+                    }
+                    /* Secondary -- blank manual row */
+                    .pq-ghost-row .pq-ghost-cta--secondary {
+                      background: #FFFFFF;
+                      color: #1A1A1A;
+                      border-color: #E5E5E5;
+                      box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+                    }
+                    .pq-ghost-row .pq-ghost-cta--secondary:hover {
+                      background: #F7F7F7;
+                      border-color: #D5D5D5;
+                      transform: translateY(-1px);
+                    }
+                    .pq-ghost-row .pq-ghost-cta--secondary:active {
+                      transform: translateY(0);
+                      background: #F0F0F0;
+                    }
+                    /* The whole row also accepts a hover so the
+                       block subtly lifts when the operator is
+                       working at the bottom of the table. */
+                    .pq-ghost-row > td {
+                      transition: background 0.2s ease;
+                    }
+                    .pq-ghost-row:hover > td {
+                      background: linear-gradient(180deg, #F8F8F8 0%, #F0F0F0 100%) !important;
+                    }
+                  `}</style>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     {onPickFromCatalog && (
                       <button
                         type="button"
                         onClick={onPickFromCatalog}
-                        className="pq-add-btn"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          height: 28,
-                          padding: "0 12px",
-                          border: `1px solid ${T.black}`,
-                          background: T.black,
-                          color: "#fff",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
-                          cursor: "pointer",
-                          borderRadius: 4,
-                        }}
-                        title="Pick a product from the catalogue -- model, name, photo and unit price auto-fill"
+                        className="pq-ghost-cta pq-ghost-cta--primary"
+                        title="Pick a product from the catalogue — model, name, photo and unit price all auto-fill"
                       >
-                        + Add product (from catalog)
+                        {/* Catalog-grid glyph */}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3"  y="3"  width="7" height="7" rx="1.5" />
+                          <rect x="14" y="3"  width="7" height="7" rx="1.5" />
+                          <rect x="3"  y="14" width="7" height="7" rx="1.5" />
+                          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        </svg>
+                        <span>Add product from catalogue</span>
                       </button>
                     )}
-                    <span style={{ fontSize: 10, color: T.inkGhost, marginLeft: 4 }}>
-                      pick &ldquo;Add product&rdquo; to auto-fill from the catalogue, or &ldquo;Add empty row&rdquo; for a blank row.
-                    </span>
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="pq-ghost-cta pq-ghost-cta--secondary"
+                      title="Add an empty row you can fill in manually"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <line x1="12" y1="5"  x2="12" y2="19" />
+                        <line x1="5"  y1="12" x2="19" y2="12" />
+                      </svg>
+                      <span>Add empty row</span>
+                    </button>
                   </div>
                 </td>
               </tr>
