@@ -347,76 +347,69 @@ export default function QuotationA4Preview({
      within 5 px of the page bottom (visibly touches the A4 edge),
      so we drop one row and gain ~110 px of breathing space below
      the items table on page 1. */
-  const ITEMS_FIRST  = 4;
-  const ITEMS_MIDDLE = 8;
-  /* Reduced from 3 to 1 -- the last page now also carries the
-     full-width Shipment & Delivery Details card on top of the
-     totals + T&C row + stamp/signature. Two or three items +
-     the new footer block was pushing the doc past the 268 mm
-     print height, producing overflow / blank trailing sheets.
-     At ITEMS_LAST=1 the footer block always has enough room. */
-  const ITEMS_LAST   = 1;
+  /* ── PAGINATION ──
+     Old model: each page tries to hold items AND (on the last page)
+     the entire footer block (Totals + T&C + Shipment Details +
+     Stamp/Sig + Bank + Footer). Problem: the footer block alone
+     measures ~940 px tall while a 270-mm A4 page only has ~978 px
+     of inner content room — leaving ~38 px for items. Anything
+     more than 1 item on the last page overflows the page boundary
+     and (in print) gets clipped OR generates blank trailing sheets.
 
-  const pages = useMemo(() => {
+     New model: split the footer across TWO dedicated pages so each
+     page actually fits inside A4:
+       · pages[0..N-1]   — header + items rows (with thead repeated)
+       · pages[N]        — footer-A: Totals + T&C + Shipment Details
+       · pages[N+1]      — footer-B: Stamp + Sig + Bank + Footer
+     Items pages can now use the full ITEMS_MIDDLE budget on the
+     LAST items page too (no need to leave room for the footer
+     block, which lives on its own pages now). */
+  const ITEMS_FIRST  = 4;   // header + thead leaves room for ~4 rows
+  const ITEMS_MIDDLE = 8;   // thead + 8 rows comfortably fits
+
+  type PageKind = "items" | "footer-a" | "footer-b";
+  type PageEntry = { kind: PageKind; items: QuotationItem[]; startIdx: number };
+  const pages = useMemo<PageEntry[]>(() => {
     const items = current.items;
-    if (items.length === 0) return [{ items: [] as QuotationItem[], startIdx: 0 }];
-    if (items.length <= ITEMS_LAST) {
-      // Everything fits on one page (header + items + footer)
-      return [{ items, startIdx: 0 }];
-    }
-    if (items.length <= ITEMS_FIRST + ITEMS_LAST) {
-      // Two pages: first holds ITEMS_FIRST, last holds the rest
-      return [
-        { items: items.slice(0, ITEMS_FIRST), startIdx: 0 },
-        { items: items.slice(ITEMS_FIRST), startIdx: ITEMS_FIRST },
-      ];
-    }
-
-    /* Multi-page layout. Rule: fill each page to ITEMS_MIDDLE before
-       moving to the next — no half-empty middle pages just to leave
-       room for the footer block. The last page either:
-         · carries the remaining items + the footer block
-           (when 1 ≤ remaining ≤ ITEMS_LAST, the footer block can sit
-            alongside the items), OR
-         · becomes a footer-only "summary" page with no items table
-           (when remaining hits 0 because items ended on a middle-page
-            boundary, OR when remaining > ITEMS_LAST so the items
-            wouldn't fit alongside the footer).
-       This trades a half-empty middle page for a clearly-purposed
-       summary page — much less wasted space overall. */
-    const out: { items: QuotationItem[]; startIdx: number }[] = [];
-    out.push({ items: items.slice(0, ITEMS_FIRST), startIdx: 0 });
+    const out: PageEntry[] = [];
+    /* Items pages — page 1 (header + ITEMS_FIRST rows), then full
+       middle pages until exhausted. Even 0 items still gets a
+       header page so the doc has somewhere for the From / To /
+       items-thead to render. */
+    out.push({ kind: "items", items: items.slice(0, ITEMS_FIRST), startIdx: 0 });
     let offset = ITEMS_FIRST;
-
-    /* Push full middle pages while the remaining items wouldn't fit
-       on the last page alongside the footer block. */
-    while (items.length - offset > ITEMS_LAST) {
+    while (offset < items.length) {
       const chunk = Math.min(ITEMS_MIDDLE, items.length - offset);
-      out.push({ items: items.slice(offset, offset + chunk), startIdx: offset });
+      out.push({ kind: "items", items: items.slice(offset, offset + chunk), startIdx: offset });
       offset += chunk;
     }
-
-    /* Final page. Either remaining items + footer, or footer-only. */
-    out.push({ items: items.slice(offset), startIdx: offset });
+    /* Two footer pages, ALWAYS appended. Together they carry the
+       complete commitment/payment/sign block that used to spill
+       off the bottom of the last items page. */
+    out.push({ kind: "footer-a", items: [], startIdx: items.length });
+    out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;
   }, [current.items]);
 
   return (
     <div className="quot-a4-stack">
     {pages.map((page, pageIdx) => {
-      const isFirstPage = pageIdx === 0;
-      const isLastPage  = pageIdx === pages.length - 1;
-      const totalPages  = pages.length;
-      const pageItems   = page.items;
+      const isFirstPage  = pageIdx === 0;
+      const isLastPage   = pageIdx === pages.length - 1;
+      const totalPages   = pages.length;
+      const pageItems    = page.items;
       const startItemIdx = page.startIdx;
-      /* True on the LAST page that actually has item rows. When the
-         document ends with a footer-only summary page, that's the
-         page BEFORE this one (pages[pageIdx+1].items.length === 0).
-         The items-table footer (Total qty / Total amount) renders
-         only here so it doesn't get repeated mid-document. */
+      const isItemsPage  = page.kind === "items";
+      const isFooterA    = page.kind === "footer-a";
+      const isFooterB    = page.kind === "footer-b";
+      /* True on the LAST page that actually has item rows — used to
+         render the items-table tfoot summary (Total qty / Total
+         amount). With the footer-a/b pages appended after items,
+         the last items page is now the one immediately BEFORE
+         footer-a. */
       const isLastItemPage =
-        pageItems.length > 0 &&
-        (isLastPage || (pages[pageIdx + 1]?.items.length ?? 0) === 0);
+        isItemsPage &&
+        (pages[pageIdx + 1]?.kind !== "items");
       return (
     <div
       key={pageIdx}
@@ -1401,13 +1394,11 @@ export default function QuotationA4Preview({
         </table>
         )}
 
-        {isLastPage && (<>
-        {/* The +Add row / +From catalog buttons used to live as a
-            separate strip here. They now live inline as a faded
-            ghost row inside the items table (see the
-            isLastItemPage block in the <tbody> further up) so the
-            "next row goes here" affordance is in the right place
-            visually -- and disappears entirely on print. */}
+        {isFooterA && (<>
+        {/* ── FOOTER PAGE A ──
+            Totals + T&C row, then Shipment Details. Sized together
+            (~530 px tall) so they fit comfortably inside one A4 page
+            with room for the page header/padding. */}
 
         {/* ═══════════════════════════════════════════════════════════════
             (g) BOTTOM ROW — totals (left) + terms (right)
@@ -1689,6 +1680,12 @@ export default function QuotationA4Preview({
             onClose={() => setQuickFillOpen(false)}
           />
         )}
+        </>)}
+        {isFooterB && (<>
+        {/* ── FOOTER PAGE B ──
+            Stamp + Sig (and Customer counter-sig on invoices) +
+            Bank Details + Page footer. Together ~570 px tall —
+            fits comfortably inside one A4 page. */}
 
         {/* ═══════════════════════════════════════════════════════════════
             (h) AUTHORISED STAMP | AUTHORISED SIGNATURE — two separate
