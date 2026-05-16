@@ -31,9 +31,18 @@ export async function GET() {
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
 
+  /* Phase S.4 — list-payload bound. The list endpoint NEVER returns
+     `metadata` (parser detected_mapping + headers + parse_warnings —
+     can be tens of KB per row on wide CSVs). Detail endpoint fetches
+     full row when expanded. Stamp metadata: {} so the client type
+     stays satisfied. */
   const { data, error } = await supabaseServer
     .from("finance_bank_statement_imports")
-    .select("*")
+    .select(
+      "id, tenant_id, bank_account_id, file_name, file_type, file_size, file_hash, " +
+      "storage_path, status, row_count, imported_count, duplicate_count, error_count, " +
+      "uploaded_by, uploaded_at, confirmed_by, confirmed_at, notes, created_at, updated_at",
+    )
     .eq("tenant_id", auth.tenant_id)
     .order("uploaded_at", { ascending: false })
     .limit(50);
@@ -41,7 +50,8 @@ export async function GET() {
     console.error("[bank-imports GET]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ imports: (data ?? []) as BankStatementImport[] });
+  const imports = (data ?? []).map((r) => ({ ...(r as unknown as Record<string, unknown>), metadata: {} })) as unknown as BankStatementImport[];
+  return NextResponse.json({ imports });
 }
 
 function inferFileType(name: string, mime: string | undefined): BankStatementFileType | null {

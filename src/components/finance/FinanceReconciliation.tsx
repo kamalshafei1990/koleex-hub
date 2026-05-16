@@ -15,7 +15,7 @@
          confirm + reject + open-payment + open-movement actions
    ========================================================================== */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
@@ -218,13 +218,16 @@ export default function FinanceReconciliation() {
             />
           ) : (
             <div className="space-y-2.5">
+              {/* Phase S.4 — pass the stable parent callbacks directly
+                  so React.memo on CandidateRow actually sticks. The
+                  child reads candidate.id and calls onConfirm(id). */}
               {candidates.map((c) => (
                 <CandidateRow
                   key={c.id}
                   candidate={c}
                   busy={acting === c.id}
-                  onConfirm={() => confirm(c.id)}
-                  onReject={() => reject(c.id)}
+                  onConfirm={confirm}
+                  onReject={reject}
                 />
               ))}
             </div>
@@ -239,7 +242,7 @@ export default function FinanceReconciliation() {
    CandidateRow — one row in the queue.
    ──────────────────────────────────────────────────────────────────────── */
 
-function CandidateRow({
+const CandidateRow = memo(function CandidateRow({
   candidate,
   busy,
   onConfirm,
@@ -247,8 +250,11 @@ function CandidateRow({
 }: {
   candidate: FinanceReconciliationCandidate;
   busy: boolean;
-  onConfirm: () => void;
-  onReject: () => void;
+  /* Phase S.4 — accept id-passing parent callbacks so React.memo
+     stays effective; toggling `busy` on one row no longer rerenders
+     every other row in the queue. */
+  onConfirm: (id: string) => void;
+  onReject: (id: string) => void;
 }) {
   const p = candidate.payment ?? null;
   const m = candidate.cash_movement ?? null;
@@ -352,7 +358,7 @@ function CandidateRow({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm(candidate.id)}
             disabled={busy}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-60"
           >
@@ -361,7 +367,7 @@ function CandidateRow({
           </button>
           <button
             type="button"
-            onClick={onReject}
+            onClick={() => onReject(candidate.id)}
             disabled={busy}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-gray-300 transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-60"
           >
@@ -383,7 +389,7 @@ function CandidateRow({
       )}
     </div>
   );
-}
+});
 
 /* ────────────────────────────────────────────────────────────────────────
    Atoms

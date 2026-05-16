@@ -21,6 +21,12 @@ export async function GET(req: Request) {
   const orderId = url.searchParams.get("order_id");
   const search = url.searchParams.get("search")?.trim();
 
+  /* Phase S.4 — list bound. Default cap 500, override via ?limit up
+     to 2000. The expense ledger grows with every paid invoice; a
+     three-year-old tenant returned 30 K+ rows before this. */
+  const reqLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(reqLimit) && reqLimit > 0 ? Math.min(reqLimit, 2000) : 500;
+
   let q = supabaseServer
     .from("finance_expenses")
     .select("*, category:category_id(name)")
@@ -29,7 +35,7 @@ export async function GET(req: Request) {
   if (status) q = q.eq("payment_status", status);
   if (orderId) q = q.eq("linked_order_id", orderId);
   if (search) q = q.ilike("title", `%${search}%`);
-  q = q.order("expense_date", { ascending: false });
+  q = q.order("expense_date", { ascending: false }).limit(limit);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const out = (data ?? []).map((row) => {

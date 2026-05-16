@@ -28,9 +28,19 @@ import RrIcon from "@/components/ui/RrIcon";
 import type {
   ForecastDayPoint,
   ForecastDiff,
+  ForecastInputs,
   ForecastResult,
   LiquidityRisk,
   ScenarioAssumptions,
+} from "@/lib/intelligence/treasury-forecast";
+/* Phase S.4 — the forecast engine is pure (no DB, no React, no
+   server-only marker) so it imports cleanly into a client component.
+   First server call returns the raw inputs bundle; subsequent preset
+   toggles re-run the engine locally — no spinner, no round-trip. */
+import {
+  buildTreasuryForecast,
+  compareForecasts,
+  rankLiquidityRisks,
 } from "@/lib/intelligence/treasury-forecast";
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -83,19 +93,26 @@ export default function FinanceTreasuryForecast() {
   const [preset, setPreset] = useState<ScenarioPreset>("base");
   const [saveDraft, setSaveDraft] = useState<{ name: string; description: string } | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
+  /* Phase S.4 — cached inputs from the first server call. While
+     non-null, preset toggles re-run the engine locally and skip the
+     server round-trip. Reset to null on explicit "refresh from
+     server" so the operator can always pull fresh data. */
+  const [cachedInputs, setCachedInputs] = useState<ForecastInputs | null>(null);
 
-  /* Run a forecast on the server. */
-  const run = useCallback(async (a: ScenarioAssumptions | null) => {
+  /* Fetch fresh inputs from the server and run the base case. The
+     server bundles `inputs` into the response when we ask for them,
+     so subsequent preset toggles can recompute locally. */
+  const refreshFromServer = useCallback(async (a: ScenarioAssumptions | null) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/finance/treasury-forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assumptions: a }),
+        body: JSON.stringify({ assumptions: a, includeInputs: true }),
       });
       const j = (await res.json().catch(() => ({}))) as {
-        base?: ForecastResult; stress?: ForecastResult | null; diff?: ForecastDiff | null; risks?: LiquidityRisk[]; error?: string;
+        base?: ForecastResult; stress?: ForecastResult | null; diff?: ForecastDiff | null; risks?: LiquidityRisk[]; inputs?: ForecastInputs; error?: string;
       };
       if (!res.ok || !j.base) throw new Error(j.error ?? `HTTP ${res.status}`);
       setBase(j.base);
@@ -103,6 +120,7 @@ export default function FinanceTreasuryForecast() {
       setDiff(j.diff ?? null);
       setRisks(j.risks ?? []);
       setAssumptions(a);
+      if (j.inputs) setCachedInputs(j.inputs);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -110,10 +128,10 @@ export default function FinanceTreasuryForecast() {
     }
   }, []);
 
-  /* Initial run on mount — base case. */
+  /* Initial run on mount — base case + fetch input bundle. */
   useEffect(() => {
-    void run(null);
-  }, [run]);
+    void refreshFromServer(null);
+  }, [refreshFromServer]);
 
   const onPreset = useCallback((p: ScenarioPreset) => {
     setPreset(p);
@@ -131,8 +149,25 @@ export default function FinanceTreasuryForecast() {
       case "combined":  a = { customerDelay: { days: 15 }, fxShock: { pct: 5 }, supplierAcceleration: { days: 7 } }; break;
       case "custom":    a = assumptions; break;
     }
-    void run(a);
-  }, [assumptions, run]);
+    /* Phase S.4 — hot path: preset toggles run the deterministic
+       engine locally against cached inputs. The server is the source
+       of truth for inputs, but the engine is pure so client output
+       is byte-identical to a server re-run. */
+    if (cachedInputs) {
+      const baseResult = buildTreasuryForecast(cachedInputs);
+      const stressResult = a ? buildTreasuryForecast(cachedInputs, a) : null;
+      const diffResult = stressResult ? compareForecasts(baseResult, stressResult) : null;
+      const risksResult = rankLiquidityRisks(stressResult ?? baseResult);
+      setBase(baseResult);
+      setStress(stressResult);
+      setDiff(diffResult);
+      setRisks(risksResult);
+      setAssumptions(a);
+      return;
+    }
+    /* Fallback: no cached inputs yet — full server round-trip. */
+    void refreshFromServer(a);
+  }, [assumptions, cachedInputs, refreshFromServer]);
 
   /* Y-axis range for the chart. */
   const chart = useMemo(() => {

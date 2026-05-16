@@ -15,7 +15,7 @@
    editing assumptions happens on /finance/treasury-forecast, not here.
    ========================================================================== */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
@@ -78,6 +78,10 @@ export default function FinanceTreasuryPlans() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  /* Phase S.4 — stable id-passing callback so PlanCard's memo holds. */
+  const togglePlan = useCallback((id: string) => {
+    setOpenId((prev) => (prev === id ? null : id));
+  }, []);
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [comparison, setComparison] = useState<CompareResponse | null>(null);
   const [compareBusy, setCompareBusy] = useState(false);
@@ -238,12 +242,14 @@ export default function FinanceTreasuryPlans() {
                   <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{g.items.length}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                  {/* Phase S.4 — pass stable togglePlan callback so
+                      the memo on PlanCard sticks across openId changes. */}
                   {g.items.map((p) => (
                     <PlanCard
                       key={p.id}
                       plan={p}
                       active={openId === p.id}
-                      onOpen={() => setOpenId(p.id === openId ? null : p.id)}
+                      onOpen={togglePlan}
                     />
                   ))}
                 </div>
@@ -279,7 +285,9 @@ export default function FinanceTreasuryPlans() {
    PlanCard
    ──────────────────────────────────────────────────────────────────────── */
 
-function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolean; onOpen: () => void }) {
+/* Phase S.4 — memoized; parent's `openId` toggle no longer rerenders
+   every card in the list. */
+const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolean; onOpen: (id: string) => void }) {
   const m = plan.projected_metrics;
   const ds = daysAgo(plan.approved_at ?? plan.updated_at);
   const reviewLabel = plan.approved_at
@@ -290,7 +298,7 @@ function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolea
 
   return (
     <button
-      onClick={onOpen}
+      onClick={() => onOpen(plan.id)}
       className={`flex flex-col gap-3 rounded-2xl border bg-[var(--bg-secondary)] p-4 text-left transition ${
         active ? "border-white/[0.18] bg-white/[0.03]" : "border-white/[0.06] hover:border-white/[0.12]"
       }`}
@@ -329,7 +337,7 @@ function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolea
       </div>
     </button>
   );
-}
+});
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "rose" | "amber" | "neutral" }) {
   const cls = tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-300" : "text-[var(--text-primary)]";

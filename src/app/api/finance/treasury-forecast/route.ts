@@ -35,6 +35,11 @@ import {
 interface Body {
   assumptions?: ScenarioAssumptions | null;
   horizonDays?: number;
+  /* Phase S.4 — when true the response includes the raw `inputs`
+     bundle the engine consumed. The client caches it and re-runs
+     `buildTreasuryForecast` locally for preset toggles, eliminating
+     the per-slider server round-trip. */
+  includeInputs?: boolean;
 }
 
 const LOOKBACK_DAYS = 60;
@@ -63,15 +68,25 @@ export async function POST(req: Request) {
       .eq("tenant_id", auth.tenant_id)
       .gte("movement_date", sinceIso)
       .limit(500),
+    /* Phase S.4 — the forecast engine only consults orders that are
+       still open / in-flight (not delivered+closed years ago) and
+       payments inside the lookback + horizon window. Bound both so
+       a five-year-old tenant doesn't drag every historical order
+       through the engine. The engine still produces the same output
+       — it ignores delivered/closed orders internally. */
     supabaseServer
       .from("finance_orders")
       .select("*, suppliers:finance_order_suppliers(*)")
-      .eq("tenant_id", auth.tenant_id),
+      .eq("tenant_id", auth.tenant_id)
+      .order("order_date", { ascending: false })
+      .limit(1000),
     supabaseServer
       .from("finance_payments")
       .select("*")
       .eq("tenant_id", auth.tenant_id)
-      .not("status", "in", "(cancelled,bounced)"),
+      .not("status", "in", "(cancelled,bounced)")
+      .order("payment_date", { ascending: false })
+      .limit(2000),
     supabaseServer
       .from("finance_expenses")
       .select("*")
@@ -106,5 +121,10 @@ export async function POST(req: Request) {
     diff,
     risks,
     assumptions: body.assumptions ?? null,
+    /* Phase S.4 — opt-in raw inputs so the client can cache them and
+       run the forecast engine in-browser for preset toggles. Not
+       returned by default (keeps the response small for clients that
+       only want the headline numbers). */
+    inputs: body.includeInputs ? inputs : undefined,
   });
 }

@@ -68,10 +68,19 @@ export async function POST(req: Request) {
       .not("status", "in", "(cancelled,bounced)")
       .order("payment_date", { ascending: false })
       .limit(500),
+    /* Phase S.4 — rescan needs candidates that can affect the skip
+       set: suggested (might be re-expired), confirmed (always skip),
+       rejected (may re-skip if neither side changed since rejection).
+       Expired candidates are truly historical and never re-enter the
+       plan, so we exclude them. Slimmed columns: the rescan only
+       reads ids + status + the two timestamps used by the
+       skip-set logic. The (tenant_id, status, suggested_at DESC)
+       index turns this into an index range scan. */
     supabaseServer
       .from("finance_reconciliation_candidates")
-      .select("*")
-      .eq("tenant_id", auth.tenant_id),
+      .select("id, tenant_id, payment_id, cash_movement_id, status, suggested_at, rejected_at, updated_at")
+      .eq("tenant_id", auth.tenant_id)
+      .in("status", ["suggested", "confirmed", "rejected"]),
   ]);
 
   if (movementsRes.error || paymentsRes.error || candidatesRes.error) {

@@ -26,15 +26,32 @@ export async function GET() {
   const deny = await requireModuleAccess(auth, "Finance");
   if (deny) return deny;
 
+  /* Phase S.4 — list-payload bound. The list endpoint NEVER returns
+     `base_forecast_snapshot` (the 90-day trajectory + drivers + events
+     blob, hundreds of KB per plan) or `scenario_assumptions`. Those
+     live behind the detail endpoint. A 100-plan tenant used to ship a
+     ~10 MB JSON; this drops it to <100 KB. Headline metrics + status
+     + review state stay so cards render identically. */
   const { data, error } = await supabaseServer
     .from("finance_treasury_plans")
-    .select("*")
+    .select(
+      "id, tenant_id, name, description, projected_metrics, confidence, " +
+      "forecast_window_days, status, created_by, reviewed_by, approved_by, " +
+      "approved_at, review_notes, metadata, created_at, updated_at, deleted_at",
+    )
     .eq("tenant_id", auth.tenant_id)
     .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .limit(100);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ plans: (data ?? []) as TreasuryPlan[] });
+  /* Stamp the two omitted jsonb columns with empty objects so the
+     existing TreasuryPlan shape on the client stays satisfied. */
+  const plans = (data ?? []).map((row) => ({
+    ...(row as unknown as Record<string, unknown>),
+    base_forecast_snapshot: {},
+    scenario_assumptions: {},
+  })) as unknown as TreasuryPlan[];
+  return NextResponse.json({ plans });
 }
 
 interface CreateBody {

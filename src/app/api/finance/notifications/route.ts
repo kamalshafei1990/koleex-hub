@@ -30,9 +30,15 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
 
+  /* Phase S.4 — list bound. The reminders inbox only needs the next
+     window of items; default cap 300 keeps the payload predictable
+     even on tenants with years of scheduled reminders. */
+  const reqLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(reqLimit) && reqLimit > 0 ? Math.min(reqLimit, 1000) : 300;
+
   let q = supabaseServer.from("finance_notifications").select("*").eq("tenant_id", auth.tenant_id);
   if (status) q = q.eq("status", status);
-  q = q.order("remind_at", { ascending: true });
+  q = q.order("remind_at", { ascending: true }).limit(limit);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ notifications: data });

@@ -73,6 +73,10 @@ export default function FinanceReports({
     [templates, activeType],
   );
 
+  /* Phase S.4 — memoize the filters JSON key once so the effect deps
+     are stable and JSON.stringify isn't called on every render. */
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+
   /* Live preview whenever the type / filters change. Debounced 300ms
      so we don't flood the API on every keystroke. */
   useEffect(() => {
@@ -82,7 +86,7 @@ export default function FinanceReports({
     }, 300);
     return () => window.clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeType, JSON.stringify(filters)]);
+  }, [activeType, filtersKey]);
 
   const loadPreview = useCallback(async (type: ReportType, f: ReportFilters) => {
     setPreviewLoading(true);
@@ -161,8 +165,10 @@ export default function FinanceReports({
     }
   }, [activeType, filters]);
 
-  const externalTemplates = templates.filter((t) => t.visibility === "external");
-  const internalTemplates = templates.filter((t) => t.visibility === "internal");
+  /* Phase S.4 — memoize the per-visibility partitions so the picker
+     panes don't re-allocate their template arrays on every render. */
+  const externalTemplates = useMemo(() => templates.filter((t) => t.visibility === "external"), [templates]);
+  const internalTemplates = useMemo(() => templates.filter((t) => t.visibility === "internal"), [templates]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">

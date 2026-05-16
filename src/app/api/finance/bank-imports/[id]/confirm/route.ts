@@ -105,10 +105,16 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
         .gte("payment_date", sinceIso)
         .not("status", "in", "(cancelled,bounced)")
         .limit(500),
+      /* Phase S.4 — only fetch ACTIVE candidates for the skip set.
+         Loading every historical row just to throw the rejected /
+         expired ones away was the largest unbounded scan in the
+         audit. (tenant_id, status, …) indexes turn this into a range
+         scan. */
       supabaseServer
         .from("finance_reconciliation_candidates")
         .select("payment_id, cash_movement_id, status, rejected_at")
-        .eq("tenant_id", auth.tenant_id),
+        .eq("tenant_id", auth.tenant_id)
+        .in("status", ["suggested", "confirmed"]),
     ]);
     const movements = (movRes.data ?? []) as CashMovement[];
     const payments = (payRes.data ?? []) as FinancePayment[];

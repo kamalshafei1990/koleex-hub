@@ -16,7 +16,7 @@
    ready/skip toggles.
    ========================================================================== */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -435,7 +435,9 @@ function Stepper({ step }: { step: StepKey }) {
    RowCard — one compact statement row.
    ──────────────────────────────────────────────────────────────────────── */
 
-function RowCard({
+/* Phase S.4 — memoized. The parsed-rows view can render hundreds of
+   RowCards; previously a single toggle re-rendered all of them. */
+const RowCard = memo(function RowCard({
   row,
   accountCurrency,
   onToggle,
@@ -506,7 +508,7 @@ function RowCard({
       )}
     </div>
   );
-}
+});
 
 /* ────────────────────────────────────────────────────────────────────────
    Recent imports — quick history below the stepper on step 1.

@@ -67,8 +67,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Cannot edit rows after confirm" }, { status: 409 });
   }
 
-  /* Per-row update — small batch in practice (≤ a few hundred). */
-  const results: BankStatementRow[] = [];
+  /* Phase S.4 — batch update path. In practice the UI fires this PATCH
+     when the operator toggles N rows between ready/skipped or applies
+     the same correction to a selection. Previously each row in the
+     batch incurred a separate round-trip (≤ a few hundred ≈ ≤ several
+     hundred ms of cumulative network); now we group by the JSON shape
+     of the patch and issue ONE update per shape using .in(id, ids).
+     For the common "toggle 50 rows" case that's 1 round-trip instead
+     of 50. Per-row error handling is preserved — a failed UPDATE for
+     a group bubbles a single error message, same as before. */
+  type PatchShape = string; // JSON.stringify of the sanitised patch
+  const grouped = new Map<PatchShape, { patch: Partial<BankStatementRow>; ids: string[] }>();
   for (const u of body.updates) {
     const patch: Partial<BankStatementRow> = {};
     for (const k of ALLOWED_FIELDS) {
@@ -77,18 +86,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       }
     }
     if (Object.keys(patch).length === 0) continue;
+    /* JSON.stringify with sorted keys so {a:1,b:2} and {b:2,a:1}
+       collapse to the same group. */
+    const key = JSON.stringify(Object.keys(patch).sort().reduce((o, k) => {
+      (o as Record<string, unknown>)[k] = (patch as Record<string, unknown>)[k];
+      return o;
+    }, {} as Partial<BankStatementRow>));
+    const slot = grouped.get(key);
+    if (slot) slot.ids.push(u.id);
+    else grouped.set(key, { patch, ids: [u.id] });
+  }
+
+  const results: BankStatementRow[] = [];
+  for (const { patch, ids } of grouped.values()) {
     const { data, error } = await supabaseServer
       .from("finance_bank_statement_rows")
       .update(patch)
-      .eq("id", u.id)
+      .in("id", ids)
       .eq("import_id", id)
       .eq("tenant_id", auth.tenant_id)
-      .select("*")
-      .maybeSingle();
+      .select("*");
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    if (data) results.push(data as BankStatementRow);
+    for (const r of data ?? []) results.push(r as BankStatementRow);
   }
 
   return NextResponse.json({ rows: results });

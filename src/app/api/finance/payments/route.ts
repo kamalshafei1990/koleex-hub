@@ -16,11 +16,18 @@ export async function GET(req: Request) {
   const orderId = url.searchParams.get("order_id");
   const expenseId = url.searchParams.get("expense_id");
 
+  /* Phase S.4 — list bound. Default cap 500, override via ?limit up
+     to a hard ceiling of 2000. The dashboard and the payments app
+     only render the newest window — no UI consumes the full ledger
+     at once. Unbounded selects were a HIGH finding in the audit. */
+  const reqLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(reqLimit) && reqLimit > 0 ? Math.min(reqLimit, 2000) : 500;
+
   let q = supabaseServer.from("finance_payments").select("*").eq("tenant_id", auth.tenant_id);
   if (direction) q = q.eq("direction", direction);
   if (orderId) q = q.eq("linked_order_id", orderId);
   if (expenseId) q = q.eq("linked_expense_id", expenseId);
-  q = q.order("payment_date", { ascending: false });
+  q = q.order("payment_date", { ascending: false }).limit(limit);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ payments: data });

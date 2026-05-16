@@ -40,6 +40,13 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status");
   const search = url.searchParams.get("search")?.trim();
 
+  /* Phase S.4 — list bound. Default cap 500, override via ?limit up
+     to 2000. The orders table holds the long tail of the business;
+     a tenant with 10K orders previously paid the cost of fetching
+     all of them every time the Orders page mounted. */
+  const reqLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(reqLimit) && reqLimit > 0 ? Math.min(reqLimit, 2000) : 500;
+
   let q = supabaseServer
     .from("finance_orders")
     .select("*, suppliers:finance_order_suppliers(*)")
@@ -49,7 +56,7 @@ export async function GET(req: Request) {
   if (status) q = q.eq("status", status);
   if (search) q = q.or(`order_no.ilike.%${search}%,customer_name.ilike.%${search}%`);
 
-  q = q.order("order_date", { ascending: false });
+  q = q.order("order_date", { ascending: false }).limit(limit);
 
   const { data, error } = await q;
   if (error) {
