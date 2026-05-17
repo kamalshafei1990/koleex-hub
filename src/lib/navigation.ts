@@ -157,7 +157,7 @@ export const APP_REGISTRY: AppDef[] = [
      "Product Data" module permission. Customers NEVER see this in
      the sidebar; the /products app (above) is the public catalog. */
   { id: "product-data",     tKey: "app.product-data",     name: "Product Data",      icon: ProductDataIcon, route: "/product-data",   active: true  },
-  { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/products",         active: true  },
+  { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/inventory",        active: true,  newSince: "2026-05-17" },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: false },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
   { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true  },

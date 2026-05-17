@@ -13,7 +13,8 @@
     "validate:edge-cases": "tsx scripts/edge-cases.ts",
     "validate:reports": "NODE_OPTIONS=--conditions=react-server tsx scripts/reports.ts",
     "validate:perf": "NODE_OPTIONS=--conditions=react-server tsx scripts/perf.ts",
-    "validate:accounting": "NODE_OPTIONS=--conditions=react-server tsx scripts/accounting.ts"
+    "validate:accounting": "NODE_OPTIONS=--conditions=react-server tsx scripts/accounting.ts",
+    "validate:inventory": "NODE_OPTIONS=--conditions=react-server tsx scripts/inventory.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",
