@@ -58,9 +58,18 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
   const customerId = ctx.filters.customer_id!;
   const period = normalisePeriod(ctx.filters.date_from, ctx.filters.date_to);
 
-  const [tenant, customer, ordersRes, paymentsRes] = await Promise.all([
+  const [tenant, customer, accountRes, ordersRes, paymentsRes] = await Promise.all([
     loadTenant(ctx.tenantId),
     loadCustomerHeader(ctx.tenantId, customerId),
+    /* Phase R.2 — pull the per-customer finance account so we can
+       show payment_terms + credit_status on the document header.
+       Both columns are typed-safe on `FinanceCustomerAccount`. */
+    supabaseServer
+      .from("finance_customer_accounts")
+      .select("payment_terms, default_currency, credit_status")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("customer_id", customerId)
+      .maybeSingle(),
     supabaseServer
       .from("finance_orders")
       .select("id, order_no, customer_id, order_date, selling_price, currency")
@@ -73,6 +82,8 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
       .eq("party_type", "customer")
       .eq("party_id", customerId),
   ]);
+
+  const account = (accountRes.data ?? null) as { payment_terms: string | null; default_currency: string | null; credit_status: string | null } | null;
 
   const orders = (ordersRes.data ?? []) as OrderRow[];
   const payments = (paymentsRes.data ?? []) as PaymentRow[];
@@ -194,7 +205,20 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
     { bucket: "Over 180",  range: "> 180 days",    amount: aging.b90plus },
   ];
 
+  /* Phase R.2 — contract-context block. The payment_terms come from
+     the operator's per-customer finance account configuration; if no
+     terms were set we omit the row rather than make one up. */
+  const contextPairs: Array<{ label: string; value: string }> = [];
+  if (account?.payment_terms) contextPairs.push({ label: "Payment Terms", value: account.payment_terms });
+  contextPairs.push({ label: "Statement Period", value: `${period.from}  to  ${period.to}` });
+  contextPairs.push({ label: "Currency", value: currency });
+
   const sections: ReportSection[] = [
+    {
+      kind: "kv",
+      title: "Statement Context",
+      pairs: contextPairs,
+    },
     {
       kind: "table",
       title: "Account Activity",
@@ -246,10 +270,11 @@ export async function buildCustomerStatement(ctx: ReportBuildContext): Promise<R
       { label: "Balance Due", value: Math.max(0, closingBalance), format: "money", emphasized: true },
     ],
     notes: [
-      "Please remit any outstanding balance via wire transfer to the bank details on file or the account number above.",
-      "Quote the reference number on all payments so we can allocate them accurately.",
-      "Statement reflects activity up to the period end date. Items posted after that date appear on the next statement.",
-      "Please raise any discrepancies within 14 days of receipt.",
+      "Payment instructions — Please remit any outstanding balance by wire transfer to the bank details on file. For bank coordinates, contact our finance team or refer to your master agreement.",
+      "Always quote the reference number shown against each item when paying so we can allocate the funds accurately.",
+      "Items appear in date order. The running balance after each line is shown in the right-most column; this statement is settled when that final balance is zero.",
+      "Statement reflects activity up to the period end date. Items posted afterwards will appear on the next statement.",
+      "Please review and reconcile this statement against your records. Raise any discrepancy in writing within 14 days of receipt; in the absence of objection the statement is deemed accepted.",
     ],
     row_count: movementRows.length,
     total_amount: closingBalance,

@@ -182,11 +182,12 @@ async function main() {
     const leaked = leakyTerms.filter((t) => csJson.includes(t));
     ok("03 customer statement: no leaky terms", leaked.length === 0, leaked.join(", ") || undefined);
 
-    /* opening + invoiced − received = closing reconciles. */
+    /* opening + invoiced − received = closing reconciles. Closing
+       now lives in `totals`, not in summary (R.2 surface change). */
     const opening = Number(cs.summary.find((s) => s.label === "Opening Balance")?.value ?? 0);
     const invoiced = Number(cs.summary.find((s) => s.label === "Invoiced")?.value ?? 0);
     const received = Number(cs.summary.find((s) => s.label === "Payments Received")?.value ?? 0);
-    const closing = Number(cs.summary.find((s) => s.label === "Closing Balance")?.value ?? 0);
+    const closing = Number(cs.totals?.find((t) => t.label === "Closing Balance")?.value ?? 0);
     ok("04 customer statement: balance arithmetic", Math.abs((opening + invoiced - received) - closing) < 0.01);
 
     /* ── Supplier statement ───────────────────────────────────── */
@@ -305,6 +306,82 @@ async function main() {
     const after = await supabase.from("finance_report_exports").select("id", { count: "exact", head: true }).eq("tenant_id", TENANT_A);
     ok("15 audit row written for pdf channel",
       audited.ok && (after.count ?? 0) === (before.count ?? 0) + 1);
+
+    /* ── R.2 deepening assertions ────────────────────────────────── */
+
+    /* 16 — customer statement carries the AP-style aging table with
+       the five expected buckets. The buckets exist even when totals
+       are zero (so an empty statement still shows them). */
+    const csAging = cs.sections.find((s) => s.kind === "table" && s.title === "Outstanding by Age");
+    const csAgingRows = (csAging && csAging.kind === "table" ? csAging.rows : []) as Array<Record<string, unknown>>;
+    const expectedBuckets = ["Current", "31 – 60", "61 – 90", "91 – 180", "Over 180"];
+    const hasAllCustomerBuckets = expectedBuckets.every((b) => csAgingRows.some((r) => r.bucket === b));
+    ok("16 customer statement: 5 aging buckets present", hasAllCustomerBuckets);
+
+    /* 17 — supplier statement has its AP aging block. */
+    const ssAging = ss.sections.find((s) => s.kind === "table" && s.title === "Outstanding by Age");
+    ok("17 supplier statement: outstanding-by-age table present",
+      !!ssAging && ssAging.kind === "table" && ssAging.rows.length === 5);
+
+    /* 18 — supplier statement deliberately exposes NO customer-side
+       financial terms. (External report safety.) */
+    const ssJson = JSON.stringify(ss).toLowerCase();
+    const supplierLeakTerms = ["gross profit", "net profit", "margin", "customer_revenue", "customer revenue"];
+    const ssLeaked = supplierLeakTerms.filter((t) => ssJson.includes(t));
+    ok("18 supplier statement: no profit/margin leakage", ssLeaked.length === 0, ssLeaked.join(", ") || undefined);
+
+    /* 19 — payment report carries the Money In / Money Out split
+       AND the Status + Reconciliation kv blocks. */
+    const hasMoneyIn  = pr.sections.some((s) => s.kind === "table" && s.title?.startsWith("Money In"));
+    const hasMoneyOut = pr.sections.some((s) => s.kind === "table" && s.title?.startsWith("Money Out"));
+    const hasStatusKv = pr.sections.some((s) => s.kind === "kv" && s.title === "Status Breakdown");
+    const hasReconKv  = pr.sections.some((s) => s.kind === "kv" && s.title === "Reconciliation");
+    ok("19 payment report: in/out split + status + recon kv", hasMoneyIn && hasMoneyOut && hasStatusKv && hasReconKv);
+
+    /* 20 — payment report exposes the evidence column. */
+    const prTable = pr.sections.find((s) => s.kind === "table");
+    const hasEvidenceCol = prTable && prTable.kind === "table" && prTable.columns.some((c) => c.key === "evidence");
+    ok("20 payment report: evidence column present", !!hasEvidenceCol);
+
+    /* 21 — reconciliation report carries engine candidate state,
+       movement totals, and the audit note. */
+    const hasCandidateKv = rr.sections.some((s) => s.kind === "kv" && s.title === "Engine Candidate State");
+    const hasMovementKv  = rr.sections.some((s) => s.kind === "kv" && s.title === "Movement Totals (this period)");
+    const hasAuditNote   = rr.sections.some((s) => s.kind === "note" && s.title === "Audit note");
+    ok("21 reconciliation report: state + totals + audit note", hasCandidateKv && hasMovementKv && hasAuditNote);
+
+    /* 22 — treasury report has FX exposure + concentration tables. */
+    const hasFxTable    = tr.sections.some((s) => s.kind === "table" && s.title === "FX Exposure by Currency");
+    const hasConcTable  = tr.sections.some((s) => s.kind === "table" && s.title === "Account Concentration");
+    ok("22 treasury report: FX exposure + concentration", hasFxTable && hasConcTable);
+
+    /* 23 — expense report Detail table includes evidence_status. */
+    const exDetail = er.sections.find((s) => s.kind === "table" && s.title === "Detail");
+    const hasEvidenceStatusCol = exDetail && exDetail.kind === "table" && exDetail.columns.some((c) => c.key === "evidence_status");
+    ok("23 expense report: evidence_status column present", !!hasEvidenceStatusCol);
+
+    /* 24 — executive summary classified EXECUTIVE — DO NOT DISTRIBUTE. */
+    ok("24 executive summary: EXECUTIVE classification",
+      ex.internal_warning === "EXECUTIVE — DO NOT DISTRIBUTE");
+
+    /* 25 — executive summary has the three required top-N tables. */
+    const hasTopCust = ex.sections.some((s) => s.kind === "table" && s.title === "Top Customers (period)");
+    const hasTopSup  = ex.sections.some((s) => s.kind === "table" && s.title === "Top Supplier Exposure");
+    const hasTopOrd  = ex.sections.some((s) => s.kind === "table" && s.title === "Top Profitable Orders");
+    ok("25 executive summary: top customers / suppliers / orders", hasTopCust && hasTopSup && hasTopOrd);
+
+    /* 26 — executive summary has Profitability + Liquidity kv blocks. */
+    const hasProfit  = ex.sections.some((s) => s.kind === "kv" && s.title === "Profitability");
+    const hasLiq     = ex.sections.some((s) => s.kind === "kv" && s.title === "Liquidity");
+    ok("26 executive summary: profitability + liquidity kv", hasProfit && hasLiq);
+
+    /* 27 — multi-page table hygiene: every table section emits a
+       <thead> with display:table-header-group so paginated rendering
+       repeats the header. Spot-check the payment report (it has the
+       largest detail table). */
+    const prHtml = renderReportHtml(pr);
+    const theadCount = (prHtml.match(/display:table-header-group/g) ?? []).length;
+    ok("27 multi-page hygiene: thead group-display present", theadCount > 0, `count=${theadCount}`);
   } finally {
     await clean();
   }

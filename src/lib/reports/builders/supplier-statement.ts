@@ -58,12 +58,20 @@ export async function buildSupplierStatement(ctx: ReportBuildContext): Promise<R
   const supplierId = ctx.filters.supplier_id!;
   const period = normalisePeriod(ctx.filters.date_from, ctx.filters.date_to);
 
-  const [tenant, supplier, linesRes, paymentsRes] = await Promise.all([
+  const [tenant, supplier, accountRes, linesRes, paymentsRes] = await Promise.all([
     loadTenant(ctx.tenantId),
     loadSupplierHeader(ctx.tenantId, supplierId),
+    /* Phase R.2 — payment_terms from finance_supplier_accounts so the
+       statement shows the agreed payment cadence. */
+    supabaseServer
+      .from("finance_supplier_accounts")
+      .select("payment_terms, default_currency")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("supplier_id", supplierId)
+      .maybeSingle(),
     supabaseServer
       .from("finance_order_suppliers")
-      .select("id, order_id, supplier_id, supplier_cost, currency, created_at")
+      .select("id, order_id, supplier_id, supplier_cost, currency, created_at, due_date")
       .eq("tenant_id", ctx.tenantId)
       .eq("supplier_id", supplierId),
     supabaseServer
@@ -74,7 +82,8 @@ export async function buildSupplierStatement(ctx: ReportBuildContext): Promise<R
       .eq("party_id", supplierId),
   ]);
 
-  const lines = (linesRes.data ?? []) as SupplierLineRow[];
+  const account = (accountRes.data ?? null) as { payment_terms: string | null; default_currency: string | null } | null;
+  const lines = (linesRes.data ?? []) as Array<SupplierLineRow & { due_date: string | null }>;
   const payments = (paymentsRes.data ?? []) as PaymentRow[];
 
   const explicitCurrency = ctx.filters.currency;
@@ -165,13 +174,67 @@ export async function buildSupplierStatement(ctx: ReportBuildContext): Promise<R
     { key: "balance", label: "Balance", align: "right", format: "money", width: "120px" },
   ];
 
+  /* Phase R.2 — AP aging buckets. Same FIFO allocation as the
+     customer statement: payments we made consume the oldest open
+     supplier line first; remainder ages from order_date (or, when
+     it's set, the line's due_date as the maturity anchor). */
+  const todayMs = Date.now();
+  const sortedLines = [...linesCur].sort((a, b) => {
+    const aDate = orderNoMap.get(a.order_id)?.date ?? (a.created_at ?? "").slice(0, 10);
+    const bDate = orderNoMap.get(b.order_id)?.date ?? (b.created_at ?? "").slice(0, 10);
+    return aDate.localeCompare(bDate);
+  });
+  let payPool = paymentsCur.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const aging = { current: 0, b30: 0, b60: 0, b90: 0, b90plus: 0 };
+  for (const l of sortedLines) {
+    const due = Number(l.supplier_cost) || 0;
+    const consumed = Math.min(due, payPool);
+    payPool -= consumed;
+    const remainder = due - consumed;
+    if (remainder <= 0.01) continue;
+    const anchor = l.due_date ?? orderNoMap.get(l.order_id)?.date ?? (l.created_at ?? "").slice(0, 10);
+    const ageDays = Math.floor((todayMs - new Date(anchor).getTime()) / 86_400_000);
+    if (ageDays <= 30) aging.current += remainder;
+    else if (ageDays <= 60) aging.b30 += remainder;
+    else if (ageDays <= 90) aging.b60 += remainder;
+    else if (ageDays <= 180) aging.b90 += remainder;
+    else aging.b90plus += remainder;
+  }
+
+  const agingColumns: ReportColumn[] = [
+    { key: "bucket", label: "Bucket" },
+    { key: "range",  label: "Days from due", width: "140px" },
+    { key: "amount", label: "Balance",       align: "right", format: "money", width: "140px" },
+  ];
+  const agingRows: Array<Record<string, ReportRowValue>> = [
+    { bucket: "Current",   range: "Not yet due",    amount: aging.current },
+    { bucket: "1 – 30",    range: "1 – 30 days",    amount: aging.b30 },
+    { bucket: "31 – 60",   range: "31 – 60 days",   amount: aging.b60 },
+    { bucket: "61 – 180",  range: "61 – 180 days",  amount: aging.b90 },
+    { bucket: "Over 180",  range: "> 180 days",     amount: aging.b90plus },
+  ];
+
+  /* Statement-context block with payment terms (if configured). */
+  const contextPairs: Array<{ label: string; value: string }> = [];
+  if (account?.payment_terms) contextPairs.push({ label: "Payment Terms", value: account.payment_terms });
+  contextPairs.push({ label: "Statement Period", value: `${period.from}  to  ${period.to}` });
+  contextPairs.push({ label: "Currency", value: currency });
+
   const sections: ReportSection[] = [
+    { kind: "kv", title: "Statement Context", pairs: contextPairs },
     {
       kind: "table",
       title: "Account Activity",
       columns,
       rows: movementRows,
       empty_state: "No activity in the selected period.",
+    },
+    {
+      kind: "table",
+      title: "Outstanding by Age",
+      columns: agingColumns,
+      rows: agingRows,
+      empty_state: "No outstanding balance.",
     },
   ];
 
@@ -202,7 +265,7 @@ export async function buildSupplierStatement(ctx: ReportBuildContext): Promise<R
       { label: "Opening Balance", value: openingBalance, format: "money", tone: "neutral" },
       { label: "Purchases", value: purchased, format: "money", tone: "neutral" },
       { label: "Payments Made", value: paid, format: "money", tone: "positive" },
-      { label: "Closing Balance", value: closingBalance, format: "money", tone: closingBalance > 0 ? "warning" : "positive" },
+      { label: "Outstanding", value: Math.max(0, closingBalance), format: "money", tone: closingBalance > 0 ? "warning" : "neutral" },
     ],
     sections,
     totals: [
