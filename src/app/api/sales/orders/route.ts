@@ -1,0 +1,109 @@
+import "server-only";
+
+/* ===========================================================================
+   GET  /api/sales/orders     list recent SOs for the tenant
+   POST /api/sales/orders     create a SO header + items
+   ========================================================================== */
+
+import { NextResponse } from "next/server";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { listSalesOrders } from "@/lib/sales/queries";
+
+const MODULE = "Orders";    // Sales-orders sub-module key
+
+export async function GET(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, MODULE);
+  if (deny) return deny;
+
+  const url = new URL(req.url);
+  const limit = Number(url.searchParams.get("limit"));
+  try {
+    const orders = await listSalesOrders(auth.tenant_id, Number.isFinite(limit) && limit > 0 ? limit : 100);
+    return NextResponse.json({ orders });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
+}
+
+interface SoItemBody {
+  inventory_item_id?: string | null;
+  product_id?: string | null;
+  description?: string | null;
+  qty: number;
+  unit_price?: number;
+}
+
+interface CreateSoBody {
+  so_no?: string | null;
+  customer_id: string;
+  currency?: string;
+  notes?: string | null;
+  status?: "draft" | "confirmed";
+  items?: SoItemBody[];
+}
+
+function generateSoNo(): string {
+  const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const tail = (Date.now().toString(16) + Math.random().toString(16).slice(2))
+    .replace(/\./g, "")
+    .slice(-6)
+    .toUpperCase();
+  return `SO-${ymd}-${tail}`;
+}
+
+export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, MODULE);
+  if (deny) return deny;
+
+  const body = (await req.json().catch(() => null)) as CreateSoBody | null;
+  if (!body?.customer_id) {
+    return NextResponse.json({ error: "customer_id required" }, { status: 400 });
+  }
+
+  const items = body.items ?? [];
+
+  const { data: row, error } = await supabaseServer
+    .from("sales_orders")
+    .insert({
+      tenant_id: auth.tenant_id,
+      so_no: body.so_no ?? generateSoNo(),
+      customer_id: body.customer_id,
+      status: body.status ?? "draft",
+      currency: body.currency ?? "USD",
+      notes: body.notes ?? null,
+      created_by: auth.account_id,
+    })
+    .select("id, so_no")
+    .single();
+  if (error || !row) return NextResponse.json({ error: error?.message ?? "SO insert failed" }, { status: 500 });
+
+  if (items.length > 0) {
+    const soId = (row as { id: string }).id;
+    const lineRows = items.map((it) => {
+      const qty = Number(it.qty) || 0;
+      const price = Number(it.unit_price) || 0;
+      return {
+        sales_order_id: soId,
+        inventory_item_id: it.inventory_item_id ?? null,
+        product_id: it.product_id ?? null,
+        description: it.description ?? null,
+        qty,
+        qty_shipped: 0,
+        unit_price: price,
+        total: qty * price,
+      };
+    });
+    const { error: itemsErr } = await supabaseServer.from("sales_order_items").insert(lineRows);
+    if (itemsErr) {
+      await supabaseServer.from("sales_orders").delete().eq("id", soId);
+      return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ order: row });
+}
