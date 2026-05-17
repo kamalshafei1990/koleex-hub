@@ -27,7 +27,8 @@
     "validate:approvals": "NODE_OPTIONS=--conditions=react-server tsx scripts/approvals.ts",
     "validate:executive": "NODE_OPTIONS=--conditions=react-server tsx scripts/executive.ts",
     "validate:smart-create": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-create.ts",
-    "validate:traceability": "NODE_OPTIONS=--conditions=react-server tsx scripts/traceability.ts"
+    "validate:traceability": "NODE_OPTIONS=--conditions=react-server tsx scripts/traceability.ts",
+    "validate:finance-ux": "NODE_OPTIONS=--conditions=react-server tsx scripts/finance-ux.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

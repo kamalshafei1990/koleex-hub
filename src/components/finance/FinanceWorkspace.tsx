@@ -101,21 +101,37 @@ export default function FinanceWorkspace() {
       {error && <div className="text-sm text-rose-300">{error}</div>}
       {snap && (
         <>
+          {/* Where to start — operator-friendly entry points for the data
+              that most CFOs don't know where to find. Surfaced first
+              because the previous workspace buried these inside Setup. */}
+          <section>
+            <div className="mb-2 flex items-baseline justify-between">
+              <ErpEyebrow>Where to start</ErpEyebrow>
+              <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">All setup cards →</Link>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <ErpQuickAction href="/finance/visual"      icon="balance-scale-left" label="Visual Statements" hint="Income · Balance · Cash Flow" />
+              <ErpQuickAction href="/finance/fx-rates"    icon="balance-scale-left" label="FX Rates"          hint="Add / edit · USD → CNY etc." />
+              <ErpQuickAction href="/finance/setup?card=opening-balances" icon="books"     label="Opening Balances" hint="Cash · AR · AP · stock" />
+              <ErpQuickAction href="/finance/setup?card=assets"           icon="briefcase" label="Company Assets"   hint="Fixed assets register" />
+            </div>
+          </section>
+
           {/* Quick Actions */}
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <ErpEyebrow>Quick Actions</ErpEyebrow>
-              <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">Finance setup →</Link>
+              <Link href="/create" className="text-[11px] text-gray-400 hover:text-gray-200">All create flows →</Link>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <ErpQuickAction href="/finance/expenses?new=1" icon="receipt"          label="New Expense"        hint="Cash or bill" />
-              <ErpQuickAction href="/finance/payments?new=1" icon="money"            label="New Payment"        hint="In / out" />
-              <ErpQuickAction href="/invoices?new=1"          icon="file-invoice-dollar" label="New Invoice"      hint="Customer billing" />
-              <ErpQuickAction href="/finance/accounting?new=1" icon="books"          label="New Journal"        hint="Manual entry" />
+              <ErpQuickAction href="/create/expense"            icon="receipt"             label="New Expense"     hint="Cash or bill" />
+              <ErpQuickAction href="/finance/payments?new=1"    icon="money"               label="New Payment"     hint="In / out" />
+              <ErpQuickAction href="/invoices?new=1"            icon="file-invoice-dollar" label="New Invoice"     hint="Customer billing" />
+              <ErpQuickAction href="/finance/accounting?new=1"  icon="books"               label="New Journal"     hint="Manual entry" />
               <ErpQuickAction href="/finance/setup?card=fx-rates" icon="balance-scale-left" label="New FX Exchange" hint="Currency conversion" />
-              <ErpQuickAction href="/finance/setup?card=assets"   icon="briefcase"   label="New Asset"           hint="Capital purchase" />
-              <ErpQuickAction href="/finance/suppliers?new-bill=1" icon="file-invoice" label="New Vendor Bill"   hint="Supplier invoice" />
-              <ErpQuickAction href="/finance/bank-accounts?new=1" icon="bank"        label="New Bank Account"    hint="Add account" />
+              <ErpQuickAction href="/create/asset"              icon="briefcase"           label="New Asset"       hint="Capital purchase" />
+              <ErpQuickAction href="/finance/suppliers?new-bill=1" icon="file-invoice"     label="New Vendor Bill" hint="Supplier invoice" />
+              <ErpQuickAction href="/finance/bank-accounts?new=1" icon="bank"              label="New Bank Account" hint="Add account" />
             </div>
           </section>
 

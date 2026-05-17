@@ -110,15 +110,21 @@ export default function ExpensesApp() {
     return () => { cancelled = true; };
   }, []);
 
+  /* Currency fix — pick up the tenant base currency for new-expense
+     defaults and KPI labels. */
+  const [baseCurrency, setBaseCurrency] = useState("CNY");
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eRes, cRes] = await Promise.all([
+      const [eRes, cRes, dRes] = await Promise.all([
         fetch("/api/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
         fetch("/api/expenses/categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
+        fetch("/api/create/defaults", { cache: "no-store" }).then((r) => r.json() as Promise<{ defaults?: { base_currency?: string } }>),
       ]);
       setExpenses(eRes.expenses ?? []);
       setCategories(cRes.categories ?? []);
+      if (dRes.defaults?.base_currency) setBaseCurrency(dRes.defaults.base_currency);
     } finally {
       setLoading(false);
     }
@@ -203,7 +209,7 @@ export default function ExpensesApp() {
   const startNew = () => setEditing({
     title: "",
     amount: 0,
-    currency: "USD",
+    currency: baseCurrency,
     expense_date: new Date().toISOString().slice(0, 10),
     payment_status: "unpaid",
     category_id: null,
@@ -317,7 +323,7 @@ export default function ExpensesApp() {
                           <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
                         </div>
                       </div>
-                      <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, "USD", { compact: true })}</div>
+                      <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
                       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
                         <div className={`h-full ${accentSolidBg(style.accent)}`} style={{ width: "100%" }} />
                       </div>
@@ -389,6 +395,7 @@ export default function ExpensesApp() {
         <ExpenseEditor
           draft={editing}
           categories={categories}
+          baseCurrency={baseCurrency}
           onClose={() => setEditing(null)}
           onSaved={(saved, wasNew) => {
             setEditing(null);
@@ -605,11 +612,14 @@ function RowKebab({
 function ExpenseEditor({
   draft,
   categories,
+  baseCurrency,
   onClose,
   onSaved,
 }: {
   draft: Partial<FinanceExpense>;
   categories: ExpenseCategory[];
+  /** Tenant base currency — used as the default when draft.currency is unset. */
+  baseCurrency: string;
   onClose: () => void;
   /** UX-validation pass: surfaces the saved row + isNew flag so the
    *  parent can auto-open the evidence drawer for fresh expenses. */
@@ -728,7 +738,7 @@ function ExpenseEditor({
                   </div>
                   <FieldLabel label="Currency">
                     <select
-                      value={local.currency ?? "USD"}
+                      value={local.currency ?? baseCurrency}
                       onChange={(e) => setLocal({ ...local, currency: e.target.value })}
                       className={INPUT_LG}
                     >

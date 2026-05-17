@@ -32,16 +32,22 @@ export default function FinanceExpenseAnalytics() {
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  /* Currency fix — read the tenant base currency once and use it for
+     every KPI / summary label so a CNY tenant doesn't see "USD"
+     plastered everywhere. */
+  const [baseCurrency, setBaseCurrency] = useState("CNY");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eRes, cRes] = await Promise.all([
+      const [eRes, cRes, dRes] = await Promise.all([
         fetch("/api/finance/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
         fetch("/api/finance/expense-categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
+        fetch("/api/create/defaults", { cache: "no-store" }).then((r) => r.json() as Promise<{ defaults?: { base_currency?: string } }>),
       ]);
       setExpenses(eRes.expenses ?? []);
       setCategories(cRes.categories ?? []);
+      if (dRes.defaults?.base_currency) setBaseCurrency(dRes.defaults.base_currency);
     } finally {
       setLoading(false);
     }
@@ -185,12 +191,12 @@ export default function FinanceExpenseAnalytics() {
         />
 
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard label="Total Expenses" value={kpi.total} unit="USD" tone="neutral" hint="All time, this view" loading={loading} />
-          <HeroKpiCard label="Unpaid" value={kpi.unpaid} unit="USD" tone="warning" hint="Awaiting payment" loading={loading} />
+          <HeroKpiCard label="Total Expenses" value={kpi.total} unit={baseCurrency} tone="neutral" hint="All time, this view" loading={loading} />
+          <HeroKpiCard label="Unpaid" value={kpi.unpaid} unit={baseCurrency} tone="warning" hint="Awaiting payment" loading={loading} />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
-          <MetricCard label="Paid"    value={kpi.paid}    unit="USD" hint="Already settled" loading={loading} />
-          <MetricCard label="Overdue" value={kpi.overdue} unit="USD" tone="negative" hint="Past due date" loading={loading} />
+          <MetricCard label="Paid"    value={kpi.paid}    unit={baseCurrency} hint="Already settled" loading={loading} />
+          <MetricCard label="Overdue" value={kpi.overdue} unit={baseCurrency} tone="negative" hint="Past due date" loading={loading} />
         </div>
 
         {/* ── Operational analytics row: Donut · Monthly · Top vendors  */}
@@ -286,7 +292,7 @@ export default function FinanceExpenseAnalytics() {
                           <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
                         </div>
                       </div>
-                      <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(c.total, "USD", { compact: true })}</div>
+                      <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
                       <div className="mt-2 flex items-center justify-between text-[10px]">
                         <span className="text-gray-500">{c.share.toFixed(0)}% of total</span>
                         {c.delta_pct != null && (
@@ -320,7 +326,7 @@ export default function FinanceExpenseAnalytics() {
                           <RrIcon name={style.icon} size={16} />
                           <div>
                             <div className="text-sm font-medium">{c.name}</div>
-                            <div className="text-[10px] text-gray-500">This month {fmtMoney(c.thisMonth, "USD", { compact: true })} · last month {fmtMoney(c.lastMonth, "USD", { compact: true })}</div>
+                            <div className="text-[10px] text-gray-500">This month {fmtMoney(c.thisMonth, baseCurrency, { compact: true })} · last month {fmtMoney(c.lastMonth, baseCurrency, { compact: true })}</div>
                           </div>
                         </div>
                         <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
@@ -357,7 +363,7 @@ export default function FinanceExpenseAnalytics() {
                           <div className="text-[10px] text-gray-500">{o.count} {o.count === 1 ? "expense" : "expenses"} linked</div>
                         </div>
                       </div>
-                      <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, "USD", { compact: true })}</span>
+                      <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, baseCurrency, { compact: true })}</span>
                     </li>
                   ))}
                 </ul>

@@ -26,6 +26,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { FinanceExpense } from "@/lib/finance/types";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 interface JoinedExpense {
   category?: { name: string } | { name: string }[] | null;
@@ -80,12 +81,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Amount must be greater than zero" }, { status: 400 });
   }
 
+  /* Currency fix: default to the tenant's base currency (CNY for
+     Chinese tenants), not USD. The form is expected to send currency
+     explicitly; this fallback only kicks in when it doesn't. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
   const payload = {
     category_id: body.category_id ?? null,
     subcategory_id: body.subcategory_id ?? null,
     title: body.title ?? "",
     amount: Number(body.amount) || 0,
-    currency: body.currency ?? "USD",
+    currency: body.currency ?? baseCurrency,
     expense_date: body.expense_date ?? new Date().toISOString().slice(0, 10),
     payment_status: body.payment_status ?? "unpaid",
     due_date: body.due_date ?? null,

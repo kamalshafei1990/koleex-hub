@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { FinanceExpense } from "@/lib/finance/types";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 interface RouteRow {
   category?: { name: string } | null;
@@ -52,12 +53,16 @@ export async function POST(req: Request) {
   if (deny) return deny;
 
   const body = (await req.json()) as Partial<FinanceExpense> & { id?: string };
+  /* Currency fix: never hard-code USD. Fall back to the tenant's
+     base currency (CNY for Chinese tenants) only when the form
+     truly omits the field. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
   const payload = {
     category_id: body.category_id ?? null,
     subcategory_id: body.subcategory_id ?? null,
     title: body.title ?? "",
     amount: Number(body.amount) || 0,
-    currency: body.currency ?? "USD",
+    currency: body.currency ?? baseCurrency,
     expense_date: body.expense_date ?? new Date().toISOString().slice(0, 10),
     payment_status: body.payment_status ?? "unpaid",
     due_date: body.due_date ?? null,
