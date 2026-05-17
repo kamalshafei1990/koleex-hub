@@ -364,3 +364,38 @@ export async function ensureInventoryItemForProduct(
   if (error) throw new Error(error.message);
   return data as string;
 }
+
+/* ─── ensureSpecialLocation ───────────────────────────────
+   Find-or-create a non-warehouse location (port, forwarder,
+   in_transit, customer_location, etc.). Phase O.3.1 receiving uses
+   this so a receipt can land stock against a virtual location even
+   when there isn't a physical warehouse involved.
+
+   Customer locations are keyed by customer_id, not by name — the
+   generated location stays unique per (tenant, customer). */
+
+export type SpecialLocationType =
+  | "port"
+  | "forwarder"
+  | "in_transit"
+  | "consolidation_point"
+  | "customer_location"
+  | "supplier_location"
+  | "exhibition_site"
+  | "demo_location"
+  | "virtual_location";
+
+export async function ensureSpecialLocation(
+  tenantId: string,
+  locationType: SpecialLocationType,
+  opts: { name?: string | null; customer_id?: string | null } = {},
+): Promise<string> {
+  const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_special_location", {
+    p_tenant_id: tenantId,
+    p_location_type: locationType,
+    p_name: opts.name ?? null,
+    p_customer_id: opts.customer_id ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
+}

@@ -43,8 +43,37 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { createInventoryMovement, postInventoryMovement, voidInventoryMovement, ensureDefaultWarehouse } from "@/lib/inventory/posting";
-import { ensureInventoryItemForProduct } from "@/lib/inventory/items";
-import type { PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, ReceiveOutcome, ReceiveRequest, PurchaseOrderStatus } from "./types";
+import {
+  ensureInventoryItemForProduct,
+  ensureSpecialLocation,
+  type SpecialLocationType,
+} from "@/lib/inventory/items";
+import type {
+  PurchaseOrder,
+  PurchaseOrderItem,
+  PurchaseReceipt,
+  ReceiveDestinationMode,
+  ReceiveOutcome,
+  ReceiveRequest,
+  PurchaseOrderStatus,
+} from "./types";
+
+const STOCK_MOVING_MODES = new Set<ReceiveDestinationMode>([
+  "warehouse", "port", "forwarder", "in_transit", "consolidation", "direct_ship_to_customer",
+]);
+
+/* Map destination_mode → location_type for find-or-create. */
+function locationTypeForMode(mode: ReceiveDestinationMode): SpecialLocationType | "warehouse" | null {
+  switch (mode) {
+    case "warehouse":               return "warehouse";
+    case "port":                    return "port";
+    case "forwarder":               return "forwarder";
+    case "in_transit":              return "in_transit";
+    case "consolidation":           return "consolidation_point";
+    case "direct_ship_to_customer": return "customer_location";
+    case "non_stock_purchase":      return null;
+  }
+}
 
 function generateReceiptNo(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -115,8 +144,38 @@ export async function receivePurchaseOrder(opts: {
     }
   }
 
-  /* 3 — Resolve receipt-level warehouse. */
-  const warehouseId = request.warehouse_id ?? (await ensureDefaultWarehouse(tenantId));
+  /* 3 — Resolve receipt-level destination.
+     The mode dictates which physical or virtual location stock lands
+     in. We resolve the destination once at receipt-header level; line
+     overrides are still honored on the line itself for the rare case
+     where one receipt splits stock across two locations of the same
+     mode. */
+  const destinationMode: ReceiveDestinationMode = request.destination_mode ?? "warehouse";
+  const affectsInventory = STOCK_MOVING_MODES.has(destinationMode);
+
+  if (destinationMode === "direct_ship_to_customer" && !request.customer_id) {
+    return { ok: false, error: "customer_id required for direct_ship_to_customer", code: 400 };
+  }
+
+  let warehouseId: string | null = null;
+  if (affectsInventory) {
+    if (request.destination_location_id) {
+      warehouseId = request.destination_location_id;
+    } else if (destinationMode === "warehouse") {
+      warehouseId = request.warehouse_id ?? (await ensureDefaultWarehouse(tenantId));
+    } else {
+      const locType = locationTypeForMode(destinationMode);
+      if (locType && locType !== "warehouse") {
+        warehouseId = await ensureSpecialLocation(tenantId, locType, {
+          name:
+            destinationMode === "port"            ? request.port_name :
+            destinationMode === "forwarder"       ? request.forwarder_name :
+            null,
+          customer_id: destinationMode === "direct_ship_to_customer" ? request.customer_id ?? null : null,
+        });
+      }
+    }
+  }
 
   /* 4 — Insert receipt header + lines. */
   const grNo = generateReceiptNo();
@@ -129,6 +188,14 @@ export async function receivePurchaseOrder(opts: {
       po_id: poId,
       supplier_id: po.supplier_id,
       warehouse_id: warehouseId,
+      destination_mode: destinationMode,
+      destination_location_id: warehouseId,
+      customer_id: request.customer_id ?? null,
+      shipment_reference: request.shipment_reference ?? null,
+      forwarder_name: request.forwarder_name ?? null,
+      port_name: request.port_name ?? null,
+      expected_ship_date: request.expected_ship_date ?? null,
+      expected_arrival_date: request.expected_arrival_date ?? null,
       status: "draft",
       received_at: receivedAt,
       received_by_account_id: receivedBy,
@@ -159,7 +226,9 @@ export async function receivePurchaseOrder(opts: {
       unit: poItem.unit ?? "pc",
       unit_cost: poItem.unit_cost,
       currency: po.currency ?? "USD",
-      warehouse_id: l.warehouse_id ?? warehouseId,
+      /* For non-stock purchases there's no location; for stock-moving
+         modes the line override (rare) or receipt-level destination wins. */
+      warehouse_id: affectsInventory ? (l.warehouse_id ?? warehouseId) : null,
       condition_notes: l.condition_notes ?? null,
     };
   });
@@ -175,54 +244,58 @@ export async function receivePurchaseOrder(opts: {
   }
 
   /* 5 — Create + post inventory movements.
-     The PO line's product_id is resolved (or auto-created) into an
-     inventory_item_id via fn_inventory_ensure_item_for_product so the
-     inventory ledger stays product-independent. */
+     For 'non_stock_purchase' the engine skips this step entirely so
+     the receipt records the event for AP/expense without touching
+     inventory. For every other destination mode we post movements
+     into the resolved location (warehouse, port, forwarder, etc.). */
   const movementIds: string[] = [];
-  for (const line of insertedLines as Array<{
-    id: string;
-    product_id: string | null;
-    qty_accepted: number;
-    warehouse_id: string | null;
-    unit_cost: number | null;
-    currency: string;
-    unit: string | null;
-  }>) {
-    if (!line.product_id) continue;          // free-text line: skip stock impact
-    const qty = Number(line.qty_accepted) || 0;
-    if (qty <= 0) continue;
+  if (affectsInventory) {
+    for (const line of insertedLines as Array<{
+      id: string;
+      product_id: string | null;
+      qty_accepted: number;
+      warehouse_id: string | null;
+      unit_cost: number | null;
+      currency: string;
+      unit: string | null;
+    }>) {
+      if (!line.product_id) continue;          // free-text line: skip stock impact
+      const qty = Number(line.qty_accepted) || 0;
+      if (qty <= 0) continue;
 
-    const inventoryItemId = await ensureInventoryItemForProduct(tenantId, line.product_id);
+      const inventoryItemId = await ensureInventoryItemForProduct(tenantId, line.product_id);
 
-    const created = await createInventoryMovement({
-      tenant_id: tenantId,
-      inventory_item_id: inventoryItemId,
-      warehouse_id: line.warehouse_id ?? warehouseId,
-      movement_type: "purchase_receipt",
-      quantity: qty,
-      unit: line.unit ?? "pc",
-      unit_cost: line.unit_cost,
-      currency: line.currency,
-      source_type: "purchase_receipt",
-      source_id: line.id,                    // line-level idempotency
-      reference: receiptNo,
-      created_by: receivedBy,
-    });
-    if (!created.ok || !created.movement) {
-      return { ok: false, error: `Inventory create failed: ${created.error}`, code: 500 };
-    }
-    const posted = await postInventoryMovement(created.movement.id, tenantId, receivedBy);
-    if (!posted.ok) {
-      return { ok: false, error: `Inventory post failed: ${posted.error}`, code: 500 };
-    }
-    movementIds.push(created.movement.id);
-    await supabaseServer
-      .from("purchase_receipt_items")
-      .update({
-        inventory_movement_id: created.movement.id,
+      const created = await createInventoryMovement({
+        tenant_id: tenantId,
         inventory_item_id: inventoryItemId,
-      })
-      .eq("id", line.id);
+        warehouse_id: line.warehouse_id ?? warehouseId,
+        movement_type: "purchase_receipt",
+        quantity: qty,
+        unit: line.unit ?? "pc",
+        unit_cost: line.unit_cost,
+        currency: line.currency,
+        source_type: "purchase_receipt",
+        source_id: line.id,                    // line-level idempotency
+        reference: receiptNo,
+        created_by: receivedBy,
+        metadata: { destination_mode: destinationMode },
+      });
+      if (!created.ok || !created.movement) {
+        return { ok: false, error: `Inventory create failed: ${created.error}`, code: 500 };
+      }
+      const posted = await postInventoryMovement(created.movement.id, tenantId, receivedBy);
+      if (!posted.ok) {
+        return { ok: false, error: `Inventory post failed: ${posted.error}`, code: 500 };
+      }
+      movementIds.push(created.movement.id);
+      await supabaseServer
+        .from("purchase_receipt_items")
+        .update({
+          inventory_movement_id: created.movement.id,
+          inventory_item_id: inventoryItemId,
+        })
+        .eq("id", line.id);
+    }
   }
 
   /* 6 — Promote receipt to posted. */
@@ -248,7 +321,10 @@ export async function receivePurchaseOrder(opts: {
     ok: true,
     receipt_id: receiptId,
     receipt_no: receiptNo,
+    destination_mode: destinationMode,
+    destination_location_id: warehouseId,
     movement_ids: movementIds,
+    affects_inventory: affectsInventory,
     po_status: newStatus,
   };
 }

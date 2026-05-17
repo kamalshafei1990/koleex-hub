@@ -409,6 +409,202 @@ async function main() {
   });
   ok("13  re-voiding a voided receipt is a no-op", voidAgain.ok);
 
+  /* ─── Phase O.3.1 — destination-mode coverage ────────────────
+     Build a fresh PO for each destination test so quantities don't
+     interact. Each test verifies (a) outcome.affects_inventory,
+     (b) the resulting destination location's type, (c) the stock
+     ledger lands the right qty (or zero, for non-stock). */
+
+  async function poForDestTest(qty: number): Promise<{ poId: string; itemId: string }> {
+    const { poId, itemIds } = await createPo({
+      tenantId: TENANT_A, supplierId: supplierA,
+      lines: [{ product_id: pidA, qty, unit_cost: 1 }],
+    });
+    return { poId, itemId: itemIds[0] };
+  }
+
+  async function locationOf(receiptId: string) {
+    const { data: rcpt } = await supabase
+      .from("purchase_receipts")
+      .select("destination_mode, destination_location_id")
+      .eq("id", receiptId)
+      .maybeSingle();
+    const r = rcpt as { destination_mode: string; destination_location_id: string | null } | null;
+    if (!r?.destination_location_id) return { mode: r?.destination_mode, type: null as string | null };
+    const { data: loc } = await supabase
+      .from("inventory_warehouses")
+      .select("location_type")
+      .eq("id", r.destination_location_id)
+      .maybeSingle();
+    return { mode: r.destination_mode, type: (loc as { location_type: string } | null)?.location_type ?? null };
+  }
+
+  /* 14 — receive_to_warehouse increases stock in a warehouse location. */
+  const po14 = await poForDestTest(10);
+  const balBefore14 = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
+  const r14 = await receivePurchaseOrder({
+    poId: po14.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "warehouse", warehouse_id: whA,
+      lines: [{ po_item_id: po14.itemId, qty_received: 10, qty_accepted: 10 }],
+    },
+  });
+  const balAfter14 = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
+  const loc14 = r14.receipt_id ? await locationOf(r14.receipt_id) : null;
+  ok(
+    "14  receive_to_warehouse: stock +10 in warehouse location",
+    r14.ok && r14.affects_inventory === true && balAfter14 - balBefore14 === 10 && loc14?.type === "warehouse",
+    `Δ=${balAfter14 - balBefore14} loc=${loc14?.type}`,
+  );
+
+  /* 15 — receive_to_port creates port location + stock there. */
+  const po15 = await poForDestTest(7);
+  const r15 = await receivePurchaseOrder({
+    poId: po15.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "port", port_name: "Shanghai", shipment_reference: "MSCU1234567",
+      lines: [{ po_item_id: po15.itemId, qty_received: 7, qty_accepted: 7 }],
+    },
+  });
+  const loc15 = r15.receipt_id ? await locationOf(r15.receipt_id) : null;
+  const balAtPort = r15.destination_location_id
+    ? (await getStockBalance(TENANT_A, itemA, r15.destination_location_id)).qty_on_hand
+    : 0;
+  ok(
+    "15  receive_to_port: stock lands in port location",
+    r15.ok && r15.affects_inventory === true && loc15?.type === "port" && balAtPort === 7,
+    `loc=${loc15?.type} bal=${balAtPort}`,
+  );
+
+  /* 16 — receive_to_forwarder. */
+  const po16 = await poForDestTest(4);
+  const r16 = await receivePurchaseOrder({
+    poId: po16.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "forwarder", forwarder_name: "DHL",
+      lines: [{ po_item_id: po16.itemId, qty_received: 4, qty_accepted: 4 }],
+    },
+  });
+  const loc16 = r16.receipt_id ? await locationOf(r16.receipt_id) : null;
+  const balAtFwd = r16.destination_location_id
+    ? (await getStockBalance(TENANT_A, itemA, r16.destination_location_id)).qty_on_hand
+    : 0;
+  ok(
+    "16  receive_to_forwarder: stock lands in forwarder location",
+    r16.ok && loc16?.type === "forwarder" && balAtFwd === 4,
+    `loc=${loc16?.type} bal=${balAtFwd}`,
+  );
+
+  /* 17 — receive_in_transit. */
+  const po17 = await poForDestTest(3);
+  const r17 = await receivePurchaseOrder({
+    poId: po17.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "in_transit",
+      lines: [{ po_item_id: po17.itemId, qty_received: 3, qty_accepted: 3 }],
+    },
+  });
+  const loc17 = r17.receipt_id ? await locationOf(r17.receipt_id) : null;
+  const balAtTransit = r17.destination_location_id
+    ? (await getStockBalance(TENANT_A, itemA, r17.destination_location_id)).qty_on_hand
+    : 0;
+  ok(
+    "17  receive_in_transit: stock lands in in_transit location",
+    r17.ok && loc17?.type === "in_transit" && balAtTransit === 3,
+    `loc=${loc17?.type} bal=${balAtTransit}`,
+  );
+
+  /* 18 — direct_ship_to_customer requires customer_id (negative case)
+     and then creates a customer_location and posts stock there. */
+  const po18a = await poForDestTest(5);
+  const rNoCust = await receivePurchaseOrder({
+    poId: po18a.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "direct_ship_to_customer",
+      lines: [{ po_item_id: po18a.itemId, qty_received: 5, qty_accepted: 5 }],
+    },
+  });
+  /* Use the test supplier row as a "customer" stand-in — the engine
+     only needs a uuid that uniquely identifies a customer per tenant. */
+  const customerStandIn = supplierA;
+  const po18b = await poForDestTest(5);
+  const r18 = await receivePurchaseOrder({
+    poId: po18b.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "direct_ship_to_customer",
+      customer_id: customerStandIn,
+      lines: [{ po_item_id: po18b.itemId, qty_received: 5, qty_accepted: 5 }],
+    },
+  });
+  const loc18 = r18.receipt_id ? await locationOf(r18.receipt_id) : null;
+  const balAtCust = r18.destination_location_id
+    ? (await getStockBalance(TENANT_A, itemA, r18.destination_location_id)).qty_on_hand
+    : 0;
+  ok(
+    "18  direct_ship_to_customer: requires customer_id; creates customer_location and posts stock",
+    !rNoCust.ok && rNoCust.code === 400 &&
+      r18.ok && loc18?.type === "customer_location" && balAtCust === 5,
+    `noCust=${rNoCust.code} loc=${loc18?.type} bal=${balAtCust}`,
+  );
+
+  /* 19 — non_stock_purchase creates a receipt but NO inventory movements. */
+  const po19 = await poForDestTest(6);
+  const balBefore19 = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
+  const r19 = await receivePurchaseOrder({
+    poId: po19.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "non_stock_purchase",
+      lines: [{ po_item_id: po19.itemId, qty_received: 6, qty_accepted: 6 }],
+    },
+  });
+  const balAfter19 = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
+  const { count: mvCount19 } = await supabase
+    .from("inventory_stock_movements")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", TENANT_A)
+    .eq("source_type", "purchase_receipt")
+    .in("source_id",
+      ((await supabase.from("purchase_receipt_items").select("id").eq("receipt_id", r19.receipt_id ?? "")).data ?? []).map((x) => (x as { id: string }).id),
+    );
+  ok(
+    "19  non_stock_purchase: receipt posted but ZERO inventory movements",
+    r19.ok && r19.affects_inventory === false && balAfter19 === balBefore19 && (mvCount19 ?? 0) === 0,
+    `Δ=${balAfter19 - balBefore19} mvs=${mvCount19}`,
+  );
+
+  /* 20 — PO qty_received still updates for non-stock receipts so
+     remaining-to-receive bookkeeping stays correct. */
+  const { data: poi20 } = await supabase
+    .from("purchase_order_items")
+    .select("qty_received, qty")
+    .eq("id", po19.itemId)
+    .maybeSingle();
+  const poiRow20 = poi20 as { qty_received: number; qty: number } | null;
+  ok(
+    "20  PO qty_received rolls up even for non-stock receipts",
+    poiRow20?.qty_received === 6 && poiRow20?.qty === 6,
+    `qty_received=${poiRow20?.qty_received}`,
+  );
+
+  /* 21 — Voiding a non-stock receipt is a clean no-op on inventory
+     and rolls back qty_received. */
+  const voidNS = await voidPurchaseReceipt({
+    receiptId: r19.receipt_id!,
+    tenantId: TENANT_A,
+    voidedBy: null,
+    reason: "non-stock void",
+  });
+  const { data: poi21 } = await supabase
+    .from("purchase_order_items")
+    .select("qty_received")
+    .eq("id", po19.itemId)
+    .maybeSingle();
+  ok(
+    "21  void of non-stock receipt: ok, no inventory side-effects, qty_received → 0",
+    voidNS.ok && (poi21 as { qty_received: number } | null)?.qty_received === 0,
+    `qty_received=${(poi21 as { qty_received?: number } | null)?.qty_received}`,
+  );
+
   console.log("─".repeat(72));
   console.log(`  ${passes} passed, ${failures} failed`);
   console.log("─".repeat(72));

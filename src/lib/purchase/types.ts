@@ -51,6 +51,25 @@ export interface PurchaseOrderItem {
   sort_order: number | null;
 }
 
+export type ReceiveDestinationMode =
+  | "warehouse"
+  | "port"
+  | "forwarder"
+  | "in_transit"
+  | "consolidation"
+  | "direct_ship_to_customer"
+  | "non_stock_purchase";
+
+/** Which destination modes still produce stock movements. */
+export const STOCK_MOVING_DESTINATION_MODES: ReceiveDestinationMode[] = [
+  "warehouse",
+  "port",
+  "forwarder",
+  "in_transit",
+  "consolidation",
+  "direct_ship_to_customer",
+];
+
 export interface PurchaseReceipt {
   id: string;
   tenant_id: string | null;
@@ -69,6 +88,14 @@ export interface PurchaseReceipt {
   carrier: string | null;
   tracking_no: string | null;
   notes: string | null;
+  destination_mode: ReceiveDestinationMode;
+  destination_location_id: string | null;
+  customer_id: string | null;
+  shipment_reference: string | null;
+  forwarder_name: string | null;
+  port_name: string | null;
+  expected_ship_date: string | null;
+  expected_arrival_date: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -106,7 +133,17 @@ export interface ReceiveLineInput {
 }
 
 export interface ReceiveRequest {
-  warehouse_id?: string | null; // receipt-level WH; defaults to tenant default
+  /* Destination-aware routing. When omitted, defaults to 'warehouse'
+     against the tenant's default warehouse for back-compat. */
+  destination_mode?: ReceiveDestinationMode;
+  destination_location_id?: string | null;     // pre-resolved location (any type)
+  warehouse_id?: string | null;                // legacy alias of destination_location_id when mode='warehouse'
+  customer_id?: string | null;                 // required for direct_ship_to_customer
+  port_name?: string | null;
+  forwarder_name?: string | null;
+  shipment_reference?: string | null;
+  expected_ship_date?: string | null;
+  expected_arrival_date?: string | null;
   received_at?: string | null;
   carrier?: string | null;
   tracking_no?: string | null;
@@ -118,7 +155,10 @@ export interface ReceiveOutcome {
   ok: boolean;
   receipt_id?: string;
   receipt_no?: string | null;
+  destination_mode?: ReceiveDestinationMode;
+  destination_location_id?: string | null;
   movement_ids?: string[];
+  affects_inventory?: boolean;
   po_status?: PurchaseOrderStatus;
   error?: string;
   code?: number;

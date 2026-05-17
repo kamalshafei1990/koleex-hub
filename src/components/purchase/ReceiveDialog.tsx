@@ -57,6 +57,20 @@ export default function ReceiveDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /* Phase O.3.1 — destination mode controls which fields show + whether
+     the receipt creates stock movements. */
+  type DestinationMode =
+    | "warehouse" | "port" | "forwarder" | "in_transit" | "consolidation"
+    | "direct_ship_to_customer" | "non_stock_purchase";
+  const [destinationMode, setDestinationMode] = useState<DestinationMode>("warehouse");
+  const [portName, setPortName] = useState("");
+  const [forwarderName, setForwarderName] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const [shipmentReference, setShipmentReference] = useState("");
+  const [expectedShipDate, setExpectedShipDate] = useState("");
+  const [expectedArrivalDate, setExpectedArrivalDate] = useState("");
+  const affectsInventory = destinationMode !== "non_stock_purchase";
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -146,7 +160,14 @@ export default function ReceiveDialog({
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          warehouse_id: warehouseId || null,
+          destination_mode: destinationMode,
+          warehouse_id: destinationMode === "warehouse" ? warehouseId || null : null,
+          port_name: destinationMode === "port" ? portName || null : null,
+          forwarder_name: destinationMode === "forwarder" ? forwarderName || null : null,
+          customer_id: destinationMode === "direct_ship_to_customer" ? customerId || null : null,
+          shipment_reference: shipmentReference || null,
+          expected_ship_date: expectedShipDate || null,
+          expected_arrival_date: expectedArrivalDate || null,
           carrier: carrier || null,
           tracking_no: trackingNo || null,
           notes: notes || null,
@@ -192,19 +213,113 @@ export default function ReceiveDialog({
 
           {detail && (
             <>
+              {/* Destination mode + helper banner. Trading flows often
+                  route goods to port / forwarder / direct-to-customer,
+                  so the user picks the destination before anything else. */}
+              <div className="rounded-md border border-white/[0.06] p-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Receiving destination</div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {([
+                    { v: "warehouse", label: "Koleex warehouse", hint: "Affects inventory" },
+                    { v: "port", label: "Port", hint: "Affects inventory" },
+                    { v: "forwarder", label: "Forwarder", hint: "Affects inventory" },
+                    { v: "in_transit", label: "In transit", hint: "Affects inventory" },
+                    { v: "consolidation", label: "Consolidation", hint: "Affects inventory" },
+                    { v: "direct_ship_to_customer", label: "Direct to customer", hint: "Affects inventory" },
+                    { v: "non_stock_purchase", label: "Non-stock", hint: "No inventory" },
+                  ] as const).map((opt) => {
+                    const active = destinationMode === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => setDestinationMode(opt.v)}
+                        className={`rounded-md border px-2 py-1.5 text-left text-[11.5px] transition ${
+                          active ? "border-white/[0.18] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] bg-transparent text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        <div className="font-medium">{opt.label}</div>
+                        <div className="text-[10px] text-gray-500">{opt.hint}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className={`mt-2 text-[11px] ${affectsInventory ? "text-emerald-300" : "text-gray-500"}`}>
+                  {affectsInventory ? "✓ Will affect inventory" : "✗ Will NOT affect inventory"}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label className="block sm:col-span-1">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Warehouse</div>
-                  <select
-                    value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                  >
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
-                    ))}
-                  </select>
-                </label>
+                {destinationMode === "warehouse" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Warehouse</div>
+                    <select
+                      value={warehouseId}
+                      onChange={(e) => setWarehouseId(e.target.value)}
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    >
+                      {warehouses.filter((w) => !("location_type" in w) || (w as { location_type?: string }).location_type === "warehouse" || (w as { location_type?: string }).location_type === undefined).map((w) => (
+                        <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {destinationMode === "port" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Port name</div>
+                    <input
+                      value={portName}
+                      onChange={(e) => setPortName(e.target.value)}
+                      placeholder="e.g. Shanghai, Hamburg, Jeddah"
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    />
+                  </label>
+                )}
+                {destinationMode === "forwarder" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Forwarder</div>
+                    <input
+                      value={forwarderName}
+                      onChange={(e) => setForwarderName(e.target.value)}
+                      placeholder="DHL, Schenker, …"
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    />
+                  </label>
+                )}
+                {destinationMode === "direct_ship_to_customer" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Customer ID *</div>
+                    <input
+                      value={customerId}
+                      onChange={(e) => setCustomerId(e.target.value)}
+                      placeholder="contact uuid"
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    />
+                  </label>
+                )}
+                {(destinationMode === "port" || destinationMode === "forwarder" || destinationMode === "direct_ship_to_customer" || destinationMode === "in_transit" || destinationMode === "consolidation") && (
+                  <>
+                    <label className="block">
+                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Shipment ref</div>
+                      <input
+                        value={shipmentReference}
+                        onChange={(e) => setShipmentReference(e.target.value)}
+                        placeholder="BL, AWB, container#…"
+                        className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Ship</div>
+                        <input type="date" value={expectedShipDate} onChange={(e) => setExpectedShipDate(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                      </label>
+                      <label className="block">
+                        <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Arrival</div>
+                        <input type="date" value={expectedArrivalDate} onChange={(e) => setExpectedArrivalDate(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
+                      </label>
+                    </div>
+                  </>
+                )}
                 <label className="block">
                   <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Carrier</div>
                   <input
