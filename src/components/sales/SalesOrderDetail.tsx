@@ -25,6 +25,7 @@ import {
 } from "@/components/inventory/InventoryUi";
 import ShipDialog from "@/components/sales/ShipDialog";
 import DocumentWorkflowBanner from "@/components/ui/workflow/DocumentWorkflowBanner";
+import TraceabilityPanel from "@/components/ui/traceability/TraceabilityPanel";
 
 interface ItemRow {
   id: string;
@@ -262,6 +263,9 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
             </Link>
           </div>
         )}
+
+        {/* Traceability — relationship timeline + financial impact + related docs */}
+        {detail && <TraceabilityPanel kind="so" id={detail.order.id} />}
 
         {loading && !detail && (
           <div className="text-[12px] text-gray-500">Loading order…</div>

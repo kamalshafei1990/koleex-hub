@@ -21,6 +21,8 @@ import {
   type ErpStatus,
 } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
+import NotificationBell from "@/components/operations/NotificationBell";
+import MobileActionBar from "@/components/ui/mobile/MobileActionBar";
 
 type DashboardRole = "ceo" | "accountant" | "sales" | "warehouse" | "purchasing" | "marketing" | "hr";
 type UiMode = "simple" | "advanced";
@@ -81,13 +83,16 @@ export default function RoleHome() {
       subtitle={exp ? `${ROLE_LABEL[exp.dashboard_role]} dashboard · ${exp.ui_mode === "simple" ? "Simple" : "Advanced"} mode` : "Loading…"}
       icon="coins"
       action={
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
-        >
-          <RrIcon name="tools" size={12} />
-          Personalize
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
+          >
+            <RrIcon name="tools" size={12} />
+            Personalize
+          </button>
+        </div>
       }
     >
       {showSetupBanner && (
@@ -145,6 +150,16 @@ export default function RoleHome() {
       {drawerOpen && exp && (
         <PersonalizeDrawer exp={exp} onClose={() => setDrawerOpen(false)} onSaved={(next) => { setExp(next); setDrawerOpen(false); }} />
       )}
+
+      {/* Sticky mobile quick actions — desktop unchanged. */}
+      <MobileActionBar
+        actions={[
+          { label: "Home",    icon: "home",          href: "/" },
+          { label: "Create",  icon: "plus",          href: "/create", tone: "primary" },
+          { label: "Ops",     icon: "signal-stream", href: "/operations" },
+          { label: "Finance", icon: "bank",          href: "/finance/workspace" },
+        ]}
+      />
     </ErpPage>
   );
 }

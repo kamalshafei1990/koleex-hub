@@ -26,7 +26,8 @@
     "validate:role-experience": "NODE_OPTIONS=--conditions=react-server tsx scripts/role-experience.ts",
     "validate:approvals": "NODE_OPTIONS=--conditions=react-server tsx scripts/approvals.ts",
     "validate:executive": "NODE_OPTIONS=--conditions=react-server tsx scripts/executive.ts",
-    "validate:smart-create": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-create.ts"
+    "validate:smart-create": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-create.ts",
+    "validate:traceability": "NODE_OPTIONS=--conditions=react-server tsx scripts/traceability.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",
