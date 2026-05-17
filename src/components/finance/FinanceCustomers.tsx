@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import { EmptyState, ProgressBar, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
-import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
+import { EmptyState, ProgressBar, StatusBadge } from "@/components/finance/FinanceUi";
+import { formatCompact } from "@/components/finance/FinanceUiX";
+import {
+  DashboardSection,
+  DisplayKpi,
+} from "@/components/finance/FinanceDashboardUi";
 import { fmtMoney } from "@/lib/finance/calc";
 import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
@@ -62,18 +66,23 @@ export default function FinanceCustomers() {
           subtitle="Revenue, money collected, and money still owed — for every customer you sell to."
         />
 
-        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard label="Total Revenue" value={kpi.revenue} unit="USD" tone="positive" hint="Across every customer" loading={loading} />
-          <HeroKpiCard label="Outstanding" value={kpi.outstanding} unit="USD" tone="warning" hint="Still to collect from customers" loading={loading} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
-          <MetricCard label="Collected" value={kpi.collected} unit="USD" hint="Cash banked from customers" loading={loading} />
-          <MetricCard label="Overdue"   value={kpi.overdue}   unit="USD" tone="negative" hint="Past due date" loading={loading} />
-        </div>
+        {/* Phase UI.5 — sibling-page convergence.
+            HeroKpiCard + MetricCard grid replaced with the dashboard's
+            typographic hierarchy: a four-tile DisplayKpi row (L1) +
+            OperationalKpi supporting line (L2). Same numbers, no
+            chrome. */}
+        <DashboardSection eyebrow="Customer accounts" title="Total exposure across every customer">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-7 lg:grid-cols-4">
+            <DisplayKpi label="Total Revenue" value={formatCompact(kpi.revenue)} hint="USD · all customers" tone="positive" loading={loading} />
+            <DisplayKpi label="Outstanding"   value={formatCompact(kpi.outstanding)} hint="USD · still to collect" tone="warning" loading={loading} />
+            <DisplayKpi label="Collected"     value={formatCompact(kpi.collected)} hint="USD · banked" tone="info" loading={loading} />
+            <DisplayKpi label="Overdue"       value={formatCompact(kpi.overdue)} hint="USD · past due" tone={kpi.overdue > 0 ? "negative" : "info"} loading={loading} />
+          </div>
+        </DashboardSection>
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading customers…</div></SectionCard>
+            <div className="py-8 text-center text-sm text-gray-500">Loading customers…</div>
           ) : rows.length === 0 ? (
             <EmptyState title="No customers yet" hint="Customers appear here as soon as you create an order for them on the Orders page." />
           ) : (

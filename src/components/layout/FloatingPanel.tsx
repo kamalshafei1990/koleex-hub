@@ -468,7 +468,7 @@ export default function FloatingPanel() {
       {/* ── Panel ── */}
       {(open || closing) && (
         <div
-          className={`absolute bottom-[56px] end-0 w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
+          className={`absolute bottom-[56px] end-0 w-[380px] max-w-[92vw] h-[520px] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden border ${border} ${bg}`}
           style={{
             /* Calm enterprise shadow — same regardless of tab so the
                Copilot panel reads as a Hub surface, not a chatbot
@@ -649,8 +649,8 @@ export default function FloatingPanel() {
                   {aiMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
                       <AiFaceIcon size={56} animated />
-                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Koleex Copilot</p>
-                      <p className={`text-[11px] mt-1 ${textG}`}>Your operational finance assistant</p>
+                      <p className={`text-[13px] font-semibold mt-3 ${textM}`}>Operator briefing</p>
+                      <p className={`text-[11px] mt-1 ${textG}`}>Embedded finance intelligence</p>
 
                       {copilotHints.length > 0 && (
                         <div className="mt-5 w-full max-w-[320px] text-left">
@@ -747,7 +747,7 @@ export default function FloatingPanel() {
               }`}>
                 <input
                   type="text"
-                  placeholder={tab === "ai" ? "Ask Koleex Copilot…" : "Type a message…"}
+                  placeholder={tab === "ai" ? "Ask the operator briefing…" : "Type a message…"}
                   value={tab === "ai" ? aiInput : msgInput}
                   onChange={(e) => tab === "ai" ? setAiInput(e.target.value) : setMsgInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -797,153 +797,41 @@ export default function FloatingPanel() {
       {/* ── FAB Pill / Circle ── */}
       <style>{`
         /* ── Rotating aurora border ── */
-        @keyframes fab-border-spin {
-          0% { --fab-angle: 0deg; }
-          100% { --fab-angle: 360deg; }
-        }
-        @property --fab-angle {
-          syntax: "<angle>";
-          initial-value: 0deg;
-          inherits: false;
-        }
+        /* Phase UI.3 — AI chrome de-neoned.
+           Removed: conic-gradient panel-neon-border, FAB conic
+           gradient sweep, fab-shimmer sweep, fab-ambient cyan/violet
+           glow pulse, fab-float breathing, ai-neon-text gradient,
+           ai-neon-icon colour cycle, ai-lottie-glow drop-shadow,
+           cubic-bezier spring transitions.
+
+           Kept: a single optional badge pulse on the unread counter
+           (genuine UI signal, not chrome). FAB and panel now read as
+           a quiet operator surface — embedded intelligence, not a
+           chatbot widget. */
         .fab-outer {
-          animation: fab-border-spin 4s linear infinite;
-          background: conic-gradient(
-            from var(--fab-angle),
-            ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"},
-            ${dk ? "rgba(0,212,255,0.25)" : "rgba(0,212,255,0.15)"},
-            ${dk ? "rgba(123,97,255,0.25)" : "rgba(123,97,255,0.15)"},
-            ${dk ? "rgba(255,110,199,0.20)" : "rgba(255,110,199,0.12)"},
-            ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"}
-          );
+          /* Flat ring, 1px hairline, no animation. */
+          background: ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"};
           padding: 1px;
         }
-
-        /* ── Floating / breathing ── */
-        @keyframes fab-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-3px); }
-        }
-        .fab-outer { animation: fab-border-spin 4s linear infinite, fab-float 3s ease-in-out infinite; }
-
-        /* ── Surface shimmer sweep ── */
-        @keyframes fab-sweep {
-          0% { left: -100%; }
-          100% { left: 200%; }
-        }
-        .fab-shimmer {
-          position: absolute;
-          top: 0; bottom: 0;
-          width: 40%;
-          background: linear-gradient(
-            90deg,
-            transparent 0%,
-            ${dk ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.3)"} 50%,
-            transparent 100%
-          );
-          animation: fab-sweep 3s ease-in-out infinite;
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        /* ── Ambient glow pulse ── */
-        @keyframes fab-ambient {
-          0%, 100% {
-            box-shadow:
-              0 4px 20px ${dk ? "rgba(0,212,255,0.08)" : "rgba(0,0,0,0.06)"},
-              0 0 40px ${dk ? "rgba(123,97,255,0.06)" : "rgba(0,0,0,0.03)"};
-          }
-          50% {
-            box-shadow:
-              0 6px 28px ${dk ? "rgba(0,212,255,0.14)" : "rgba(0,0,0,0.10)"},
-              0 0 56px ${dk ? "rgba(123,97,255,0.10)" : "rgba(0,0,0,0.06)"};
-          }
-        }
-        .fab-outer { animation: fab-border-spin 4s linear infinite, fab-float 3s ease-in-out infinite, fab-ambient 3s ease-in-out infinite; }
-
-        /* ── AI neon text gradient ── */
-        @keyframes ai-shimmer {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
         .ai-neon-text {
-          background: linear-gradient(135deg, #00d4ff, #7b61ff, #ff6ec7, #00d4ff);
-          background-size: 300% 300%;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          animation: ai-shimmer 3s ease-in-out infinite;
+          /* Inherit current text colour — no gradient, no animation. */
+          color: inherit;
         }
-
-        /* ── AI icon color cycle + glow ── */
-        @keyframes ai-icon-glow {
-          0%, 100% {
-            filter: drop-shadow(0 0 3px rgba(0,212,255,0.7)) drop-shadow(0 0 8px rgba(123,97,255,0.4));
-            color: #00d4ff;
-          }
-          33% {
-            filter: drop-shadow(0 0 5px rgba(123,97,255,0.8)) drop-shadow(0 0 12px rgba(255,110,199,0.4));
-            color: #7b61ff;
-          }
-          66% {
-            filter: drop-shadow(0 0 5px rgba(255,110,199,0.7)) drop-shadow(0 0 12px rgba(0,212,255,0.4));
-            color: #ff6ec7;
-          }
+        .ai-lottie-glow {
+          /* No drop-shadow, no animation — let the icon stand on its own. */
+          filter: none;
         }
-        .ai-neon-icon { animation: ai-icon-glow 3s ease-in-out infinite; }
-
-        /* ── Lottie icon glow (pulsing neon shadow around the Lottie container) ── */
-        @keyframes ai-lottie-pulse {
-          0%, 100% {
-            filter: drop-shadow(0 0 3px rgba(0,212,255,0.5)) drop-shadow(0 0 6px rgba(123,97,255,0.3));
-          }
-          50% {
-            filter: drop-shadow(0 0 5px rgba(123,97,255,0.6)) drop-shadow(0 0 10px rgba(255,110,199,0.4));
-          }
-        }
-        .ai-lottie-glow { animation: ai-lottie-pulse 3s ease-in-out infinite; }
-
-        /* ── X rotate on open ── */
-        @keyframes fab-x-spin {
-          from { transform: rotate(-90deg) scale(0.5); opacity: 0; }
-          to { transform: rotate(0deg) scale(1); opacity: 1; }
-        }
-        .fab-x-enter { animation: fab-x-spin 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-
-        /* ── Notification badge pulse ── */
+        /* Badge pulse retained — it's a real unread signal. */
         @keyframes badge-pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.15); }
         }
         .fab-badge { animation: badge-pulse 2s ease-in-out infinite; }
 
-        /* ── Panel neon border (AI tab) ── */
-        @property --panel-angle {
-          syntax: "<angle>";
-          initial-value: 0deg;
-          inherits: false;
-        }
-        @keyframes panel-border-spin {
-          0% { --panel-angle: 0deg; }
-          100% { --panel-angle: 360deg; }
-        }
+        /* Panel surface — flat, hairline-bordered. */
         .panel-neon-border {
-          animation: panel-border-spin 3s linear infinite;
-          border: 1px solid transparent;
-          background-origin: border-box;
-          background-clip: padding-box, border-box;
-          background-image:
-            linear-gradient(${dk ? "#111" : "#fff"}, ${dk ? "#111" : "#fff"}),
-            conic-gradient(
-              from var(--panel-angle),
-              rgba(0,212,255,0.4),
-              rgba(123,97,255,0.4),
-              rgba(255,110,199,0.3),
-              rgba(0,212,255,0.1),
-              rgba(123,97,255,0.4),
-              rgba(0,212,255,0.4)
-            );
+          border: 1px solid ${dk ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"};
+          background: ${dk ? "#111" : "#fff"};
         }
       `}</style>
       <div className="relative">

@@ -131,19 +131,29 @@ export default function Sidebar() {
           if (!app.active) e.preventDefault();
           setMobileOpen(false);
         }}
-        className={`flex items-center gap-2.5 rounded-lg transition-all duration-150 ${
+        /* Phase UI.4 — sidebar refinement.
+           Active state painted with a thin 2px left-edge accent rule
+           + full-opacity ink, NOT a background fill. Icon sizes
+           dropped from 14/17 → 13/15 so the row reads as Apple-thin
+           SF Symbols rather than the heavier uicons regular. */
+        className={`relative flex items-center gap-2.5 rounded-md transition-colors duration-150 ${
           compact ? "px-2.5 py-1.5" : "px-3 py-2"
         } ${
           isActive
             ? dk
-              ? "bg-white/[0.06] text-white/90 font-medium"
-              : "bg-black/[0.05] text-black/90 font-medium"
+              ? "text-white/95 font-medium"
+              : "text-black/95 font-medium"
             : app.active
               ? `${textMuted} ${hoverBg} hover:${dk ? "text-white/80" : "text-black/80"}`
               : `${textGhost} cursor-default opacity-30`
         }`}
       >
-        <Icon size={compact ? 14 : 17} className="shrink-0" />
+        {/* Active accent rail — 2px left-edge mark, calmer than a
+            background fill and lets the icon weight do the work. */}
+        {isActive && (
+          <span aria-hidden className={`pointer-events-none absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`} />
+        )}
+        <Icon size={compact ? 13 : 15} className="shrink-0" />
         <span className={`text-[13px] truncate ${compact ? "text-[12px]" : ""}`}>
           {label}
         </span>
@@ -173,7 +183,7 @@ export default function Sidebar() {
           }`}
         >
           <GroupIcon
-            size={17}
+            size={15}
             className={
               isGroupActive
                 ? dk
@@ -215,18 +225,22 @@ export default function Sidebar() {
     return (
       <div className="relative group/fly">
         <button
-          className={`w-full flex items-center justify-center h-11 rounded-xl transition-all duration-200 relative ${
+          className={`w-full flex items-center justify-center h-11 rounded-md transition-colors duration-150 relative ${
             isGroupActive || hasActiveChild
               ? dk
-                ? "bg-white/[0.08] text-white/80"
-                : "bg-black/[0.06] text-black/80"
+                ? "text-white/90"
+                : "text-black/90"
               : dk
-                ? "text-white/30 hover:bg-white/[0.06] hover:text-white/60 hover:scale-105"
-                : "text-black/30 hover:bg-black/[0.05] hover:text-black/60 hover:scale-105"
+                ? "text-white/35 hover:text-white/65"
+                : "text-black/35 hover:text-black/65"
           }`}
           aria-label={label}
         >
-          <GroupIcon size={18} />
+          {/* Active accent rail for collapsed sidebar. */}
+          {(isGroupActive || hasActiveChild) && (
+            <span aria-hidden className={`pointer-events-none absolute top-2 bottom-2 left-0 w-[2px] rounded-r ${dk ? "bg-white/55" : "bg-black/60"}`} />
+          )}
+          <GroupIcon size={16} />
         </button>
 
         {/* Tooltip (shows group name on hover) */}
@@ -313,10 +327,13 @@ export default function Sidebar() {
             ),
           )}
         </nav>
-        <div className={`border-t ${border} p-3 flex items-center justify-center`}>
+        {/* Phase UI.4 — sidebar footer reduced to a quiet uppercase
+            mark in the expanded state. No border-top divider, no
+            "Platform v2.4" version string. */}
+        <div className="p-3 flex items-center justify-center">
           {showExpanded && (
-            <span className={`text-[10px] font-medium ${textGhost}`}>
-              Platform v2.4
+            <span className={`text-[9px] font-semibold uppercase tracking-[0.22em] ${textGhost}`}>
+              KOLEEX HUB
             </span>
           )}
         </div>

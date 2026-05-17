@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
-import { EmptyState, ProgressBar, SectionCard } from "@/components/finance/FinanceUi";
-import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
+import { EmptyState, ProgressBar } from "@/components/finance/FinanceUi";
+import { formatCompact } from "@/components/finance/FinanceUiX";
+import {
+  DashboardSection,
+  DisplayKpi,
+} from "@/components/finance/FinanceDashboardUi";
 import { fmtMoney } from "@/lib/finance/calc";
 import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
@@ -60,17 +64,19 @@ export default function FinanceSuppliers() {
           subtitle="What you've bought from each supplier, what's paid, and what's still owed."
         />
 
-        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard label="Total Purchases" value={kpi.purchases} unit="USD" tone="neutral" hint="Across every supplier" loading={loading} />
-          <HeroKpiCard label="Outstanding" value={kpi.payable} unit="USD" tone="warning" hint="Still to pay suppliers" loading={loading} />
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-3">
-          <MetricCard label="Paid" value={kpi.paid} unit="USD" hint="Cash already wired to suppliers" loading={loading} />
-        </div>
+        {/* Phase UI.5 — sibling-page convergence — same hierarchy as
+            Customers. Three DisplayKpi tiles, no card chrome. */}
+        <DashboardSection eyebrow="Supplier accounts" title="Total exposure across every supplier">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-3">
+            <DisplayKpi label="Total Purchases" value={formatCompact(kpi.purchases)} hint="USD · all suppliers" tone="info" loading={loading} />
+            <DisplayKpi label="Outstanding"     value={formatCompact(kpi.payable)}   hint="USD · still to pay" tone="warning" loading={loading} />
+            <DisplayKpi label="Paid"            value={formatCompact(kpi.paid)}      hint="USD · already wired" tone="positive" loading={loading} />
+          </div>
+        </DashboardSection>
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading suppliers…</div></SectionCard>
+            <div className="py-8 text-center text-sm text-gray-500">Loading suppliers…</div>
           ) : rows.length === 0 ? (
             <EmptyState title="No suppliers yet" hint="Suppliers appear here as soon as you add supplier costs to an order or link a supplier to an expense." />
           ) : (

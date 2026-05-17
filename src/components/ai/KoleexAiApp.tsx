@@ -1103,7 +1103,8 @@ export default function KoleexAiApp() {
              On desktop, width morphs 0 ↔ 280 based on collapsed state. */
           width: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
           minWidth: sidebarOpen ? 280 : (sidebarCollapsed ? 0 : 280),
-          transition: "width 0.35s cubic-bezier(0.34,1.56,0.64,1), min-width 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+          /* Phase UI.3 — spring cubic-bezier replaced with a calm ease-out. */
+          transition: "width 0.25s ease-out, min-width 0.25s ease-out",
         }}
         aria-hidden={!sidebarOpen && sidebarCollapsed}
       >
