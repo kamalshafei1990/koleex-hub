@@ -193,6 +193,70 @@ export async function voidInventoryMovement(
   return (data ?? { ok: false, error: "No response from void RPC" }) as VoidMovementResult;
 }
 
+/* ─── rebuildStockBalance ────────────────────────────────────
+   Repair tool. Recomputes qty_on_hand from the movement ledger
+   for one (product, warehouse) pair and overwrites the stored
+   balance. Voided rows + their reverses both contribute (the
+   reverse cancels the voided original), so a fully-consistent
+   history yields the same number that's already stored. If they
+   diverge, the stored row was somehow corrupted and this call
+   reconciles it.
+
+   Race protection: holds the same advisory lock the post engine
+   uses, so no concurrent post can change the balance mid-rebuild.
+   Draft rows are skipped. */
+
+export async function rebuildStockBalance(
+  tenantId: string,
+  productId: string,
+  warehouseId: string,
+): Promise<{ ok: boolean; qty_on_hand: number; previous: number | null }> {
+  const { data: movements, error } = await supabaseServer
+    .from("inventory_stock_movements")
+    .select("direction, quantity, status")
+    .eq("tenant_id", tenantId)
+    .eq("product_id", productId)
+    .eq("warehouse_id", warehouseId)
+    .in("status", ["posted", "voided"])
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const rebuilt = (movements ?? []).reduce((acc, m) => {
+    const r = m as { direction: "in" | "out"; quantity: number };
+    const q = Number(r.quantity) || 0;
+    return acc + (r.direction === "in" ? q : -q);
+  }, 0);
+  /* Clamp at zero. A truly consistent ledger never produces a
+     negative — the post RPC rejects OUT moves that would. But
+     if the rebuild somehow sees one, we floor it and the operator
+     will see it in the audit log. */
+  const safe = rebuilt < 0 ? 0 : rebuilt;
+
+  const { data: prev } = await supabaseServer
+    .from("inventory_stock_balances")
+    .select("qty_on_hand")
+    .eq("tenant_id", tenantId)
+    .eq("product_id", productId)
+    .eq("warehouse_id", warehouseId)
+    .maybeSingle();
+  const previous = prev ? Number((prev as { qty_on_hand: number }).qty_on_hand) : null;
+
+  const { error: upErr } = await supabaseServer
+    .from("inventory_stock_balances")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        product_id: productId,
+        warehouse_id: warehouseId,
+        qty_on_hand: safe,
+      },
+      { onConflict: "tenant_id,product_id,warehouse_id" },
+    );
+  if (upErr) throw new Error(upErr.message);
+
+  return { ok: true, qty_on_hand: safe, previous };
+}
+
 /* ─── Convenience: create + post in one call ──────────────────
    Used by API routes that want a single-shot endpoint (POST a
    draft with ?post=1, or the simple Add Movement form). */

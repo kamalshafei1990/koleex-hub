@@ -129,6 +129,65 @@ export interface ProductStockSummary {
   }>;
 }
 
+/* ─── Single-balance lookup ──────────────────────────────────
+   getStockBalance returns the live on-hand / reserved / available
+   for one (product, warehouse) pair. Returns zeros if no balance
+   row exists yet (i.e. no movement has ever posted). */
+
+export interface SingleBalance {
+  tenant_id: string;
+  product_id: string;
+  warehouse_id: string;
+  qty_on_hand: number;
+  qty_reserved: number;
+  qty_available: number;
+  last_movement_id: string | null;
+  last_movement_at: string | null;
+  exists: boolean;
+}
+
+export async function getStockBalance(
+  tenantId: string,
+  productId: string,
+  warehouseId: string,
+): Promise<SingleBalance> {
+  const { data, error } = await supabaseServer
+    .from("inventory_stock_balances")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("product_id", productId)
+    .eq("warehouse_id", warehouseId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) {
+    return {
+      tenant_id: tenantId,
+      product_id: productId,
+      warehouse_id: warehouseId,
+      qty_on_hand: 0,
+      qty_reserved: 0,
+      qty_available: 0,
+      last_movement_id: null,
+      last_movement_at: null,
+      exists: false,
+    };
+  }
+  const row = data as StockBalance;
+  const onHand = Number(row.qty_on_hand) || 0;
+  const reserved = Number(row.qty_reserved) || 0;
+  return {
+    tenant_id: row.tenant_id,
+    product_id: row.product_id,
+    warehouse_id: row.warehouse_id,
+    qty_on_hand: onHand,
+    qty_reserved: reserved,
+    qty_available: onHand - reserved,
+    last_movement_id: row.last_movement_id,
+    last_movement_at: row.last_movement_at,
+    exists: true,
+  };
+}
+
 export async function getProductStockSummary(
   tenantId: string,
   productId: string,
