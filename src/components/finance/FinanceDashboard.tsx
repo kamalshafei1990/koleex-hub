@@ -34,17 +34,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   AgingTable,
-  AnomalyChip,
   AreaChart,
   ChartCard,
   ConcentrationBar,
-  HeroKpiCard,
   InsightCard,
   LiquidityMeter,
-  MetricCard,
   ModeToggle,
-  SectionTitle,
-  StatRow,
   TimelineStrip,
   WorkflowRail,
   formatCompact,
@@ -54,7 +49,20 @@ import {
   type WorkflowItem,
 } from "@/components/finance/FinanceUiX";
 import { PeriodTabs } from "@/components/finance/FinanceUi";
-import Link from "next/link";
+/* Phase UI.1 — new dashboard-only primitives.
+   The HeroKpiCard / MetricCard / SectionTitle / StatRow chrome from
+   FinanceUiX is replaced on the dashboard by these typographic
+   primitives. The legacy primitives remain available for other
+   Finance pages — only the dashboard switches. */
+import {
+  DashboardSection,
+  DisplayKpi,
+  HealthRail,
+  IntelligenceLine,
+  OperationalKpi,
+  OperationsDigest,
+  type OpsPillData,
+} from "@/components/finance/FinanceDashboardUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import { styleForCategory } from "@/components/finance/categoryStyles";
 /* Phase 2.5 — operational guidance layer. */
@@ -280,14 +288,12 @@ export default function FinanceDashboard() {
           }
         />
 
-        {/* ── Phase 2.0 — Cross-module pressure narrative.
-           Calm one-block panel showing business health pulse + the
-           top correlation. Sits in both modes so the operator always
-           sees the connected-system reading first. */}
-        <CrossModulePressurePanel intel={businessIntelligence} />
-        <ApprovalOperationsPanel intel={businessIntelligence} />
-        <PaymentOperationsPanel intel={businessIntelligence} />
-        <TreasuryOperationsPanel intel={businessIntelligence} />
+        {/* ── Phase UI.1 — System Health rail.
+           Replaces the four stacked CrossModule + Approval + Payment +
+           Treasury panels. One typographic strip carrying the composite
+           health number, the dimension bars, and the headline narrative.
+           No box, no border — spacing + a single hairline rule above. */}
+        <SystemHealth intel={businessIntelligence} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -327,6 +333,90 @@ export default function FinanceDashboard() {
 }
 
 /* ===========================================================================
+   Phase UI.1 — SystemHealth.
+
+   The single opening surface that replaces the four stacked
+   CrossModule + Approval + Payment + Treasury panels. Renders:
+     · the composite health number (display-sized, tonal)
+     · the pressure tier (eyebrow caption)
+     · the cross-module headline
+     · a 5-bar per-module strip
+     · a single Operations Digest line with three pills below the
+       module bars: Approvals · Payments · Treasury (only when any of
+       the three carries non-calm pressure)
+
+   No box, no card — just typography on a hairline-separated band.
+   ========================================================================== */
+
+function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+  const { health, approval, payment, treasury, correlations, digest } = intel;
+
+  /* Quiet state — nothing to say, calm pressure, no events. */
+  if (!intel.events.length && correlations.length === 0 && digest.length === 0 && health.composite >= 95) {
+    return null;
+  }
+
+  const topCorrelation = correlations[0];
+
+  /* Build the Operations Digest pills only when the underlying
+     surface is meaningfully active. The old 4-panel stack rendered
+     every panel; the new rail surfaces a pill only when its
+     pressure exits "calm" or its backlog is material. */
+  const pills: OpsPillData[] = [];
+  if (approval.pressure !== "calm" || approval.backlog.count >= 3) {
+    pills.push({
+      label: "Approvals",
+      score: approval.healthScore,
+      pressure: approval.pressure,
+      hint: approval.backlog.count > 0 ? `${approval.backlog.count} pending · ${approval.backlog.oldestDays}d oldest` : undefined,
+    });
+  }
+  if (payment.pressure !== "calm") {
+    pills.push({
+      label: "Payments",
+      score: payment.healthScore,
+      pressure: payment.pressure,
+      hint: payment.read,
+    });
+  }
+  if (treasury.pressure !== "calm") {
+    pills.push({
+      label: "Treasury",
+      score: treasury.healthScore,
+      pressure: treasury.pressure,
+      hint: treasury.read,
+    });
+  }
+
+  return (
+    <div className="mt-6">
+      <HealthRail
+        headline={health.headline}
+        composite={health.composite}
+        pressure={health.pressure}
+        modules={health.dimensions.map((d) => ({
+          key: d.module,
+          /* Short capitalised label for each module key. */
+          label: d.module[0].toUpperCase() + d.module.slice(1),
+          score: d.score,
+          pressure: d.pressure,
+        }))}
+        helpId="intelligence.businessHealth"
+      />
+
+      {(pills.length > 0 || topCorrelation) && (
+        <div className="mt-8">
+          <OperationsDigest
+            pills={pills}
+            note={topCorrelation?.narrative ?? topCorrelation?.headline}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===========================================================================
    Operational view  —  workflows first, queues, then narrative.
    ========================================================================== */
 
@@ -348,189 +438,264 @@ function OperationalView({
   outgoingTimeline: ReturnType<typeof buildOutgoingTimeline>;
   liquidity: ReturnType<typeof projectLiquidity>;
 }) {
-  /* Top anomalies surfaced inline above the WorkflowRail when meaningful */
-  const topAnomalies = anomalies.filter((a) => a.severity !== "info").slice(0, 3);
+  /* Pressure-anomaly chips were duplicated by the HealthPill in the
+     header and the SystemHealth rail above — Phase UI.1 removes the
+     standalone strip. Anomalies still surface inside the Intelligence
+     section below as IntelligenceLine items. */
 
-  /* Find revenue / net_profit anomalies for inline KPI chips */
-  const revenueAnomaly = anomalies.find((a) => a.key === "delta-revenue");
-  const netProfitAnomaly = anomalies.find((a) => a.key === "delta-net_profit");
+  /* ── Hierarchy values ────────────────────────────────────────────
+     L1 (Display): Net Profit · Revenue · Cash Position · Gross Margin
+     L2 (Headline): Cash In · Cash Out · AR · AP
+     Cash Position = realized_cash_position when available, else
+     cash_in − cash_out. No new math. */
+  const cashPosition =
+    kpi?.expected_vs_realized?.realized_cash_position ?? ((kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0));
+  const netProfitTone: Tone = (kpi?.net_profit ?? 0) >= 0 ? "info" : "negative";
+  const marginValue = kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}%` : "—";
+  const marginTone: Tone =
+    (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
+    : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
+    : (kpi?.gross_margin_pct ?? 0) < 0 ? "negative"
+    : "info";
+  const cashPositionTone: Tone = cashPosition >= 0 ? "positive" : "negative";
 
   return (
     <>
-      {/* ── 0. WORKFLOW QUEUE — prioritised by current pressure ─── */}
-      <div className="mt-4">
-        <WorkflowRail items={workflowItems} />
-      </div>
+      {/* ── 1. FINANCIAL PERFORMANCE — L1 then L2 row.
+            Display-sized hero quartet leads, supporting metrics row
+            beneath. No card chrome — typography only with a tonal
+            accent rule on top of each L1 number. */}
+      <DashboardSection
+        eyebrow="Financial performance"
+        title="Where the business stands this period"
+        helpId="finance.section.atGlance"
+      >
+        <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
+          <DisplayKpi
+            label="Net Profit"
+            value={formatCompact(kpi?.net_profit ?? 0)}
+            hint={`${currency} · ${fmtPct(kpi?.delta.net_profit_pct ?? null, 1)} vs prior`}
+            tone={netProfitTone}
+            helpId="finance.netProfit"
+            loading={loading}
+          />
+          <DisplayKpi
+            label="Revenue"
+            value={formatCompact(kpi?.total_revenue ?? 0)}
+            hint={`${currency} · ${fmtPct(kpi?.delta.revenue_pct ?? null, 1)} vs prior`}
+            tone="positive"
+            helpId="finance.revenue"
+            loading={loading}
+          />
+          <DisplayKpi
+            label="Cash position"
+            value={formatCompact(cashPosition)}
+            hint={cashPosition >= 0 ? "Inflow heavy" : "Outflow heavy"}
+            tone={cashPositionTone}
+            loading={loading}
+          />
+          <DisplayKpi
+            label="Gross margin"
+            value={marginValue}
+            hint="Gross profit ÷ revenue"
+            tone={marginTone}
+            helpId="finance.grossMargin"
+            loading={loading}
+          />
+        </div>
 
-      {/* ── Pressure callout strip (only if material anomalies) ── */}
-      {topAnomalies.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.04] bg-white/[0.012] px-3 py-2">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Pressure</span>
-          {topAnomalies.map((a) => (
-            <AnomalyChip
-              key={a.key}
-              text={a.label}
-              severity={a.severity}
-              direction={a.direction === "up" ? "up" : a.direction === "down" ? "down" : undefined}
+        {/* L2 supporting metrics row — calmer, smaller, no chrome. */}
+        <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4">
+          <OperationalKpi
+            label="Cash in"
+            value={formatCompact(kpi?.cash_in ?? 0)}
+            hint={currency}
+            tone="positive"
+            helpId="finance.cashIn"
+            loading={loading}
+            deltaPct={kpi?.delta.cash_in_pct ?? null}
+          />
+          <OperationalKpi
+            label="Cash out"
+            value={formatCompact(kpi?.cash_out ?? 0)}
+            hint={currency}
+            tone="negative"
+            helpId="finance.cashOut"
+            loading={loading}
+            deltaPct={kpi?.delta.cash_out_pct ?? null}
+          />
+          <OperationalKpi
+            label="To collect"
+            value={formatCompact(kpi?.accounts_receivable ?? 0)}
+            hint="Outstanding"
+            tone="warning"
+            helpId="finance.accountsReceivable"
+            loading={loading}
+          />
+          <OperationalKpi
+            label="To pay"
+            value={formatCompact(kpi?.accounts_payable ?? 0)}
+            hint="Suppliers + bills"
+            tone="warning"
+            helpId="finance.accountsPayable"
+            loading={loading}
+          />
+        </div>
+      </DashboardSection>
+
+      {/* ── 2. LIQUIDITY & TREASURY — Timelines + LiquidityMeter.
+            The three existing widgets share a row; the section heading
+            replaces the in-card title each carries. */}
+      <DashboardSection
+        eyebrow="Liquidity"
+        title="What's moving in the next 45 days"
+        description="Incoming collections, supplier dues, and forward liquidity."
+        helpId="finance.section.cashRadar"
+      >
+        <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
+          <TimelineStrip
+            title="Incoming cash"
+            direction="incoming"
+            currency={currency}
+            events={incomingTimeline}
+          />
+          <TimelineStrip
+            title="Supplier dues"
+            direction="outgoing"
+            currency={currency}
+            events={outgoingTimeline}
+          />
+          <LiquidityMeter
+            d7={liquidity.d7}
+            d30={liquidity.d30}
+            d60={liquidity.d60}
+            inflowShare={liquidity.inflowShare}
+          />
+        </div>
+      </DashboardSection>
+
+      {/* ── 3. RISKS & PRESSURE — AR/AP aging side-by-side.
+            Aging tables retain their internal chrome but the section
+            framing is typographic. Anomaly digest is now surfaced
+            inside the Intelligence section below to avoid duplication
+            with the SystemHealth narrative. */}
+      <DashboardSection
+        eyebrow="Risks"
+        title="Receivables and payables by age"
+        description="Anything past 30 days is silently flagged."
+        helpId="finance.section.aging"
+      >
+        <div className="grid gap-x-6 gap-y-5 lg:grid-cols-2">
+          <AgingTable title="AR aging" buckets={arAging} currency={currency} totalLabel="Customer side" />
+          <AgingTable title="AP aging" buckets={apAging} currency={currency} totalLabel="Supplier side" />
+        </div>
+      </DashboardSection>
+
+      {/* ── 4. OPERATIONAL ACTIONS — WorkflowRail.
+            The action queue lives here in the narrative (after the
+            user has read the company's condition + risks). */}
+      <DashboardSection
+        eyebrow="Actions"
+        title="Operational queue, prioritised"
+        description="Items most likely to need a decision this week, ordered by current pressure."
+      >
+        <WorkflowRail items={workflowItems} />
+      </DashboardSection>
+
+      {/* ── 5. INTELLIGENCE — interpretations + meaningful anomalies. */}
+      <DashboardSection
+        eyebrow="Intelligence"
+        title="What the numbers mean"
+        description="Automatic interpretation of this period's signal."
+        helpId="finance.section.intelligence"
+      >
+        {/* Anomaly call-outs collapsed into a single quiet stack —
+            no boxed chip strip. Each meaningful anomaly becomes one
+            IntelligenceLine, the same typographic treatment as a
+            narrative observation. */}
+        {anomalies.filter((a) => a.severity !== "info").length > 0 && (
+          <div className="mb-6 space-y-2">
+            {anomalies.filter((a) => a.severity !== "info").slice(0, 3).map((a) => (
+              <IntelligenceLine
+                key={a.key}
+                prefix={a.label}
+                text={a.detail}
+                severity={a.severity === "risk" ? "risk" : "watch"}
+              />
+            ))}
+          </div>
+        )}
+        <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+          {intelligence.cards.map((c, i) => (
+            <InsightCard
+              key={i}
+              icon={c.icon}
+              title={c.title}
+              description={c.description}
+              chip={c.chip}
+              severity={c.severity}
             />
           ))}
         </div>
-      )}
+      </DashboardSection>
 
-      {/* ── 1. PRIMARY HEROES ────────────────────────────────── */}
-      <SectionTitle eyebrow="At a glance" title="Performance this period" helpId="finance.section.atGlance" />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="relative">
-          <HeroKpiCard
-            label="Revenue"
-            helpId="finance.revenue"
-            value={kpi?.total_revenue ?? 0}
-            unit={currency}
-            delta={kpi?.delta.revenue_pct ?? null}
-            deltaValue={kpi?.delta_value.revenue}
-            hint="Across all orders in this window"
-            tone="positive"
-            trend={sparklines.revenue}
-            trendCurrency={currency}
-            loading={loading}
-          />
-          {revenueAnomaly && revenueAnomaly.severity !== "info" && (
-            <div className="absolute right-4 top-4">
-              <AnomalyChip text={revenueAnomaly.label} severity={revenueAnomaly.severity} direction={revenueAnomaly.direction === "up" ? "up" : "down"} />
-            </div>
-          )}
-        </div>
-        <div className="relative">
-          <HeroKpiCard
-            label="Net Profit"
-            helpId="finance.netProfit"
-            value={kpi?.net_profit ?? 0}
-            unit={currency}
-            delta={kpi?.delta.net_profit_pct ?? null}
-            deltaValue={kpi?.delta_value.net_profit}
-            hint="Gross − Expenses + Tax refund − Bank"
-            tone={(kpi?.net_profit ?? 0) >= 0 ? "info" : "negative"}
-            trend={sparklines.net_profit}
-            trendCurrency={currency}
-            loading={loading}
-          />
-          {netProfitAnomaly && netProfitAnomaly.severity !== "info" && (
-            <div className="absolute right-4 top-4">
-              <AnomalyChip text={netProfitAnomaly.label} severity={netProfitAnomaly.severity} direction={netProfitAnomaly.direction === "up" ? "up" : "down"} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── 2. SECONDARY METRICS ────────────────────────────── */}
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricCard label="Cash In"  helpId="finance.cashIn"  value={kpi?.cash_in  ?? 0} unit={currency} delta={kpi?.delta.cash_in_pct  ?? null} hint="Customer payments received" loading={loading} />
-        <MetricCard label="Cash Out" helpId="finance.cashOut" value={kpi?.cash_out ?? 0} unit={currency} delta={kpi?.delta.cash_out_pct ?? null} hint="Suppliers + expenses paid" loading={loading} />
-        <MetricCard label="Money to Collect" helpId="finance.accountsReceivable" value={kpi?.accounts_receivable ?? 0} unit={currency} tone="warning" hint="Outstanding receivables" loading={loading} />
-        <MetricCard label="Money to Pay"     helpId="finance.accountsPayable"    value={kpi?.accounts_payable    ?? 0} unit={currency} tone="warning" hint="Suppliers + unpaid bills"   loading={loading} />
-        <MetricCard
-          label="Gross Margin"
-          helpId="finance.grossMargin"
-          value={kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}` : "—"}
-          unit="%"
-          hint="Gross profit ÷ revenue"
-          tone={
-            (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
-            : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
-            : (kpi?.gross_margin_pct ?? 0) < 0 ? "negative"
-            : "neutral"
-          }
-          loading={loading}
-        />
-      </div>
-
-      {/* ── 3. TIMELINES + LIQUIDITY ──────────────────────── */}
-      <SectionTitle eyebrow="Cash radar" title="What's moving in the next 45 days" description="Incoming collections, supplier dues, and forward liquidity." helpId="finance.section.cashRadar" />
-      <div className="grid gap-3 lg:grid-cols-3">
-        <TimelineStrip
-          title="Incoming cash"
-          direction="incoming"
-          currency={currency}
-          events={incomingTimeline}
-        />
-        <TimelineStrip
-          title="Supplier dues"
-          direction="outgoing"
-          currency={currency}
-          events={outgoingTimeline}
-        />
-        <LiquidityMeter
-          d7={liquidity.d7}
-          d30={liquidity.d30}
-          d60={liquidity.d60}
-          inflowShare={liquidity.inflowShare}
-        />
-      </div>
-
-      {/* ── 4. AGING ─────────────────────────────────────── */}
-      <SectionTitle eyebrow="Aging" title="Receivables and payables by age" description="Anything past 30 days is silently flagged." helpId="finance.section.aging" />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <AgingTable title="AR aging" buckets={arAging} currency={currency} totalLabel="Customer side" />
-        <AgingTable title="AP aging" buckets={apAging} currency={currency} totalLabel="Supplier side" />
-      </div>
-
-      {/* ── 5. CHART CARD ────────────────────────────────── */}
-      <SectionTitle
-        eyebrow="Trend"
-        title="Revenue vs Costs"
+      {/* ── 6. DEEP ANALYTICS — Trend chart + Profit flow + Top lists.
+            The most data-dense surfaces live at the end of the page,
+            after the operator has absorbed the narrative above. */}
+      <DashboardSection
+        eyebrow="Analytics"
+        title="Cash flow over time"
         description={
-          period === "week"   ? "Daily breakdown — last 7 days"
+          period === "week"      ? "Daily breakdown — last 7 days"
           : period === "quarter" ? "Weekly breakdown — last 90 days"
-          : "Monthly breakdown — last 12 months"
+          :                        "Monthly breakdown — last 12 months"
         }
-      />
-      <ChartCard title="Cash flow over time" subtitle="Revenue is the inflow line; costs + expenses combine into the outflow line.">
-        <AreaChart
-          currency={currency}
-          labels={sparklines.labels}
-          height={280}
-          series={[
-            { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
-            { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
-            { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
-          ]}
-        />
-      </ChartCard>
-
-      {/* ── 6. INTELLIGENCE LAYER ───────────────────────── */}
-      <SectionTitle eyebrow="Intelligence" title="What the numbers mean" description="Automatic interpretations of this period's signal." helpId="finance.section.intelligence" />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {intelligence.cards.map((c, i) => (
-          <InsightCard
-            key={i}
-            icon={c.icon}
-            title={c.title}
-            description={c.description}
-            chip={c.chip}
-            severity={c.severity}
+      >
+        <ChartCard title="Revenue · costs · net profit" subtitle="Revenue is the inflow line; costs + expenses combine into the outflow line.">
+          <AreaChart
+            currency={currency}
+            labels={sparklines.labels}
+            height={280}
+            series={[
+              { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
+              { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
+              { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+            ]}
           />
-        ))}
-      </div>
+        </ChartCard>
+      </DashboardSection>
 
-      {/* ── 7. PROFIT FLOW STORY ────────────────────────── */}
-      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" description="Gross profit excludes tax refund; refund is added back separately before net profit." helpId="finance.section.profitFlow" />
-      <ProfitFlow
-        revenue={kpi?.total_revenue ?? 0}
-        supplierCost={kpi?.total_supplier_cost ?? 0}
-        expenses={kpi?.total_expenses ?? 0}
-        taxRefund={kpi?.total_tax_refund ?? 0}
-        finCharges={kpi?.total_financial_charges ?? 0}
-        gross={kpi?.gross_profit ?? 0}
-        net={kpi?.net_profit ?? 0}
-        currency={currency}
-      />
+      <DashboardSection
+        eyebrow="Profit flow"
+        title="From revenue to net profit"
+        description="Gross profit excludes tax refund; refund is added back separately before net profit."
+        helpId="finance.section.profitFlow"
+        tight
+      >
+        <ProfitFlow
+          revenue={kpi?.total_revenue ?? 0}
+          supplierCost={kpi?.total_supplier_cost ?? 0}
+          expenses={kpi?.total_expenses ?? 0}
+          taxRefund={kpi?.total_tax_refund ?? 0}
+          finCharges={kpi?.total_financial_charges ?? 0}
+          gross={kpi?.gross_profit ?? 0}
+          net={kpi?.net_profit ?? 0}
+          currency={currency}
+        />
+      </DashboardSection>
 
-      {/* ── 8. TOP INSIGHTS ────────────────────────────── */}
-      <SectionTitle eyebrow="Top insights" title="Where profit is being made — and where it's leaking" helpId="finance.section.topInsights" />
-      <div className="grid gap-3 lg:grid-cols-2">
-        <TopOrdersCard kpi={kpi} currency={currency} />
-        <TopCategoriesCard kpi={kpi} currency={currency} />
-      </div>
+      <DashboardSection
+        eyebrow="Detail"
+        title="Where profit is being made — and where it's leaking"
+        helpId="finance.section.topInsights"
+        tight
+      >
+        <div className="grid gap-x-6 gap-y-5 lg:grid-cols-2">
+          <TopOrdersCard kpi={kpi} currency={currency} />
+          <TopCategoriesCard kpi={kpi} currency={currency} />
+        </div>
+      </DashboardSection>
+
     </>
   );
 }
@@ -556,114 +721,171 @@ function ExecutiveView({
   ccc: ReturnType<typeof computeCCC>;
   pressure: Pressure;
 }) {
-  /* Stat row — six executive-grade numbers, compressed. */
-  const stats: { label: string; value: string; hint?: string; tone?: Tone; helpId?: string }[] = [
-    {
-      label: "Revenue",
-      helpId: "finance.revenue",
-      value: formatCompact(kpi?.total_revenue ?? 0),
-      hint: `${currency} · ${period}`,
-      tone: "positive",
-    },
-    {
-      label: "Net profit",
-      helpId: "finance.netProfit",
-      value: formatCompact(kpi?.net_profit ?? 0),
-      hint: `Margin ${(kpi?.gross_margin_pct ?? 0).toFixed(1)}%`,
-      tone: (kpi?.net_profit ?? 0) >= 0 ? "info" : "negative",
-    },
-    {
-      label: "AR exposure",
-      helpId: "finance.accountsReceivable",
-      value: formatCompact(kpi?.accounts_receivable ?? 0),
-      hint: `${arAging.reduce((s, b) => s + b.count, 0)} open`,
-      tone: "warning",
-    },
-    {
-      label: "AP exposure",
-      helpId: "finance.accountsPayable",
-      value: formatCompact(kpi?.accounts_payable ?? 0),
-      hint: `${apAging.reduce((s, b) => s + b.count, 0)} open`,
-      tone: "warning",
-    },
-    {
-      label: "DSO",
-      helpId: "finance.dso",
-      value: `${ccc.dso.toFixed(0)} d`,
-      hint: "Days sales outstanding",
-    },
-    {
-      label: "CCC",
-      helpId: "finance.ccc",
-      value: `${ccc.ccc.toFixed(0)} d`,
-      hint: ccc.ccc >= 0 ? "Cash cycle gap" : "Cash cycle surplus",
-      tone: ccc.ccc <= 30 ? "positive" : ccc.ccc <= 60 ? "warning" : "negative",
-    },
-  ];
+  /* Phase UI.1 — ExecutiveView mirrors the Operational narrative
+     order (Financial performance → Liquidity → Risks → Intelligence
+     → Analytics) but stays calmer: no WorkflowRail, no anomaly chips.
+     Hierarchy:
+       L1: Net Profit · Revenue · AR exposure · AP exposure
+       L2: DSO · CCC · margin · cash position */
+  const netProfitTone: Tone = (kpi?.net_profit ?? 0) >= 0 ? "info" : "negative";
+  const marginValue = kpi ? `${(kpi.gross_margin_pct ?? 0).toFixed(1)}%` : "—";
+  const cccTone: Tone = ccc.ccc <= 30 ? "positive" : ccc.ccc <= 60 ? "warning" : "negative";
+  const arOpen = arAging.reduce((s, b) => s + b.count, 0);
+  const apOpen = apAging.reduce((s, b) => s + b.count, 0);
+  const cashPosition =
+    kpi?.expected_vs_realized?.realized_cash_position ?? ((kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0));
 
   return (
     <>
-      {/* ── 0. Pressure narrative ───────────────────── */}
-      <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Executive read</div>
-            <div className="mt-1 text-[14px] text-gray-200">{liquidity.narrative}</div>
-          </div>
-          <PressurePill pressure={pressure} />
+      {/* ── 1. Executive read — a single narrative line below the
+            SystemHealth rail. No box; just typography. */}
+      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <p className="max-w-[820px] text-[13px] leading-[1.55] text-gray-300">{liquidity.narrative}</p>
+        <PressurePill pressure={pressure} />
+      </div>
+
+      {/* ── 2. FINANCIAL PERFORMANCE — L1 quartet. */}
+      <DashboardSection
+        eyebrow="Financial performance"
+        title={`Executive read · ${currency} · ${period}`}
+        helpId="finance.section.atGlance"
+      >
+        <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
+          <DisplayKpi
+            label="Net profit"
+            value={formatCompact(kpi?.net_profit ?? 0)}
+            hint={`Margin ${marginValue}`}
+            tone={netProfitTone}
+            helpId="finance.netProfit"
+            loading={loading}
+          />
+          <DisplayKpi
+            label="Revenue"
+            value={formatCompact(kpi?.total_revenue ?? 0)}
+            hint={`${currency} · ${period}`}
+            tone="positive"
+            helpId="finance.revenue"
+            loading={loading}
+          />
+          <DisplayKpi
+            label="AR exposure"
+            value={formatCompact(kpi?.accounts_receivable ?? 0)}
+            hint={`${arOpen} open`}
+            tone="warning"
+            helpId="finance.accountsReceivable"
+            loading={loading}
+          />
+          <DisplayKpi
+            label="AP exposure"
+            value={formatCompact(kpi?.accounts_payable ?? 0)}
+            hint={`${apOpen} open`}
+            tone="warning"
+            helpId="finance.accountsPayable"
+            loading={loading}
+          />
         </div>
-      </div>
 
-      {/* ── 1. STAT ROW — exec KPIs ──────────────── */}
-      <div className="mt-3">
-        <StatRow stats={loading ? stats.map((s) => ({ ...s, value: "—" })) : stats} />
-      </div>
+        {/* L2 supporting row — DSO · CCC · margin · cash position. */}
+        <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4">
+          <OperationalKpi
+            label="DSO"
+            value={`${ccc.dso.toFixed(0)} d`}
+            hint="Days sales outstanding"
+            tone="info"
+            helpId="finance.dso"
+            loading={loading}
+          />
+          <OperationalKpi
+            label="CCC"
+            value={`${ccc.ccc.toFixed(0)} d`}
+            hint={ccc.ccc >= 0 ? "Cash cycle gap" : "Cash cycle surplus"}
+            tone={cccTone}
+            helpId="finance.ccc"
+            loading={loading}
+          />
+          <OperationalKpi
+            label="Gross margin"
+            value={marginValue}
+            hint="Profit ÷ revenue"
+            tone={
+              (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
+              : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
+              : (kpi?.gross_margin_pct ?? 0) < 0 ? "negative"
+              : "info"
+            }
+            helpId="finance.grossMargin"
+            loading={loading}
+          />
+          <OperationalKpi
+            label="Cash position"
+            value={formatCompact(cashPosition)}
+            hint={cashPosition >= 0 ? "Inflow heavy" : "Outflow heavy"}
+            tone={cashPosition >= 0 ? "positive" : "negative"}
+            loading={loading}
+          />
+        </div>
+      </DashboardSection>
 
-      {/* ── 2. LIQUIDITY + AGING ─────────────────── */}
-      <SectionTitle eyebrow="Liquidity" title="Forward cash window + aging exposure" description="Projection blends steady-state trajectory with scheduled AR/AP." helpId="finance.liquidity" />
-      <div className="grid gap-3 lg:grid-cols-3">
-        <LiquidityMeter
-          d7={liquidity.d7}
-          d30={liquidity.d30}
-          d60={liquidity.d60}
-          inflowShare={liquidity.inflowShare}
-        />
-        <AgingTable title="AR aging" buckets={arAging} currency={currency} />
-        <AgingTable title="AP aging" buckets={apAging} currency={currency} />
-      </div>
+      {/* ── 3. LIQUIDITY & TREASURY. */}
+      <DashboardSection
+        eyebrow="Liquidity"
+        title="Forward cash window + aging exposure"
+        description="Projection blends steady-state trajectory with scheduled AR/AP."
+        helpId="finance.liquidity"
+      >
+        <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
+          <LiquidityMeter
+            d7={liquidity.d7}
+            d30={liquidity.d30}
+            d60={liquidity.d60}
+            inflowShare={liquidity.inflowShare}
+          />
+          <AgingTable title="AR aging" buckets={arAging} currency={currency} />
+          <AgingTable title="AP aging" buckets={apAging} currency={currency} />
+        </div>
+      </DashboardSection>
 
-      {/* ── 3. CONCENTRATION ─────────────────────── */}
-      <SectionTitle eyebrow="Concentration" title="Revenue + cost-of-goods dependency" description="How exposed the business is to a single counterparty." helpId="finance.concentration" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ConcentrationBar
-          label="Top customer share"
-          party={concentration.topCustomer?.name ?? "—"}
-          share={concentration.topCustomer?.share ?? 0}
-          hint={
-            (concentration.topCustomer?.share ?? 0) >= 60 ? "Critical concentration — single counterparty risk."
-            : (concentration.topCustomer?.share ?? 0) >= 40 ? "Material concentration."
-            : "Healthy distribution."
-          }
-          severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
-        />
-        <ConcentrationBar
-          label="Top supplier share"
-          party={concentration.topSupplier?.name ?? "—"}
-          share={concentration.topSupplier?.share ?? 0}
-          hint={
-            (concentration.topSupplier?.share ?? 0) >= 70 ? "Critical dependency — single source of goods."
-            : (concentration.topSupplier?.share ?? 0) >= 50 ? "Significant supplier dependency."
-            : "Diversified supplier base."
-          }
-          severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
-        />
-      </div>
+      {/* ── 4. RISKS — concentration. */}
+      <DashboardSection
+        eyebrow="Risks"
+        title="Counterparty concentration"
+        description="How exposed the business is to a single counterparty."
+        helpId="finance.concentration"
+      >
+        <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+          <ConcentrationBar
+            label="Top customer share"
+            party={concentration.topCustomer?.name ?? "—"}
+            share={concentration.topCustomer?.share ?? 0}
+            hint={
+              (concentration.topCustomer?.share ?? 0) >= 60 ? "Critical concentration — single counterparty risk."
+              : (concentration.topCustomer?.share ?? 0) >= 40 ? "Material concentration."
+              : "Healthy distribution."
+            }
+            severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
+          />
+          <ConcentrationBar
+            label="Top supplier share"
+            party={concentration.topSupplier?.name ?? "—"}
+            share={concentration.topSupplier?.share ?? 0}
+            hint={
+              (concentration.topSupplier?.share ?? 0) >= 70 ? "Critical dependency — single source of goods."
+              : (concentration.topSupplier?.share ?? 0) >= 50 ? "Significant supplier dependency."
+              : "Diversified supplier base."
+            }
+            severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
+          />
+        </div>
+      </DashboardSection>
 
-      {/* ── 4. ANOMALY DIGEST ─────────────────────── */}
+      {/* ── 5. INTELLIGENCE — anomaly digest as InsightCards. */}
       {anomalies.length > 0 && (
-        <>
-          <SectionTitle eyebrow="Anomaly digest" title="Period-over-period deviations" description="Material movements worth a second look." />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <DashboardSection
+          eyebrow="Intelligence"
+          title="Period-over-period deviations"
+          description="Material movements worth a second look."
+        >
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             {anomalies.slice(0, 6).map((a) => (
               <InsightCard
                 key={a.key}
@@ -673,36 +895,44 @@ function ExecutiveView({
               />
             ))}
           </div>
-        </>
+        </DashboardSection>
       )}
 
-      {/* ── 5. TREND CHART — contextual, smaller ─── */}
-      <SectionTitle eyebrow="Trend" title="Cash flow over time" />
-      <ChartCard title="Revenue · costs · net profit" subtitle="Compressed for adaptive readability when spikes dominate.">
-        <AreaChart
-          currency={currency}
-          labels={sparklines.labels}
-          height={240}
-          series={[
-            { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
-            { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
-            { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
-          ]}
-        />
-      </ChartCard>
+      {/* ── 6. DEEP ANALYTICS — Trend + Profit flow. */}
+      <DashboardSection
+        eyebrow="Analytics"
+        title="Cash flow over time"
+      >
+        <ChartCard title="Revenue · costs · net profit" subtitle="Compressed for adaptive readability when spikes dominate.">
+          <AreaChart
+            currency={currency}
+            labels={sparklines.labels}
+            height={240}
+            series={[
+              { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
+              { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
+              { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+            ]}
+          />
+        </ChartCard>
+      </DashboardSection>
 
-      {/* ── 6. PROFIT FLOW ──────────────────────── */}
-      <SectionTitle eyebrow="Profit flow" title="From revenue to net profit" />
-      <ProfitFlow
-        revenue={kpi?.total_revenue ?? 0}
-        supplierCost={kpi?.total_supplier_cost ?? 0}
-        expenses={kpi?.total_expenses ?? 0}
-        taxRefund={kpi?.total_tax_refund ?? 0}
-        finCharges={kpi?.total_financial_charges ?? 0}
-        gross={kpi?.gross_profit ?? 0}
-        net={kpi?.net_profit ?? 0}
-        currency={currency}
-      />
+      <DashboardSection
+        eyebrow="Profit flow"
+        title="From revenue to net profit"
+        tight
+      >
+        <ProfitFlow
+          revenue={kpi?.total_revenue ?? 0}
+          supplierCost={kpi?.total_supplier_cost ?? 0}
+          expenses={kpi?.total_expenses ?? 0}
+          taxRefund={kpi?.total_tax_refund ?? 0}
+          finCharges={kpi?.total_financial_charges ?? 0}
+          gross={kpi?.gross_profit ?? 0}
+          net={kpi?.net_profit ?? 0}
+          currency={currency}
+        />
+      </DashboardSection>
     </>
   );
 }
@@ -1054,720 +1284,3 @@ function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; curren
   );
 }
 
-/* ===========================================================================
-   Cross-Module Pressure Panel  —  Phase 2.0
-
-   The "business nervous system" surface. Renders three things:
-
-     1. A composite health number (0..100) + pressure pill.
-     2. A per-module health strip (Finance · Customer · Supplier ·
-        Logistics · Inventory).
-     3. The top cross-module correlation narrative if any — the
-        causal story spanning modules, e.g. "Logistics costs
-        compressing margin." Calm, single sentence.
-
-   Designed to read like a Bloomberg ribbon: dense, monochrome,
-   actionable in 1.5 seconds.
-   ========================================================================== */
-
-function CrossModulePressurePanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
-  const { health, correlations, digest } = intel;
-  const top = correlations[0];
-
-  /* Quiet state when there's no real signal yet. */
-  if (!intel.events.length && !top && digest.length === 0 && health.composite >= 95) {
-    return null;
-  }
-
-  const compositeCls =
-    health.pressure === "critical" ? "text-rose-300"
-    : health.pressure === "risk"   ? "text-rose-300/90"
-    : health.pressure === "watch"  ? "text-amber-300"
-    :                                "text-emerald-300";
-
-  const pressureChipCls =
-    health.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
-    : health.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-    : health.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
-    :                                "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
-
-  const pressureLabel =
-    health.pressure === "critical" ? "Critical"
-    : health.pressure === "risk"   ? "Risk"
-    : health.pressure === "watch"  ? "Watch"
-    :                                "Calm";
-
-  return (
-    <div className="mt-4 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-            <span>Business nervous system</span>
-            <GuidanceTip guidanceId="intelligence.businessHealth" />
-          </div>
-          <div className="mt-1 text-[12px] text-gray-300">{health.headline}</div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureChipCls}`}>
-            <span aria-hidden className={
-              "h-1.5 w-1.5 rounded-full " + (
-                health.pressure === "critical" ? "bg-rose-400"
-                : health.pressure === "risk"   ? "bg-rose-400"
-                : health.pressure === "watch"  ? "bg-amber-300"
-                :                                "bg-emerald-400"
-              )
-            } />
-            {pressureLabel} pressure
-          </span>
-          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${compositeCls}`}>
-            {health.composite}
-            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Per-module strip */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {health.dimensions.map((d) => {
-          const tone =
-            d.pressure === "critical" ? "bg-rose-300/55"
-            : d.pressure === "risk"   ? "bg-rose-300/40"
-            : d.pressure === "watch"  ? "bg-amber-300/45"
-            :                           "bg-emerald-300/40";
-          const label =
-            d.module === "finance"   ? "Finance"
-          : d.module === "customer"  ? "Customer"
-          : d.module === "supplier"  ? "Supplier"
-          : d.module === "logistics" ? "Logistics"
-          : d.module === "inventory" ? "Inventory"
-          : d.module === "crm"       ? "Pipeline"
-          : d.module;
-          return (
-            <div key={d.module} className="rounded-lg border border-white/[0.04] bg-white/[0.012] px-2.5 py-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{label}</span>
-                <span className="text-[12px] font-medium tabular-nums text-gray-200">{d.score}</span>
-              </div>
-              <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
-                <div className={`h-full ${tone}`} style={{ width: `${Math.max(3, Math.min(100, d.score))}%` }} />
-              </div>
-              <div className="mt-1 truncate text-[10px] text-gray-500">{d.driver}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Executive digest — 3-5 curated narratives.
-         Phase 2.0.1: each digest item carries a kind chip
-         (PRESSURE / RISK / DEPENDENCY / IMPROVEMENT / OPPORTUNITY)
-         and a confidence/state marker when relevant. The system stays
-         silent if nothing material is happening — no padding hints. */}
-      {digest.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {digest.map((d) => {
-            const sevDot =
-              d.severity === "critical" ? "bg-rose-400"
-              : d.severity === "risk"   ? "bg-rose-400"
-              : d.severity === "watch"  ? "bg-amber-300"
-              :                           "bg-white/40";
-            const kindLabel =
-              d.kind === "biggest_pressure"    ? "Pressure"
-              : d.kind === "biggest_risk"       ? "Risk"
-              : d.kind === "biggest_dependency" ? "Dependency"
-              : d.kind === "biggest_improvement"? "Improving"
-              :                                    "Opportunity";
-            const kindCls =
-              d.kind === "biggest_improvement"  ? "bg-emerald-500/[0.10] text-emerald-300/90 border-emerald-500/[0.18]"
-              : d.kind === "biggest_opportunity" ? "bg-white/[0.05] text-gray-300 border-white/[0.06]"
-              : d.severity === "risk" || d.severity === "critical"
-                ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-                : "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]";
-            return (
-              <li key={d.key} className="flex items-start gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
-                <span aria-hidden className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${sevDot}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.16em] ${kindCls}`}>
-                      {kindLabel}
-                    </span>
-                    {d.state === "worsening" && (
-                      <span className="rounded-full bg-rose-500/[0.10] px-1.5 py-0.5 text-[9px] font-medium text-rose-300/90">Worsening</span>
-                    )}
-                    {d.state === "recurring" && (
-                      <span className="rounded-full bg-white/[0.05] px-1.5 py-0.5 text-[9px] font-medium text-gray-400">Persisting</span>
-                    )}
-                    {d.confidence != null && d.confidence >= 0.85 && (
-                      <span className="rounded-full bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-gray-500">
-                        {Math.round(d.confidence * 100)}% conf
-                      </span>
-                    )}
-                    <span className="text-[11px] font-semibold tracking-tight text-gray-200">{d.headline}</span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{d.narrative}</div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* Top cross-module correlation when no curated digest, as a fallback. */}
-      {digest.length === 0 && top && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
-          <span aria-hidden className={
-            "mt-1 h-1.5 w-1.5 shrink-0 rounded-full " + (
-              top.severity === "critical" ? "bg-rose-400"
-              : top.severity === "risk"   ? "bg-rose-400"
-              : top.severity === "watch"  ? "bg-amber-300"
-              :                             "bg-white/40"
-            )
-          } />
-          <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-semibold tracking-tight text-gray-200">{top.headline}</div>
-            <div className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{top.narrative}</div>
-          </div>
-          {correlations.length > 1 && (
-            <span className="shrink-0 rounded-full bg-white/[0.05] px-1.5 py-0.5 text-[10px] tabular-nums text-gray-400">
-              +{correlations.length - 1} more
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ===========================================================================
-   ApprovalOperationsPanel  —  Phase 2.2.1
-
-   Calm one-block panel that surfaces approval-operations state on the
-   dashboard. Mirrors the CrossModulePressurePanel vocabulary:
-
-     · header: title + approval-health number + pressure pill
-     · backlog stat row (count · value · oldest · cycle time)
-     · 5-bucket aging mini-table
-     · top reviewer line (only when material concentration exists)
-
-   The panel **renders nothing** when there's no operational pressure
-   and no backlog — keeps the dashboard quiet by default.
-   ========================================================================== */
-
-function ApprovalOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
-  const a = intel.approval;
-  /* UX-validation pass: avoid surfacing a dedicated panel for trivial
-     backlogs. The events stream + Copilot already carry small backlog
-     signals where they belong (digest / Copilot hints); the panel
-     surfaces only when there's something a CFO would actually scan
-     for — backlog ≥ 3 OR an item ≥ 7 days old OR non-calm pressure. */
-  const meaningful =
-    a.backlog.count >= 3 ||
-    a.backlog.oldestDays >= 7 ||
-    a.pressure !== "calm";
-  if (!meaningful) return null;
-
-  const pressureCls =
-    a.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
-    : a.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-    : a.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
-    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
-  const pressureDot =
-    a.pressure === "critical" ? "bg-rose-400"
-    : a.pressure === "risk"   ? "bg-rose-400"
-    : a.pressure === "watch"  ? "bg-amber-300"
-    :                           "bg-emerald-400";
-  const scoreCls =
-    a.pressure === "critical" ? "text-rose-300"
-    : a.pressure === "risk"   ? "text-rose-300/90"
-    : a.pressure === "watch"  ? "text-amber-300"
-    :                           "text-emerald-300";
-
-  /* Top reviewer is only meaningful when at least 5 are pending. */
-  const top = a.workload[0];
-  const showTopReviewer = !!top && top.reviewerName !== "Unassigned" && a.backlog.count >= 5;
-
-  return (
-    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-            <span>Approval operations</span>
-            <GuidanceTip guidanceId="approval.health" />
-          </div>
-          {a.read && <div className="mt-1 text-[12px] text-gray-300">{a.read}</div>}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
-            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
-            {a.pressure === "calm" ? "Calm" : a.pressure === "watch" ? "Watch" : a.pressure === "risk" ? "Risk" : "Critical"}
-          </span>
-          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
-            {a.healthScore}
-            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stat row */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Pending" value={a.backlog.count.toString()} />
-        <StatTile label="Held value" value={formatCompactUsd(a.backlog.totalValue)} unit="USD" />
-        <StatTile
-          label="Oldest"
-          value={a.backlog.oldestDays > 0 ? `${a.backlog.oldestDays}d` : "—"}
-          tone={a.backlog.oldestDays >= 14 ? "rose" : a.backlog.oldestDays >= 7 ? "amber" : "neutral"}
-        />
-        <StatTile
-          label="Cycle"
-          value={a.cycle.avgCycleDays > 0 ? `${a.cycle.avgCycleDays.toFixed(1)}d` : "—"}
-          hint={a.cycle.trendPct >= 8 ? `↑ ${a.cycle.trendPct.toFixed(0)}% vs prior` : undefined}
-          tone={a.cycle.trendPct >= 50 ? "amber" : "neutral"}
-        />
-      </div>
-
-      {/* Aging mini-grid */}
-      {a.backlog.count > 0 && (
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {a.aging.map((b) => {
-            const critical = b.key === "14_plus" || b.key === "8_14d";
-            const watch    = b.key === "4_7d";
-            const valueCls = critical ? "text-rose-300" : watch ? "text-amber-200" : "text-gray-200";
-            const barCls   = critical ? "bg-rose-300/60" : watch ? "bg-amber-300/60" : "bg-white/40";
-            const maxValue = Math.max(1, ...a.aging.map((x) => x.totalValue));
-            return (
-              <div key={b.key} className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-2 py-1.5">
-                <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{b.label}</div>
-                <div className={`mt-0.5 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>
-                  {b.count}
-                </div>
-                <div className="mt-0.5 text-[9px] text-gray-600 tabular-nums">{formatCompactUsd(b.totalValue)}</div>
-                <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
-                  <div className={`h-full ${barCls}`} style={{ width: `${Math.max(3, (b.totalValue / maxValue) * 100)}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Top reviewer concentration line */}
-      {showTopReviewer && top && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2">
-          <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${(top.backlogShare ?? 0) >= 0.8 ? "bg-rose-400" : (top.backlogShare ?? 0) >= 0.6 ? "bg-amber-300" : "bg-white/40"}`} />
-          <div className="min-w-0 flex-1 text-[11px] text-gray-300">
-            <span className="font-medium">{top.reviewerName}</span>
-            <span className="text-gray-500"> · </span>
-            <span className="tabular-nums">{top.pendingCount} pending</span>
-            <span className="text-gray-500"> · </span>
-            <span className="tabular-nums">{Math.round((top.backlogShare ?? 0) * 100)}% of queue</span>
-            {top.avgLatencyDays > 0 && (
-              <>
-                <span className="text-gray-500"> · </span>
-                <span className="tabular-nums">avg {top.avgLatencyDays.toFixed(1)}d</span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatTile({
-  label, value, unit, hint, tone = "neutral", helpId,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-  hint?: string;
-  tone?: "neutral" | "amber" | "rose";
-  /** Phase 2.5 — optional guidance-registry id for a "?" affordance
-   *  next to the tile label. Off by default so existing tiles stay
-   *  visually untouched. */
-  helpId?: string;
-}) {
-  const valueCls =
-    tone === "rose"  ? "text-rose-300"
-    : tone === "amber" ? "text-amber-200"
-    :                    "text-gray-200";
-  return (
-    <div className="rounded-lg border border-white/[0.04] bg-white/[0.012] px-2.5 py-2">
-      <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
-        <span>{label}</span>
-        {helpId && <GuidanceTip guidanceId={helpId} />}
-      </div>
-      <div className={`mt-1 text-[15px] font-medium tabular-nums tracking-tight ${valueCls}`}>
-        {value}
-        {unit && <span className="ml-1 text-[10px] text-gray-500">{unit}</span>}
-      </div>
-      {hint && <div className="mt-0.5 text-[10px] text-gray-500">{hint}</div>}
-    </div>
-  );
-}
-
-function formatCompactUsd(n: number): string {
-  if (!Number.isFinite(n)) return "0";
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return (n / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2) + "M";
-  if (abs >= 1_000)     return (n / 1_000).toFixed(abs >= 10_000 ? 1 : 2) + "K";
-  return n.toFixed(0);
-}
-
-/* ===========================================================================
-   PaymentOperationsPanel  —  Phase 2.3
-
-   Calm one-block panel that surfaces payment-control state on the
-   dashboard. Mirrors ApprovalOperationsPanel.
-
-     · header: pressure pill + composite health
-     · 4-tile stat row (pending approval · unreconciled · mismatches · missing evidence)
-     · narrative read
-
-   Renders nothing when everything is calm — quiet by default.
-   ========================================================================== */
-
-function PaymentOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
-  const p = intel.payment;
-  const meaningful =
-    p.pendingApproval.count >= 1 && p.pendingApproval.totalValue >= 10_000 ||
-    p.reconciliation.unreconciledCount >= 1 ||
-    p.reconciliation.mismatchCount >= 1 ||
-    p.evidence.missingCount >= 2 ||
-    p.failedCount >= 1 ||
-    p.pressure !== "calm";
-  if (!meaningful) return null;
-
-  const pressureCls =
-    p.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
-    : p.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-    : p.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
-    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
-  const pressureDot =
-    p.pressure === "critical" ? "bg-rose-400"
-    : p.pressure === "risk"   ? "bg-rose-400"
-    : p.pressure === "watch"  ? "bg-amber-300"
-    :                           "bg-emerald-400";
-  const scoreCls =
-    p.pressure === "critical" ? "text-rose-300"
-    : p.pressure === "risk"   ? "text-rose-300/90"
-    : p.pressure === "watch"  ? "text-amber-300"
-    :                           "text-emerald-300";
-
-  return (
-    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-            <span>Payment operations</span>
-            <GuidanceTip guidanceId="payment.health" />
-          </div>
-          {p.read && <div className="mt-1 text-[12px] text-gray-300">{p.read}</div>}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
-            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
-            {p.pressure === "calm" ? "Calm" : p.pressure === "watch" ? "Watch" : p.pressure === "risk" ? "Risk" : "Critical"}
-          </span>
-          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
-            {p.healthScore}
-            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile
-          label="Pending approval"
-          value={p.pendingApproval.count > 0 ? p.pendingApproval.count.toString() : "0"}
-          hint={p.pendingApproval.totalValue > 0 ? `${formatCompactUsd(p.pendingApproval.totalValue)} USD` : undefined}
-          tone={p.pendingApproval.oldestDays >= 14 ? "rose" : p.pendingApproval.oldestDays >= 7 ? "amber" : "neutral"}
-        />
-        <StatTile
-          label="Unreconciled"
-          value={p.reconciliation.unreconciledCount.toString()}
-          hint={p.reconciliation.unreconciledValue > 0 ? `${formatCompactUsd(p.reconciliation.unreconciledValue)} USD` : undefined}
-          tone={p.reconciliation.unreconciledCount >= 5 ? "rose" : p.reconciliation.unreconciledCount >= 1 ? "amber" : "neutral"}
-        />
-        <StatTile
-          label="Mismatches"
-          value={p.reconciliation.mismatchCount.toString()}
-          hint={p.reconciliation.mismatchValue > 0 ? `${formatCompactUsd(p.reconciliation.mismatchValue)} USD diff` : undefined}
-          tone={p.reconciliation.mismatchCount >= 1 ? "rose" : "neutral"}
-        />
-        <StatTile
-          label="Missing evidence"
-          value={p.evidence.missingCount.toString()}
-          hint={p.evidence.missingValue > 0 ? `${formatCompactUsd(p.evidence.missingValue)} USD` : undefined}
-          tone={p.evidence.missingCount >= 5 ? "rose" : p.evidence.missingCount >= 2 ? "amber" : "neutral"}
-        />
-      </div>
-
-      {p.failedCount > 0 && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/[0.20] bg-rose-500/[0.04] px-3 py-2 text-[11px] text-rose-200">
-          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-          <span><span className="font-medium">{p.failedCount}</span> payment{p.failedCount === 1 ? "" : "s"} failed at the bank — recovery required.</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ===========================================================================
-   TreasuryOperationsPanel  —  Phase 2.4
-
-   The calm "real cash" surface. Mirrors PaymentOperationsPanel's
-   visual language exactly so the operator's eye can move across the
-   four control panels (cross-module pressure → approval → payment →
-   treasury) without re-orienting.
-
-   Renders nothing when there are no bank accounts (dormant) AND
-   nothing material is happening. Once connected, surfaces only when
-   the snapshot reports meaningful pressure — quiet by default.
-
-     · header: pressure pill + composite health
-     · 4-tile stat row (available cash · 7d · 30d · runway)
-     · currency exposure bar + bank concentration line
-   ========================================================================== */
-
-function TreasuryOperationsPanel({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
-  const t = intel.treasury;
-  const r = intel.reconciliation;
-  const bi = intel.bankImports;
-  const pl = intel.plans;
-  if (t.accounts.length === 0) return null;
-  const meaningful =
-    t.pressure !== "calm" ||
-    t.projection.runwayDays != null ||
-    t.unreconciledMovements >= 3 ||
-    t.events.length > 0 ||
-    r.pendingCount > 0 ||
-    bi.events.length > 0;
-  if (!meaningful) return null;
-
-  const pressureCls =
-    t.pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
-    : t.pressure === "risk"   ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-    : t.pressure === "watch"  ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
-    :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
-  const pressureDot =
-    t.pressure === "critical" ? "bg-rose-400"
-    : t.pressure === "risk"   ? "bg-rose-400"
-    : t.pressure === "watch"  ? "bg-amber-300"
-    :                           "bg-emerald-400";
-  const scoreCls =
-    t.pressure === "critical" ? "text-rose-300"
-    : t.pressure === "risk"   ? "text-rose-300/90"
-    : t.pressure === "watch"  ? "text-amber-300"
-    :                           "text-emerald-300";
-
-  /* Runway formatting + tone. */
-  const runwayLabel = t.projection.runwayDays == null ? "—" : `${t.projection.runwayDays}d`;
-  const runwayTone =
-    t.projection.runwayDays == null ? "neutral"
-    : t.projection.runwayDays <= 14 ? "rose"
-    : t.projection.runwayDays <= 30 ? "amber"
-    :                                 "neutral";
-
-  /* Top non-reporting currency exposure for the dependency line. */
-  const topNonReporting = t.currencyExposure.find((c) => !c.isReporting);
-  const topAccount = t.accounts[0];
-
-  return (
-    <div className="mt-3 rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
-            <span>Treasury operations</span>
-            <GuidanceTip guidanceId="treasury.health" />
-          </div>
-          {t.read && <div className="mt-1 text-[12px] text-gray-300">{t.read}</div>}
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${pressureCls}`}>
-            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${pressureDot}`} />
-            {t.pressure === "calm" ? "Calm" : t.pressure === "watch" ? "Watch" : t.pressure === "risk" ? "Risk" : "Critical"}
-          </span>
-          <div className={`text-[22px] font-medium tabular-nums tracking-tight ${scoreCls}`}>
-            {t.healthScore}
-            <span className="ml-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">health</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile
-          label="Available"
-          helpId="treasury.available"
-          value={formatCompactUsd(t.availableCash)}
-          unit="USD"
-          tone={t.availableCash < 25_000 ? "amber" : "neutral"}
-        />
-        <StatTile
-          label="7-day projection"
-          helpId="treasury.projected"
-          value={`${t.projection.d7 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d7))}`}
-          tone={t.projection.d7 < 0 ? "rose" : "neutral"}
-        />
-        <StatTile
-          label="30-day projection"
-          helpId="treasury.liquidityGap"
-          value={`${t.projection.d30 >= 0 ? "+" : "−"}${formatCompactUsd(Math.abs(t.projection.d30))}`}
-          tone={t.projection.d30 < 0 ? "rose" : "neutral"}
-        />
-        <StatTile
-          label="Runway"
-          helpId="treasury.runway"
-          value={runwayLabel}
-          hint={t.projection.runwayDays == null ? "Beyond horizon" : "Until cash crosses zero"}
-          tone={runwayTone}
-        />
-      </div>
-
-      {/* Concentration + FX line — only when there's something to say. */}
-      {(topAccount && topAccount.share >= 0.6) || (topNonReporting && topNonReporting.share >= 0.3) ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2 text-[11px]">
-          {topAccount && topAccount.share >= 0.6 && (
-            <span className="text-gray-300">
-              <span className="text-gray-500">Top account · </span>
-              {topAccount.accountName} <span className="text-gray-500">·</span> {(topAccount.share * 100).toFixed(0)}%
-            </span>
-          )}
-          {topNonReporting && topNonReporting.share >= 0.3 && (
-            <>
-              <span className="text-gray-600">·</span>
-              <span className={topNonReporting.share >= 0.6 ? "text-amber-200" : "text-gray-300"}>
-                <span className="text-gray-500">FX · </span>
-                {(topNonReporting.share * 100).toFixed(0)}% in {topNonReporting.currency}
-              </span>
-              <GuidanceTip guidanceId="treasury.fxExposure" />
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {/* Bank-failure or overdraft callouts. */}
-      {t.events.some((e) => e.kind === "overdraft_risk" || e.kind === "transfer_failure") && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/[0.20] bg-rose-500/[0.04] px-3 py-2 text-[11px] text-rose-200">
-          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-          <span>
-            {t.events.find((e) => e.kind === "overdraft_risk")?.label
-              ?? t.events.find((e) => e.kind === "transfer_failure")?.label}
-            <span className="text-rose-200/70"> — recovery action required.</span>
-          </span>
-        </div>
-      )}
-
-      {/* Phase 2.8 — forecast quick link. Always visible on the
-          treasury panel when treasury is otherwise meaningful, so the
-          executive can run a stress test in one click. Calm chip
-          treatment, no large widget. */}
-      <Link
-        href="/finance/treasury-forecast"
-        className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
-      >
-        <span className="inline-flex items-center gap-2 text-gray-300">
-          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-          <span className="font-semibold text-gray-200">Treasury forecast</span>
-          <span>· Run a 90-day cash stress test</span>
-        </span>
-        <span className="inline-flex items-center gap-1 text-gray-400">Open <span aria-hidden>→</span></span>
-      </Link>
-
-      {/* Phase 2.9 — plans pulse. Surfaces only when a saved plan
-          materially diverges from the current state, is stale, or
-          when reviews are sitting on the backlog. Calm read-only
-          strip with one deep link to /finance/treasury-plans. */}
-      {(pl.activePlan
-        || pl.pendingReviewCount > 0
-        || Math.abs(pl.divergence) >= 5_000) && (
-        <Link
-          href="/finance/treasury-plans"
-          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
-        >
-          <span className="inline-flex items-center gap-2 text-gray-300">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
-            <span className="font-semibold text-gray-200">Treasury plans</span>
-            {pl.activePlan && pl.activePlanAgeDays != null && (
-              <span>· Active plan {pl.activePlanAgeDays}d old</span>
-            )}
-            {Math.abs(pl.divergence) >= 5_000 && (
-              <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
-                Divergence {formatCompactUsd(pl.divergence)} USD
-              </span>
-            )}
-            {pl.pendingReviewCount > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
-                {pl.pendingReviewCount} awaiting review
-              </span>
-            )}
-          </span>
-          <span className="inline-flex items-center gap-1 text-gray-400">Open <span aria-hidden>→</span></span>
-        </Link>
-      )}
-
-      {/* Phase 2.6 — bank-import pulse. Surfaces when imports have
-          failed, when an import landed many unreconciled movements,
-          or when an account hasn't received a statement in 21+ days. */}
-      {bi.events.length > 0 && (
-        <Link
-          href="/finance/bank-imports"
-          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
-        >
-          <span className="inline-flex items-center gap-2 text-gray-300">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
-            <span className="font-semibold text-gray-200">{bi.failedImportCount + bi.largeUnreconciledImportCount + bi.duplicateHeavyImportCount + bi.importGapAccounts}</span>
-            <span>bank-import signal{(bi.failedImportCount + bi.largeUnreconciledImportCount + bi.duplicateHeavyImportCount + bi.importGapAccounts) === 1 ? "" : "s"}</span>
-            {bi.failedImportCount > 0 && (
-              <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">{bi.failedImportCount} failed</span>
-            )}
-            {bi.largeUnreconciledImportCount > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">{bi.largeUnreconciledImportCount} large unreconciled</span>
-            )}
-            {bi.importGapAccounts > 0 && (
-              <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-gray-300">{bi.importGapAccounts} gap</span>
-            )}
-          </span>
-          <span className="inline-flex items-center gap-1 text-gray-400">
-            Open imports
-            <span aria-hidden>→</span>
-          </span>
-        </Link>
-      )}
-
-      {/* Phase 2.5 — reconciliation pulse. Surfaces only when the queue
-          has meaningful pending work. Pure read-only strip so the
-          dashboard never quietly reconciles anything. */}
-      {r.pendingCount > 0 && (
-        <Link
-          href="/finance/reconciliation"
-          className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.018] px-3 py-2 text-[11px] transition hover:border-white/[0.18]"
-        >
-          <span className="inline-flex items-center gap-2 text-gray-300">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-            <span className="font-semibold text-gray-200">{r.pendingCount}</span>
-            <span>match{r.pendingCount === 1 ? "" : "es"} suggested</span>
-            {r.highConfidencePendingCount > 0 && (
-              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-                {r.highConfidencePendingCount} high-confidence
-              </span>
-            )}
-            {r.duplicateRiskCount > 0 && (
-              <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
-                {r.duplicateRiskCount} duplicate risk
-              </span>
-            )}
-            {r.partialPendingCount > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
-                {r.partialPendingCount} partial
-              </span>
-            )}
-          </span>
-          <span className="inline-flex items-center gap-1 text-gray-400">
-            Open queue
-            <span aria-hidden>→</span>
-          </span>
-        </Link>
-      )}
-    </div>
-  );
-}
