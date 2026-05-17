@@ -21,7 +21,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const limit = Number(url.searchParams.get("limit"));
   try {
-    const orders = await listSalesOrders(auth.tenant_id, Number.isFinite(limit) && limit > 0 ? limit : 100);
+    const orders = await listSalesOrders(auth.tenant_id, {
+      search: url.searchParams.get("q") ?? undefined,
+      status: url.searchParams.get("status") ?? undefined,
+      since:  url.searchParams.get("since")  ?? undefined,
+      limit: Number.isFinite(limit) && limit > 0 ? limit : 100,
+    });
     return NextResponse.json({ orders });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });

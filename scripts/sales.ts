@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 
 /* ===========================================================================
-   Phase O.4 — Basic Sales Shipment validator.
+   Phase O.4 / O.4.1 — Sales Shipment validator.
 
-   Coverage (12 assertions):
+   Coverage (18 assertions):
      01  Create SO with two line items
      02  Ship partial qty on line 1 → balance decreases by qty_accepted
      03  SO status becomes 'partial'
@@ -17,6 +17,12 @@
      10  Insufficient stock rejected by inventory layer (422)
      11  Void shipment restores stock + rolls back qty_shipped
      12  Tenant isolation — A cannot ship against B's SO
+     13  SO list enriches with customer_name + qty totals
+     14  SO list status filter restricts results
+     15  SO list search by SO number works
+     16  SO list search by customer name works (post-join match)
+     17  SO detail carries per-line total_on_hand + available_locations
+     18  SO detail shipment history carries source location + totals
    ========================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
@@ -28,6 +34,7 @@ import {
   createInventoryMovement,
   postInventoryMovement,
 } from "../src/lib/inventory/posting";
+import { listSalesOrders, getSalesOrderDetail } from "../src/lib/sales/queries";
 
 const URL_ENV = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -342,6 +349,78 @@ async function main() {
     request: { lines: [{ sales_order_item_id: soB.itemIds[0], qty: 1 }] },
   });
   ok("12  tenant isolation — A cannot ship against B's SO", !crossTenant.ok && crossTenant.code === 404, crossTenant.error ?? "");
+
+  /* ─── Phase O.4.1 — UX-surface coverage (13–18) ─────────────
+     The list and detail endpoints carry the joined data the new
+     pages depend on (customer name, qty totals, per-line live
+     stock). The assertions below pin those contracts in place. */
+
+  /* 13 — listSalesOrders returns customer name + qty totals.
+     After void in test 11, the main SO is back to 'partial' with
+     15 (line 1 after void) + 30 (line 2 still shipped) = 45 shipped. */
+  const listAll = await listSalesOrders(TENANT_A);
+  const fullySoRow = listAll.find((r) => r.id === soId);
+  ok(
+    "13  SO list enriches with customer_name + qty_ordered/shipped/remaining",
+    !!fullySoRow &&
+      fullySoRow.customer_name === `Phase-O4 ${TENANT_A.slice(-4)}` &&
+      fullySoRow.qty_ordered === 70 &&
+      fullySoRow.qty_shipped === 45 &&
+      fullySoRow.qty_remaining === 25 &&
+      fullySoRow.line_count === 2,
+    `customer=${fullySoRow?.customer_name} ord=${fullySoRow?.qty_ordered} ship=${fullySoRow?.qty_shipped} rem=${fullySoRow?.qty_remaining}`,
+  );
+
+  /* 14 — Status filter limits to one status. The main SO is now
+     'partial' (line 1 voided back, line 2 still fully shipped). */
+  const partialOnly = await listSalesOrders(TENANT_A, { status: "partial" });
+  const onlyPartial = partialOnly.every((r) => r.status === "partial");
+  ok(
+    "14  SO list status filter restricts results",
+    onlyPartial && partialOnly.some((r) => r.id === soId),
+    `n=${partialOnly.length}`,
+  );
+
+  /* 15 — Search filter matches by SO number. */
+  const so = listAll.find((r) => r.id === soId)!;
+  const byNo = await listSalesOrders(TENANT_A, { search: so.so_no?.slice(0, 8) ?? "" });
+  ok(
+    "15  SO list search filter matches by SO number",
+    byNo.some((r) => r.id === soId),
+    `match=${byNo.length}`,
+  );
+
+  /* 16 — Search filter matches by customer name (post-join). */
+  const byCust = await listSalesOrders(TENANT_A, { search: "Phase-O4" });
+  ok(
+    "16  SO list search filter matches by customer name",
+    byCust.some((r) => r.id === soId),
+    `match=${byCust.length}`,
+  );
+
+  /* 17 — getSalesOrderDetail returns per-line stock totals + locations. */
+  const otherSo = await createSo({
+    tenantId: TENANT_A, customerId: customerA,
+    lines: [{ inventory_item_id: itemA.itemId, qty: 5, unit_price: 10 }],
+  });
+  const det = await getSalesOrderDetail(TENANT_A, otherSo.soId);
+  const line = det?.items[0];
+  /* Item A had 100 in stock - 25 (s1 shipped) - 15 (s2 shipped) + 25 (s1 voided) = 85. */
+  const hasLocation = !!line?.available_locations.find((b) => b.warehouse_id === itemA.warehouseId);
+  ok(
+    "17  SO detail carries per-line total_on_hand + available_locations",
+    !!line && line.total_on_hand >= 1 && hasLocation,
+    `total=${line?.total_on_hand} locs=${line?.available_locations.length}`,
+  );
+
+  /* 18 — Shipment history rows expose source_location + total_qty. */
+  const det2 = await getSalesOrderDetail(TENANT_A, soId);
+  const sample = det2?.shipments[0];
+  ok(
+    "18  shipment history carries source_location_code + total_qty + line_count",
+    !!sample && typeof sample.source_location_code === "string" && sample.total_qty >= 0 && sample.line_count >= 1,
+    `loc=${sample?.source_location_code} qty=${sample?.total_qty}`,
+  );
 
   console.log("─".repeat(72));
   console.log(`  ${passes} passed, ${failures} failed`);

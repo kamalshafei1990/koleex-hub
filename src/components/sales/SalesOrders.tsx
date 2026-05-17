@@ -1,16 +1,21 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   /sales/orders — Sales Order list + Shipment dialog (Phase O.4).
+   /sales/orders — Sales Order list (Phase O.4.1).
 
-   Minimal surface, focused on the operational outbound flow:
-     · table of recent SOs with status badge + Ship button
-     · ShipDialog: pick source location, enter qty per line, tracking,
-       notes; clear "ordered / shipped / remaining" per line
-     · Void shipment from the shipment history list inside the dialog
+   Minimal but useful daily-operations surface:
+     · search by SO number or customer name (debounced)
+     · status filter chips (with counts)
+     · date filter (created since)
+     · columns: SO # · customer · status · ordered / shipped / remaining ·
+                created
+     · row click → SO detail page
+     · header "+ Ship" link goes to detail flow; per-row Ship button
+       opens an inline dialog for fast partial shipments without
+       leaving the list
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import {
@@ -18,28 +23,86 @@ import {
   Panel,
   StatusBadge,
 } from "@/components/inventory/InventoryUi";
+import ShipDialog from "@/components/sales/ShipDialog";
 
 interface SoRow {
   id: string;
   so_no: string | null;
   customer_id: string | null;
+  customer_name: string | null;
   status: "draft" | "confirmed" | "partial" | "shipped" | "closed" | "cancelled";
   currency: string;
-  notes: string | null;
+  qty_ordered: number;
+  qty_shipped: number;
+  qty_remaining: number;
+  line_count: number;
   created_at: string;
+}
+
+type StatusKey = "" | "draft" | "confirmed" | "partial" | "shipped" | "cancelled";
+
+const STATUS_CHIPS: Array<{ key: StatusKey; label: string }> = [
+  { key: "",          label: "All" },
+  { key: "draft",     label: "Draft" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "partial",   label: "Partial" },
+  { key: "shipped",   label: "Shipped" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+type DateRangeKey = "all" | "30d" | "90d" | "1y";
+const DATE_RANGES: Array<{ key: DateRangeKey; label: string }> = [
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+  { key: "1y",  label: "Last year" },
+  { key: "all", label: "All time" },
+];
+
+function sinceFor(range: DateRangeKey): string | undefined {
+  if (range === "all") return undefined;
+  const now = new Date();
+  const d = new Date(now);
+  if (range === "30d") d.setDate(now.getDate() - 30);
+  if (range === "90d") d.setDate(now.getDate() - 90);
+  if (range === "1y")  d.setFullYear(now.getFullYear() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtQty(n: number) {
+  return Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
 export default function SalesOrders() {
   const [rows, setRows] = useState<SoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [searchKey, setSearchKey] = useState("");
+  const [filterStatus, setFilterStatus] = useState<StatusKey>("");
+  const [dateRange, setDateRange] = useState<DateRangeKey>("90d");
+
   const [shipSoId, setShipSoId] = useState<string | null>(null);
+
+  /* Debounce search. */
+  const debounceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => setSearchKey(search.trim()), 250);
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
+  }, [search]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/sales/orders?limit=100", { credentials: "include", cache: "no-store" });
+      const qs = new URLSearchParams();
+      qs.set("limit", "200");
+      if (searchKey) qs.set("q", searchKey);
+      if (filterStatus) qs.set("status", filterStatus);
+      const since = sinceFor(dateRange);
+      if (since) qs.set("since", since);
+      const r = await fetch(`/api/sales/orders?${qs.toString()}`, { credentials: "include", cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
       setRows((j.orders ?? []) as SoRow[]);
@@ -48,13 +111,24 @@ export default function SalesOrders() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchKey, filterStatus, dateRange]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const counts = useMemo(() => {
+    const m = new Map<StatusKey, number>();
+    for (const r of rows) {
+      const k = r.status as StatusKey;
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    m.set("", rows.length);
+    return m;
+  }, [rows]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
+        {/* Page bar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <Link
@@ -69,7 +143,9 @@ export default function SalesOrders() {
             </div>
             <div className="flex min-w-0 items-center gap-2.5">
               <h1 className="text-xl font-bold tracking-tight md:text-[22px]">Sales Orders</h1>
-              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">Outbound flow — order → shipment → inventory OUT.</p>
+              <p className="hidden text-[12px] text-[var(--text-dim)] sm:block">
+                Order → shipment → inventory OUT.
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -88,6 +164,60 @@ export default function SalesOrders() {
           </div>
         )}
 
+        {/* Filter bar */}
+        <Panel className="px-3 py-2.5">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col">
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Search</span>
+              <span className="relative">
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-gray-500">
+                  <RrIcon name="search" size={12} />
+                </span>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="SO # or customer…"
+                  className="w-[260px] rounded-md border border-white/[0.06] bg-[var(--bg-primary)] py-1.5 pl-7 pr-2 text-[12px]"
+                />
+              </span>
+            </label>
+            <label className="flex flex-col">
+              <span className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Created</span>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value as DateRangeKey)}
+                className="rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+              >
+                {DATE_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+              </select>
+            </label>
+            <div className="ml-auto self-end text-[11px] text-gray-500 tabular-nums">
+              {loading ? "…" : `${rows.length} order${rows.length === 1 ? "" : "s"}`}
+            </div>
+          </div>
+
+          {/* Status filter chips */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11.5px]">
+            {STATUS_CHIPS.map((c) => {
+              const isActive = filterStatus === c.key;
+              const n = counts.get(c.key) ?? 0;
+              return (
+                <button
+                  key={c.key || "all"}
+                  onClick={() => setFilterStatus(c.key)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors ${
+                    isActive ? "border-white/[0.14] bg-white/[0.06] text-[var(--text-primary)]" : "border-white/[0.06] text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {c.label}
+                  <span className="text-gray-500 tabular-nums">{n}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+
+        {/* Orders table */}
         <Panel>
           <table className="min-w-full text-[12.5px]">
             <thead>
@@ -95,40 +225,66 @@ export default function SalesOrders() {
                 <th className="px-4 py-2 text-left">SO #</th>
                 <th className="px-4 py-2 text-left">Customer</th>
                 <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-left">Currency</th>
+                <th className="px-4 py-2 text-right">Ordered</th>
+                <th className="px-4 py-2 text-right">Shipped</th>
+                <th className="px-4 py-2 text-right">Remaining</th>
                 <th className="px-4 py-2 text-left">Created</th>
                 <th className="px-4 py-2 text-right"></th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-0 py-0">
+                <tr><td colSpan={8} className="px-0 py-0">
                   <InventoryEmpty
-                    title="No sales orders yet"
-                    hint="Sales orders are created upstream (quotation → SO). This page surfaces them so you can ship."
+                    title={searchKey || filterStatus ? "No orders match the filters" : "No sales orders yet"}
+                    hint={searchKey || filterStatus ? "Try clearing the filters or expanding the date range." : "Sales orders typically come from a confirmed quotation."}
                   />
                 </td></tr>
               ) : (
                 rows.map((s) => {
                   const canShip = s.status === "confirmed" || s.status === "partial";
+                  const pct = s.qty_ordered > 0 ? Math.min(100, Math.round((s.qty_shipped / s.qty_ordered) * 100)) : 0;
                   return (
                     <tr key={s.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300 whitespace-nowrap">{s.so_no ?? s.id.slice(0, 8)}</td>
-                      <td className="px-4 py-2 text-[11px] text-gray-400">{s.customer_id ? s.customer_id.slice(0, 8) : "—"}</td>
+                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-200 whitespace-nowrap">
+                        <Link href={`/sales/orders/${s.id}`} className="hover:text-[var(--text-primary)]">
+                          {s.so_no ?? s.id.slice(0, 8)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2 text-gray-200">{s.customer_name ?? <span className="text-gray-500">—</span>}</td>
                       <td className="px-4 py-2"><StatusBadge status={s.status} /></td>
-                      <td className="px-4 py-2 text-[11px] text-gray-400">{s.currency}</td>
-                      <td className="px-4 py-2 text-[11px] text-gray-500">{s.created_at.slice(0, 10)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-300">{fmtQty(s.qty_ordered)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtQty(s.qty_shipped)}</td>
                       <td className="px-4 py-2 text-right">
-                        {canShip && (
-                          <button
-                            onClick={() => setShipSoId(s.id)}
-                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.10] bg-white/[0.04] px-2.5 py-1 text-[11.5px] hover:bg-white/[0.08]"
+                        <div className="inline-flex flex-col items-end gap-1">
+                          <span className="tabular-nums font-mono">{fmtQty(s.qty_remaining)}</span>
+                          {s.qty_ordered > 0 && (
+                            <span aria-hidden className="h-1 w-16 overflow-hidden rounded-full bg-white/[0.05]">
+                              <span className="block h-full bg-emerald-400/50" style={{ width: `${pct}%` }} />
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-[11px] text-gray-500 whitespace-nowrap">{s.created_at.slice(0, 10)}</td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {canShip && (
+                            <button
+                              onClick={() => setShipSoId(s.id)}
+                              className="inline-flex items-center gap-1 rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-1 text-[11px] hover:bg-white/[0.08]"
+                            >
+                              <RrIcon name="truck-side" size={11} /> Ship
+                            </button>
+                          )}
+                          <Link
+                            href={`/sales/orders/${s.id}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] px-2 py-1 text-[11px] text-gray-400 hover:text-gray-200"
                           >
-                            <RrIcon name="truck-side" size={11} /> Ship
-                          </button>
-                        )}
+                            Open
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -146,267 +302,6 @@ export default function SalesOrders() {
           onSuccess={() => { setShipSoId(null); void load(); }}
         />
       )}
-    </div>
-  );
-}
-
-/* ─── Ship dialog ──────────────────────────────────────── */
-
-interface SoItem {
-  id: string;
-  description: string | null;
-  inventory_item_id: string | null;
-  qty: number;
-  qty_shipped: number;
-  unit_price: number;
-}
-interface SoDetail {
-  order: {
-    id: string;
-    so_no: string | null;
-    status: string;
-    currency: string;
-    customer_id: string | null;
-  };
-  items: SoItem[];
-  shipments: Array<{ id: string; shipment_no: string; status: string; shipped_at: string | null; tracking_no: string | null }>;
-}
-interface Warehouse { id: string; code: string; name: string; is_default: boolean; location_type?: string | null }
-
-function ShipDialog({
-  soId, onClose, onSuccess,
-}: { soId: string; onClose: () => void; onSuccess: () => void }) {
-  const [detail, setDetail] = useState<SoDetail | null>(null);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [sourceLocationId, setSourceLocationId] = useState("");
-  const [trackingNo, setTrackingNo] = useState("");
-  const [notes, setNotes] = useState("");
-  const [lineQty, setLineQty] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [sRes, wRes] = await Promise.all([
-        fetch(`/api/sales/orders/${soId}`, { credentials: "include", cache: "no-store" }),
-        fetch("/api/inventory/warehouses", { credentials: "include", cache: "no-store" }),
-      ]);
-      const sJ = (await sRes.json()) as SoDetail | { error: string };
-      const wJ = await wRes.json();
-      if (!sRes.ok || !("order" in sJ)) { setError("Failed to load SO"); return; }
-      setDetail(sJ);
-      const whs = (wJ.warehouses ?? []) as Warehouse[];
-      setWarehouses(whs);
-      const def = whs.find((w) => w.is_default) ?? whs.find((w) => (w.location_type ?? "warehouse") === "warehouse") ?? whs[0];
-      if (def) setSourceLocationId(def.id);
-      const init: Record<string, string> = {};
-      for (const it of sJ.items) {
-        const remaining = Math.max(0, Number(it.qty) - Number(it.qty_shipped));
-        init[it.id] = remaining > 0 ? String(remaining) : "";
-      }
-      setLineQty(init);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [soId]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const totalToShip = useMemo(() => {
-    if (!detail) return 0;
-    return detail.items.reduce((acc, it) => acc + (Number(lineQty[it.id]) || 0), 0);
-  }, [detail, lineQty]);
-
-  const submit = async () => {
-    if (!detail) return;
-    setError(null);
-    const lines = detail.items
-      .map((it) => {
-        const q = Number(lineQty[it.id]) || 0;
-        if (q <= 0) return null;
-        return { sales_order_item_id: it.id, qty: q };
-      })
-      .filter((l): l is NonNullable<typeof l> => l !== null);
-    if (lines.length === 0) { setError("Enter at least one quantity"); return; }
-    setSubmitting(true);
-    try {
-      const r = await fetch(`/api/sales/orders/${soId}/ship`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_location_id: sourceLocationId || null,
-          tracking_no: trackingNo || null,
-          notes: notes || null,
-          lines,
-        }),
-      });
-      const j = await r.json();
-      if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
-      onSuccess();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const voidShipment = async (id: string) => {
-    if (!confirm("Void this shipment? Stock will be restored and qty_shipped will roll back.")) return;
-    const reason = prompt("Reason (optional):") ?? null;
-    const r = await fetch(`/api/sales/shipments/${id}/void`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
-    await load();
-  };
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div className="w-full max-w-3xl rounded-xl border border-white/[0.08] bg-[var(--bg-primary)] text-[var(--text-primary)]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-          <div>
-            <h2 className="text-[14px] font-semibold">Ship Sales Order</h2>
-            <p className="text-[11px] text-gray-500">
-              {detail?.order.so_no ? `SO ${detail.order.so_no}` : "Loading…"} · {detail ? `${detail.items.length} line${detail.items.length === 1 ? "" : "s"}` : ""}
-            </p>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-300 text-[20px] leading-none">×</button>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
-          {loading && !detail && <div className="text-[12px] text-gray-500">Loading SO…</div>}
-          {error && (
-            <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
-          )}
-
-          {detail && (
-            <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label className="block sm:col-span-1">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Source location</div>
-                  <select
-                    value={sourceLocationId}
-                    onChange={(e) => setSourceLocationId(e.target.value)}
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                  >
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Tracking #</div>
-                  <input
-                    value={trackingNo}
-                    onChange={(e) => setTrackingNo(e.target.value)}
-                    placeholder="DHL, AWB, courier ref…"
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                  />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Notes</div>
-                  <input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Optional"
-                    className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                  />
-                </label>
-              </div>
-
-              <Panel>
-                <table className="min-w-full text-[12.5px]">
-                  <thead>
-                    <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                      <th className="px-3 py-2 text-left">Item</th>
-                      <th className="px-3 py-2 text-right">Ordered</th>
-                      <th className="px-3 py-2 text-right">Shipped</th>
-                      <th className="px-3 py-2 text-right">Remaining</th>
-                      <th className="px-3 py-2 text-right">This shipment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.items.map((it) => {
-                      const remaining = Math.max(0, Number(it.qty) - Number(it.qty_shipped));
-                      const trackedNote = it.inventory_item_id ? null : "non-stock";
-                      return (
-                        <tr key={it.id} className="border-b border-white/[0.03] last:border-b-0">
-                          <td className="px-3 py-1.5 text-gray-300">
-                            {it.description ?? it.inventory_item_id?.slice(0, 8) ?? "—"}
-                            {trackedNote && <span className="ml-1.5 text-[10.5px] text-amber-300/80">· {trackedNote}</span>}
-                          </td>
-                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-gray-400">{it.qty}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums font-mono text-gray-500">{it.qty_shipped}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums font-mono">{remaining}</td>
-                          <td className="px-3 py-1.5 text-right">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.0001"
-                              max={remaining}
-                              value={lineQty[it.id] ?? ""}
-                              onChange={(e) => setLineQty((s) => ({ ...s, [it.id]: e.target.value }))}
-                              className="w-24 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-1.5 py-1 text-right text-[11.5px] tabular-nums"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Panel>
-
-              {detail.shipments.length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Shipment history</div>
-                  <ul className="space-y-1 text-[11.5px]">
-                    {detail.shipments.map((s) => (
-                      <li key={s.id} className="flex items-center justify-between rounded-md border border-white/[0.04] px-2 py-1.5">
-                        <span className="flex items-center gap-2 text-gray-300">
-                          <span className="font-mono">{s.shipment_no}</span>
-                          <StatusBadge status={s.status} />
-                          {s.shipped_at && <span className="text-gray-500">{s.shipped_at.slice(0, 10)}</span>}
-                          {s.tracking_no && <span className="text-gray-500">· {s.tracking_no}</span>}
-                        </span>
-                        {s.status === "shipped" && (
-                          <button onClick={() => voidShipment(s.id)} className="text-[11px] text-rose-300 hover:text-rose-200">Void</button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-white/[0.06] px-4 py-3">
-          <span className="text-[11px] text-gray-500">
-            {totalToShip > 0 ? `${totalToShip} units will leave inventory` : "No quantities entered"}
-          </span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] text-gray-400 hover:text-gray-200">
-              Cancel
-            </button>
-            <button
-              onClick={submit}
-              disabled={submitting || !detail || totalToShip <= 0}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.12] bg-white/[0.06] px-3 py-1.5 text-[12px] hover:bg-white/[0.10] disabled:opacity-50"
-            >
-              {!submitting && <RrIcon name="truck-side" size={12} />}
-              {submitting ? "Posting…" : "Confirm shipment"}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
