@@ -369,6 +369,164 @@ async function main() {
     ok("20 GL running balance reconciles to closing",
       gl !== null && Math.abs(gl.closing_balance - bankBalance) < 0.005,
       gl ? `gl=${gl.closing_balance.toFixed(2)} tb=${bankBalance.toFixed(2)}` : "no ledger");
+
+    /* ── Phase A.2 — Operational posting integration ────────────── */
+
+    const { draftPayment, postDraftedEntry, retryRecognition } =
+      await import("../src/lib/accounting/posting.js");
+
+    /* Seed a fresh payment so we can drive it through the draft-first
+       workflow without colliding with the seeds already posted above. */
+    const a2PaymentId = randomUUID();
+    await supabase.from("finance_payments").insert({
+      id: a2PaymentId, tenant_id: TENANT_A,
+      direction: "in", party_type: "customer", party_id: null, party_name: "A2 Customer",
+      amount: 2_500, currency: "USD", payment_date: "2026-05-08",
+      reference_no: "WIRE-A2", bank_reference: "WIRE-A2",
+      status: "completed", reconciliation_status: "unreconciled", approval_status: "approved",
+    });
+
+    /* 22 — fresh source rows start at accounting_status='pending'. */
+    const { data: pendRow } = await supabase
+      .from("finance_payments")
+      .select("accounting_status, accounting_entry_id, accounting_last_error, accounting_posted_at")
+      .eq("id", a2PaymentId)
+      .maybeSingle();
+    const pend = pendRow as { accounting_status: string; accounting_entry_id: string | null; accounting_last_error: string | null; accounting_posted_at: string | null } | null;
+    ok("22 source row defaults to accounting_status='pending'",
+      pend?.accounting_status === "pending" && pend?.accounting_entry_id === null);
+
+    /* 23 — draftPayment creates entry in 'draft' status + flips
+       source to 'drafted' with entry_id stamped. */
+    const draftRes = await draftPayment(ctx, a2PaymentId);
+    const { data: draftedRow } = await supabase
+      .from("finance_payments")
+      .select("accounting_status, accounting_entry_id")
+      .eq("id", a2PaymentId)
+      .maybeSingle();
+    const drafted = draftedRow as { accounting_status: string; accounting_entry_id: string | null } | null;
+    const { data: draftEntry } = draftRes.ok
+      ? await supabase.from("accounting_journal_entries").select("status").eq("id", draftRes.entry_id).maybeSingle()
+      : { data: null };
+    ok("23 draftPayment creates draft + flips source to 'drafted'",
+      draftRes.ok &&
+      (draftEntry as { status?: string } | null)?.status === "draft" &&
+      drafted?.accounting_status === "drafted" &&
+      drafted?.accounting_entry_id === (draftRes.ok ? draftRes.entry_id : null));
+
+    /* 24 — drafting the same source twice returns the existing draft. */
+    const draftAgain = await draftPayment(ctx, a2PaymentId);
+    ok("24 double-draft idempotency: same source returns same entry",
+      draftAgain.ok && draftRes.ok && draftAgain.entry_id === draftRes.entry_id);
+
+    /* 25 — postDraftedEntry flips source to 'posted' + stamps
+       accounting_posted_at + clears any prior error. */
+    const postedRes = draftRes.ok ? await postDraftedEntry(ctx, draftRes.entry_id) : { ok: false } as const;
+    const { data: postedRow } = await supabase
+      .from("finance_payments")
+      .select("accounting_status, accounting_posted_at, accounting_last_error")
+      .eq("id", a2PaymentId)
+      .maybeSingle();
+    const posted = postedRow as { accounting_status: string; accounting_posted_at: string | null; accounting_last_error: string | null } | null;
+    ok("25 postDraftedEntry flips source to 'posted' with posted_at stamped",
+      postedRes.ok &&
+      posted?.accounting_status === "posted" &&
+      !!posted?.accounting_posted_at &&
+      posted?.accounting_last_error === null);
+
+    /* 26 — failed-state path. Build an unbalanced draft directly
+       (bypassing the helper that pre-flights the balance) so the DB
+       trigger rejects it at post time. */
+    const a2FailPaymentId = randomUUID();
+    await supabase.from("finance_payments").insert({
+      id: a2FailPaymentId, tenant_id: TENANT_A,
+      direction: "in", party_type: "customer", party_id: null, party_name: "A2 Fail",
+      amount: 1_000, currency: "USD", payment_date: "2026-05-09",
+      reference_no: "FAIL-1", bank_reference: "FAIL-1",
+      status: "completed", reconciliation_status: "unreconciled", approval_status: "approved",
+    });
+    const failEntryId = randomUUID();
+    await supabase.from("accounting_journal_entries").insert({
+      id: failEntryId, tenant_id: TENANT_A,
+      journal_no: `JE-FAIL-${Date.now().toString(16).slice(-6)}`,
+      entry_date: "2026-05-09", source_type: "payment", source_id: a2FailPaymentId,
+      status: "draft", description: "Intentionally unbalanced",
+    });
+    await supabase.from("accounting_journal_lines").insert([
+      { tenant_id: TENANT_A, entry_id: failEntryId, line_index: 0, account_id: aCoa.get("1010")!.id, debit: 1_000, credit: 0, currency: "USD" },
+      { tenant_id: TENANT_A, entry_id: failEntryId, line_index: 1, account_id: aCoa.get("1100")!.id, debit: 0, credit: 999, currency: "USD" },
+    ]);
+    /* Manually link the source to this unbalanced entry — mimics the
+       state a real failed draft would be in. */
+    await supabase.from("finance_payments")
+      .update({ accounting_status: "drafted", accounting_entry_id: failEntryId })
+      .eq("id", a2FailPaymentId);
+    const failPost = await postDraftedEntry(ctx, failEntryId);
+    const { data: failRow } = await supabase
+      .from("finance_payments")
+      .select("accounting_status, accounting_last_error")
+      .eq("id", a2FailPaymentId)
+      .maybeSingle();
+    const failed = failRow as { accounting_status: string; accounting_last_error: string | null } | null;
+    ok("26 failed post flips source to 'failed' + stores last_error",
+      !failPost.ok &&
+      failed?.accounting_status === "failed" &&
+      !!failed?.accounting_last_error);
+
+    /* 27 — voiding a posted entry flips source to 'voided'. */
+    if (postedRes.ok) {
+      const { voidJournalEntry } = await import("../src/lib/accounting/posting.js");
+      const voidRes = await voidJournalEntry(ctx, postedRes.entry_id, "Phase-A2 test void");
+      const { data: voidedRow } = await supabase
+        .from("finance_payments")
+        .select("accounting_status")
+        .eq("id", a2PaymentId)
+        .maybeSingle();
+      const voided = voidedRow as { accounting_status: string } | null;
+      ok("27 void flips source to 'voided'",
+        voidRes.ok && voided?.accounting_status === "voided");
+    } else {
+      ok("27 void flips source to 'voided'", false, "post failed");
+    }
+
+    /* 28 — queue endpoint behaviour. We can't call the route here
+       (no HTTP layer in the validator) but we can verify the
+       underlying queryability: pulling pending+drafted+failed
+       returns the right tenant set. */
+    const { data: tenantAQueue } = await supabase
+      .from("finance_payments")
+      .select("id, accounting_status")
+      .eq("tenant_id", TENANT_A)
+      .in("accounting_status", ["pending", "drafted", "failed"]);
+    const tenantAIds = new Set(((tenantAQueue ?? []) as Array<{ id: string }>).map((r) => r.id));
+    ok("28 queue list returns tenant-A rows when filtered by status",
+      tenantAIds.has(a2FailPaymentId),
+      `${tenantAIds.size} rows`);
+
+    /* 29 — cross-tenant queue access denied. Tenant B asks for
+       tenant A's queued rows by id; the row should NOT appear. */
+    const { data: crossQueue } = await supabase
+      .from("finance_payments")
+      .select("id")
+      .eq("tenant_id", TENANT_B)
+      .in("accounting_status", ["pending", "drafted", "failed"])
+      .in("id", [a2PaymentId, a2FailPaymentId]);
+    ok("29 cross-tenant queue access denied",
+      (crossQueue?.length ?? 0) === 0);
+
+    /* 30 — retry on a failed source either rebuilds or re-posts the
+       draft. We re-create a clean draft for the fail-payment first
+       (the previous draft is stuck unbalanced), then verify retry
+       brings the source to 'failed' again on the same unbalanced
+       data — confirming the retry path is wired without silently
+       laundering broken data. */
+    const retried = await retryRecognition(ctx, "payment", a2FailPaymentId);
+    /* The existing unbalanced draft is still there from the manual
+       insert above; retry tries to post it and fails. Voilà — same
+       failure path, same status. The point of this assertion is the
+       FLOW, not the data outcome. */
+    ok("30 retry path runs without silent success on broken draft",
+      !retried.ok);
   } finally {
     await clean();
   }

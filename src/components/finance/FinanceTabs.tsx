@@ -83,8 +83,9 @@ const GROUPS: TabGroup[] = [
   {
     id: "accounting",
     label: "Accounting",
-    defaultHref: "/finance/accounting/trial-balance",
+    defaultHref: "/finance/accounting/queue",
     items: [
+      { key: "/finance/accounting/queue",          label: "Queue",          icon: "clock" },
       { key: "/finance/accounting/trial-balance",  label: "Trial Balance",  icon: "badge-check" },
       { key: "/finance/accounting/general-ledger", label: "General Ledger", icon: "contract" },
     ],

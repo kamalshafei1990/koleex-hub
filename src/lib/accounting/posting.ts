@@ -34,6 +34,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import type {
   AccountingAccount,
   PostingContext,
+  PostingError,
   PostingOutcome,
   JournalSourceType,
 } from "./types";
@@ -101,7 +102,27 @@ async function findActiveEntryFor(tenantId: string, sourceType: JournalSourceTyp
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/* ─── Internal: create draft entry + lines and post atomically ──── */
+/* ─── Internal: create draft entry + lines, optionally promote ───
+   Phase A.2 splits the old `createAndPost` into two halves:
+
+     1. createDraft       inserts entry as status='draft', inserts
+                          lines, returns the entry id WITHOUT calling
+                          the post RPC. Also flips the operational
+                          source row's accounting_status to 'drafted'
+                          and stamps accounting_entry_id.
+
+     2. postExistingDraft calls fn_accounting_post_entry on a draft
+                          entry. On success flips the source row to
+                          'posted' and stamps accounting_posted_at.
+                          On failure flips to 'failed' + stores the
+                          error so the queue surface can show a
+                          retry button with the original message.
+
+   `createAndPost` is preserved as a back-compat one-shot wrapper —
+   the legacy public posters keep using it. New callers that want a
+   draft-first workflow call createDraft alone, then postExistingDraft
+   when the accountant approves.
+   ================================================================ */
 
 interface DraftLine {
   account_id: string;
@@ -115,7 +136,39 @@ interface DraftLine {
   reference?: string | null;
 }
 
-async function createAndPost(args: {
+/* Map source_type → operational table name. Used to keep the
+   accounting_status on the operational row in sync with the journal.
+   Opening-balance + manual + void sources have no operational row to
+   update. */
+function sourceTableFor(sourceType: JournalSourceType): string | null {
+  if (sourceType === "payment") return "finance_payments";
+  if (sourceType === "expense") return "finance_expenses";
+  if (sourceType === "cash_movement") return "finance_cash_movements";
+  return null;
+}
+
+async function setSourceAccountingStatus(
+  tenantId: string,
+  sourceType: JournalSourceType,
+  sourceId: string | null,
+  patch: {
+    accounting_status: "pending" | "drafted" | "posted" | "failed" | "voided";
+    accounting_entry_id?: string | null;
+    accounting_last_error?: string | null;
+    accounting_posted_at?: string | null;
+  },
+): Promise<void> {
+  if (!sourceId) return;
+  const tbl = sourceTableFor(sourceType);
+  if (!tbl) return;
+  await supabaseServer
+    .from(tbl)
+    .update(patch)
+    .eq("id", sourceId)
+    .eq("tenant_id", tenantId);
+}
+
+interface DraftArgs {
   tenantId: string;
   postedBy: string | null;
   sourceType: JournalSourceType;
@@ -124,13 +177,20 @@ async function createAndPost(args: {
   description: string;
   lines: DraftLine[];
   metadata?: Record<string, unknown>;
-}): Promise<PostingOutcome> {
+}
+
+async function createDraft(args: DraftArgs): Promise<PostingOutcome> {
   /* Pre-flight balance check — saves a round-trip when the caller
      gives us unbalanced lines. The DB also enforces this. */
   const debitSum = args.lines.reduce((s, l) => s + (l.debit || 0), 0);
   const creditSum = args.lines.reduce((s, l) => s + (l.credit || 0), 0);
   if (Math.abs(debitSum - creditSum) > 0.005) {
-    return { ok: false, error: `Unbalanced: sum(debit)=${debitSum.toFixed(2)} sum(credit)=${creditSum.toFixed(2)}` };
+    const err = `Unbalanced: sum(debit)=${debitSum.toFixed(2)} sum(credit)=${creditSum.toFixed(2)}`;
+    await setSourceAccountingStatus(args.tenantId, args.sourceType, args.sourceId, {
+      accounting_status: "failed",
+      accounting_last_error: err,
+    });
+    return { ok: false, error: err };
   }
   if (args.lines.length === 0) {
     return { ok: false, error: "Cannot post a journal with zero lines" };
@@ -138,7 +198,7 @@ async function createAndPost(args: {
 
   const journalNo = generateJournalNo(args.sourceType, args.sourceId, new Date(args.entryDate));
 
-  /* Insert the draft header first. */
+  /* Insert the draft header. */
   const { data: entryRow, error: entryErr } = await supabaseServer
     .from("accounting_journal_entries")
     .insert({
@@ -157,6 +217,10 @@ async function createAndPost(args: {
   if (entryErr || !entryRow) {
     /* Most common cause: duplicate (tenant_id, source_type, source_id)
        — surface that explicitly. */
+    await setSourceAccountingStatus(args.tenantId, args.sourceType, args.sourceId, {
+      accounting_status: "failed",
+      accounting_last_error: entryErr?.message ?? "Insert failed",
+    });
     return { ok: false, error: entryErr?.message ?? "Insert failed", code: 409 };
   }
   const entryId = (entryRow as { id: string }).id;
@@ -183,20 +247,83 @@ async function createAndPost(args: {
     /* Compensating delete — the entry exists in draft but lines
        failed, so wipe it before returning. */
     await supabaseServer.from("accounting_journal_entries").delete().eq("id", entryId).eq("tenant_id", args.tenantId);
+    await setSourceAccountingStatus(args.tenantId, args.sourceType, args.sourceId, {
+      accounting_status: "failed",
+      accounting_last_error: linesErr.message,
+    });
     return { ok: false, error: linesErr.message, code: 500 };
   }
 
-  /* Atomically post — DB validates balance + flips status. */
+  /* Mirror the new draft state to the operational row so the queue
+     UI sees the transition immediately. Clears any previous error. */
+  await setSourceAccountingStatus(args.tenantId, args.sourceType, args.sourceId, {
+    accounting_status: "drafted",
+    accounting_entry_id: entryId,
+    accounting_last_error: null,
+  });
+
+  return { ok: true, entry_id: entryId, journal_no: journalNo, status: "draft" };
+}
+
+async function postExistingDraft(
+  tenantId: string,
+  postedBy: string | null,
+  entryId: string,
+): Promise<PostingOutcome> {
+  /* Read the entry's source so we can mirror the status flip back
+     to the operational row. */
+  const { data: entryData } = await supabaseServer
+    .from("accounting_journal_entries")
+    .select("id, source_type, source_id, journal_no, status")
+    .eq("id", entryId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!entryData) return { ok: false, error: "Entry not found", code: 404 };
+  const entry = entryData as { id: string; source_type: JournalSourceType; source_id: string | null; journal_no: string; status: string };
+
+  /* Already posted — idempotent return without re-running the RPC. */
+  if (entry.status === "posted") {
+    return { ok: true, entry_id: entry.id, journal_no: entry.journal_no, status: "posted" };
+  }
+
   const { data: postRes, error: postErr } = await supabaseServer.rpc("fn_accounting_post_entry", {
     p_entry_id: entryId,
-    p_tenant_id: args.tenantId,
-    p_posted_by: args.postedBy,
+    p_tenant_id: tenantId,
+    p_posted_by: postedBy,
   });
-  if (postErr) return { ok: false, error: postErr.message, code: 500 };
+  if (postErr) {
+    await setSourceAccountingStatus(tenantId, entry.source_type, entry.source_id, {
+      accounting_status: "failed",
+      accounting_last_error: postErr.message,
+    });
+    return { ok: false, error: postErr.message, code: 500 };
+  }
   const r = (postRes ?? {}) as { ok?: boolean; error?: string; code?: number };
-  if (!r.ok) return { ok: false, error: r.error ?? "Post failed", code: r.code };
+  if (!r.ok) {
+    await setSourceAccountingStatus(tenantId, entry.source_type, entry.source_id, {
+      accounting_status: "failed",
+      accounting_last_error: r.error ?? "Post failed",
+    });
+    return { ok: false, error: r.error ?? "Post failed", code: r.code };
+  }
 
-  return { ok: true, entry_id: entryId, journal_no: journalNo, status: "posted" };
+  /* Mirror posted state to the source row. */
+  await setSourceAccountingStatus(tenantId, entry.source_type, entry.source_id, {
+    accounting_status: "posted",
+    accounting_entry_id: entry.id,
+    accounting_posted_at: new Date().toISOString(),
+    accounting_last_error: null,
+  });
+
+  return { ok: true, entry_id: entry.id, journal_no: entry.journal_no, status: "posted" };
+}
+
+/* Legacy one-shot helper — preserved so existing public posters
+   (postPayment, postExpense, etc.) keep their atomic behaviour. */
+async function createAndPost(args: DraftArgs): Promise<PostingOutcome> {
+  const draftResult = await createDraft(args);
+  if (!draftResult.ok) return draftResult;
+  return postExistingDraft(args.tenantId, args.postedBy, draftResult.entry_id);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -551,6 +678,16 @@ export async function postOpeningBalance(ctx: PostingContext, args: OpeningBalan
 /* ─── Void helper ─────────────────────────────────────────────── */
 
 export async function voidJournalEntry(ctx: PostingContext, entryId: string, reason: string): Promise<PostingOutcome> {
+  /* Look up the entry's source so we can flip the operational row's
+     accounting_status='voided' AFTER the reversal posts. The void RPC
+     is atomic on the accounting side; this just mirrors the status. */
+  const { data: entryData } = await supabaseServer
+    .from("accounting_journal_entries")
+    .select("source_type, source_id")
+    .eq("id", entryId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+
   const { data, error } = await supabaseServer.rpc("fn_accounting_void_entry", {
     p_entry_id: entryId,
     p_tenant_id: ctx.tenantId,
@@ -560,5 +697,212 @@ export async function voidJournalEntry(ctx: PostingContext, entryId: string, rea
   if (error) return { ok: false, error: error.message, code: 500 };
   const r = (data ?? {}) as { ok?: boolean; error?: string; code?: number; reversing_entry_id?: string; reversing_journal_no?: string };
   if (!r.ok) return { ok: false, error: r.error ?? "Void failed", code: r.code };
+
+  /* Mirror the void back to the operational row. */
+  if (entryData) {
+    const src = entryData as { source_type: JournalSourceType; source_id: string | null };
+    await setSourceAccountingStatus(ctx.tenantId, src.source_type, src.source_id, {
+      accounting_status: "voided",
+      accounting_last_error: null,
+    });
+  }
+
   return { ok: true, entry_id: r.reversing_entry_id!, journal_no: r.reversing_journal_no ?? "", status: "posted" };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase A.2 — DRAFT-FIRST WORKFLOW PUBLIC API
+
+   The functions below are the new operator-driven recognition path:
+   create a draft now, review it in the Accounting Queue, post it
+   when the accountant approves.
+
+   Each draftXxx() resolves the right Dr/Cr accounts (same logic as
+   the legacy postXxx) and creates a draft entry WITHOUT promoting
+   it to posted. The operational row's accounting_status flips to
+   'drafted' so the queue UI shows the new state immediately.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/** Resolve the draft inputs for a payment, returning the
+ *  DraftArgs (or an error). Shared by draftPayment + the
+ *  retry path so the Dr/Cr math stays in one place. */
+async function buildPaymentDraftArgs(ctx: PostingContext, paymentId: string): Promise<DraftArgs | PostingError> {
+  const { data: pay } = await supabaseServer
+    .from("finance_payments")
+    .select("id, direction, party_type, party_id, party_name, amount, currency, payment_date, reference_no, status")
+    .eq("id", paymentId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  if (!pay) return { ok: false, error: "Payment not found", code: 404 };
+  const p = pay as { id: string; direction: string; party_type: string; party_id: string | null; party_name: string; amount: number; currency: string; payment_date: string; reference_no: string | null; status: string };
+  if (p.status !== "completed") {
+    return { ok: false, error: `Cannot draft a ${p.status} payment`, code: 409 };
+  }
+
+  const accts = await loadAccountsByCode(ctx.tenantId);
+  const bank = requireAccount(accts, "1010");
+  const ar   = requireAccount(accts, "1100");
+  const ap   = requireAccount(accts, "2000");
+  const amt  = Number(p.amount) || 0;
+  const isCustomerCollection = p.direction === "in";
+
+  return {
+    tenantId: ctx.tenantId,
+    postedBy: ctx.postedByAccountId,
+    sourceType: "payment",
+    sourceId: p.id,
+    entryDate: p.payment_date,
+    description: isCustomerCollection
+      ? `Customer collection — ${p.party_name}${p.reference_no ? ` (ref ${p.reference_no})` : ""}`
+      : `Supplier payment — ${p.party_name}${p.reference_no ? ` (ref ${p.reference_no})` : ""}`,
+    metadata: { payment_id: p.id, party_id: p.party_id, party_type: p.party_type, direction: p.direction },
+    lines: isCustomerCollection
+      ? [
+          { account_id: bank.id, debit: amt, credit: 0, currency: p.currency, description: "Cash received", reference: p.reference_no },
+          { account_id: ar.id,   debit: 0, credit: amt, currency: p.currency, description: "Settle receivable", party_id: p.party_id, party_type: "customer", reference: p.reference_no },
+        ]
+      : [
+          { account_id: ap.id,   debit: amt, credit: 0, currency: p.currency, description: "Settle payable", party_id: p.party_id, party_type: "supplier", reference: p.reference_no },
+          { account_id: bank.id, debit: 0, credit: amt, currency: p.currency, description: "Cash disbursed", reference: p.reference_no },
+        ],
+  };
+}
+
+const EXPENSE_CATEGORY_HINTS_DRAFT: Record<string, string> = {
+  banking: "5100", bank: "5100", freight: "5200", shipping: "5200", customs: "5300",
+};
+
+async function buildExpenseDraftArgs(ctx: PostingContext, expenseId: string): Promise<DraftArgs | PostingError> {
+  const { data: exp } = await supabaseServer
+    .from("finance_expenses")
+    .select("id, title, amount, currency, expense_date, payment_status, linked_supplier_id, category_id")
+    .eq("id", expenseId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  if (!exp) return { ok: false, error: "Expense not found", code: 404 };
+  const e = exp as { id: string; title: string; amount: number; currency: string; expense_date: string; payment_status: string; linked_supplier_id: string | null; category_id: string | null };
+
+  const accts = await loadAccountsByCode(ctx.tenantId);
+  let debitCode = "5000";
+  if (e.category_id) {
+    const { data: cat } = await supabaseServer
+      .from("finance_expense_categories")
+      .select("name")
+      .eq("id", e.category_id)
+      .maybeSingle();
+    const name = ((cat as { name?: string } | null)?.name ?? "").toLowerCase();
+    for (const [hint, code] of Object.entries(EXPENSE_CATEGORY_HINTS_DRAFT)) {
+      if (name.includes(hint)) { debitCode = code; break; }
+    }
+  }
+  const debitAccount = requireAccount(accts, debitCode);
+  const creditAccount = e.payment_status === "paid"
+    ? requireAccount(accts, "1010")
+    : requireAccount(accts, "2000");
+  const amt = Number(e.amount) || 0;
+
+  return {
+    tenantId: ctx.tenantId,
+    postedBy: ctx.postedByAccountId,
+    sourceType: "expense",
+    sourceId: e.id,
+    entryDate: e.expense_date,
+    description: `Expense — ${e.title}`,
+    metadata: { expense_id: e.id, payment_status: e.payment_status },
+    lines: [
+      { account_id: debitAccount.id, debit: amt, credit: 0, currency: e.currency, description: e.title, party_id: e.linked_supplier_id, party_type: e.linked_supplier_id ? "supplier" : null },
+      { account_id: creditAccount.id, debit: 0, credit: amt, currency: e.currency, description: e.payment_status === "paid" ? "Cash disbursed" : "Recognise payable", party_id: e.linked_supplier_id, party_type: e.linked_supplier_id ? "supplier" : null },
+    ],
+  };
+}
+
+async function buildCashMovementDraftArgs(ctx: PostingContext, movementId: string): Promise<DraftArgs | PostingError | { redirectPaymentId: string }> {
+  const { data: mov } = await supabaseServer
+    .from("finance_cash_movements")
+    .select("id, direction, amount, currency, movement_date, bank_reference, counterparty_name, related_payment_id")
+    .eq("id", movementId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  if (!mov) return { ok: false, error: "Cash movement not found", code: 404 };
+  const m = mov as { id: string; direction: string; amount: number; currency: string; movement_date: string; bank_reference: string | null; counterparty_name: string | null; related_payment_id: string | null };
+  if (m.related_payment_id) return { redirectPaymentId: m.related_payment_id };
+
+  const accts = await loadAccountsByCode(ctx.tenantId);
+  const bank = requireAccount(accts, "1010");
+  const suspense = requireAccount(accts, "3000");
+  const amt = Number(m.amount) || 0;
+  const inflow = m.direction === "inflow";
+
+  return {
+    tenantId: ctx.tenantId,
+    postedBy: ctx.postedByAccountId,
+    sourceType: "cash_movement",
+    sourceId: m.id,
+    entryDate: m.movement_date,
+    description: `Bank movement — ${m.counterparty_name ?? "unattributed"} ${m.bank_reference ? `(ref ${m.bank_reference})` : ""}`,
+    metadata: { movement_id: m.id, direction: m.direction, suspense_default: true },
+    lines: inflow
+      ? [
+          { account_id: bank.id,     debit: amt, credit: 0,   currency: m.currency, description: "Unclassified inflow",  reference: m.bank_reference },
+          { account_id: suspense.id, debit: 0,   credit: amt, currency: m.currency, description: "Pending classification (Owner Capital — reclassify)", reference: m.bank_reference },
+        ]
+      : [
+          { account_id: suspense.id, debit: amt, credit: 0,   currency: m.currency, description: "Pending classification (Owner Capital — reclassify)", reference: m.bank_reference },
+          { account_id: bank.id,     debit: 0,   credit: amt, currency: m.currency, description: "Unclassified outflow", reference: m.bank_reference },
+        ],
+  };
+}
+
+/* Draft-only public posters. Each returns the new draft entry id;
+   the operator promotes it to posted via postDraftedEntry. */
+
+export async function draftPayment(ctx: PostingContext, paymentId: string): Promise<PostingOutcome> {
+  /* Idempotent — if an active (non-voided) entry already exists for
+     this source we return that one. Drafted, posted, and failed all
+     count as "exists"; only voided makes a slot available. */
+  const existing = await findActiveEntryFor(ctx.tenantId, "payment", paymentId);
+  if (existing) return { ok: true, entry_id: existing, journal_no: "", status: "draft" };
+
+  const args = await buildPaymentDraftArgs(ctx, paymentId);
+  if ("ok" in args && args.ok === false) return args;
+  return createDraft(args as DraftArgs);
+}
+
+export async function draftExpense(ctx: PostingContext, expenseId: string): Promise<PostingOutcome> {
+  const existing = await findActiveEntryFor(ctx.tenantId, "expense", expenseId);
+  if (existing) return { ok: true, entry_id: existing, journal_no: "", status: "draft" };
+  const args = await buildExpenseDraftArgs(ctx, expenseId);
+  if ("ok" in args && args.ok === false) return args;
+  return createDraft(args as DraftArgs);
+}
+
+export async function draftCashMovement(ctx: PostingContext, movementId: string): Promise<PostingOutcome> {
+  const existing = await findActiveEntryFor(ctx.tenantId, "cash_movement", movementId);
+  if (existing) return { ok: true, entry_id: existing, journal_no: "", status: "draft" };
+  const args = await buildCashMovementDraftArgs(ctx, movementId);
+  if ("redirectPaymentId" in args) return draftPayment(ctx, args.redirectPaymentId);
+  if ("ok" in args && args.ok === false) return args;
+  return createDraft(args as DraftArgs);
+}
+
+/** Promote a drafted entry to posted. Looks up the entry's source
+ *  internally so the operational row's status mirrors the journal. */
+export async function postDraftedEntry(ctx: PostingContext, entryId: string): Promise<PostingOutcome> {
+  return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, entryId);
+}
+
+/** Retry a failed source. Looks for an existing active draft and
+ *  posts it; if none exists, re-runs the appropriate draftXxx then
+ *  posts. Clears accounting_last_error on success. */
+export async function retryRecognition(ctx: PostingContext, kind: "payment" | "expense" | "cash_movement", sourceId: string): Promise<PostingOutcome> {
+  const existing = await findActiveEntryFor(ctx.tenantId, kind, sourceId);
+  if (existing) {
+    return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, existing);
+  }
+  /* No surviving draft — rebuild from scratch and post. */
+  const drafted = kind === "payment" ? await draftPayment(ctx, sourceId)
+    : kind === "expense" ? await draftExpense(ctx, sourceId)
+    : await draftCashMovement(ctx, sourceId);
+  if (!drafted.ok) return drafted;
+  return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, drafted.entry_id);
 }
