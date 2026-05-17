@@ -125,7 +125,7 @@ async function ensureSupplier(tenantId: string): Promise<string> {
 async function createPo(opts: {
   tenantId: string;
   supplierId: string;
-  lines: Array<{ product_id: string; qty: number; unit_cost: number }>;
+  lines: Array<{ product_id?: string | null; inventory_item_id?: string | null; description?: string | null; qty: number; unit_cost: number }>;
 }): Promise<{ poId: string; itemIds: string[] }> {
   const { data: po, error } = await supabase
     .from("purchase_orders")
@@ -148,7 +148,9 @@ async function createPo(opts: {
     .from("purchase_order_items")
     .insert(opts.lines.map((l, idx) => ({
       po_id: poId,
-      product_id: l.product_id,
+      product_id: l.product_id ?? null,
+      inventory_item_id: l.inventory_item_id ?? null,
+      description: l.description ?? null,
       qty: l.qty,
       qty_received: 0,
       qty_billed: 0,
@@ -603,6 +605,132 @@ async function main() {
     "21  void of non-stock receipt: ok, no inventory side-effects, qty_received → 0",
     voidNS.ok && (poi21 as { qty_received: number } | null)?.qty_received === 0,
     `qty_received=${(poi21 as { qty_received?: number } | null)?.qty_received}`,
+  );
+
+  /* ─── Phase O.3.1 (continuation) — universal-inventory PO lines
+     + exhibition mode + container_no.
+
+     22  PO line carrying inventory_item_id only (no product). Receive
+         to warehouse — engine must use that item directly without
+         touching the product catalog.
+     23  PO line carrying ONLY a linked product. Engine derives an
+         inventory item via fn_inventory_ensure_item_for_product.
+     24  receive_to_exhibition lands stock in an exhibition_site
+         location named by exhibition_name.
+     25  container_no is captured on the receipt header. */
+
+  /* Create a fresh inventory item not linked to any product, then a
+     PO with a line that references it directly. */
+  const { data: extraType } = await supabase
+    .from("inventory_item_types")
+    .select("id, code_prefix")
+    .is("tenant_id", null)
+    .eq("type_key", "spare_part")
+    .maybeSingle();
+  const sparePartTypeId = (extraType as { id: string; code_prefix: string } | null)?.id;
+  if (!sparePartTypeId) throw new Error("spare_part system type missing");
+  /* Auto-code via the items library to mirror real path. */
+  const { createInventoryItem } = await import("../src/lib/inventory/items");
+  const standalone = await createInventoryItem({
+    tenant_id: TENANT_A, item_name: "Needle Bar Assembly (PO-22)",
+    type_key: "spare_part", unit_of_measure: "pcs",
+  });
+  const standaloneItemId = standalone.item!.id;
+
+  const po22 = await createPo({
+    tenantId: TENANT_A, supplierId: supplierA,
+    lines: [{ inventory_item_id: standaloneItemId, description: "Needle bar assy", qty: 25, unit_cost: 4 }],
+  });
+  const r22 = await receivePurchaseOrder({
+    poId: po22.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "warehouse", warehouse_id: whA,
+      lines: [{ po_item_id: po22.itemIds[0], qty_received: 25, qty_accepted: 25 }],
+    },
+  });
+  const bal22 = (await getStockBalance(TENANT_A, standaloneItemId, whA)).qty_on_hand;
+  ok(
+    "22  PO line using inventory_item_id only (no product) — stock lands on that item",
+    r22.ok && bal22 === 25,
+    `bal=${bal22}`,
+  );
+
+  /* PO line using ONLY linked product (existing fallback path).
+     Assert the delta, not the absolute — pidB has been hit by other
+     tests already so its derived inventory item carries prior stock. */
+  const po23 = await createPo({
+    tenantId: TENANT_A, supplierId: supplierA,
+    lines: [{ product_id: pidB, qty: 4, unit_cost: 1 }],
+  });
+  /* Resolve the auto-derived item BEFORE receiving so we can record a
+     baseline. The ensure RPC is idempotent. */
+  const { ensureInventoryItemForProduct: _ensure23 } = await import("../src/lib/inventory/items");
+  const derivedItem = await _ensure23(TENANT_A, pidB);
+  const balBefore23 = (await getStockBalance(TENANT_A, derivedItem, whA)).qty_on_hand;
+  const r23 = await receivePurchaseOrder({
+    poId: po23.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "warehouse", warehouse_id: whA,
+      lines: [{ po_item_id: po23.itemIds[0], qty_received: 4, qty_accepted: 4 }],
+    },
+  });
+  const { data: rcptLines23 } = await supabase
+    .from("purchase_receipt_items")
+    .select("inventory_item_id")
+    .eq("receipt_id", r23.receipt_id ?? "");
+  const recordedItem = ((rcptLines23 ?? [])[0] as { inventory_item_id: string } | undefined)?.inventory_item_id;
+  const balAfter23 = (await getStockBalance(TENANT_A, derivedItem, whA)).qty_on_hand;
+  ok(
+    "23  PO line using only linked product — engine derives inventory item, stock posted",
+    r23.ok && recordedItem === derivedItem && (balAfter23 - balBefore23) === 4,
+    `derived=${derivedItem.slice(0, 8)} Δ=${balAfter23 - balBefore23}`,
+  );
+
+  /* Exhibition mode — stock lands in an exhibition_site location. */
+  const po24 = await createPo({
+    tenantId: TENANT_A, supplierId: supplierA,
+    lines: [{ inventory_item_id: standaloneItemId, description: "Exhibition spare kit", qty: 2, unit_cost: 4 }],
+  });
+  const r24 = await receivePurchaseOrder({
+    poId: po24.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "exhibition", exhibition_name: "ITMA Milan 2027",
+      lines: [{ po_item_id: po24.itemIds[0], qty_received: 2, qty_accepted: 2 }],
+    },
+  });
+  const loc24 = r24.receipt_id ? await locationOf(r24.receipt_id) : null;
+  const balExh = r24.destination_location_id
+    ? (await getStockBalance(TENANT_A, standaloneItemId, r24.destination_location_id)).qty_on_hand
+    : 0;
+  ok(
+    "24  receive_to_exhibition: stock lands in exhibition_site location",
+    r24.ok && loc24?.type === "exhibition_site" && balExh === 2,
+    `loc=${loc24?.type} bal=${balExh}`,
+  );
+
+  /* container_no captured on receipt header. */
+  const po25 = await createPo({
+    tenantId: TENANT_A, supplierId: supplierA,
+    lines: [{ inventory_item_id: standaloneItemId, description: "Container test", qty: 1, unit_cost: 4 }],
+  });
+  const r25 = await receivePurchaseOrder({
+    poId: po25.poId, tenantId: TENANT_A, receivedBy: null,
+    request: {
+      destination_mode: "port", port_name: "Shenzhen",
+      shipment_reference: "BL-9988", container_no: "MSCU7654321",
+      lines: [{ po_item_id: po25.itemIds[0], qty_received: 1, qty_accepted: 1 }],
+    },
+  });
+  const { data: hdr25 } = await supabase
+    .from("purchase_receipts")
+    .select("container_no, shipment_reference, port_name")
+    .eq("id", r25.receipt_id ?? "")
+    .maybeSingle();
+  const h25 = hdr25 as { container_no: string | null; shipment_reference: string | null; port_name: string | null } | null;
+  ok(
+    "25  container_no + shipment_reference + port_name persisted on receipt header",
+    r25.ok && h25?.container_no === "MSCU7654321" && h25?.shipment_reference === "BL-9988" && h25?.port_name === "Shenzhen",
+    `c=${h25?.container_no} ref=${h25?.shipment_reference}`,
   );
 
   console.log("─".repeat(72));

@@ -31,6 +31,9 @@ export async function GET(req: Request) {
 }
 
 interface PoItemBody {
+  /* O.3.1: inventory_item_id is the primary operational handle.
+     product_id remains supported as an optional catalog link. */
+  inventory_item_id?: string | null;
   product_id?: string | null;
   description?: string | null;
   qty: number;
@@ -94,6 +97,7 @@ export async function POST(req: Request) {
     const lineTotal = discounted * (1 + taxPct / 100);
     subtotal += discounted;
     return {
+      inventory_item_id: it.inventory_item_id ?? null,
       product_id: it.product_id ?? null,
       description: it.description ?? null,
       qty,

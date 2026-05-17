@@ -59,7 +59,8 @@ import type {
 } from "./types";
 
 const STOCK_MOVING_MODES = new Set<ReceiveDestinationMode>([
-  "warehouse", "port", "forwarder", "in_transit", "consolidation", "direct_ship_to_customer",
+  "warehouse", "port", "forwarder", "in_transit", "consolidation",
+  "direct_ship_to_customer", "exhibition", "demo_location",
 ]);
 
 /* Map destination_mode → location_type for find-or-create. */
@@ -71,6 +72,8 @@ function locationTypeForMode(mode: ReceiveDestinationMode): SpecialLocationType 
     case "in_transit":              return "in_transit";
     case "consolidation":           return "consolidation_point";
     case "direct_ship_to_customer": return "customer_location";
+    case "exhibition":              return "exhibition_site";
+    case "demo_location":           return "demo_location";
     case "non_stock_purchase":      return null;
   }
 }
@@ -168,8 +171,10 @@ export async function receivePurchaseOrder(opts: {
       if (locType && locType !== "warehouse") {
         warehouseId = await ensureSpecialLocation(tenantId, locType, {
           name:
-            destinationMode === "port"            ? request.port_name :
-            destinationMode === "forwarder"       ? request.forwarder_name :
+            destinationMode === "port"          ? request.port_name :
+            destinationMode === "forwarder"     ? request.forwarder_name :
+            destinationMode === "exhibition"    ? request.exhibition_name :
+            destinationMode === "demo_location" ? request.demo_location_name :
             null,
           customer_id: destinationMode === "direct_ship_to_customer" ? request.customer_id ?? null : null,
         });
@@ -194,6 +199,7 @@ export async function receivePurchaseOrder(opts: {
       shipment_reference: request.shipment_reference ?? null,
       forwarder_name: request.forwarder_name ?? null,
       port_name: request.port_name ?? null,
+      container_no: request.container_no ?? null,
       expected_ship_date: request.expected_ship_date ?? null,
       expected_arrival_date: request.expected_arrival_date ?? null,
       status: "draft",
@@ -219,6 +225,11 @@ export async function receivePurchaseOrder(opts: {
       receipt_id: receiptId,
       po_item_id: poItem.id,
       product_id: poItem.product_id,
+      /* Carry the PO line's inventory_item_id forward immediately so
+         the receipt line knows what it represents even before stock
+         is posted (relevant for non_stock_purchase too — bookkeeping
+         needs to know which item the receipt was for). */
+      inventory_item_id: poItem.inventory_item_id ?? null,
       description: poItem.description,
       qty_received: qtyReceived,
       qty_accepted: qtyAccepted,
@@ -253,17 +264,26 @@ export async function receivePurchaseOrder(opts: {
     for (const line of insertedLines as Array<{
       id: string;
       product_id: string | null;
+      inventory_item_id: string | null;
       qty_accepted: number;
       warehouse_id: string | null;
       unit_cost: number | null;
       currency: string;
       unit: string | null;
     }>) {
-      if (!line.product_id) continue;          // free-text line: skip stock impact
+      /* Universal-inventory routing:
+           1. PO line carried inventory_item_id  → use it directly
+           2. PO line carried only a product_id → derive / auto-create
+              an inventory item from the product (back-compat)
+           3. Neither → free-text / service line, no stock impact */
+      let inventoryItemId: string | null = line.inventory_item_id;
+      if (!inventoryItemId && line.product_id) {
+        inventoryItemId = await ensureInventoryItemForProduct(tenantId, line.product_id);
+      }
+      if (!inventoryItemId) continue;          // service / non-trackable line
+
       const qty = Number(line.qty_accepted) || 0;
       if (qty <= 0) continue;
-
-      const inventoryItemId = await ensureInventoryItemForProduct(tenantId, line.product_id);
 
       const created = await createInventoryMovement({
         tenant_id: tenantId,

@@ -40,6 +40,11 @@ export interface PurchaseOrder {
 export interface PurchaseOrderItem {
   id: string;
   po_id: string;
+  /** Primary operational item. When present the receiving engine
+   *  posts the stock movement against this inventory_item_id. */
+  inventory_item_id: string | null;
+  /** Optional catalog linkage. Engine falls back to deriving an
+   *  inventory item from this product when inventory_item_id is null. */
   product_id: string | null;
   description: string | null;
   qty: number;
@@ -58,6 +63,8 @@ export type ReceiveDestinationMode =
   | "in_transit"
   | "consolidation"
   | "direct_ship_to_customer"
+  | "exhibition"
+  | "demo_location"
   | "non_stock_purchase";
 
 /** Which destination modes still produce stock movements. */
@@ -68,6 +75,8 @@ export const STOCK_MOVING_DESTINATION_MODES: ReceiveDestinationMode[] = [
   "in_transit",
   "consolidation",
   "direct_ship_to_customer",
+  "exhibition",
+  "demo_location",
 ];
 
 export interface PurchaseReceipt {
@@ -94,6 +103,7 @@ export interface PurchaseReceipt {
   shipment_reference: string | null;
   forwarder_name: string | null;
   port_name: string | null;
+  container_no: string | null;
   expected_ship_date: string | null;
   expected_arrival_date: string | null;
   created_at: string;
@@ -142,8 +152,11 @@ export interface ReceiveRequest {
   port_name?: string | null;
   forwarder_name?: string | null;
   shipment_reference?: string | null;
+  container_no?: string | null;
   expected_ship_date?: string | null;
   expected_arrival_date?: string | null;
+  exhibition_name?: string | null;
+  demo_location_name?: string | null;
   received_at?: string | null;
   carrier?: string | null;
   tracking_no?: string | null;

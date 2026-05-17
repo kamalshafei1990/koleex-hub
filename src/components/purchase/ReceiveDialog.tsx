@@ -61,12 +61,16 @@ export default function ReceiveDialog({
      the receipt creates stock movements. */
   type DestinationMode =
     | "warehouse" | "port" | "forwarder" | "in_transit" | "consolidation"
-    | "direct_ship_to_customer" | "non_stock_purchase";
+    | "direct_ship_to_customer" | "exhibition" | "demo_location"
+    | "non_stock_purchase";
   const [destinationMode, setDestinationMode] = useState<DestinationMode>("warehouse");
   const [portName, setPortName] = useState("");
   const [forwarderName, setForwarderName] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [exhibitionName, setExhibitionName] = useState("");
+  const [demoLocationName, setDemoLocationName] = useState("");
   const [shipmentReference, setShipmentReference] = useState("");
+  const [containerNo, setContainerNo] = useState("");
   const [expectedShipDate, setExpectedShipDate] = useState("");
   const [expectedArrivalDate, setExpectedArrivalDate] = useState("");
   const affectsInventory = destinationMode !== "non_stock_purchase";
@@ -165,7 +169,10 @@ export default function ReceiveDialog({
           port_name: destinationMode === "port" ? portName || null : null,
           forwarder_name: destinationMode === "forwarder" ? forwarderName || null : null,
           customer_id: destinationMode === "direct_ship_to_customer" ? customerId || null : null,
+          exhibition_name: destinationMode === "exhibition" ? exhibitionName || null : null,
+          demo_location_name: destinationMode === "demo_location" ? demoLocationName || null : null,
           shipment_reference: shipmentReference || null,
+          container_no: containerNo || null,
           expected_ship_date: expectedShipDate || null,
           expected_arrival_date: expectedArrivalDate || null,
           carrier: carrier || null,
@@ -226,6 +233,8 @@ export default function ReceiveDialog({
                     { v: "in_transit", label: "In transit", hint: "Affects inventory" },
                     { v: "consolidation", label: "Consolidation", hint: "Affects inventory" },
                     { v: "direct_ship_to_customer", label: "Direct to customer", hint: "Affects inventory" },
+                    { v: "exhibition", label: "Exhibition", hint: "Affects inventory" },
+                    { v: "demo_location", label: "Demo location", hint: "Affects inventory" },
                     { v: "non_stock_purchase", label: "Non-stock", hint: "No inventory" },
                   ] as const).map((opt) => {
                     const active = destinationMode === opt.v;
@@ -297,14 +306,45 @@ export default function ReceiveDialog({
                     />
                   </label>
                 )}
-                {(destinationMode === "port" || destinationMode === "forwarder" || destinationMode === "direct_ship_to_customer" || destinationMode === "in_transit" || destinationMode === "consolidation") && (
+                {destinationMode === "exhibition" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Exhibition</div>
+                    <input
+                      value={exhibitionName}
+                      onChange={(e) => setExhibitionName(e.target.value)}
+                      placeholder="ITMA Milan 2027, Texprocess…"
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    />
+                  </label>
+                )}
+                {destinationMode === "demo_location" && (
+                  <label className="block sm:col-span-1">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Demo location</div>
+                    <input
+                      value={demoLocationName}
+                      onChange={(e) => setDemoLocationName(e.target.value)}
+                      placeholder="Customer site, training center…"
+                      className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                    />
+                  </label>
+                )}
+                {(destinationMode === "port" || destinationMode === "forwarder" || destinationMode === "direct_ship_to_customer" || destinationMode === "in_transit" || destinationMode === "consolidation" || destinationMode === "exhibition" || destinationMode === "demo_location") && (
                   <>
                     <label className="block">
                       <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Shipment ref</div>
                       <input
                         value={shipmentReference}
                         onChange={(e) => setShipmentReference(e.target.value)}
-                        placeholder="BL, AWB, container#…"
+                        placeholder="BL, AWB, ref#…"
+                        className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Container #</div>
+                      <input
+                        value={containerNo}
+                        onChange={(e) => setContainerNo(e.target.value)}
+                        placeholder="MSCU1234567"
                         className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
                       />
                     </label>
