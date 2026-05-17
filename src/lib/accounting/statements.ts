@@ -28,7 +28,10 @@ import type { AccountingAccount } from "./types";
 
 /* Direct-cost expense accounts. With no COGS module yet, freight +
    customs are the closest direct-cost analogue in the Hub COA. */
-const DIRECT_COST_CODES = new Set(["5200", "5300"]);
+/* Cost-of-sales codes — freight (5200), customs (5300), and the
+   Phase A.4 COGS account (5400). Anything else under 5xxx falls into
+   operating expenses by default. */
+const DIRECT_COST_CODES = new Set(["5200", "5300", "5400"]);
 
 /* Current-asset codes — excludes 1400-1999 (would be fixed assets
    when those accounts are added in a later phase). */

@@ -305,11 +305,15 @@ export default function FinanceAccountingQueue() {
           )}
         </div>
 
-        {/* Phase A.4 — Inventory COGS recognition. Lives next to the
-            payment/expense queue so accountants can review every COGS
-            draft from one surface. */}
+        {/* Phase A.4 — Inventory COGS recognition. */}
         <DashboardSection eyebrow="Inventory COGS" title="Cost of Goods Sold from sales shipments" tight>
           <InventoryCogsSection />
+        </DashboardSection>
+
+        {/* Phase A.5 — Revenue recognition. Sits beside COGS so the
+            accountant sees both sides of every sale in one place. */}
+        <DashboardSection eyebrow="Sales Revenue" title="Revenue + AR recognition from confirmed invoices" tight>
+          <SalesRevenueSection />
         </DashboardSection>
 
         <DashboardSection eyebrow="Workflow" title="How recognition works">
@@ -661,5 +665,148 @@ function ReviewDrawer({
         )}
       </div>
     </aside>
+  );
+}
+
+/* ─── Sales Revenue section (Phase A.5) ───────────────────────
+   Same shape as the Inventory COGS section: read the dedicated
+   /api/accounting/revenue endpoint, render with Post / Void
+   actions, mirror the operational row via the standard journal
+   void RPC. */
+
+interface RevenueQueueRow {
+  id: string;
+  journal_no: string;
+  status: "draft" | "posted" | "voided";
+  entry_date: string;
+  source_id: string | null;
+  invoice_no: string | null;
+  customer_name: string | null;
+  total: number;
+}
+
+function SalesRevenueSection() {
+  const [rows, setRows] = useState<RevenueQueueRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch("/api/accounting/revenue?limit=100", { credentials: "include", cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      setRows((j.entries ?? []) as RevenueQueueRow[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const post = async (id: string) => {
+    setBusy(id);
+    try {
+      const r = await fetch("/api/accounting/post-draft", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entry_id: id }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { alert(j.error ?? "Post failed"); return; }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const voidEntry = async (id: string) => {
+    if (!confirm("Void this revenue journal? A reversing entry will be posted.")) return;
+    const reason = prompt("Reason (optional):") ?? "voided from queue";
+    setBusy(id);
+    try {
+      const r = await fetch(`/api/accounting/journals/${id}/void`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error ?? "Void failed"); return; }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+      )}
+      <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
+        <table className="min-w-full text-[12.5px]">
+          <thead>
+            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+              <th className="px-4 py-2 text-left">Journal #</th>
+              <th className="px-4 py-2 text-left">Invoice #</th>
+              <th className="px-4 py-2 text-left">Customer</th>
+              <th className="px-4 py-2 text-left">Date</th>
+              <th className="px-4 py-2 text-right">Total</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && rows.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-[11px] text-gray-600">
+                No revenue drafts yet. They appear here once a confirmed invoice is drafted via the API.
+              </td></tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.journal_no}</td>
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.invoice_no ?? "—"}</td>
+                  <td className="px-4 py-2 text-gray-300">{r.customer_name ?? "—"}</td>
+                  <td className="px-4 py-2 text-[11px] text-gray-500">{r.entry_date}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-mono">
+                    {Number(r.total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
+                      r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+                                              "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                    }`}>{r.status}</span>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {r.status === "draft" && (
+                        <button onClick={() => post(r.id)} disabled={busy === r.id}
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
+                          Post
+                        </button>
+                      )}
+                      {r.status === "posted" && (
+                        <button onClick={() => voidEntry(r.id)} disabled={busy === r.id}
+                          className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50">
+                          Void
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

@@ -53,7 +53,8 @@ export type JournalSourceType =
   | "opening_balance"
   | "manual"
   | "void"
-  | "inventory_cogs";
+  | "inventory_cogs"
+  | "sales_revenue";
 
 export type JournalStatus = "draft" | "posted" | "voided";
 

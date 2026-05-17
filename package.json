@@ -18,7 +18,9 @@
     "validate:purchases": "NODE_OPTIONS=--conditions=react-server tsx scripts/purchases.ts",
     "validate:sales": "NODE_OPTIONS=--conditions=react-server tsx scripts/sales.ts",
     "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts",
-    "validate:cogs": "NODE_OPTIONS=--conditions=react-server tsx scripts/cogs.ts"
+    "validate:cogs": "NODE_OPTIONS=--conditions=react-server tsx scripts/cogs.ts",
+    "validate:revenue": "NODE_OPTIONS=--conditions=react-server tsx scripts/revenue.ts",
+    "validate:financial-statements": "NODE_OPTIONS=--conditions=react-server tsx scripts/financial-statements.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

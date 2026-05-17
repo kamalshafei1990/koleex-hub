@@ -91,6 +91,7 @@ const GROUPS: TabGroup[] = [
       { key: "/finance/accounting/profit-loss",    label: "Profit & Loss",   icon: "file-invoice-dollar" },
       { key: "/finance/accounting/cash-flow",      label: "Cash Flow",       icon: "wallet" },
       { key: "/finance/accounting/equity",         label: "Equity",          icon: "coins" },
+      { key: "/finance/statements",                label: "Statements",      icon: "balance-scale-left" },
     ],
   },
   {

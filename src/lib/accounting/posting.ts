@@ -82,6 +82,7 @@ function generateJournalNo(sourceType: JournalSourceType, sourceId: string | nul
     sourceType === "cash_movement" ? "JE-MOV" :
     sourceType === "opening_balance" ? "JE-OB" :
     sourceType === "inventory_cogs" ? "JE-COGS" :
+    sourceType === "sales_revenue"  ? "JE-REV"  :
     "JE-MAN";
   return `${prefix}-${ymd}-${tail}`;
 }
@@ -148,6 +149,8 @@ function sourceTableFor(sourceType: JournalSourceType): string | null {
   /* Phase A.4 — Sales Shipment COGS mirrors its status on the
      sales_shipments row. */
   if (sourceType === "inventory_cogs") return "sales_shipments";
+  /* Phase A.5 — Invoice revenue mirrors on the invoices row. */
+  if (sourceType === "sales_revenue") return "invoices";
   return null;
 }
 
@@ -1019,6 +1022,98 @@ export async function postInventoryCogs(
   shipmentId: string,
 ): Promise<PostingOutcome> {
   const drafted = await draftInventoryCogs(ctx, shipmentId);
+  if (!drafted.ok) return drafted;
+  return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, drafted.entry_id);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase A.5 — Revenue + AR recognition.
+
+   When an invoice is confirmed (status != draft / cancelled / void)
+   the accounting layer drafts:
+
+     Dr 1100  Accounts Receivable
+     Cr 4000  Sales Revenue
+
+   amount = invoice.total. No VAT, no deferred revenue, no schedule —
+   the brief is explicit: only the revenue side of the basic flow.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/** Statuses that count as "confirmed" for revenue recognition. */
+const REVENUE_ELIGIBLE_STATUSES = new Set([
+  "issued", "sent", "partial", "paid", "overdue",
+]);
+
+async function buildRevenueDraftArgs(
+  ctx: PostingContext,
+  invoiceId: string,
+): Promise<DraftArgs | PostingError> {
+  const { data: row } = await supabaseServer
+    .from("invoices")
+    .select("id, inv_no, status, customer_id, currency, total, issue_date, cancelled_at")
+    .eq("id", invoiceId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "Invoice not found", code: 404 };
+  const inv = row as { id: string; inv_no: string | null; status: string; customer_id: string | null; currency: string; total: number; issue_date: string; cancelled_at: string | null };
+
+  if (inv.cancelled_at) return { ok: false, error: "Invoice is cancelled", code: 409 };
+  if (!REVENUE_ELIGIBLE_STATUSES.has(inv.status)) {
+    return { ok: false, error: `Cannot draft revenue for invoice in status '${inv.status}'`, code: 409 };
+  }
+
+  const total = Number(inv.total) || 0;
+  if (total <= 0) {
+    return { ok: false, error: "Invoice total is zero — no revenue to recognise", code: 422 };
+  }
+
+  const accts = await loadAccountsByCode(ctx.tenantId);
+  const ar   = requireAccount(accts, "1100");
+  const rev  = requireAccount(accts, "4000");
+  const currency = inv.currency || "USD";
+
+  return {
+    tenantId: ctx.tenantId,
+    postedBy: ctx.postedByAccountId,
+    sourceType: "sales_revenue",
+    sourceId: inv.id,
+    entryDate: inv.issue_date,
+    description: `Revenue · ${inv.inv_no ?? inv.id.slice(0, 8)}`,
+    metadata: { invoice_no: inv.inv_no, customer_id: inv.customer_id },
+    lines: [
+      {
+        account_id: ar.id, debit: total, credit: 0, currency,
+        description: "Accounts Receivable", reference: inv.inv_no,
+        party_id: inv.customer_id, party_type: "customer",
+      },
+      {
+        account_id: rev.id, debit: 0, credit: total, currency,
+        description: "Sales Revenue", reference: inv.inv_no,
+      },
+    ],
+  };
+}
+
+/** Draft a revenue recognition entry for a confirmed invoice.
+ *  Idempotent — re-calls return the existing active draft. */
+export async function draftRevenueRecognition(
+  ctx: PostingContext,
+  invoiceId: string,
+): Promise<PostingOutcome> {
+  const existing = await findActiveEntryFor(ctx.tenantId, "sales_revenue", invoiceId);
+  if (existing) return { ok: true, entry_id: existing, journal_no: "", status: "draft" };
+
+  const args = await buildRevenueDraftArgs(ctx, invoiceId);
+  if ("ok" in args && args.ok === false) return args;
+  return createDraft(args as DraftArgs);
+}
+
+/** draft + post in one shot (validator helper). */
+export async function postRevenueRecognition(
+  ctx: PostingContext,
+  invoiceId: string,
+): Promise<PostingOutcome> {
+  const drafted = await draftRevenueRecognition(ctx, invoiceId);
   if (!drafted.ok) return drafted;
   return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, drafted.entry_id);
 }
