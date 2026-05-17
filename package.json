@@ -22,7 +22,8 @@
     "validate:revenue": "NODE_OPTIONS=--conditions=react-server tsx scripts/revenue.ts",
     "validate:financial-statements": "NODE_OPTIONS=--conditions=react-server tsx scripts/financial-statements.ts",
     "validate:onboarding": "NODE_OPTIONS=--conditions=react-server tsx scripts/onboarding.ts",
-    "validate:currency": "NODE_OPTIONS=--conditions=react-server tsx scripts/currency.ts"
+    "validate:currency": "NODE_OPTIONS=--conditions=react-server tsx scripts/currency.ts",
+    "validate:role-experience": "NODE_OPTIONS=--conditions=react-server tsx scripts/role-experience.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

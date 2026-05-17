@@ -10,6 +10,7 @@ import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { listInventoryItems } from "@/lib/inventory/queries";
 import { createInventoryItem } from "@/lib/inventory/items";
 import type { CreateItemInput } from "@/lib/inventory/types";
+import { getUserExperience } from "@/lib/experience";
 
 const MODULE = "Inventory";
 
@@ -28,7 +29,13 @@ export async function GET(req: Request) {
       status: (url.searchParams.get("status") as "active" | "inactive" | "archived" | null) ?? undefined,
       limit: Number(url.searchParams.get("limit")) || 200,
     });
-    return NextResponse.json({ items });
+    /* Role-based cost masking — strip cost_price / avg_cost / inventory_value
+       on the wire for roles that aren't allowed to see them. */
+    const experience = await getUserExperience(auth);
+    const masked = experience.can_see_cost_data
+      ? items
+      : items.map((it) => ({ ...it, cost_price: null, avg_cost: 0, inventory_value: 0 }));
+    return NextResponse.json({ items: masked, can_see_cost_data: experience.can_see_cost_data });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
