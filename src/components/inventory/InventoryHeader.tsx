@@ -17,6 +17,7 @@ interface TabEntry { key: string; label: string; icon: RrIconName }
 
 const TABS: TabEntry[] = [
   { key: "/inventory",            label: "Dashboard",      icon: "coins" },
+  { key: "/inventory/items",      label: "Items",           icon: "contract" },
   { key: "/inventory/movements",  label: "Stock Movements", icon: "file-invoice" },
   { key: "/inventory/balances",   label: "Stock Balances",  icon: "badge-check" },
   { key: "/inventory/warehouses", label: "Warehouses",      icon: "bank" },

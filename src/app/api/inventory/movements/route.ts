@@ -5,11 +5,11 @@ import "server-only";
    POST /api/inventory/movements    create a movement (draft, optionally post)
 
    Body shape:
-     { product_id, warehouse_id?, movement_type, direction?, quantity,
-       unit?, unit_cost?, currency?, reference?, notes?, movement_date?,
-       source_type?, source_id?, post? }
+     { inventory_item_id, warehouse_id?, movement_type, direction?,
+       quantity, unit?, unit_cost?, currency?, reference?, notes?,
+       movement_date?, source_type?, source_id?, post? }
 
-     post=true  → create + post atomically (default for now).
+     post=true  → create + post atomically (default).
      post=false → leave as draft so the operator can review.
    ========================================================================== */
 
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   try {
     const movements = await buildMovementHistory({
       tenantId: auth.tenant_id,
-      productId: url.searchParams.get("product_id") ?? undefined,
+      inventoryItemId: url.searchParams.get("inventory_item_id") ?? undefined,
       warehouseId: url.searchParams.get("warehouse_id") ?? undefined,
       status: (url.searchParams.get("status") as "draft" | "posted" | "voided" | null) ?? undefined,
       movementType: url.searchParams.get("movement_type") ?? undefined,
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
   const input: CreateMovementInput = {
     tenant_id: auth.tenant_id,
-    product_id: body.product_id ?? "",
+    inventory_item_id: body.inventory_item_id ?? "",
     warehouse_id: body.warehouse_id ?? undefined,
     movement_type: body.movement_type as CreateMovementInput["movement_type"],
     direction: body.direction,
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     metadata: {},
   };
 
-  const shouldPost = body.post !== false;        // default: post
+  const shouldPost = body.post !== false;
 
   if (!shouldPost) {
     const r = await createInventoryMovement(input);
@@ -92,8 +92,6 @@ export async function POST(req: Request) {
 
   const r = await createAndPostInventoryMovement(input);
   if (!r.ok) {
-    /* Created but not posted: surface 422 with the draft id so the
-       client can show a retry button on the queue. */
     if (r.movement && r.post) {
       return NextResponse.json(
         { error: r.error, movement: r.movement, post: r.post },

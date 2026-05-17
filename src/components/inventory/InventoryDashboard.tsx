@@ -21,8 +21,10 @@ interface SummaryMovement {
   status: string;
 }
 interface SummaryBalance {
-  product_id: string;
-  product_name: string | null;
+  inventory_item_id: string;
+  item_code: string;
+  item_name: string | null;
+  item_type_name: string | null;
   warehouse_code: string;
   warehouse_name: string;
   qty_on_hand: number;
@@ -30,7 +32,7 @@ interface SummaryBalance {
 }
 interface Summary {
   warehouse_count: number;
-  product_count: number;
+  item_count: number;
   total_on_hand: number;
   total_reserved: number;
   recent_movements: SummaryMovement[];
@@ -103,7 +105,7 @@ export default function InventoryDashboard() {
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <KpiTile label="Warehouses" value={String(summary.warehouse_count)} hint="Active locations" />
-              <KpiTile label="SKUs with stock" value={String(summary.product_count)} hint="Distinct products on hand" />
+              <KpiTile label="Items with stock" value={String(summary.item_count)} hint="Distinct inventory items on hand" />
               <KpiTile label="Total on-hand" value={fmtQty(summary.total_on_hand)} hint="Sum across all warehouses" />
               <KpiTile label="Reserved" value={fmtQty(summary.total_reserved)} hint="Held for committed orders" />
             </div>
@@ -121,7 +123,8 @@ export default function InventoryDashboard() {
                 <table className="min-w-full text-[12.5px]">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
-                      <th className="px-4 py-2 text-left">Product</th>
+                      <th className="px-4 py-2 text-left">Code</th>
+                      <th className="px-4 py-2 text-left">Item</th>
                       <th className="px-4 py-2 text-left">Warehouse</th>
                       <th className="px-4 py-2 text-right">On hand</th>
                       <th className="px-4 py-2 text-right">Available</th>
@@ -130,14 +133,15 @@ export default function InventoryDashboard() {
                   <tbody>
                     {summary.top_balances.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-[11px] text-gray-600">
-                          No stock recorded yet. Post your first movement to build balances.
+                        <td colSpan={5} className="px-4 py-6 text-center text-[11px] text-gray-600">
+                          No stock recorded yet. Add an item with initial quantity or post your first movement.
                         </td>
                       </tr>
                     ) : (
                       summary.top_balances.map((b) => (
-                        <tr key={`${b.product_id}-${b.warehouse_code}`} className="border-b border-white/[0.03]">
-                          <td className="px-4 py-2 text-gray-300">{b.product_name ?? "—"}</td>
+                        <tr key={`${b.inventory_item_id}-${b.warehouse_code}`} className="border-b border-white/[0.03]">
+                          <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{b.item_code}</td>
+                          <td className="px-4 py-2 text-gray-300">{b.item_name ?? "—"}</td>
                           <td className="px-4 py-2 text-gray-400">{b.warehouse_code}</td>
                           <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(b.qty_on_hand)}</td>
                           <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtQty(b.qty_available)}</td>

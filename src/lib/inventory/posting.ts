@@ -1,24 +1,19 @@
 import "server-only";
 
 /* ===========================================================================
-   Phase O.2 — Inventory posting engine.
+   Phase O.2.1 — Inventory posting engine (re-keyed onto inventory_item_id).
 
    Three public functions:
 
      createInventoryMovement()   build + insert a DRAFT movement row.
-                                  Returns the row id. No balance change.
-
-     postInventoryMovement()     promote a draft to POSTED. Atomic at the
-                                  DB layer (advisory lock + balance upsert
-                                  inside fn_inventory_post_movement).
-                                  Idempotent: re-posting a posted row
-                                  returns the existing state.
-
+     postInventoryMovement()     promote a draft to POSTED.
      voidInventoryMovement()     void a posted movement via a reversing
                                   draft posted in the same transaction.
-                                  Original is never mutated.
 
-   Lifecycle: DRAFT → POSTED → VOID.
+   `inventory_item_id` is now the universal subject of every movement.
+   Products no longer feature in this layer at all — Phase O.3 must
+   first resolve a product to its inventory_item via
+   `ensureInventoryItemForProduct` (see items.ts) before posting.
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -31,8 +26,6 @@ import {
   directionForType,
 } from "./types";
 
-/* ─── Default warehouse helper ───────────────────────────────── */
-
 export async function ensureDefaultWarehouse(tenantId: string): Promise<string> {
   const { data, error } = await supabaseServer.rpc("fn_inventory_ensure_default_warehouse", {
     p_tenant_id: tenantId,
@@ -40,13 +33,6 @@ export async function ensureDefaultWarehouse(tenantId: string): Promise<string> 
   if (error) throw new Error(error.message);
   return data as string;
 }
-
-/* ─── Movement-number generator ───────────────────────────────
-   Format: IM-<TYPE>-YYYYMMDD-XXXXXX. Stable enough for a register
-   listing; uniqueness is ultimately enforced by the (tenant_id,
-   movement_no) UNIQUE constraint, so we add a 6-char random tail
-   to avoid in-tenant collisions when many movements are entered
-   in the same millisecond. */
 
 function generateMovementNo(movementType: string, date: Date): string {
   const ymd = date.toISOString().slice(0, 10).replace(/-/g, "");
@@ -65,26 +51,13 @@ function generateMovementNo(movementType: string, date: Date): string {
   return `${prefix}-${ymd}-${tail}`;
 }
 
-/* ─── createInventoryMovement ─────────────────────────────────
-   Inserts a draft row. Balances are not touched.
-
-   Validation:
-     - quantity > 0 (decimal allowed; uses numeric(18,4) at the DB)
-     - direction resolves (either supplied or derived from type)
-     - product_id + warehouse_id present (warehouse defaults to the
-       tenant's default if omitted)
-     - if source_id present, no non-voided movement may already exist
-       for the same (tenant, source_type, source_id) — partial unique
-       index will raise 23505, we surface a clean error.
-   ============================================================== */
-
 export async function createInventoryMovement(input: CreateMovementInput): Promise<{
   ok: boolean;
   movement?: StockMovement;
   error?: string;
 }> {
   if (!input.tenant_id) return { ok: false, error: "tenant_id required" };
-  if (!input.product_id) return { ok: false, error: "product_id required" };
+  if (!input.inventory_item_id) return { ok: false, error: "inventory_item_id required" };
   if (!input.movement_type) return { ok: false, error: "movement_type required" };
   if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
     return { ok: false, error: "quantity must be a positive number" };
@@ -102,9 +75,7 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
   const movementDate = date.toISOString().slice(0, 10);
   const movementNo = generateMovementNo(input.movement_type, date);
 
-  /* Idempotency probe — if source_type + source_id are present and a
-     non-voided movement already exists, return that row instead of
-     attempting an insert that the unique index would reject. */
+  /* Source idempotency probe. */
   if (input.source_type && input.source_id) {
     const { data: existing } = await supabaseServer
       .from("inventory_stock_movements")
@@ -125,7 +96,7 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
       tenant_id: input.tenant_id,
       movement_no: movementNo,
       movement_date: movementDate,
-      product_id: input.product_id,
+      inventory_item_id: input.inventory_item_id,
       warehouse_id: warehouseId,
       movement_type: input.movement_type,
       direction,
@@ -155,8 +126,6 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
   return { ok: true, movement: data as StockMovement };
 }
 
-/* ─── postInventoryMovement ──────────────────────────────────── */
-
 export async function postInventoryMovement(
   movementId: string,
   tenantId: string,
@@ -167,13 +136,9 @@ export async function postInventoryMovement(
     p_tenant_id: tenantId,
     p_posted_by: postedBy,
   });
-  if (error) {
-    return { ok: false, error: error.message, code: 500 };
-  }
+  if (error) return { ok: false, error: error.message, code: 500 };
   return (data ?? { ok: false, error: "No response from posting RPC" }) as PostMovementResult;
 }
-
-/* ─── voidInventoryMovement ──────────────────────────────────── */
 
 export async function voidInventoryMovement(
   movementId: string,
@@ -187,35 +152,21 @@ export async function voidInventoryMovement(
     p_voided_by: voidedBy,
     p_reason: reason,
   });
-  if (error) {
-    return { ok: false, error: error.message, code: 500 };
-  }
+  if (error) return { ok: false, error: error.message, code: 500 };
   return (data ?? { ok: false, error: "No response from void RPC" }) as VoidMovementResult;
 }
 
-/* ─── rebuildStockBalance ────────────────────────────────────
-   Repair tool. Recomputes qty_on_hand from the movement ledger
-   for one (product, warehouse) pair and overwrites the stored
-   balance. Voided rows + their reverses both contribute (the
-   reverse cancels the voided original), so a fully-consistent
-   history yields the same number that's already stored. If they
-   diverge, the stored row was somehow corrupted and this call
-   reconciles it.
-
-   Race protection: holds the same advisory lock the post engine
-   uses, so no concurrent post can change the balance mid-rebuild.
-   Draft rows are skipped. */
-
+/* ─── rebuildStockBalance — repair tool ─────────────────────── */
 export async function rebuildStockBalance(
   tenantId: string,
-  productId: string,
+  inventoryItemId: string,
   warehouseId: string,
 ): Promise<{ ok: boolean; qty_on_hand: number; previous: number | null }> {
   const { data: movements, error } = await supabaseServer
     .from("inventory_stock_movements")
     .select("direction, quantity, status")
     .eq("tenant_id", tenantId)
-    .eq("product_id", productId)
+    .eq("inventory_item_id", inventoryItemId)
     .eq("warehouse_id", warehouseId)
     .in("status", ["posted", "voided"])
     .is("deleted_at", null);
@@ -226,17 +177,13 @@ export async function rebuildStockBalance(
     const q = Number(r.quantity) || 0;
     return acc + (r.direction === "in" ? q : -q);
   }, 0);
-  /* Clamp at zero. A truly consistent ledger never produces a
-     negative — the post RPC rejects OUT moves that would. But
-     if the rebuild somehow sees one, we floor it and the operator
-     will see it in the audit log. */
   const safe = rebuilt < 0 ? 0 : rebuilt;
 
   const { data: prev } = await supabaseServer
     .from("inventory_stock_balances")
     .select("qty_on_hand")
     .eq("tenant_id", tenantId)
-    .eq("product_id", productId)
+    .eq("inventory_item_id", inventoryItemId)
     .eq("warehouse_id", warehouseId)
     .maybeSingle();
   const previous = prev ? Number((prev as { qty_on_hand: number }).qty_on_hand) : null;
@@ -246,20 +193,16 @@ export async function rebuildStockBalance(
     .upsert(
       {
         tenant_id: tenantId,
-        product_id: productId,
+        inventory_item_id: inventoryItemId,
         warehouse_id: warehouseId,
         qty_on_hand: safe,
       },
-      { onConflict: "tenant_id,product_id,warehouse_id" },
+      { onConflict: "tenant_id,inventory_item_id,warehouse_id" },
     );
   if (upErr) throw new Error(upErr.message);
 
   return { ok: true, qty_on_hand: safe, previous };
 }
-
-/* ─── Convenience: create + post in one call ──────────────────
-   Used by API routes that want a single-shot endpoint (POST a
-   draft with ?post=1, or the simple Add Movement form). */
 
 export async function createAndPostInventoryMovement(
   input: CreateMovementInput,
@@ -277,14 +220,10 @@ export async function createAndPostInventoryMovement(
     input.tenant_id,
     input.created_by ?? null,
   );
-
-  /* If posting fails (e.g. would go negative), we keep the draft so
-     the operator can investigate, but we surface the error code. */
   if (!posted.ok) {
     return { ok: false, movement: created.movement, post: posted, error: posted.error };
   }
 
-  /* Re-load to return the posted-state row. */
   const { data: fresh } = await supabaseServer
     .from("inventory_stock_movements")
     .select("*")

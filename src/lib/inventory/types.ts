@@ -1,16 +1,10 @@
 /* ===========================================================================
-   Phase O.2 — Inventory Movement Core: shared types.
+   Phase O.2.1 — Universal Inventory shared types.
 
-   The inventory module sits ALONGSIDE the accounting module: both are
-   append-only ledgers whose derived state (balance sheet for accounting,
-   on-hand for inventory) is rebuildable from the journal alone. The
-   API mirrors that shape on purpose — drafts are editable, posted rows
-   are immutable, voids are reversing entries that never mutate the
-   original.
-
-   No valuation, no FIFO, no COGS, no reservations engine in this phase.
-   `unit_cost` is captured so a later accounting integration phase can
-   read it without a migration.
+   The inventory module now owns its own master record (inventory_items)
+   and is fully independent of the Product catalog. Products may
+   optionally link in via inventory_items.linked_product_id, but the
+   inventory ledger speaks only `inventory_item_id`.
    ========================================================================== */
 
 export type MovementType =
@@ -27,6 +21,118 @@ export type MovementType =
 
 export type Direction = "in" | "out";
 export type MovementStatus = "draft" | "posted" | "voided";
+
+export type IconName =
+  | "box" | "package" | "machine" | "cog" | "wrench" | "tool" | "tag" | "label"
+  | "file" | "book" | "screen" | "monitor" | "truck" | "pallet" | "warehouse"
+  | "sample" | "warning" | "recycle" | "office" | "gift" | "star" | "cube"
+  | "layers" | "cable" | "motor" | "shield" | "other";
+
+export type ColorToken =
+  | "gray" | "blue" | "cyan" | "teal" | "green" | "amber" | "orange"
+  | "red"  | "rose" | "purple" | "violet" | "slate";
+
+export type ItemStatus = "active" | "inactive" | "archived";
+
+export type UnitOfMeasure =
+  | "pcs" | "set" | "pair" | "box" | "carton" | "pallet" | "roll" | "sheet"
+  | "meter" | "cm" | "mm" | "kg" | "gram" | "liter" | "ml" | "bag"
+  | "bottle" | "pack" | "bundle" | "coil" | "container" | "unit";
+
+export const ALLOWED_UNITS: UnitOfMeasure[] = [
+  "pcs", "set", "pair", "box", "carton", "pallet", "roll", "sheet",
+  "meter", "cm", "mm", "kg", "gram", "liter", "ml", "bag",
+  "bottle", "pack", "bundle", "coil", "container", "unit",
+];
+
+export const ALLOWED_ICONS: IconName[] = [
+  "box","package","machine","cog","wrench","tool","tag","label",
+  "file","book","screen","monitor","truck","pallet","warehouse",
+  "sample","warning","recycle","office","gift","star","cube",
+  "layers","cable","motor","shield","other",
+];
+
+export const ALLOWED_COLORS: ColorToken[] = [
+  "gray","blue","cyan","teal","green","amber","orange",
+  "red","rose","purple","violet","slate",
+];
+
+export interface InventoryItemType {
+  id: string;
+  tenant_id: string | null;        // NULL for system rows
+  type_key: string;
+  type_name: string;
+  code_prefix: string;
+  icon: IconName;
+  color: ColorToken;
+  description: string | null;
+  is_system: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface InventoryItemCategory {
+  id: string;
+  tenant_id: string;
+  parent_id: string | null;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  tenant_id: string;
+  item_code: string;
+  item_name: string;
+  item_type_id: string;
+  category_id: string | null;
+  subcategory: string | null;
+  brand: string | null;
+  unit_of_measure: UnitOfMeasure;
+  default_warehouse_id: string | null;
+  preferred_supplier_id: string | null;
+  linked_product_id: string | null;
+  sku: string | null;
+  barcode: string | null;
+  qr_code: string | null;
+  cost_price: number | null;
+  currency: string | null;
+  min_stock: number | null;
+  reorder_point: number | null;
+  max_stock: number | null;
+  track_stock: boolean;
+  is_consumable: boolean;
+  is_sellable: boolean;
+  is_purchasable: boolean;
+  weight: number | null;
+  dimensions: string | null;
+  image_url: string | null;
+  description: string | null;
+  notes: string | null;
+  status: ItemStatus;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface InventoryItemWithRefs extends InventoryItem {
+  type_key: string;
+  type_name: string;
+  icon: IconName;
+  color: ColorToken;
+  category_name: string | null;
+  qty_on_hand: number;
+}
 
 export interface Warehouse {
   id: string;
@@ -47,8 +153,8 @@ export interface StockMovement {
   id: string;
   tenant_id: string;
   movement_no: string;
-  movement_date: string;            // YYYY-MM-DD
-  product_id: string;
+  movement_date: string;
+  inventory_item_id: string;
   warehouse_id: string;
   movement_type: MovementType;
   direction: Direction;
@@ -78,7 +184,7 @@ export interface StockMovement {
 export interface StockBalance {
   id: string;
   tenant_id: string;
-  product_id: string;
+  inventory_item_id: string;
   warehouse_id: string;
   qty_on_hand: number;
   qty_reserved: number;
@@ -89,20 +195,17 @@ export interface StockBalance {
   updated_at: string;
 }
 
-/** Convenience shape for the UI: a balance row joined with the
- *  product's display name + sku-ish identifiers and the warehouse
- *  label. The API enriches balances on the way out. */
 export interface BalanceWithRefs extends StockBalance {
-  product_name: string | null;
+  item_code: string;
+  item_name: string | null;
+  item_type_name: string | null;
+  item_icon: IconName;
+  item_color: ColorToken;
   warehouse_code: string;
   warehouse_name: string;
-  qty_available: number;            // on_hand - reserved
+  qty_available: number;
 }
 
-/** Direction defaults derived from movement_type. Centralised so
- *  the API, the validator, and the UI all agree. The user MAY
- *  override it (e.g. a `manual` movement can be either direction)
- *  but for typed flows we fill it in. */
 export function directionForType(type: MovementType): Direction | null {
   switch (type) {
     case "opening_balance":
@@ -117,16 +220,16 @@ export function directionForType(type: MovementType): Direction | null {
     case "return_out":
       return "out";
     case "manual":
-      return null;                  // caller must supply
+      return null;
   }
 }
 
 export interface CreateMovementInput {
   tenant_id: string;
-  product_id: string;
-  warehouse_id?: string | null;     // defaults to the tenant's default WH
+  inventory_item_id: string;
+  warehouse_id?: string | null;
   movement_type: MovementType;
-  direction?: Direction;            // required for `manual`
+  direction?: Direction;
   quantity: number;
   unit?: string;
   unit_cost?: number | null;
@@ -135,7 +238,7 @@ export interface CreateMovementInput {
   source_id?: string | null;
   reference?: string | null;
   notes?: string | null;
-  movement_date?: string;           // defaults to today
+  movement_date?: string;
   created_by?: string | null;
   metadata?: Record<string, unknown>;
 }
@@ -157,4 +260,39 @@ export interface VoidMovementResult {
   already_voided?: boolean;
   error?: string;
   code?: number;
+}
+
+/* ─── Item creation input ──────────────────────────────────── */
+export interface CreateItemInput {
+  tenant_id: string;
+  item_name: string;
+  item_type_id?: string;        // resolved from type_key if absent
+  type_key?: string;
+  category_id?: string | null;
+  unit_of_measure?: UnitOfMeasure;
+  brand?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
+  qr_code?: string | null;
+  cost_price?: number | null;
+  currency?: string;
+  min_stock?: number | null;
+  reorder_point?: number | null;
+  max_stock?: number | null;
+  track_stock?: boolean;
+  is_consumable?: boolean;
+  is_sellable?: boolean;
+  is_purchasable?: boolean;
+  weight?: number | null;
+  dimensions?: string | null;
+  image_url?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  preferred_supplier_id?: string | null;
+  linked_product_id?: string | null;
+  default_warehouse_id?: string | null;
+  /* Optional opening balance to post immediately. */
+  initial_quantity?: number;
+  initial_warehouse_id?: string | null;
+  created_by?: string | null;
 }

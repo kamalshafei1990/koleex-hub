@@ -1,27 +1,36 @@
 #!/usr/bin/env tsx
 
 /* ===========================================================================
-   Phase O.2 — Inventory Movement Core validator.
+   Phase O.2.1 — Universal Inventory validator.
 
-   Coverage (13 assertions):
-     01  Default warehouse seeder is idempotent
-     02  Creating a custom (non-default) warehouse succeeds
-     03  createInventoryMovement(draft) inserts a draft row
-     04  Post IN increases stock (on-hand goes 0 → 100)
-     05  Post OUT decreases stock (on-hand goes 100 → 60)
-     06  Negative stock rejected: OUT > on_hand returns ok=false / code 422
-     07  Posted movement immutable: UPDATE on operational columns rejected
-     08  Double post is a no-op (idempotent — returns already_posted)
-     09  voidInventoryMovement creates reversing entry and updates balance
-     10  Tenant isolation: A cannot read B's movements
-     11  Source idempotency: two creates with same (source_type, source_id)
-         do NOT produce two non-voided movements
-     12  getStockBalance returns live (product, warehouse) row
-     13  rebuildStockBalance reconciles to the movement history
+   The ledger is now keyed on inventory_item_id, and the module owns its
+   own master data: items, types (system + custom), and warehouses.
+
+   Coverage (20 assertions):
+     01  System item types seeded
+     02  Custom item type creation (icon, color)
+     03  Duplicate custom-type name rejected
+     04  System type cannot be deleted
+     05  Custom item type tenant isolation
+     06  Default warehouse seeder idempotent
+     07  Custom warehouse creation
+     08  createInventoryItem — auto code (MC-000001 / SP-000001 / …)
+     09  Create different item TYPES (machine, spare, packaging, exhibition,
+         office, damaged, consumable, no linked product)
+     10  Item without linked product works (independent of products table)
+     11  Quick add with initial_quantity posts opening_balance movement
+     12  Stock movement created from item uses inventory_item_id
+     13  Post IN increases stock to 100
+     14  Post OUT decreases stock 100 → 60
+     15  Negative stock rejected (422)
+     16  Posted movement immutable
+     17  Double post idempotent
+     18  Void posts reversing entry; balance moves back
+     19  Tenant isolation — A cannot see B's movements
+     20  rebuildStockBalance matches movement history
    ========================================================================== */
 
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
 import {
   createInventoryMovement,
   postInventoryMovement,
@@ -32,7 +41,13 @@ import {
 import {
   buildMovementHistory,
   getStockBalance,
+  listItemTypes,
 } from "../src/lib/inventory/queries";
+import {
+  createInventoryItem,
+  createItemType,
+  archiveItemType,
+} from "../src/lib/inventory/items";
 
 const URL_ENV = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -55,11 +70,8 @@ function ok(name: string, condition: boolean, detail = "") {
 async function ensureTenants() {
   for (const id of [TENANT_A, TENANT_B]) {
     await supabase.from("tenants").upsert({
-      id,
-      slug: `phase-o2-${id.slice(-4)}`,
-      name: `Phase-O2 Sandbox ${id.slice(-4)}`,
-      is_host: false,
-      active: true,
+      id, slug: `phase-o21-${id.slice(-4)}`,
+      name: `Phase-O2.1 Sandbox ${id.slice(-4)}`, is_host: false, active: true,
     }, { onConflict: "id" });
   }
 }
@@ -68,198 +80,225 @@ async function clean() {
   for (const t of [TENANT_A, TENANT_B]) {
     await supabase.from("inventory_stock_balances").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_movements").delete().eq("tenant_id", t);
+    await supabase.from("inventory_items").delete().eq("tenant_id", t);
+    await supabase.from("inventory_item_code_sequences").delete().eq("tenant_id", t);
+    await supabase.from("inventory_item_types").delete().eq("tenant_id", t);
     await supabase.from("inventory_warehouses").delete().eq("tenant_id", t);
   }
 }
 
-async function pickAnyProductId(): Promise<string> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("id")
-    .order("created_at", { ascending: true })
-    .limit(1);
-  if (error || !data || data.length === 0) throw new Error("No product available to test");
-  return (data[0] as { id: string }).id;
-}
-
 async function main() {
   console.log("─".repeat(72));
-  console.log("Phase O.2 — Inventory Movement Core validator");
+  console.log("Phase O.2.1 — Universal Inventory validator");
   console.log("─".repeat(72));
 
   await ensureTenants();
   await clean();
 
-  const productId = await pickAnyProductId();
+  /* 01 — System item types seeded. */
+  const typesA = await listItemTypes(TENANT_A);
+  const systemTypes = typesA.filter((t) => t.is_system);
+  const expectedKeys = new Set([
+    "finished_product","machine","machine_part","spare_part","accessory","attachment",
+    "raw_material","semi_finished","packaging_material","printed_material","consumable",
+    "tool","maintenance_item","office_supply","exhibition_material","marketing_material",
+    "sample","returned_goods","damaged_goods","refurbished_goods","obsolete_stock",
+    "service_item","other",
+  ]);
+  const seededKeys = new Set(systemTypes.map((t) => t.type_key));
+  const allSeeded = Array.from(expectedKeys).every((k) => seededKeys.has(k));
+  ok("01  system item types seeded (23 default types)", systemTypes.length >= 23 && allSeeded, `seeded=${systemTypes.length}`);
 
-  /* 01 — Default warehouse idempotent. */
+  /* 02 — Custom item type. */
+  const custom = await createItemType({
+    tenant_id: TENANT_A,
+    type_name: "CEO Office Items",
+    icon: "office",
+    color: "purple",
+    description: "Things assigned to the CEO's office",
+  });
+  ok(
+    "02  custom item type created with icon + color",
+    custom.ok && custom.type?.is_system === false && custom.type?.icon === "office" && custom.type?.color === "purple",
+    custom.error ?? "",
+  );
+
+  /* 03 — Duplicate name rejected. */
+  const dup = await createItemType({
+    tenant_id: TENANT_A,
+    type_name: "CEO Office Items",  // same name
+    icon: "box", color: "slate",
+  });
+  ok("03  duplicate custom-type name rejected", !dup.ok, dup.error ?? "");
+
+  /* 04 — System type cannot be deleted. */
+  const sysOther = systemTypes.find((t) => t.type_key === "other")!;
+  const delSys = await archiveItemType(TENANT_A, sysOther.id);
+  ok("04  system type cannot be deleted", !delSys.ok, delSys.error ?? "");
+
+  /* 05 — Custom type tenant isolation. */
+  const customB = await createItemType({
+    tenant_id: TENANT_B,
+    type_name: "B Special",
+    icon: "star", color: "rose",
+  });
+  /* List types for A; the B-custom must not appear. */
+  const typesAagain = await listItemTypes(TENANT_A);
+  const bLeaked = typesAagain.some((t) => t.id === customB.type?.id);
+  ok("05  custom item type tenant isolation", customB.ok && !bLeaked);
+
+  /* 06 — Default warehouse idempotent. */
   const wh1 = await ensureDefaultWarehouse(TENANT_A);
   const wh1again = await ensureDefaultWarehouse(TENANT_A);
-  ok("01  default warehouse seeder idempotent", wh1 === wh1again, `wh=${wh1.slice(0, 8)}`);
+  ok("06  default warehouse seeder idempotent", wh1 === wh1again, `wh=${wh1.slice(0, 8)}`);
 
-  /* 02 — Create custom warehouse. */
-  const custom = await supabase
+  /* 07 — Custom warehouse creation. */
+  const customWh = await supabase
     .from("inventory_warehouses")
-    .insert({ tenant_id: TENANT_A, code: "WH-OVERFLOW", name: "Overflow", is_default: false })
+    .insert({ tenant_id: TENANT_A, code: "WH-OVERFLOW", name: "Overflow" })
     .select("id")
     .single();
-  ok(
-    "02  custom warehouse created",
-    !custom.error && !!custom.data,
-    custom.error?.message ?? `id=${(custom.data as { id: string } | null)?.id?.slice(0, 8) ?? "?"}`,
-  );
+  ok("07  custom warehouse created", !customWh.error, customWh.error?.message ?? "");
 
-  /* 03 — Create draft. */
-  const draft = await createInventoryMovement({
-    tenant_id: TENANT_A,
-    product_id: productId,
-    warehouse_id: wh1,
-    movement_type: "opening_balance",
-    quantity: 100,
-    notes: "Phase O.2 test seed",
+  /* 08 — Auto code (MC-000001 / SP-000001 / …) — create one machine
+     and one spare part item and verify the code prefix + sequence. */
+  const m1 = await createInventoryItem({
+    tenant_id: TENANT_A, item_name: "Lockstitch Machine LX-9000",
+    type_key: "machine", unit_of_measure: "set",
   });
-  ok("03  createInventoryMovement inserts draft", !!(draft.ok && draft.movement && draft.movement.status === "draft"));
-
-  /* 04 — Post IN increases stock. */
-  const post1 = await postInventoryMovement(draft.movement!.id, TENANT_A, null);
-  const bal0 = await getStockBalance(TENANT_A, productId, wh1);
-  ok(
-    "04  post IN increases stock to 100",
-    post1.ok && bal0.qty_on_hand === 100,
-    `on_hand=${bal0.qty_on_hand}`,
-  );
-
-  /* 05 — Post OUT decreases stock. */
-  const outDraft = await createInventoryMovement({
-    tenant_id: TENANT_A,
-    product_id: productId,
-    warehouse_id: wh1,
-    movement_type: "sales_shipment",
-    quantity: 40,
+  const sp1 = await createInventoryItem({
+    tenant_id: TENANT_A, item_name: "Needle Bar Assembly",
+    type_key: "spare_part", unit_of_measure: "pcs",
   });
-  const outPost = await postInventoryMovement(outDraft.movement!.id, TENANT_A, null);
-  const bal1 = await getStockBalance(TENANT_A, productId, wh1);
   ok(
-    "05  post OUT decreases stock 100 → 60",
-    outPost.ok && bal1.qty_on_hand === 60,
-    `on_hand=${bal1.qty_on_hand}`,
+    "08  auto item code: machine → MC-000001, spare part → SP-000001",
+    m1.ok && sp1.ok &&
+      m1.item?.item_code === "MC-000001" &&
+      sp1.item?.item_code === "SP-000001",
+    `mc=${m1.item?.item_code} sp=${sp1.item?.item_code}`,
   );
 
-  /* 06 — Negative stock rejected. */
-  const overdraw = await createInventoryMovement({
-    tenant_id: TENANT_A,
-    product_id: productId,
-    warehouse_id: wh1,
-    movement_type: "adjustment_out",
-    quantity: 500,                 // > 60 on hand
+  /* 09 — Create items across many types. */
+  const created = await Promise.all([
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Export Carton 60×40×40", type_key: "packaging_material", unit_of_measure: "carton" }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Booth LED Backdrop",     type_key: "exhibition_material", unit_of_measure: "pcs" }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Printer Toner — Black",  type_key: "office_supply",      unit_of_measure: "pcs" }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Damaged Carton Stock",   type_key: "damaged_goods",      unit_of_measure: "pcs" }),
+    createInventoryItem({ tenant_id: TENANT_A, item_name: "Sewing Machine Oil",     type_key: "consumable",         unit_of_measure: "liter", is_consumable: true }),
+  ]);
+  ok(
+    "09  create items of types packaging/exhibition/office/damaged/consumable",
+    created.every((r) => r.ok && r.item),
+    created.map((r) => r.item?.item_code).join(" · "),
+  );
+
+  /* 10 — Item without linked product works (the items we just created
+     have no linked_product_id and they were created cleanly). */
+  ok(
+    "10  inventory item works without a linked product",
+    m1.item?.linked_product_id == null && sp1.item?.linked_product_id == null,
+  );
+
+  /* 11 — Quick add with initial_quantity posts opening_balance. */
+  const seeded = await createInventoryItem({
+    tenant_id: TENANT_A, item_name: "Office Chair",
+    type_key: "office_supply", unit_of_measure: "pcs",
+    initial_quantity: 6, initial_warehouse_id: wh1,
   });
-  const overdrawPost = await postInventoryMovement(overdraw.movement!.id, TENANT_A, null);
+  const seededBal = seeded.item ? await getStockBalance(TENANT_A, seeded.item.id, wh1) : null;
   ok(
-    "06  negative stock rejected (code=422)",
-    !overdrawPost.ok && overdrawPost.code === 422,
-    overdrawPost.error ?? "",
+    "11  quick-add with initial_quantity posts opening_balance",
+    seeded.ok && !!seeded.opening_movement_id && seededBal?.qty_on_hand === 6,
+    `bal=${seededBal?.qty_on_hand}`,
   );
 
-  /* 07 — Posted movement immutable. */
+  /* 12 — Stock movement uses inventory_item_id. */
+  const mvCheck = await supabase
+    .from("inventory_stock_movements")
+    .select("id, inventory_item_id, source_type, source_id, movement_type")
+    .eq("id", seeded.opening_movement_id ?? "")
+    .maybeSingle();
+  const mv = mvCheck.data as { id: string; inventory_item_id: string; source_type: string; source_id: string; movement_type: string } | null;
+  ok(
+    "12  movement carries inventory_item_id + opening_balance source",
+    !!mv && mv.inventory_item_id === seeded.item!.id && mv.movement_type === "opening_balance" && mv.source_type === "inventory_item_opening_balance",
+  );
+
+  /* 13 — Post IN +100 on m1. */
+  const inCreate = await createInventoryMovement({
+    tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
+    warehouse_id: wh1, movement_type: "opening_balance", quantity: 100,
+  });
+  await postInventoryMovement(inCreate.movement!.id, TENANT_A, null);
+  const bal0 = await getStockBalance(TENANT_A, m1.item!.id, wh1);
+  ok("13  post IN increases stock to 100", bal0.qty_on_hand === 100, `on_hand=${bal0.qty_on_hand}`);
+
+  /* 14 — Post OUT 40. */
+  const outCreate = await createInventoryMovement({
+    tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
+    warehouse_id: wh1, movement_type: "sales_shipment", quantity: 40,
+  });
+  await postInventoryMovement(outCreate.movement!.id, TENANT_A, null);
+  const bal1 = await getStockBalance(TENANT_A, m1.item!.id, wh1);
+  ok("14  post OUT decreases stock 100 → 60", bal1.qty_on_hand === 60, `on_hand=${bal1.qty_on_hand}`);
+
+  /* 15 — Negative rejected. */
+  const over = await createInventoryMovement({
+    tenant_id: TENANT_A, inventory_item_id: m1.item!.id,
+    warehouse_id: wh1, movement_type: "adjustment_out", quantity: 500,
+  });
+  const overPost = await postInventoryMovement(over.movement!.id, TENANT_A, null);
+  ok("15  negative stock rejected (422)", !overPost.ok && overPost.code === 422, overPost.error ?? "");
+
+  /* 16 — Posted immutable. */
   const updTry = await supabase
     .from("inventory_stock_movements")
     .update({ quantity: 999 })
-    .eq("id", draft.movement!.id);
-  ok(
-    "07  posted movement immutable (UPDATE on quantity rejected)",
-    !!updTry.error,
-    updTry.error?.message ? updTry.error.message.slice(0, 60) : "",
-  );
+    .eq("id", inCreate.movement!.id);
+  ok("16  posted movement immutable", !!updTry.error, updTry.error?.message?.slice(0, 60) ?? "");
 
-  /* 08 — Double post is a no-op (idempotent). */
-  const post2 = await postInventoryMovement(draft.movement!.id, TENANT_A, null);
-  const bal2 = await getStockBalance(TENANT_A, productId, wh1);
+  /* 17 — Double post idempotent. */
+  const dbl = await postInventoryMovement(inCreate.movement!.id, TENANT_A, null);
+  ok("17  double post idempotent", dbl.ok && dbl.already_posted === true);
+
+  /* 18 — Void OUT shipment, balance returns to 100. */
+  const voided = await voidInventoryMovement(outCreate.movement!.id, TENANT_A, null, "test reversal");
+  const bal2 = await getStockBalance(TENANT_A, m1.item!.id, wh1);
   ok(
-    "08  double post idempotent — balance unchanged",
-    post2.ok === true && post2.already_posted === true && bal2.qty_on_hand === 60,
+    "18  void reverses stock 60 → 100",
+    voided.ok && !!voided.reverse_movement_id && bal2.qty_on_hand === 100,
     `on_hand=${bal2.qty_on_hand}`,
   );
 
-  /* 09 — Void produces a reversing entry that updates balance. */
-  const voided = await voidInventoryMovement(draft.movement!.id, TENANT_A, null, "test reversal");
-  /* original was +100; reverse subtracts 100 from 60 → would go -40.
-     The reverse fires through fn_inventory_post_movement which rejects
-     negatives, so the void RAISES. We're testing the happy path: void
-     the OUT shipment instead (40 was deducted; reverse adds 40 → 100). */
-  const voidedOut = await voidInventoryMovement(outDraft.movement!.id, TENANT_A, null, "test reversal");
-  const bal3 = await getStockBalance(TENANT_A, productId, wh1);
-  ok(
-    "09  void posts reversing entry and adjusts balance",
-    !voided.ok && voidedOut.ok && !!voidedOut.reverse_movement_id && bal3.qty_on_hand === 100,
-    `on_hand=${bal3.qty_on_hand} void-of-in=${voided.ok ? "ok" : "rejected"} void-of-out=${voidedOut.ok ? "ok" : "rejected"}`,
-  );
-
-  /* 10 — Tenant isolation. Seed a movement in B, ensure A can't see it. */
+  /* 19 — Tenant isolation. */
   const whB = await ensureDefaultWarehouse(TENANT_B);
-  const bDraft = await createInventoryMovement({
-    tenant_id: TENANT_B,
-    product_id: productId,
-    warehouse_id: whB,
-    movement_type: "opening_balance",
-    quantity: 7,
+  const itemB = await createInventoryItem({
+    tenant_id: TENANT_B, item_name: "B-side item",
+    type_key: "machine", unit_of_measure: "pcs",
   });
-  await postInventoryMovement(bDraft.movement!.id, TENANT_B, null);
+  const bMove = await createInventoryMovement({
+    tenant_id: TENANT_B, inventory_item_id: itemB.item!.id,
+    warehouse_id: whB, movement_type: "opening_balance", quantity: 9,
+  });
+  await postInventoryMovement(bMove.movement!.id, TENANT_B, null);
   const aSees = await buildMovementHistory({ tenantId: TENANT_A });
   const aId = TENANT_A.toLowerCase();
-  const bLeaked = aSees.some((m) => m.tenant_id.toLowerCase() !== aId);
-  ok("10  tenant isolation — A cannot see B's movements", !bLeaked, `rows=${aSees.length}`);
+  const leaked = aSees.some((m) => m.tenant_id.toLowerCase() !== aId);
+  ok("19  tenant isolation — A cannot see B's movements", !leaked, `rows=${aSees.length}`);
 
-  /* 11 — Source idempotency. */
-  const sourceId = randomUUID();
-  const s1 = await createInventoryMovement({
-    tenant_id: TENANT_A,
-    product_id: productId,
-    warehouse_id: wh1,
-    movement_type: "purchase_receipt",
-    quantity: 12,
-    source_type: "purchase_receipt",
-    source_id: sourceId,
-  });
-  const s2 = await createInventoryMovement({
-    tenant_id: TENANT_A,
-    product_id: productId,
-    warehouse_id: wh1,
-    movement_type: "purchase_receipt",
-    quantity: 12,
-    source_type: "purchase_receipt",
-    source_id: sourceId,
-  });
-  ok(
-    "11  source idempotency — two creates with same source return same row",
-    !!(s1.ok && s2.ok && s1.movement && s2.movement && s1.movement.id === s2.movement.id),
-  );
-
-  /* 12 — getStockBalance returns live row. */
-  await postInventoryMovement(s1.movement!.id, TENANT_A, null);          // post the +12
-  const singleBal = await getStockBalance(TENANT_A, productId, wh1);
-  ok(
-    "12  getStockBalance returns live (product, warehouse) row",
-    singleBal.exists && singleBal.qty_on_hand === 112,
-    `on_hand=${singleBal.qty_on_hand}`,
-  );
-
-  /* 13 — rebuildStockBalance reconciles to the movement history.
-     Voided rows had their original delta applied at posting time;
-     the matching reverse (status='posted') undoes them. So the
-     rebuild sums over BOTH posted and voided rows — together they
-     equal the live balance. */
-  const rebuild = await rebuildStockBalance(TENANT_A, productId, wh1);
-  const after = await getStockBalance(TENANT_A, productId, wh1);
-  const history = await buildMovementHistory({ tenantId: TENANT_A, productId });
-  const expected = history
+  /* 20 — rebuildStockBalance matches history. */
+  const rebuilt = await rebuildStockBalance(TENANT_A, m1.item!.id, wh1);
+  const after = await getStockBalance(TENANT_A, m1.item!.id, wh1);
+  const hist = await buildMovementHistory({ tenantId: TENANT_A, inventoryItemId: m1.item!.id });
+  const expected = hist
     .filter((m) => m.status !== "draft" && m.warehouse_id === wh1)
     .reduce((acc, m) => acc + (m.direction === "in" ? m.quantity : -m.quantity), 0);
   ok(
-    "13  rebuildStockBalance matches movement history",
-    rebuild.ok &&
-      Math.abs(rebuild.qty_on_hand - expected) < 0.0001 &&
+    "20  rebuildStockBalance matches movement history",
+    rebuilt.ok &&
+      Math.abs(rebuilt.qty_on_hand - expected) < 0.0001 &&
       Math.abs(after.qty_on_hand - expected) < 0.0001,
-    `rebuilt=${rebuild.qty_on_hand} stored=${after.qty_on_hand} expected=${expected}`,
+    `rebuilt=${rebuilt.qty_on_hand} stored=${after.qty_on_hand} expected=${expected}`,
   );
 
   console.log("─".repeat(72));

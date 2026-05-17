@@ -1,30 +1,25 @@
 import "server-only";
 
 /* ===========================================================================
-   Phase O.2 — Inventory read queries.
+   Phase O.2.1 — Inventory read queries.
 
-   Three shapes the UI cares about:
-
-     buildBalancesSnapshot()    a list of stock balances enriched with
-                                 product + warehouse labels and computed
-                                 qty_available. The Stock Balances page.
-
-     buildMovementHistory()     paged movement ledger for a tenant,
-                                 optionally filtered by product / warehouse.
-
-     getProductStockSummary()   aggregated on-hand across warehouses for
-                                 a single product. Used by the product
-                                 detail panel.
-
-   No write functions in this module — write paths live in posting.ts.
+   All reads pivot on inventory_item_id. Products are not referenced.
+   The balances snapshot joins to inventory_items (and through to
+   inventory_item_types for the type badge in the UI) so the row
+   carries everything the list view needs.
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type {
   BalanceWithRefs,
+  ColorToken,
+  IconName,
   StockBalance,
   StockMovement,
   Warehouse,
+  InventoryItem,
+  InventoryItemType,
+  InventoryItemWithRefs,
 } from "./types";
 
 /* ─── Balances ────────────────────────────────────────────────── */
@@ -32,7 +27,7 @@ import type {
 export async function buildBalancesSnapshot(opts: {
   tenantId: string;
   warehouseId?: string;
-  productId?: string;
+  inventoryItemId?: string;
   onlyPositive?: boolean;
 }): Promise<BalanceWithRefs[]> {
   let q = supabaseServer
@@ -40,31 +35,51 @@ export async function buildBalancesSnapshot(opts: {
     .select("*")
     .eq("tenant_id", opts.tenantId);
   if (opts.warehouseId) q = q.eq("warehouse_id", opts.warehouseId);
-  if (opts.productId) q = q.eq("product_id", opts.productId);
+  if (opts.inventoryItemId) q = q.eq("inventory_item_id", opts.inventoryItemId);
   const { data: balances, error } = await q;
   if (error) throw new Error(error.message);
 
   const rows = (balances ?? []) as StockBalance[];
   if (rows.length === 0) return [];
 
-  const productIds = Array.from(new Set(rows.map((r) => r.product_id)));
+  const itemIds = Array.from(new Set(rows.map((r) => r.inventory_item_id)));
   const warehouseIds = Array.from(new Set(rows.map((r) => r.warehouse_id)));
 
-  const [prodRes, whRes] = await Promise.all([
-    supabaseServer.from("products").select("id, product_name").in("id", productIds),
-    supabaseServer.from("inventory_warehouses").select("id, code, name").in("id", warehouseIds),
+  const [itemsRes, whRes] = await Promise.all([
+    supabaseServer
+      .from("inventory_items")
+      .select("id, item_code, item_name, item_type_id")
+      .in("id", itemIds),
+    supabaseServer
+      .from("inventory_warehouses")
+      .select("id, code, name")
+      .in("id", warehouseIds),
   ]);
+  const items = (itemsRes.data ?? []) as Array<{
+    id: string; item_code: string; item_name: string; item_type_id: string;
+  }>;
+  const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
+  const typesRes = typeIds.length
+    ? await supabaseServer
+        .from("inventory_item_types")
+        .select("id, type_name, icon, color")
+        .in("id", typeIds)
+    : { data: [] as Array<{ id: string; type_name: string; icon: IconName; color: ColorToken }> };
 
-  const prodMap = new Map<string, string | null>();
-  for (const p of (prodRes.data ?? []) as Array<{ id: string; product_name: string | null }>) {
-    prodMap.set(p.id, p.product_name);
+  const typeMap = new Map<string, { type_name: string; icon: IconName; color: ColorToken }>();
+  for (const t of (typesRes.data ?? []) as Array<{ id: string; type_name: string; icon: IconName; color: ColorToken }>) {
+    typeMap.set(t.id, { type_name: t.type_name, icon: t.icon, color: t.color });
   }
+  const itemMap = new Map<string, { item_code: string; item_name: string; item_type_id: string }>();
+  for (const i of items) itemMap.set(i.id, { item_code: i.item_code, item_name: i.item_name, item_type_id: i.item_type_id });
   const whMap = new Map<string, { code: string; name: string }>();
   for (const w of (whRes.data ?? []) as Array<{ id: string; code: string; name: string }>) {
     whMap.set(w.id, { code: w.code, name: w.name });
   }
 
   const enriched: BalanceWithRefs[] = rows.map((b) => {
+    const item = itemMap.get(b.inventory_item_id);
+    const type = item ? typeMap.get(item.item_type_id) : undefined;
     const wh = whMap.get(b.warehouse_id) ?? { code: "?", name: "Unknown" };
     const onHand = Number(b.qty_on_hand) || 0;
     const reserved = Number(b.qty_reserved) || 0;
@@ -72,7 +87,11 @@ export async function buildBalancesSnapshot(opts: {
       ...b,
       qty_on_hand: onHand,
       qty_reserved: reserved,
-      product_name: prodMap.get(b.product_id) ?? null,
+      item_code: item?.item_code ?? "—",
+      item_name: item?.item_name ?? null,
+      item_type_name: type?.type_name ?? null,
+      item_icon: (type?.icon ?? "box") as IconName,
+      item_color: (type?.color ?? "slate") as ColorToken,
       warehouse_code: wh.code,
       warehouse_name: wh.name,
       qty_available: onHand - reserved,
@@ -84,59 +103,9 @@ export async function buildBalancesSnapshot(opts: {
     : enriched;
 }
 
-/* ─── Movement history ─────────────────────────────────────── */
-
-export async function buildMovementHistory(opts: {
-  tenantId: string;
-  productId?: string;
-  warehouseId?: string;
-  status?: "draft" | "posted" | "voided";
-  movementType?: string;
-  limit?: number;
-}): Promise<StockMovement[]> {
-  const limit = Math.min(opts.limit ?? 200, 1000);
-  let q = supabaseServer
-    .from("inventory_stock_movements")
-    .select("*")
-    .eq("tenant_id", opts.tenantId)
-    .is("deleted_at", null)
-    .order("movement_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (opts.productId) q = q.eq("product_id", opts.productId);
-  if (opts.warehouseId) q = q.eq("warehouse_id", opts.warehouseId);
-  if (opts.status) q = q.eq("status", opts.status);
-  if (opts.movementType) q = q.eq("movement_type", opts.movementType);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as StockMovement[];
-}
-
-/* ─── Per-product summary ─────────────────────────────────── */
-
-export interface ProductStockSummary {
-  product_id: string;
-  total_on_hand: number;
-  total_reserved: number;
-  total_available: number;
-  warehouses: Array<{
-    warehouse_id: string;
-    warehouse_code: string;
-    warehouse_name: string;
-    qty_on_hand: number;
-    qty_reserved: number;
-    qty_available: number;
-  }>;
-}
-
-/* ─── Single-balance lookup ──────────────────────────────────
-   getStockBalance returns the live on-hand / reserved / available
-   for one (product, warehouse) pair. Returns zeros if no balance
-   row exists yet (i.e. no movement has ever posted). */
-
 export interface SingleBalance {
   tenant_id: string;
-  product_id: string;
+  inventory_item_id: string;
   warehouse_id: string;
   qty_on_hand: number;
   qty_reserved: number;
@@ -148,21 +117,21 @@ export interface SingleBalance {
 
 export async function getStockBalance(
   tenantId: string,
-  productId: string,
+  inventoryItemId: string,
   warehouseId: string,
 ): Promise<SingleBalance> {
   const { data, error } = await supabaseServer
     .from("inventory_stock_balances")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("product_id", productId)
+    .eq("inventory_item_id", inventoryItemId)
     .eq("warehouse_id", warehouseId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) {
     return {
       tenant_id: tenantId,
-      product_id: productId,
+      inventory_item_id: inventoryItemId,
       warehouse_id: warehouseId,
       qty_on_hand: 0,
       qty_reserved: 0,
@@ -177,7 +146,7 @@ export async function getStockBalance(
   const reserved = Number(row.qty_reserved) || 0;
   return {
     tenant_id: row.tenant_id,
-    product_id: row.product_id,
+    inventory_item_id: row.inventory_item_id,
     warehouse_id: row.warehouse_id,
     qty_on_hand: onHand,
     qty_reserved: reserved,
@@ -188,36 +157,114 @@ export async function getStockBalance(
   };
 }
 
-export async function getProductStockSummary(
-  tenantId: string,
-  productId: string,
-): Promise<ProductStockSummary> {
-  const balances = await buildBalancesSnapshot({ tenantId, productId });
-  const totals = balances.reduce(
-    (acc, b) => {
-      acc.on_hand += b.qty_on_hand;
-      acc.reserved += b.qty_reserved;
-      return acc;
-    },
-    { on_hand: 0, reserved: 0 },
-  );
-  return {
-    product_id: productId,
-    total_on_hand: totals.on_hand,
-    total_reserved: totals.reserved,
-    total_available: totals.on_hand - totals.reserved,
-    warehouses: balances.map((b) => ({
-      warehouse_id: b.warehouse_id,
-      warehouse_code: b.warehouse_code,
-      warehouse_name: b.warehouse_name,
-      qty_on_hand: b.qty_on_hand,
-      qty_reserved: b.qty_reserved,
-      qty_available: b.qty_available,
-    })),
-  };
+/* ─── Movement history ────────────────────────────────────── */
+
+export async function buildMovementHistory(opts: {
+  tenantId: string;
+  inventoryItemId?: string;
+  warehouseId?: string;
+  status?: "draft" | "posted" | "voided";
+  movementType?: string;
+  limit?: number;
+}): Promise<StockMovement[]> {
+  const limit = Math.min(opts.limit ?? 200, 1000);
+  let q = supabaseServer
+    .from("inventory_stock_movements")
+    .select("*")
+    .eq("tenant_id", opts.tenantId)
+    .is("deleted_at", null)
+    .order("movement_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (opts.inventoryItemId) q = q.eq("inventory_item_id", opts.inventoryItemId);
+  if (opts.warehouseId) q = q.eq("warehouse_id", opts.warehouseId);
+  if (opts.status) q = q.eq("status", opts.status);
+  if (opts.movementType) q = q.eq("movement_type", opts.movementType);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StockMovement[];
 }
 
-/* ─── Warehouses ──────────────────────────────────────────── */
+/* ─── Items list (with enrichment) ───────────────────────── */
+
+export async function listInventoryItems(opts: {
+  tenantId: string;
+  search?: string;
+  typeId?: string;
+  status?: "active" | "inactive" | "archived";
+  limit?: number;
+}): Promise<InventoryItemWithRefs[]> {
+  const limit = Math.min(opts.limit ?? 200, 1000);
+  let q = supabaseServer
+    .from("inventory_items")
+    .select("*")
+    .eq("tenant_id", opts.tenantId)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (opts.typeId) q = q.eq("item_type_id", opts.typeId);
+  if (opts.status) q = q.eq("status", opts.status);
+  if (opts.search) {
+    const s = opts.search.replace(/[%_]/g, "\\$&");
+    q = q.or(`item_name.ilike.%${s}%,item_code.ilike.%${s}%,brand.ilike.%${s}%,sku.ilike.%${s}%`);
+  }
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const items = (data ?? []) as InventoryItem[];
+  if (items.length === 0) return [];
+
+  const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
+  const catIds = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
+  const [typesRes, catsRes, balancesRes] = await Promise.all([
+    supabaseServer.from("inventory_item_types").select("id, type_key, type_name, icon, color").in("id", typeIds),
+    catIds.length
+      ? supabaseServer.from("inventory_item_categories").select("id, name").in("id", catIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+    supabaseServer
+      .from("inventory_stock_balances")
+      .select("inventory_item_id, qty_on_hand")
+      .eq("tenant_id", opts.tenantId)
+      .in("inventory_item_id", items.map((i) => i.id)),
+  ]);
+  const typeMap = new Map<string, { type_key: string; type_name: string; icon: IconName; color: ColorToken }>();
+  for (const t of (typesRes.data ?? []) as Array<{ id: string; type_key: string; type_name: string; icon: IconName; color: ColorToken }>) {
+    typeMap.set(t.id, { type_key: t.type_key, type_name: t.type_name, icon: t.icon, color: t.color });
+  }
+  const catMap = new Map<string, string>();
+  for (const c of (catsRes.data ?? []) as Array<{ id: string; name: string }>) catMap.set(c.id, c.name);
+  const balMap = new Map<string, number>();
+  for (const b of (balancesRes.data ?? []) as Array<{ inventory_item_id: string; qty_on_hand: number }>) {
+    balMap.set(b.inventory_item_id, (balMap.get(b.inventory_item_id) ?? 0) + Number(b.qty_on_hand || 0));
+  }
+
+  return items.map((it) => {
+    const t = typeMap.get(it.item_type_id);
+    return {
+      ...it,
+      type_key: t?.type_key ?? "other",
+      type_name: t?.type_name ?? "Other",
+      icon: (t?.icon ?? "box") as IconName,
+      color: (t?.color ?? "slate") as ColorToken,
+      category_name: it.category_id ? catMap.get(it.category_id) ?? null : null,
+      qty_on_hand: balMap.get(it.id) ?? 0,
+    };
+  });
+}
+
+/* ─── Item types (system + per-tenant custom) ────────────── */
+
+export async function listItemTypes(tenantId: string): Promise<InventoryItemType[]> {
+  /* System rows (tenant_id IS NULL) + this tenant's custom rows. */
+  const { data, error } = await supabaseServer
+    .from("inventory_item_types")
+    .select("*")
+    .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true })
+    .order("type_name", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as InventoryItemType[];
+}
 
 export async function listWarehouses(tenantId: string): Promise<Warehouse[]> {
   const { data, error } = await supabaseServer
@@ -231,11 +278,11 @@ export async function listWarehouses(tenantId: string): Promise<Warehouse[]> {
   return (data ?? []) as Warehouse[];
 }
 
-/* ─── Dashboard summary ───────────────────────────────────── */
+/* ─── Dashboard summary ──────────────────────────────────── */
 
 export interface InventoryDashboardSummary {
   warehouse_count: number;
-  product_count: number;
+  item_count: number;
   total_on_hand: number;
   total_reserved: number;
   recent_movements: StockMovement[];
@@ -251,7 +298,7 @@ export async function buildInventoryDashboardSummary(
     buildMovementHistory({ tenantId, limit: 10 }),
   ]);
 
-  const productSet = new Set(balances.filter((b) => b.qty_on_hand > 0).map((b) => b.product_id));
+  const itemSet = new Set(balances.filter((b) => b.qty_on_hand > 0).map((b) => b.inventory_item_id));
   const totals = balances.reduce(
     (acc, b) => {
       acc.on_hand += b.qty_on_hand;
@@ -268,10 +315,56 @@ export async function buildInventoryDashboardSummary(
 
   return {
     warehouse_count: warehouses.filter((w) => w.is_active).length,
-    product_count: productSet.size,
+    item_count: itemSet.size,
     total_on_hand: totals.on_hand,
     total_reserved: totals.reserved,
     recent_movements: recent,
     top_balances: topBalances,
+  };
+}
+
+/* ─── Per-item stock summary ─────────────────────────────── */
+
+export interface ItemStockSummary {
+  inventory_item_id: string;
+  total_on_hand: number;
+  total_reserved: number;
+  total_available: number;
+  warehouses: Array<{
+    warehouse_id: string;
+    warehouse_code: string;
+    warehouse_name: string;
+    qty_on_hand: number;
+    qty_reserved: number;
+    qty_available: number;
+  }>;
+}
+
+export async function getItemStockSummary(
+  tenantId: string,
+  inventoryItemId: string,
+): Promise<ItemStockSummary> {
+  const balances = await buildBalancesSnapshot({ tenantId, inventoryItemId });
+  const totals = balances.reduce(
+    (acc, b) => {
+      acc.on_hand += b.qty_on_hand;
+      acc.reserved += b.qty_reserved;
+      return acc;
+    },
+    { on_hand: 0, reserved: 0 },
+  );
+  return {
+    inventory_item_id: inventoryItemId,
+    total_on_hand: totals.on_hand,
+    total_reserved: totals.reserved,
+    total_available: totals.on_hand - totals.reserved,
+    warehouses: balances.map((b) => ({
+      warehouse_id: b.warehouse_id,
+      warehouse_code: b.warehouse_code,
+      warehouse_name: b.warehouse_name,
+      qty_on_hand: b.qty_on_hand,
+      qty_reserved: b.qty_reserved,
+      qty_available: b.qty_available,
+    })),
   };
 }

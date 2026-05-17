@@ -43,6 +43,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { createInventoryMovement, postInventoryMovement, voidInventoryMovement, ensureDefaultWarehouse } from "@/lib/inventory/posting";
+import { ensureInventoryItemForProduct } from "@/lib/inventory/items";
 import type { PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, ReceiveOutcome, ReceiveRequest, PurchaseOrderStatus } from "./types";
 
 function generateReceiptNo(): string {
@@ -173,7 +174,10 @@ export async function receivePurchaseOrder(opts: {
     return { ok: false, error: linesErr?.message ?? "Line insert failed", code: 500 };
   }
 
-  /* 5 — Create + post inventory movements. */
+  /* 5 — Create + post inventory movements.
+     The PO line's product_id is resolved (or auto-created) into an
+     inventory_item_id via fn_inventory_ensure_item_for_product so the
+     inventory ledger stays product-independent. */
   const movementIds: string[] = [];
   for (const line of insertedLines as Array<{
     id: string;
@@ -184,13 +188,15 @@ export async function receivePurchaseOrder(opts: {
     currency: string;
     unit: string | null;
   }>) {
-    if (!line.product_id) continue;          // a free-text line w/o a product: skip stock impact
+    if (!line.product_id) continue;          // free-text line: skip stock impact
     const qty = Number(line.qty_accepted) || 0;
     if (qty <= 0) continue;
 
+    const inventoryItemId = await ensureInventoryItemForProduct(tenantId, line.product_id);
+
     const created = await createInventoryMovement({
       tenant_id: tenantId,
-      product_id: line.product_id,
+      inventory_item_id: inventoryItemId,
       warehouse_id: line.warehouse_id ?? warehouseId,
       movement_type: "purchase_receipt",
       quantity: qty,
@@ -212,7 +218,10 @@ export async function receivePurchaseOrder(opts: {
     movementIds.push(created.movement.id);
     await supabaseServer
       .from("purchase_receipt_items")
-      .update({ inventory_movement_id: created.movement.id })
+      .update({
+        inventory_movement_id: created.movement.id,
+        inventory_item_id: inventoryItemId,
+      })
       .eq("id", line.id);
   }
 

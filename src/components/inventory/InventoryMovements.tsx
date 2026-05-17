@@ -2,30 +2,20 @@
 
 /* ---------------------------------------------------------------------------
    /inventory/movements — Movement ledger + new-movement form.
-
-   Two side-by-side regions on desktop, stacked on mobile (per
-   desktop/mobile-parity rules):
-     · LEFT  — list of recent movements with status + void button
-     · RIGHT — compact "New Movement" form
-
-   We deliberately keep the form simple: pick a product from a
-   datalist, pick a warehouse, pick movement_type (which fixes the
-   direction except for `manual`), enter quantity. The API does
-   create+post in one shot; if posting fails (e.g. would go negative)
-   the response shows the error so the user can adjust.
+   Now keyed on inventory_item_id (Phase O.2.1).
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { MovementStatus, MovementType } from "@/lib/inventory/types";
 
-interface Product { id: string; product_name: string }
+interface Item { id: string; item_code: string; item_name: string }
 interface Warehouse { id: string; code: string; name: string; is_default: boolean }
 interface MovementRow {
   id: string;
   movement_no: string;
   movement_date: string;
-  product_id: string;
+  inventory_item_id: string;
   warehouse_id: string;
   movement_type: MovementType;
   direction: "in" | "out";
@@ -56,16 +46,16 @@ function fmtQty(n: number): string {
 
 export default function InventoryMovements() {
   const [movements, setMovements] = useState<MovementRow[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* Form state */
-  const [productQuery, setProductQuery] = useState("");
-  const [productId, setProductId] = useState("");
+  /* Form */
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemId, setItemId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [type, setType] = useState<MovementType>("purchase_receipt");
+  const [type, setType] = useState<MovementType>("adjustment_in");
   const [direction, setDirection] = useState<"in" | "out">("in");
   const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("pcs");
@@ -74,11 +64,11 @@ export default function InventoryMovements() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const productMap = useMemo(() => {
+  const itemMap = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of products) m.set(p.id, p.product_name);
+    for (const i of items) m.set(i.id, `${i.item_code} · ${i.item_name}`);
     return m;
-  }, [products]);
+  }, [items]);
   const warehouseMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const w of warehouses) m.set(w.id, w.code);
@@ -89,20 +79,17 @@ export default function InventoryMovements() {
     setLoading(true);
     setError(null);
     try {
-      const [mvRes, prRes, whRes] = await Promise.all([
+      const [mvRes, itemRes, whRes] = await Promise.all([
         fetch("/api/inventory/movements?limit=100", { cache: "no-store", credentials: "include" }),
-        fetch("/api/products?limit=500", { cache: "no-store", credentials: "include" }),
+        fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
         fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
       ]);
       const mvJ = await mvRes.json();
-      const prJ = await prRes.json();
+      const itemJ = await itemRes.json();
       const whJ = await whRes.json();
       if (!mvRes.ok) throw new Error(mvJ.error ?? `Movements failed (${mvRes.status})`);
       setMovements((mvJ.movements ?? []) as MovementRow[]);
-      const productsList = ((prJ.products ?? prJ.items ?? []) as Array<{ id: string; product_name: string }>).map(
-        (p) => ({ id: p.id, product_name: p.product_name }),
-      );
-      setProducts(productsList);
+      setItems(((itemJ.items ?? []) as Array<{ id: string; item_code: string; item_name: string }>).map((i) => ({ id: i.id, item_code: i.item_code, item_name: i.item_name })));
       const whList = ((whJ.warehouses ?? []) as Warehouse[]);
       setWarehouses(whList);
       if (!warehouseId && whList.length > 0) {
@@ -128,7 +115,7 @@ export default function InventoryMovements() {
     e.preventDefault();
     setSubmitError(null);
     const qty = Number(quantity);
-    if (!productId) { setSubmitError("Pick a product"); return; }
+    if (!itemId) { setSubmitError("Pick an inventory item"); return; }
     if (!warehouseId) { setSubmitError("Pick a warehouse"); return; }
     if (!Number.isFinite(qty) || qty <= 0) { setSubmitError("Quantity must be > 0"); return; }
     setSubmitting(true);
@@ -138,7 +125,7 @@ export default function InventoryMovements() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product_id: productId,
+          inventory_item_id: itemId,
           warehouse_id: warehouseId,
           movement_type: type,
           direction,
@@ -151,10 +138,7 @@ export default function InventoryMovements() {
       });
       const j = await r.json();
       if (!r.ok) { setSubmitError(j.error ?? `Failed (${r.status})`); return; }
-      /* Reset form & reload. */
-      setQuantity("");
-      setReference("");
-      setNotes("");
+      setQuantity(""); setReference(""); setNotes("");
       await load();
     } finally {
       setSubmitting(false);
@@ -187,14 +171,13 @@ export default function InventoryMovements() {
         )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr,360px]">
-          {/* LEFT — movement list */}
           <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
             <table className="min-w-full text-[12.5px]">
               <thead>
                 <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Movement #</th>
-                  <th className="px-3 py-2 text-left">Product</th>
+                  <th className="px-3 py-2 text-left">Item</th>
                   <th className="px-3 py-2 text-left">WH</th>
                   <th className="px-3 py-2 text-left">Type</th>
                   <th className="px-3 py-2 text-right">Qty</th>
@@ -212,7 +195,7 @@ export default function InventoryMovements() {
                     <tr key={m.id} className="border-b border-white/[0.03]">
                       <td className="px-3 py-1.5 text-gray-400">{m.movement_date}</td>
                       <td className="px-3 py-1.5 font-mono text-[11.5px] text-gray-300">{m.movement_no}</td>
-                      <td className="px-3 py-1.5 text-gray-300">{productMap.get(m.product_id) ?? "—"}</td>
+                      <td className="px-3 py-1.5 text-gray-300">{itemMap.get(m.inventory_item_id) ?? "—"}</td>
                       <td className="px-3 py-1.5 text-gray-400">{warehouseMap.get(m.warehouse_id) ?? "?"}</td>
                       <td className="px-3 py-1.5 text-gray-400">{m.movement_type}</td>
                       <td className={`px-3 py-1.5 text-right tabular-nums font-mono ${m.direction === "in" ? "text-emerald-200" : "text-rose-200"}`}>
@@ -229,10 +212,7 @@ export default function InventoryMovements() {
                       </td>
                       <td className="px-3 py-1.5 text-right">
                         {m.status === "posted" && (
-                          <button
-                            onClick={() => voidMovement(m.id)}
-                            className="text-[11px] text-rose-300 hover:text-rose-200"
-                          >
+                          <button onClick={() => voidMovement(m.id)} className="text-[11px] text-rose-300 hover:text-rose-200">
                             Void
                           </button>
                         )}
@@ -244,67 +224,47 @@ export default function InventoryMovements() {
             </table>
           </div>
 
-          {/* RIGHT — new movement form */}
-          <form
-            onSubmit={submit}
-            className="space-y-3 rounded-xl border border-white/[0.05] bg-white/[0.012] p-4 self-start"
-          >
+          <form onSubmit={submit} className="space-y-3 rounded-xl border border-white/[0.05] bg-white/[0.012] p-4 self-start">
             <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">New Movement</div>
 
             <label className="block">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Product</div>
+              <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Inventory Item</div>
               <input
-                list="inv-product-list"
-                value={productQuery}
+                list="inv-item-list"
+                value={itemQuery}
                 onChange={(e) => {
-                  setProductQuery(e.target.value);
-                  const match = products.find((p) => p.product_name === e.target.value);
-                  setProductId(match?.id ?? "");
+                  setItemQuery(e.target.value);
+                  const match = items.find((i) => `${i.item_code} · ${i.item_name}` === e.target.value || i.item_code === e.target.value);
+                  setItemId(match?.id ?? "");
                 }}
-                placeholder="Search products…"
+                placeholder="Search items by code or name…"
                 className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
               />
-              <datalist id="inv-product-list">
-                {products.slice(0, 200).map((p) => (
-                  <option key={p.id} value={p.product_name} />
+              <datalist id="inv-item-list">
+                {items.slice(0, 300).map((i) => (
+                  <option key={i.id} value={`${i.item_code} · ${i.item_name}`} />
                 ))}
               </datalist>
             </label>
 
             <label className="block">
               <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Warehouse</div>
-              <select
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              >
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
-                ))}
+              <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
               </select>
             </label>
 
             <label className="block">
               <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Type</div>
-              <select
-                value={type}
-                onChange={(e) => onTypeChange(e.target.value as MovementType)}
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              >
-                {MOVEMENT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
+              <select value={type} onChange={(e) => onTypeChange(e.target.value as MovementType)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
+                {MOVEMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </label>
 
             {type === "manual" && (
               <label className="block">
                 <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Direction</div>
-                <select
-                  value={direction}
-                  onChange={(e) => setDirection(e.target.value as "in" | "out")}
-                  className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                >
+                <select value={direction} onChange={(e) => setDirection(e.target.value as "in" | "out")} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]">
                   <option value="in">IN (+)</option>
                   <option value="out">OUT (−)</option>
                 </select>
@@ -314,56 +274,29 @@ export default function InventoryMovements() {
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
                 <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Quantity</div>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums"
-                />
+                <input type="number" min="0" step="0.0001" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px] tabular-nums" />
               </label>
               <label className="block">
                 <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Unit</div>
-                <input
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-                />
+                <input value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
               </label>
             </div>
 
             <label className="block">
               <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Reference</div>
-              <input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="GR-2026-0001, PO-22…"
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              />
+              <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="GR-…, PO-…" className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </label>
 
             <label className="block">
               <div className="mb-1 text-[10px] uppercase tracking-[0.12em] text-gray-500">Notes</div>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]"
-              />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1.5 text-[12px]" />
             </label>
 
             {submitError && (
-              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
-                {submitError}
-              </div>
+              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">{submitError}</div>
             )}
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-white/[0.06] disabled:opacity-50"
-            >
+            <button type="submit" disabled={submitting} className="w-full rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06] disabled:opacity-50">
               {submitting ? "Posting…" : "Post Movement"}
             </button>
           </form>

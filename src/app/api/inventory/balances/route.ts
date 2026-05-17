@@ -2,9 +2,9 @@ import "server-only";
 
 /* ===========================================================================
    GET /api/inventory/balances
-     ?warehouse_id=  optional filter
-     ?product_id=    optional filter
-     ?only_positive  hide rows with zero on-hand
+     ?warehouse_id=        optional filter
+     ?inventory_item_id=   optional filter
+     ?only_positive        hide rows with zero on-hand
    ========================================================================== */
 
 import { NextResponse } from "next/server";
@@ -19,14 +19,14 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const warehouseId = url.searchParams.get("warehouse_id") ?? undefined;
-  const productId = url.searchParams.get("product_id") ?? undefined;
+  const inventoryItemId = url.searchParams.get("inventory_item_id") ?? undefined;
   const onlyPositive = url.searchParams.get("only_positive") === "1";
 
   try {
     const balances = await buildBalancesSnapshot({
       tenantId: auth.tenant_id,
       warehouseId,
-      productId,
+      inventoryItemId,
       onlyPositive,
     });
     return NextResponse.json({ balances });

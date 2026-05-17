@@ -32,6 +32,7 @@ import { randomUUID } from "node:crypto";
 import { receivePurchaseOrder, voidPurchaseReceipt } from "../src/lib/purchase/receiving";
 import { ensureDefaultWarehouse } from "../src/lib/inventory/posting";
 import { getStockBalance } from "../src/lib/inventory/queries";
+import { ensureInventoryItemForProduct } from "../src/lib/inventory/items";
 
 const URL_ENV = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -77,6 +78,9 @@ async function clean() {
     }
     await supabase.from("inventory_stock_balances").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_movements").delete().eq("tenant_id", t);
+    await supabase.from("inventory_items").delete().eq("tenant_id", t);
+    await supabase.from("inventory_item_code_sequences").delete().eq("tenant_id", t);
+    await supabase.from("inventory_item_types").delete().eq("tenant_id", t);
     await supabase.from("inventory_warehouses").delete().eq("tenant_id", t);
   }
 }
@@ -170,6 +174,11 @@ async function main() {
   const whA = await ensureDefaultWarehouse(TENANT_A);
   await ensureDefaultWarehouse(TENANT_B);
 
+  /* Phase O.2.1: the inventory ledger is keyed on inventory_item_id.
+     Resolve the auto-created (or existing) inventory item for each
+     product so balance assertions query the right key. */
+  const itemA = await ensureInventoryItemForProduct(TENANT_A, pidA);
+
   /* 01 — Create PO. */
   const { poId, itemIds } = await createPo({
     tenantId: TENANT_A,
@@ -191,7 +200,7 @@ async function main() {
       lines: [{ po_item_id: itemIds[0], qty_received: 50, qty_accepted: 50 }],
     },
   });
-  const balA = await getStockBalance(TENANT_A, pidA, whA);
+  const balA = await getStockBalance(TENANT_A, itemA, whA);
   const { data: rcptRow } = await supabase
     .from("purchase_receipts")
     .select("status, posted_at")
@@ -288,12 +297,12 @@ async function main() {
     tenantId: TENANT_A, supplierId: supplierA,
     lines: [{ product_id: pidA, qty: 20, unit_cost: 5 }],
   });
-  const balBefore = (await getStockBalance(TENANT_A, pidA, whA)).qty_on_hand;
+  const balBefore = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
   await receivePurchaseOrder({
     poId: fresh.poId, tenantId: TENANT_A, receivedBy: null,
     request: { lines: [{ po_item_id: fresh.itemIds[0], qty_received: 10, qty_accepted: 3, qty_rejected: 7 }] },
   });
-  const balAfter = (await getStockBalance(TENANT_A, pidA, whA)).qty_on_hand;
+  const balAfter = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
   ok(
     "07  rejected qty does not increase stock (only accepted moves)",
     Math.abs((balAfter - balBefore) - 3) < 0.0001,
@@ -309,7 +318,7 @@ async function main() {
   const m1 = await supabase.from("inventory_stock_movements").insert({
     tenant_id: TENANT_A, movement_no: `IM-DUP-${Date.now()}`,
     movement_date: new Date().toISOString().slice(0, 10),
-    product_id: pidA, warehouse_id: whA,
+    inventory_item_id: itemA, warehouse_id: whA,
     movement_type: "purchase_receipt", direction: "in",
     quantity: 1, unit: "pc", currency: "USD",
     source_type: "purchase_receipt", source_id: sharedSourceId,
@@ -318,7 +327,7 @@ async function main() {
   const m2 = await supabase.from("inventory_stock_movements").insert({
     tenant_id: TENANT_A, movement_no: `IM-DUP2-${Date.now()}`,
     movement_date: new Date().toISOString().slice(0, 10),
-    product_id: pidA, warehouse_id: whA,
+    inventory_item_id: itemA, warehouse_id: whA,
     movement_type: "purchase_receipt", direction: "in",
     quantity: 1, unit: "pc", currency: "USD",
     source_type: "purchase_receipt", source_id: sharedSourceId,
@@ -370,14 +379,14 @@ async function main() {
   );
 
   /* 12 — Void receipt reverses stock + rolls back PO line qty_received. */
-  const balBeforeVoid = (await getStockBalance(TENANT_A, pidA, whA)).qty_on_hand;
+  const balBeforeVoid = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
   const voidR = await voidPurchaseReceipt({
     receiptId: r1.receipt_id!,
     tenantId: TENANT_A,
     voidedBy: null,
     reason: "test reversal",
   });
-  const balAfterVoid = (await getStockBalance(TENANT_A, pidA, whA)).qty_on_hand;
+  const balAfterVoid = (await getStockBalance(TENANT_A, itemA, whA)).qty_on_hand;
   const { data: poiAfterVoid } = await supabase
     .from("purchase_order_items")
     .select("qty_received")
