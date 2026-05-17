@@ -82,21 +82,11 @@ export function HeroKpiCard({
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
 
   return (
-    <div className="group relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-gradient-to-br from-white/[0.035] via-white/[0.01] to-transparent p-5 transition-all duration-300 ease-out hover:-translate-y-[1px] hover:border-white/[0.10] hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
-      {/* Soft directional glow — calmer than Phase 1.5 to suit the
-          tighter card. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-8 -right-6 -z-10 h-36 w-36 rounded-full blur-3xl transition-opacity duration-500 group-hover:opacity-80"
-        style={{
-          background:
-            tone === "positive" ? "rgba(52,211,153,0.09)"
-            : tone === "negative" ? "rgba(251,113,133,0.09)"
-            : tone === "warning"  ? "rgba(251,191,36,0.07)"
-            : tone === "info"     ? "rgba(56,189,248,0.07)"
-            : "rgba(255,255,255,0.04)",
-        }}
-      />
+    /* Phase UI.2 — de-glowed HeroKpiCard. The blur-3xl coloured halo,
+       the gradient background, the hover y-lift, and the drop shadow
+       all removed. The card now reads as data printed on dark paper:
+       a hairline border, a flat surface, typography that breathes. */
+    <div className="group relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.012] p-5 transition-colors duration-200 hover:border-white/[0.09]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">
@@ -217,37 +207,35 @@ export function MetricCard({
 
 export type InsightSeverity = "positive" | "neutral" | "watch" | "risk" | "critical";
 
-const SEVERITY_FRAME: Record<InsightSeverity, { border: string; bg: string; rail: string; glow: string; pulse?: string }> = {
+/* Phase UI.2 — InsightCard severity frame. Halos + pulse keyframe
+   removed. The card now communicates severity through a thin tinted
+   left rail and a subtly tinted border only — no "lit from inside"
+   glow, no edge pulse. */
+const SEVERITY_FRAME: Record<InsightSeverity, { border: string; bg: string; rail: string }> = {
   positive: {
     border: "border-white/[0.05]",
     bg:     "bg-white/[0.02]",
-    rail:   "bg-gradient-to-b from-emerald-400/55 to-emerald-500/10",
-    glow:   "rgba(52,211,153,0.06)",
+    rail:   "bg-emerald-300/55",
   },
   neutral: {
     border: "border-white/[0.04]",
     bg:     "bg-white/[0.018]",
     rail:   "bg-white/[0.10]",
-    glow:   "rgba(255,255,255,0.02)",
   },
   watch: {
-    border: "border-amber-500/[0.22]",
-    bg:     "bg-amber-500/[0.025]",
-    rail:   "bg-gradient-to-b from-amber-300/60 to-amber-500/10",
-    glow:   "rgba(251,191,36,0.07)",
+    border: "border-amber-500/[0.18]",
+    bg:     "bg-white/[0.018]",
+    rail:   "bg-amber-300/65",
   },
   risk: {
-    border: "border-rose-500/[0.30]",
-    bg:     "bg-rose-500/[0.025]",
-    rail:   "bg-gradient-to-b from-rose-300/60 to-rose-500/15",
-    glow:   "rgba(251,113,133,0.10)",
+    border: "border-rose-500/[0.22]",
+    bg:     "bg-white/[0.018]",
+    rail:   "bg-rose-300/65",
   },
   critical: {
-    border: "border-rose-500/[0.45]",
-    bg:     "bg-rose-500/[0.035]",
-    rail:   "bg-gradient-to-b from-rose-300/80 to-rose-500/20",
-    glow:   "rgba(251,113,133,0.16)",
-    pulse:  "animate-koleex-edge-pulse",
+    border: "border-rose-500/[0.30]",
+    bg:     "bg-white/[0.020]",
+    rail:   "bg-rose-300/80",
   },
 };
 
@@ -283,17 +271,11 @@ export function InsightCard({
   const tone = chipTone ?? SEVERITY_TO_CHIP_TONE[severity];
   return (
     <div
-      className={`group relative isolate flex items-start gap-3 overflow-hidden rounded-2xl border p-4 transition-colors duration-300 ${sev.border} ${sev.bg} ${sev.pulse ?? ""}`}
+      className={`relative isolate flex items-start gap-3 overflow-hidden rounded-2xl border p-4 ${sev.border} ${sev.bg}`}
     >
       {/* Left severity rail — 2 px tinted strip. Communicates urgency
           without colouring the whole card. */}
       <div aria-hidden className={`absolute left-0 top-3 bottom-3 w-[2px] rounded-r ${sev.rail}`} />
-      {/* Subtle directional glow keyed to severity. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-8 -right-6 -z-10 h-28 w-28 rounded-full blur-3xl"
-        style={{ background: sev.glow }}
-      />
       {icon && (
         <div className="ml-1.5 mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-base">
           {icon}
@@ -343,7 +325,12 @@ export function ChartCard({
   helpId?: string;
 }) {
   return (
-    <div className="relative isolate overflow-hidden rounded-3xl border border-white/[0.05] bg-gradient-to-br from-white/[0.03] via-transparent to-transparent p-5">
+    /* Phase UI.2 — ChartCard frame de-glowed.
+       Lost: the diagonal gradient, the rounded-3xl curve. Kept: a
+       single hairline border on a flat slightly-tinted surface, so
+       the chart-data inside reads as the loud element, not the
+       wrapper. */
+    <div className="relative isolate overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.012] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-1.5 text-[13px] font-semibold tracking-tight text-[var(--text-primary)]">
@@ -394,12 +381,12 @@ export function AreaChartMini({
   const path = buildSmoothPath(points);
   const areaPath = `${path} L ${(data.length - 1) * stepX},${H} L 0,${H} Z`;
 
-  const stroke =
-    tone === "positive" ? "#34d399"
-    : tone === "negative" ? "#fb7185"
-    : tone === "warning"  ? "#fbbf24"
-    : tone === "info"     ? "#38bdf8"
-    : "rgba(255,255,255,0.55)";
+  /* Phase UI.2 — restrained 3-tone palette. The dashboard no longer
+     speaks in 12 hues; lines are ink-default with positive/negative
+     accent variants only. Warning / info collapse into the ink line
+     because the surrounding context (chip, tile rail, narrative)
+     already encodes the tone. */
+  const stroke = chartStrokeFor(tone);
   /* Stable per-instance id so React-19 react-hooks/purity is satisfied
      and two AreaChartMini components in the same view don't share a
      gradient by accident. */
@@ -421,32 +408,31 @@ export function AreaChartMini({
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stopColor={stroke} stopOpacity="0.32" />
+            {/* Phase UI.2 — area fill 32% → 6%. "Data printed on
+                dark paper", not "lit from inside". */}
+            <stop offset="0%"  stopColor={stroke} stopOpacity="0.06" />
             <stop offset="100%" stopColor={stroke} stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill={`url(#${gradId})`} />
         {/* vectorEffect=non-scaling-stroke keeps stroke width constant
             in real pixels even when the SVG is stretched non-uniformly
-            (preserveAspectRatio="none"). Without this the line looks
-            chunky in wide cards and squashed in narrow ones. */}
+            (preserveAspectRatio="none"). Stroke 1.5 → 1.0 (Phase UI.2). */}
         <path
           d={path}
           fill="none"
           stroke={stroke}
-          strokeWidth="1.5"
+          strokeWidth="1"
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
         />
         <title>{currency ? `${data.length} points · ${currency}` : `${data.length} data points`}</title>
       </svg>
-      {/* HTML last-point dot — stays a perfect circle under any aspect
-          ratio because it's positioned via percentages in real pixels,
-          not inside the stretched SVG viewBox. */}
+      {/* HTML last-point dot — tiny 1.5×1.5 solid, no ring, no halo. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[var(--bg-secondary)]"
+        className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
           left: `${lastXPct}%`,
           top: `${lastYPct}%`,
@@ -465,7 +451,9 @@ export function AreaChartMini({
 export function AreaChart({
   series,
   labels,
-  height = 280,
+  /* Phase UI.2 — chart height trimmed 280→220 so the chart stops
+     overpowering the typography of the surrounding section. */
+  height = 220,
   currency = "USD",
 }: {
   series: { name: string; values: number[]; tone: Tone }[];
@@ -531,7 +519,9 @@ export function AreaChart({
   const range = max - min || 1;
   const stepX = innerW / Math.max(1, labels.length - 1);
 
-  const ticks = 4; /* horizontal grid lines */
+  /* Phase UI.2 — 4 ticks (5 lines) → 3 ticks (4 lines). Cleaner
+     frame, more breathing room around the curve. */
+  const ticks = 3;
   const tickValues = Array.from({ length: ticks + 1 }, (_, i) => min + (range * i) / ticks);
 
   /* Pre-compute last-point positions per series so we can render true-
@@ -551,21 +541,20 @@ export function AreaChart({
   return (
     <div>
     <div className="relative w-full" style={{ height }}>
+      {/* Phase UI.2 — fade-in keyframe removed. Chart renders
+          instantly; no animation chrome. */}
       <svg
         viewBox={`0 0 ${W} ${height}`}
         className="absolute inset-0 h-full w-full"
         preserveAspectRatio="none"
-        style={{
-          /* Subtle fade-in reveal so charts feel alive when loaded */
-          animation: "koleex-fade-in 480ms ease-out both",
-        }}
       >
         <defs>
           {series.map((s, i) => {
             const stroke = toneToStroke(s.tone);
             return (
               <linearGradient key={i} id={`area-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"  stopColor={stroke} stopOpacity="0.30" />
+                {/* Phase UI.2 — area fill 30% → 6%. */}
+                <stop offset="0%"  stopColor={stroke} stopOpacity="0.06" />
                 <stop offset="100%" stopColor={stroke} stopOpacity="0" />
               </linearGradient>
             );
@@ -613,6 +602,10 @@ export function AreaChart({
           }));
           const path = buildSmoothPath(pts);
           const areaPath = `${path} L ${padX + (s.values.length - 1) * stepX},${padY + innerH} L ${padX},${padY + innerH} Z`;
+          /* Phase UI.2 — primary series renders at 1.1px stroke, the
+             rest at 0.9px so multi-line charts still have a clear
+             "lead" without painting every line in a different hue. */
+          const isPrimary = i === 0;
           return (
             <g key={i}>
               <path d={areaPath} fill={`url(#area-grad-${i})`} />
@@ -620,7 +613,7 @@ export function AreaChart({
                 d={path}
                 fill="none"
                 stroke={stroke}
-                strokeWidth="1.6"
+                strokeWidth={isPrimary ? "1.1" : "0.9"}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
@@ -642,26 +635,16 @@ export function AreaChart({
         })}
       </svg>
 
-      {/* HTML last-point markers — stay perfectly round under any
-          horizontal stretch because they're positioned via percentages
-          in real CSS pixels, not inside the stretched SVG viewBox. */}
+      {/* Phase UI.2 — endpoints collapsed to a single 1.5×1.5 dot, no
+          halo, no ring. Same approach as the AreaChartMini endpoint. */}
       {seriesLastPoints.map((p, i) =>
         p ? (
           <span
             key={i}
             aria-hidden
-            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${p.xPct}%`, top: `${p.yPct}%` }}
-          >
-            <span
-              className="block h-3 w-3 rounded-full opacity-30"
-              style={{ background: p.stroke }}
-            />
-            <span
-              className="absolute left-1/2 top-1/2 block h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-1 ring-[var(--bg-secondary)]"
-              style={{ background: p.stroke }}
-            />
-          </span>
+            className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: `${p.xPct}%`, top: `${p.yPct}%`, background: p.stroke }}
+          />
         ) : null
       )}
     </div>
@@ -683,14 +666,32 @@ export function AreaChart({
   );
 }
 
+/* ─── Phase UI.2 — restrained chart palette ───────────────────────
+   The dashboard's chart system used to speak in 5 hues (emerald /
+   rose / amber / sky / default). This collapses to 3 functional
+   tones:
+     · CHART_INK     — neutral / info, ~88% white (the default)
+     · CHART_GAIN    — positive, muted emerald @ 70%
+     · CHART_LOSS    — negative, muted rose @ 70%
+   "warning" and "info" both render as ink — the surrounding context
+   (chip, tile rail, narrative) already carries the tone. This is the
+   Bloomberg / institutional-finance convention: data is monochrome,
+   accent reserved for direction.
+   The function name `toneToStroke` is preserved (multiple callers in
+   this file). A second helper `chartStrokeFor` is exposed so the
+   AreaChartMini call-site reads cleanly. */
+const CHART_INK   = "rgba(255,255,255,0.88)";
+const CHART_GAIN  = "rgba(134,239,172,0.70)";   // #86efac @ 70%
+const CHART_LOSS  = "rgba(253,164,175,0.70)";   // #fda4af @ 70%
+
+function chartStrokeFor(t: Tone): string {
+  if (t === "positive") return CHART_GAIN;
+  if (t === "negative") return CHART_LOSS;
+  /* warning, info, neutral all collapse to ink. */
+  return CHART_INK;
+}
 function toneToStroke(t: Tone): string {
-  switch (t) {
-    case "positive": return "#34d399";
-    case "negative": return "#fb7185";
-    case "warning":  return "#fbbf24";
-    case "info":     return "#38bdf8";
-    default:         return "rgba(255,255,255,0.65)";
-  }
+  return chartStrokeFor(t);
 }
 
 /* Catmull-Rom → SVG cubic Bezier for smooth path interpolation. */
@@ -850,10 +851,10 @@ export function BarChart({
           const pct = (Math.abs(d.value) / max) * 100;
           const isMax = max > 0 && Math.abs(d.value) === max;
           const isLast = i === data.length - 1;
-          const tone =
-            isMax
-              ? "bg-gradient-to-t from-white/30 to-white/70"
-              : "bg-white/[0.10]";
+          /* Phase UI.2 — bars rendered in flat monochrome opacity
+             tiers. The "max" bar gets a heavier white fill; everything
+             else stays at low opacity. No gradient pill, no hue. */
+          const tone = isMax ? "bg-white/[0.45]" : "bg-white/[0.10]";
           const ring =
             highlightLast && isLast
               ? "ring-1 ring-white/[0.08]"
@@ -861,7 +862,7 @@ export function BarChart({
           return (
             <div
               key={i}
-              className={`group flex-1 cursor-default rounded-md transition-colors duration-200 hover:bg-white/[0.20] ${tone} ${ring}`}
+              className={`group flex-1 cursor-default rounded-sm transition-colors duration-200 hover:bg-white/[0.20] ${tone} ${ring}`}
               style={{ height: `${Math.max(3, pct)}%`, minHeight: 3 }}
               title={`${d.label} · ${formatCompact(d.value)}`}
             />

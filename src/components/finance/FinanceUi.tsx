@@ -143,8 +143,19 @@ export function KpiCard({
   );
 }
 
-/* Tiny inline trend line — renders 1×40 px SVG path. Pure visual,
-   no labels. Accent colour pulled from the KPI card's accent. */
+/* Phase UI.2 — restrained Sparkline.
+   The 12-hue rainbow palette is replaced by a 3-tone chart language:
+     · default ink (most accents → ink)
+     · muted gain  (emerald / lime / teal / cyan)
+     · muted loss  (rose / orange / fuchsia)
+   Stroke width 1.5 → 1.0. Opacity wrapper removed; the colour does
+   the work. The KPI_ACCENTS map outside this function is intact so
+   the chip strip on legacy KpiCard still uses the original accent
+   palette — only the sparkline goes monochrome. */
+const CHART_INK_INLINE  = "rgba(255,255,255,0.88)";
+const CHART_GAIN_INLINE = "rgba(134,239,172,0.70)";
+const CHART_LOSS_INLINE = "rgba(253,164,175,0.70)";
+
 function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
   const W = 64;
   const H = 22;
@@ -156,22 +167,21 @@ function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
     .map((v, i) => `${(i * step).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`)
     .join(" ");
   const stroke =
-    accent === "emerald" ? "#34d399"
-    : accent === "rose"  ? "#fb7185"
-    : accent === "amber" ? "#fbbf24"
-    : accent === "sky"   ? "#38bdf8"
-    : accent === "violet"? "#a78bfa"
-    : accent === "blue"  ? "#60a5fa"
-    : accent === "teal"  ? "#2dd4bf"
-    : accent === "orange"? "#fb923c"
-    : accent === "fuchsia"? "#e879f9"
-    : accent === "lime"  ? "#a3e635"
-    : accent === "cyan"  ? "#22d3ee"
-    : accent === "indigo"? "#818cf8"
-    : "rgba(255,255,255,0.4)";
+    accent === "emerald" || accent === "lime" || accent === "teal" || accent === "cyan"
+      ? CHART_GAIN_INLINE
+      : accent === "rose" || accent === "orange" || accent === "fuchsia"
+        ? CHART_LOSS_INLINE
+        : CHART_INK_INLINE;
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-80">
-      <polyline points={points} stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none">
+      <polyline
+        points={points}
+        stroke={stroke}
+        strokeWidth={1}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   );
 }
@@ -324,7 +334,12 @@ export function PeriodTabs<T extends string>({
   );
 }
 
-/* ── TrendChart — simple stacked bar chart of revenue vs expenses ── */
+/* ── TrendChart — paired bars (revenue vs expenses).
+   Phase UI.2 — saturated emerald/rose 70% pills replaced by the same
+   3-tone chart palette as Sparkline + AreaChart. Bars are flat fills
+   (no gradient, no hue shift on hover — opacity-only). Used by the
+   legacy KpiCard surface on Customers / Suppliers / Expense pages;
+   no consumer needs the loud original. */
 export function TrendChart({
   data,
   currency,
@@ -336,18 +351,26 @@ export function TrendChart({
   const max = Math.max(1, ...data.map((d) => Math.max(d.revenue, d.expenses)));
   return (
     <div>
-      <div className="flex items-end gap-2 h-44">
+      <div className="flex h-44 items-end gap-2">
         {data.map((d, i) => (
           <div key={i} className="flex flex-1 flex-col items-center gap-1">
-            <div className="flex w-full items-end gap-0.5 h-full">
+            <div className="flex h-full w-full items-end gap-0.5">
               <div
-                className="flex-1 rounded-t bg-emerald-500/70 transition hover:bg-emerald-400"
-                style={{ height: `${(d.revenue / max) * 100}%`, minHeight: d.revenue > 0 ? 4 : 0 }}
+                className="flex-1 rounded-t-sm transition-opacity duration-200 hover:opacity-90"
+                style={{
+                  height: `${(d.revenue / max) * 100}%`,
+                  minHeight: d.revenue > 0 ? 4 : 0,
+                  background: CHART_GAIN_INLINE,
+                }}
                 title={`Revenue: ${fmtMoney(d.revenue, currency, { compact: true })}`}
               />
               <div
-                className="flex-1 rounded-t bg-rose-500/70 transition hover:bg-rose-400"
-                style={{ height: `${(d.expenses / max) * 100}%`, minHeight: d.expenses > 0 ? 4 : 0 }}
+                className="flex-1 rounded-t-sm transition-opacity duration-200 hover:opacity-90"
+                style={{
+                  height: `${(d.expenses / max) * 100}%`,
+                  minHeight: d.expenses > 0 ? 4 : 0,
+                  background: CHART_LOSS_INLINE,
+                }}
                 title={`Costs + Expenses: ${fmtMoney(d.expenses, currency, { compact: true })}`}
               />
             </div>
@@ -360,8 +383,12 @@ export function TrendChart({
         ))}
       </div>
       <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-gray-400">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500/70" /> Revenue</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500/70" /> Costs + Expenses</span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: CHART_GAIN_INLINE }} /> Revenue
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: CHART_LOSS_INLINE }} /> Costs + Expenses
+        </span>
       </div>
     </div>
   );
