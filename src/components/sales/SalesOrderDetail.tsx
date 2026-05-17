@@ -228,6 +228,30 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
           </div>
         )}
 
+        {/* Cross-links — quick navigation to related surfaces. */}
+        {detail && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
+            <span className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mr-1">Related</span>
+            {detail.order.customer_id && (
+              <Link href={`/customers/${detail.order.customer_id}`} className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.012] px-2 py-0.5 hover:bg-white/[0.04]">
+                <RrIcon name="contract" size={10} /> Customer
+              </Link>
+            )}
+            <Link href="/inventory/balances" className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.012] px-2 py-0.5 hover:bg-white/[0.04]">
+              <RrIcon name="box-open" size={10} /> Inventory
+            </Link>
+            <Link href="/invoices" className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.012] px-2 py-0.5 hover:bg-white/[0.04]">
+              <RrIcon name="file-invoice-dollar" size={10} /> Invoices
+            </Link>
+            <Link href="/finance/accounting/queue" className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.012] px-2 py-0.5 hover:bg-white/[0.04]">
+              <RrIcon name="clock" size={10} /> Accounting Queue
+            </Link>
+            <Link href="/workflows/sales" className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.012] px-2 py-0.5 hover:bg-white/[0.04]">
+              <RrIcon name="contract" size={10} /> Sales Workflow
+            </Link>
+          </div>
+        )}
+
         {loading && !detail && (
           <div className="text-[12px] text-gray-500">Loading order…</div>
         )}
