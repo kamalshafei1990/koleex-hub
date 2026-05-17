@@ -46,7 +46,8 @@ const GROUPS: TabGroup[] = [
     label: "Overview",
     defaultHref: "/finance",
     items: [
-      { key: "/finance", label: "Dashboard", icon: "coins" },
+      { key: "/finance",       label: "Dashboard", icon: "coins" },
+      { key: "/finance/setup", label: "Setup",     icon: "shield-check" },
     ],
   },
   {
