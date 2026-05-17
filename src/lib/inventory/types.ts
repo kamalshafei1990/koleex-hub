@@ -132,6 +132,11 @@ export interface InventoryItemWithRefs extends InventoryItem {
   color: ColorToken;
   category_name: string | null;
   qty_on_hand: number;
+  /** Tenant-wide weighted-average cost for this item. Surfaces in the
+   *  Items table as "Avg Cost". */
+  avg_cost: number;
+  /** Sum of inventory_value across every (item, warehouse) bucket. */
+  inventory_value: number;
 }
 
 export type LocationType =

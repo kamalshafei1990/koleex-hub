@@ -39,6 +39,9 @@ interface ItemRow {
   color: ColorToken;
   qty_on_hand: number;
   cost_price: number | null;
+  /* Phase O.5 — folded into the items list query. */
+  avg_cost: number;
+  inventory_value: number;
 }
 
 interface ItemType {
@@ -57,6 +60,9 @@ interface Warehouse { id: string; code: string; name: string; is_default: boolea
 
 function fmtQty(n: number) {
   return Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 });
+}
+function fmtMoney(n: number) {
+  return Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function InventoryItems() {
@@ -223,15 +229,16 @@ export default function InventoryItems() {
                 <th className="px-3 py-2 text-left">Brand</th>
                 <th className="px-3 py-2 text-left">UoM</th>
                 <th className="px-3 py-2 text-right">On hand</th>
-                <th className="px-3 py-2 text-right">Cost</th>
+                <th className="px-3 py-2 text-right">Avg cost</th>
+                <th className="px-3 py-2 text-right">Stock value</th>
                 <th className="px-3 py-2 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-0 py-0">
+                <tr><td colSpan={10} className="px-0 py-0">
                   <InventoryEmpty
                     title={searchKey || filterTypeId ? "No items match the current filters" : "No items yet"}
                     hint={searchKey || filterTypeId ? "Try clearing filters or broadening your search." : "Create your first item — machines, parts, packaging, supplies, anything you track."}
@@ -263,13 +270,33 @@ export default function InventoryItems() {
                     <td className="px-3 py-2 text-gray-400">{r.unit_of_measure}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-mono text-gray-400">
-                      {r.cost_price != null ? Number(r.cost_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                      {r.avg_cost > 0 ? fmtMoney(r.avg_cost) : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-mono">
+                      {r.inventory_value > 0 ? fmtMoney(r.inventory_value) : <span className="text-gray-600">—</span>}
                     </td>
                     <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
                   </tr>
                 ))
               )}
             </tbody>
+            {rows.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-white/[0.08] text-[11px]">
+                  <td colSpan={6} className="px-3 py-2 text-right uppercase tracking-[0.10em] text-gray-500">
+                    Totals
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-mono text-gray-400">
+                    {fmtQty(rows.reduce((acc, r) => acc + r.qty_on_hand, 0))}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600 text-right text-[10px]">—</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-mono text-emerald-200">
+                    {fmtMoney(rows.reduce((acc, r) => acc + r.inventory_value, 0))}
+                  </td>
+                  <td className="px-3 py-2"></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </Panel>
       </div>
@@ -567,6 +594,22 @@ interface DetailStock {
   total_available: number;
   warehouses: DetailStockBucket[];
 }
+interface DetailValuationLocation {
+  warehouse_id: string;
+  warehouse_code: string;
+  warehouse_name: string;
+  qty_on_hand: number;
+  average_cost: number;
+  inventory_value: number;
+}
+interface DetailValuation {
+  total_qty: number;
+  total_value: number;
+  weighted_avg_cost: number;
+  last_in_cost: number | null;
+  currency: string;
+  locations: DetailValuationLocation[];
+}
 
 function ItemDetailDrawer({
   itemId, typeMap, onClose, onChanged,
@@ -578,6 +621,7 @@ function ItemDetailDrawer({
 }) {
   const [item, setItem] = useState<DetailItem | null>(null);
   const [stock, setStock] = useState<DetailStock | null>(null);
+  const [valuation, setValuation] = useState<DetailValuation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -588,12 +632,17 @@ function ItemDetailDrawer({
       setLoading(true);
       setError(null);
       try {
-        const r = await fetch(`/api/inventory/items/${itemId}`, { credentials: "include", cache: "no-store" });
+        const [r, vRes] = await Promise.all([
+          fetch(`/api/inventory/items/${itemId}`, { credentials: "include", cache: "no-store" }),
+          fetch(`/api/inventory/items/${itemId}/valuation`, { credentials: "include", cache: "no-store" }),
+        ]);
         const j = await r.json();
+        const vJ = await vRes.json();
         if (cancelled) return;
         if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
         setItem(j.item as DetailItem);
         setStock(j.stock as DetailStock);
+        if (vRes.ok && vJ.valuation) setValuation(vJ.valuation as DetailValuation);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -716,6 +765,56 @@ function ItemDetailDrawer({
               </div>
             )}
           </div>
+
+          {/* Valuation — Phase O.5 */}
+          {valuation && valuation.total_qty > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mb-2">Valuation</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Avg cost</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono">{fmtMoney(valuation.weighted_avg_cost)}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                </div>
+                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Stock value</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-emerald-200">{fmtMoney(valuation.total_value)}</div>
+                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                </div>
+                <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-3 py-2">
+                  <div className="text-[9.5px] uppercase tracking-[0.10em] text-gray-500">Last in cost</div>
+                  <div className="mt-0.5 text-[15px] tabular-nums font-mono text-gray-300">
+                    {valuation.last_in_cost != null ? fmtMoney(valuation.last_in_cost) : "—"}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-gray-500">{valuation.currency}</div>
+                </div>
+              </div>
+              {valuation.locations.length > 0 && (
+                <div className="mt-3 overflow-hidden rounded-md border border-white/[0.05]">
+                  <table className="min-w-full text-[11.5px]">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                        <th className="px-2 py-1.5 text-left">Location</th>
+                        <th className="px-2 py-1.5 text-right">Qty</th>
+                        <th className="px-2 py-1.5 text-right">Avg cost</th>
+                        <th className="px-2 py-1.5 text-right">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {valuation.locations.map((l) => (
+                        <tr key={l.warehouse_id} className="border-b border-white/[0.03] last:border-b-0">
+                          <td className="px-2 py-1.5 text-gray-300">{l.warehouse_code} <span className="text-gray-500">· {l.warehouse_name}</span></td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtQty(l.qty_on_hand)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono text-gray-400">{fmtMoney(l.average_cost)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums font-mono">{fmtMoney(l.inventory_value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Details grid */}
           <div>

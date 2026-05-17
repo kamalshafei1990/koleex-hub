@@ -53,17 +53,45 @@ interface Summary {
   item_count: number;
   total_on_hand: number;
   total_reserved: number;
+  /* Phase O.5 */
+  total_value: number;
+  value_by_currency: Record<string, number>;
   recent_movements: SummaryMovement[];
   top_balances: SummaryBalance[];
+}
+
+interface ValuationRow {
+  inventory_item_id: string;
+  item_code: string;
+  item_name: string | null;
+  warehouse_code: string;
+  warehouse_name: string;
+  qty_on_hand: number;
+  average_cost: number;
+  inventory_value: number;
+  currency: string;
 }
 
 function fmtQty(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
+function fmtMoney(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+/* For mixed-currency tenants we still want a single headline KPI; pick
+   the dominant currency and surface a "+ N" note. */
+function pickHeadlineCurrency(byCurrency: Record<string, number> | undefined): { currency: string; value: number; otherCount: number } {
+  if (!byCurrency) return { currency: "USD", value: 0, otherCount: 0 };
+  const entries = Object.entries(byCurrency).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) return { currency: "USD", value: 0, otherCount: 0 };
+  return { currency: entries[0][0], value: entries[0][1], otherCount: entries.length - 1 };
+}
 
 export default function InventoryDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [topValue, setTopValue] = useState<ValuationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,14 +99,18 @@ export default function InventoryDashboard() {
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/inventory/summary", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        const j = await r.json();
+        const [sRes, vRes] = await Promise.all([
+          fetch("/api/inventory/summary", { credentials: "include", cache: "no-store" }),
+          fetch("/api/inventory/valuation?only_positive=1&totals=1", { credentials: "include", cache: "no-store" }),
+        ]);
+        const sJ = await sRes.json();
+        const vJ = await vRes.json();
         if (cancelled) return;
-        if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
-        setSummary(j.summary as Summary);
+        if (!sRes.ok) { setError(sJ.error ?? `Failed (${sRes.status})`); return; }
+        setSummary(sJ.summary as Summary);
+        if (vRes.ok && vJ.totals) {
+          setTopValue((vJ.totals.top_holders ?? []) as ValuationRow[]);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -89,6 +121,7 @@ export default function InventoryDashboard() {
   }, []);
 
   const totalStock = summary?.total_on_hand ?? 0;
+  const headlineValue = pickHeadlineCurrency(summary?.value_by_currency);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -123,7 +156,7 @@ export default function InventoryDashboard() {
         )}
 
         {/* KPI strip — uses InventoryKpi (mirrors Finance KPI rhythm). */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           <InventoryKpi
             label="Locations"
             value={loading ? "—" : String(summary?.warehouse_count ?? 0)}
@@ -146,6 +179,16 @@ export default function InventoryDashboard() {
             value={loading ? "—" : fmtQty(summary?.total_reserved ?? 0)}
             hint="Committed but not yet shipped"
             tone="warning"
+          />
+          <InventoryKpi
+            label="Inventory value"
+            value={loading ? "—" : fmtMoney(headlineValue.value)}
+            hint={
+              headlineValue.otherCount > 0
+                ? `${headlineValue.currency} (+ ${headlineValue.otherCount} other currencies)`
+                : headlineValue.currency
+            }
+            tone="positive"
           />
         </div>
 
@@ -196,6 +239,53 @@ export default function InventoryDashboard() {
                       <td className="px-4 py-2 text-gray-400">{b.warehouse_code}</td>
                       <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(b.qty_on_hand)}</td>
                       <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtQty(b.qty_available)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </Panel>
+        </section>
+
+        {/* Phase O.5 — Top value holders. */}
+        <section>
+          <div className="flex items-baseline justify-between gap-3">
+            <Eyebrow>Top value holders</Eyebrow>
+            <Link href="/inventory/items" className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-300">
+              View all items <span aria-hidden>→</span>
+            </Link>
+          </div>
+          <Panel className="mt-3">
+            <table className="min-w-full text-[12.5px]">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+                  <th className="px-4 py-2 text-left">Code</th>
+                  <th className="px-4 py-2 text-left">Item</th>
+                  <th className="px-4 py-2 text-left">Location</th>
+                  <th className="px-4 py-2 text-right">Qty</th>
+                  <th className="px-4 py-2 text-right">Avg cost</th>
+                  <th className="px-4 py-2 text-right">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+                ) : topValue.length === 0 ? (
+                  <tr><td colSpan={6} className="px-0 py-0">
+                    <InventoryEmpty
+                      title="No valued stock yet"
+                      hint="Receive items with a unit cost (or set one on the item master) and the value shows up here."
+                    />
+                  </td></tr>
+                ) : (
+                  topValue.map((r) => (
+                    <tr key={`${r.inventory_item_id}-${r.warehouse_code}`} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
+                      <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.item_code}</td>
+                      <td className="px-4 py-2 text-gray-200">{r.item_name ?? "—"}</td>
+                      <td className="px-4 py-2 text-gray-400">{r.warehouse_code}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono">{fmtQty(r.qty_on_hand)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-gray-400">{fmtMoney(r.average_cost)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(r.inventory_value)}</td>
                     </tr>
                   ))
                 )}

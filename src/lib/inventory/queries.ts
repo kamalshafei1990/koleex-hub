@@ -215,7 +215,7 @@ export async function listInventoryItems(opts: {
 
   const typeIds = Array.from(new Set(items.map((i) => i.item_type_id)));
   const catIds = Array.from(new Set(items.map((i) => i.category_id).filter(Boolean) as string[]));
-  const [typesRes, catsRes, balancesRes] = await Promise.all([
+  const [typesRes, catsRes, balancesRes, valuationRes] = await Promise.all([
     supabaseServer.from("inventory_item_types").select("id, type_key, type_name, icon, color").in("id", typeIds),
     catIds.length
       ? supabaseServer.from("inventory_item_categories").select("id, name").in("id", catIds)
@@ -223,6 +223,14 @@ export async function listInventoryItems(opts: {
     supabaseServer
       .from("inventory_stock_balances")
       .select("inventory_item_id, qty_on_hand")
+      .eq("tenant_id", opts.tenantId)
+      .in("inventory_item_id", items.map((i) => i.id)),
+    /* Phase O.5 — fold valuation totals into the list query so the
+       Items table can show Avg Cost + Stock Value without a second
+       round-trip. */
+    supabaseServer
+      .from("inventory_valuation")
+      .select("inventory_item_id, qty_on_hand, inventory_value")
       .eq("tenant_id", opts.tenantId)
       .in("inventory_item_id", items.map((i) => i.id)),
   ]);
@@ -236,9 +244,18 @@ export async function listInventoryItems(opts: {
   for (const b of (balancesRes.data ?? []) as Array<{ inventory_item_id: string; qty_on_hand: number }>) {
     balMap.set(b.inventory_item_id, (balMap.get(b.inventory_item_id) ?? 0) + Number(b.qty_on_hand || 0));
   }
+  const valMap = new Map<string, { qty: number; value: number }>();
+  for (const v of (valuationRes.data ?? []) as Array<{ inventory_item_id: string; qty_on_hand: number; inventory_value: number }>) {
+    const cur = valMap.get(v.inventory_item_id) ?? { qty: 0, value: 0 };
+    cur.qty   += Number(v.qty_on_hand)     || 0;
+    cur.value += Number(v.inventory_value) || 0;
+    valMap.set(v.inventory_item_id, cur);
+  }
 
   return items.map((it) => {
     const t = typeMap.get(it.item_type_id);
+    const v = valMap.get(it.id) ?? { qty: 0, value: 0 };
+    const avg = v.qty > 0 ? v.value / v.qty : 0;
     return {
       ...it,
       type_key: t?.type_key ?? "other",
@@ -247,6 +264,8 @@ export async function listInventoryItems(opts: {
       color: (t?.color ?? "slate") as ColorToken,
       category_name: it.category_id ? catMap.get(it.category_id) ?? null : null,
       qty_on_hand: balMap.get(it.id) ?? 0,
+      avg_cost: avg,
+      inventory_value: v.value,
     };
   });
 }
@@ -285,6 +304,12 @@ export interface InventoryDashboardSummary {
   item_count: number;
   total_on_hand: number;
   total_reserved: number;
+  /** Phase O.5 — tenant-wide total inventory value (sum across every
+   *  (item, location) bucket). */
+  total_value: number;
+  /** Per-currency breakdown so the dashboard can surface mixed-currency
+   *  tenants honestly instead of pretending it's all USD. */
+  value_by_currency: Record<string, number>;
   recent_movements: StockMovement[];
   top_balances: BalanceWithRefs[];
 }
@@ -292,10 +317,14 @@ export interface InventoryDashboardSummary {
 export async function buildInventoryDashboardSummary(
   tenantId: string,
 ): Promise<InventoryDashboardSummary> {
-  const [warehouses, balances, recent] = await Promise.all([
+  const [warehouses, balances, recent, valuationRows] = await Promise.all([
     listWarehouses(tenantId),
     buildBalancesSnapshot({ tenantId }),
     buildMovementHistory({ tenantId, limit: 10 }),
+    supabaseServer
+      .from("inventory_valuation")
+      .select("inventory_value, currency, qty_on_hand")
+      .eq("tenant_id", tenantId),
   ]);
 
   const itemSet = new Set(balances.filter((b) => b.qty_on_hand > 0).map((b) => b.inventory_item_id));
@@ -313,11 +342,22 @@ export async function buildInventoryDashboardSummary(
     .sort((a, b) => b.qty_on_hand - a.qty_on_hand)
     .slice(0, 8);
 
+  let totalValue = 0;
+  const byCurrency: Record<string, number> = {};
+  for (const v of (valuationRows.data ?? []) as Array<{ inventory_value: number; currency: string; qty_on_hand: number }>) {
+    const value = Number(v.inventory_value) || 0;
+    totalValue += value;
+    const c = v.currency || "USD";
+    byCurrency[c] = (byCurrency[c] ?? 0) + value;
+  }
+
   return {
     warehouse_count: warehouses.filter((w) => w.is_active).length,
     item_count: itemSet.size,
     total_on_hand: totals.on_hand,
     total_reserved: totals.reserved,
+    total_value: totalValue,
+    value_by_currency: byCurrency,
     recent_movements: recent,
     top_balances: topBalances,
   };
