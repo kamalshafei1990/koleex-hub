@@ -26,11 +26,22 @@ export async function GET() {
   return NextResponse.json({ warehouses: list });
 }
 
+const ALLOWED_LOCATION_TYPES = [
+  "warehouse","supplier_location","port","forwarder","consolidation_point",
+  "in_transit","customer_location","exhibition_site","demo_location","virtual_location",
+] as const;
+type AllowedLocationType = (typeof ALLOWED_LOCATION_TYPES)[number];
+
 interface NewWarehouseBody {
   code: string;
   name: string;
   location?: string | null;
+  location_type?: AllowedLocationType | null;
   is_default?: boolean;
+  is_virtual?: boolean;
+  contact_person?: string | null;
+  contact_phone?: string | null;
+  address?: string | null;
   notes?: string | null;
 }
 
@@ -45,9 +56,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "code and name required" }, { status: 400 });
   }
 
-  /* If is_default is being toggled on, clear the flag from any other
-     warehouse first. The partial unique index would otherwise reject. */
-  if (body.is_default === true) {
+  /* Default rule: only "warehouse" type locations can be the tenant's
+     default. Virtual locations (port, forwarder, customer, …) are not
+     eligible to be the default destination. */
+  const locType: AllowedLocationType = (body.location_type as AllowedLocationType) ?? "warehouse";
+  if (!ALLOWED_LOCATION_TYPES.includes(locType)) {
+    return NextResponse.json({ error: `Unknown location_type '${locType}'` }, { status: 400 });
+  }
+  const isDefault = (body.is_default ?? false) && locType === "warehouse";
+  /* Auto-infer is_virtual when the caller didn't supply it. */
+  const isVirtual = body.is_virtual ?? (locType !== "warehouse" && locType !== "supplier_location");
+
+  if (isDefault) {
     await supabaseServer
       .from("inventory_warehouses")
       .update({ is_default: false })
@@ -62,8 +82,13 @@ export async function POST(req: Request) {
       code: body.code,
       name: body.name,
       location: body.location ?? null,
-      is_default: body.is_default ?? false,
+      location_type: locType,
+      is_default: isDefault,
+      is_virtual: isVirtual,
       is_active: true,
+      contact_person: body.contact_person ?? null,
+      contact_phone: body.contact_phone ?? null,
+      address: body.address ?? null,
       notes: body.notes ?? null,
     })
     .select("*")

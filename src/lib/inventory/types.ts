@@ -134,14 +134,30 @@ export interface InventoryItemWithRefs extends InventoryItem {
   qty_on_hand: number;
 }
 
+export type LocationType =
+  | "warehouse" | "supplier_location" | "port" | "forwarder"
+  | "consolidation_point" | "in_transit" | "customer_location"
+  | "exhibition_site" | "demo_location" | "virtual_location";
+
+export const ALLOWED_LOCATION_TYPES: LocationType[] = [
+  "warehouse","supplier_location","port","forwarder","consolidation_point",
+  "in_transit","customer_location","exhibition_site","demo_location","virtual_location",
+];
+
 export interface Warehouse {
   id: string;
   tenant_id: string;
   code: string;
   name: string;
   location: string | null;
+  location_type: LocationType;
   is_default: boolean;
   is_active: boolean;
+  is_virtual: boolean;
+  contact_person: string | null;
+  contact_phone: string | null;
+  address: string | null;
+  customer_id: string | null;
   notes: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
