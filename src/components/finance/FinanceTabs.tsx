@@ -85,9 +85,12 @@ const GROUPS: TabGroup[] = [
     label: "Accounting",
     defaultHref: "/finance/accounting/queue",
     items: [
-      { key: "/finance/accounting/queue",          label: "Queue",          icon: "clock" },
-      { key: "/finance/accounting/trial-balance",  label: "Trial Balance",  icon: "badge-check" },
-      { key: "/finance/accounting/general-ledger", label: "General Ledger", icon: "contract" },
+      { key: "/finance/accounting/queue",          label: "Queue",           icon: "clock" },
+      { key: "/finance/accounting/trial-balance",  label: "Trial Balance",   icon: "badge-check" },
+      { key: "/finance/accounting/general-ledger", label: "General Ledger",  icon: "contract" },
+      { key: "/finance/accounting/profit-loss",    label: "Profit & Loss",   icon: "file-invoice-dollar" },
+      { key: "/finance/accounting/cash-flow",      label: "Cash Flow",       icon: "wallet" },
+      { key: "/finance/accounting/equity",         label: "Equity",          icon: "coins" },
     ],
   },
   {

@@ -527,6 +527,144 @@ async function main() {
        FLOW, not the data outcome. */
     ok("30 retry path runs without silent success on broken draft",
       !retried.ok);
+
+    /* ── Phase A.3 — Financial statements & ratios ──────────────── */
+
+    const { buildProfitLoss, buildCashFlow, buildEquityStatement, buildFinancialRatios } =
+      await import("../src/lib/accounting/statements.js");
+
+    /* For the P&L we need at least one posted revenue line. The
+       sandbox seeds + A.1 already posted a customer payment that hit
+       AR + Bank — no revenue posted yet. Drop in a small manual
+       revenue entry so P&L has data to slice. */
+    const revEntryId = randomUUID();
+    await supabase.from("accounting_journal_entries").insert({
+      id: revEntryId, tenant_id: TENANT_A,
+      journal_no: `JE-REV-${Date.now().toString(16).slice(-6)}`,
+      entry_date: "2026-05-15", source_type: "manual", status: "draft",
+      description: "A.3 test revenue + opex",
+    });
+    await supabase.from("accounting_journal_lines").insert([
+      /* 10000 revenue */
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 0, account_id: aCoa.get("1100")!.id, debit: 10_000, credit: 0, currency: "USD" },
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 1, account_id: aCoa.get("4000")!.id, debit: 0, credit: 10_000, currency: "USD" },
+      /* 2500 operating expense */
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 2, account_id: aCoa.get("5000")!.id, debit: 2_500, credit: 0, currency: "USD" },
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 3, account_id: aCoa.get("2000")!.id, debit: 0, credit: 2_500, currency: "USD" },
+      /* 500 freight (direct cost) */
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 4, account_id: aCoa.get("5200")!.id, debit: 500, credit: 0, currency: "USD" },
+      { tenant_id: TENANT_A, entry_id: revEntryId, line_index: 5, account_id: aCoa.get("2000")!.id, debit: 0, credit: 500, currency: "USD" },
+    ]);
+    const revPostRes = await supabase.rpc("fn_accounting_post_entry", {
+      p_entry_id: revEntryId, p_tenant_id: TENANT_A, p_posted_by: null,
+    });
+    void revPostRes;
+
+    const period = { from: "2026-01-01", to: "2026-12-31" };
+    const pl = await buildProfitLoss(TENANT_A, period);
+
+    /* 31 — Revenue matches the seeded 10K. */
+    ok("31 P&L revenue = sum of credits on revenue accounts",
+      Math.abs(pl.revenue.amount - 10_000) < 0.01,
+      `revenue=${pl.revenue.amount.toFixed(2)}`);
+
+    /* 32 — P&L identity: revenue - cost_of_sales - opex = net_profit.
+       Structural check — doesn't depend on the specific seed values
+       (the earlier A.1 test block also posted some expense rows). */
+    const totalExp = pl.cost_of_sales.amount + pl.operating_expenses.amount;
+    const computedNet = pl.revenue.amount - pl.cost_of_sales.amount - pl.operating_expenses.amount;
+    ok("32 P&L identity: revenue − costs − opex = net profit",
+      Math.abs(computedNet - pl.net_profit) < 0.01 && totalExp > 0,
+      `revenue=${pl.revenue.amount.toFixed(2)} cos=${pl.cost_of_sales.amount.toFixed(2)} opex=${pl.operating_expenses.amount.toFixed(2)} net=${pl.net_profit.toFixed(2)}`);
+
+    /* 33 — P&L net = TB current-year-earnings (cross-statement
+       consistency). Use buildBalanceSheetSummary which already
+       computes CYE from posted balances. */
+    const bsAfter = await buildBalanceSheetSummary(TENANT_A);
+    ok("33 P&L net = TB current-year-earnings",
+      Math.abs(pl.net_profit - bsAfter.current_year_earnings) < 0.01,
+      `pl=${pl.net_profit.toFixed(2)} cye=${bsAfter.current_year_earnings.toFixed(2)}`);
+
+    /* 34 — Drafted (not posted) entries are excluded from P&L. Insert
+       a draft revenue line and confirm it doesn't move the number. */
+    const draftId = randomUUID();
+    await supabase.from("accounting_journal_entries").insert({
+      id: draftId, tenant_id: TENANT_A,
+      journal_no: `JE-DRAFT-${Date.now().toString(16).slice(-6)}`,
+      entry_date: "2026-05-20", source_type: "manual", status: "draft",
+      description: "Drafted revenue — should not affect P&L",
+    });
+    await supabase.from("accounting_journal_lines").insert([
+      { tenant_id: TENANT_A, entry_id: draftId, line_index: 0, account_id: aCoa.get("1100")!.id, debit: 99_999, credit: 0, currency: "USD" },
+      { tenant_id: TENANT_A, entry_id: draftId, line_index: 1, account_id: aCoa.get("4000")!.id, debit: 0, credit: 99_999, currency: "USD" },
+    ]);
+    const plAfterDraft = await buildProfitLoss(TENANT_A, period);
+    ok("34 drafted entries excluded from P&L",
+      Math.abs(plAfterDraft.revenue.amount - pl.revenue.amount) < 0.01);
+
+    /* 35 — Cash flow opening + net = closing (within rounding). */
+    const cf = await buildCashFlow(TENANT_A, period);
+    ok("35 cash flow: opening + net = closing",
+      Math.abs((cf.opening_cash + cf.net_change) - cf.closing_cash) < 0.01,
+      `${cf.opening_cash.toFixed(2)} + ${cf.net_change.toFixed(2)} = ${cf.closing_cash.toFixed(2)}`);
+
+    /* 36 — Cash flow only includes bank-account lines. The closing
+       cash should match the cash balance on the TB. */
+    const tbForCf = await buildTrialBalance(TENANT_A, { to: period.to });
+    let tbCash = 0;
+    for (const r of tbForCf.rows) {
+      if (r.code === "1000" || r.code === "1010") tbCash += r.balance;
+    }
+    ok("36 cash flow closing matches TB cash balance",
+      Math.abs(cf.closing_cash - tbCash) < 0.01,
+      `cf=${cf.closing_cash.toFixed(2)} tb=${tbCash.toFixed(2)}`);
+
+    /* 37 — Equity statement: opening + movements = closing. */
+    const eq = await buildEquityStatement(TENANT_A, period);
+    const eqDelta = eq.closing_equity - eq.opening_equity;
+    const eqMovementSum = eq.contributions + eq.current_year_earnings;
+    ok("37 equity: opening + movements = closing",
+      Math.abs(eqDelta - eqMovementSum) < 0.01,
+      `Δ=${eqDelta.toFixed(2)} moves=${eqMovementSum.toFixed(2)}`);
+
+    /* 38 — Retained earnings continuity: prior-period CYE flows into
+       the current period's opening retained-earnings + the next
+       period's opening equity. We can't easily test the rollup here
+       without a closing process, so assert the field is exposed and
+       matches the 3100 balance. */
+    const { data: retainedRow } = await supabase
+      .from("accounting_journal_lines")
+      .select("debit, credit, accounting_journal_entries!inner(entry_date, status, tenant_id)")
+      .eq("tenant_id", TENANT_A)
+      .eq("account_id", aCoa.get("3100")!.id)
+      .eq("accounting_journal_entries.status", "posted");
+    const retainedSum = ((retainedRow ?? []) as Array<{ debit: number | string; credit: number | string }>)
+      .reduce((s, r) => s + ((Number(r.credit) || 0) - (Number(r.debit) || 0)), 0);
+    ok("38 retained-earnings exposure matches account 3100 balance",
+      Math.abs(eq.retained_earnings - retainedSum) < 0.01,
+      `eq=${eq.retained_earnings.toFixed(2)} acct=${retainedSum.toFixed(2)}`);
+
+    /* 39 — Financial ratios: current_ratio formula correct. */
+    const ratios = await buildFinancialRatios(TENANT_A, period.to);
+    /* Re-derive from the TB to sanity-check. */
+    const tbAtEnd = await buildTrialBalance(TENANT_A, { to: period.to });
+    let curAssets = 0;
+    let curLiabs = 0;
+    for (const r of tbAtEnd.rows) {
+      if (["1000", "1010", "1100", "1200", "1300"].includes(r.code)) curAssets += r.balance;
+      if (["2000", "2200"].includes(r.code)) curLiabs += r.balance;
+    }
+    const expectedCurrent = curLiabs > 0 ? curAssets / curLiabs : 0;
+    ok("39 current ratio = current_assets / current_liabilities",
+      Math.abs(ratios.current_ratio - expectedCurrent) < 0.001,
+      `r=${ratios.current_ratio.toFixed(4)} expected=${expectedCurrent.toFixed(4)}`);
+
+    /* 40 — Cross-tenant isolation: tenant B asking for tenant A's
+       P&L returns zero (no posted activity belongs to B). */
+    const plCross = await buildProfitLoss(TENANT_B, period);
+    ok("40 cross-tenant P&L returns zero",
+      Math.abs(plCross.revenue.amount) < 0.01 && Math.abs(plCross.net_profit) < 0.01,
+      `B revenue=${plCross.revenue.amount.toFixed(2)}`);
   } finally {
     await clean();
   }
