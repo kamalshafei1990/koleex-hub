@@ -24,6 +24,7 @@ import {
   StatusBadge,
 } from "@/components/inventory/InventoryUi";
 import ShipDialog from "@/components/sales/ShipDialog";
+import DocumentWorkflowBanner from "@/components/ui/workflow/DocumentWorkflowBanner";
 
 interface ItemRow {
   id: string;
@@ -226,6 +227,16 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
           <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
             {error}
           </div>
+        )}
+
+        {/* Workflow context — Customer → SO → Ship → Invoice → Payment */}
+        {detail && (
+          <DocumentWorkflowBanner
+            kind="so"
+            status={detail.order.status}
+            documentId={detail.order.id}
+            customerHref={detail.order.customer_id ? `/customers/${detail.order.customer_id}` : null}
+          />
         )}
 
         {/* Cross-links — quick navigation to related surfaces. */}

@@ -25,7 +25,8 @@
     "validate:currency": "NODE_OPTIONS=--conditions=react-server tsx scripts/currency.ts",
     "validate:role-experience": "NODE_OPTIONS=--conditions=react-server tsx scripts/role-experience.ts",
     "validate:approvals": "NODE_OPTIONS=--conditions=react-server tsx scripts/approvals.ts",
-    "validate:executive": "NODE_OPTIONS=--conditions=react-server tsx scripts/executive.ts"
+    "validate:executive": "NODE_OPTIONS=--conditions=react-server tsx scripts/executive.ts",
+    "validate:smart-create": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-create.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",
