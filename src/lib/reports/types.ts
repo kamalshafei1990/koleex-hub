@@ -129,6 +129,50 @@ export interface ReportTotalsItem {
   emphasized?: boolean;
 }
 
+/* ── Phase R.3 — signature / stamp slots ───────────────────────────
+   Architecture-only; the renderer draws labelled signature lines and
+   an empty stamp box ready for ink. Upload/storage of actual
+   signatures and stamps is out of scope for R.3. */
+export type SignatureRole = "prepared_by" | "reviewed_by" | "approved_by" | "audited_by";
+
+export interface SignatureSlot {
+  role: SignatureRole;
+  /** Display label override. Defaults applied by renderer. */
+  label?: string;
+  /** Pre-filled name (e.g. "John Doe, Controller"). May stay null —
+   *  a signature line is still drawn in either case. */
+  name?: string | null;
+  /** ISO date pre-filled into the date line, or null for blank. */
+  date?: string | null;
+}
+
+/* ── Phase R.3 — QR verification placeholder ───────────────────────
+   Architecture-only — the renderer draws a labelled box. A future
+   phase wires a QR generator + a verification endpoint. */
+export interface VerificationBlock {
+  /** URL the QR will encode (placeholder while the verification
+   *  endpoint is unimplemented). */
+  verification_url?: string;
+  /** Short token the operator can quote when verifying by phone. */
+  token?: string;
+  /** "Coming soon" hint shown in the placeholder box. */
+  caption?: string;
+}
+
+/* ── Phase R.3 — executive cover page ──────────────────────────────
+   Only used by the Executive Finance Summary today. The composer
+   emits a dedicated page-1 cover when this block is present and
+   then continues with the regular report on page 2. */
+export interface CoverPage {
+  /** Headline kpis (4 cells, label + value). Same format keys as
+   *  ReportSummaryItem so the cover renderer reuses formatting. */
+  headline: ReportSummaryItem[];
+  /** Up to 3 risks surfaced large on the cover. */
+  top_risks?: string[];
+  /** Short narrative — 2-3 sentences. Wrapped to ≤ 3 lines on cover. */
+  narrative?: string;
+}
+
 export interface ReportPayload {
   meta: ReportMeta;
   recipient?: ReportRecipient;
@@ -140,6 +184,15 @@ export interface ReportPayload {
    *  it on an external one. Used for "INTERNAL — NOT FOR DISTRIBUTION"
    *  watermark + warning band. */
   internal_warning?: string;
+  /** Phase R.3 — formal signature areas. Renderer draws a labelled
+   *  signature line + date line per slot. Internal reports get
+   *  Prepared/Reviewed/Approved; external reports get Prepared only. */
+  signatures?: SignatureSlot[];
+  /** Phase R.3 — verification block. Architecture only. */
+  verification?: VerificationBlock;
+  /** Phase R.3 — executive cover page. Only renderer-aware when
+   *  present; safe to omit for all non-executive reports. */
+  cover?: CoverPage;
   /** Total row count (used for the audit row). */
   row_count: number;
   /** Headline numeric total (used for the audit row). Null for reports

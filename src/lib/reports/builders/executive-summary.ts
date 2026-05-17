@@ -354,6 +354,8 @@ export async function buildExecutiveSummary(ctx: ReportBuildContext): Promise<Re
     },
   ];
 
+  const reportNo = generateReportNo("KX-EXEC");
+
   return {
     meta: {
       report_type: "executive_summary",
@@ -364,7 +366,7 @@ export async function buildExecutiveSummary(ctx: ReportBuildContext): Promise<Re
       generated_by_name: ctx.generatedByName,
       period,
       currency: REPORTING_CURRENCY,
-      report_no: generateReportNo("KX-EXEC"),
+      report_no: reportNo,
       tenant_name: tenant.name,
       locale: "en-US",
     },
@@ -379,6 +381,33 @@ export async function buildExecutiveSummary(ctx: ReportBuildContext): Promise<Re
       { label: "Net Profit (period, USD eqv)", value: netProfit, format: "money", emphasized: true },
     ],
     internal_warning: "EXECUTIVE — DO NOT DISTRIBUTE",
+    /* Phase R.3 — board-room cover sheet. Renders as its own A4 page
+       before the detail report. 7 headline KPIs (the renderer caps
+       at 4 visually — first 4 are the most decision-relevant). */
+    cover: {
+      headline: [
+        { label: `Revenue (${REPORTING_CURRENCY})`,     value: revenueUsd,  format: "money", tone: "positive" },
+        { label: `Net Profit (${REPORTING_CURRENCY})`,  value: netProfit,   format: "money", tone: netProfit >= 0 ? "positive" : "negative" },
+        { label: `Treasury (${REPORTING_CURRENCY})`,    value: treasuryUsd, format: "money", tone: treasuryUsd >= 0 ? "positive" : "negative" },
+        { label: "Runway",                               value: runwayDays === null ? "Net cash-generative" : `${runwayDays} days`, format: "text", tone: runwayDays !== null && runwayDays < 60 ? "warning" : "neutral", hint: `Gross margin ${grossMargin.toFixed(1)}%` },
+      ],
+      top_risks: risks.slice(0, 3),
+      narrative: obs,
+    },
+    /* Phase R.3 — executive briefing carries the full audit-grade
+       sign-off chain (Prepared / Reviewed / Approved / Audited). */
+    signatures: [
+      { role: "prepared_by", name: ctx.generatedByName, date: new Date().toISOString() },
+      { role: "reviewed_by", name: null, date: null },
+      { role: "approved_by", name: null, date: null },
+      { role: "audited_by",  name: null, date: null },
+    ],
+    /* Verification placeholder block. R.3 architecture-only — the
+     * URL points at a future endpoint; QR generation lands later. */
+    verification: {
+      verification_url: `koleexgroup.com/verify/${reportNo}`,
+      caption: "Scan to verify document authenticity (placeholder)",
+    },
     row_count: orders.length + activeAccounts.length,
     total_amount: netProfit,
   };

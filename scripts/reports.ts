@@ -382,6 +382,88 @@ async function main() {
     const prHtml = renderReportHtml(pr);
     const theadCount = (prHtml.match(/display:table-header-group/g) ?? []).length;
     ok("27 multi-page hygiene: thead group-display present", theadCount > 0, `count=${theadCount}`);
+
+    /* Tiny local helper used by R.3 assertions to keep callsites tidy. */
+    const csHtml = (p: unknown) => renderReportHtml(p as never);
+
+    /* ── R.3 print-polish + multi-language assertions ────────────── */
+
+    /* 28 — executive cover page renders with the headline KPI tiles,
+       top risks, and narrative. Cover sits in its own A4 sheet via
+       page-break-after:always. */
+    ok("28 executive: cover page payload present",
+      !!ex.cover && Array.isArray(ex.cover.headline) && ex.cover.headline.length >= 4);
+    const exHtml = renderReportHtml(ex);
+    ok("29 executive: cover page renders + page-break-after",
+      exHtml.includes('class="rpt-cover"') && exHtml.includes("page-break-after:always"));
+
+    /* 30 — formal signature block: every report carries either the
+       payload-provided signatures OR the renderer-synthesised
+       default set. Verify by checking the rendered HTML for the
+       signature-line treatment. */
+    ok("30 signature block rendered on every report",
+      [csHtml(cs), csHtml(ss), csHtml(pr), csHtml(rr), csHtml(tr), csHtml(er), exHtml]
+        .every((h) => h.includes('class="rpt-signature')));
+
+    /* 31 — internal reports get the full Prepared/Reviewed/Approved
+       chain; external reports get Prepared only. */
+    const externalSigCount = (csHtml(cs).match(/Signature<\/span>/g) ?? []).length;
+    const internalSigCount = (csHtml(pr).match(/Signature<\/span>/g) ?? []).length;
+    const executiveSigCount = (exHtml.match(/Signature<\/span>/g) ?? []).length;
+    ok("31 signature roles: external=1, internal=3, executive=4",
+      externalSigCount === 1 && internalSigCount === 3 && executiveSigCount === 4,
+      `ext=${externalSigCount}, int=${internalSigCount}, exec=${executiveSigCount}`);
+
+    /* 32 — QR verification placeholder renders on the executive
+       summary (only report that opts in via payload.verification). */
+    ok("32 verification placeholder present on executive",
+      exHtml.includes('class="rpt-verification') && exHtml.includes("QR"));
+
+    /* 33 — print-safe utility classes emitted in the stylesheet. */
+    ok("33 print-safe utility classes in stylesheet",
+      exHtml.includes(".avoid-break") &&
+      exHtml.includes(".keep-with-next") &&
+      exHtml.includes(".section-safe") &&
+      exHtml.includes(".totals-safe"));
+
+    /* 34 — orphan/widow defence: body declares orphans:3 + widows:3
+       and the @page rule is present. */
+    ok("34 orphans/widows + @page rule present",
+      exHtml.includes("orphans: 3") && exHtml.includes("widows: 3") && exHtml.includes("@page"));
+
+    /* 35 — RTL locale renders without crashing AND emits dir="rtl". */
+    const arPayload = { ...cs, meta: { ...cs.meta, locale: "ar-EG" } };
+    const arHtml = renderReportHtml(arPayload);
+    ok("35 RTL locale renders + dir=rtl",
+      arHtml.includes('dir="rtl"') && arHtml.includes('lang="ar-EG"'));
+
+    /* 36 — Chinese locale renders without crashing AND emits dir=ltr
+       (CJK is LTR). */
+    const zhPayload = { ...cs, meta: { ...cs.meta, locale: "zh-CN" } };
+    const zhHtml = renderReportHtml(zhPayload);
+    ok("36 CJK locale renders + dir=ltr",
+      zhHtml.includes('dir="ltr"') && zhHtml.includes('lang="zh-CN"'));
+
+    /* 37 — corporate-identity block present on every report. The
+       sandbox tenant isn't named "KOLEEX", so the renderer falls
+       back to the generic identity (tenant name + koleexgroup.com).
+       The KOLEEX-specific Taizhou identity is exercised separately
+       below. */
+    ok("37a generic identity present (sandbox tenant)",
+      exHtml.includes("koleexgroup.com") && exHtml.includes("Phase-R Sandbox"));
+    const koleexPayload = { ...ex, meta: { ...ex.meta, tenant_name: "KOLEEX International Group" } };
+    const koleexHtml = renderReportHtml(koleexPayload);
+    ok("37b KOLEEX identity expands to Taizhou + finance@",
+      koleexHtml.includes("Taizhou") && koleexHtml.includes("finance@koleexgroup.com"));
+
+    /* 38 — per-page running footer template (Puppeteer) carries
+       page X of Y + classification + report id. */
+    const { pageFooterTemplate } = await import("../src/lib/reports/layout.js");
+    const footerTpl = pageFooterTemplate(ex);
+    ok("38 page footer template: classification + page X/Y",
+      footerTpl.includes("EXECUTIVE") &&
+      footerTpl.includes('class="pageNumber"') &&
+      footerTpl.includes('class="totalPages"'));
   } finally {
     await clean();
   }

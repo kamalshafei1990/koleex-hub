@@ -47,11 +47,25 @@ function cellHtml(col: ReportColumn, raw: ReportRowValue, isSubtotal: boolean, i
   const fontStyle = numeric || col.format === "date"
     ? "font-family:var(--rpt-mono);font-variant-numeric:tabular-nums"
     : "";
+  /* Negative amounts (rendered as "(1,234.56)" by formatMoney) get a
+     subtle underline emphasis — accountants expect to spot losses
+     instantly without the document going technicolour. */
+  const isNegativeMoney = col.format === "money" && typeof text === "string" && text.startsWith("(");
+  const negativeStyle = isNegativeMoney
+    ? `text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px`
+    : "";
   const colorOverride = isEmDash ? COLOR.mutedSoft : COLOR.ink;
   const weight =
     isTotal ? "font-weight:700"
     : isSubtotal ? "font-weight:600"
     : "";
+  /* Long text in non-numeric columns: wrap at word boundaries; never
+     overflow the column. Numeric/date columns stay nowrap so a wide
+     number doesn't break onto a second line — they get sized via
+     the column's `width` hint. */
+  const wrap = numeric || col.format === "date"
+    ? "white-space:nowrap"
+    : "white-space:normal;word-wrap:break-word;overflow-wrap:anywhere";
   return `<td style="
     padding:${SPACE.sm}px ${SPACE.md}px;
     text-align:${align};
@@ -59,6 +73,8 @@ function cellHtml(col: ReportColumn, raw: ReportRowValue, isSubtotal: boolean, i
     color:${colorOverride};
     ${fontStyle};
     ${weight};
+    ${negativeStyle};
+    ${wrap};
     font-size:${TYPE.tableNumber.size}pt;
     line-height:${TYPE.tableNumber.lineHeight};
   ">${escapeHtml(text)}</td>`;

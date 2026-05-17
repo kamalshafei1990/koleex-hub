@@ -32,15 +32,41 @@ import type { ReportVisibility } from "./types";
 export const FONT_STACK = {
   /* Latin script default. Helvetica / SF are present on every device
      puppeteer is likely to encounter. Inter is the explicit Hub
-     fallback for legacy systems. */
-  body: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, "Inter", Arial, sans-serif',
+     fallback for legacy systems. Phase R.3 adds CJK and Arabic
+     system fallbacks at the end of the stack so a payload with
+     locale="zh-CN" or "ar" renders correctly without us shipping any
+     embedded fonts (huge PDF blow-up is the easy mistake here). */
+  body: [
+    "-apple-system",
+    "BlinkMacSystemFont",
+    '"Helvetica Neue"',
+    "Helvetica",
+    '"Inter"',
+    "Arial",
+    /* CJK system fallbacks — covered by macOS / Windows / Linux. */
+    '"PingFang SC"',                /* macOS Chinese */
+    '"Microsoft YaHei"',             /* Windows Chinese */
+    '"Noto Sans CJK SC"',            /* Linux Chinese */
+    '"Hiragino Sans"',               /* Japanese */
+    /* Arabic system fallbacks. */
+    '"SF Arabic"',
+    '"Geeza Pro"',
+    '"Tahoma"',
+    "sans-serif",
+  ].join(", "),
   /* Mono for numbers + report references. tabular-nums turned on at
      usage time so columns line up under different glyph widths. */
   mono: '"SF Mono", "ui-monospace", Menlo, Consolas, "Liberation Mono", monospace',
-  /* Future: CJK + Arabic fallbacks. Architecture-ready (the renderer
-     emits a `dir` attribute based on locale), but the @font-face
-     ship is deferred to Phase R.3. */
 } as const;
+
+/* Locale → text-direction map. Architecture-ready for the AR ship in
+   future phases; the renderer reads this when composing the <html
+   dir="…"> attribute. */
+const RTL_LANGS = new Set(["ar", "he", "fa", "ur"]);
+export function directionForLocale(locale: string): "ltr" | "rtl" {
+  const lang = (locale || "en").toLowerCase().split(/[-_]/)[0];
+  return RTL_LANGS.has(lang) ? "rtl" : "ltr";
+}
 
 /* Type scale in pt — the same numbers map to px in CSS, but we
    author in pt so the relationship to paper output stays explicit. */

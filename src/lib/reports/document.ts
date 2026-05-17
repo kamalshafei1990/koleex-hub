@@ -26,9 +26,10 @@
    keep their signature.
    ========================================================================== */
 
-import { COLOR, FONT_STACK, PAGE, SPACE, TYPE } from "./design-system";
+import { COLOR, FONT_STACK, PAGE, SPACE, TYPE, directionForLocale } from "./design-system";
 import {
   classificationAccent,
+  coverPage,
   documentHeader,
   inlineDocumentFooter,
   notesBlock,
@@ -37,6 +38,7 @@ import {
   summaryGrid,
   titleBlock,
   totalsBlock,
+  verificationBlock,
 } from "./layout";
 import { renderTable } from "./table";
 import type { ReportPayload, ReportSection } from "./types";
@@ -102,7 +104,16 @@ function documentStylesheet(): string {
      baseline reset so the inline-styled elements in layout.ts +
      table.ts compose consistently. We deliberately use inline styles
      on layout primitives so the same fragments work inside the
-     in-app preview iframe even if a parent stylesheet leaks. */
+     in-app preview iframe even if a parent stylesheet leaks.
+
+     Phase R.3 — added a small print-safe utility class set used by
+     every layout primitive to declare break behaviour:
+       .avoid-break      → page-break-inside: avoid
+       .keep-with-next   → page-break-after: avoid  (heading + content)
+       .page-break-before / .page-break-after
+       .section-safe     → orphan/widow defence for prose paragraphs
+       .totals-safe      → applied to totals + signature blocks
+   */
   return `
   :root {
     --rpt-mono: ${FONT_STACK.mono};
@@ -121,7 +132,16 @@ function documentStylesheet(): string {
     font-size: ${TYPE.body.size}pt;
     line-height: ${TYPE.body.lineHeight};
     -webkit-font-smoothing: antialiased;
+    /* Phase R.3 — orphan / widow defence for prose paragraphs. */
+    orphans: 3;
+    widows: 3;
   }
+  /* RTL flip: when the <html dir="rtl"> attribute is set, swap default
+     text-alignment for prose and revert numeric tables to left-aligned
+     (numbers stay aligned to the right column anchor visually). */
+  html[dir="rtl"] body { text-align: right; }
+  html[dir="rtl"] .rpt-header-right { align-items: flex-start !important; }
+  html[dir="rtl"] .rpt-header-left  { text-align: right; }
   /* Reset elements that ship with default browser styling we don't
      want bleeding into the document. */
   h1, h2, h3, h4 { margin: 0; font-weight: inherit; }
@@ -141,12 +161,45 @@ function documentStylesheet(): string {
       max-width: none;
     }
   }
-  /* Page-break hygiene */
-  table, tr { page-break-inside: avoid; }
+  /* ── Print-safe utility classes — Phase R.3 ──────────────────── */
+  .avoid-break         { page-break-inside: avoid; break-inside: avoid; }
+  .keep-with-next      { page-break-after: avoid; break-after: avoid; }
+  .page-break-before   { page-break-before: always; break-before: page; }
+  .page-break-after    { page-break-after: always; break-after: page; }
+  .section-safe        { page-break-inside: avoid; break-inside: avoid; orphans: 3; widows: 3; }
+  .totals-safe         { page-break-inside: avoid; break-inside: avoid; }
+  /* Page-break hygiene for tables: thead repeats; rows never split. */
+  table, tr { page-break-inside: avoid; break-inside: avoid; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
+  /* Section titles never end up at the bottom of a page alone. */
+  .rpt-section-title, .rpt-table-wrap > div:first-child { page-break-after: avoid; break-after: avoid; }
   /* In-document footer never sits alone on a page. */
-  .rpt-inline-footer { page-break-inside: avoid; }
+  .rpt-inline-footer { page-break-inside: avoid; break-inside: avoid; }
+  /* Watermark architecture — class applied to body for executive +
+     internal docs. Renderer emits the layer; opacity stays subtle so
+     it never overpowers content. Currently disabled by default — the
+     R.3 default keeps printed pages clean white; flipping the
+     ENABLE_WATERMARK constant in document.ts turns it on later. */
+  .rpt-watermark {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 0;
+  }
+  .rpt-watermark > span {
+    font-family: ${FONT_STACK.body};
+    font-size: 72pt;
+    font-weight: 800;
+    color: rgba(10,10,10,0.05);
+    letter-spacing: 0.18em;
+    transform: rotate(-30deg);
+    text-transform: uppercase;
+  }
+  main.rpt-document { position: relative; z-index: 1; }
   `;
 }
 
@@ -183,11 +236,25 @@ export function renderReportDocument(
       </script>`
     : "";
 
-  /* dir attribute is architecture-ready for RTL — today we hardcode
-     LTR until R.3 ships Arabic and Chinese. */
-  const dir = "ltr";
+  /* Phase R.3 — locale-driven direction. The renderer reads
+     payload.meta.locale and switches dir="rtl" for AR/HE/FA/UR.
+     Layout is RTL-safe (the right-aligned masthead flips to left,
+     headers retain numeric column alignment for tabular numerics). */
+  const dir = directionForLocale(payload.meta.locale);
 
   const sections = payload.sections.map(renderSection).join("\n");
+
+  /* Cover page composed only when payload.cover is set (executive
+     summary today). Renders as its own A4 sheet via
+     page-break-after:always inside coverPage(). */
+  const cover = payload.cover ? coverPage(payload) : "";
+
+  /* Watermark layer — opt-in. R.3 ships with the renderer architecture
+     in place and OFF by default to keep print pages clean. Future
+     phase flips this on for the EXECUTIVE classification or for any
+     payload with a specific opt-in field. */
+  const ENABLE_WATERMARK = false;
+  const watermark = ENABLE_WATERMARK ? `<div class="rpt-watermark" aria-hidden="true"><span>${esc(payload.internal_warning ?? payload.meta.visibility)}</span></div>` : "";
 
   return `<!DOCTYPE html>
 <html lang="${esc(payload.meta.locale)}" dir="${dir}">
@@ -201,7 +268,11 @@ export function renderReportDocument(
   data-report-no="${esc(payload.meta.report_no)}"
   data-visibility="${esc(payload.meta.visibility)}"
   data-report-type="${esc(payload.meta.report_type)}"
+  data-locale="${esc(payload.meta.locale)}"
+  data-dir="${dir}"
 >
+${watermark}
+${cover}
 <main class="rpt-document">
 ${classificationAccent(payload)}
 ${documentHeader(payload)}
@@ -212,6 +283,7 @@ ${sections}
 ${totalsBlock(payload.totals)}
 ${notesBlock(payload.notes)}
 ${signatureBlock(payload)}
+${verificationBlock(payload.verification, payload)}
 ${inlineDocumentFooter(payload)}
 </main>
 ${readyScript}

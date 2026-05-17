@@ -20,7 +20,15 @@
 
 import { BORDER, COLOR, PAGE, SPACE, classificationFor, typeCss } from "./design-system";
 import { formatDate, formatDateTime, escapeHtml, escapeAttr } from "./formatters";
-import type { ReportPayload, ReportSummaryItem, ReportTotalsItem, ReportRecipient } from "./types";
+import type {
+  ReportPayload,
+  ReportSummaryItem,
+  ReportTotalsItem,
+  ReportRecipient,
+  SignatureSlot,
+  SignatureRole,
+  VerificationBlock,
+} from "./types";
 import { formatValue } from "./formatters";
 
 /* ─── KOLEEX wordmark (inline SVG) ─────────────────────────────────
@@ -50,17 +58,31 @@ export function classificationAccent(payload: ReportPayload): string {
 /* ─── Document header ─────────────────────────────────────────────── */
 
 /* Two-column header:
-     left  = KOLEEX wordmark + tenant name + koleexgroup.com
-     right = report number + generated datetime + period + currency
+     left  = KOLEEX wordmark + tenant name + corporate-identity block
+             (entity line + address / contact / website)
+     right = formal metadata strip (report id · generated · period ·
+             currency · prepared by · classification chip)
 
    Everything sits above a single hairline rule. Then comes the title
-   block. No background tints, no cards, no boxes.
-*/
+   block. No background tints, no cards, no boxes — Big-4 document
+   discipline, not dashboard chrome.
+
+   The header repeats only on cover + page 1 of the body; subsequent
+   pages get the slimmer per-page running header via Puppeteer's
+   displayHeaderFooter mechanism (see pageHeaderTemplate). */
 export function documentHeader(payload: ReportPayload): string {
   const cls = classificationFor(payload.meta.visibility, payload.internal_warning ?? undefined);
 
+  /* Refined metaRow: end-justified, hairline divider between rows so
+     the column reads like a banking statement masthead. */
   const metaRow = (label: string, value: string, isMono = false) => `
-    <div style="display:flex;align-items:baseline;gap:${SPACE.md}px;justify-content:flex-end">
+    <div style="
+      display:flex;
+      align-items:baseline;
+      gap:${SPACE.md}px;
+      justify-content:flex-end;
+      padding:2px 0;
+    ">
       <div style="${typeCss("metaLabel")};color:${COLOR.muted}">${escapeHtml(label)}</div>
       <div style="${typeCss("metaValue")};color:${COLOR.ink};${isMono ? `font-family:var(--rpt-mono);font-variant-numeric:tabular-nums;` : ""}">${escapeHtml(value)}</div>
     </div>
@@ -70,8 +92,17 @@ export function documentHeader(payload: ReportPayload): string {
     ? metaRow("Period", `${formatDate(payload.meta.period.from)} → ${formatDate(payload.meta.period.to)}`)
     : "";
 
+  /* Corporate-identity block beneath the wordmark. Tenant name in
+     bold body weight, then a stack of address/website/email — light
+     muted captions that read like the masthead of a real corporate
+     letterhead. The current tenant table only stores `name`, so we
+     hard-code the public corporate identity for the Hub instance;
+     when per-tenant address/email become available we'll lift them
+     into payload.meta. */
+  const identityLines = corporateIdentityLines(payload.meta.tenant_name);
+
   return `
-<header class="rpt-header" style="
+<header class="rpt-header avoid-break" style="
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
@@ -80,13 +111,13 @@ export function documentHeader(payload: ReportPayload): string {
   border-bottom:${BORDER.hairline};
   margin-bottom:${SPACE.xl}px;
 ">
-  <div class="rpt-header-left">
+  <div class="rpt-header-left" style="max-width:60%">
     ${KOLEEX_WORDMARK}
-    <div style="${typeCss("metaLabel")};color:${COLOR.muted};margin-top:${SPACE.sm}px">${escapeHtml(payload.meta.tenant_name)}</div>
-    <div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">koleexgroup.com</div>
+    <div style="${typeCss("partyName")};color:${COLOR.ink};margin-top:${SPACE.sm}px">${escapeHtml(payload.meta.tenant_name)}</div>
+    ${identityLines.map((l) => `<div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">${escapeHtml(l)}</div>`).join("")}
   </div>
 
-  <div class="rpt-header-right" style="display:flex;flex-direction:column;gap:${SPACE.xs}px;align-items:flex-end">
+  <div class="rpt-header-right" style="display:flex;flex-direction:column;gap:0;align-items:flex-end;min-width:38%">
     <div style="
       ${typeCss("classification")};
       color:${cls.accent};
@@ -102,6 +133,23 @@ export function documentHeader(payload: ReportPayload): string {
   </div>
 </header>
 `;
+}
+
+/* Corporate-identity lines printed under the wordmark. Today this
+   is hardcoded for the KOLEEX Hub tenant; when per-tenant address /
+   contact data is added to the tenants table we will read it out
+   of the payload. The function is a single line to swap out later. */
+function corporateIdentityLines(tenantName: string): string[] {
+  /* Keep this compact — masthead, not a phone book. */
+  const isKoleex = tenantName.toLowerCase().includes("koleex");
+  if (isKoleex) {
+    return [
+      "KOLEEX International Corporation Taizhou Co., Ltd.",
+      "Taizhou, Zhejiang, China",
+      "finance@koleexgroup.com  ·  koleexgroup.com",
+    ];
+  }
+  return [tenantName, "koleexgroup.com"];
 }
 
 /* ─── Title block ─────────────────────────────────────────────────── */
@@ -251,34 +299,265 @@ export function notesBlock(notes: string[] | undefined, sectionLabel = "Notes"):
 
 /* ─── Signature block ─────────────────────────────────────────────── */
 
-/* Two columns: "Prepared by" + "Approved by", each with a hairline
-   rule above space for a signature. Only shown when the document is
-   internal (external statements don't need an internal sign-off). */
+/* Phase R.3 — formal signature architecture. Renderer draws a
+   labelled signature line and a date line for each slot. If the
+   builder doesn't pass `signatures`, we synthesise the standard set
+   per visibility:
+     · external  → Prepared by only
+     · internal  → Prepared / Reviewed / Approved
+     · executive → Prepared / Reviewed / Approved / Audited
+   No upload + storage in R.3 — this is the labelled empty box ready
+   for ink. The optional stamp slot below the grid is for an inked
+   corporate stamp.
+*/
+const DEFAULT_LABEL: Record<SignatureRole, string> = {
+  prepared_by:  "Prepared by",
+  reviewed_by:  "Reviewed by",
+  approved_by:  "Approved by",
+  audited_by:   "Audited by",
+};
+
+function defaultSignaturesFor(payload: ReportPayload): SignatureSlot[] {
+  if (payload.meta.visibility === "external") {
+    return [
+      { role: "prepared_by", name: payload.meta.generated_by_name, date: payload.meta.generated_at },
+    ];
+  }
+  /* Internal — incl. EXECUTIVE — gets the full sign-off chain. */
+  const isExecutive = (payload.internal_warning ?? "").toLowerCase().includes("executive");
+  return [
+    { role: "prepared_by", name: payload.meta.generated_by_name, date: payload.meta.generated_at },
+    { role: "reviewed_by", name: null, date: null },
+    { role: "approved_by", name: null, date: null },
+    ...(isExecutive ? [{ role: "audited_by" as const, name: null, date: null }] : []),
+  ];
+}
+
 export function signatureBlock(payload: ReportPayload): string {
-  if (payload.meta.visibility !== "internal") return "";
+  const slots = payload.signatures && payload.signatures.length > 0
+    ? payload.signatures
+    : defaultSignaturesFor(payload);
+  if (slots.length === 0) return "";
+
+  /* Grid auto-sizes to slot count so 1-4 slots all look balanced. */
+  const cols = Math.min(slots.length, 4);
+
+  const cell = (s: SignatureSlot) => {
+    const label = s.label ?? DEFAULT_LABEL[s.role];
+    const name = s.name ?? "";
+    const dateStr = s.date ? formatDateTime(s.date) : "";
+    return `
+      <div class="avoid-break">
+        <div style="${typeCss("label")};color:${COLOR.muted}">${escapeHtml(label)}</div>
+        <div style="
+          height:36px;
+          border-bottom:${BORDER.hard};
+          margin-top:${SPACE.lg}px;
+          display:flex;
+          align-items:flex-end;
+          ${typeCss("body")};
+          color:${COLOR.ink};
+        ">${escapeHtml(name)}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:${SPACE.xs}px;${typeCss("caption")};color:${COLOR.muted}">
+          <span>Signature</span>
+          <span style="font-family:var(--rpt-mono);font-variant-numeric:tabular-nums">${escapeHtml(dateStr)}</span>
+        </div>
+      </div>
+    `;
+  };
+
+  /* Stamp slot — small dashed-rule box labelled "Official stamp",
+     printed only on internal docs (external statements rely on the
+     letterhead). */
+  const stamp = payload.meta.visibility === "internal" ? `
+    <div class="avoid-break" style="margin-top:${SPACE.xl}px;display:flex;justify-content:flex-end">
+      <div style="
+        width:120px;
+        height:80px;
+        border:1px dashed ${COLOR.hairline};
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        ${typeCss("caption")};
+        color:${COLOR.mutedSoft};
+        letter-spacing:0.12em;
+        text-transform:uppercase;
+      ">Official stamp</div>
+    </div>
+  ` : "";
+
   return `
-<section class="rpt-signature" style="
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:${SPACE.xxl}px;
+<section class="rpt-signature section-safe" style="
   margin-top:${SPACE.xxxl}px;
   page-break-inside:avoid;
 ">
-  <div>
-    <div style="border-top:${BORDER.hard};padding-top:${SPACE.sm}px">
-      <div style="${typeCss("label")};color:${COLOR.muted}">Prepared by</div>
-      <div style="${typeCss("body")};color:${COLOR.ink};margin-top:2px">${escapeHtml(payload.meta.generated_by_name)}</div>
-      <div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">${escapeHtml(formatDateTime(payload.meta.generated_at))}</div>
-    </div>
+  <div style="
+    display:grid;
+    grid-template-columns:repeat(${cols}, minmax(0, 1fr));
+    gap:${SPACE.xxl}px;
+  ">
+    ${slots.map(cell).join("")}
   </div>
+  ${stamp}
+</section>
+`;
+}
+
+/* ─── QR verification placeholder ─────────────────────────────────── */
+
+/* Phase R.3 architecture — no QR generator wired yet, just the
+   labelled placeholder block ready for a future "scan to verify".
+   Renders ONLY when payload.verification is set; the renderer treats
+   absence as "feature off". */
+export function verificationBlock(v: VerificationBlock | undefined, payload: ReportPayload): string {
+  if (!v) return "";
+  const url = v.verification_url ?? `koleexgroup.com/verify/${payload.meta.report_no}`;
+  const token = v.token ?? payload.meta.report_no;
+  const caption = v.caption ?? "Scan to verify document authenticity";
+  return `
+<section class="rpt-verification avoid-break" style="
+  margin-top:${SPACE.xxxl}px;
+  padding-top:${SPACE.md}px;
+  border-top:${BORDER.hairline};
+  display:flex;
+  align-items:flex-start;
+  gap:${SPACE.lg}px;
+  page-break-inside:avoid;
+">
+  <div style="
+    width:90px;
+    height:90px;
+    border:1px solid ${COLOR.hairline};
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    ${typeCss("caption")};
+    color:${COLOR.mutedSoft};
+    letter-spacing:0.06em;
+    text-align:center;
+    line-height:1.25;
+  ">QR<br/>placeholder</div>
   <div>
-    <div style="border-top:${BORDER.hard};padding-top:${SPACE.sm}px">
-      <div style="${typeCss("label")};color:${COLOR.muted}">Reviewed by</div>
-      <div style="${typeCss("body")};color:${COLOR.mutedSoft};margin-top:2px">—</div>
-    </div>
+    <div style="${typeCss("label")};color:${COLOR.muted}">Verification</div>
+    <div style="${typeCss("body")};color:${COLOR.ink};margin-top:2px">${escapeHtml(caption)}</div>
+    <div style="${typeCss("caption")};color:${COLOR.muted};margin-top:${SPACE.xs}px">URL: <span style="font-family:var(--rpt-mono)">${escapeHtml(url)}</span></div>
+    <div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">Token: <span style="font-family:var(--rpt-mono);font-variant-numeric:tabular-nums">${escapeHtml(token)}</span></div>
   </div>
 </section>
 `;
+}
+
+/* ─── Cover page (Executive Summary) ──────────────────────────────── */
+
+/* Phase R.3 — board-room cover sheet for the Executive Finance
+   Summary. Layout:
+     · KOLEEX wordmark + tenant identity (smaller than body header)
+     · Title + reporting period
+     · Executive classification chip
+     · 4-tile headline KPI grid
+     · Top 3 risks
+     · 2-3 sentence narrative
+     · "Page 2 →" hint at the foot
+
+   Cover page sits in its own A4 sheet via `page-break-after: always`
+   so the regular header re-renders cleanly on page 2. */
+export function coverPage(payload: ReportPayload): string {
+  const cover = payload.cover;
+  if (!cover) return "";
+  const cls = classificationFor(payload.meta.visibility, payload.internal_warning ?? undefined);
+
+  const tile = (it: ReportSummaryItem) => {
+    const valueStr = formatValue(it.value, it.format ?? "money");
+    return `
+      <div style="padding:${SPACE.xl}px 0;border-bottom:${BORDER.hairline}">
+        <div style="${typeCss("label")};color:${COLOR.muted}">${escapeHtml(it.label)}</div>
+        <div style="
+          ${typeCss("documentTitle")};
+          color:${COLOR.ink};
+          margin-top:${SPACE.sm}px;
+          font-family:var(--rpt-mono);
+          font-variant-numeric:tabular-nums;
+        ">${escapeHtml(valueStr)}</div>
+        ${it.hint ? `<div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">${escapeHtml(it.hint)}</div>` : ""}
+      </div>
+    `;
+  };
+
+  const periodLine = payload.meta.period
+    ? `${formatDate(payload.meta.period.from)}  →  ${formatDate(payload.meta.period.to)}`
+    : "";
+
+  return `
+<section class="rpt-cover" style="
+  page-break-after:always;
+  min-height:calc(297mm - ${PAGE.margin.top} - ${PAGE.margin.bottom});
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+">
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:${SPACE.xl}px;border-bottom:${BORDER.hairline}">
+      <div>
+        ${KOLEEX_WORDMARK}
+        <div style="${typeCss("partyName")};color:${COLOR.ink};margin-top:${SPACE.md}px">${escapeHtml(payload.meta.tenant_name)}</div>
+        <div style="${typeCss("caption")};color:${COLOR.muted};margin-top:2px">koleexgroup.com</div>
+      </div>
+      <div style="
+        ${typeCss("classification")};
+        color:${cls.accent};
+        border:1px solid ${cls.accent};
+        padding:3px 8px;
+      ">${escapeHtml(cls.label)}</div>
+    </div>
+
+    <div style="margin-top:${SPACE.xxxl}px">
+      <div style="${typeCss("label")};color:${COLOR.muted}">Executive Briefing</div>
+      <h1 style="${typeCss("documentTitle")};color:${COLOR.ink};margin:${SPACE.sm}px 0 ${SPACE.xs}px;font-size:34pt">${escapeHtml(payload.meta.title)}</h1>
+      <div style="${typeCss("body")};color:${COLOR.muted}">${escapeHtml(periodLine)}</div>
+    </div>
+
+    <div style="
+      margin-top:${SPACE.xxxl}px;
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:0 ${SPACE.xxxl}px;
+      border-top:${BORDER.hard};
+    ">
+      ${cover.headline.slice(0, 4).map(tile).join("")}
+    </div>
+
+    ${cover.top_risks && cover.top_risks.length > 0 ? `
+      <div style="margin-top:${SPACE.xxxl}px" class="avoid-break">
+        <div style="${typeCss("sectionTitle")};color:${COLOR.ink};margin-bottom:${SPACE.md}px">Top Risks</div>
+        <ol style="margin:0;padding-left:${SPACE.xl}px;${typeCss("body")};color:${COLOR.ink2}">
+          ${cover.top_risks.slice(0, 3).map((r) => `<li style="margin-bottom:${SPACE.xs}px">${escapeHtml(r)}</li>`).join("")}
+        </ol>
+      </div>
+    ` : ""}
+
+    ${cover.narrative ? `
+      <div style="margin-top:${SPACE.xl}px;${typeCss("body")};color:${COLOR.ink2};max-width:62ch" class="avoid-break">
+        ${escapeHtml(cover.narrative)}
+      </div>
+    ` : ""}
+  </div>
+
+  <div style="
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-top:${BORDER.hairline};
+    padding-top:${SPACE.md}px;
+    ${typeCss("caption")};
+    color:${COLOR.muted};
+  ">
+    <span>${escapeHtml(payload.meta.tenant_name)} · ${escapeHtml(payload.meta.report_no)}</span>
+    <span>Detail report follows →</span>
+  </div>
+</section>
+`;
+  /* Keep `SignatureRole` re-export shape stable for callers. */
+  void ({} as SignatureRole);
 }
 
 /* ─── Document footer (per-page, via @page-bottom CSS) ────────────── */
@@ -295,6 +574,7 @@ export function signatureBlock(payload: ReportPayload): string {
    document compositor invokes that — this function returns the
    inline string used as the footer template. */
 export function pageFooterTemplate(payload: ReportPayload): string {
+  const cls = classificationFor(payload.meta.visibility, payload.internal_warning ?? undefined);
   return `
 <div style="
   width:100%;
@@ -305,12 +585,22 @@ export function pageFooterTemplate(payload: ReportPayload): string {
   display:flex;
   justify-content:space-between;
   align-items:center;
+  -webkit-print-color-adjust:exact;
 ">
   <span>${escapeAttr(payload.meta.tenant_name)} · koleexgroup.com</span>
-  <span>${escapeAttr(payload.meta.report_no)}</span>
-  <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+  <span style="text-transform:uppercase;letter-spacing:0.10em">${escapeAttr(cls.label)}</span>
+  <span>${escapeAttr(payload.meta.report_no)} · Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
 </div>
 `;
+}
+
+/* Empty header template — keeps the top margin clean (the in-doc
+   header sits inside the body on page 1; subsequent pages don't need
+   a running header strip because the classification + report id are
+   in the footer). Puppeteer requires *something* in headerTemplate
+   when displayHeaderFooter is true, so we return a single empty div. */
+export function pageHeaderTemplate(): string {
+  return `<div></div>`;
 }
 
 /* In-document footer that prints once after the body (acts as the
