@@ -52,7 +52,8 @@ export type JournalSourceType =
   | "cash_movement"
   | "opening_balance"
   | "manual"
-  | "void";
+  | "void"
+  | "inventory_cogs";
 
 export type JournalStatus = "draft" | "posted" | "voided";
 

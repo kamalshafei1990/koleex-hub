@@ -24,6 +24,7 @@ import {
   voidInventoryMovement,
   ensureDefaultWarehouse,
 } from "@/lib/inventory/posting";
+import { voidJournalEntry } from "@/lib/accounting/posting";
 import type {
   SalesOrder,
   SalesOrderItem,
@@ -259,6 +260,18 @@ export async function voidSalesShipment(opts: {
     if (!r.ok && !r.already_voided) {
       return { ok: false, error: `Inventory void failed: ${r.error}`, code: 500 };
     }
+  }
+
+  /* Phase A.4 — if a COGS entry was drafted or posted for this
+     shipment, void it too so the accounting state mirrors the
+     operational reversal. voidJournalEntry is a no-op against a
+     voided entry and handles both drafted-only and posted entries. */
+  if (shipment.accounting_entry_id) {
+    await voidJournalEntry(
+      { tenantId, postedByAccountId: voidedBy },
+      shipment.accounting_entry_id,
+      reason ?? `Void of shipment ${shipment.shipment_no}`,
+    );
   }
 
   const { error: voidErr } = await supabaseServer

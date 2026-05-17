@@ -78,6 +78,9 @@ async function ensureTenants() {
 
 async function clean() {
   for (const t of [TENANT_A, TENANT_B]) {
+    /* Phase A.4 added inventory_valuation with FK ON DELETE RESTRICT to
+       warehouses; clear it first so the warehouse delete below succeeds. */
+    await supabase.from("inventory_valuation").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_balances").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_movements").delete().eq("tenant_id", t);
     await supabase.from("inventory_items").delete().eq("tenant_id", t);

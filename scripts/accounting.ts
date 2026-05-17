@@ -7,7 +7,8 @@
    sheet query layer end-to-end against two sandbox tenants.
 
    Coverage:
-     01  COA seeded with the 16 default accounts on first read
+     01  COA seeded with the 18 default accounts on first read
+         (16 from A.1 + 1400 Inventory Asset + 5400 COGS from A.4)
      02  Unbalanced journal entry rejected by the DB
      03  Balanced manual journal posts cleanly
      04  Posted entries are immutable — UPDATE on header rejected
@@ -153,7 +154,8 @@ async function main() {
     /* 01 — COA seed. */
     await supabase.rpc("fn_accounting_ensure_coa", { p_tenant_id: TENANT_A });
     const aCoa = await coa(TENANT_A);
-    ok("01 COA seeded — 16 default accounts", aCoa.size === 16, `got ${aCoa.size}`);
+    /* Phase A.4 added 1400 Inventory Asset + 5400 COGS → 18 total. */
+    ok("01 COA seeded — 18 default accounts", aCoa.size === 18, `got ${aCoa.size}`);
     ok("01a COA contains 1010 Bank, 1100 AR, 2000 AP, 3000 Owner, 5000 OpEx",
       aCoa.has("1010") && aCoa.has("1100") && aCoa.has("2000") && aCoa.has("3000") && aCoa.has("5000"));
 

@@ -17,7 +17,8 @@
     "validate:inventory": "NODE_OPTIONS=--conditions=react-server tsx scripts/inventory.ts",
     "validate:purchases": "NODE_OPTIONS=--conditions=react-server tsx scripts/purchases.ts",
     "validate:sales": "NODE_OPTIONS=--conditions=react-server tsx scripts/sales.ts",
-    "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts"
+    "validate:valuation": "NODE_OPTIONS=--conditions=react-server tsx scripts/valuation.ts",
+    "validate:cogs": "NODE_OPTIONS=--conditions=react-server tsx scripts/cogs.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

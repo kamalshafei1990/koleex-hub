@@ -81,6 +81,7 @@ function generateJournalNo(sourceType: JournalSourceType, sourceId: string | nul
     sourceType === "expense" ? "JE-EXP" :
     sourceType === "cash_movement" ? "JE-MOV" :
     sourceType === "opening_balance" ? "JE-OB" :
+    sourceType === "inventory_cogs" ? "JE-COGS" :
     "JE-MAN";
   return `${prefix}-${ymd}-${tail}`;
 }
@@ -144,6 +145,9 @@ function sourceTableFor(sourceType: JournalSourceType): string | null {
   if (sourceType === "payment") return "finance_payments";
   if (sourceType === "expense") return "finance_expenses";
   if (sourceType === "cash_movement") return "finance_cash_movements";
+  /* Phase A.4 — Sales Shipment COGS mirrors its status on the
+     sales_shipments row. */
+  if (sourceType === "inventory_cogs") return "sales_shipments";
   return null;
 }
 
@@ -903,6 +907,118 @@ export async function retryRecognition(ctx: PostingContext, kind: "payment" | "e
   const drafted = kind === "payment" ? await draftPayment(ctx, sourceId)
     : kind === "expense" ? await draftExpense(ctx, sourceId)
     : await draftCashMovement(ctx, sourceId);
+  if (!drafted.ok) return drafted;
+  return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, drafted.entry_id);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase A.4 — Inventory COGS recognition
+
+   When a sales shipment is shipped, every shipment line is backed by
+   a posted inventory OUT movement. Phase O.5 stamped each of those
+   with `total_cost = qty × current_avg`. Summing them gives the
+   shipment-level COGS:
+
+     Dr 5400  Cost of Goods Sold
+     Cr 1400  Inventory Asset
+
+   This is drafted only — the accountant promotes it to posted from
+   the queue. No auto-post.
+   ═══════════════════════════════════════════════════════════════════ */
+
+async function buildInventoryCogsDraftArgs(
+  ctx: PostingContext,
+  shipmentId: string,
+): Promise<DraftArgs | PostingError> {
+  /* Load the shipment header. */
+  const { data: shipRow } = await supabaseServer
+    .from("sales_shipments")
+    .select("id, sales_order_id, shipment_no, status, customer_id, shipped_at, created_at")
+    .eq("id", shipmentId)
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  if (!shipRow) return { ok: false, error: "Shipment not found", code: 404 };
+  const ship = shipRow as { id: string; sales_order_id: string; shipment_no: string; status: string; customer_id: string | null; shipped_at: string | null; created_at: string };
+  if (ship.status !== "shipped") {
+    return { ok: false, error: `Cannot draft COGS for shipment with status '${ship.status}'`, code: 409 };
+  }
+
+  /* Sum total_cost from every linked OUT movement. The shipment line
+     already stores inventory_movement_id; we read the movements to
+     respect the append-only ledger as the cost-of-truth. */
+  const { data: shipLines } = await supabaseServer
+    .from("sales_shipment_items")
+    .select("id, inventory_movement_id")
+    .eq("shipment_id", shipmentId)
+    .eq("tenant_id", ctx.tenantId);
+  const movementIds = ((shipLines ?? []) as Array<{ inventory_movement_id: string | null }>)
+    .map((l) => l.inventory_movement_id)
+    .filter((x): x is string => !!x);
+
+  if (movementIds.length === 0) {
+    return { ok: false, error: "Shipment has no inventory movements — nothing to recognise as COGS", code: 422 };
+  }
+
+  const { data: movements } = await supabaseServer
+    .from("inventory_stock_movements")
+    .select("id, total_cost, currency, status")
+    .in("id", movementIds)
+    .eq("tenant_id", ctx.tenantId)
+    .eq("status", "posted");
+  const rows = ((movements ?? []) as Array<{ id: string; total_cost: number | null; currency: string; status: string }>);
+
+  const totalCost = rows.reduce((acc, m) => acc + (Number(m.total_cost) || 0), 0);
+  const currency = rows[0]?.currency ?? "USD";
+
+  if (totalCost <= 0) {
+    /* A shipment whose lines all had zero cost (e.g. opening balance
+       items with no cost basis) cannot be drafted — there's nothing
+       to recognise. The operator can wait until cost basis exists. */
+    return { ok: false, error: "Shipment total_cost is zero — no COGS to recognise", code: 422 };
+  }
+
+  const accts = await loadAccountsByCode(ctx.tenantId);
+  const cogs       = requireAccount(accts, "5400");
+  const invAsset   = requireAccount(accts, "1400");
+  const entryDate  = (ship.shipped_at ?? ship.created_at).slice(0, 10);
+
+  return {
+    tenantId: ctx.tenantId,
+    postedBy: ctx.postedByAccountId,
+    sourceType: "inventory_cogs",
+    sourceId: ship.id,
+    entryDate,
+    description: `COGS · ${ship.shipment_no}`,
+    metadata: { shipment_no: ship.shipment_no, sales_order_id: ship.sales_order_id },
+    lines: [
+      { account_id: cogs.id,     debit: totalCost, credit: 0,         currency, description: "Cost of Goods Sold", reference: ship.shipment_no },
+      { account_id: invAsset.id, debit: 0,         credit: totalCost, currency, description: "Inventory Asset",    reference: ship.shipment_no },
+    ],
+  };
+}
+
+/** Draft (only) a COGS entry for a shipped sales shipment.
+ *  Idempotent — repeats return the existing active draft. */
+export async function draftInventoryCogs(
+  ctx: PostingContext,
+  shipmentId: string,
+): Promise<PostingOutcome> {
+  const existing = await findActiveEntryFor(ctx.tenantId, "inventory_cogs", shipmentId);
+  if (existing) return { ok: true, entry_id: existing, journal_no: "", status: "draft" };
+
+  const args = await buildInventoryCogsDraftArgs(ctx, shipmentId);
+  if ("ok" in args && args.ok === false) return args;
+  return createDraft(args as DraftArgs);
+}
+
+/** Convenience: draft + post in one call. The validator uses this
+ *  to assert the end state; production flow keeps it operator-driven
+ *  via the queue UI. */
+export async function postInventoryCogs(
+  ctx: PostingContext,
+  shipmentId: string,
+): Promise<PostingOutcome> {
+  const drafted = await draftInventoryCogs(ctx, shipmentId);
   if (!drafted.ok) return drafted;
   return postExistingDraft(ctx.tenantId, ctx.postedByAccountId, drafted.entry_id);
 }

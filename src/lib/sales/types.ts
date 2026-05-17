@@ -50,6 +50,11 @@ export interface SalesShipment {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  /* Phase A.4 — mirrored accounting state for the queue UI. */
+  accounting_status: "drafted" | "posted" | "failed" | "voided" | "pending" | null;
+  accounting_entry_id: string | null;
+  accounting_last_error: string | null;
+  accounting_posted_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

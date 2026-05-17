@@ -74,6 +74,7 @@ async function clean() {
       await supabase.from("sales_order_items").delete().in("sales_order_id", soIds);
       await supabase.from("sales_orders").delete().in("id", soIds);
     }
+    await supabase.from("inventory_valuation").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_balances").delete().eq("tenant_id", t);
     await supabase.from("inventory_stock_movements").delete().eq("tenant_id", t);
     await supabase.from("inventory_items").delete().eq("tenant_id", t);

@@ -53,8 +53,12 @@ interface ShipmentRow {
   source_location_code: string | null;
   source_location_name: string | null;
   total_qty: number;
+  total_cost: number;
   line_count: number;
   created_at: string;
+  /* Phase A.4 — mirrored from sales_shipments. */
+  accounting_status: "drafted" | "posted" | "failed" | "voided" | "pending" | null;
+  accounting_entry_id: string | null;
 }
 interface OrderRow {
   id: string;
@@ -116,6 +120,18 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
+    });
+    const j = await r.json();
+    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    await load();
+  };
+
+  const draftCogs = async (id: string) => {
+    const r = await fetch(`/api/accounting/inventory-cogs/draft`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shipment_id: id }),
     });
     const j = await r.json();
     if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
@@ -331,6 +347,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
                         <th className="px-3 py-2 text-left">Source</th>
                         <th className="px-3 py-2 text-right">Lines</th>
                         <th className="px-3 py-2 text-right">Qty</th>
+                        <th className="px-3 py-2 text-right">COGS</th>
                         <th className="px-3 py-2 text-left">Tracking</th>
                         <th className="px-3 py-2 text-right"></th>
                       </tr>
@@ -347,13 +364,41 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
                           </td>
                           <td className="px-3 py-1.5 text-right tabular-nums font-mono text-gray-400">{s.line_count}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums font-mono">{fmtQty(s.total_qty)}</td>
+                          <td className="px-3 py-1.5 text-right">
+                            <div className="inline-flex flex-col items-end gap-0.5">
+                              <span className="tabular-nums font-mono text-gray-300">
+                                {s.total_cost > 0 ? s.total_cost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
+                              </span>
+                              {s.accounting_status && (
+                                <span className={`inline-flex items-center rounded-full border px-1.5 py-px text-[9.5px] uppercase tracking-[0.10em] ${
+                                  s.accounting_status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+                                  s.accounting_status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+                                  s.accounting_status === "failed" ? "border-rose-400/30 bg-rose-500/10 text-rose-300" :
+                                                                     "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                                }`}>
+                                  {s.accounting_status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-3 py-1.5 text-[11px] text-gray-400">{s.tracking_no ?? "—"}</td>
                           <td className="px-3 py-1.5 text-right">
-                            {s.status === "shipped" && (
-                              <button onClick={() => voidShipment(s.id)} className="text-[11px] text-rose-300 hover:text-rose-200">
-                                Void
-                              </button>
-                            )}
+                            <div className="inline-flex items-center gap-2">
+                              {s.status === "shipped" && s.total_cost > 0 && !s.accounting_status && (
+                                <button
+                                  onClick={() => draftCogs(s.id)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-white/[0.10] bg-white/[0.04] px-2 py-0.5 text-[10.5px] hover:bg-white/[0.08]"
+                                  title="Create a draft COGS journal in the Accounting Queue"
+                                >
+                                  Draft COGS
+                                </button>
+                              )}
+                              {s.status === "shipped" && (
+                                <button onClick={() => voidShipment(s.id)} className="text-[11px] text-rose-300 hover:text-rose-200">
+                                  Void
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

@@ -305,6 +305,13 @@ export default function FinanceAccountingQueue() {
           )}
         </div>
 
+        {/* Phase A.4 — Inventory COGS recognition. Lives next to the
+            payment/expense queue so accountants can review every COGS
+            draft from one surface. */}
+        <DashboardSection eyebrow="Inventory COGS" title="Cost of Goods Sold from sales shipments" tight>
+          <InventoryCogsSection />
+        </DashboardSection>
+
         <DashboardSection eyebrow="Workflow" title="How recognition works">
           <ol className="grid gap-3 text-[12px] text-gray-400 sm:grid-cols-2 lg:grid-cols-4">
             <li><strong className="text-gray-300">1. Pending</strong> — operational event happened; no journal yet.</li>
@@ -314,6 +321,159 @@ export default function FinanceAccountingQueue() {
           </ol>
         </DashboardSection>
         <Hairline />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Inventory COGS section ─────────────────────────────────
+   Reads /api/accounting/inventory-cogs (Phase A.4) and surfaces a
+   compact table with Post / Void actions. Mirrors the visual rhythm
+   of the main queue but stays in its own component so the existing
+   payment/expense flow is untouched. */
+
+interface CogsRow {
+  id: string;
+  journal_no: string;
+  status: "draft" | "posted" | "voided";
+  entry_date: string;
+  source_id: string | null;
+  shipment_no: string | null;
+  sales_order_id: string | null;
+  total_cost: number;
+}
+
+function InventoryCogsSection() {
+  const [rows, setRows] = useState<CogsRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch("/api/accounting/inventory-cogs?limit=100", { credentials: "include", cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      setRows((j.entries ?? []) as CogsRow[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const post = async (id: string) => {
+    setBusy(id);
+    try {
+      const r = await fetch("/api/accounting/post-draft", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entry_id: id }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { alert(j.error ?? "Post failed"); return; }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const voidEntry = async (id: string) => {
+    if (!confirm("Void this COGS journal? A reversing entry will be posted.")) return;
+    const reason = prompt("Reason (optional):") ?? "voided from queue";
+    setBusy(id);
+    try {
+      const r = await fetch(`/api/accounting/journals/${id}/void`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error ?? "Void failed"); return; }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+      )}
+      <div className="overflow-hidden rounded-xl border border-white/[0.05] bg-white/[0.012]">
+        <table className="min-w-full text-[12.5px]">
+          <thead>
+            <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.10em] text-gray-500">
+              <th className="px-4 py-2 text-left">Journal #</th>
+              <th className="px-4 py-2 text-left">Shipment #</th>
+              <th className="px-4 py-2 text-left">Date</th>
+              <th className="px-4 py-2 text-right">Inventory value</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && rows.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[11px] text-gray-600">
+                No COGS drafts yet. They appear here automatically once a sales shipment is shipped and the operator drafts the entry.
+              </td></tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className="border-b border-white/[0.03] last:border-b-0 hover:bg-white/[0.02]">
+                  <td className="px-4 py-2 font-mono text-[11.5px] text-gray-300">{r.journal_no}</td>
+                  <td className="px-4 py-2 text-gray-300">
+                    {r.sales_order_id ? (
+                      <Link href={`/sales/orders/${r.sales_order_id}`} className="font-mono hover:text-[var(--text-primary)]">{r.shipment_no ?? "—"}</Link>
+                    ) : (
+                      <span className="font-mono">{r.shipment_no ?? "—"}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-[11px] text-gray-500">{r.entry_date}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-mono">
+                    {Number(r.total_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
+                      r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+                      r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-gray-400" :
+                                              "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                    }`}>{r.status}</span>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {r.status === "draft" && (
+                        <button
+                          onClick={() => post(r.id)}
+                          disabled={busy === r.id}
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
+                        >
+                          Post
+                        </button>
+                      )}
+                      {r.status === "posted" && (
+                        <button
+                          onClick={() => voidEntry(r.id)}
+                          disabled={busy === r.id}
+                          className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50"
+                        >
+                          Void
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

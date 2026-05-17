@@ -142,7 +142,13 @@ export interface SalesOrderDetail {
     qty_remaining: number;
   };
   items: SalesOrderItemWithStock[];
-  shipments: Array<SalesShipment & { source_location_code: string | null; source_location_name: string | null; line_count: number; total_qty: number }>;
+  shipments: Array<SalesShipment & {
+    source_location_code: string | null;
+    source_location_name: string | null;
+    line_count: number;
+    total_qty: number;
+    total_cost: number;
+  }>;
   shipment_items: SalesShipmentItem[];
 }
 
@@ -190,29 +196,50 @@ export async function getSalesOrderDetail(
   const shipLines = (linesRes.data ?? []) as SalesShipmentItem[];
 
   /* Build a per-shipment summary (line count + total qty + source
-     location code/name). */
+     location code/name + Phase A.4 COGS amount). */
   const sourceIds = Array.from(new Set(shipments.map((s) => s.source_location_id).filter(Boolean) as string[]));
   const whRes = sourceIds.length
     ? await supabaseServer.from("inventory_warehouses").select("id, code, name").in("id", sourceIds)
     : { data: [] as Array<{ id: string; code: string; name: string }> };
   const whMap = new Map<string, { code: string; name: string }>();
   for (const w of (whRes.data ?? [])) whMap.set(w.id, { code: w.code, name: w.name });
-  const shipSummary = new Map<string, { count: number; qty: number }>();
+
+  /* Phase A.4 — surface per-shipment total inventory cost so the SO
+     detail page can show "X USD COGS · drafted" beside each row. The
+     OUT movements were stamped with total_cost in O.5. */
+  const movementIds = shipLines
+    .map((l) => l.inventory_movement_id)
+    .filter((x): x is string => !!x);
+  const mvRes = movementIds.length
+    ? await supabaseServer
+        .from("inventory_stock_movements")
+        .select("id, total_cost")
+        .in("id", movementIds)
+        .eq("tenant_id", tenantId)
+    : { data: [] as Array<{ id: string; total_cost: number | null }> };
+  const costByMovement = new Map<string, number>();
+  for (const m of (mvRes.data ?? []) as Array<{ id: string; total_cost: number | null }>) {
+    costByMovement.set(m.id, Number(m.total_cost) || 0);
+  }
+
+  const shipSummary = new Map<string, { count: number; qty: number; cost: number }>();
   for (const sl of shipLines) {
-    const cur = shipSummary.get(sl.shipment_id) ?? { count: 0, qty: 0 };
+    const cur = shipSummary.get(sl.shipment_id) ?? { count: 0, qty: 0, cost: 0 };
     cur.count += 1;
     cur.qty   += Number(sl.qty) || 0;
+    cur.cost  += sl.inventory_movement_id ? (costByMovement.get(sl.inventory_movement_id) ?? 0) : 0;
     shipSummary.set(sl.shipment_id, cur);
   }
   const shipmentsEnriched = shipments.map((s) => {
     const wh = s.source_location_id ? whMap.get(s.source_location_id) : null;
-    const sum = shipSummary.get(s.id) ?? { count: 0, qty: 0 };
+    const sum = shipSummary.get(s.id) ?? { count: 0, qty: 0, cost: 0 };
     return {
       ...s,
       source_location_code: wh?.code ?? null,
       source_location_name: wh?.name ?? null,
       line_count: sum.count,
       total_qty: sum.qty,
+      total_cost: sum.cost,
     };
   });
 
