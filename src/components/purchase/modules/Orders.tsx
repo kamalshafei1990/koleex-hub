@@ -11,6 +11,7 @@ import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { PurchaseModuleProps } from "../PurchaseApp";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_PO } from "../shared";
 import { NewPurchaseOrderDialog } from "../dialogs";
+import ReceiveDialog from "../ReceiveDialog";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -27,6 +28,7 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
   const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
+  const [receivePoId, setReceivePoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [pR, cR] = await Promise.all([
@@ -64,6 +66,14 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
       </div>
 
       <NewPurchaseOrderDialog open={newOpen} onClose={() => setNewOpen(false)} onCreated={load} />
+      {receivePoId && (
+        <ReceiveDialog
+          open={!!receivePoId}
+          poId={receivePoId}
+          onClose={() => setReceivePoId(null)}
+          onSuccess={() => { setReceivePoId(null); load(); }}
+        />
+      )}
 
       {rows.length === 0 ? (
         <div className={`${cardCls} p-8 text-center`}>
@@ -85,6 +95,16 @@ export default function OrdersModule({ t }: PurchaseModuleProps) {
                 <div className="flex items-center gap-2 justify-end">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${tone}`}>{status}</span>
                   <span className="text-[13px] tabular-nums font-semibold text-[var(--text-primary)] min-w-[80px] text-right">{formatMoney(Number(p.total) || 0, p.currency || "USD")}</span>
+                  {/* O.3 — Receive button. Disabled for terminal statuses. */}
+                  {!["received", "cancelled", "closed"].includes(status) && (
+                    <button
+                      type="button"
+                      onClick={() => setReceivePoId(p.id)}
+                      className="inline-flex items-center px-2 py-1 rounded-md border border-white/[0.10] bg-white/[0.04] text-[11px] hover:bg-white/[0.08]"
+                    >
+                      Receive
+                    </button>
+                  )}
                 </div>
               </div>
             );
