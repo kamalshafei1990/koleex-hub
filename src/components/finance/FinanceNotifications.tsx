@@ -5,6 +5,7 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import type { FinanceNotification } from "@/lib/finance/types";
 
 /* Severity model — driven by how far past (or before) the due date.
@@ -48,6 +49,7 @@ const OFFSET_OPTIONS = [
 ];
 
 export default function FinanceNotifications() {
+  const baseCurrency = useBaseCurrency();
   const [rows, setRows] = useState<FinanceNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -104,11 +106,11 @@ export default function FinanceNotifications() {
         />
 
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard label="Money to Collect" value={kpi.collect} unit="USD" tone="positive" hint="From customers" loading={loading} />
-          <HeroKpiCard label="Money to Pay" value={kpi.pay} unit="USD" tone="warning" hint="To suppliers + bills" loading={loading} />
+          <HeroKpiCard label="Money to Collect" value={kpi.collect} unit={baseCurrency} tone="positive" hint="From customers" loading={loading} />
+          <HeroKpiCard label="Money to Pay" value={kpi.pay} unit={baseCurrency} tone="warning" hint="To suppliers + bills" loading={loading} />
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3">
-          <MetricCard label="Overdue" value={kpi.overdue} unit="USD" tone="negative" hint={`${overdue.length} item${overdue.length === 1 ? "" : "s"} past due`} loading={loading} />
+          <MetricCard label="Overdue" value={kpi.overdue} unit={baseCurrency} tone="negative" hint={`${overdue.length} item${overdue.length === 1 ? "" : "s"} past due`} loading={loading} />
         </div>
 
         {/* Reminder Center — at-a-glance severity strip */}
@@ -123,7 +125,7 @@ export default function FinanceNotifications() {
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.chip}`}>{style.label}</span>
                   <span className="text-xs text-gray-500">{items.length}</span>
                 </div>
-                <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(total, "USD", { compact: true })}</div>
+                <div className="mt-3 text-lg font-semibold tabular-nums">{fmtMoney(total, baseCurrency, { compact: true })}</div>
                 <div className="mt-1 text-[10px] text-gray-500">
                   {sev === "critical" ? "Overdue > 7 days"
                   : sev === "urgent"   ? "Overdue 1–7 days"

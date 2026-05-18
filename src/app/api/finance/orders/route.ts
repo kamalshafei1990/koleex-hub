@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { computeOrderProfit, deriveTaxRefundValue } from "@/lib/finance/calc";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
 /* GET  /api/finance/orders — list (tenant-scoped, with computed profit fields)
@@ -175,6 +176,14 @@ export async function POST(req: Request) {
     Number(o.tax_refund_pct) || 0,
     Number(o.tax_refund_value) || 0,
   );
+  /* Currency stabilization — sales orders default to USD per the brief
+     ("Sales: default form currency = USD"), but a non-base-currency
+     SO is still allowed; the fallback only kicks in when the form
+     truly omits the field. Supplier rows on the same order inherit
+     the order's currency. */
+  const salesDefaultCcy = "USD";
+  const tenantBaseCcy = await resolveBaseCurrency(auth.tenant_id);
+  void tenantBaseCcy;
 
   if (o.id) {
     /* UPDATE path */
@@ -185,7 +194,7 @@ export async function POST(req: Request) {
         customer_id: o.customer_id ?? null,
         customer_name: o.customer_name ?? "",
         order_date: o.order_date ?? new Date().toISOString().slice(0, 10),
-        currency: o.currency ?? "USD",
+        currency: o.currency ?? salesDefaultCcy,
         selling_price: Number(o.selling_price) || 0,
         tax_refund_pct: Number(o.tax_refund_pct) || 0,
         tax_refund_value: taxRefundValue,
@@ -224,7 +233,7 @@ export async function POST(req: Request) {
         supplier_id: s.supplier_id ?? null,
         supplier_name: s.supplier_name ?? "",
         supplier_cost: Number(s.supplier_cost) || 0,
-        currency: s.currency ?? updated.currency ?? "USD",
+        currency: s.currency ?? updated.currency ?? salesDefaultCcy,
         payment_status: s.payment_status ?? "unpaid",
         paid_amount: Number(s.paid_amount) || 0,
         due_date: s.due_date ?? null,
@@ -278,7 +287,7 @@ export async function POST(req: Request) {
       supplier_id: s.supplier_id ?? null,
       supplier_name: s.supplier_name ?? "",
       supplier_cost: Number(s.supplier_cost) || 0,
-      currency: s.currency ?? created.currency ?? "USD",
+      currency: s.currency ?? created.currency ?? salesDefaultCcy,
       payment_status: s.payment_status ?? "unpaid",
       paid_amount: Number(s.paid_amount) || 0,
       due_date: s.due_date ?? null,

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { FinanceNotification } from "@/lib/finance/types";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* GET  /api/finance/notifications
  *   Returns scheduled + recently-sent reminders for the tenant. The UI
@@ -58,6 +59,8 @@ export async function POST(req: Request) {
   const due = new Date(body.due_date);
   due.setDate(due.getDate() - offset);
   const remindAt = due.toISOString().slice(0, 10);
+  /* Currency stabilization — default to tenant base. */
+  const notifBaseCcy = await resolveBaseCurrency(auth.tenant_id);
   const { data, error } = await supabaseServer
     .from("finance_notifications")
     .insert({
@@ -67,7 +70,7 @@ export async function POST(req: Request) {
       reference_id: body.reference_id,
       party_name: body.party_name ?? "",
       amount: Number(body.amount) || 0,
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? notifBaseCcy,
       due_date: body.due_date,
       reminder_offset_days: offset,
       remind_at: remindAt,

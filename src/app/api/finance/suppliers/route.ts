@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { computeSupplierTotals } from "@/lib/finance/calc";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceSupplierAccount, FinanceExpense, FinanceOrderSupplier, FinancePayment } from "@/lib/finance/types";
 
 export async function GET() {
@@ -52,6 +53,9 @@ export async function GET() {
     if (!ids.has(k)) ids.set(k, { name: "" });
   }
 
+  /* Currency stabilization — suppliers default to tenant base. */
+  const baseCcy = await resolveBaseCurrency(auth.tenant_id);
+
   const out = Array.from(ids.entries()).map(([supplier_id, meta]) => {
     const acc = accounts.find((a) => a.supplier_id === supplier_id);
     const lines = supplierLines.filter((s) => (s as { supplier_id: string | null }).supplier_id === supplier_id);
@@ -81,7 +85,7 @@ export async function GET() {
       supplier_id,
       supplier_name: acc?.supplier_name || meta.name,
       payment_terms: acc?.payment_terms ?? null,
-      default_currency: acc?.default_currency ?? "USD",
+      default_currency: acc?.default_currency ?? baseCcy,
       notes: acc?.notes ?? null,
       ...totals,
     };
@@ -101,6 +105,8 @@ export async function POST(req: Request) {
   if (!body.supplier_id) {
     return NextResponse.json({ error: "supplier_id required" }, { status: 400 });
   }
+  /* Currency stabilization — default to tenant base, not USD. */
+  const baseCcy = await resolveBaseCurrency(auth.tenant_id);
   const { data, error } = await supabaseServer
     .from("finance_supplier_accounts")
     .upsert(
@@ -109,7 +115,7 @@ export async function POST(req: Request) {
         supplier_id: body.supplier_id,
         supplier_name: body.supplier_name ?? "",
         payment_terms: body.payment_terms ?? null,
-        default_currency: body.default_currency ?? "USD",
+        default_currency: body.default_currency ?? baseCcy,
         notes: body.notes ?? null,
         updated_at: new Date().toISOString(),
       },

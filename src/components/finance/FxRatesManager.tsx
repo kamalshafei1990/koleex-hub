@@ -30,8 +30,22 @@ function fmtRate(n: number) {
 }
 function fmtDay(iso: string) { return iso.slice(0, 10); }
 
+interface PairUsage {
+  pair: string; from_currency: string; to_currency: string;
+  has_rate: boolean; rate: number | null; effective_date: string | null;
+  stale_days: number | null;
+  open_invoice_count: number; open_bill_count: number; open_total_original: number;
+}
+interface FxStatus {
+  base_currency: string;
+  pairs: PairUsage[];
+  missing_pairs: PairUsage[];
+  stale_pairs: PairUsage[];
+}
+
 export default function FxRatesManager() {
   const [rates, setRates] = useState<RateRow[]>([]);
+  const [status, setStatus] = useState<FxStatus | null>(null);
   const [baseCurrency, setBaseCurrency] = useState("CNY");
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -47,18 +61,21 @@ export default function FxRatesManager() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [rRes, dRes] = await Promise.all([
+      const [rRes, dRes, sRes] = await Promise.all([
         fetch("/api/finance/fx/rates", { cache: "no-store" }),
         fetch("/api/create/defaults", { cache: "no-store" }),
+        fetch("/api/finance/fx/status", { cache: "no-store" }),
       ]);
       const rJ = await rRes.json();
       const dJ = await dRes.json();
+      const sJ = await sRes.json().catch(() => ({}));
       if (!rRes.ok) throw new Error(rJ.error || `HTTP ${rRes.status}`);
       setRates(rJ.rates ?? []);
       if (dJ.defaults?.base_currency) {
         setBaseCurrency(dJ.defaults.base_currency);
         setTo(dJ.defaults.base_currency);
       }
+      if (sJ.status) setStatus(sJ.status as FxStatus);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
@@ -139,6 +156,91 @@ export default function FxRatesManager() {
       }
     >
       {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
+
+      {/* Status — pairs in use + missing + stale */}
+      {status && (status.missing_pairs.length > 0 || status.stale_pairs.length > 0 || status.pairs.length > 0) && (
+        <section>
+          <ErpEyebrow>FX coverage status</ErpEyebrow>
+          <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-3">
+            {/* Missing required pairs */}
+            {status.missing_pairs.length > 0 ? (
+              <ErpPanel className="border-rose-300/40 bg-rose-300/[0.05] px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-rose-200">
+                  <RrIcon name="cross-circle" size={12} /> Missing rates
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {status.missing_pairs.map((p) => (
+                    <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
+                      <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
+                      <span className="text-[10.5px] text-gray-400">
+                        used by {p.open_invoice_count + p.open_bill_count} open doc{p.open_invoice_count + p.open_bill_count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] text-rose-200/80">
+                  Add a rate row below — without it, base-amount conversions fall back to 1:1.
+                </div>
+              </ErpPanel>
+            ) : (
+              <ErpPanel className="px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
+                  <RrIcon name="check" size={12} /> All exposed pairs configured
+                </div>
+                <div className="mt-2 text-[10.5px] text-gray-500">
+                  Every non-base currency in use has a rate row.
+                </div>
+              </ErpPanel>
+            )}
+            {/* Stale rates */}
+            {status.stale_pairs.length > 0 ? (
+              <ErpPanel className="border-amber-300/40 bg-amber-300/[0.05] px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-amber-200">
+                  <RrIcon name="clock" size={12} /> Stale rates (&gt;14d)
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {status.stale_pairs.map((p) => (
+                    <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
+                      <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
+                      <span className="text-[10.5px] text-gray-400">{p.stale_days}d ago</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-[10px] text-amber-200/80">
+                  Update with the latest mid-market rate to keep conversions accurate.
+                </div>
+              </ErpPanel>
+            ) : (
+              <ErpPanel className="px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
+                  <RrIcon name="check" size={12} /> Rates fresh
+                </div>
+                <div className="mt-2 text-[10.5px] text-gray-500">
+                  Every configured rate is within 14 days.
+                </div>
+              </ErpPanel>
+            )}
+            {/* Used by open documents */}
+            <ErpPanel className="px-4 py-3">
+              <div className="flex items-center gap-2 text-[11.5px] text-gray-300">
+                <RrIcon name="signal-stream" size={12} /> Open exposure
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {status.pairs.length === 0 ? (
+                  <div className="text-[10.5px] text-gray-500">No non-base currency open documents.</div>
+                ) : status.pairs.slice(0, 5).map((p) => (
+                  <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
+                    <span className="font-mono">{p.from_currency}</span>
+                    <span className="text-[10.5px] text-gray-400">
+                      {p.open_invoice_count} inv · {p.open_bill_count} bill
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </ErpPanel>
+          </div>
+        </section>
+      )}
 
       {/* Hero — latest rate per pair */}
       <section>

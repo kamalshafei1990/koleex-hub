@@ -56,7 +56,9 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     .select("default_currency")
     .eq("id", tenantId)
     .maybeSingle();
-  const baseCurrency = ((tenantRow as { default_currency: string | null } | null)?.default_currency ?? "USD") || "USD";
+  /* Currency stabilization: brand-new tenants default to CNY instead of
+     USD. Explicit tenant.default_currency always wins. */
+  const baseCurrency = ((tenantRow as { default_currency: string | null } | null)?.default_currency ?? "CNY") || "CNY";
 
   /* Parallel reads — every section in one shot. */
   const [

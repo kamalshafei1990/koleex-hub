@@ -17,6 +17,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import {
   type CreateMovementInput,
   type Direction,
@@ -103,7 +104,9 @@ export async function createInventoryMovement(input: CreateMovementInput): Promi
       quantity: input.quantity,
       unit: input.unit ?? "pcs",
       unit_cost: input.unit_cost ?? null,
-      currency: input.currency ?? "USD",
+      /* Currency stabilization — fall back to the tenant base when
+         the caller doesn't pass one. CNY for Chinese tenants. */
+      currency: input.currency ?? (await resolveBaseCurrency(input.tenant_id)),
       source_type: input.source_type ?? null,
       source_id: input.source_id ?? null,
       reference: input.reference ?? null,

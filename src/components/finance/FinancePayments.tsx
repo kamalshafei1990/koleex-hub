@@ -11,8 +11,10 @@ import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
 import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
 import PaymentReviewDrawer from "@/components/payment/PaymentReviewDrawer";
 import GuidanceTip from "@/components/ui/GuidanceTip";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
+  const baseCurrency = useBaseCurrency();
   const [rows, setRows] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<FinancePayment> | null>(null);
@@ -56,7 +58,7 @@ export default function FinancePayments() {
     party_type: direction === "in" ? "customer" : "supplier",
     party_name: "",
     amount: 0,
-    currency: "USD",
+    currency: baseCurrency,
     payment_date: new Date().toISOString().slice(0, 10),
     status: "completed",
     payment_method: "T/T",
@@ -96,7 +98,7 @@ export default function FinancePayments() {
             label="Net Cash This View"
             helpId="treasury.available"
             value={kpi.net}
-            unit="USD"
+            unit={baseCurrency}
             tone={kpi.net >= 0 ? "positive" : "negative"}
             hint="Money in minus money out"
             loading={loading}
@@ -105,15 +107,15 @@ export default function FinancePayments() {
             label="Pending"
             helpId="treasury.pending"
             value={kpi.pending}
-            unit="USD"
+            unit={baseCurrency}
             tone="warning"
             hint="Payments awaiting clearance"
             loading={loading}
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <MetricCard label="Money In"  helpId="finance.cashIn"  value={kpi.inComp}  unit="USD" hint="From customers" loading={loading} />
-          <MetricCard label="Money Out" helpId="finance.cashOut" value={kpi.outComp} unit="USD" hint="To suppliers + bills" loading={loading} />
+          <MetricCard label="Money In"  helpId="finance.cashIn"  value={kpi.inComp}  unit={baseCurrency} hint="From customers" loading={loading} />
+          <MetricCard label="Money Out" helpId="finance.cashOut" value={kpi.outComp} unit={baseCurrency} hint="To suppliers + bills" loading={loading} />
         </div>
 
         {editing && (
@@ -135,7 +137,7 @@ export default function FinancePayments() {
                   <input type="number" inputMode="decimal" value={editing.amount ?? 0} onChange={(e) => setEditing({ ...editing, amount: Number(e.target.value) || 0 })} className={INPUT} />
                 </Field>
                 <Field label="Currency">
-                  <select value={editing.currency ?? "USD"} onChange={(e) => setEditing({ ...editing, currency: e.target.value })} className={INPUT}>
+                  <select value={editing.currency ?? baseCurrency} onChange={(e) => setEditing({ ...editing, currency: e.target.value })} className={INPUT}>
                     {["USD","EUR","CNY","EGP","GBP"].map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </Field>

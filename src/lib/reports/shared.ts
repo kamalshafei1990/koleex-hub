@@ -42,7 +42,8 @@ export async function loadTenant(tenantId: string): Promise<ResolvedTenant> {
   return {
     id: tenantId,
     name: (data as { name?: string } | null)?.name ?? "KOLEEX International Group",
-    currency: (data as { default_currency?: string } | null)?.default_currency ?? "USD",
+    /* Currency stabilization: a brand-new tenant defaults to CNY. */
+    currency: (data as { default_currency?: string } | null)?.default_currency ?? "CNY",
   };
 }
 

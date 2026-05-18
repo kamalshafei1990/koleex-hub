@@ -113,7 +113,7 @@ export default function FinanceSetup() {
             </div>
             <div className="text-right">
               <div className="font-mono text-[22px] tabular-nums tracking-tight">{pct}%</div>
-              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{snapshot?.base_currency ?? "USD"}</div>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{snapshot?.base_currency ?? "CNY"}</div>
             </div>
           </div>
           <div aria-hidden className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.05]">

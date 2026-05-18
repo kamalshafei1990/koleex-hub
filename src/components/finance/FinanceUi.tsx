@@ -96,7 +96,7 @@ export function KpiCard({
   const display =
     typeof value === "string"
       ? value
-      : fmtMoney(numericValue ?? 0, currency || "USD", { compact: true });
+      : fmtMoney(numericValue ?? 0, currency || "CNY", { compact: true });
   const deltaSign = delta == null ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0;
   const goodDirection = invertDelta ? deltaSign < 0 : deltaSign > 0;
   const neutralDelta = deltaSign === 0;

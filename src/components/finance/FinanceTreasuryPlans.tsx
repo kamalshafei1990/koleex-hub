@@ -20,6 +20,7 @@ import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import RrIcon from "@/components/ui/RrIcon";
 import type {
   TreasuryPlan,
@@ -375,6 +376,7 @@ function PlanDetail({
   onArchive: () => void;
   onClose: () => void;
 }) {
+  const baseCurrency = useBaseCurrency();
   const p = detail.plan;
   const m = p.projected_metrics;
   const snapshot = p.base_forecast_snapshot as Partial<ForecastResult>;
@@ -440,11 +442,11 @@ function PlanDetail({
 
       {/* Executive summary KPIs */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricCard label="Start"  value={m.startingCash} unit="USD" hint="At save" loading={false} />
-        <MetricCard label="7d"  value={m.d7}  unit="USD" tone={m.d7  < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="30d" value={m.d30} unit="USD" tone={m.d30 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="60d" value={m.d60} unit="USD" tone={m.d60 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
-        <MetricCard label="90d" value={m.d90} unit="USD" tone={m.d90 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
+        <MetricCard label="Start"  value={m.startingCash} unit={baseCurrency} hint="At save" loading={false} />
+        <MetricCard label="7d"  value={m.d7}  unit={baseCurrency} tone={m.d7  < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
+        <MetricCard label="30d" value={m.d30} unit={baseCurrency} tone={m.d30 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
+        <MetricCard label="60d" value={m.d60} unit={baseCurrency} tone={m.d60 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
+        <MetricCard label="90d" value={m.d90} unit={baseCurrency} tone={m.d90 < 0 ? "negative" : "neutral"} hint="Locked" loading={false} />
         <MetricCard
           label="Runway"
           value={m.runwayDays != null ? `${m.runwayDays}` : "—"}

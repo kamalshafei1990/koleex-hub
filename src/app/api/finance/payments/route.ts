@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { FinancePayment } from "@/lib/finance/types";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -43,13 +44,16 @@ export async function POST(req: Request) {
   if (!body.direction || !body.party_type) {
     return NextResponse.json({ error: "direction + party_type required" }, { status: 400 });
   }
+  /* Currency stabilization — fall back to the tenant's base currency
+     (CNY for Chinese tenants), never USD. */
+  const paymentDefaultCcy = await resolveBaseCurrency(auth.tenant_id);
   const payload = {
     direction: body.direction,
     party_type: body.party_type,
     party_id: body.party_id ?? null,
     party_name: body.party_name ?? "",
     amount: Number(body.amount) || 0,
-    currency: body.currency ?? "USD",
+    currency: body.currency ?? paymentDefaultCcy,
     payment_date: body.payment_date ?? new Date().toISOString().slice(0, 10),
     payment_method: body.payment_method ?? null,
     reference_no: body.reference_no ?? null,

@@ -13,6 +13,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { JournalEntry, JournalLine } from "@/lib/accounting/types";
 
 interface ManualLineBody {
@@ -98,6 +99,10 @@ export async function POST(req: Request) {
   }
   const entryId = (header as { id: string }).id;
 
+  /* Currency stabilization — journal lines default to the tenant's base
+     currency when the line omits one (the journal is internal to the GL
+     and posts in base currency unless explicitly overridden). */
+  const journalBaseCcy = await resolveBaseCurrency(auth.tenant_id);
   const lineRows = body.lines.map((l, i) => ({
     tenant_id: auth.tenant_id,
     entry_id: entryId,
@@ -105,7 +110,7 @@ export async function POST(req: Request) {
     account_id: l.account_id,
     debit:  Number(l.debit)  || 0,
     credit: Number(l.credit) || 0,
-    currency: l.currency ?? "USD",
+    currency: l.currency ?? journalBaseCcy,
     exchange_rate: 1,
     description: l.description ?? null,
     party_id:   l.party_id   ?? null,

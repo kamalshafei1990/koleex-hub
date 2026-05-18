@@ -5,7 +5,7 @@
 
    Coverage (10 assertions):
      01  buildSetupSnapshot returns 10 cards, all empty on a fresh tenant
-     02  base_currency defaults to USD when tenant has none
+     02  base_currency defaults to CNY when tenant has none (audit)
      03  Setting tenants.default_currency changes the snapshot's base
      04  An opening_balances cash entry flips the cash_accounts card
          to 'started' and shifts completion %
@@ -77,10 +77,11 @@ async function main() {
     `cards=${fresh.cards.length} statuses=${fresh.cards.map((c) => c.status).join("/")}`,
   );
 
-  /* 02 — Base currency defaults to USD when tenant has none. */
+  /* 02 — Base currency defaults to CNY when tenant has none (Global
+     Currency Audit: never USD as the system-wide fallback). */
   ok(
-    "02  base_currency defaults to USD when not set",
-    fresh.base_currency === "USD",
+    "02  base_currency defaults to CNY when not set (was USD before audit)",
+    fresh.base_currency === "CNY",
     `base=${fresh.base_currency}`,
   );
 

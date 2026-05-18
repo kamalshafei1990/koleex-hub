@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { listPurchaseOrders } from "@/lib/purchase/queries";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 const MODULE = "Purchase";
 
@@ -112,6 +113,10 @@ export async function POST(req: Request) {
     };
   });
 
+  /* Currency: purchases default to the tenant's base currency
+     (CNY for a Chinese tenant). Only the form's explicit override is
+     honoured. */
+  const purchaseDefaultCcy = await resolveBaseCurrency(auth.tenant_id);
   const { data: poRow, error: poErr } = await supabaseServer
     .from("purchase_orders")
     .insert({
@@ -121,7 +126,7 @@ export async function POST(req: Request) {
       status,
       order_date: body.order_date ?? new Date().toISOString().slice(0, 10),
       expected_delivery_date: body.expected_delivery_date ?? null,
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? purchaseDefaultCcy,
       exchange_rate: body.exchange_rate ?? 1,
       payment_terms: body.payment_terms ?? null,
       incoterms: body.incoterms ?? null,

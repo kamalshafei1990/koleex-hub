@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { computeCustomerTotals } from "@/lib/finance/calc";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import type { FinanceCustomerAccount, FinanceOrder, FinancePayment } from "@/lib/finance/types";
 
 /* GET  /api/finance/customers
@@ -46,6 +47,9 @@ export async function GET() {
   const accounts: FinanceCustomerAccount[] = (accountsRes.data ?? []) as FinanceCustomerAccount[];
   const orders = ordersRes.data ?? [];
   const payments = paymentsRes.data ?? [];
+  /* Currency stabilization — customer accounts default to the tenant base
+     when no per-customer override exists. */
+  const baseCcy = await resolveBaseCurrency(auth.tenant_id);
 
   /* Build the union: every customer_id seen anywhere */
   const ids = new Map<string, { name: string }>();
@@ -80,7 +84,7 @@ export async function GET() {
       payment_terms: acc?.payment_terms ?? null,
       credit_limit: acc?.credit_limit ?? null,
       credit_status: acc?.credit_status ?? "good",
-      default_currency: acc?.default_currency ?? "USD",
+      default_currency: acc?.default_currency ?? baseCcy,
       notes: acc?.notes ?? null,
       ...totals,
     };
@@ -100,6 +104,8 @@ export async function POST(req: Request) {
   if (!body.customer_id) {
     return NextResponse.json({ error: "customer_id required" }, { status: 400 });
   }
+  /* Currency stabilization — default to tenant base, not USD. */
+  const baseCcy = await resolveBaseCurrency(auth.tenant_id);
   const { data, error } = await supabaseServer
     .from("finance_customer_accounts")
     .upsert(
@@ -110,7 +116,7 @@ export async function POST(req: Request) {
         payment_terms: body.payment_terms ?? null,
         credit_limit: body.credit_limit ?? null,
         credit_status: body.credit_status ?? "good",
-        default_currency: body.default_currency ?? "USD",
+        default_currency: body.default_currency ?? baseCcy,
         notes: body.notes ?? null,
         updated_at: new Date().toISOString(),
       },

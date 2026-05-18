@@ -21,6 +21,7 @@ import { MetricCard } from "@/components/finance/FinanceUiX";
 import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
 import RrIcon from "@/components/ui/RrIcon";
 import { fmtMoney } from "@/lib/finance/calc";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import type {
   BankAccount,
   BankAccountStatus,
@@ -56,6 +57,7 @@ function daysSince(iso: string | null): number | null {
    ──────────────────────────────────────────────────────────────────────── */
 
 export default function FinanceBankAccounts() {
+  const baseCurrency = useBaseCurrency();
   const [accounts, setAccounts] = useState<BankAccountListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function FinanceBankAccounts() {
   const startNew = () => setEditing({
     bank_name: "",
     account_name: "",
-    currency: tenantKpi.primary?.currency ?? "USD",
+    currency: tenantKpi.primary?.currency ?? baseCurrency,
     status: "active",
     available_balance: 0,
     pending_balance: 0,
@@ -159,9 +161,9 @@ export default function FinanceBankAccounts() {
         />
 
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard label="Available" value={tenantKpi.avail} unit="USD" hint="Across active accounts" loading={loading} />
-          <MetricCard label="Pending" value={tenantKpi.pending} unit="USD" hint="Not yet cleared" loading={loading} />
-          <MetricCard label="Restricted" value={tenantKpi.restricted} unit="USD" hint="Holds + reserves" loading={loading} />
+          <MetricCard label="Available" value={tenantKpi.avail} unit={baseCurrency} hint="Across active accounts" loading={loading} />
+          <MetricCard label="Pending" value={tenantKpi.pending} unit={baseCurrency} hint="Not yet cleared" loading={loading} />
+          <MetricCard label="Restricted" value={tenantKpi.restricted} unit={baseCurrency} hint="Holds + reserves" loading={loading} />
           <MetricCard label="Unreconciled movements" value={tenantKpi.unrec} unit="cm." hint="Across all accounts" loading={loading} />
         </div>
 

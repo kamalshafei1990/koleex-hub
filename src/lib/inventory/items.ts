@@ -21,6 +21,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import { createInventoryMovement, postInventoryMovement } from "./posting";
 import type {
   ColorToken,
@@ -102,6 +103,9 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
   if (!ALLOWED_UNITS.includes(unit)) return { ok: false, error: `Unit '${unit}' not allowed` };
 
   const code = await nextItemCode(input.tenant_id, type.code_prefix);
+  /* Currency stabilization — default any missing currency to the
+     tenant's base currency (CNY for Chinese tenants). */
+  const itemDefaultCcy = input.currency ?? (await resolveBaseCurrency(input.tenant_id));
 
   const { data, error } = await supabaseServer
     .from("inventory_items")
@@ -117,7 +121,7 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
       barcode: input.barcode ?? null,
       qr_code: input.qr_code ?? null,
       cost_price: input.cost_price ?? null,
-      currency: input.currency ?? "USD",
+      currency: itemDefaultCcy,
       min_stock: input.min_stock ?? null,
       reorder_point: input.reorder_point ?? null,
       max_stock: input.max_stock ?? null,
@@ -154,7 +158,7 @@ export async function createInventoryItem(input: CreateItemInput): Promise<{
       quantity: initial,
       unit,
       unit_cost: input.cost_price ?? null,
-      currency: input.currency ?? "USD",
+      currency: itemDefaultCcy,
       source_type: "inventory_item_opening_balance",
       source_id: item.id,
       reference: code,

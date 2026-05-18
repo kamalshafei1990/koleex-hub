@@ -25,6 +25,7 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import type {
   ForecastDayPoint,
   ForecastDiff,
@@ -83,6 +84,7 @@ function zeroY(H: number, vMin: number, vMax: number, padY = 8): number {
 type ScenarioPreset = "base" | "delay7" | "delay15" | "delay30" | "accel7" | "accel15" | "fx5" | "fx10" | "cost10" | "combined" | "custom";
 
 export default function FinanceTreasuryForecast() {
+  const baseCurrency = useBaseCurrency();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [base, setBase] = useState<ForecastResult | null>(null);
@@ -342,11 +344,11 @@ export default function FinanceTreasuryForecast() {
           <>
             {/* KPI strip */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <MetricCard label="Cash today"  value={base.startingCash} unit="USD" hint="Available across active accounts" loading={false} />
-              <MetricCard label="7d"  value={(stress ?? base).d7}  unit="USD" tone={(stress ?? base).d7  < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="30d" value={(stress ?? base).d30} unit="USD" tone={(stress ?? base).d30 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="60d" value={(stress ?? base).d60} unit="USD" tone={(stress ?? base).d60 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
-              <MetricCard label="90d" value={(stress ?? base).d90} unit="USD" tone={(stress ?? base).d90 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
+              <MetricCard label="Cash today"  value={base.startingCash} unit={baseCurrency} hint="Available across active accounts" loading={false} />
+              <MetricCard label="7d"  value={(stress ?? base).d7}  unit={baseCurrency} tone={(stress ?? base).d7  < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
+              <MetricCard label="30d" value={(stress ?? base).d30} unit={baseCurrency} tone={(stress ?? base).d30 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
+              <MetricCard label="60d" value={(stress ?? base).d60} unit={baseCurrency} tone={(stress ?? base).d60 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
+              <MetricCard label="90d" value={(stress ?? base).d90} unit={baseCurrency} tone={(stress ?? base).d90 < 0 ? "negative" : "neutral"} hint="Projected" loading={false} />
               <MetricCard
                 label="Runway"
                 value={(stress ?? base).runwayDays != null ? `${(stress ?? base).runwayDays}` : "—"}

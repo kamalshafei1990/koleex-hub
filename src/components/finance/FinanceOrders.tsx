@@ -9,6 +9,7 @@ import {
   StatusBadge,
 } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import PartyPickerModal, { type FinancePartyRow } from "@/components/finance/PartyPickerModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import PartyChip, { type PartyChipData } from "@/components/finance/PartyChip";
@@ -28,6 +29,13 @@ const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
 };
 
 export default function FinanceOrders() {
+  /* Currency: sales-side surface, so we keep USD as the form default
+     per the brief — but the KPI cards use the tenant base so a Chinese
+     tenant aggregating USD orders sees CNY-converted totals where the
+     server provides them. The unit label stays USD on the KPI cards
+     since orders are stored in USD; tweak per row when mixing
+     currencies. */
+  const baseCurrency = useBaseCurrency();
   const [orders, setOrders] = useState<FinanceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "editor">("list");
@@ -180,7 +188,7 @@ export default function FinanceOrders() {
             label="Total Revenue"
             helpId="finance.revenue"
             value={kpi.totalSelling}
-            unit="USD"
+            unit={baseCurrency}
             tone="positive"
             hint={`${orders.length} order${orders.length === 1 ? "" : "s"} this view`}
             loading={loading}
@@ -189,15 +197,15 @@ export default function FinanceOrders() {
             label="Net Profit"
             helpId="finance.netProfit"
             value={kpi.totalNet}
-            unit="USD"
+            unit={baseCurrency}
             tone={kpi.totalNet >= 0 ? "info" : "negative"}
             hint={`Average margin ${fmtPct(kpi.avgMargin)}`}
             loading={loading}
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
-          <MetricCard label="Collected" helpId="order.collected" value={kpi.totalCollected} unit="USD" hint="Cash banked across orders" loading={loading} />
-          <MetricCard label="Outstanding" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit="USD" tone="warning" hint="Still to collect" loading={loading} />
+          <MetricCard label="Collected" helpId="order.collected" value={kpi.totalCollected} unit={baseCurrency} hint="Cash banked across orders" loading={loading} />
+          <MetricCard label="Outstanding" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint="Still to collect" loading={loading} />
           <MetricCard label="Orders" value={String(orders.length)} hint="In current view" loading={loading} />
         </div>
 

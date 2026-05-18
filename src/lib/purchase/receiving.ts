@@ -42,6 +42,7 @@ import "server-only";
    ========================================================================== */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 import { createInventoryMovement, postInventoryMovement, voidInventoryMovement, ensureDefaultWarehouse } from "@/lib/inventory/posting";
 import {
   ensureInventoryItemForProduct,
@@ -185,6 +186,9 @@ export async function receivePurchaseOrder(opts: {
   /* 4 — Insert receipt header + lines. */
   const grNo = generateReceiptNo();
   const receivedAt = request.received_at ?? new Date().toISOString();
+  /* Currency stabilization — fall back to tenant base if the PO row
+     somehow has a null currency. */
+  const receiptCcy = po.currency ?? (await resolveBaseCurrency(tenantId));
   const { data: receiptRow, error: rcptErr } = await supabaseServer
     .from("purchase_receipts")
     .insert({
@@ -236,7 +240,7 @@ export async function receivePurchaseOrder(opts: {
       qty_rejected: qtyRejected,
       unit: poItem.unit ?? "pc",
       unit_cost: poItem.unit_cost,
-      currency: po.currency ?? "USD",
+      currency: receiptCcy,
       /* For non-stock purchases there's no location; for stock-moving
          modes the line override (rare) or receipt-level destination wins. */
       warehouse_id: affectsInventory ? (l.warehouse_id ?? warehouseId) : null,

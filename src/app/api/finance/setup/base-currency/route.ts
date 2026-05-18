@@ -21,7 +21,7 @@ export async function GET() {
     .eq("id", auth.tenant_id)
     .maybeSingle();
   return NextResponse.json({
-    base_currency: ((data as { default_currency: string | null } | null)?.default_currency) ?? "USD",
+    base_currency: ((data as { default_currency: string | null } | null)?.default_currency) ?? "CNY",
   });
 }
 

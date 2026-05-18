@@ -64,6 +64,7 @@ import {
   type OpsPillData,
 } from "@/components/finance/FinanceDashboardUi";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
+import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 import { styleForCategory } from "@/components/finance/categoryStyles";
 /* Phase 2.5 — operational guidance layer. */
 import GuidanceTip from "@/components/ui/GuidanceTip";
@@ -192,7 +193,8 @@ export default function FinanceDashboard() {
   }, []);
   useEffect(() => { void load(period); }, [period, load]);
 
-  const currency = "USD";
+  /* Currency stabilization — read tenant base currency dynamically. */
+  const currency = useBaseCurrency();
 
   /* Inline sparklines from the period's trend series */
   const sparklines = useMemo(() => {
@@ -206,7 +208,7 @@ export default function FinanceDashboard() {
   }, [kpi]);
 
   /* Intelligence layer */
-  const intelligence    = useMemo(() => buildIntelligence(kpi, period), [kpi, period]);
+  const intelligence    = useMemo(() => buildIntelligence(kpi, period, currency), [kpi, period, currency]);
   const arAging         = useMemo(() => computeArAging(orders), [orders]);
   const apAging         = useMemo(() => computeApAging(orders), [orders]);
   const incomingTimeline = useMemo(() => buildIncomingTimeline(orders), [orders]);
@@ -979,7 +981,7 @@ type IntelligenceCard = {
   icon: React.ReactNode;
 };
 
-function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
+function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, currency: string) {
   if (!kpi) {
     return {
       headline: "Loading executive view…",
@@ -998,7 +1000,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     headline = `Mixed signals ${periodLabel}. ${kpi.health_reasons[0] ?? ""}`.trim();
   } else {
     const margin = kpi.gross_margin_pct ?? 0;
-    headline = `Healthy ${periodLabel} · Net profit ${formatCompact(kpi.net_profit)} USD · Gross margin ${margin.toFixed(1)}%.`;
+    headline = `Healthy ${periodLabel} · Net profit ${formatCompact(kpi.net_profit)} ${currency} · Gross margin ${margin.toFixed(1)}%.`;
   }
 
   const cards: IntelligenceCard[] = [];
@@ -1010,8 +1012,8 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
     title: "Cash velocity",
     description:
       cashNet >= 0
-        ? `Cash in exceeds cash out by ${fmtMoney(cashNet, "USD", { compact: true })} ${periodLabel}.`
-        : `Cash out exceeds cash in by ${fmtMoney(Math.abs(cashNet), "USD", { compact: true })} ${periodLabel} — watch the bank balance.`,
+        ? `Cash in exceeds cash out by ${fmtMoney(cashNet, currency, { compact: true })} ${periodLabel}.`
+        : `Cash out exceeds cash in by ${fmtMoney(Math.abs(cashNet), currency, { compact: true })} ${periodLabel} — watch the bank balance.`,
     chip: cashNet >= 0 ? "Positive" : "Negative",
     severity: cashNet >= 0 ? "positive" : "risk",
   });
@@ -1021,7 +1023,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
       icon: <RrIcon name="arrow-down-left" size={16} />,
       title: "Collections on track",
       description: kpi.accounts_receivable > 0
-        ? `${fmtMoney(kpi.accounts_receivable, "USD", { compact: true })} still to collect from customers. Customer payments cover ${collectionPct.toFixed(0)}% of revenue so far.`
+        ? `${fmtMoney(kpi.accounts_receivable, currency, { compact: true })} still to collect from customers. Customer payments cover ${collectionPct.toFixed(0)}% of revenue so far.`
         : "All issued orders have been fully collected.",
       chip: kpi.accounts_receivable === 0 ? "Clear" : collectionPct >= 70 ? "On track" : "Lagging",
       severity: kpi.accounts_receivable === 0
@@ -1039,8 +1041,8 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod) {
       icon: <RrIcon name="arrow-up-right" size={16} />,
       title: "Supplier liabilities",
       description: apHeavy
-        ? `${fmtMoney(kpi.accounts_payable, "USD", { compact: true })} owed to suppliers — exceeds outstanding receivables.`
-        : `${fmtMoney(kpi.accounts_payable, "USD", { compact: true })} owed to suppliers + unpaid bills.`,
+        ? `${fmtMoney(kpi.accounts_payable, currency, { compact: true })} owed to suppliers — exceeds outstanding receivables.`
+        : `${fmtMoney(kpi.accounts_payable, currency, { compact: true })} owed to suppliers + unpaid bills.`,
       chip: apSevere ? "Critical" : apHeavy ? "Heavy" : "Manageable",
       severity: apSevere ? "critical" : apHeavy ? "watch" : "neutral",
     });
