@@ -26,6 +26,7 @@ import {
 import ShipDialog from "@/components/sales/ShipDialog";
 import DocumentWorkflowBanner from "@/components/ui/workflow/DocumentWorkflowBanner";
 import TraceabilityPanel from "@/components/ui/traceability/TraceabilityPanel";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface ItemRow {
   id: string;
@@ -103,7 +104,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
     try {
       const r = await fetch(`/api/sales/orders/${soId}`, { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setDetail(j as Detail);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -124,7 +125,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
       body: JSON.stringify({ reason }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    if (!r.ok) { alert(humanizeError(j.error)); return; }
     await load();
   };
 
@@ -136,7 +137,7 @@ export default function SalesOrderDetail({ soId }: { soId: string }) {
       body: JSON.stringify({ shipment_id: id }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    if (!r.ok) { alert(humanizeError(j.error)); return; }
     await load();
   };
 

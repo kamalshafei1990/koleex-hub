@@ -23,6 +23,7 @@ import {
 import RrIcon from "@/components/ui/RrIcon";
 import NotificationBell from "@/components/operations/NotificationBell";
 import MobileActionBar from "@/components/ui/mobile/MobileActionBar";
+import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 
 type DashboardRole = "ceo" | "accountant" | "sales" | "warehouse" | "purchasing" | "marketing" | "hr";
 type UiMode = "simple" | "advanced";
@@ -84,6 +85,16 @@ export default function RoleHome() {
       icon="coins"
       action={
         <div className="flex items-center gap-2">
+          {/* Universal Smart-Create launcher — opens the drawer everywhere. */}
+          <button
+            type="button" onClick={() => openSmartCreate()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+            aria-label="Open Smart Create drawer (shortcut: c)"
+            title="Create (c)"
+          >
+            <RrIcon name="plus" size={12} />
+            Create
+          </button>
           <NotificationBell />
           <button
             onClick={() => setDrawerOpen(true)}
@@ -155,7 +166,9 @@ export default function RoleHome() {
       <MobileActionBar
         actions={[
           { label: "Home",    icon: "home",          href: "/" },
-          { label: "Create",  icon: "plus",          href: "/create", tone: "primary" },
+          /* Mobile Create opens the SmartCreateDrawer instead of
+             routing — keeps the operator in the current workflow. */
+          { label: "Create",  icon: "plus",          onClick: () => openSmartCreate(), tone: "primary" },
           { label: "Ops",     icon: "signal-stream", href: "/operations" },
           { label: "Finance", icon: "bank",          href: "/finance/workspace" },
         ]}

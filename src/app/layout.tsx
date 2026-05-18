@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import RootShell from "@/components/layout/RootShell";
 import DialogHost from "@/lib/ui-dialog";
+import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -50,6 +51,9 @@ export default function RootLayout({
             Mounted once so any component can call dialog.confirm()
             without each page wiring its own state. */}
         <DialogHost />
+        {/* Global "+ Create" launcher — callable from header chips,
+            mobile action bar, and openSmartCreate() helper. */}
+        <SmartCreateDrawer />
       </body>
     </html>
   );

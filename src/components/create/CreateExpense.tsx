@@ -13,7 +13,7 @@
      · Smart defaults: base currency + default category + today's date
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
@@ -21,6 +21,8 @@ import {
   InlineEntityPicker, InlineCreateModal, SmartEmptyState,
   type PickerOption,
 } from "@/components/ui/create/SmartCreate";
+import { useDraftAutosave } from "@/lib/hooks/useDraftAutosave";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface SmartDefaults {
   base_currency: string;
@@ -59,6 +61,15 @@ export default function CreateExpense() {
   const [supplierId, setSupplierId]       = useState<string | null>(null);
   const [notes, setNotes]                 = useState("");
 
+  /* Draft autosave — restore on mount, clear on success. */
+  const draftValue = useMemo(() => ({
+    title, amount, currency, date, dueDate, paymentStatus, categoryId, supplierId, notes,
+  }), [title, amount, currency, date, dueDate, paymentStatus, categoryId, supplierId, notes]);
+  const draft = useDraftAutosave("expense:new", draftValue, {
+    enabled: title.trim().length > 0 || amount.trim().length > 0 || notes.trim().length > 0,
+  });
+  const [resumePromptOpen, setResumePromptOpen] = useState(draft.hasDraft);
+
   /* Inline-create modals */
   const [catModalOpen, setCatModalOpen]   = useState(false);
   const [supModalOpen, setSupModalOpen]   = useState(false);
@@ -93,7 +104,7 @@ export default function CreateExpense() {
             .map((s) => ({ id: s.id, label: s.company_name ?? s.display_name ?? s.id.slice(0, 8) }))
         );
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(humanizeError(e));
       } finally { setLoading(false); }
     })();
   }, []);
@@ -175,9 +186,12 @@ export default function CreateExpense() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       const id = j.expense?.id ?? j.id;
+      /* Smart-entry: success → wipe the saved draft so the form
+         doesn't offer to "resume" it next time. */
+      draft.clear();
       router.push(`/finance/expenses?id=${id ?? ""}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(humanizeError(e));
     } finally { setBusy(false); }
   }
 
@@ -203,6 +217,38 @@ export default function CreateExpense() {
     >
       {loading && <div className="text-sm text-gray-500">Loading defaults…</div>}
       {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
+
+      {/* Resume Draft prompt — surfaced when a previous unsaved attempt
+          exists in localStorage. One click to restore, one to discard. */}
+      {resumePromptOpen && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[12px] text-amber-100">
+          <span>You have an unsaved draft from a previous session. Resume?</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const v = draft.restore();
+                if (v) {
+                  setTitle(v.title); setAmount(v.amount); setCurrency(v.currency);
+                  setDate(v.date); setDueDate(v.dueDate);
+                  setPaymentStatus(v.paymentStatus); setCategoryId(v.categoryId);
+                  setSupplierId(v.supplierId); setNotes(v.notes);
+                }
+                setResumePromptOpen(false);
+              }}
+              className="rounded-md border border-emerald-300/40 bg-emerald-300/[0.10] px-2.5 py-1 text-[11px] text-emerald-100 hover:bg-emerald-300/[0.18]">
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={() => { draft.clear(); setResumePromptOpen(false); }}
+              className="rounded-md border border-white/[0.10] bg-white/[0.04] px-2.5 py-1 text-[11px] hover:bg-white/[0.08]">
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {!loading && (
         <>
           <SmartSection title="Identification" subtitle="What is the expense about?">

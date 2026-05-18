@@ -324,7 +324,7 @@ export function SmartEmptyState({
 export interface PickerOption { id: string; label: string; sub?: string }
 
 export function InlineEntityPicker({
-  label, value, options, onChange, onCreate, placeholder = "Select…",
+  label, value, options, onChange, onCreate, onRefresh, placeholder = "Select…",
   createLabel, required, impact, hint,
 }: {
   label: string;
@@ -334,6 +334,9 @@ export function InlineEntityPicker({
   /** Render a creation form. Resolves with the new option (added to
    *  the parent's option list by the caller) or null on cancel. */
   onCreate: () => Promise<PickerOption | null>;
+  /** Optional refresh callback — re-pulls the list from the server.
+   *  Useful when another tab or operator added an entry. */
+  onRefresh?: () => Promise<void> | void;
   placeholder?: string;
   createLabel: string;
   required?: boolean;
@@ -403,6 +406,14 @@ export function InlineEntityPicker({
                   <RrIcon name="plus" size={10} />
                   {createLabel}
                 </button>
+                {onRefresh && (
+                  <button type="button"
+                          onClick={async () => { await onRefresh(); setFilter(""); }}
+                          className="flex w-full items-center gap-2 border-t border-white/[0.04] px-3 py-2 text-left text-[11.5px] text-gray-300 hover:bg-white/[0.04]">
+                    <RrIcon name="loading" size={10} />
+                    Refresh list
+                  </button>
+                )}
               </li>
             </ul>
           </div>
