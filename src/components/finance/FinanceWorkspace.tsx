@@ -18,6 +18,9 @@ import {
   ErpStatusDot, type ErpStatus,
 } from "@/components/ui/erp/ErpUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { FocusBoundary, FocusToggle } from "@/components/ui/focus/FocusMode";
+import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface PendingItem {
   kind: "expense" | "payment" | "bill" | "journal";
@@ -73,11 +76,11 @@ export default function FinanceWorkspace() {
       try {
         const r = await fetch("/api/finance/workspace");
         const j = await r.json();
-        if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+        if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
         setSnap(j.snapshot);
         setVis(j.visibility);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(humanizeError(e));
       } finally { setLoading(false); }
     })();
   }, []);
@@ -91,47 +94,37 @@ export default function FinanceWorkspace() {
       icon="bank"
       backHref="/"
       action={
-        <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
-          <RrIcon name="newspaper" size={12} />
-          Reports
-        </Link>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => openSmartCreate()}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+                  title="Create (c)">
+            <RrIcon name="plus" size={12} /> Create
+          </button>
+          <FocusToggle />
+          <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
+            <RrIcon name="newspaper" size={12} /> Reports
+          </Link>
+        </div>
       }
     >
       {loading && <div className="text-sm text-gray-500">Loading…</div>}
       {error && <div className="text-sm text-rose-300">{error}</div>}
       {snap && (
         <>
-          {/* Where to start — operator-friendly entry points for the data
-              that most CFOs don't know where to find. Surfaced first
-              because the previous workspace buried these inside Setup. */}
+          {/* Top actions — three highest-value finance routes.
+              "+ Create" lives in the header and opens the SmartCreateDrawer
+              for everything else (expense, payment, invoice, journal,
+              FX exchange, asset, vendor bill, bank account), so the
+              workspace itself stays lean. */}
           <section>
             <div className="mb-2 flex items-baseline justify-between">
-              <ErpEyebrow>Where to start</ErpEyebrow>
-              <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">All setup cards →</Link>
+              <ErpEyebrow>Top actions</ErpEyebrow>
+              <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">Setup cards →</Link>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <ErpQuickAction href="/finance/visual"      icon="balance-scale-left" label="Visual Statements" hint="Income · Balance · Cash Flow" />
-              <ErpQuickAction href="/finance/fx-rates"    icon="balance-scale-left" label="FX Rates"          hint="Add / edit · USD → CNY etc." />
-              <ErpQuickAction href="/finance/setup?card=opening-balances" icon="books"     label="Opening Balances" hint="Cash · AR · AP · stock" />
-              <ErpQuickAction href="/finance/setup?card=assets"           icon="briefcase" label="Company Assets"   hint="Fixed assets register" />
-            </div>
-          </section>
-
-          {/* Quick Actions */}
-          <section>
-            <div className="mb-2 flex items-baseline justify-between">
-              <ErpEyebrow>Quick Actions</ErpEyebrow>
-              <Link href="/create" className="text-[11px] text-gray-400 hover:text-gray-200">All create flows →</Link>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <ErpQuickAction href="/create/expense"            icon="receipt"             label="New Expense"     hint="Cash or bill" />
-              <ErpQuickAction href="/finance/payments?new=1"    icon="money"               label="New Payment"     hint="In / out" />
-              <ErpQuickAction href="/invoices?new=1"            icon="file-invoice-dollar" label="New Invoice"     hint="Customer billing" />
-              <ErpQuickAction href="/finance/accounting?new=1"  icon="books"               label="New Journal"     hint="Manual entry" />
-              <ErpQuickAction href="/finance/setup?card=fx-rates" icon="balance-scale-left" label="New FX Exchange" hint="Currency conversion" />
-              <ErpQuickAction href="/create/asset"              icon="briefcase"           label="New Asset"       hint="Capital purchase" />
-              <ErpQuickAction href="/finance/suppliers?new-bill=1" icon="file-invoice"     label="New Vendor Bill" hint="Supplier invoice" />
-              <ErpQuickAction href="/finance/bank-accounts?new=1" icon="bank"              label="New Bank Account" hint="Add account" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <ErpQuickAction href="/finance/visual"    icon="balance-scale-left" label="Statements" hint="Income · Balance · Cash flow" />
+              <ErpQuickAction href="/finance/fx-rates"  icon="balance-scale-left" label="FX Rates"   hint="USD → CNY · stale + missing" />
+              <ErpQuickAction href="/finance/approvals" icon="badge-check"        label="Approvals"  hint="Review pending" />
             </div>
           </section>
 
@@ -210,7 +203,8 @@ export default function FinanceWorkspace() {
             </div>
           </section>
 
-          {/* Recent Transactions */}
+          {/* Recent Transactions — secondary chrome, hidden under Focus Mode. */}
+          <FocusBoundary>
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <ErpEyebrow>Recent Activity</ErpEyebrow>
@@ -254,6 +248,7 @@ export default function FinanceWorkspace() {
             <NavCard href="/reports"            icon="newspaper"           label="Reports"    count={null} />
             <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label="FX Activity" count={snap.counts.fx_30d} />
           </section>
+          </FocusBoundary>
         </>
       )}
     </ErpPage>

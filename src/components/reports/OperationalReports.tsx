@@ -13,6 +13,7 @@ import {
   ReportShell, ReportFilters, ReportToolbar, ReportTable, ReportFooter,
   type ReportColumn, fmtMoney,
 } from "@/components/ui/report/ReportUi";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 type Kind = "sales" | "purchases" | "expenses" | "inventory" | "customers" | "suppliers";
 
@@ -49,10 +50,10 @@ export default function OperationalReports() {
       const qs = new URLSearchParams({ kind, from, to });
       const r = await fetch(`/api/reports/operational?${qs.toString()}`);
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       setReport(j.report);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(humanizeError(e));
     } finally { setLoading(false); }
   }, [kind, from, to]);
 
@@ -137,19 +138,63 @@ export default function OperationalReports() {
       {loading && <div className="px-1 text-sm text-gray-500">Loading…</div>}
       {error && <div className="px-1 text-sm text-rose-300">{error}</div>}
       {report && !loading && (
-        <ReportTable<Row>
-          rows={report.rows}
-          columns={columns}
-          rowKey={(r) => r.key}
-          footerTotals={totalsRow}
-          empty="No data in this range."
-        />
+        <>
+          {/* Summary strip — operational intelligence before the detail
+              table (per the SCOPE 3 rule: summary → insights → details). */}
+          {report.rows.length > 0 && (
+            <SummaryStrip report={report} />
+          )}
+          <ReportTable<Row>
+            rows={report.rows}
+            columns={columns}
+            rowKey={(r) => r.key}
+            footerTotals={totalsRow}
+            empty="No data in this range."
+          />
+        </>
       )}
     </ReportShell>
   );
 }
 
 /* ─── Drill-down route map ─── */
+function SummaryStrip({ report }: { report: Report }) {
+  /* Three insights only — top contributor, share concentration, and
+     "everything else" remainder. No charts; calm three-card row. */
+  const sorted = [...report.rows].sort((a, b) => b.amount - a.amount);
+  const top = sorted[0];
+  const top3 = sorted.slice(0, 3).reduce((s, r) => s + r.amount, 0);
+  const total = report.totals.amount || 1;
+  const top3Share = (top3 / total) * 100;
+  const remainder = total - top3;
+
+  return (
+    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Top contributor</div>
+        <div className="mt-1 truncate text-[13px] font-medium">{top?.label ?? "—"}</div>
+        <div className="mt-0.5 font-mono text-[11.5px] tabular-nums text-gray-300">
+          {fmtMoney(top?.amount ?? 0)}
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Top-3 share</div>
+        <div className="mt-1 font-mono text-[16px] tabular-nums">{top3Share.toFixed(0)}%</div>
+        <div className="mt-0.5 text-[10.5px] text-gray-500">
+          Concentration of total — high % = single-customer / single-category risk.
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Everything else</div>
+        <div className="mt-1 font-mono text-[16px] tabular-nums">{fmtMoney(remainder)}</div>
+        <div className="mt-0.5 text-[10.5px] text-gray-500">
+          Total beyond the top three rows · {report.rows.length} rows.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function drillFor(kind: Kind, r: Row): string {
   switch (kind) {
     case "sales":     return r.key === "—" ? "/invoices" : `/customers/${r.key}`;

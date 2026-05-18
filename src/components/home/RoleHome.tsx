@@ -24,6 +24,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import NotificationBell from "@/components/operations/NotificationBell";
 import MobileActionBar from "@/components/ui/mobile/MobileActionBar";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
+import { FocusBoundary, FocusToggle } from "@/components/ui/focus/FocusMode";
 
 type DashboardRole = "ceo" | "accountant" | "sales" | "warehouse" | "purchasing" | "marketing" | "hr";
 type UiMode = "simple" | "advanced";
@@ -96,6 +97,7 @@ export default function RoleHome() {
             Create
           </button>
           <NotificationBell />
+          <FocusToggle />
           <button
             onClick={() => setDrawerOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
@@ -129,9 +131,10 @@ export default function RoleHome() {
         </>
       )}
 
-      {/* Favorites + Pins (shared). */}
+      {/* Favorites + Pins (shared). Hidden under Focus Mode — these
+          are personalization, not operational essentials. */}
       {exp && (exp.favorite_apps.length > 0 || exp.pinned_workflows.length > 0) && (
-        <>
+        <FocusBoundary>
           <ErpHairline />
           <section className="space-y-4">
             {exp.pinned_workflows.length > 0 && (
@@ -155,7 +158,7 @@ export default function RoleHome() {
               </div>
             )}
           </section>
-        </>
+        </FocusBoundary>
       )}
 
       {drawerOpen && exp && (
@@ -197,11 +200,10 @@ function CeoDashboard({ exp, status }: { exp: Experience; status: WorkflowStatus
         <ErpKpi label="Inventory items"     value={String(i.items ?? 0)}                                hint="Universal master" />
       </div>
       <ErpHairline />
-      <Quicks heading="Executive shortcuts">
-        <ErpQuickAction href="/finance/statements"       icon="balance-scale-left" label="Financial statements" hint="P&L · BS · CF · AR/AP · Gross profit" />
-        {exp.can_see_profit && <ErpQuickAction href="/finance/accounting/profit-loss" icon="file-invoice-dollar" label="Profit & Loss" />}
-        <ErpQuickAction href="/finance/accounting/queue" icon="clock"              label="Accounting Queue"     hint="Approve drafts before they post" />
-        <ErpQuickAction href="/workflows"                icon="contract"           label="Workflow hub"         hint="End-to-end operational view" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label="Statements"       hint="Income · Balance · Cash flow" />
+        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label="Accounting queue" hint="Approve drafts" />
+        <ErpQuickAction href="/workflows"                 icon="contract"           label="Workflows"        hint="End-to-end timelines" />
       </Quicks>
     </div>
   );
@@ -219,13 +221,10 @@ function AccountantDashboard({ exp, status }: { exp: Experience; status: Workflo
         <ErpKpi label="Posted expenses"  value={String(f.expenses_posted ?? 0)} hint="In the GL" tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Accounting actions">
-        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"               label="Accounting Queue"      hint="Draft / post / void entries" />
-        <ErpQuickAction href="/finance/accounting/general-ledger" icon="contract"    label="General Ledger"        hint="Per-account history" />
-        <ErpQuickAction href="/finance/statements"        icon="balance-scale-left"  label="Statements"            hint="P&L · BS · CF · aging" />
-        <ErpQuickAction href="/finance/bank-imports"      icon="upload"              label="Bank imports"          hint="Match statements" />
-        <ErpQuickAction href="/finance/reconciliation"    icon="badge-check"         label="Reconciliation"        hint="Match cash movements" />
-        <ErpQuickAction href="/finance/setup"             icon="shield-check"        label="Setup"                 hint="Base currency · FX · opening balances" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/finance/accounting/queue"  icon="clock"              label="Accounting queue" hint="Draft / post / void" />
+        <ErpQuickAction href="/finance/visual"            icon="balance-scale-left" label="Statements"       hint="Income · Balance · Cash flow" />
+        <ErpQuickAction href="/finance/workspace"         icon="bank"               label="Workspace"        hint="Approvals · banks · activity" />
       </Quicks>
     </div>
   );
@@ -242,12 +241,10 @@ function SalesDashboard({ status }: { status: WorkflowStatus | null }) {
         <ErpKpi label="Payments received" value={String(s.payments_in ?? 0)}     tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Sales actions">
-        <ErpQuickAction href="/quotations"        icon="file-invoice"          label="Quotations"     hint="Pipeline + win/loss" />
-        <ErpQuickAction href="/sales/orders"      icon="contract"              label="Sales Orders"   hint="Create · ship · track" />
-        <ErpQuickAction href="/invoices"          icon="file-invoice-dollar"   label="Invoices"       hint="Issue + collect" />
-        <ErpQuickAction href="/customers"         icon="arrow-down-left"       label="Customers"      hint="Open balances + history" />
-        <ErpQuickAction href="/workflows/sales"   icon="contract"              label="Sales workflow" hint="End-to-end timeline" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/sales/orders"      icon="contract"            label="Sales orders"   hint="Create · ship · track" />
+        <ErpQuickAction href="/invoices"          icon="file-invoice-dollar" label="Invoices"       hint="Issue + collect" />
+        <ErpQuickAction href="/workflows/sales"   icon="contract"            label="Sales workflow" hint="Quote → SO → ship → invoice → pay" />
       </Quicks>
     </div>
   );
@@ -264,17 +261,11 @@ function WarehouseDashboard({ status }: { status: WorkflowStatus | null }) {
         <ErpKpi label="Locations"      value={String(i.balances ?? 0)}  hint="Warehouses + virtual" />
       </div>
       <ErpHairline />
-      <Quicks heading="Warehouse actions">
-        <ErpQuickAction href="/inventory"             icon="coins"        label="Inventory Dashboard" />
-        <ErpQuickAction href="/inventory/items"       icon="box-open"     label="Items"               hint="Add, archive, classify" />
-        <ErpQuickAction href="/inventory/movements"   icon="file-invoice" label="Stock Movements"     hint="Append-only ledger" />
-        <ErpQuickAction href="/inventory/warehouses"  icon="bank"         label="Locations"           hint="Warehouses + virtual" />
-        <ErpQuickAction href="/inventory/balances"    icon="badge-check"  label="Stock Balances"      hint="Derived truth" />
-        <ErpQuickAction href="/workflows/inventory"   icon="box-open"     label="Inventory workflow" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/inventory/items"       icon="box-open"        label="Items"             hint="Master · classify · archive" />
+        <ErpQuickAction href="/inventory/movements"   icon="file-invoice"    label="Movements"         hint="Append-only ledger" />
+        <ErpQuickAction href="/workflows/inventory"   icon="box-open"        label="Inventory workflow" hint="End-to-end timeline" />
       </Quicks>
-      <div className="rounded-md border border-white/[0.05] bg-white/[0.012] px-4 py-3 text-[11px] text-gray-500">
-        <ErpStatusDot status="empty" /> <span className="ml-1">Stock alerts feature is reserved for a future phase.</span>
-      </div>
     </div>
   );
 }
@@ -290,11 +281,10 @@ function PurchasingDashboard({ status }: { status: WorkflowStatus | null }) {
         <ErpKpi label="Bills posted"     value={String(p.bills_posted ?? 0)}    tone="positive" />
       </div>
       <ErpHairline />
-      <Quicks heading="Purchasing actions">
-        <ErpQuickAction href="/purchase"                 icon="contract"          label="Purchase Orders"     hint="Draft · confirm · receive" />
-        <ErpQuickAction href="/suppliers"                icon="arrow-up-right"    label="Suppliers"           hint="Master + balances" />
-        <ErpQuickAction href="/workflows/procurement"    icon="box-circle-check"  label="Procurement workflow" hint="End-to-end timeline" />
-        <ErpQuickAction href="/inventory/movements"      icon="file-invoice"      label="Stock Movements"     hint="Track received goods" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/purchase"                 icon="contract"         label="Purchase orders"      hint="Draft · confirm · receive" />
+        <ErpQuickAction href="/suppliers"                icon="arrow-up-right"   label="Suppliers"            hint="Master + balances" />
+        <ErpQuickAction href="/workflows/procurement"    icon="box-circle-check" label="Procurement workflow" hint="Supplier → PO → receipt → bill → pay" />
       </Quicks>
     </div>
   );
@@ -309,11 +299,10 @@ function MarketingDashboard() {
         <ErpKpi label="Events" value="—" hint="Exhibition planning" />
       </div>
       <ErpHairline />
-      <Quicks heading="Marketing actions">
+      <Quicks heading="Top actions">
         <ErpQuickAction href="/website"   icon="megaphone" label="Website"   hint="Pages + content" />
         <ErpQuickAction href="/catalogs"  icon="books"     label="Catalogs"  hint="Public catalog management" />
         <ErpQuickAction href="/products"  icon="box-open"  label="Products"  hint="Customer-facing catalog" />
-        <ErpQuickAction href="/markets"   icon="flag-alt"  label="Markets"   hint="Per-country pricing" />
       </Quicks>
     </div>
   );
@@ -328,10 +317,10 @@ function HrDashboard() {
         <ErpKpi label="HR docs"      value="—" hint="Contracts + IDs" />
       </div>
       <ErpHairline />
-      <Quicks heading="HR actions">
-        <ErpQuickAction href="/employees"   icon="id-badge"        label="Employees"   hint="Personnel records" />
-        <ErpQuickAction href="/hr"          icon="graduation-cap"  label="HR Hub"      hint="Org + leave + appraisals" />
-        <ErpQuickAction href="/management"  icon="briefcase"       label="Management"  hint="Department structure" />
+      <Quicks heading="Top actions">
+        <ErpQuickAction href="/employees"   icon="id-badge"        label="Employees" hint="Personnel records" />
+        <ErpQuickAction href="/hr"          icon="graduation-cap"  label="HR Hub"    hint="Org + leave + appraisals" />
+        <ErpQuickAction href="/management"  icon="briefcase"       label="Management" hint="Department structure" />
       </Quicks>
     </div>
   );

@@ -30,7 +30,8 @@
     "validate:traceability": "NODE_OPTIONS=--conditions=react-server tsx scripts/traceability.ts",
     "validate:finance-ux": "NODE_OPTIONS=--conditions=react-server tsx scripts/finance-ux.ts",
     "validate:currency-global": "NODE_OPTIONS=--conditions=react-server tsx scripts/currency-global.ts",
-    "validate:smart-entry": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-entry.ts"
+    "validate:smart-entry": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-entry.ts",
+    "validate:experience-refinement": "NODE_OPTIONS=--conditions=react-server tsx scripts/experience-refinement.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",
