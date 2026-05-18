@@ -19,6 +19,7 @@ import QuotationA4Preview from "./QuotationA4Preview";
 import ProductPickerModal, { type PickResult } from "./ProductPickerModal";
 import CustomerPickerModal, { type CustomerPickResult } from "./CustomerPickerModal";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   QUOTATIONS_SYNC,
   fetchDocList,
@@ -1053,7 +1054,7 @@ export default function Quotations() {
         setCurrent(next);
         setView("editor");
       } catch (e) {
-        alert(`Duplicate failed: ${e instanceof Error ? e.message : String(e)}`);
+        alert(`Duplicate failed: ${humanizeError(e)}`);
       } finally {
         setDuplicatingId(null);
       }
@@ -1129,12 +1130,12 @@ export default function Quotations() {
           // upsertDoc swallows the error so we have no detail; surface a
           // generic message and keep the editor unchanged.
           setSaveState("error");
-          setSaveError("Save failed — server returned an error.");
+          setSaveError("Save failed. Please retry — if it keeps failing, refresh the page.");
           setTimeout(() => setSaveState("idle"), 4000);
         }
       } catch (e) {
         setSaveState("error");
-        setSaveError(e instanceof Error ? e.message : String(e));
+        setSaveError(humanizeError(e));
         setTimeout(() => setSaveState("idle"), 4000);
       }
     },
@@ -1328,7 +1329,7 @@ export default function Quotations() {
               win.focus();
               win.print();
             } catch (err) {
-              alert(`Print failed: ${err instanceof Error ? err.message : String(err)}`);
+              alert(`Print failed: ${humanizeError(err)}`);
             }
             setPdfState("idle");
           } else {
@@ -1340,7 +1341,7 @@ export default function Quotations() {
       iframe.addEventListener("load", onLoad);
     } catch (e) {
       setPdfState("error");
-      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+      alert(`Export failed: ${humanizeError(e)}`);
       setTimeout(() => setPdfState("idle"), 2_000);
     }
   }, [current, handleSave]);
@@ -1436,7 +1437,7 @@ export default function Quotations() {
       }, 600);
     } catch (e) {
       try { win.close(); } catch { /* already closed */ }
-      alert(`Send failed: ${e instanceof Error ? e.message : String(e)}`);
+      alert(`Send failed: ${humanizeError(e)}`);
     }
   }, [current, handleSave]);
 
@@ -1599,7 +1600,7 @@ export default function Quotations() {
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          alert(`Upload failed: ${j.error ?? res.status}`);
+          alert(`Upload failed: ${humanizeError(j.error)}`);
           return;
         }
         const json = (await res.json()) as { kind: string; url: string };
@@ -1611,7 +1612,7 @@ export default function Quotations() {
           if (current) setCurrent({ ...current, signatureUrl: json.url });
         }
       } catch (e) {
-        alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+        alert(`Upload failed: ${humanizeError(e)}`);
       }
     },
     [current],

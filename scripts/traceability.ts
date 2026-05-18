@@ -44,9 +44,15 @@ async function ensureTenants() {
 }
 
 async function cleanup() {
+  /* Shipments + invoices first because they FK into sales_orders.
+     Without this the cascade chokes and the next run fails on
+     "duplicate key sales_orders_so_no_key". */
   for (const t of [TENANT_A, TENANT_B]) {
+    await supabase.from("sales_shipments").delete().eq("tenant_id", t);
     await supabase.from("invoices").delete().eq("tenant_id", t);
     await supabase.from("sales_orders").delete().eq("tenant_id", t);
+    await supabase.from("inventory_stock_movements").delete().eq("tenant_id", t);
+    await supabase.from("inventory_stock_balances").delete().eq("tenant_id", t);
     await supabase.from("inventory_valuation").delete().eq("tenant_id", t);
     await supabase.from("inventory_items").delete().eq("tenant_id", t);
   }

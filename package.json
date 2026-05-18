@@ -31,7 +31,8 @@
     "validate:finance-ux": "NODE_OPTIONS=--conditions=react-server tsx scripts/finance-ux.ts",
     "validate:currency-global": "NODE_OPTIONS=--conditions=react-server tsx scripts/currency-global.ts",
     "validate:smart-entry": "NODE_OPTIONS=--conditions=react-server tsx scripts/smart-entry.ts",
-    "validate:experience-refinement": "NODE_OPTIONS=--conditions=react-server tsx scripts/experience-refinement.ts"
+    "validate:experience-refinement": "NODE_OPTIONS=--conditions=react-server tsx scripts/experience-refinement.ts",
+    "validate:quotation-fix": "NODE_OPTIONS=--conditions=react-server tsx scripts/quotation-fix.ts"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^148.0.0",

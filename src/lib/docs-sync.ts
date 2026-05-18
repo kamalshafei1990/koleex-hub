@@ -1,5 +1,7 @@
 "use client";
 
+import { humanizeError } from "@/lib/ui/humanize-error";
+
 /* ---------------------------------------------------------------------------
    docs-sync — shared client-side persistence for the Quotations +
    Invoices doc builders. Both apps have identical CRUD needs:
@@ -106,9 +108,12 @@ export async function upsertDoc<T = Record<string, unknown>>(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    // Pull the server's error message and THROW — silent null was making
-    // it impossible for callers (Quotations.tsx save flow) to tell the
-    // user why their save failed.
+    // Pull the server's error message and THROW with a human-friendly
+    // sentence. Raw Postgres FK / 422 / 500 strings were leaking into
+    // the operator's alert modal (e.g. "violates foreign key
+    // constraint quotations_created_by_fkey"). humanizeError maps
+    // those to plain English; we keep the HTTP status as a fallback
+    // when no error body is present.
     let detail = "";
     try {
       const j = await res.json();
@@ -116,7 +121,7 @@ export async function upsertDoc<T = Record<string, unknown>>(
     } catch {
       try { detail = await res.text(); } catch { /* ignore */ }
     }
-    throw new Error(`Save failed (${res.status})${detail ? `: ${detail}` : ""}`);
+    throw new Error(humanizeError(detail || `HTTP ${res.status}`));
   }
   // Bust any cached list/detail responses so the next read is fresh.
   invalidateFetchCache(b.listPath);
