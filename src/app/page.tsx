@@ -794,6 +794,7 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
 function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => void }) {
   const err = getMeBootstrapLastError();
   const wasFailure = !!err;
+  const isAuth = err?.kind === "http_401";
   return (
     <div
       className={`rounded-2xl border px-5 py-6 text-center ${
@@ -805,19 +806,37 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
       <div className={`text-[13px] font-semibold ${dk ? "text-white/85" : "text-black/85"}`}>
         {wasFailure ? "We couldn't load your apps" : "No apps available for your account"}
       </div>
-      <p className={`mt-1 text-[12px] ${dk ? "text-white/50" : "text-black/50"}`}>
+      <p className={`mt-1 text-[12px] ${dk ? "text-white/55" : "text-black/55"}`}>
         {wasFailure
-          ? "Looks like a flaky connection. Tap Retry — we'll re-fetch your permissions."
+          ? err!.message
           : "Your role doesn't have any modules enabled. Ask an admin to grant access."}
       </p>
+      {wasFailure && err?.raw && (
+        /* Diagnostic line — small, muted, so the operator can screenshot
+           it for support without it dominating the panel. */
+        <p className={`mt-1 text-[10.5px] ${dk ? "text-white/30" : "text-black/30"}`}>
+          {err.kind}{err.status ? ` · ${err.status}` : ""}
+        </p>
+      )}
       {wasFailure && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
-        >
-          Retry
-        </button>
+        <div className="mt-3 flex items-center justify-center gap-2">
+          {isAuth ? (
+            <a
+              href="/login"
+              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
+            >
+              Sign in again
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

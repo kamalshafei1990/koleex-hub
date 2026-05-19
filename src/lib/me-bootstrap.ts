@@ -77,16 +77,30 @@ export function seedMeBootstrap(payload: MeBootstrapPayload): void {
 }
 
 /* Mobile-resilience tuning. Empty-launcher reports traced back to
-   /api/me/bootstrap hanging on flaky cellular networks. The previous
-   implementation had no timeout, no retry, and no surfaced error — so
-   the App Launcher fail-closed forever. Defaults below: 8 s per try,
-   up to 3 tries, exponential backoff (0 → 800ms → 2400ms). */
-const FETCH_TIMEOUT_MS = 8_000;
-const MAX_RETRIES      = 3;
+   /api/me/bootstrap hanging on flaky cellular networks AND to Vercel
+   serverless + Supabase (Tokyo region) cold starts that can hit
+   6-10 s on a fresh container. The previous 8 s budget aborted right
+   in the middle of those cold starts, so the user got a "couldn't
+   load" banner even though the server was just slow on its first
+   wake. Allow a longer first attempt; shorter retries. */
+const TIMEOUTS_MS  = [15_000, 8_000, 8_000];
+const MAX_RETRIES  = TIMEOUTS_MS.length;
 
-/** Last error captured by getMeBootstrap so the UI can show a Retry CTA. */
-let _lastError: string | null = null;
-export function getMeBootstrapLastError(): string | null { return _lastError; }
+/** Last error captured by getMeBootstrap so the UI can show a Retry CTA.
+ *  Structured so the UI can surface a useful hint instead of a raw
+ *  error message. */
+export interface BootstrapFailure {
+  /** "timeout" | "http_<status>" | "network" — a stable short code. */
+  kind: string;
+  /** Friendly sentence for the operator. */
+  message: string;
+  /** Raw error string for debugging. */
+  raw: string;
+  /** Last HTTP status seen, if any. */
+  status?: number;
+}
+let _lastError: BootstrapFailure | null = null;
+export function getMeBootstrapLastError(): BootstrapFailure | null { return _lastError; }
 
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -111,20 +125,52 @@ export async function getMeBootstrap(): Promise<MeBootstrapPayload | null> {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
+        const timeoutMs = TIMEOUTS_MS[attempt];
         try {
-          const res = await fetchWithTimeout("/api/me/bootstrap", FETCH_TIMEOUT_MS);
-          if (!res.ok) throw new Error(`bootstrap returned ${res.status}`);
+          const res = await fetchWithTimeout("/api/me/bootstrap", timeoutMs);
+          if (!res.ok) {
+            /* Capture status so the UI can hint specifically — 401 →
+               "please sign in again", 5xx → "server is having a
+               moment". */
+            _lastError = {
+              kind: `http_${res.status}`,
+              status: res.status,
+              raw: `bootstrap returned ${res.status}`,
+              message:
+                res.status === 401
+                  ? "Session expired — please sign in again."
+                  : res.status >= 500
+                    ? "Server is having a moment. Tap Retry."
+                    : `Server responded ${res.status}. Tap Retry.`,
+            };
+            if (res.status === 401) {
+              cache = null;
+              for (const cb of listeners) cb(null);
+              return null;   // No point retrying 401
+            }
+            throw new Error(_lastError.raw);
+          }
           const payload = (await res.json()) as MeBootstrapPayload;
           cache = { payload, expiresAt: Date.now() + CACHE_TTL_MS };
           _lastError = null;
           for (const cb of listeners) cb(payload);
           return payload;
         } catch (e) {
-          _lastError = e instanceof Error ? e.message : String(e);
-          if (attempt < MAX_RETRIES) {
-            /* Exponential backoff: 800 ms then 2400 ms. */
-            await new Promise((r) => setTimeout(r, 800 * attempt * attempt));
+          const raw = e instanceof Error ? e.message : String(e);
+          const timedOut = raw.includes("aborted") || raw.toLowerCase().includes("timeout") || (e as Error)?.name === "AbortError";
+          if (!_lastError || _lastError.kind.startsWith("http_") === false) {
+            _lastError = {
+              kind: timedOut ? "timeout" : "network",
+              raw,
+              message: timedOut
+                ? `Server didn't respond in ${(timeoutMs / 1000).toFixed(0)} s. Tap Retry — likely a slow connection or a cold server.`
+                : "Connection problem. Tap Retry.",
+            };
+          }
+          if (attempt < MAX_RETRIES - 1) {
+            /* Exponential backoff: 800ms, 2400ms between retries. */
+            await new Promise((r) => setTimeout(r, 800 * (attempt + 1) * (attempt + 1)));
             continue;
           }
           cache = null;
