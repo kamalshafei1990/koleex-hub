@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import FinanceTabs from "@/components/finance/FinanceTabs";
+import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -88,6 +89,29 @@ export default function FinanceHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {controls}
+          {/* Universal entry points — render on every Finance page so
+              operators always know where to add data. The screenshot
+              feedback was: "I can't find where to enter data
+              manually." This pair of chips is the answer, and it
+              lives in the bar that ships with every Finance route. */}
+          <Link
+            href="/finance/data-entry"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.08]"
+            title="Where to put finance data manually"
+          >
+            <RrIcon name="pencil" size={12} />
+            Data Entry
+          </Link>
+          <button
+            type="button"
+            onClick={() => openSmartCreate()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+            title="Create (c)"
+            aria-label="Open Smart Create drawer (shortcut: c)"
+          >
+            <RrIcon name="plus" size={12} />
+            Create
+          </button>
           {action}
         </div>
       </div>

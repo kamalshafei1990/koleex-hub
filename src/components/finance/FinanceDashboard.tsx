@@ -31,6 +31,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   AgingTable,
@@ -289,6 +290,23 @@ export default function FinanceDashboard() {
             </div>
           }
         />
+
+        {/* "Where do I put data manually?" banner — sits just under
+            the page header on the Finance dashboard so operators
+            never have to hunt for the entry forms again. Dismissable
+            only by routing into the hub itself. */}
+        <Link
+          href="/finance/data-entry"
+          className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-300/30 bg-emerald-300/[0.04] px-4 py-3 text-[12.5px] text-emerald-100 hover:bg-emerald-300/[0.08]"
+        >
+          <span>
+            <strong className="text-emerald-200">Where to put finance data manually:</strong>{" "}
+            Assets, opening balances, customer / supplier balances, FX rates, expenses, invoices — every entry form has a clear path.
+          </span>
+          <span className="shrink-0 rounded-md border border-emerald-300/40 bg-emerald-300/[0.10] px-2.5 py-1 text-[11px] text-emerald-100">
+            Open Data Entry hub →
+          </span>
+        </Link>
 
         {/* ── Phase UI.1 — System Health rail.
            Replaces the four stacked CrossModule + Approval + Payment +
