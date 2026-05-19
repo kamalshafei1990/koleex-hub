@@ -89,19 +89,10 @@ export default function FinanceHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {controls}
-          {/* Universal entry points — render on every Finance page so
-              operators always know where to add data. The screenshot
-              feedback was: "I can't find where to enter data
-              manually." This pair of chips is the answer, and it
-              lives in the bar that ships with every Finance route. */}
-          <Link
-            href="/finance/data-entry"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.08]"
-            title="Where to put finance data manually"
-          >
-            <RrIcon name="pencil" size={12} />
-            Data Entry
-          </Link>
+          {/* Single universal "+ Create" launcher in the header so the
+              chrome stays calm. The Data Entry link lives on the Home
+              tile and inside every tab hint — no need to duplicate it
+              in the header on every page. */}
           <button
             type="button"
             onClick={() => openSmartCreate()}

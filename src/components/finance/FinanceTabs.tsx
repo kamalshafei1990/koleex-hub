@@ -49,7 +49,7 @@ const GROUPS: TabGroup[] = [
     id: "overview",
     label: "Overview",
     defaultHref: "/finance",
-    hint: "Start here — four clear paths and your essential KPIs.",
+    hint: "Start here — four clear paths and your essential KPIs. Setup + Intelligence live here too.",
     items: [
       { key: "/finance",              label: "Home",         icon: "coins" },
       { key: "/finance/intelligence", label: "Intelligence", icon: "signal-stream" },
@@ -61,7 +61,7 @@ const GROUPS: TabGroup[] = [
     id: "operations",
     label: "Operations",
     defaultHref: "/finance/orders",
-    hint: "ADD — Orders, customers, suppliers, payments, expenses.",
+    hint: "Daily transactions — orders, customers, suppliers, payments, expenses.",
     items: [
       { key: "/finance/orders",    label: "Orders",            icon: "file-invoice" },
       { key: "/finance/customers", label: "Customers",         icon: "arrow-down-left" },
@@ -71,31 +71,25 @@ const GROUPS: TabGroup[] = [
     ],
   },
   {
-    id: "banking",
-    label: "Banking",
+    /* Merged Banking + Treasury — both deal with cash. One tab,
+       five sub-items, every page preserved. */
+    id: "cash",
+    label: "Cash & Banking",
     defaultHref: "/finance/bank-accounts",
-    hint: "READ — Bank balances, imported statements, reconciliation.",
+    hint: "Bank balances, statement imports, reconciliation, and forward cash forecast.",
     items: [
-      { key: "/finance/bank-accounts",  label: "Bank Accounts",  icon: "bank" },
-      { key: "/finance/bank-imports",   label: "Bank Imports",   icon: "upload" },
-      { key: "/finance/reconciliation", label: "Reconciliation", icon: "badge-check" },
-    ],
-  },
-  {
-    id: "treasury",
-    label: "Treasury",
-    defaultHref: "/finance/treasury-forecast",
-    hint: "READ — Forward cash forecast and treasury plans.",
-    items: [
-      { key: "/finance/treasury-forecast", label: "Forecast", icon: "arrow-up-right" },
-      { key: "/finance/treasury-plans",    label: "Plans",    icon: "file-invoice" },
+      { key: "/finance/bank-accounts",     label: "Bank Accounts",   icon: "bank" },
+      { key: "/finance/bank-imports",      label: "Bank Imports",    icon: "upload" },
+      { key: "/finance/reconciliation",    label: "Reconciliation",  icon: "badge-check" },
+      { key: "/finance/treasury-forecast", label: "Cash Forecast",   icon: "arrow-up-right" },
+      { key: "/finance/treasury-plans",    label: "Treasury Plans",  icon: "file-invoice" },
     ],
   },
   {
     id: "accounting",
     label: "Accounting",
     defaultHref: "/finance/accounting/queue",
-    hint: "ADD + READ — Review journal drafts, post entries, inspect the ledger.",
+    hint: "Ledger work — review journal drafts, post entries, inspect the ledger.",
     items: [
       { key: "/finance/accounting/queue",          label: "Queue",           icon: "clock" },
       { key: "/finance/accounting/trial-balance",  label: "Trial Balance",   icon: "badge-check" },
@@ -103,17 +97,20 @@ const GROUPS: TabGroup[] = [
       { key: "/finance/accounting/profit-loss",    label: "Profit & Loss",   icon: "file-invoice-dollar" },
       { key: "/finance/accounting/cash-flow",      label: "Cash Flow",       icon: "wallet" },
       { key: "/finance/accounting/equity",         label: "Equity",          icon: "coins" },
-      { key: "/finance/statements",                label: "Statements",      icon: "balance-scale-left" },
     ],
   },
   {
+    /* Reports = the READ surface. Statements + Visual + custom
+       reports + reminders all live here. */
     id: "reports",
     label: "Reports",
-    defaultHref: "/finance/reports",
-    hint: "READ — Income statement, balance sheet, AR/AP aging, inventory, exports.",
+    defaultHref: "/finance/visual",
+    hint: "Read the books — income statement, balance sheet, cash flow, AR/AP aging.",
     items: [
-      { key: "/finance/reports",       label: "Reports",   icon: "file-invoice" },
-      { key: "/finance/notifications", label: "Reminders", icon: "clock" },
+      { key: "/finance/visual",        label: "Visual Statements", icon: "balance-scale-left" },
+      { key: "/finance/statements",    label: "Detailed Statements", icon: "balance-scale-left" },
+      { key: "/finance/reports",       label: "Operational Reports", icon: "file-invoice" },
+      { key: "/finance/notifications", label: "Reminders",         icon: "clock" },
     ],
   },
 ];

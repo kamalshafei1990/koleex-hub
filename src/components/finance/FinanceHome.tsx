@@ -159,11 +159,72 @@ export default function FinanceHome() {
           </div>
         </section>
 
-        {/* Single, calm link to the dense intelligence dashboard.
-            Everything that used to live on /finance is preserved there
-            — no data has been removed, only moved out of the default
-            landing so the entry feels simple. */}
+        {/* "Finance Map" — every Finance page visible in one calm
+            five-column layout so the operator always knows where
+            things live. Mirrors the FinanceTabs structure exactly. */}
         <section className="mt-10">
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">Finance Map · every page, at a glance</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <MapColumn
+              title="Home"
+              hint="Start here"
+              links={[
+                { href: "/finance",              label: "Home" },
+                { href: "/finance/intelligence", label: "Intelligence (deep view)" },
+                { href: "/finance/workspace",    label: "Workspace" },
+                { href: "/finance/setup",        label: "Setup" },
+              ]}
+            />
+            <MapColumn
+              title="Operations"
+              hint="Daily transactions"
+              links={[
+                { href: "/finance/orders",    label: "Order Profitability" },
+                { href: "/finance/customers", label: "Customers" },
+                { href: "/finance/suppliers", label: "Suppliers" },
+                { href: "/finance/payments",  label: "Payments" },
+                { href: "/finance/expenses",  label: "Expense Analytics" },
+              ]}
+            />
+            <MapColumn
+              title="Cash & Banking"
+              hint="Cash management"
+              links={[
+                { href: "/finance/bank-accounts",     label: "Bank Accounts" },
+                { href: "/finance/bank-imports",      label: "Bank Imports" },
+                { href: "/finance/reconciliation",    label: "Reconciliation" },
+                { href: "/finance/treasury-forecast", label: "Cash Forecast" },
+                { href: "/finance/treasury-plans",    label: "Treasury Plans" },
+                { href: "/finance/fx-rates",          label: "Exchange Rates" },
+              ]}
+            />
+            <MapColumn
+              title="Accounting"
+              hint="Ledger work"
+              links={[
+                { href: "/finance/accounting/queue",          label: "Queue (approvals)" },
+                { href: "/finance/accounting/trial-balance",  label: "Trial Balance" },
+                { href: "/finance/accounting/general-ledger", label: "General Ledger" },
+                { href: "/finance/accounting/profit-loss",    label: "Profit & Loss" },
+                { href: "/finance/accounting/cash-flow",      label: "Cash Flow" },
+                { href: "/finance/accounting/equity",         label: "Equity" },
+              ]}
+            />
+            <MapColumn
+              title="Reports"
+              hint="Read the books"
+              links={[
+                { href: "/finance/visual",        label: "Visual Statements" },
+                { href: "/finance/statements",    label: "Detailed Statements" },
+                { href: "/finance/reports",       label: "Operational Reports" },
+                { href: "/finance/notifications", label: "Reminders" },
+              ]}
+            />
+          </div>
+        </section>
+
+        {/* Single, calm link to the dense intelligence dashboard. */}
+        <section className="mt-8">
           <Link
             href="/finance/intelligence"
             className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
@@ -181,6 +242,29 @@ export default function FinanceHome() {
           </Link>
         </section>
       </div>
+    </div>
+  );
+}
+
+/* ─── Finance map column ─── */
+
+function MapColumn({ title, hint, links }: { title: string; hint: string; links: Array<{ href: string; label: string }> }) {
+  return (
+    <div>
+      <div className="text-[12px] font-semibold text-[var(--text-primary)]">{title}</div>
+      <div className="text-[10px] text-gray-500">{hint}</div>
+      <ul className="mt-2 space-y-0.5">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link
+              href={l.href}
+              className="block rounded-md px-1.5 py-1 text-[11.5px] text-gray-300 hover:bg-white/[0.03] hover:text-gray-100"
+            >
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
