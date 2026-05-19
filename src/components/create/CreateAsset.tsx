@@ -1,5 +1,6 @@
 "use client";
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -52,7 +53,7 @@ export default function CreateAsset() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       router.push("/finance/setup?card=assets");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

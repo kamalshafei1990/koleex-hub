@@ -23,6 +23,7 @@ import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 import { fmtMoney } from "@/lib/finance/calc";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import type {
   FinanceReconciliationCandidate,
   ReconciliationCandidateType,
@@ -51,7 +52,7 @@ export default function FinanceReconciliation() {
         "suggested,confirmed,rejected,expired";
       const r = await fetch(`/api/finance/reconciliation/candidates?status=${encodeURIComponent(statusParam)}&limit=200`, { cache: "no-store" });
       const j = (await r.json().catch(() => ({}))) as { candidates?: FinanceReconciliationCandidate[]; error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setCandidates(j.candidates ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -71,7 +72,7 @@ export default function FinanceReconciliation() {
         body: JSON.stringify({}),
       });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok || !j.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       await load(filter);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -90,7 +91,7 @@ export default function FinanceReconciliation() {
         body: JSON.stringify({ candidate_id: id }),
       });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!r.ok || !j.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok || !j.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       await load(filter);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -110,7 +111,7 @@ export default function FinanceReconciliation() {
         body: JSON.stringify({ candidate_id: id, rejection_reason: reason || undefined }),
       });
       const j = (await r.json().catch(() => ({}))) as { candidate?: unknown; error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       await load(filter);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

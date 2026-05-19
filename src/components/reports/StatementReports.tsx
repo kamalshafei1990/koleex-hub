@@ -8,6 +8,7 @@
    subtotal visibility, and a polished print layout.
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReportShell, ReportFilters, ReportToolbar, ReportSection, ReportRow,
@@ -63,15 +64,15 @@ export default function StatementReports() {
       const qs = new URLSearchParams({ from, to });
       if (tab === "pl") {
         const r = await fetch(`/api/accounting/profit-loss?${qs.toString()}`);
-        const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+        const j = await r.json(); if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
         setPL(j.pl ?? j.profit_loss ?? j);
       } else if (tab === "bs") {
         const r = await fetch(`/api/accounting/balance-sheet?as_of=${to}`);
-        const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+        const j = await r.json(); if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
         setBS(j.bs ?? j.balance_sheet ?? j);
       } else {
         const r = await fetch(`/api/accounting/cash-flow?${qs.toString()}`);
-        const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+        const j = await r.json(); if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
         setCF(j.cf ?? j.cash_flow ?? j);
       }
     } catch (e) {

@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RrIcon from "@/components/ui/RrIcon";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   Panel,
   StatusBadge,
@@ -160,7 +161,7 @@ export default function ShipDialog({
         }),
       });
       const j = await r.json();
-      if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -177,7 +178,7 @@ export default function ShipDialog({
       body: JSON.stringify({ reason }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    if (!r.ok) { alert(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
     await load();
   };
 

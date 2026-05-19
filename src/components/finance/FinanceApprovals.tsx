@@ -8,6 +8,7 @@
    - Recent activity (audit trail) on the right
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -93,7 +94,7 @@ export default function FinanceApprovals() {
         body: JSON.stringify({ entity: it.kind, entityId: it.id, action, reason }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       await fetchAll();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e));

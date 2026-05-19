@@ -24,6 +24,7 @@ import {
   movementLabel,
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface Item { id: string; item_code: string; item_name: string }
 interface Warehouse {
@@ -133,7 +134,7 @@ export default function InventoryMovements() {
       if (filterType) qs.set("movement_type", filterType);
       const r = await fetch(`/api/inventory/movements?${qs.toString()}`, { cache: "no-store", credentials: "include" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setMovements((j.movements ?? []) as MovementRow[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -187,7 +188,7 @@ export default function InventoryMovements() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) { setSubmitError(j.error ?? `Failed (${r.status})`); return; }
+      if (!r.ok) { setSubmitError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       setQuantity(""); setReference(""); setNotes("");
       setFlash(`Posted ${movementLabel(type)} · ${qty} ${unit}`);
       window.setTimeout(() => setFlash(null), 2500);
@@ -207,7 +208,7 @@ export default function InventoryMovements() {
       body: JSON.stringify({ reason }),
     });
     const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    if (!r.ok) { alert(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
     await loadMovements();
   };
 

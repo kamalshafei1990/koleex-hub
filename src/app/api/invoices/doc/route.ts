@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* Parallel endpoint to /api/invoices that understands the doc-builder's
    JSONB-shaped payload. Preserves the ERP-style columns (customer_id,
@@ -87,6 +88,11 @@ export async function POST(req: Request) {
   const deny = await requireModuleAccess(auth, "Invoices");
   if (deny) return deny;
 
+  /* Server fallback for currency — tenant base (CNY for KOLEEX),
+     not the previous hardcoded "USD". The form always sends a
+     currency; this only kicks in for legacy / API callers. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
+
   const body = (await req.json()) as {
     id?: string;
     inv_no?: string;
@@ -115,7 +121,7 @@ export async function POST(req: Request) {
       .update({
         inv_no: body.inv_no,
         customer_id: body.customer_id ?? null,
-        currency: body.currency ?? "USD",
+        currency: body.currency ?? baseCurrency,
         status: body.status ?? "draft",
         issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
         due_date: body.due_date ?? null,
@@ -140,7 +146,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       inv_no,
       customer_id: body.customer_id ?? null,
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? baseCurrency,
       status: body.status ?? "draft",
       issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
       due_date: body.due_date ?? null,

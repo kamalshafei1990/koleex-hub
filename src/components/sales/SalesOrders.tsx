@@ -24,6 +24,7 @@ import {
   StatusBadge,
 } from "@/components/inventory/InventoryUi";
 import ShipDialog from "@/components/sales/ShipDialog";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface SoRow {
   id: string;
@@ -104,7 +105,7 @@ export default function SalesOrders() {
       if (since) qs.set("since", since);
       const r = await fetch(`/api/sales/orders?${qs.toString()}`, { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setRows((j.orders ?? []) as SoRow[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

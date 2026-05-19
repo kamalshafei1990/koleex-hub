@@ -13,6 +13,7 @@
    Calm, dense, Hub-native. No spreadsheet feel, no fluff.
    ========================================================================== */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -73,7 +74,7 @@ export default function FinanceBankAccounts() {
     try {
       const r = await fetch("/api/finance/bank-accounts", { cache: "no-store" });
       const j = (await r.json().catch(() => ({}))) as { accounts?: BankAccountListItem[]; error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setAccounts(j.accounts ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -697,7 +698,7 @@ function EditDrawer({
         body: JSON.stringify(local),
       });
       const j = (await r.json().catch(() => ({}))) as { account?: BankAccount; error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       /* If creating, optionally set primary. */
       if (!isEdit && local.is_primary && j.account?.id) {
         /* already handled in create flow. */

@@ -20,6 +20,7 @@ import {
 } from "@/components/inventory/InventoryUi";
 import { ALLOWED_LOCATION_TYPES, type LocationType, type Warehouse } from "@/lib/inventory/types";
 import RrIcon from "@/components/ui/RrIcon";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 /* Friendly labels for the picker. Mirrors the chip vocabulary in
    InventoryUi (which only handles display). */
@@ -49,7 +50,7 @@ export default function InventoryWarehouses() {
     try {
       const r = await fetch("/api/inventory/warehouses", { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setRows((j.warehouses ?? []) as Warehouse[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -238,7 +239,7 @@ function NewLocationDrawer({
         }),
       });
       const j = await r.json();
-      if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       onSuccess();
     } finally {
       setSubmitting(false);

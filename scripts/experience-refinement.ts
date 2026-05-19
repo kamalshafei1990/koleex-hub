@@ -68,12 +68,13 @@ async function main() {
   ok("03  RoleHome: FocusToggle present in header",
      roleHome.includes("<FocusToggle />"));
 
-  /* 04 — FinanceWorkspace: "Top actions" section has 3 ErpQuickAction
-     tiles (was 4 + 8 in the previous layout). */
+  /* 04 — FinanceWorkspace: "Top actions" section has 3 or 4 tiles
+     (was 4 + 8 in the previous layout). 4 is the current shape after
+     the Data-Entry discoverability fix added that tile. */
   const topActionsBlock = workspace.match(/Top actions[\s\S]*?<\/section>/)?.[0] ?? "";
   const topActionsCount = (topActionsBlock.match(/<ErpQuickAction\b/g) ?? []).length;
-  ok("04  FinanceWorkspace: Top actions reduced to 3 tiles",
-     topActionsCount === 3, `got ${topActionsCount}`);
+  ok("04  FinanceWorkspace: Top actions kept compact (3-4 tiles)",
+     topActionsCount >= 3 && topActionsCount <= 4, `got ${topActionsCount}`);
 
   /* 05 */
   ok("05  FinanceWorkspace: Recent Activity + Nav cards inside FocusBoundary",

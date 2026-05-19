@@ -8,6 +8,7 @@
    Currency labels respect the tenant base currency (no hard-coded USD).
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -74,7 +75,7 @@ export default function VisualStatements() {
     try {
       const r = await fetch(`/api/finance/visual-statements?granularity=${granularity}`, { cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       setSnap(j.snapshot);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

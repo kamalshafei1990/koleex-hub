@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* GET  /api/quotations — list (tenant-scoped)
      Query:
@@ -154,6 +155,11 @@ export async function POST(req: Request) {
     doc: Record<string, unknown>;
   };
 
+  /* Server fallback for currency — tenant base instead of hardcoded
+     USD. The doc-builder form always sends a currency; this guards
+     legacy API consumers. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
+
   // Upsert by id if given; else mint a new record with a fresh quote_no.
   if (body.id) {
     const { data, error } = await supabaseServer
@@ -161,7 +167,7 @@ export async function POST(req: Request) {
       .update({
         quote_no: body.quote_no,
         customer_id: body.customer_id ?? null,
-        currency: body.currency ?? "USD",
+        currency: body.currency ?? baseCurrency,
         status: body.status ?? "draft",
         issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
         valid_till: body.valid_till ?? null,
@@ -185,7 +191,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       quote_no,
       customer_id: body.customer_id ?? null,
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? baseCurrency,
       status: body.status ?? "draft",
       issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
       valid_till: body.valid_till ?? null,

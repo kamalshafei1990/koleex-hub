@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { SmartField, SmartInput, SmartSelect } from "@/components/ui/create/SmartCreate";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface RateRow {
   id: string; from_currency: string; to_currency: string;
@@ -96,7 +97,7 @@ export default function FxRatesManager() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setRate(""); setNotes("");
       await load();
     } catch (e) {
@@ -110,7 +111,7 @@ export default function FxRatesManager() {
     try {
       const r = await fetch(`/api/finance/fx/rates?id=${id}`, { method: "DELETE" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* GET  /api/invoices — list invoices (tenant-scoped).
      Query:
@@ -105,6 +106,11 @@ export async function POST(req: Request) {
   );
 
   const inv_no = await nextInvoiceNumber(auth.tenant_id);
+  /* Server fallback: tenant base currency (CNY for KOLEEX) instead
+     of hardcoded USD. The invoice form is expected to inherit the
+     source SO's currency or the form's pre-fill; this fallback only
+     applies to API consumers that omit the field. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
 
   const { data: invoice, error } = await supabaseServer
     .from("invoices")
@@ -112,7 +118,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       inv_no,
       customer_id: body.customer_id ?? null,
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? baseCurrency,
       issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
       due_date: body.due_date ?? null,
       tax_rate: body.tax_rate ?? 0,

@@ -30,6 +30,7 @@ import type {
   TreasuryPlanVersion,
 } from "@/lib/finance/types";
 import type { ForecastResult } from "@/lib/intelligence/treasury-forecast";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 function fmtCompactUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -94,7 +95,7 @@ export default function FinanceTreasuryPlans() {
     try {
       const r = await fetch("/api/finance/treasury-plans", { cache: "no-store" });
       const j = (await r.json().catch(() => ({}))) as { plans?: TreasuryPlan[]; error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setPlans(j.plans ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -108,7 +109,7 @@ export default function FinanceTreasuryPlans() {
     try {
       const r = await fetch(`/api/finance/treasury-plans/${id}`, { cache: "no-store" });
       const j = (await r.json().catch(() => ({}))) as DetailResponse & { error?: string };
-      if (!r.ok || !j.plan) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok || !j.plan) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setDetail(j);
       setComparison(null);
     } catch (e) {
@@ -128,7 +129,7 @@ export default function FinanceTreasuryPlans() {
         body: JSON.stringify({ against: "current" }),
       });
       const j = (await r.json().catch(() => ({}))) as CompareResponse & { error?: string };
-      if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setComparison(j);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -148,7 +149,7 @@ export default function FinanceTreasuryPlans() {
       });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? `HTTP ${r.status}`);
+        throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       }
       await loadList();
       await loadDetail(openId);
@@ -167,7 +168,7 @@ export default function FinanceTreasuryPlans() {
       const r = await fetch(`/api/finance/treasury-plans/${openId}/archive`, { method: "POST" });
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error ?? `HTTP ${r.status}`);
+        throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       }
       await loadList();
       await loadDetail(openId);

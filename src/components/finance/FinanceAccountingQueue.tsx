@@ -20,6 +20,7 @@
    one of the four API endpoints under /api/accounting/.
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -358,7 +359,7 @@ function InventoryCogsSection() {
     try {
       const r = await fetch("/api/accounting/inventory-cogs?limit=100", { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
       setRows((j.entries ?? []) as CogsRow[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -696,7 +697,7 @@ function SalesRevenueSection() {
     try {
       const r = await fetch("/api/accounting/revenue?limit=100", { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
       setRows((j.entries ?? []) as RevenueQueueRow[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

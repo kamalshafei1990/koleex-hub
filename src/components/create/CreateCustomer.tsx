@@ -1,5 +1,6 @@
 "use client";
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -49,7 +50,7 @@ export default function CreateCustomer() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       const id = j.customer?.id ?? j.id;
       router.push(id ? `/customers/${id}` : "/customers");
     } catch (e) {

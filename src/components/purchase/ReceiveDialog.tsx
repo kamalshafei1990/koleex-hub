@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface POItem {
   id: string;
@@ -183,7 +184,7 @@ export default function ReceiveDialog({
       });
       const j = await r.json();
       if (!r.ok) {
-        setError(j.error ?? `Failed (${r.status})`);
+        setError(humanizeError(j.error ?? `HTTP ${r.status}`));
         return;
       }
       onSuccess();

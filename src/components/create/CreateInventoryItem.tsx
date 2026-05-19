@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
@@ -71,7 +72,7 @@ export default function CreateInventoryItem() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       const id = j.item?.id ?? j.id;
       router.push(id ? `/inventory/items/${id}` : "/inventory");
     } catch (e) {

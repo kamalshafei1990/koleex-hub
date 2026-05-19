@@ -25,6 +25,7 @@ import {
   TypeIcon,
 } from "@/components/inventory/InventoryUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface ItemRow {
   id: string;
@@ -423,7 +424,7 @@ function QuickAddDrawer({
         body: JSON.stringify(payload),
       });
       const j = await r.json();
-      if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -639,7 +640,7 @@ function ItemDetailDrawer({
         const j = await r.json();
         const vJ = await vRes.json();
         if (cancelled) return;
-        if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
+        if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
         setItem(j.item as DetailItem);
         setStock(j.stock as DetailStock);
         if (vRes.ok && vJ.valuation) setValuation(vJ.valuation as DetailValuation);
@@ -887,7 +888,7 @@ function TypesPanel({
         body: JSON.stringify({ type_name: name.trim(), icon, color, description: description || null }),
       });
       const j = await r.json();
-      if (!r.ok) { setError(j.error ?? `Failed (${r.status})`); return; }
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
       setName(""); setDescription("");
       onChanged();
     } finally {
@@ -899,7 +900,7 @@ function TypesPanel({
     if (!confirm("Archive this custom type? Items already using it keep their reference.")) return;
     const r = await fetch(`/api/inventory/item-types/${id}`, { method: "DELETE", credentials: "include" });
     const j = await r.json();
-    if (!r.ok) { alert(j.error ?? `Failed (${r.status})`); return; }
+    if (!r.ok) { alert(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
     onChanged();
   };
 

@@ -16,6 +16,7 @@
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
+import { isTransientFetch, warnOnce } from "./util/transient-fetch";
 import type {
   AccountRow,
   InboxMessageRow,
@@ -283,8 +284,14 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
     .is("read_at", null)
     .is("archived_at", null);
   if (error) {
-    if (!isMissingTable(error.message)) {
+    /* Don't log every transient network failure — this is on a 60 s
+       poller and a single offline window would otherwise spam the
+       console. warnOnce surfaces the first occurrence so it's
+       diagnosable, no more. */
+    if (!isMissingTable(error.message) && !isTransientFetch(error.message)) {
       console.error("[Inbox] Unread count:", error.message);
+    } else if (isTransientFetch(error.message)) {
+      warnOnce("inbox-unread-transient", "[Inbox] unread count: network unavailable (silenced; will retry)");
     }
     return 0;
   }

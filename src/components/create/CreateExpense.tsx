@@ -122,7 +122,7 @@ export default function CreateExpense() {
         body: JSON.stringify({ name: newCatName.trim() }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       const created: PickerOption = { id: j.category?.id ?? j.id, label: j.category?.name ?? newCatName };
       setCategories((cs) => [...cs, created]);
       setCategoryId(created.id);
@@ -151,7 +151,7 @@ export default function CreateExpense() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       const id = j.contact?.id ?? j.id;
       const created: PickerOption = { id, label: newSupName.trim() };
       setSuppliers((s) => [...s, created]);
@@ -184,7 +184,7 @@ export default function CreateExpense() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       const id = j.expense?.id ?? j.id;
       /* Smart-entry: success → wipe the saved draft so the form
          doesn't offer to "resume" it next time. */

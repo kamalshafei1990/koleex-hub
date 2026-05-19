@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 type CardKey =
   | "base_currency" | "bank_accounts" | "cash_accounts" | "opening_balances"
@@ -71,7 +72,7 @@ export default function FinanceSetup() {
     try {
       const r = await fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       setSnapshot(j.snapshot as SetupSnapshot);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

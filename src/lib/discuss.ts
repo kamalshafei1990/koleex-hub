@@ -18,6 +18,7 @@
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { uploadToStorage } from "./storage-client";
+import { isTransientFetch, warnOnce } from "./util/transient-fetch";
 import type {
   DiscussAttachment,
   DiscussAuthor,
@@ -189,8 +190,15 @@ export async function fetchMyChannels(
     .eq("account_id", accountId)
     .is("left_at", null);
   if (memErr) {
-    if (!isMissingTable(memErr.message)) {
+    /* Don't log noisy transient failures from background pollers.
+       The bell polls every 10s — a flaky 30 s outage would otherwise
+       flood the console with hundreds of identical errors and bury
+       real bugs. We still log the FIRST occurrence (via the warn-
+       once helper) so it's diagnosable but doesn't drown signal. */
+    if (!isMissingTable(memErr.message) && !isTransientFetch(memErr.message)) {
       console.error("[Discuss] Fetch memberships:", memErr.message);
+    } else if (isTransientFetch(memErr.message)) {
+      warnOnce("discuss-memberships-transient", "[Discuss] memberships: network unavailable (silenced; will retry)");
     }
     return [];
   }

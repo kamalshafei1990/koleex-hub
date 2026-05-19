@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { listSalesOrders } from "@/lib/sales/queries";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 const MODULE = "Orders";    // Sales-orders sub-module key
 
@@ -72,6 +73,12 @@ export async function POST(req: Request) {
 
   const items = body.items ?? [];
 
+  /* Server fallback when the form omitted currency: use tenant base
+     (CNY for KOLEEX). The sales-order form pre-fills USD as the
+     selling currency, so this only fires for API consumers /
+     legacy clients — and there it must not silently write USD when
+     the tenant's books are in CNY. */
+  const baseCurrency = await resolveBaseCurrency(auth.tenant_id);
   const { data: row, error } = await supabaseServer
     .from("sales_orders")
     .insert({
@@ -79,7 +86,7 @@ export async function POST(req: Request) {
       so_no: body.so_no ?? generateSoNo(),
       customer_id: body.customer_id,
       status: body.status ?? "draft",
-      currency: body.currency ?? "USD",
+      currency: body.currency ?? baseCurrency,
       notes: body.notes ?? null,
       created_by: auth.account_id,
     })

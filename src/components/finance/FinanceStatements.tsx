@@ -22,6 +22,7 @@
    Hairline, low borders, no neon).
    --------------------------------------------------------------------------- */
 
+import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
@@ -133,7 +134,7 @@ function useJson<T>(url: string | null) {
     try {
       const r = await fetch(url, { credentials: "include", cache: "no-store" });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
       setData(j as T);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

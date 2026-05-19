@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
@@ -39,7 +40,7 @@ export default function CreateSupplier() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
       const id = j.contact?.id ?? j.id;
       router.push(id ? `/contacts/${id}` : "/suppliers");
     } catch (e) {

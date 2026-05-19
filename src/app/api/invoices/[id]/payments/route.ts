@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { resolveBaseCurrency } from "@/lib/finance/currency";
 
 /* GET  /api/invoices/:id/payments — list payments
    POST /api/invoices/:id/payments — record a payment and roll
@@ -65,7 +66,8 @@ export async function POST(req: Request, { params }: RouteCtx) {
       reference: body.reference ?? null,
       received_at: body.received_at ?? new Date().toISOString().slice(0, 10),
       notes: body.notes ?? null,
-      currency: body.currency ?? invoice.currency ?? "USD",
+      /* Cascade: body → invoice → tenant base. Never silently USD. */
+      currency: body.currency ?? invoice.currency ?? (await resolveBaseCurrency(auth.tenant_id)),
       recorded_by_account_id: auth.account_id,
     })
     .select("*")

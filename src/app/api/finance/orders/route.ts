@@ -259,7 +259,7 @@ export async function POST(req: Request) {
       customer_id: o.customer_id ?? null,
       customer_name: o.customer_name ?? "",
       order_date: o.order_date ?? new Date().toISOString().slice(0, 10),
-      currency: o.currency ?? "USD",
+      currency: o.currency ?? tenantBaseCcy,
       selling_price: Number(o.selling_price) || 0,
       tax_refund_pct: Number(o.tax_refund_pct) || 0,
       tax_refund_value: taxRefundValue,
