@@ -100,6 +100,14 @@ export default function CreateHub() {
       icon="plus"
       backHref="/"
     >
+      {/* Pointer to the Data Entry hub — operators kept asking "where
+          do I put starting data" because /create only covers ongoing
+          flows. */}
+      <Link href="/finance/data-entry"
+            className="block rounded-xl border border-emerald-300/30 bg-emerald-300/[0.04] px-4 py-3 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.08]">
+        Looking for company starting data (assets · opening balances · customers' / suppliers' balances · FX rates)?
+        <span className="ml-1 text-emerald-200">Open the Data Entry hub →</span>
+      </Link>
       {GROUPS.map((g) => (
         <section key={g.title}>
           <div className="mb-2 flex items-baseline justify-between">

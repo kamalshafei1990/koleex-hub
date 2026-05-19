@@ -82,6 +82,25 @@ export default function FinanceSetup() {
 
   useEffect(() => { void load(); }, [load]);
 
+  /* Hash-to-drawer: /finance/setup#assets now opens the Assets drawer
+     directly. Discoverability fix — operators land here from
+     /finance/data-entry expecting an entry form, not a card grid. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function syncFromHash() {
+      const raw = window.location.hash.replace(/^#/, "");
+      if (!raw) { setActiveCard(null); return; }
+      const validKeys: CardKey[] = [
+        "base_currency", "bank_accounts", "cash_accounts", "opening_balances",
+        "customers_ar", "suppliers_ap", "assets", "loans", "equity", "fx_rates",
+      ];
+      if (validKeys.includes(raw as CardKey)) setActiveCard(raw as CardKey);
+    }
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
   const pct = Math.round(((snapshot?.completion ?? 0) * 100));
   const startedCount = snapshot?.cards.filter((c) => c.status !== "empty").length ?? 0;
 

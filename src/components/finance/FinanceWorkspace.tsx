@@ -119,12 +119,13 @@ export default function FinanceWorkspace() {
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <ErpEyebrow>Top actions</ErpEyebrow>
-              <Link href="/finance/setup" className="text-[11px] text-gray-400 hover:text-gray-200">Setup cards →</Link>
+              <Link href="/finance/data-entry" className="text-[11px] text-emerald-200 hover:text-emerald-100">How do I enter data? →</Link>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <ErpQuickAction href="/finance/visual"    icon="balance-scale-left" label="Statements" hint="Income · Balance · Cash flow" />
-              <ErpQuickAction href="/finance/fx-rates"  icon="balance-scale-left" label="FX Rates"   hint="USD → CNY · stale + missing" />
-              <ErpQuickAction href="/finance/approvals" icon="badge-check"        label="Approvals"  hint="Review pending" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+              <ErpQuickAction href="/finance/data-entry" icon="pencil"             label="Data Entry"  hint="Assets · balances · all manual entry" />
+              <ErpQuickAction href="/finance/visual"     icon="balance-scale-left" label="Statements"  hint="Income · Balance · Cash flow" />
+              <ErpQuickAction href="/finance/fx-rates"   icon="balance-scale-left" label="FX Rates"    hint="USD → CNY · stale + missing" />
+              <ErpQuickAction href="/finance/approvals"  icon="badge-check"        label="Approvals"   hint="Review pending" />
             </div>
           </section>
 

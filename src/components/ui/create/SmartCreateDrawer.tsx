@@ -144,8 +144,17 @@ export default function SmartCreateDrawer() {
             </button>
           ))}
         </div>
-        <footer className="border-t border-white/[0.06] px-5 py-2.5 text-[10px] text-gray-500">
-          Tip: press <span className="rounded border border-white/[0.10] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9.5px]">c</span> anywhere to open this drawer.
+        <footer className="flex items-center justify-between border-t border-white/[0.06] px-5 py-2.5 text-[10px] text-gray-500">
+          <span>
+            Tip: press <span className="rounded border border-white/[0.10] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9.5px]">c</span> anywhere to open this drawer.
+          </span>
+          <button
+            type="button"
+            onClick={() => { close(); router.push("/finance/data-entry"); }}
+            className="text-emerald-200 hover:text-emerald-100"
+          >
+            Don't see what you need? Open the Data Entry hub →
+          </button>
         </footer>
       </div>
     </div>

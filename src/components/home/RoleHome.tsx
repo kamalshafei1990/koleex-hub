@@ -96,6 +96,15 @@ export default function RoleHome() {
             <RrIcon name="plus" size={12} />
             Create
           </button>
+          {/* "Data Entry" — answer to "how do I put data in manually". */}
+          <Link
+            href="/finance/data-entry"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.08]"
+            title="Where to put finance data manually"
+          >
+            <RrIcon name="pencil" size={12} />
+            Data Entry
+          </Link>
           <NotificationBell />
           <FocusToggle />
           <button
