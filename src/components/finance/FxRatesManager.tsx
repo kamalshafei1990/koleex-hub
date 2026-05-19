@@ -144,8 +144,8 @@ export default function FxRatesManager() {
 
   return (
     <ErpPage
-      title="FX Rates"
-      subtitle={`Base currency: ${baseCurrency}`}
+      title="Exchange Rates"
+      subtitle={`Main operating currency: ${baseCurrency}`}
       icon="balance-scale-left"
       backHref="/finance/workspace"
       action={

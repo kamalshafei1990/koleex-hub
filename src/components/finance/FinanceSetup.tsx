@@ -123,11 +123,17 @@ export default function FinanceSetup() {
 
         <Hairline />
 
+        {/* Recommended order — operator guidance. */}
+        {snapshot && (
+          <SetupGuidance snapshot={snapshot} />
+        )}
+
         {/* Card grid */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {(snapshot?.cards ?? []).map((c) => (
             <button
               key={c.key}
+              id={c.key}
               type="button"
               onClick={() => setActiveCard(c.key)}
               disabled={loading}
@@ -706,5 +712,108 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
         </div>
       </div>
     </DrawerShell>
+  );
+}
+
+/* ─── Setup guidance — operator-friendly checklist + warnings ─── */
+
+function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
+  /* Recommended setup order — operators repeatedly asked "where do I
+     start?" The checklist below is the answer: do these in this
+     order and the rest unlocks. */
+  const order: Array<{ key: CardKey; label: string; why: string }> = [
+    { key: "base_currency",   label: "Main Operating Currency",     why: "Locks the books in your reporting currency." },
+    { key: "bank_accounts",   label: "Bank Accounts",                why: "Tells the system where cash is held." },
+    { key: "fx_rates",        label: "Exchange Rates",               why: "Required if you sell in USD and operate in CNY." },
+    { key: "opening_balances", label: "Starting Company Position",   why: "Day-zero snapshot — assets, liabilities, balances." },
+    { key: "customers_ar",    label: "Money Customers Owe Us",       why: "Outstanding AR at go-live." },
+    { key: "suppliers_ap",    label: "Money We Owe Suppliers",       why: "Outstanding AP at go-live." },
+    { key: "assets",          label: "Assets",                       why: "Fixed assets + equipment register." },
+    { key: "equity",          label: "Owner Capital",                why: "Founder + investor contributions." },
+  ];
+
+  const cardByKey = new Map(snapshot.cards.map((c) => [c.key, c]));
+  const isCN = snapshot.base_currency === "CNY";
+  const fxCard = cardByKey.get("fx_rates");
+  const fxMissing = !fxCard || fxCard.count === 0;
+  const firstEmpty = order.find((o) => (cardByKey.get(o.key)?.status ?? "empty") === "empty");
+
+  return (
+    <section className="space-y-3">
+      {/* Warnings strip — only render when there's something to say. */}
+      {(!isCN || fxMissing) && (
+        <div className="space-y-2">
+          {!isCN && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[11.5px] text-amber-100">
+              <RrIcon name="info" size={12} className="mt-0.5" />
+              <div>
+                <div className="font-medium">Main operating currency is {snapshot.base_currency}, not CNY.</div>
+                <div className="text-[10.5px] text-amber-200/80">
+                  KOLEEX tenants normally use CNY. Change it in the "Main Operating Currency" card if this isn't a foreign subsidiary.
+                </div>
+              </div>
+            </div>
+          )}
+          {isCN && fxMissing && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300/40 bg-amber-300/[0.06] px-3 py-2 text-[11.5px] text-amber-100">
+              <RrIcon name="balance-scale-left" size={12} className="mt-0.5" />
+              <div>
+                <div className="font-medium">USD → CNY exchange rate is missing.</div>
+                <div className="text-[10.5px] text-amber-200/80">
+                  You sell in USD and operate in CNY — add a USD → CNY rate so customer payments convert correctly.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recommended order — a clean checklist, not a wizard. */}
+      <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3">
+        <div className="flex items-baseline justify-between">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Recommended order</div>
+          {firstEmpty && (
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById(firstEmpty.key)?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className="text-[10.5px] text-emerald-200 hover:text-emerald-100"
+            >
+              Start here: {firstEmpty.label} →
+            </button>
+          )}
+        </div>
+        <ol className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+          {order.map((step, i) => {
+            const card = cardByKey.get(step.key);
+            const status = card?.status ?? "empty";
+            const tone =
+              status === "complete" ? "border-emerald-400/30 bg-emerald-500/[0.06]" :
+              status === "started"  ? "border-amber-400/30 bg-amber-500/[0.06]"   :
+                                      "border-white/[0.05] bg-white/[0.012]";
+            const dot =
+              status === "complete" ? "bg-emerald-400/80" :
+              status === "started"  ? "bg-amber-300/80"   :
+                                      "bg-white/[0.10]";
+            return (
+              <li key={step.key} className={`flex gap-2 rounded-md border px-3 py-2 ${tone}`}>
+                <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden style={{ background: undefined }}>
+                  <span className={`block h-full w-full rounded-full ${dot}`} />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.10em] text-gray-500">Step {i + 1}</div>
+                  <div className="text-[12px] font-medium">{step.label}</div>
+                  <div className="text-[10px] text-gray-500">{step.why}</div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mt-3 text-[10.5px] text-gray-500">
+          You can fill these in any order — the system uses what's there. The Finance app becomes fully usable once at least half the cards are started.
+        </div>
+      </div>
+    </section>
   );
 }

@@ -21,6 +21,7 @@
    ========================================================================== */
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 
 /* ─── 5-token type scale ──────────────────────────────────────────
@@ -163,6 +164,7 @@ export function OperationalKpi({
   helpId,
   loading = false,
   deltaPct,
+  href,
 }: {
   label: string;
   value: string;
@@ -173,6 +175,9 @@ export function OperationalKpi({
   /** Optional period-over-period delta percent. Rendered as a small
    *  triangle + signed number, never as a coloured pill. */
   deltaPct?: number | null;
+  /** Optional drill-down route. When set, the whole tile becomes a
+   *  clickable Link so the operator can navigate from the number. */
+  href?: string;
 }) {
   const delta = deltaPct ?? null;
   const deltaSign = delta == null ? null : delta > 0 ? "▲" : delta < 0 ? "▼" : "·";
@@ -181,8 +186,8 @@ export function OperationalKpi({
     : (tone === "positive" && delta >= 0) || (tone === "negative" && delta < 0) ? "text-emerald-300/80"
     : (tone === "positive" && delta < 0) || (tone === "negative" && delta >= 0) ? "text-rose-300/80"
     : "text-gray-400";
-  return (
-    <div>
+  const body = (
+    <>
       <div className="flex items-center gap-1.5">
         <Eyebrow>{label}</Eyebrow>
         {helpId && <GuidanceTip guidanceId={helpId} />}
@@ -199,8 +204,16 @@ export function OperationalKpi({
         )}
         {hint && <span className="text-[10px] text-gray-500">{hint}</span>}
       </div>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-md transition-opacity hover:opacity-95" aria-label={`Open ${label}`}>
+        {body}
+      </Link>
+    );
+  }
+  return <div>{body}</div>;
 }
 
 /* ─── IntelligenceLine (L3) ────────────────────────────────────────

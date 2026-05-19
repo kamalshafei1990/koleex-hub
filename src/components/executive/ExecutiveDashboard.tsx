@@ -56,19 +56,26 @@ function fmtFull(n: number, ccy: string): string {
 
 /* ─── KPI card ─── */
 
-function KpiCard({ kpi, ccy }: { kpi: ExecKpi; ccy: string }) {
+function KpiCard({ kpi, ccy, tier = "primary" }: { kpi: ExecKpi; ccy: string; tier?: "primary" | "secondary" }) {
   const accent =
     kpi.tone === "positive" ? "bg-emerald-300/55" :
     kpi.tone === "warning"  ? "bg-amber-300/55"   :
     kpi.tone === "info"     ? "bg-blue-300/55"    :
                               "bg-white/30";
+  /* Visual hierarchy: primary KPIs use a larger numeric face and
+     brighter text; secondary KPIs are quieter so the eye lands on
+     the four headline numbers first. */
+  const valueCls =
+    tier === "primary"
+      ? "mt-2 font-mono text-[30px] leading-none tabular-nums tracking-[-0.015em] text-[var(--text-primary)]"
+      : "mt-2 font-mono text-[20px] leading-none tabular-nums tracking-[-0.01em] text-gray-300";
   return (
-    <Link href={kpi.href} className="group block">
-      <div className="relative h-full rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5 transition-colors group-hover:bg-white/[0.02]">
+    <Link href={kpi.href} className="group block" aria-label={`Open ${kpi.label}`}>
+      <div className="relative h-full rounded-xl border border-white/[0.05] bg-white/[0.012] px-4 py-3.5 transition-colors group-hover:bg-white/[0.025]">
         <div aria-hidden className={`absolute left-4 top-0 h-px w-8 ${accent}`} />
         <ErpEyebrow>{kpi.label}</ErpEyebrow>
-        <div className="mt-2 font-mono text-[22px] leading-none tabular-nums tracking-[-0.01em]">
-          {ccy} {fmtAmt(kpi.value)}
+        <div className={valueCls}>
+          <span className="text-[12px] text-gray-500">{ccy}</span> {fmtAmt(kpi.value)}
         </div>
         {kpi.hint && <div className="mt-1.5 text-[10.5px] text-gray-600">{kpi.hint}</div>}
       </div>
@@ -255,10 +262,10 @@ export default function ExecutiveDashboard() {
           {/* Secondary KPIs — quieter visual weight, same drill-down. */}
           <FocusBoundary>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <KpiCard kpi={snap.kpis.inventory}    ccy={snap.base_currency} />
-              <KpiCard kpi={snap.kpis.receivables}  ccy={snap.base_currency} />
-              <KpiCard kpi={snap.kpis.payables}     ccy={snap.base_currency} />
-              <KpiCard kpi={snap.kpis.fx_exposure}  ccy={snap.base_currency} />
+              <KpiCard kpi={snap.kpis.inventory}    ccy={snap.base_currency} tier="secondary" />
+              <KpiCard kpi={snap.kpis.receivables}  ccy={snap.base_currency} tier="secondary" />
+              <KpiCard kpi={snap.kpis.payables}     ccy={snap.base_currency} tier="secondary" />
+              <KpiCard kpi={snap.kpis.fx_exposure}  ccy={snap.base_currency} tier="secondary" />
             </div>
           </FocusBoundary>
 

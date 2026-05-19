@@ -511,36 +511,40 @@ function OperationalView({
           <OperationalKpi
             label="Cash in"
             value={formatCompact(kpi?.cash_in ?? 0)}
-            hint={currency}
+            hint={`${currency} · tap for bank movements`}
             tone="positive"
             helpId="finance.cashIn"
             loading={loading}
             deltaPct={kpi?.delta.cash_in_pct ?? null}
+            href="/finance/payments?direction=in"
           />
           <OperationalKpi
             label="Cash out"
             value={formatCompact(kpi?.cash_out ?? 0)}
-            hint={currency}
+            hint={`${currency} · tap for bank movements`}
             tone="negative"
             helpId="finance.cashOut"
             loading={loading}
             deltaPct={kpi?.delta.cash_out_pct ?? null}
+            href="/finance/payments?direction=out"
           />
           <OperationalKpi
-            label="To collect"
+            label="Money to Collect"
             value={formatCompact(kpi?.accounts_receivable ?? 0)}
-            hint="Outstanding"
+            hint="Outstanding AR · tap for aging"
             tone="warning"
             helpId="finance.accountsReceivable"
             loading={loading}
+            href="/reports/statements?tab=ar"
           />
           <OperationalKpi
-            label="To pay"
+            label="Money to Pay"
             value={formatCompact(kpi?.accounts_payable ?? 0)}
-            hint="Suppliers + bills"
+            hint="Suppliers + bills · tap for aging"
             tone="warning"
             helpId="finance.accountsPayable"
             loading={loading}
+            href="/reports/statements?tab=ap"
           />
         </div>
       </DashboardSection>
@@ -770,17 +774,17 @@ function ExecutiveView({
             loading={loading}
           />
           <DisplayKpi
-            label="AR exposure"
+            label="Money to Collect"
             value={formatCompact(kpi?.accounts_receivable ?? 0)}
-            hint={`${arOpen} open`}
+            hint={`${arOpen} open AR`}
             tone="warning"
             helpId="finance.accountsReceivable"
             loading={loading}
           />
           <DisplayKpi
-            label="AP exposure"
+            label="Money to Pay"
             value={formatCompact(kpi?.accounts_payable ?? 0)}
-            hint={`${apOpen} open`}
+            hint={`${apOpen} open AP`}
             tone="warning"
             helpId="finance.accountsPayable"
             loading={loading}

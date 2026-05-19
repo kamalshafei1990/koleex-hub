@@ -110,18 +110,24 @@ export default function VisualStatements() {
       {/* Hero KPI strip + trend bars */}
       {snap && (
         <ErpPanel className="px-5 py-5">
+          {/* Both hero KPIs drill into the Income tab so the operator
+              can inspect the underlying account lines. */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <KpiHeader
-              label="Total Revenue"
-              ccy={ccy} value={totalRevenue}
-              delta={revDelta} pct={revPct}
-            />
-            <KpiHeader
-              label="Net Income"
-              ccy={ccy} value={netIncome}
-              delta={niDelta} pct={niPct}
-              tone={netIncome >= 0 ? "positive" : "warning"}
-            />
+            <Link href="/reports/statements" onClick={() => setTab("income")} className="block hover:opacity-95" aria-label="Open Income Statement detail">
+              <KpiHeader
+                label="Total Revenue"
+                ccy={ccy} value={totalRevenue}
+                delta={revDelta} pct={revPct}
+              />
+            </Link>
+            <Link href="/reports/statements" onClick={() => setTab("income")} className="block hover:opacity-95" aria-label="Open Income Statement detail">
+              <KpiHeader
+                label="Net Income"
+                ccy={ccy} value={netIncome}
+                delta={niDelta} pct={niPct}
+                tone={netIncome >= 0 ? "positive" : "warning"}
+              />
+            </Link>
           </div>
           {/* Trend bar chart — 5 buckets, twin bars (revenue + net income) */}
           <TrendChart trend={snap.trend} />

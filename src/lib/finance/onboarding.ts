@@ -116,8 +116,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
   const cards: SetupCard[] = [
     {
       key: "base_currency",
-      title: "Company Base Currency",
-      hint: "The default currency everything else is denominated in.",
+      title: "Main Operating Currency",
+      hint: "The currency your books are kept in. KOLEEX tenants normally use CNY.",
       status: baseCurrency ? "complete" : "empty",
       count: baseCurrency ? 1 : 0,
       total: 0,
@@ -146,8 +146,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     },
     {
       key: "opening_balances",
-      title: "Opening Balances",
-      hint: "Day-zero snapshot — captures every other section as one entry.",
+      title: "Starting Company Position",
+      hint: "Day-zero snapshot — what the company looked like before you started using the system.",
       status: obRows.length === 0 ? "empty" : "started",
       count: obRows.length,
       total: obRows.reduce((s, r) => s + Number(r.amount || 0), 0),
@@ -156,8 +156,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     },
     {
       key: "customers_ar",
-      title: "Customers Receivable",
-      hint: "Outstanding balances customers owe at go-live.",
+      title: "Money Customers Owe Us",
+      hint: "Outstanding balances customers owe at go-live (technical name: Accounts Receivable / AR).",
       status: countByCategory("customer_receivable") === 0 ? "empty" : "started",
       count: countByCategory("customer_receivable"),
       total: arSum,
@@ -166,8 +166,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     },
     {
       key: "suppliers_ap",
-      title: "Suppliers Payable",
-      hint: "Outstanding balances owed to suppliers at go-live.",
+      title: "Money We Owe Suppliers",
+      hint: "Outstanding balances owed to suppliers at go-live (technical name: Accounts Payable / AP).",
       status: countByCategory("supplier_payable") === 0 ? "empty" : "started",
       count: countByCategory("supplier_payable"),
       total: apSum,
@@ -196,8 +196,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     },
     {
       key: "equity",
-      title: "Equity / Capital",
-      hint: "Owner-injected capital and equity at company formation.",
+      title: "Owner Capital",
+      hint: "Money the owners invested in the business at formation (technical name: Equity).",
       status: countByCategory("owner_capital") === 0 ? "empty" : "started",
       count: countByCategory("owner_capital"),
       total: equitySum,
@@ -206,8 +206,8 @@ export async function buildSetupSnapshot(tenantId: string): Promise<SetupSnapsho
     },
     {
       key: "fx_rates",
-      title: "FX Rates",
-      hint: "Manual exchange rates for foreign-currency transactions.",
+      title: "Exchange Rates",
+      hint: "Conversion rates between currencies (e.g. USD → CNY). Required when you trade in more than one currency.",
       status: fxRates.length === 0 ? "empty" : "started",
       count: fxRates.length,
       total: 0,

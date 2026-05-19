@@ -190,13 +190,24 @@ export default function FinanceExpenseAnalytics() {
           }
         />
 
+        {/* KPI cards are now clickable — each drills into the matching
+            filtered list so the operator never lands on a dead-end
+            number. Wrapped in Link so the visual styling stays intact. */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard label="Total Expenses" value={kpi.total} unit={baseCurrency} tone="neutral" hint="All time, this view" loading={loading} />
-          <HeroKpiCard label="Unpaid" value={kpi.unpaid} unit={baseCurrency} tone="warning" hint="Awaiting payment" loading={loading} />
+          <Link href="/finance/expenses" className="block hover:opacity-95" aria-label="See every expense">
+            <HeroKpiCard label="Total Expenses" value={kpi.total} unit={baseCurrency} tone="neutral" hint="All time, this view" loading={loading} />
+          </Link>
+          <Link href="/finance/expenses?status=unpaid" className="block hover:opacity-95" aria-label="Review unpaid expenses">
+            <HeroKpiCard label="Unpaid (Money to Pay)" value={kpi.unpaid} unit={baseCurrency} tone="warning" hint="Awaiting payment" loading={loading} />
+          </Link>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
-          <MetricCard label="Paid"    value={kpi.paid}    unit={baseCurrency} hint="Already settled" loading={loading} />
-          <MetricCard label="Overdue" value={kpi.overdue} unit={baseCurrency} tone="negative" hint="Past due date" loading={loading} />
+          <Link href="/finance/expenses?status=paid" className="block hover:opacity-95" aria-label="See settled expenses">
+            <MetricCard label="Paid" value={kpi.paid} unit={baseCurrency} hint="Already settled" loading={loading} />
+          </Link>
+          <Link href="/finance/expenses?status=overdue" className="block hover:opacity-95" aria-label="Resolve overdue expenses">
+            <MetricCard label="Overdue" value={kpi.overdue} unit={baseCurrency} tone="negative" hint="Past due date — needs action" loading={loading} />
+          </Link>
         </div>
 
         {/* ── Operational analytics row: Donut · Monthly · Top vendors  */}

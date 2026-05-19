@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import {
   EmptyState,
@@ -183,29 +184,41 @@ export default function FinanceOrders() {
 
         {/* Hero cards: Revenue + Net Profit dominate. Smaller metric
             cards beneath for count / collected / outstanding. */}
+        {/* KPI cards are clickable drill-downs. Revenue and profit
+            jump to the statements view; collected / outstanding lead
+            to payments + AR aging so the operator can act on a
+            number, not just admire it. */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <HeroKpiCard
-            label="Total Revenue"
-            helpId="finance.revenue"
-            value={kpi.totalSelling}
-            unit={baseCurrency}
-            tone="positive"
-            hint={`${orders.length} order${orders.length === 1 ? "" : "s"} this view`}
-            loading={loading}
-          />
-          <HeroKpiCard
-            label="Net Profit"
-            helpId="finance.netProfit"
-            value={kpi.totalNet}
-            unit={baseCurrency}
-            tone={kpi.totalNet >= 0 ? "info" : "negative"}
-            hint={`Average margin ${fmtPct(kpi.avgMargin)}`}
-            loading={loading}
-          />
+          <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
+            <HeroKpiCard
+              label="Total Revenue"
+              helpId="finance.revenue"
+              value={kpi.totalSelling}
+              unit={baseCurrency}
+              tone="positive"
+              hint={`${orders.length} order${orders.length === 1 ? "" : "s"} this view · tap for Income Statement`}
+              loading={loading}
+            />
+          </Link>
+          <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
+            <HeroKpiCard
+              label="Net Profit"
+              helpId="finance.netProfit"
+              value={kpi.totalNet}
+              unit={baseCurrency}
+              tone={kpi.totalNet >= 0 ? "info" : "negative"}
+              hint={`Average margin ${fmtPct(kpi.avgMargin)} · tap for Income Statement`}
+              loading={loading}
+            />
+          </Link>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
-          <MetricCard label="Collected" helpId="order.collected" value={kpi.totalCollected} unit={baseCurrency} hint="Cash banked across orders" loading={loading} />
-          <MetricCard label="Outstanding" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint="Still to collect" loading={loading} />
+          <Link href="/finance/payments" className="block hover:opacity-95" aria-label="Open payments received">
+            <MetricCard label="Collected (Money in)" helpId="order.collected" value={kpi.totalCollected} unit={baseCurrency} hint="Cash banked · tap for payments" loading={loading} />
+          </Link>
+          <Link href="/reports/statements?tab=ar" className="block hover:opacity-95" aria-label="Open AR aging report">
+            <MetricCard label="Outstanding (Money to Collect)" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint="Still to collect · tap for AR aging" loading={loading} />
+          </Link>
           <MetricCard label="Orders" value={String(orders.length)} hint="In current view" loading={loading} />
         </div>
 

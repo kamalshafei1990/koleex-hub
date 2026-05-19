@@ -436,21 +436,21 @@ export async function buildExecutiveSnapshot(tenantId: string): Promise<Executiv
       href: "/finance/statements?tab=inventory",
     },
     receivables: {
-      label: "Receivables", value: ar.totals.total_open,
+      label: "Money to Collect (AR)", value: ar.totals.total_open,
       hint: ar.totals.total_overdue > 0 ? `${ar.totals.total_overdue.toFixed(0)} overdue` : "current",
       tone: ar.totals.total_overdue > 0 ? "warning" : "info",
       href: "/finance/statements?tab=ar",
     },
     payables: {
-      label: "Payables", value: ap.totals.total_open,
+      label: "Money to Pay (AP)", value: ap.totals.total_open,
       hint: ap.totals.total_overdue > 0 ? `${ap.totals.total_overdue.toFixed(0)} overdue` : "current",
       tone: ap.totals.total_overdue > 0 ? "warning" : "info",
       href: "/finance/statements?tab=ap",
     },
     fx_exposure: {
-      label: "FX Exposure", value: fx.total_net_base_abs,
-      hint: `${fx.exposed.length} currencies`, tone: fx.total_net_base_abs > 0 ? "warning" : "neutral",
-      href: "/finance/setup?card=fx-rates",
+      label: "Currency Exposure", value: fx.total_net_base_abs,
+      hint: `${fx.exposed.length} non-base currencies`, tone: fx.total_net_base_abs > 0 ? "warning" : "neutral",
+      href: "/finance/fx-rates",
     },
   };
 
