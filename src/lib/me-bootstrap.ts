@@ -76,29 +76,76 @@ export function seedMeBootstrap(payload: MeBootstrapPayload): void {
   for (const cb of listeners) cb(payload);
 }
 
+/* Mobile-resilience tuning. Empty-launcher reports traced back to
+   /api/me/bootstrap hanging on flaky cellular networks. The previous
+   implementation had no timeout, no retry, and no surfaced error — so
+   the App Launcher fail-closed forever. Defaults below: 8 s per try,
+   up to 3 tries, exponential backoff (0 → 800ms → 2400ms). */
+const FETCH_TIMEOUT_MS = 8_000;
+const MAX_RETRIES      = 3;
+
+/** Last error captured by getMeBootstrap so the UI can show a Retry CTA. */
+let _lastError: string | null = null;
+export function getMeBootstrapLastError(): string | null { return _lastError; }
+
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { credentials: "include", signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 /**
  * Fetch (or return cached) bootstrap. Safe to call many times —
  * concurrent calls dedupe onto the same in-flight promise.
+ *
+ * Now resilient on mobile: bounded timeout per request + exponential
+ * backoff retries. On total failure resolves to null but records
+ * _lastError so the UI can show "Retry".
  */
 export async function getMeBootstrap(): Promise<MeBootstrapPayload | null> {
   if (cache && cache.expiresAt > Date.now()) return cache.payload;
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const res = await fetch("/api/me/bootstrap", { credentials: "include" });
-      if (!res.ok) {
-        cache = null;
-        return null;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+        try {
+          const res = await fetchWithTimeout("/api/me/bootstrap", FETCH_TIMEOUT_MS);
+          if (!res.ok) throw new Error(`bootstrap returned ${res.status}`);
+          const payload = (await res.json()) as MeBootstrapPayload;
+          cache = { payload, expiresAt: Date.now() + CACHE_TTL_MS };
+          _lastError = null;
+          for (const cb of listeners) cb(payload);
+          return payload;
+        } catch (e) {
+          _lastError = e instanceof Error ? e.message : String(e);
+          if (attempt < MAX_RETRIES) {
+            /* Exponential backoff: 800 ms then 2400 ms. */
+            await new Promise((r) => setTimeout(r, 800 * attempt * attempt));
+            continue;
+          }
+          cache = null;
+          /* Notify listeners that loading is over (with no payload) so
+             the UI swaps from skeleton to "Retry" instead of hanging. */
+          for (const cb of listeners) cb(null);
+          return null;
+        }
       }
-      const payload = (await res.json()) as MeBootstrapPayload;
-      cache = { payload, expiresAt: Date.now() + CACHE_TTL_MS };
-      for (const cb of listeners) cb(payload);
-      return payload;
+      return null;
     } finally {
       inflight = null;
     }
   })();
   return inflight;
+}
+
+/** Force a re-fetch from a UI Retry button. Bypasses the dedupe path. */
+export async function retryMeBootstrap(): Promise<MeBootstrapPayload | null> {
+  invalidateMeBootstrap();
+  return getMeBootstrap();
 }
 
 /**

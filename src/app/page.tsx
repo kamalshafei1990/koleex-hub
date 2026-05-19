@@ -33,6 +33,7 @@ import {
   trackAppOpen,
 } from "@/lib/app-launcher";
 import { usePermittedModules } from "@/lib/use-scope";
+import { getMeBootstrapLastError, retryMeBootstrap } from "@/lib/me-bootstrap";
 
 const PRIMARY_CATS = ["operations", "commercial", "people", "communication", "system"];
 
@@ -676,7 +677,21 @@ export default function HomePage() {
           ))}
         </div>
 
-        {isSearchOrFilter ? (
+        {/* Mobile-resilience: while the permission bootstrap is in
+            flight or has failed (timeout / 5xx / lost mobile signal),
+            render a calm loading skeleton or a Retry banner instead
+            of a silent empty grid. */}
+        {permLoading ? (
+          <AppGridSkeleton dk={dk} />
+        ) : visibleRegistry.length === 0 ? (
+          <BootstrapErrorBanner
+            dk={dk}
+            onRetry={async () => {
+              await retryMeBootstrap();
+              if (typeof window !== "undefined") window.location.reload();
+            }}
+          />
+        ) : isSearchOrFilter ? (
           /* Flat grid when searching or filtering by category */
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
             {filteredApps.map((app) => (
@@ -746,6 +761,64 @@ export default function HomePage() {
           transform: translateY(-2px);
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ─── Mobile-resilience: loading + error states for the apps grid ─── */
+
+function AppGridSkeleton({ dk }: { dk: boolean }) {
+  /* Ghost cards so the page feels alive while permissions load.
+     Replaces the previously silent empty area that left mobile
+     operators staring at a blank screen on flaky connections. */
+  const cellCls = dk ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.025] border-black/[0.05]";
+  return (
+    <div>
+      <div className={`flex items-center gap-2 mb-3 text-[11px] font-medium ${dk ? "text-white/30" : "text-black/30"}`}>
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
+        Loading your apps…
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <div
+            key={i}
+            className={`aspect-[1/1.1] rounded-2xl border ${cellCls} animate-pulse`}
+            style={{ animationDelay: `${i * 60}ms` }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => void }) {
+  const err = getMeBootstrapLastError();
+  const wasFailure = !!err;
+  return (
+    <div
+      className={`rounded-2xl border px-5 py-6 text-center ${
+        wasFailure
+          ? dk ? "border-amber-300/30 bg-amber-300/[0.04]" : "border-amber-600/30 bg-amber-50"
+          : dk ? "border-white/[0.06] bg-white/[0.012]" : "border-black/[0.06] bg-black/[0.01]"
+      }`}
+    >
+      <div className={`text-[13px] font-semibold ${dk ? "text-white/85" : "text-black/85"}`}>
+        {wasFailure ? "We couldn't load your apps" : "No apps available for your account"}
+      </div>
+      <p className={`mt-1 text-[12px] ${dk ? "text-white/50" : "text-black/50"}`}>
+        {wasFailure
+          ? "Looks like a flaky connection. Tap Retry — we'll re-fetch your permissions."
+          : "Your role doesn't have any modules enabled. Ask an admin to grant access."}
+      </p>
+      {wasFailure && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-200 hover:bg-emerald-300/[0.16]"
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 }
