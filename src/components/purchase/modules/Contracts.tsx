@@ -55,15 +55,16 @@ export default function ContractsModule({ t }: PurchaseModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
+  /* React-Compiler: anchor "now" once via useState so useMemo stays pure. */
+  const [nowMs] = useState(() => Date.now());
   const expiringSoon = useMemo(() => {
-    const now = Date.now();
-    const in60 = now + 60 * 86400000;
+    const in60 = nowMs + 60 * 86400000;
     return rows.filter((r) => {
       if (!r.end_date) return false;
       const t = new Date(r.end_date).getTime();
-      return t > now && t <= in60 && (r.status || "").toLowerCase() === "active";
+      return t > nowMs && t <= in60 && (r.status || "").toLowerCase() === "active";
     }).length;
-  }, [rows]);
+  }, [rows, nowMs]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 

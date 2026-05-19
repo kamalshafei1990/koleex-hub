@@ -1555,7 +1555,7 @@ const TagEditor = React.memo(function TagEditor({
   placeholder?: string;
   icon?: React.ReactNode;
 }) {
-  const inputId = React.useMemo(() => `tag-editor-${Math.random().toString(36).slice(2, 9)}`, []);
+  const inputId = React.useId();
   return (
     <div>
       <label className="text-xs text-[var(--text-faint)] mb-1 block">{label}</label>
@@ -1647,11 +1647,15 @@ const CustomerPipelineBlock = React.memo(function CustomerPipelineBlock({
     return `$${Math.round(n).toLocaleString()}`;
   };
 
+  /* React-Compiler: anchor "now" once at first render so the relative-day
+     math stays referentially stable. A live ticker isn't needed — pipeline
+     dates only meaningfully change when the page is re-mounted. */
+  const [nowMs] = useState(() => Date.now());
   const relDate = (iso: string | null) => {
     if (!iso) return null;
     const then = new Date(iso).getTime();
     if (Number.isNaN(then)) return null;
-    const diff = Math.round((then - Date.now()) / 86_400_000);
+    const diff = Math.round((then - nowMs) / 86_400_000);
     if (diff < 0) return { label: `${Math.abs(diff)}d overdue`, tone: "overdue" as const };
     if (diff === 0) return { label: t("pipeline.today", "today"), tone: "soon" as const };
     if (diff <= 7) return { label: `${diff}d`, tone: "soon" as const };

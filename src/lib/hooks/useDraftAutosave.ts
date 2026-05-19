@@ -16,7 +16,7 @@
      if (draft.hasDraft) showResumePrompt(draft.restore());
    ========================================================================== */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const PREFIX = "koleex.draft.";
 const DEFAULT_EXPIRE_MS = 24 * 60 * 60 * 1000;
@@ -55,28 +55,29 @@ export function useDraftAutosave<T>(
   const expireMs   = opts.expireMs ?? DEFAULT_EXPIRE_MS;
   const enabled    = opts.enabled !== false;
   const storageKey = `${PREFIX}${tenantId ?? "anon"}:${key}`;
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const initialRef = useRef<{ raw: string | null } | null>(null);
 
-  /* Probe on mount. */
-  if (initialRef.current === null && typeof window !== "undefined") {
-    initialRef.current = { raw: window.localStorage.getItem(storageKey) };
-    if (initialRef.current.raw) {
-      try {
-        const parsed = JSON.parse(initialRef.current.raw) as Wrapped<T>;
-        const age = Date.now() - parsed.saved_at;
-        if (age > expireMs || (tenantId && parsed.tenant && parsed.tenant !== tenantId)) {
-          window.localStorage.removeItem(storageKey);
-          initialRef.current = { raw: null };
-        } else {
-          setSavedAt(parsed.saved_at);
-        }
-      } catch { /* corrupt blob — wipe */
+  /* React-Compiler-friendly probe: side effects + Date.now() belong inside
+     a lazy useState initializer (runs once per mount), not the bare render
+     body. Returns { hasDraft, savedAt } so we don't need a parallel ref. */
+  const [probe, setProbe] = useState<{ hasDraft: boolean; savedAt: number | null }>(() => {
+    if (typeof window === "undefined") return { hasDraft: false, savedAt: null };
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return { hasDraft: false, savedAt: null };
+    try {
+      const parsed = JSON.parse(raw) as Wrapped<T>;
+      const age = Date.now() - parsed.saved_at;
+      if (age > expireMs || (tenantId && parsed.tenant && parsed.tenant !== tenantId)) {
         window.localStorage.removeItem(storageKey);
-        initialRef.current = { raw: null };
+        return { hasDraft: false, savedAt: null };
       }
+      return { hasDraft: true, savedAt: parsed.saved_at };
+    } catch {
+      window.localStorage.removeItem(storageKey);
+      return { hasDraft: false, savedAt: null };
     }
-  }
+  });
+  const savedAt = probe.savedAt;
+  const setSavedAt = (next: number | null) => setProbe((p) => ({ ...p, savedAt: next }));
 
   /* Debounced autosave on every value change. */
   useEffect(() => {
@@ -116,7 +117,7 @@ export function useDraftAutosave<T>(
   }
 
   return {
-    hasDraft: initialRef.current?.raw != null,
+    hasDraft: probe.hasDraft,
     restore, clear, flush, savedAt,
   };
 }

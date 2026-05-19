@@ -71,11 +71,12 @@ export default function PaymentsModule({ t }: SalesModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
+  /* React-Compiler: anchor "now" once via useState so useMemo stays pure. */
+  const [nowMs] = useState(() => Date.now());
   /* Roll up totals — last 30 days, last 90 days, all-time. */
   const totals = useMemo(() => {
-    const now = Date.now();
-    const d30 = now - 30 * 86400000;
-    const d90 = now - 90 * 86400000;
+    const d30 = nowMs - 30 * 86400000;
+    const d90 = nowMs - 90 * 86400000;
     let t30 = 0, t90 = 0, total = 0;
     for (const p of rows) {
       const amt = Number(p.amount) || 0;
@@ -86,7 +87,7 @@ export default function PaymentsModule({ t }: SalesModuleProps) {
       if (ts >= d90) t90 += amt;
     }
     return { t30, t90, total };
-  }, [rows]);
+  }, [rows, nowMs]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} className="animate-spin" /></div>;
 
