@@ -1,5 +1,5 @@
 "use client";
-import FinanceDashboard from "@/components/finance/FinanceDashboard";
+import FinanceHome from "@/components/finance/FinanceHome";
 export default function FinancePage() {
-  return <FinanceDashboard />;
+  return <FinanceHome />;
 }

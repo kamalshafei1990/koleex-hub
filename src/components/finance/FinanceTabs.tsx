@@ -49,10 +49,12 @@ const GROUPS: TabGroup[] = [
     id: "overview",
     label: "Overview",
     defaultHref: "/finance",
-    hint: "READ — Snapshot of health, profit, money to collect, money to pay.",
+    hint: "Start here — four clear paths and your essential KPIs.",
     items: [
-      { key: "/finance",       label: "Dashboard", icon: "coins" },
-      { key: "/finance/setup", label: "Setup",     icon: "shield-check" },
+      { key: "/finance",              label: "Home",         icon: "coins" },
+      { key: "/finance/intelligence", label: "Intelligence", icon: "signal-stream" },
+      { key: "/finance/workspace",    label: "Workspace",    icon: "bank" },
+      { key: "/finance/setup",        label: "Setup",        icon: "shield-check" },
     ],
   },
   {
