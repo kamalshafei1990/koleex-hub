@@ -37,6 +37,10 @@ interface TabGroup {
   /* Default destination when the user clicks the group label.
      Usually the first sub-item. */
   defaultHref: string;
+  /* One-line operator-friendly description shown under the row 2
+     sub-nav when this group is active. Tells the operator what
+     they can DO on these pages. */
+  hint: string;
   items: TabEntry[];
 }
 
@@ -45,6 +49,7 @@ const GROUPS: TabGroup[] = [
     id: "overview",
     label: "Overview",
     defaultHref: "/finance",
+    hint: "READ — Snapshot of health, profit, money to collect, money to pay.",
     items: [
       { key: "/finance",       label: "Dashboard", icon: "coins" },
       { key: "/finance/setup", label: "Setup",     icon: "shield-check" },
@@ -54,6 +59,7 @@ const GROUPS: TabGroup[] = [
     id: "operations",
     label: "Operations",
     defaultHref: "/finance/orders",
+    hint: "ADD — Orders, customers, suppliers, payments, expenses.",
     items: [
       { key: "/finance/orders",    label: "Orders",            icon: "file-invoice" },
       { key: "/finance/customers", label: "Customers",         icon: "arrow-down-left" },
@@ -66,6 +72,7 @@ const GROUPS: TabGroup[] = [
     id: "banking",
     label: "Banking",
     defaultHref: "/finance/bank-accounts",
+    hint: "READ — Bank balances, imported statements, reconciliation.",
     items: [
       { key: "/finance/bank-accounts",  label: "Bank Accounts",  icon: "bank" },
       { key: "/finance/bank-imports",   label: "Bank Imports",   icon: "upload" },
@@ -76,6 +83,7 @@ const GROUPS: TabGroup[] = [
     id: "treasury",
     label: "Treasury",
     defaultHref: "/finance/treasury-forecast",
+    hint: "READ — Forward cash forecast and treasury plans.",
     items: [
       { key: "/finance/treasury-forecast", label: "Forecast", icon: "arrow-up-right" },
       { key: "/finance/treasury-plans",    label: "Plans",    icon: "file-invoice" },
@@ -85,6 +93,7 @@ const GROUPS: TabGroup[] = [
     id: "accounting",
     label: "Accounting",
     defaultHref: "/finance/accounting/queue",
+    hint: "ADD + READ — Review journal drafts, post entries, inspect the ledger.",
     items: [
       { key: "/finance/accounting/queue",          label: "Queue",           icon: "clock" },
       { key: "/finance/accounting/trial-balance",  label: "Trial Balance",   icon: "badge-check" },
@@ -99,6 +108,7 @@ const GROUPS: TabGroup[] = [
     id: "reports",
     label: "Reports",
     defaultHref: "/finance/reports",
+    hint: "READ — Income statement, balance sheet, AR/AP aging, inventory, exports.",
     items: [
       { key: "/finance/reports",       label: "Reports",   icon: "file-invoice" },
       { key: "/finance/notifications", label: "Reminders", icon: "clock" },
@@ -153,6 +163,12 @@ export default function FinanceTabs() {
             </Link>
           );
         })}
+      </div>
+
+      {/* "What this tab is for" — single sentence so the operator
+          knows whether to ADD or READ data on the pages below. */}
+      <div className="text-[10.5px] text-gray-500">
+        {activeGroup.hint}
       </div>
 
       {/* ── Row 2: contextual sub-items — only shown when the active

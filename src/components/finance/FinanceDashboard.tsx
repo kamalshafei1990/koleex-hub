@@ -291,22 +291,47 @@ export default function FinanceDashboard() {
           }
         />
 
-        {/* "Where do I put data manually?" banner — sits just under
-            the page header on the Finance dashboard so operators
-            never have to hunt for the entry forms again. Dismissable
-            only by routing into the hub itself. */}
-        <Link
-          href="/finance/data-entry"
-          className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-emerald-300/30 bg-emerald-300/[0.04] px-4 py-3 text-[12.5px] text-emerald-100 hover:bg-emerald-300/[0.08]"
-        >
-          <span>
-            <strong className="text-emerald-200">Where to put finance data manually:</strong>{" "}
-            Assets, opening balances, customer / supplier balances, FX rates, expenses, invoices — every entry form has a clear path.
-          </span>
-          <span className="shrink-0 rounded-md border border-emerald-300/40 bg-emerald-300/[0.10] px-2.5 py-1 text-[11px] text-emerald-100">
-            Open Data Entry hub →
-          </span>
-        </Link>
+        {/* "What do you want to do?" — two clean tiles under the page
+            header. The Finance app does many things; an operator
+            entering it shouldn't have to scan the whole dashboard to
+            find their next click. Two paths only:
+              1. ADD data   → /finance/data-entry
+              2. READ data  → /finance/visual (statements)
+            Everything else stays on the dashboard below. */}
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Link
+            href="/finance/data-entry"
+            className="group flex items-center gap-3 rounded-xl border border-emerald-300/30 bg-emerald-300/[0.04] px-4 py-3.5 transition-colors hover:bg-emerald-300/[0.08]"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-300/40 bg-emerald-300/[0.10] text-emerald-100">
+              <RrIcon name="pencil" size={16} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-300/80">Add data</div>
+              <div className="text-[13.5px] font-semibold text-emerald-50">Enter finance data</div>
+              <div className="mt-0.5 text-[11px] text-emerald-200/80">
+                Assets · opening balances · customers · suppliers · FX rates · expenses · invoices
+              </div>
+            </div>
+            <RrIcon name="arrow-up-right" size={12} className="text-emerald-200 group-hover:text-emerald-100" />
+          </Link>
+          <Link
+            href="/finance/visual"
+            className="group flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.04]"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.10] bg-white/[0.04] text-gray-200">
+              <RrIcon name="balance-scale-left" size={16} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Read data</div>
+              <div className="text-[13.5px] font-semibold text-gray-100">Read financial statements</div>
+              <div className="mt-0.5 text-[11px] text-gray-400">
+                Income · balance sheet · cash flow · AR/AP aging · inventory valuation · gross profit
+              </div>
+            </div>
+            <RrIcon name="arrow-up-right" size={12} className="text-gray-400 group-hover:text-gray-200" />
+          </Link>
+        </div>
 
         {/* ── Phase UI.1 — System Health rail.
            Replaces the four stacked CrossModule + Approval + Payment +
