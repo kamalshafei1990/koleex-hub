@@ -287,27 +287,43 @@ export async function generateEmployeeNumber(): Promise<string> {
   }
 }
 
-/** Fetch all departments for picker */
+/** Fetch all departments for picker.
+ *  Routed through /api/management/departments so the request runs
+ *  under the service-role client and respects tenant scoping —
+ *  RLS on koleex_departments otherwise returns an empty list and
+ *  leaves the Add Employee wizard stuck on "Loading…". */
 export async function fetchDepartments(): Promise<DepartmentRow[]> {
-  const { data, error } = await supabase
-    .from(DEPARTMENTS)
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
-  if (error) { console.error("[Departments]", error.message); return []; }
-  return (data as DepartmentRow[]) || [];
+  try {
+    const res = await fetch("/api/management/departments", { credentials: "include", cache: "no-store" });
+    if (!res.ok) {
+      console.error("[Departments] HTTP", res.status);
+      return [];
+    }
+    const json = (await res.json()) as { departments?: DepartmentRow[] };
+    return (json.departments ?? []).filter((d) => d.is_active !== false);
+  } catch (e) {
+    console.error("[Departments] fetch failed:", e);
+    return [];
+  }
 }
 
-/** Fetch positions for a given department */
+/** Fetch positions for a given department.
+ *  Routed through /api/management/positions for the same reason as
+ *  fetchDepartments — RLS blocks the anon client. */
 export async function fetchPositionsByDepartment(departmentId: string): Promise<PositionRow[]> {
-  const { data, error } = await supabase
-    .from(POSITIONS)
-    .select("*")
-    .eq("department_id", departmentId)
-    .eq("is_active", true)
-    .order("title");
-  if (error) { console.error("[Positions]", error.message); return []; }
-  return (data as PositionRow[]) || [];
+  try {
+    const qs = new URLSearchParams({ department_id: departmentId });
+    const res = await fetch(`/api/management/positions?${qs.toString()}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) {
+      console.error("[Positions] HTTP", res.status);
+      return [];
+    }
+    const json = (await res.json()) as { positions?: PositionRow[] };
+    return (json.positions ?? []).filter((p) => p.is_active !== false);
+  } catch (e) {
+    console.error("[Positions] fetch failed:", e);
+    return [];
+  }
 }
 
 /** Fetch all employees as list items (joined across tables).
