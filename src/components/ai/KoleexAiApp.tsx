@@ -847,9 +847,17 @@ export default function KoleexAiApp() {
     });
   }, []);
 
-  /** Copy an assistant message to the clipboard. Shows a tiny
-   *  "Copied" hint by mutating a per-message state (not here — the
-   *  bubble handles its own feedback). */
+  /** Copy an assistant message to the clipboard. Returns true on
+   *  success so the bubble can flash its ✓ "Copied" confirmation.
+   *
+   *  Two strategies, in order:
+   *    1. navigator.clipboard.writeText (modern path; only works in
+   *       secure contexts AND when the iframe / page has the
+   *       `clipboard-write` permissions-policy).
+   *    2. legacy document.execCommand("copy") via a hidden textarea.
+   *       This runs in places where path 1 is blocked (Claude
+   *       Preview's iframe sandbox, some embedded webviews) so the
+   *       checkmark still appears for the user. */
   const handleCopy = useCallback(async (content: string): Promise<boolean> => {
     if (!content) return false;
     try {
@@ -857,11 +865,27 @@ export default function KoleexAiApp() {
         await navigator.clipboard.writeText(content);
         return true;
       }
+    } catch { /* fall through to legacy path */ }
+    /* Legacy execCommand fallback. Works in most browsers including
+       sandboxed iframes; deprecated but not removed. */
+    try {
+      if (typeof document === "undefined") return false;
+      const ta = document.createElement("textarea");
+      ta.value = content;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, content.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
     } catch {
-      /* Clipboard API denied — fall through to failure. The bubble
-         already offers text selection so there's a manual escape. */
+      return false;
     }
-    return false;
   }, []);
 
   /** Per-message TTS replay — stops whatever is currently speaking,
@@ -1797,7 +1821,10 @@ function Bubble({
     const ok = await onCopy(msg.content);
     if (ok) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      /* Hold the ✓ confirmation a bit longer so the swap is
+         clearly perceived. 2 s is the sweet spot in chat-app
+         copy buttons (ChatGPT / Linear / Notion all sit ~2 s). */
+      setTimeout(() => setCopied(false), 2000);
     }
   }, [onCopy, msg.content]);
   /* Show the action row on assistant messages that have real
@@ -2057,13 +2084,13 @@ function BubbleActions({
       <button
         type="button"
         onClick={onCopy}
-        className={btnCls}
+        className={`${btnCls} ${copied ? "text-emerald-300" : ""}`}
         aria-label={copied ? "Copied" : "Copy message"}
         title={copied ? "Copied" : "Copy"}
       >
         {copied ? (
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 13l4 4L19 7" />
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.5l4 4L19 7" />
           </svg>
         ) : (
           <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
