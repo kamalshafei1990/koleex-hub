@@ -2144,13 +2144,15 @@ function BubbleActions({
           aria-label="Read aloud"
           title="Read aloud"
         >
-          {/* Lucide "volume-2" — stroke-based so it matches the rest
-              of the row. The previous filled silhouette rendered as
-              a noticeably heavier shape next to the line icons. */}
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+          {/* Lucide volume-2 redrawn on a 20×20 viewBox so the
+              speaker triangle + arc waves actually fill the box.
+              The original 24×24 lucide path only used the left
+              ~17 units, which made the icon look noticeably
+              smaller next to copy / regenerate / 👍 / 👎. */}
+          <svg aria-hidden viewBox="0 0 20 20" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="9 3 4 7 1 7 1 13 4 13 9 17 9 3" />
+            <path d="M13 6.5a4.5 4.5 0 0 1 0 7" />
+            <path d="M16 4a8 8 0 0 1 0 12" />
           </svg>
         </button>
       )}
