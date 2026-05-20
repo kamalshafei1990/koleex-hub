@@ -9,6 +9,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import ExpensesTabs, { type ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
+import { useTranslation } from "@/lib/i18n";
+import { expensesT } from "@/lib/translations/expenses";
 
 export default function ExpensesHeader({
   title,
@@ -25,13 +27,14 @@ export default function ExpensesHeader({
   onTabChange: (next: ExpensesTabKey) => void;
   counts: { all: number; unpaid: number; paid: number; overdue: number };
 }) {
+  const { t } = useTranslation(expensesT);
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"
-            aria-label="Back to Hub"
+            aria-label={t("header.backHub", "Back to Hub")}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
           >
             <RrIcon name="arrow-left" size={16} />
@@ -48,9 +51,9 @@ export default function ExpensesHeader({
           <Link
             href="/finance/expenses"
             className="hidden items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-xs font-medium text-[var(--text-dim)] transition hover:text-[var(--text-primary)] sm:inline-flex"
-            title="Switch to the executive Expense Analytics view"
+            title={t("header.analyticsTitle", "Switch to the executive Expense Analytics view")}
           >
-            Finance Analytics
+            {t("header.financeAnalytics", "Finance Analytics")}
             <RrIcon name="arrow-up-right-from-square" size={11} />
           </Link>
           {action}

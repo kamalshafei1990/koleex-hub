@@ -25,49 +25,49 @@ import FinanceHeader from "@/components/finance/FinanceHeader";
 import { formatCompact } from "@/components/finance/FinanceUiX";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import type { DashboardKpi } from "@/lib/finance/types";
 
 interface PathTile {
   href: string;
   icon: RrIconName;
   tone: "emerald" | "blue" | "amber" | "neutral";
-  kicker: string;
-  title: string;
-  body: string;
+  /* i18n keys + English fallbacks so the dictionary is the source of
+     truth and the tile still renders if a key is ever missing. */
+  kickerKey: string;     kickerFallback: string;
+  titleKey:  string;     titleFallback:  string;
+  bodyKey:   string;     bodyFallback:   string;
 }
 
 const PATHS: PathTile[] = [
   {
-    href: "/finance/data-entry",
-    icon: "pencil",
-    tone: "emerald",
-    kicker: "Add data",
-    title: "Enter finance data",
-    body: "Assets · opening balances · customers · suppliers · FX rates · expenses · invoices.",
+    href: "/finance/data-entry", icon: "pencil",  tone: "emerald",
+    kickerKey: "home.path.enter.kicker", kickerFallback: "Add data",
+    titleKey:  "home.path.enter.title",  titleFallback:  "Enter finance data",
+    bodyKey:   "home.path.enter.body",
+    bodyFallback: "Assets · opening balances · customers · suppliers · FX rates · expenses · invoices.",
   },
   {
-    href: "/finance/visual",
-    icon: "balance-scale-left",
-    tone: "blue",
-    kicker: "Read data",
-    title: "Read financial statements",
-    body: "Income · balance sheet · cash flow · AR/AP aging · inventory · gross profit.",
+    href: "/finance/visual", icon: "balance-scale-left", tone: "blue",
+    kickerKey: "home.path.read.kicker", kickerFallback: "Read data",
+    titleKey:  "home.path.read.title",  titleFallback:  "Read financial statements",
+    bodyKey:   "home.path.read.body",
+    bodyFallback: "Income · balance sheet · cash flow · AR/AP aging · inventory · gross profit.",
   },
   {
-    href: "/finance/workspace",
-    icon: "bank",
-    tone: "amber",
-    kicker: "Day-to-day",
-    title: "Daily operations",
-    body: "Pending approvals · bank balances · recent activity · quick actions.",
+    href: "/finance/workspace", icon: "bank", tone: "amber",
+    kickerKey: "home.path.daily.kicker", kickerFallback: "Day-to-day",
+    titleKey:  "home.path.daily.title",  titleFallback:  "Daily operations",
+    bodyKey:   "home.path.daily.body",
+    bodyFallback: "Pending approvals · bank balances · recent activity · quick actions.",
   },
   {
-    href: "/finance/accounting/queue",
-    icon: "books",
-    tone: "neutral",
-    kicker: "Accounting",
-    title: "Ledger work",
-    body: "Review journal queue · post entries · trial balance · general ledger.",
+    href: "/finance/accounting/queue", icon: "books", tone: "neutral",
+    kickerKey: "home.path.accounting.kicker", kickerFallback: "Accounting",
+    titleKey:  "home.path.accounting.title",  titleFallback:  "Ledger work",
+    bodyKey:   "home.path.accounting.body",
+    bodyFallback: "Review journal queue · post entries · trial balance · general ledger.",
   },
 ];
 
@@ -88,6 +88,7 @@ interface SetupHealth {
 }
 
 export default function FinanceHome() {
+  const { t } = useTranslation(financeT);
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
   /* Tenant currency comes from the shared cached hook — see
      useBaseCurrencyOptional. Returns null until resolved; KPI labels
@@ -125,36 +126,39 @@ export default function FinanceHome() {
 
   const cashPosition = (kpi?.cash_in ?? 0) - (kpi?.cash_out ?? 0);
 
+  const grossMarginPct = (kpi?.gross_margin_pct ?? 0).toFixed(1);
   const kpis: Kpi[] = [
     {
-      label: "Money to Collect",
+      label: t("home.kpi.collect", "Money to Collect"),
       value: kpi?.accounts_receivable ?? 0,
       unit: baseCurrency,
-      hint: "Outstanding AR · tap for aging",
+      hint: t("home.kpi.collect.hint", "Outstanding AR · tap for aging"),
       href: "/reports/statements?tab=ar",
       tone: "warning",
     },
     {
-      label: "Money to Pay",
+      label: t("home.kpi.pay", "Money to Pay"),
       value: kpi?.accounts_payable ?? 0,
       unit: baseCurrency,
-      hint: "Suppliers + bills · tap for aging",
+      hint: t("home.kpi.pay.hint", "Suppliers + bills · tap for aging"),
       href: "/reports/statements?tab=ap",
       tone: "warning",
     },
     {
-      label: "Cash Position",
+      label: t("home.kpi.cash", "Cash Position"),
       value: cashPosition,
       unit: baseCurrency,
-      hint: cashPosition >= 0 ? "Inflow heavy" : "Outflow heavy",
+      hint: cashPosition >= 0
+        ? t("home.kpi.cash.in",  "Inflow heavy")
+        : t("home.kpi.cash.out", "Outflow heavy"),
       href: "/finance/bank-accounts",
       tone: cashPosition >= 0 ? "positive" : "warning",
     },
     {
-      label: "Net Profit",
+      label: t("home.kpi.netProfit", "Net Profit"),
       value: kpi?.net_profit ?? 0,
       unit: baseCurrency,
-      hint: `${(kpi?.gross_margin_pct ?? 0).toFixed(1)}% gross margin · tap for P&L`,
+      hint: t("home.kpi.netProfit.hint", "{pct}% gross margin · tap for P&L").replace("{pct}", grossMarginPct),
       href: "/finance/visual",
       tone: (kpi?.net_profit ?? 0) >= 0 ? "positive" : "warning",
     },
@@ -164,8 +168,8 @@ export default function FinanceHome() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <FinanceHeader
-          title="Finance"
-          subtitle="Add data, read data, run the books — every path one click away."
+          title={t("app.title", "Finance")}
+          subtitle={t("app.subtitle", "Add data, read data, run the books — every path one click away.")}
         />
 
         {/* Setup-health banner. Hidden once every card is at least
@@ -176,7 +180,7 @@ export default function FinanceHome() {
 
         {/* What do you want to do? — the only thing above the fold. */}
         <section className="mt-5">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">What do you want to do?</div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowAction", "What do you want to do?")}</div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PATHS.map((p) => <PathTileCard key={p.href} tile={p} />)}
           </div>
@@ -184,7 +188,7 @@ export default function FinanceHome() {
 
         {/* Four essential KPIs. */}
         <section className="mt-8">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">Today at a glance</div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowToday", "Today at a glance")}</div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {kpis.map((k) => <KpiCard key={k.label} kpi={k} loading={loading} />)}
           </div>
@@ -194,61 +198,61 @@ export default function FinanceHome() {
             five-column layout so the operator always knows where
             things live. Mirrors the FinanceTabs structure exactly. */}
         <section className="mt-10">
-          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">Finance Map · every page, at a glance</div>
+          <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.eyebrowMap", "Finance Map · every page, at a glance")}</div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <MapColumn
-              title="Home"
-              hint="Start here"
+              title={t("home.map.home", "Home")}
+              hint={t("home.map.home.hint", "Start here")}
               links={[
-                { href: "/finance",              label: "Home" },
-                { href: "/finance/intelligence", label: "Intelligence (deep view)" },
-                { href: "/finance/workspace",    label: "Workspace" },
-                { href: "/finance/setup",        label: "Setup" },
+                { href: "/finance",              label: t("subtab.home",         "Home") },
+                { href: "/finance/intelligence", label: t("home.map.intelligence","Intelligence (deep view)") },
+                { href: "/finance/workspace",    label: t("subtab.workspace",    "Workspace") },
+                { href: "/finance/setup",        label: t("subtab.setup",        "Setup") },
               ]}
             />
             <MapColumn
-              title="Operations"
-              hint="Daily transactions"
+              title={t("home.map.operations", "Operations")}
+              hint={t("home.map.operations.hint", "Daily transactions")}
               links={[
-                { href: "/finance/orders",    label: "Order Profitability" },
-                { href: "/finance/customers", label: "Customers" },
-                { href: "/finance/suppliers", label: "Suppliers" },
-                { href: "/finance/payments",  label: "Payments" },
-                { href: "/finance/expenses",  label: "Expense Analytics" },
+                { href: "/finance/orders",    label: t("home.map.orderProfit",       "Order Profitability") },
+                { href: "/finance/customers", label: t("subtab.customers",           "Customers") },
+                { href: "/finance/suppliers", label: t("subtab.suppliers",           "Suppliers") },
+                { href: "/finance/payments",  label: t("subtab.payments",            "Payments") },
+                { href: "/finance/expenses",  label: t("subtab.expenseAnalytics",    "Expense Analytics") },
               ]}
             />
             <MapColumn
-              title="Cash & Banking"
-              hint="Cash management"
+              title={t("home.map.cash", "Cash & Banking")}
+              hint={t("home.map.cash.hint", "Cash management")}
               links={[
-                { href: "/finance/bank-accounts",     label: "Bank Accounts" },
-                { href: "/finance/bank-imports",      label: "Bank Imports" },
-                { href: "/finance/reconciliation",    label: "Reconciliation" },
-                { href: "/finance/treasury-forecast", label: "Cash Forecast" },
-                { href: "/finance/treasury-plans",    label: "Treasury Plans" },
-                { href: "/finance/fx-rates",          label: "Exchange Rates" },
+                { href: "/finance/bank-accounts",     label: t("subtab.bankAccounts",   "Bank Accounts") },
+                { href: "/finance/bank-imports",      label: t("subtab.bankImports",    "Bank Imports") },
+                { href: "/finance/reconciliation",    label: t("subtab.reconciliation", "Reconciliation") },
+                { href: "/finance/treasury-forecast", label: t("subtab.cashForecast",   "Cash Forecast") },
+                { href: "/finance/treasury-plans",    label: t("subtab.treasuryPlans",  "Treasury Plans") },
+                { href: "/finance/fx-rates",          label: t("home.map.exchangeRates","Exchange Rates") },
               ]}
             />
             <MapColumn
-              title="Accounting"
-              hint="Ledger work"
+              title={t("home.map.accounting", "Accounting")}
+              hint={t("home.map.accounting.hint", "Ledger work")}
               links={[
-                { href: "/finance/accounting/queue",          label: "Queue (approvals)" },
-                { href: "/finance/accounting/trial-balance",  label: "Trial Balance" },
-                { href: "/finance/accounting/general-ledger", label: "General Ledger" },
-                { href: "/finance/accounting/profit-loss",    label: "Profit & Loss" },
-                { href: "/finance/accounting/cash-flow",      label: "Cash Flow" },
-                { href: "/finance/accounting/equity",         label: "Equity" },
+                { href: "/finance/accounting/queue",          label: t("home.map.queueApprovals", "Queue (approvals)") },
+                { href: "/finance/accounting/trial-balance",  label: t("subtab.trialBalance",     "Trial Balance") },
+                { href: "/finance/accounting/general-ledger", label: t("subtab.generalLedger",    "General Ledger") },
+                { href: "/finance/accounting/profit-loss",    label: t("subtab.profitLoss",       "Profit & Loss") },
+                { href: "/finance/accounting/cash-flow",      label: t("subtab.cashFlow",         "Cash Flow") },
+                { href: "/finance/accounting/equity",         label: t("subtab.equity",           "Equity") },
               ]}
             />
             <MapColumn
-              title="Reports"
-              hint="Read the books"
+              title={t("home.map.reports", "Reports")}
+              hint={t("home.map.reports.hint", "Read the books")}
               links={[
-                { href: "/finance/visual",        label: "Visual Statements" },
-                { href: "/finance/statements",    label: "Detailed Statements" },
-                { href: "/finance/reports",       label: "Operational Reports" },
-                { href: "/finance/notifications", label: "Reminders" },
+                { href: "/finance/visual",        label: t("subtab.visualStatements",   "Visual Statements") },
+                { href: "/finance/statements",    label: t("subtab.detailedStatements", "Detailed Statements") },
+                { href: "/finance/reports",       label: t("subtab.operationalReports", "Operational Reports") },
+                { href: "/finance/notifications", label: t("subtab.reminders",          "Reminders") },
               ]}
             />
           </div>
@@ -261,14 +265,14 @@ export default function FinanceHome() {
             className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.012] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
           >
             <div>
-              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Need the deep view?</div>
-              <div className="mt-1 text-[13px] font-medium">Open the full Financial Intelligence dashboard</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{t("home.deep.kicker", "Need the deep view?")}</div>
+              <div className="mt-1 text-[13px] font-medium">{t("home.deep.title", "Open the full Financial Intelligence dashboard")}</div>
               <div className="mt-0.5 text-[11px] text-gray-500">
-                System health · liquidity · counterparty risk · period-over-period deviations · cash flow chart · profit waterfall.
+                {t("home.deep.body", "System health · liquidity · counterparty risk · period-over-period deviations · cash flow chart · profit waterfall.")}
               </div>
             </div>
             <span className="shrink-0 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[11.5px] text-gray-200">
-              Open →
+              {t("home.deep.cta", "Open →")}
             </span>
           </Link>
         </section>
@@ -333,19 +337,20 @@ function PathTileCard({ tile }: { tile: PathTile }) {
       kicker: "text-gray-500",
     },
   };
-  const t = tones[tile.tone];
+  const toneCls = tones[tile.tone];
+  const { t } = useTranslation(financeT);
   return (
     <Link
       href={tile.href}
-      className={`group flex h-full items-start gap-3 rounded-xl border ${t.border} ${t.bg} px-4 py-4 transition-colors`}
+      className={`group flex h-full items-start gap-3 rounded-xl border ${toneCls.border} ${toneCls.bg} px-4 py-4 transition-colors`}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${t.iconBg} ${t.iconText}`}>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${toneCls.iconBg} ${toneCls.iconText}`}>
         <RrIcon name={tile.icon} size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className={`text-[10px] uppercase tracking-[0.16em] ${t.kicker}`}>{tile.kicker}</div>
-        <div className="mt-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">{tile.title}</div>
-        <div className="mt-1 text-[11px] text-gray-400">{tile.body}</div>
+        <div className={`text-[10px] uppercase tracking-[0.16em] ${toneCls.kicker}`}>{t(tile.kickerKey, tile.kickerFallback)}</div>
+        <div className="mt-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">{t(tile.titleKey, tile.titleFallback)}</div>
+        <div className="mt-1 text-[11px] text-gray-400">{t(tile.bodyKey, tile.bodyFallback)}</div>
       </div>
       <RrIcon name="arrow-up-right" size={11} className="text-gray-500 transition-colors group-hover:text-gray-200" />
     </Link>
@@ -386,10 +391,11 @@ function KpiCard({ kpi, loading }: { kpi: Kpi; loading: boolean }) {
    names the top 3 missing items so the next click is obvious. */
 
 function SetupHealthBanner({ health }: { health: SetupHealth }) {
+  const { t } = useTranslation(financeT);
   const pct = Math.round(health.completion * 100);
   const items = health.missingTitles.join(" · ");
   const more = health.missingCount > health.missingTitles.length
-    ? ` · +${health.missingCount - health.missingTitles.length} more`
+    ? t("home.banner.more", " · +{n} more").replace("{n}", String(health.missingCount - health.missingTitles.length))
     : "";
   return (
     <section className="mt-5">
@@ -402,12 +408,12 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-amber-300/80">
-            Finance setup · {pct}% complete
+            {t("home.banner.kicker", "Finance setup · {pct}% complete").replace("{pct}", String(pct))}
           </div>
           <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">
             {health.missingCount === 1
-              ? "1 setup item is empty — your KPIs may understate cash and AR/AP until it's filled."
-              : `${health.missingCount} setup items are empty — your KPIs may understate cash and AR/AP until they're filled.`}
+              ? t("home.banner.oneMissing", "1 setup item is empty — your KPIs may understate cash and AR/AP until it's filled.")
+              : t("home.banner.manyMissing", "{n} setup items are empty — your KPIs may understate cash and AR/AP until they're filled.").replace("{n}", String(health.missingCount))}
           </div>
           <div className="mt-1 truncate text-[11px] text-gray-400">{items}{more}</div>
         </div>

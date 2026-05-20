@@ -24,6 +24,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
+import { useTranslation } from "@/lib/i18n";
+import { expensesT } from "@/lib/translations/expenses";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
@@ -60,18 +62,21 @@ type TabKey = ExpensesTabKey;
    so the predicate logic + filter UI agree on what each chip means. */
 type ApprovalFilterKey = HookApprovalFilterKey;
 
-const APPROVAL_FILTER_LABELS: Record<ApprovalFilterKey, string> = {
-  all:              "Any state",
-  needs_review:     "Needs review",
-  draft:            "Drafts",
-  rejected:         "Rejected",
-  requires_changes: "Changes needed",
-  approved:         "Approved",
+/* English fallbacks live alongside the i18n keys so the strip still
+   renders if the dictionary is missing a key for some reason. */
+const APPROVAL_FILTER_LABELS: Record<ApprovalFilterKey, { key: string; en: string }> = {
+  all:              { key: "approval.any",          en: "Any state" },
+  needs_review:     { key: "approval.needsReview",  en: "Needs review" },
+  draft:            { key: "approval.drafts",       en: "Drafts" },
+  rejected:         { key: "approval.rejected",     en: "Rejected" },
+  requires_changes: { key: "approval.changesNeeded",en: "Changes needed" },
+  approved:         { key: "approval.approved",     en: "Approved" },
 };
 
 const CURRENCIES = ["USD", "EUR", "CNY", "EGP", "GBP"];
 
 export default function ExpensesApp() {
+  const { t } = useTranslation(expensesT);
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,8 +201,8 @@ export default function ExpensesApp() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <ExpensesHeader
-          title="Expenses"
-          subtitle="Fast daily expense entry. Add receipts, track what&apos;s paid, what&apos;s due."
+          title={t("app.title", "Expenses")}
+          subtitle={t("app.subtitle", "Fast daily expense entry. Add receipts, track what's paid, what's due.")}
           tab={tab}
           onTabChange={setTab}
           counts={counts}
@@ -207,7 +212,7 @@ export default function ExpensesApp() {
               onClick={startNew}
               className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
             >
-              + Add Expense
+              {t("header.addExpense", "+ Add Expense")}
             </button>
           }
         />
@@ -215,12 +220,13 @@ export default function ExpensesApp() {
         {/* ── Phase 2.2 — Approval filter strip ─────────────────── */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           <span className="mr-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-gray-500">
-            <span>Approval</span>
+            <span>{t("approval.label", "Approval")}</span>
             <GuidanceTip guidanceId="approval.status" />
           </span>
           {(Object.keys(APPROVAL_FILTER_LABELS) as ApprovalFilterKey[]).map((key) => {
             const active = approvalFilter === key;
             const count = approvalCounts[key];
+            const lbl = APPROVAL_FILTER_LABELS[key];
             return (
               <button
                 key={key}
@@ -233,7 +239,7 @@ export default function ExpensesApp() {
                     : "border-white/[0.05] bg-white/[0.02] text-gray-400 hover:bg-white/[0.05] hover:text-gray-200")
                 }
               >
-                <span>{APPROVAL_FILTER_LABELS[key]}</span>
+                <span>{t(lbl.key, lbl.en)}</span>
                 {count > 0 && key !== "all" && (
                   <span className={
                     "rounded-full px-1 text-[9px] tabular-nums " +
@@ -250,7 +256,7 @@ export default function ExpensesApp() {
         {/* ── VISUAL CATEGORY TILES ──────────────────────────────── */}
         {topCategories.length > 0 && (
           <div className="mt-6">
-            <SectionCard title="Top categories" subtitle="Tap a tile to filter the list below." helpId="expense.section.topCategories">
+            <SectionCard title={t("categories.title", "Top categories")} subtitle={t("categories.tapHint", "Tap a tile to filter the list below.")} helpId="expense.section.topCategories">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {topCategories.map((c) => {
                   const style = styleForCategory(c.name);
@@ -267,7 +273,7 @@ export default function ExpensesApp() {
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><RrIcon name={style.icon} size={18} /></span>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12px] font-semibold uppercase tracking-wider text-gray-300">{c.name}</div>
-                          <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? "expense" : "expenses"}</div>
+                          <div className="text-[10px] text-gray-500">{c.count} {c.count === 1 ? t("categories.expenseOne", "expense") : t("categories.expenseMany", "expenses")}</div>
                         </div>
                       </div>
                       <div className="mt-3 text-base font-semibold tabular-nums">{fmtMoney(c.total, baseCurrency, { compact: true })}</div>
@@ -282,15 +288,12 @@ export default function ExpensesApp() {
           </div>
         )}
 
-        {/* ── SEARCH / FILTER BAR ─────────────────────────────────
-            (The All/Unpaid/Paid/Overdue tabs now live in the header
-            so this row only carries free-text search + the active
-            category-filter chip.) */}
+        {/* ── SEARCH / FILTER BAR ───────────────────────────────── */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search expenses…"
+            placeholder={t("search.placeholder", "Search expenses…")}
             className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-sm placeholder-gray-600 focus:border-white/[0.22] focus:outline-none sm:max-w-[280px]"
           />
           {categoryFilter && (
@@ -298,9 +301,9 @@ export default function ExpensesApp() {
               type="button"
               onClick={() => setCategoryFilter("")}
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
-              title="Clear category filter"
+              title={t("filter.clearTitle", "Clear category filter")}
             >
-              Clear filter
+              {t("filter.clear", "Clear filter")}
               <RrIcon name="cross" size={10} />
             </button>
           )}
@@ -309,13 +312,17 @@ export default function ExpensesApp() {
         {/* ── EXPENSE LIST ───────────────────────────────────────── */}
         <div className="mt-4">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading expenses…</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("list.loading", "Loading expenses…")}</div></SectionCard>
           ) : filtered.length === 0 ? (
             <EmptyState
-              title={search || categoryFilter ? "No expenses match your filter" : tab === "all" ? "No expenses yet" : `No ${tab} expenses`}
-              hint={tab === "all" ? "Click + Add Expense to log your first one." : undefined}
+              title={search || categoryFilter
+                ? t("list.empty.filtered", "No expenses match your filter")
+                : tab === "all"
+                  ? t("list.empty.all", "No expenses yet")
+                  : t(`list.empty.${tab}`, `No ${tab} expenses`)}
+              hint={tab === "all" ? t("list.empty.hint", "Click + Add Expense to log your first one.") : undefined}
               action={tab === "all" ? (
-                <button onClick={startNew} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">+ Add Expense</button>
+                <button onClick={startNew} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("header.addExpense", "+ Add Expense")}</button>
               ) : undefined}
             />
           ) : (
@@ -363,7 +370,7 @@ export default function ExpensesApp() {
         onClose={() => setEvidenceExpense(null)}
         entityType="expense"
         entityId={evidenceExpense?.id ?? null}
-        title={evidenceExpense?.title ?? "Expense"}
+        title={evidenceExpense?.title ?? t("evidence.title", "Expense")}
         evidenceStatus={evidenceExpense?.evidence_status}
         receiptCount={evidenceExpense?.receipt_count}
         approvalStatus={evidenceExpense?.approval_status}
@@ -401,17 +408,19 @@ export default function ExpensesApp() {
       {/* ── Micro-polish — Hub-native delete confirmation + Undo. ── */}
       <ConfirmDialog
         open={!!confirmDelete}
-        title={confirmDelete ? `Delete "${confirmDelete.title || "expense"}"?` : ""}
-        description="You'll have 5 seconds to undo. Receipts and approval history will be removed once the timer expires."
-        confirmLabel="Delete"
-        cancelLabel="Keep"
+        title={confirmDelete
+          ? t("confirm.deleteTitle", 'Delete "{name}"?').replace("{name}", confirmDelete.title || t("confirm.deleteFallback", "expense"))
+          : ""}
+        description={t("confirm.deleteDesc", "You'll have 5 seconds to undo. Receipts and approval history will be removed once the timer expires.")}
+        confirmLabel={t("confirm.delete", "Delete")}
+        cancelLabel={t("confirm.keep", "Keep")}
         destructive
         onCancel={() => setConfirmDelete(null)}
         onConfirm={startDeferredDelete}
       />
       <UndoToast
         open={!!pendingDeleteId}
-        message={`Deleted "${pendingDeleteTitle}"`}
+        message={t("toast.deleted", 'Deleted "{name}"').replace("{name}", pendingDeleteTitle)}
         onUndo={undoDeferredDelete}
         onExpire={() => { void commitDeferredDelete(); }}
       />
@@ -433,6 +442,7 @@ function ExpenseRow({
   nowMs: number;
   todayIso: string;
 }) {
+  const { t } = useTranslation(expensesT);
   const style = styleForCategory(e.category_name);
   const isOverdue = e.payment_status !== "paid" && !!e.due_date && e.due_date < todayIso;
   /* Phase 2.1: evidence status is now the canonical signal. Legacy
@@ -456,14 +466,14 @@ function ExpenseRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium">{e.title || "Untitled expense"}</span>
+            <span className="truncate text-sm font-medium">{e.title || t("list.untitled", "Untitled expense")}</span>
             <StatusBadge status={e.payment_status} />
-            {isOverdue && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-300">Overdue</span>}
+            {isOverdue && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-300">{t("badge.overdue", "Overdue")}</span>}
             <button
               type="button"
               onClick={onEvidence}
               className="cursor-pointer"
-              title="Open evidence drawer"
+              title={t("list.openEvidence", "Open evidence drawer")}
             >
               <EvidenceBadge status={evidenceStatus} receiptCount={receiptCount} compact />
             </button>
@@ -471,7 +481,7 @@ function ExpenseRow({
               type="button"
               onClick={onReview}
               className="cursor-pointer"
-              title="Open approval review drawer"
+              title={t("list.openReview", "Open approval review drawer")}
             >
               <ApprovalBadge status={approvalStatus} ageDays={ageDays} compact />
             </button>
@@ -479,8 +489,8 @@ function ExpenseRow({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
             <span>{e.expense_date}</span>
             {e.category_name && (<><span>·</span><span>{e.category_name}</span></>)}
-            {e.due_date && (<><span>·</span><span>Due {e.due_date}</span></>)}
-            {e.linked_order_id && (<><span>·</span><span>Linked to order</span></>)}
+            {e.due_date && (<><span>·</span><span>{t("list.dueLabel", "Due")} {e.due_date}</span></>)}
+            {e.linked_order_id && (<><span>·</span><span>{t("list.linkedOrder", "Linked to order")}</span></>)}
           </div>
           {e.notes && (
             <div className="mt-1 truncate text-[11px] text-gray-400">{e.notes}</div>
@@ -499,9 +509,9 @@ function ExpenseRow({
             <button
               onClick={onEdit}
               className="rounded-md border border-white/[0.05] bg-white/[0.02] px-2 py-1 text-[11px] text-gray-300 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05]"
-              title="Edit expense"
+              title={t("row.editTitle", "Edit expense")}
             >
-              Edit
+              {t("common.edit", "Edit")}
             </button>
             <RowKebab onEvidence={onEvidence} onReview={onReview} onDelete={onDelete} />
           </div>
@@ -522,6 +532,7 @@ function RowKebab({
   onReview: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation(expensesT);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -533,7 +544,7 @@ function RowKebab({
     <div className="relative">
       <button
         type="button"
-        aria-label="More actions"
+        aria-label={t("row.moreActions", "More actions")}
         onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v); }}
         className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.05] bg-white/[0.02] text-gray-400 transition-colors hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-gray-100"
       >
@@ -544,9 +555,9 @@ function RowKebab({
           onClick={(ev) => ev.stopPropagation()}
           className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)]"
         >
-          <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">Open review</button>
-          <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">Open evidence</button>
-          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-white/[0.05] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">Delete expense</button>
+          <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">{t("row.openReview", "Open review")}</button>
+          <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-gray-200 hover:bg-white/[0.04]">{t("row.openEvidence", "Open evidence")}</button>
+          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-white/[0.05] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">{t("row.deleteExpense", "Delete expense")}</button>
         </div>
       )}
     </div>
@@ -572,6 +583,7 @@ function ExpenseEditor({
    *  parent can auto-open the evidence drawer for fresh expenses. */
   onSaved: (saved: FinanceExpense | null, wasNew: boolean) => void;
 }) {
+  const { t } = useTranslation(expensesT);
   const [local, setLocal] = useState<Partial<FinanceExpense>>(draft);
   const [saving, setSaving] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(!!draft.linked_order_id || !!draft.linked_supplier_id || !!draft.attachment_url);
@@ -583,8 +595,8 @@ function ExpenseEditor({
 
   const save = async () => {
     setError(null);
-    if (!local.title?.trim()) { setError("Add a short title so this expense is findable later."); return; }
-    if (!Number(local.amount) || Number(local.amount) <= 0) { setError("Amount must be greater than zero."); return; }
+    if (!local.title?.trim()) { setError(t("editor.err.titleMissing", "Add a short title so this expense is findable later.")); return; }
+    if (!Number(local.amount) || Number(local.amount) <= 0) { setError(t("editor.err.amountInvalid", "Amount must be greater than zero.")); return; }
     setSaving(true);
     try {
       const r = await fetch("/api/expenses", {
@@ -593,7 +605,7 @@ function ExpenseEditor({
         body: JSON.stringify(local),
       });
       if (!r.ok) {
-        setError("Save failed — try again.");
+        setError(t("editor.err.saveFailed", "Save failed — try again."));
         return;
       }
       const body = (await r.json().catch(() => ({}))) as { expense?: FinanceExpense };
@@ -639,16 +651,16 @@ function ExpenseEditor({
               </span>
               <div className="min-w-0">
                 <h2 className="truncate text-[15px] font-semibold text-[var(--text-primary)]">
-                  {local.id ? "Edit expense" : "Add expense"}
+                  {local.id ? t("editor.titleEdit", "Edit expense") : t("editor.titleAdd", "Add expense")}
                 </h2>
                 <p className="mt-0.5 text-[11px] text-gray-500">
-                  Title, amount, and a category — done in 20 seconds. The rest is optional.
+                  {t("editor.subtitle", "Title, amount, and a category — done in 20 seconds. The rest is optional.")}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("editor.close", "Close")}
               className="rounded-lg p-1.5 text-gray-400 transition hover:bg-white/[0.06] hover:text-gray-100"
             >
               <RrIcon name="cross" size={14} />
@@ -660,20 +672,20 @@ function ExpenseEditor({
         <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           <div className="space-y-6">
             {/* ── Section 1: Basics ─────────────────────────────── */}
-            <Section title="Basics" hint="What it was and how much it cost.">
+            <Section title={t("editor.section.basics", "Basics")} hint={t("editor.section.basicsHint", "What it was and how much it cost.")}>
               <div className="space-y-3">
-                <FieldLabel label="What was this for?" helpId="expense.title" required>
+                <FieldLabel label={t("editor.field.what", "What was this for?")} helpId="expense.title" required>
                   <input
                     autoFocus
                     value={local.title ?? ""}
                     onChange={(e) => setLocal({ ...local, title: e.target.value })}
-                    placeholder="e.g. Sea freight to Alexandria"
+                    placeholder={t("editor.field.whatPlaceholder", "e.g. Sea freight to Alexandria")}
                     className={INPUT_LG}
                   />
                 </FieldLabel>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <FieldLabel label="Amount" helpId="expense.amount" required>
+                    <FieldLabel label={t("editor.field.amount", "Amount")} helpId="expense.amount" required>
                       <input
                         type="number"
                         inputMode="decimal"
@@ -683,7 +695,7 @@ function ExpenseEditor({
                       />
                     </FieldLabel>
                   </div>
-                  <FieldLabel label="Currency">
+                  <FieldLabel label={t("editor.field.currency", "Currency")}>
                     <select
                       value={local.currency ?? baseCurrency}
                       onChange={(e) => setLocal({ ...local, currency: e.target.value })}
@@ -698,8 +710,8 @@ function ExpenseEditor({
 
             {/* ── Section 2: Category (the star of the show) ────── */}
             <Section
-              title="Category"
-              hint="Pick a group on the left, then a specific sub-category."
+              title={t("editor.section.category", "Category")}
+              hint={t("editor.section.categoryHint", "Pick a group on the left, then a specific sub-category.")}
               right={
                 selectedCat ? (
                   <span
@@ -718,7 +730,7 @@ function ExpenseEditor({
                   </span>
                 ) : (
                   <span className="rounded-full border border-dashed border-white/[0.12] px-2 py-0.5 text-[11px] text-gray-500">
-                    No category selected
+                    {t("editor.noCategory", "No category selected")}
                   </span>
                 )
               }
@@ -731,9 +743,9 @@ function ExpenseEditor({
             </Section>
 
             {/* ── Section 3: Schedule ───────────────────────────── */}
-            <Section title="Schedule" hint="When the cost was incurred and when it's due.">
+            <Section title={t("editor.section.schedule", "Schedule")} hint={t("editor.section.scheduleHint", "When the cost was incurred and when it's due.")}>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <FieldLabel label="Date">
+                <FieldLabel label={t("editor.field.expDate", "Date")}>
                   <input
                     type="date"
                     value={local.expense_date ?? ""}
@@ -741,18 +753,18 @@ function ExpenseEditor({
                     className={INPUT}
                   />
                 </FieldLabel>
-                <FieldLabel label="Status" helpId="expense.paymentStatus">
+                <FieldLabel label={t("editor.field.payStatus", "Status")} helpId="expense.paymentStatus">
                   <select
                     value={local.payment_status ?? "unpaid"}
                     onChange={(e) => setLocal({ ...local, payment_status: e.target.value as FinanceExpense["payment_status"] })}
                     className={INPUT}
                   >
-                    <option value="unpaid">Unpaid</option>
-                    <option value="partial">Partial</option>
-                    <option value="paid">Paid</option>
+                    <option value="unpaid">{t("status.unpaid", "Unpaid")}</option>
+                    <option value="partial">{t("status.partial", "Partially approved")}</option>
+                    <option value="paid">{t("status.paid", "Paid")}</option>
                   </select>
                 </FieldLabel>
-                <FieldLabel label="Due date" helpId="expense.dueDate">
+                <FieldLabel label={t("editor.field.dueDate", "Due date")} helpId="expense.dueDate">
                   <input
                     type="date"
                     value={local.due_date ?? ""}
@@ -764,12 +776,12 @@ function ExpenseEditor({
             </Section>
 
             {/* ── Section 4: Notes ──────────────────────────────── */}
-            <Section title="Notes" hint="Optional — one line of context if it'll help your future self.">
-              <FieldLabel label="Notes" helpId="expense.notes">
+            <Section title={t("editor.field.notes", "Notes")} hint={t("editor.section.notesHint", "Optional — one line of context if it'll help your future self.")}>
+              <FieldLabel label={t("editor.field.notes", "Notes")} helpId="expense.notes">
                 <input
                   value={local.notes ?? ""}
                   onChange={(e) => setLocal({ ...local, notes: e.target.value })}
-                  placeholder="One-line context"
+                  placeholder={t("editor.field.notesPlaceholder", "One-line context")}
                   className={INPUT}
                 />
               </FieldLabel>
@@ -784,37 +796,37 @@ function ExpenseEditor({
               >
                 <span className="inline-flex items-center gap-2">
                   <RrIcon name={advancedOpen ? "cross" : "plus"} size={11} className="opacity-70" />
-                  Advanced options
+                  {t("editor.advanced.title", "Advanced options")}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider text-gray-500">
-                  link to order / supplier / receipt URL
+                  {t("editor.advanced.hint", "link to order / supplier / receipt URL")}
                 </span>
               </button>
               {advancedOpen && (
                 <div className="grid grid-cols-1 gap-3 border-t border-white/[0.05] px-4 py-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <FieldLabel label="Legacy receipt URL">
+                    <FieldLabel label={t("editor.advanced.receiptUrl", "Legacy receipt URL")}>
                       <input
                         value={local.attachment_url ?? ""}
                         onChange={(e) => setLocal({ ...local, attachment_url: e.target.value || null })}
-                        placeholder="https://… (most teams now use the Evidence drawer instead)"
+                        placeholder={t("editor.advanced.receiptUrlHint", "https://… (most teams now use the Evidence drawer instead)")}
                         className={INPUT}
                       />
                     </FieldLabel>
                   </div>
-                  <FieldLabel label="Linked supplier">
+                  <FieldLabel label={t("editor.advanced.linkedSupplier", "Linked supplier")}>
                     <input
                       value={local.linked_supplier_id ?? ""}
                       onChange={(e) => setLocal({ ...local, linked_supplier_id: e.target.value || null })}
-                      placeholder="Supplier id (optional)"
+                      placeholder={t("editor.advanced.supplierIdHint", "Supplier id (optional)")}
                       className={INPUT}
                     />
                   </FieldLabel>
-                  <FieldLabel label="Linked customer">
+                  <FieldLabel label={t("editor.advanced.linkedCustomer", "Linked customer")}>
                     <input
                       value={local.linked_customer_id ?? ""}
                       onChange={(e) => setLocal({ ...local, linked_customer_id: e.target.value || null })}
-                      placeholder="Customer id (optional)"
+                      placeholder={t("editor.advanced.customerIdHint", "Customer id (optional)")}
                       className={INPUT}
                     />
                   </FieldLabel>
@@ -835,7 +847,7 @@ function ExpenseEditor({
                 </span>
               ) : (
                 <span className="text-[11px] text-gray-500">
-                  {selectedCat ? `Category · ${selectedCat.name}` : "Pick a category to make reporting cleaner."}
+                  {selectedCat ? `${t("editor.footer.category", "Category")} · ${selectedCat.name}` : t("editor.footer.pickPrompt", "Pick a category to make reporting cleaner.")}
                 </span>
               )}
             </div>
@@ -844,7 +856,7 @@ function ExpenseEditor({
                 onClick={onClose}
                 className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-gray-300 transition hover:border-white/[0.18] hover:text-gray-100"
               >
-                Cancel
+                {t("common.cancel", "Cancel")}
               </button>
               <button
                 onClick={save}
@@ -854,12 +866,12 @@ function ExpenseEditor({
                 {saving ? (
                   <>
                     <RrIcon name="loading" size={11} className="animate-spin" />
-                    Saving…
+                    {t("editor.saving", "Saving…")}
                   </>
                 ) : (
                   <>
                     <RrIcon name="check" size={11} />
-                    {wasNew ? "Save & attach receipt" : "Save expense"}
+                    {wasNew ? t("editor.saveAndAttach", "Save & attach receipt") : t("editor.saveExpense", "Save expense")}
                   </>
                 )}
               </button>
@@ -948,6 +960,7 @@ function CategoryPicker({
   value: string | null;
   onChange: (id: string) => void;
 }) {
+  const { t } = useTranslation(expensesT);
   const parents = useMemo(
     () => categories.filter((c) => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order),
     [categories],
@@ -1034,7 +1047,7 @@ function CategoryPicker({
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-semibold leading-tight">{p.name}</div>
                 <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500">
-                  {subCount} {subCount === 1 ? "option" : "options"}
+                  {subCount} {subCount === 1 ? t("picker.optionOne", "option") : t("picker.optionMany", "options")}
                 </div>
               </div>
             </button>
@@ -1052,7 +1065,7 @@ function CategoryPicker({
                 <RrIcon name={activeParentStyle.icon} size={11} />
               </span>
               <span className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{activeParentObj.name}</span>
-              <span className="hidden text-[10px] text-gray-500 sm:inline">· choose a sub-category</span>
+              <span className="hidden text-[10px] text-gray-500 sm:inline">{t("picker.chooseSub", "· choose a sub-category")}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {activeChildren.length > 5 && (
@@ -1061,7 +1074,7 @@ function CategoryPicker({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Filter…"
+                    placeholder={t("picker.filterPlaceholder", "Filter…")}
                     className="w-24 bg-transparent text-[11px] placeholder-gray-600 focus:outline-none sm:w-32"
                   />
                 </div>
@@ -1073,7 +1086,7 @@ function CategoryPicker({
                   className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-gray-400 transition hover:border-rose-500/30 hover:text-rose-300"
                 >
                   <RrIcon name="cross" size={9} />
-                  Clear
+                  {t("picker.clear", "Clear")}
                 </button>
               )}
             </div>
@@ -1090,12 +1103,12 @@ function CategoryPicker({
                   ? accentActiveClass(activeParentStyle.accent)
                   : "border-dashed border-white/[0.10] bg-[var(--bg-secondary)] text-gray-300 hover:border-white/[0.22] hover:bg-white/[0.04]"
               }`}
-              title={`General · ${activeParentObj.name}`}
+              title={`${t("picker.general", "General")} · ${activeParentObj.name}`}
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.06]">
                 <RrIcon name="info" size={11} className="opacity-70" />
               </span>
-              <span className="min-w-0 flex-1 truncate">General · {activeParentObj.name}</span>
+              <span className="min-w-0 flex-1 truncate">{t("picker.general", "General")} · {activeParentObj.name}</span>
               {value === activeParent && <RrIcon name="check" size={11} className="shrink-0 opacity-80" />}
             </button>
 
@@ -1126,7 +1139,7 @@ function CategoryPicker({
 
             {filteredChildren.length === 0 && query && (
               <div className="col-span-full rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[11px] text-gray-500">
-                No sub-categories match &ldquo;{query}&rdquo;.
+                {t("picker.noMatch", "No sub-categories match “{q}”.").replace("{q}", query)}
               </div>
             )}
           </div>

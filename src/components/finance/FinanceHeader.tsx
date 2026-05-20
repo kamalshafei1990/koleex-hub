@@ -20,29 +20,33 @@ import Link from "next/link";
 import RrIcon from "@/components/ui/RrIcon";
 import FinanceTabs from "@/components/finance/FinanceTabs";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
-const HEALTH_STYLE: Record<HealthStatus, { dot: string; label: string; hint: string }> = {
+interface HealthStyle { dot: string; labelKey: string; labelFallback: string; hintKey: string; hintFallback: string }
+
+const HEALTH_STYLE: Record<HealthStatus, HealthStyle> = {
   healthy: {
-    dot:  "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]",
-    label: "Healthy",
-    hint: "Profit positive, cash flowing, nothing overdue.",
+    dot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]",
+    labelKey: "header.healthHealthy",    labelFallback: "Healthy",
+    hintKey:  "header.healthHealthyHint",hintFallback:  "Profit positive, cash flowing, nothing overdue.",
   },
   watch: {
-    dot:  "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.55)]",
-    label: "Watch",
-    hint: "Some overdue items or tight cash position.",
+    dot: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.55)]",
+    labelKey: "header.healthWatch",       labelFallback: "Watch",
+    hintKey:  "header.healthWatchHint",   hintFallback:  "Some overdue items or tight cash position.",
   },
   stress: {
-    dot:  "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.65)]",
-    label: "Stress",
-    hint: "Negative net profit or major overdue exposure.",
+    dot: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.65)]",
+    labelKey: "header.healthStress",      labelFallback: "Stress",
+    hintKey:  "header.healthStressHint",  hintFallback:  "Negative net profit or major overdue exposure.",
   },
   unknown: {
-    dot:  "bg-gray-500",
-    label: "—",
-    hint: "Not enough activity yet to score.",
+    dot: "bg-gray-500",
+    labelKey: "common.untilLoaded",       labelFallback: "—",
+    hintKey:  "header.healthUnknownHint", hintFallback:  "Not enough activity yet to score.",
   },
 };
 
@@ -62,6 +66,7 @@ export default function FinanceHeader({
   health?: HealthStatus;
   showTabs?: boolean;
 }) {
+  const { t } = useTranslation(financeT);
   return (
     <div>
       {/* ── Native Hub page bar ─────────────────────────────────── */}
@@ -69,7 +74,7 @@ export default function FinanceHeader({
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"
-            aria-label="Back to Hub"
+            aria-label={t("header.backHub", "Back to Hub")}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]"
           >
             <RrIcon name="arrow-left" size={16} />
@@ -89,19 +94,15 @@ export default function FinanceHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {controls}
-          {/* Single universal "+ Create" launcher in the header so the
-              chrome stays calm. The Data Entry link lives on the Home
-              tile and inside every tab hint — no need to duplicate it
-              in the header on every page. */}
           <button
             type="button"
             onClick={() => openSmartCreate()}
             className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
-            title="Create (c)"
-            aria-label="Open Smart Create drawer (shortcut: c)"
+            title={t("header.createTitle", "Create (c)")}
+            aria-label={t("header.createAria", "Open Smart Create drawer (shortcut: c)")}
           >
             <RrIcon name="plus" size={12} />
-            Create
+            {t("header.create", "Create")}
           </button>
           {action}
         </div>
@@ -122,13 +123,14 @@ export default function FinanceHeader({
    alongside the title without dominating. */
 export function HealthPill({ status }: { status: HealthStatus }) {
   const s = HEALTH_STYLE[status];
+  const { t } = useTranslation(financeT);
   return (
     <span
-      title={s.hint}
+      title={t(s.hintKey, s.hintFallback)}
       className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-gray-300"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-      {s.label}
+      {t(s.labelKey, s.labelFallback)}
     </span>
   );
 }

@@ -24,93 +24,103 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 interface TabEntry {
   key: string;          // route
-  label: string;
+  labelKey: string;     // i18n key in financeT
+  fallback: string;     // English fallback if key missing
   icon: RrIconName;
 }
 
 interface TabGroup {
   id: string;
-  label: string;
+  labelKey: string;
+  labelFallback: string;
   /* Default destination when the user clicks the group label.
      Usually the first sub-item. */
   defaultHref: string;
   /* One-line operator-friendly description shown under the row 2
-     sub-nav when this group is active. Tells the operator what
-     they can DO on these pages. */
-  hint: string;
+     sub-nav when this group is active — translated, see hintKey. */
+  hintKey: string;
+  hintFallback: string;
   items: TabEntry[];
 }
 
 const GROUPS: TabGroup[] = [
   {
     id: "overview",
-    label: "Overview",
+    labelKey: "tabs.overview",
+    labelFallback: "Overview",
     defaultHref: "/finance",
-    hint: "Start here — four clear paths and your essential KPIs. Setup + Intelligence live here too.",
+    hintKey: "tabs.overview.hint",
+    hintFallback: "Start here — four clear paths and your essential KPIs. Setup + Intelligence live here too.",
     items: [
-      { key: "/finance",              label: "Home",         icon: "coins" },
-      { key: "/finance/intelligence", label: "Intelligence", icon: "signal-stream" },
-      { key: "/finance/workspace",    label: "Workspace",    icon: "bank" },
-      { key: "/finance/setup",        label: "Setup",        icon: "shield-check" },
+      { key: "/finance",              labelKey: "subtab.home",          fallback: "Home",         icon: "coins" },
+      { key: "/finance/intelligence", labelKey: "subtab.intelligence",  fallback: "Intelligence", icon: "signal-stream" },
+      { key: "/finance/workspace",    labelKey: "subtab.workspace",     fallback: "Workspace",    icon: "bank" },
+      { key: "/finance/setup",        labelKey: "subtab.setup",         fallback: "Setup",        icon: "shield-check" },
     ],
   },
   {
     id: "operations",
-    label: "Operations",
+    labelKey: "tabs.operations",
+    labelFallback: "Operations",
     defaultHref: "/finance/orders",
-    hint: "Daily transactions — orders, customers, suppliers, payments, expenses.",
+    hintKey: "tabs.operations.hint",
+    hintFallback: "Daily transactions — orders, customers, suppliers, payments, expenses.",
     items: [
-      { key: "/finance/orders",    label: "Orders",            icon: "file-invoice" },
-      { key: "/finance/customers", label: "Customers",         icon: "arrow-down-left" },
-      { key: "/finance/suppliers", label: "Suppliers",         icon: "arrow-up-right" },
-      { key: "/finance/payments",  label: "Payments",          icon: "wallet" },
-      { key: "/finance/expenses",  label: "Expense Analytics", icon: "receipt" },
+      { key: "/finance/orders",    labelKey: "subtab.orders",            fallback: "Orders",            icon: "file-invoice" },
+      { key: "/finance/customers", labelKey: "subtab.customers",         fallback: "Customers",         icon: "arrow-down-left" },
+      { key: "/finance/suppliers", labelKey: "subtab.suppliers",         fallback: "Suppliers",         icon: "arrow-up-right" },
+      { key: "/finance/payments",  labelKey: "subtab.payments",          fallback: "Payments",          icon: "wallet" },
+      { key: "/finance/expenses",  labelKey: "subtab.expenseAnalytics",  fallback: "Expense Analytics", icon: "receipt" },
     ],
   },
   {
-    /* Merged Banking + Treasury — both deal with cash. One tab,
-       five sub-items, every page preserved. */
     id: "cash",
-    label: "Cash & Banking",
+    labelKey: "tabs.cashBanking",
+    labelFallback: "Cash & Banking",
     defaultHref: "/finance/bank-accounts",
-    hint: "Bank balances, statement imports, reconciliation, and forward cash forecast.",
+    hintKey: "tabs.cashBanking.hint",
+    hintFallback: "Bank balances, statement imports, reconciliation, and forward cash forecast.",
     items: [
-      { key: "/finance/bank-accounts",     label: "Bank Accounts",   icon: "bank" },
-      { key: "/finance/bank-imports",      label: "Bank Imports",    icon: "upload" },
-      { key: "/finance/reconciliation",    label: "Reconciliation",  icon: "badge-check" },
-      { key: "/finance/treasury-forecast", label: "Cash Forecast",   icon: "arrow-up-right" },
-      { key: "/finance/treasury-plans",    label: "Treasury Plans",  icon: "file-invoice" },
+      { key: "/finance/bank-accounts",     labelKey: "subtab.bankAccounts",   fallback: "Bank Accounts",   icon: "bank" },
+      { key: "/finance/bank-imports",      labelKey: "subtab.bankImports",    fallback: "Bank Imports",    icon: "upload" },
+      { key: "/finance/reconciliation",    labelKey: "subtab.reconciliation", fallback: "Reconciliation",  icon: "badge-check" },
+      { key: "/finance/treasury-forecast", labelKey: "subtab.cashForecast",   fallback: "Cash Forecast",   icon: "arrow-up-right" },
+      { key: "/finance/treasury-plans",    labelKey: "subtab.treasuryPlans",  fallback: "Treasury Plans",  icon: "file-invoice" },
     ],
   },
   {
     id: "accounting",
-    label: "Accounting",
+    labelKey: "tabs.accounting",
+    labelFallback: "Accounting",
     defaultHref: "/finance/accounting/queue",
-    hint: "Ledger work — review journal drafts, post entries, inspect the ledger.",
+    hintKey: "tabs.accounting.hint",
+    hintFallback: "Ledger work — review journal drafts, post entries, inspect the ledger.",
     items: [
-      { key: "/finance/accounting/queue",          label: "Queue",           icon: "clock" },
-      { key: "/finance/accounting/trial-balance",  label: "Trial Balance",   icon: "badge-check" },
-      { key: "/finance/accounting/general-ledger", label: "General Ledger",  icon: "contract" },
-      { key: "/finance/accounting/profit-loss",    label: "Profit & Loss",   icon: "file-invoice-dollar" },
-      { key: "/finance/accounting/cash-flow",      label: "Cash Flow",       icon: "wallet" },
-      { key: "/finance/accounting/equity",         label: "Equity",          icon: "coins" },
+      { key: "/finance/accounting/queue",          labelKey: "subtab.queue",          fallback: "Queue",          icon: "clock" },
+      { key: "/finance/accounting/trial-balance",  labelKey: "subtab.trialBalance",   fallback: "Trial Balance",  icon: "badge-check" },
+      { key: "/finance/accounting/general-ledger", labelKey: "subtab.generalLedger",  fallback: "General Ledger", icon: "contract" },
+      { key: "/finance/accounting/profit-loss",    labelKey: "subtab.profitLoss",     fallback: "Profit & Loss",  icon: "file-invoice-dollar" },
+      { key: "/finance/accounting/cash-flow",      labelKey: "subtab.cashFlow",       fallback: "Cash Flow",      icon: "wallet" },
+      { key: "/finance/accounting/equity",         labelKey: "subtab.equity",         fallback: "Equity",         icon: "coins" },
     ],
   },
   {
-    /* Reports = the READ surface. Statements + Visual + custom
-       reports + reminders all live here. */
     id: "reports",
-    label: "Reports",
+    labelKey: "tabs.reports",
+    labelFallback: "Reports",
     defaultHref: "/finance/visual",
-    hint: "Read the books — income statement, balance sheet, cash flow, AR/AP aging.",
+    hintKey: "tabs.reports.hint",
+    hintFallback: "Read the books — income statement, balance sheet, cash flow, AR/AP aging.",
     items: [
-      { key: "/finance/visual",        label: "Visual Statements", icon: "balance-scale-left" },
-      { key: "/finance/statements",    label: "Detailed Statements", icon: "balance-scale-left" },
-      { key: "/finance/reports",       label: "Operational Reports", icon: "file-invoice" },
-      { key: "/finance/notifications", label: "Reminders",         icon: "clock" },
+      { key: "/finance/visual",        labelKey: "subtab.visualStatements",   fallback: "Visual Statements",   icon: "balance-scale-left" },
+      { key: "/finance/statements",    labelKey: "subtab.detailedStatements", fallback: "Detailed Statements", icon: "balance-scale-left" },
+      { key: "/finance/reports",       labelKey: "subtab.operationalReports", fallback: "Operational Reports", icon: "file-invoice" },
+      { key: "/finance/notifications", labelKey: "subtab.reminders",          fallback: "Reminders",           icon: "clock" },
     ],
   },
 ];
@@ -135,9 +145,10 @@ export default function FinanceTabs() {
   const pathname = usePathname() ?? "/finance";
   const { groupId, itemKey } = resolveActive(pathname);
   const activeGroup = GROUPS.find((g) => g.id === groupId) ?? GROUPS[0];
+  const { t } = useTranslation(financeT);
 
   return (
-    <nav aria-label="Finance navigation" className="space-y-2">
+    <nav aria-label={t("app.title", "Finance")} className="space-y-2">
       {/* ── Row 1: primary groups — always visible, no scrolling. */}
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
         {GROUPS.map((g) => {
@@ -158,7 +169,7 @@ export default function FinanceTabs() {
                   className="pointer-events-none absolute inset-x-1 -bottom-px h-[2px] rounded-full bg-white/40"
                 />
               )}
-              {g.label}
+              {t(g.labelKey, g.labelFallback)}
             </Link>
           );
         })}
@@ -167,7 +178,7 @@ export default function FinanceTabs() {
       {/* "What this tab is for" — single sentence so the operator
           knows whether to ADD or READ data on the pages below. */}
       <div className="text-[10.5px] text-gray-500">
-        {activeGroup.hint}
+        {t(activeGroup.hintKey, activeGroup.hintFallback)}
       </div>
 
       {/* ── Row 2: contextual sub-items — only shown when the active
@@ -188,7 +199,7 @@ export default function FinanceTabs() {
                 }`}
               >
                 <SubIcon name={it.icon} active={isActive} />
-                {it.label}
+                {t(it.labelKey, it.fallback)}
               </Link>
             );
           })}
