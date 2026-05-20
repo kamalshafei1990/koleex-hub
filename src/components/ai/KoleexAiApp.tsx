@@ -1447,16 +1447,21 @@ export default function KoleexAiApp() {
               }}
               className="relative"
             >
-              {/* Two-row composer (ChatGPT-style):
-                  Row 1 — attachment chips (if any) + textarea.
-                  Row 2 — secondary actions (attach / emoji / web search)
-                          on the left, primary actions (mic / send) on
-                          the right. Same hairline border + bg-secondary
-                          fill the Hub uses for every input surface. */}
-              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* Composer pill — ChatGPT-style single rounded surface
+                  with a tall textarea on top and a compact action row
+                  underneath. Visual hierarchy mirrors ChatGPT:
+                    · Plus / emoji / web-search read as small ghost
+                      icons (32×32 hit, 16 px glyph).
+                    · Mic + Send are the primary cluster — slightly
+                      bigger (36×36) and the Send button takes the
+                      inverted "raised" fill so it visually anchors
+                      the row's far end.
+                  The whole pill is a single rounded-3xl surface with
+                  a soft hairline border that brightens on focus. */}
+              <div className="rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
                     {attachments.map((file, i) => (
                       <span
                         key={`${file.name}-${i}`}
@@ -1478,7 +1483,9 @@ export default function KoleexAiApp() {
                   </div>
                 )}
 
-                {/* Textarea — no inline icons, gets the full width. */}
+                {/* Textarea — generous top padding so the prompt feels
+                    spacious; bottom padding is minimal because the
+                    action row picks up just below it. */}
                 <textarea
                   ref={composerRef}
                   value={input}
@@ -1508,29 +1515,27 @@ export default function KoleexAiApp() {
                   inputMode="text"
                   autoComplete="off"
                   autoCorrect="on"
-                  className="block w-full px-4 pt-3 pb-1 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  className="block w-full px-5 pt-4 pb-1 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
                   style={{ minHeight: "44px" }}
                 />
 
-                {/* Action row — secondary on the left, primary on the right.
-                    Uniform sizing rules:
-                      · Every button: 36×36 (h-9 w-9), rounded-full.
-                      · Every glyph inside a button: 18×18 SVG.
-                      · Spacing: gap-1 within each side; the parent flex
-                        gives the two clusters opposite alignment.
-                    Web-search becomes icon-only (its toggled state is
-                    enough signal; the tooltip explains it). */}
-                <div className="flex items-center justify-between px-2 pb-2">
-                  <div className="flex items-center gap-1">
+                {/* Action row — sized to feel tight under the textarea.
+                    Secondary buttons are 32×32 with 16 px glyphs (a
+                    notch smaller than the primary mic / send cluster
+                    on the right). Tighter overall padding and gap-0
+                    between siblings, since the icons already carry
+                    their own breathing room via rounded-full hover. */}
+                <div className="flex items-center justify-between px-2 pb-2 pt-0.5">
+                  <div className="flex items-center gap-0">
                     {/* + Attachment */}
                     <button
                       type="button"
                       onClick={openFilePicker}
-                      className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                       aria-label="Attach file"
                       title="Attach file"
                     >
-                      <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
@@ -1545,26 +1550,26 @@ export default function KoleexAiApp() {
                       tabIndex={-1}
                     />
 
-                    {/* Emoji picker (iOS-style) — icon-only, identical to siblings. */}
+                    {/* Emoji picker (iOS-style). */}
                     <EmojiButton
                       onSelect={insertEmoji}
-                      className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     />
 
-                    {/* Web search toggle — icon-only; emerald ring when on. */}
+                    {/* Web search toggle — emerald tint when on. */}
                     <button
                       type="button"
                       onClick={() => setWebSearch((v) => !v)}
                       aria-pressed={webSearch}
                       aria-label="Search the web"
                       title={webSearch ? "Web search: on" : "Web search: off"}
-                      className={`h-9 w-9 rounded-full inline-flex items-center justify-center transition-colors ${
+                      className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
                           ? "bg-emerald-300/[0.12] text-emerald-200 ring-1 ring-emerald-300/40"
                           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                       }`}
                     >
-                      <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="2" y1="12" x2="22" y2="12" />
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
@@ -1572,8 +1577,8 @@ export default function KoleexAiApp() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    {/* Mic — voice in. 36 matches the secondary cluster on the left. */}
+                  <div className="flex items-center gap-0.5">
+                    {/* Mic — primary cluster, 36×36. */}
                     <MicButton
                       size={36}
                       onTranscript={(t) => send(t, true)}
@@ -1584,9 +1589,7 @@ export default function KoleexAiApp() {
                       lang={lang}
                     />
 
-                    {/* Send / Stop — primary action, inverted bg. Identical
-                        36×36 footprint as every other composer button so
-                        the row reads as a single visual rhythm. */}
+                    {/* Send / Stop — inverted bg circle, anchors the row. */}
                     {sending ? (
                       <button
                         type="button"
