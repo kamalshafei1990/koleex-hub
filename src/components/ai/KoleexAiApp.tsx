@@ -189,7 +189,12 @@ export default function KoleexAiApp() {
      other's stale selection. Cleared automatically when the stored
      conversation no longer exists (deleted from another tab). */
   const activeIdKey = account?.id ? `koleex-ai-active-chat:${account.id}` : null;
+  /* Live ref of the current activeId — read inside the SSE reader so a
+     mid-stream conversation switch makes deltas no-op instead of
+     writing into the new thread's placeholder. Audit P0 #1/#2. */
+  const activeIdRef = useRef<string | null>(activeId);
   useEffect(() => {
+    activeIdRef.current = activeId;
     if (!activeIdKey) return;
     if (!activeId) return;
     /* Safari private mode + quota-exceeded throw on setItem; the
@@ -455,8 +460,16 @@ export default function KoleexAiApp() {
       /* New turn cancels any in-flight TTS so audio never stacks. */
       stopTts();
 
+      /* Audit P0 #1/#2 — capture activeId ONCE at the start of the turn
+         so the SSE reader writes deltas into THIS conversation only.
+         If the user switches chats mid-stream, openConversation()
+         aborts our controller — but until that propagates, the
+         reader keeps writing. Guarding every patch against the
+         captured id below means a stale delta silently no-ops
+         instead of corrupting the freshly-opened thread. */
       // Ensure we have a conversation first
       let conversationId = activeId;
+      const turnConversationId = activeId;
       if (!conversationId) {
         const res = await fetch("/api/ai/conversations", {
           method: "POST",
@@ -653,6 +666,14 @@ export default function KoleexAiApp() {
         let convUpdateTitle: string | null = null;
 
         const pushPatch = (patch: Partial<ChatMsg>) => {
+          /* Audit P0 #1/#2 — if the user has switched to a different
+             conversation since this turn started, drop the delta
+             entirely. The placeholderId might match a stale row OR
+             not exist; either way the new conversation's messages
+             must not be touched. */
+          if (turnConversationId !== null && activeIdRef.current !== turnConversationId) {
+            return;
+          }
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === placeholderId);
             if (idx < 0) return prev;
@@ -796,8 +817,16 @@ export default function KoleexAiApp() {
             return prev;
           });
         } else {
+          /* Audit P0 #11 — distinguish a true network drop (fetch
+             rejects with TypeError "Failed to fetch") from a generic
+             server error. Both drop the placeholder, but the message
+             is humanized so the user doesn't see the raw cause. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-          setError(e instanceof Error ? e.message : "Network error");
+          const raw = e instanceof Error ? e.message : String(e);
+          const isNetwork =
+            (e instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(raw)) ||
+            /networkerror|net::err|the operation was aborted/i.test(raw);
+          setError(humanizeError(isNetwork ? "NetworkError" : raw));
         }
       } finally {
         abortRef.current = null;
@@ -1870,7 +1899,12 @@ function Bubble({
      AI side: the animated AI face icon with its neon gradient. */
   return (
     <div
-      dir="ltr" /* Keep the row's gap order stable regardless of content */
+      /* Audit P1 #1 — let the row inherit the document direction so
+         screen readers walk avatar→bubble in the natural reading
+         order for Arabic users. The previous hardcoded dir="ltr"
+         kept the visual gap fine but broke a11y reading order.
+         flex-row-reverse on user bubbles below keeps the layout
+         "right-aligned" without forcing LTR on the document. */
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
@@ -2080,7 +2114,7 @@ function BubbleActions({
   const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const ICON = 14;
   return (
-    <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+    <div role="toolbar" aria-label="Message actions" className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
       <button
         type="button"
         onClick={onCopy}

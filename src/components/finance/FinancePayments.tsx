@@ -69,7 +69,7 @@ export default function FinancePayments() {
 
   const save = async () => {
     if (!editing?.amount || !editing.party_name?.trim()) {
-      alert("Please add a party name and amount.");
+      alert(t("payments.err.missing", "Please add a party name and amount."));
       return;
     }
     const r = await fetch("/api/finance/payments", {
@@ -77,7 +77,7 @@ export default function FinancePayments() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editing),
     });
-    if (!r.ok) { alert("Save failed"); return; }
+    if (!r.ok) { alert(t("payments.err.saveFailed", "Save failed")); return; }
     setEditing(null);
     void load();
   };
@@ -90,77 +90,77 @@ export default function FinancePayments() {
           subtitle={t("payments.subtitle", "Money in from customers and money out to suppliers — partial, full, pending, all in one ledger.")}
           action={
             <div className="flex gap-2">
-              <button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">+ Customer Payment</button>
-              <button onClick={() => startNew("out")} className="rounded-xl bg-rose-500/20 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-500/30">+ Supplier Payment</button>
+              <button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.action.in", "+ Customer Payment")}</button>
+              <button onClick={() => startNew("out")} className="rounded-xl bg-rose-500/20 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-500/30">{t("payments.action.out", "+ Supplier Payment")}</button>
             </div>
           }
         />
 
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
           <HeroKpiCard
-            label="Net Cash This View"
+            label={t("payments.kpi.net", "Net Cash This View")}
             helpId="treasury.available"
             value={kpi.net}
             unit={baseCurrency}
             tone={kpi.net >= 0 ? "positive" : "negative"}
-            hint="Money in minus money out"
+            hint={t("payments.kpi.netHint", "Money in minus money out")}
             loading={loading}
           />
           <HeroKpiCard
-            label="Pending"
+            label={t("payments.kpi.pending", "Pending")}
             helpId="treasury.pending"
             value={kpi.pending}
             unit={baseCurrency}
             tone="warning"
-            hint="Payments awaiting clearance"
+            hint={t("payments.kpi.pendingHint", "Payments awaiting clearance")}
             loading={loading}
           />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <MetricCard label="Money In"  helpId="finance.cashIn"  value={kpi.inComp}  unit={baseCurrency} hint="From customers" loading={loading} />
-          <MetricCard label="Money Out" helpId="finance.cashOut" value={kpi.outComp} unit={baseCurrency} hint="To suppliers + bills" loading={loading} />
+          <MetricCard label={t("payments.kpi.in",  "Money In")}  helpId="finance.cashIn"  value={kpi.inComp}  unit={baseCurrency} hint={t("payments.kpi.inHint",  "From customers")} loading={loading} />
+          <MetricCard label={t("payments.kpi.out", "Money Out")} helpId="finance.cashOut" value={kpi.outComp} unit={baseCurrency} hint={t("payments.kpi.outHint", "To suppliers + bills")} loading={loading} />
         </div>
 
         {editing && (
           <div className="mt-6">
             <SectionCard
-              title={editing.direction === "in" ? "Record customer payment" : "Record supplier payment"}
+              title={editing.direction === "in" ? t("payments.editor.titleIn", "Record customer payment") : t("payments.editor.titleOut", "Record supplier payment")}
               action={
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">Cancel</button>
-                  <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30">Save Payment</button>
+                  <button onClick={() => setEditing(null)} className="rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-gray-300 hover:border-white/[0.12]">{t("payments.editor.cancel", "Cancel")}</button>
+                  <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.editor.save", "Save Payment")}</button>
                 </div>
               }
             >
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Field label={editing.direction === "in" ? "Customer name" : "Supplier name"} wide>
+                <Field label={editing.direction === "in" ? t("payments.field.customer", "Customer name") : t("payments.field.supplier", "Supplier name")} wide>
                   <input value={editing.party_name ?? ""} onChange={(e) => setEditing({ ...editing, party_name: e.target.value })} className={INPUT} />
                 </Field>
-                <Field label="Amount">
+                <Field label={t("payments.field.amount", "Amount")}>
                   <input type="number" inputMode="decimal" value={editing.amount ?? 0} onChange={(e) => setEditing({ ...editing, amount: Number(e.target.value) || 0 })} className={INPUT} />
                 </Field>
-                <Field label="Currency">
+                <Field label={t("payments.field.currency", "Currency")}>
                   <select value={editing.currency ?? baseCurrency} onChange={(e) => setEditing({ ...editing, currency: e.target.value })} className={INPUT}>
                     {["USD","EUR","CNY","EGP","GBP"].map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </Field>
-                <Field label="Date">
+                <Field label={t("payments.field.date", "Date")}>
                   <input type="date" value={editing.payment_date ?? ""} onChange={(e) => setEditing({ ...editing, payment_date: e.target.value })} className={INPUT} />
                 </Field>
-                <Field label="Method">
+                <Field label={t("payments.field.method", "Method")}>
                   <select value={editing.payment_method ?? "T/T"} onChange={(e) => setEditing({ ...editing, payment_method: e.target.value })} className={INPUT}>
                     {["T/T","L/C","Cash","Cheque","Card","Other"].map((m) => <option key={m}>{m}</option>)}
                   </select>
                 </Field>
-                <Field label="Reference">
-                  <input value={editing.reference_no ?? ""} onChange={(e) => setEditing({ ...editing, reference_no: e.target.value })} placeholder="Bank ref / cheque no." className={INPUT} />
+                <Field label={t("payments.field.reference", "Reference")}>
+                  <input value={editing.reference_no ?? ""} onChange={(e) => setEditing({ ...editing, reference_no: e.target.value })} placeholder={t("payments.field.referencePh", "Bank ref / cheque no.")} className={INPUT} />
                 </Field>
-                <Field label="Status">
+                <Field label={t("payments.field.status", "Status")}>
                   <select value={editing.status ?? "completed"} onChange={(e) => setEditing({ ...editing, status: e.target.value as FinancePayment["status"] })} className={INPUT}>
                     {(["pending","completed","cancelled","bounced"] as const).map((s) => <option key={s}>{s}</option>)}
                   </select>
                 </Field>
-                <Field label="Notes" wide>
+                <Field label={t("payments.field.notes", "Notes")} wide>
                   <input value={editing.notes ?? ""} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} className={INPUT} />
                 </Field>
               </div>
@@ -170,12 +170,12 @@ export default function FinancePayments() {
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading payments…</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("payments.loading", "Loading payments…")}</div></SectionCard>
           ) : rows.length === 0 ? (
             <EmptyState
-              title="No payments recorded yet"
-              hint="Log every money movement — customer payments, supplier payments, banking fees."
-              action={<button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">+ Record First Payment</button>}
+              title={t("payments.emptyTitle", "No payments recorded yet")}
+              hint={t("payments.emptyHint", "Log every money movement — customer payments, supplier payments, banking fees.")}
+              action={<button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.emptyAction", "+ Record First Payment")}</button>}
             />
           ) : (
             <SectionCard>
@@ -183,29 +183,29 @@ export default function FinancePayments() {
                 <table className="w-full text-sm">
                   <thead className="text-left text-[10px] uppercase tracking-wider text-gray-500">
                     <tr>
-                      <th className="py-2 pr-3">Date</th>
+                      <th className="py-2 pr-3">{t("payments.col.date", "Date")}</th>
                       <th className="py-2 pr-3">
                         <span className="inline-flex items-center gap-1">
-                          <span>Direction</span>
+                          <span>{t("payments.col.direction", "Direction")}</span>
                           <GuidanceTip guidanceId="payment.direction" />
                         </span>
                       </th>
                       <th className="py-2 pr-3">
                         <span className="inline-flex items-center gap-1">
-                          <span>Party</span>
+                          <span>{t("payments.col.party", "Party")}</span>
                           <GuidanceTip guidanceId="payment.party" />
                         </span>
                       </th>
                       <th className="py-2 pr-3">
                         <span className="inline-flex items-center gap-1">
-                          <span>Method</span>
+                          <span>{t("payments.col.method", "Method")}</span>
                           <GuidanceTip guidanceId="payment.method" />
                         </span>
                       </th>
-                      <th className="py-2 pr-3 text-right">Amount</th>
+                      <th className="py-2 pr-3 text-right">{t("payments.col.amount", "Amount")}</th>
                       <th className="py-2 pr-3">
                         <span className="inline-flex items-center gap-1">
-                          <span>Status</span>
+                          <span>{t("payments.col.status", "Status")}</span>
                           <GuidanceTip guidanceId="payment.movementStatus" />
                         </span>
                       </th>
@@ -221,7 +221,7 @@ export default function FinancePayments() {
                         <td className="py-3 pr-3 text-gray-400 tabular-nums">{p.payment_date}</td>
                         <td className="py-3 pr-3">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${p.direction === "in" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
-                            {p.direction === "in" ? "Money in" : "Money out"}
+                            {p.direction === "in" ? t("payments.row.in", "Money in") : t("payments.row.out", "Money out")}
                           </span>
                         </td>
                         <td className="py-3 pr-3 font-medium">{p.party_name || "—"}</td>

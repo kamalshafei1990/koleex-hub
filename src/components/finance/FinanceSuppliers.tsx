@@ -45,7 +45,7 @@ export default function FinanceSuppliers() {
         body: JSON.stringify({ type: "supplier_statement", filters: { supplier_id: supplierId } }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error ?? `Failed (${res.status})`); return; }
+      if (!res.ok) { alert(j.error ?? t("suppliers.exportFailed", "Failed ({n})").replace("{n}", String(res.status))); return; }
       window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
     } finally {
       setGenerating(null);
@@ -67,37 +67,35 @@ export default function FinanceSuppliers() {
           subtitle={t("suppliers.subtitle", "What you've bought from each supplier, what's paid, and what's still owed.")}
         />
 
-        {/* Phase UI.5 — sibling-page convergence — same hierarchy as
-            Customers. Three DisplayKpi tiles, no card chrome. */}
-        <DashboardSection eyebrow="Supplier accounts" title="Total exposure across every supplier">
+        <DashboardSection eyebrow={t("suppliers.section.eyebrow", "Supplier accounts")} title={t("suppliers.section.title", "Total exposure across every supplier")}>
           <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-3">
-            <DisplayKpi label="Total Purchases" value={formatCompact(kpi.purchases)} hint="USD · all suppliers" tone="info" loading={loading} />
-            <DisplayKpi label="Outstanding"     value={formatCompact(kpi.payable)}   hint="USD · still to pay" tone="warning" loading={loading} />
-            <DisplayKpi label="Paid"            value={formatCompact(kpi.paid)}      hint="USD · already wired" tone="positive" loading={loading} />
+            <DisplayKpi label={t("suppliers.kpi.purchases",   "Total Purchases")} value={formatCompact(kpi.purchases)} hint={`USD · ${t("suppliers.kpi.allSuppliers", "all suppliers")}`} tone="info" loading={loading} />
+            <DisplayKpi label={t("suppliers.kpi.outstanding", "Outstanding")}     value={formatCompact(kpi.payable)}   hint={`USD · ${t("suppliers.kpi.toPay",        "still to pay")}`} tone="warning" loading={loading} />
+            <DisplayKpi label={t("suppliers.kpi.paid",        "Paid")}            value={formatCompact(kpi.paid)}      hint={`USD · ${t("suppliers.kpi.wired",        "already wired")}`} tone="positive" loading={loading} />
           </div>
         </DashboardSection>
 
         <div className="mt-6">
           {loading ? (
-            <div className="py-8 text-center text-sm text-gray-500">Loading suppliers…</div>
+            <div className="py-8 text-center text-sm text-gray-500">{t("suppliers.loading", "Loading suppliers…")}</div>
           ) : rows.length === 0 ? (
-            <EmptyState title="No suppliers yet" hint="Suppliers appear here as soon as you add supplier costs to an order or link a supplier to an expense." />
+            <EmptyState title={t("suppliers.emptyTitle", "No suppliers yet")} hint={t("suppliers.emptyHint", "Suppliers appear here as soon as you add supplier costs to an order or link a supplier to an expense.")} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
                 <div key={r.supplier_id} className="rounded-2xl border border-white/[0.06] bg-[var(--bg-secondary)] p-5 transition hover:border-white/[0.10]">
                   <div>
                     <div className="text-base font-semibold">{r.supplier_name || "—"}</div>
-                    <div className="mt-1 text-[11px] text-gray-500">{r.payment_terms ?? "No payment terms set"}</div>
+                    <div className="mt-1 text-[11px] text-gray-500">{r.payment_terms ?? t("suppliers.noTerms", "No payment terms set")}</div>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
-                    <Mini label="Purchases" value={fmtMoney(r.total_purchases ?? 0, r.default_currency, { compact: true })} accent="default" />
-                    <Mini label="Paid" value={fmtMoney(r.paid_amount ?? 0, r.default_currency, { compact: true })} accent="emerald" />
-                    <Mini label="To pay" value={fmtMoney(r.outstanding_payable ?? 0, r.default_currency, { compact: true })} accent="amber" />
+                    <Mini label={t("suppliers.mini.purchases", "Purchases")} value={fmtMoney(r.total_purchases ?? 0,    r.default_currency, { compact: true })} accent="default" />
+                    <Mini label={t("suppliers.mini.paid",      "Paid")}      value={fmtMoney(r.paid_amount ?? 0,        r.default_currency, { compact: true })} accent="emerald" />
+                    <Mini label={t("suppliers.mini.toPay",     "To pay")}    value={fmtMoney(r.outstanding_payable ?? 0,r.default_currency, { compact: true })} accent="amber" />
                   </div>
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-[10px] text-gray-500">
-                      <span>Payment progress</span>
+                      <span>{t("suppliers.paymentProgress", "Payment progress")}</span>
                       <span>{r.total_purchases ? (((r.paid_amount ?? 0) / r.total_purchases) * 100).toFixed(0) : 0}%</span>
                     </div>
                     <div className="mt-1"><ProgressBar value={r.paid_amount ?? 0} max={r.total_purchases ?? 0} color="emerald" /></div>
@@ -110,7 +108,7 @@ export default function FinanceSuppliers() {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
                     >
                       <RrIcon name="file-invoice" size={12} />
-                      {generating === r.supplier_id ? "Preparing…" : "Generate Supplier Statement"}
+                      {generating === r.supplier_id ? t("suppliers.preparing", "Preparing…") : t("suppliers.generate", "Generate Supplier Statement")}
                     </button>
                   </div>
                 </div>
