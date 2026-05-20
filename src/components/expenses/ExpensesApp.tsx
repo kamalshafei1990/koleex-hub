@@ -45,6 +45,7 @@ import AttachmentPreviewDrawer from "@/components/attachments/AttachmentPreviewD
 import { ApprovalBadge } from "@/components/approval/ApprovalBadge";
 import ApprovalReviewDrawer from "@/components/approval/ApprovalReviewDrawer";
 import type { ApprovalStatus } from "@/lib/finance/types";
+import { useExpenseFilter, type ApprovalFilterKey as HookApprovalFilterKey } from "@/lib/hooks/useExpenseFilter";
 /* Micro-polish primitives. */
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import UndoToast from "@/components/ui/UndoToast";
@@ -55,14 +56,9 @@ type TabKey = ExpensesTabKey;
 
 /* Phase 2.2 — approval-state quick filter. Lives next to the existing
    payment-state tabs so an operator can scan "what needs my attention"
-   without leaving the page. */
-type ApprovalFilterKey =
-  | "all"
-  | "needs_review"     // submitted + under_review (approver view)
-  | "draft"            // operator's drafts not yet submitted
-  | "rejected"
-  | "requires_changes"
-  | "approved";
+   without leaving the page. Type is re-exported from the filter hook
+   so the predicate logic + filter UI agree on what each chip means. */
+type ApprovalFilterKey = HookApprovalFilterKey;
 
 const APPROVAL_FILTER_LABELS: Record<ApprovalFilterKey, string> = {
   all:              "Any state",
@@ -138,62 +134,11 @@ export default function ExpensesApp() {
   const [nowMs] = useState<number>(() => Date.now());
   const today = useMemo(() => new Date(nowMs).toISOString().slice(0, 10), [nowMs]);
 
-  /* Filters: tab + search + category */
-  const filtered = useMemo(() => {
-    return expenses.filter((e) => {
-      if (tab === "paid"   && e.payment_status !== "paid") return false;
-      if (tab === "unpaid" && e.payment_status === "paid") return false;
-      if (tab === "overdue") {
-        const isOverdue = e.payment_status !== "paid" && e.due_date && e.due_date < today;
-        if (!isOverdue) return false;
-      }
-      /* Hide rows currently in the undo-grace window so the operator
-         experiences an instant delete; the real API call fires when
-         the toast expires. */
-      if (pendingDeleteId === e.id) return false;
-      if (categoryFilter && e.category_id !== categoryFilter) return false;
-      /* Phase 2.2 — approval filter. */
-      if (approvalFilter !== "all") {
-        const a = (e.approval_status ?? "draft") as ApprovalStatus;
-        if (approvalFilter === "needs_review" && a !== "submitted" && a !== "under_review") return false;
-        if (approvalFilter === "draft"            && a !== "draft")            return false;
-        if (approvalFilter === "rejected"         && a !== "rejected")         return false;
-        if (approvalFilter === "requires_changes" && a !== "requires_changes") return false;
-        if (approvalFilter === "approved"         && a !== "approved" && a !== "partially_approved") return false;
-      }
-      if (search.trim()) {
-        const needle = search.trim().toLowerCase();
-        const hay = `${e.title} ${e.notes ?? ""} ${e.category_name ?? ""}`.toLowerCase();
-        if (!hay.includes(needle)) return false;
-      }
-      return true;
-    });
-  }, [expenses, tab, categoryFilter, search, today, approvalFilter, pendingDeleteId]);
-
-  /* Counts for the approval filter strip. */
-  const approvalCounts = useMemo(() => {
-    const c: Record<ApprovalFilterKey, number> = {
-      all: expenses.length, needs_review: 0, draft: 0, rejected: 0, requires_changes: 0, approved: 0,
-    };
-    for (const e of expenses) {
-      const a = (e.approval_status ?? "draft") as ApprovalStatus;
-      if (a === "submitted" || a === "under_review") c.needs_review += 1;
-      if (a === "draft")                              c.draft += 1;
-      if (a === "rejected")                           c.rejected += 1;
-      if (a === "requires_changes")                   c.requires_changes += 1;
-      if (a === "approved" || a === "partially_approved") c.approved += 1;
-    }
-    return c;
-  }, [expenses]);
-
-  /* Top-line counts shown above the tab strip */
-  const counts = useMemo(() => {
-    const all = expenses.length;
-    const unpaid = expenses.filter((e) => e.payment_status !== "paid").length;
-    const paid   = expenses.filter((e) => e.payment_status === "paid").length;
-    const overdue = expenses.filter((e) => e.payment_status !== "paid" && e.due_date && e.due_date < today).length;
-    return { all, unpaid, paid, overdue };
-  }, [expenses, today]);
+  /* Filter + counts come from a single hook — keeps the predicate
+     logic in one place and lets us test it in isolation. */
+  const { filtered, counts, approvalCounts } = useExpenseFilter({
+    expenses, tab, search, categoryFilter, approvalFilter, today, pendingDeleteId,
+  });
 
   /* Top categories for the visual tile grid (compute, not analytic) */
   const topCategories = useMemo(() => {
