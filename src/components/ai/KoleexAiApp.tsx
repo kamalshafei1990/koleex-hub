@@ -2123,13 +2123,16 @@ function BubbleActions({
         title={copied ? "Copied" : "Copy"}
       >
         {copied ? (
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.5l4 4L19 7" />
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
           </svg>
         ) : (
+          /* Lucide "copy" — two overlapping rounded rectangles. The
+             previous variant used a single rect + escape-path which
+             didn't read as a duplicate at small sizes. */
           <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="9" width="11" height="11" rx="2" />
-            <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
         )}
       </button>
@@ -2141,8 +2144,13 @@ function BubbleActions({
           aria-label="Read aloud"
           title="Read aloud"
         >
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="currentColor">
-            <path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06c2.89 0 5.25 2.36 5.25 5.25S16.89 15.79 14 15.79v2.06c4.02 0 7.31-3.29 7.31-7.31S18.02 3.23 14 3.23z" />
+          {/* Lucide "volume-2" — stroke-based so it matches the rest
+              of the row. The previous filled silhouette rendered as
+              a noticeably heavier shape next to the line icons. */}
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
           </svg>
         </button>
       )}
