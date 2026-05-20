@@ -274,7 +274,7 @@ export default function EmojiButton({
           "h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
         }
       >
-        <SmileIcon size={24} className="text-current" />
+        <SmileIcon size={16} className="text-current" />
       </button>
       {popoverNode && typeof document !== "undefined"
         ? createPortal(popoverNode, document.body)
