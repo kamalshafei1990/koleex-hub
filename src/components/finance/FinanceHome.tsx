@@ -80,6 +80,13 @@ interface Kpi {
   tone: "positive" | "warning" | "info" | "neutral";
 }
 
+interface SetupHealth {
+  ready: boolean;
+  completion: number;
+  missingCount: number;
+  missingTitles: string[];
+}
+
 export default function FinanceHome() {
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
   /* Tenant currency comes from the shared cached hook — see
@@ -88,13 +95,30 @@ export default function FinanceHome() {
      "CNY" on first paint. */
   const baseCurrency = useBaseCurrencyOptional() ?? "";
   const [loading, setLoading] = useState(true);
+  /* Setup-health banner — surfaces missing onboarding items so a new
+     tenant isn't left staring at empty KPIs without knowing why. The
+     snapshot endpoint already exists for /finance/setup; we reuse it. */
+  const [setupHealth, setSetupHealth] = useState<SetupHealth | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const k = await fetch("/api/finance/dashboard?period=year", { cache: "no-store" }).then((r) => r.ok ? r.json() : null);
+        const [k, s] = await Promise.all([
+          fetch("/api/finance/dashboard?period=year", { cache: "no-store" }).then((r) => r.ok ? r.json() : null),
+          fetch("/api/finance/setup/status", { cache: "no-store" }).then((r) => r.ok ? r.json() : null),
+        ]);
         if (k?.kpi) setKpi(k.kpi as DashboardKpi);
+        if (s?.snapshot) {
+          const snap = s.snapshot as { ready: boolean; completion: number; cards: Array<{ status: string; title: string }> };
+          const missing = snap.cards.filter((c) => c.status === "empty");
+          setSetupHealth({
+            ready: snap.ready,
+            completion: snap.completion,
+            missingCount: missing.length,
+            missingTitles: missing.slice(0, 3).map((c) => c.title),
+          });
+        }
       } finally { setLoading(false); }
     })();
   }, []);
@@ -143,6 +167,12 @@ export default function FinanceHome() {
           title="Finance"
           subtitle="Add data, read data, run the books — every path one click away."
         />
+
+        {/* Setup-health banner. Hidden once every card is at least
+            'started'; renders amber when items remain. */}
+        {setupHealth && !setupHealth.ready && setupHealth.missingCount > 0 && (
+          <SetupHealthBanner health={setupHealth} />
+        )}
 
         {/* What do you want to do? — the only thing above the fold. */}
         <section className="mt-5">
@@ -348,5 +378,41 @@ function KpiCard({ kpi, loading }: { kpi: Kpi; loading: boolean }) {
       </div>
       <div className="mt-1.5 text-[10.5px] text-gray-500">{kpi.hint}</div>
     </Link>
+  );
+}
+
+/* ─── Setup-health banner ───
+   Shows when the tenant has empty setup cards. Operator-friendly copy:
+   names the top 3 missing items so the next click is obvious. */
+
+function SetupHealthBanner({ health }: { health: SetupHealth }) {
+  const pct = Math.round(health.completion * 100);
+  const items = health.missingTitles.join(" · ");
+  const more = health.missingCount > health.missingTitles.length
+    ? ` · +${health.missingCount - health.missingTitles.length} more`
+    : "";
+  return (
+    <section className="mt-5">
+      <Link
+        href="/finance/setup"
+        className="group relative flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] px-4 py-3 transition-colors hover:bg-amber-300/[0.07]"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/15 text-amber-200">
+          <RrIcon name="shield-check" size={14} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-amber-300/80">
+            Finance setup · {pct}% complete
+          </div>
+          <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">
+            {health.missingCount === 1
+              ? "1 setup item is empty — your KPIs may understate cash and AR/AP until it's filled."
+              : `${health.missingCount} setup items are empty — your KPIs may understate cash and AR/AP until they're filled.`}
+          </div>
+          <div className="mt-1 truncate text-[11px] text-gray-400">{items}{more}</div>
+        </div>
+        <RrIcon name="arrow-up-right" size={11} className="mt-1 text-amber-300/70 transition-colors group-hover:text-amber-200" />
+      </Link>
+    </section>
   );
 }
