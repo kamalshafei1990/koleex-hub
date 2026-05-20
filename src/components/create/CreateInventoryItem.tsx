@@ -7,6 +7,7 @@ import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
 } from "@/components/ui/create/SmartCreate";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 
 const WORKFLOW = [
   { key: "item",   label: "Item",     icon: "box-open" as const,         state: "current" as const, hint: "You are here" },
@@ -28,7 +29,15 @@ export default function CreateInventoryItem() {
   const [typeId, setTypeId] = useState<string>("");
   const [types, setTypes] = useState<ItemType[]>([]);
   const [costPrice, setCostPrice] = useState("");
-  const [currency, setCurrency] = useState("CNY");
+  /* Currency hydrates from the shared cached base-currency hook —
+     see useBaseCurrencyOptional. Until it resolves the select stays on
+     USD so the form is always submittable. */
+  const resolvedBase = useBaseCurrencyOptional();
+  const [currency, setCurrency] = useState("USD");
+  const [currencyTouched, setCurrencyTouched] = useState(false);
+  useEffect(() => {
+    if (resolvedBase && !currencyTouched) setCurrency(resolvedBase);
+  }, [resolvedBase, currencyTouched]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +45,11 @@ export default function CreateInventoryItem() {
   useEffect(() => {
     (async () => {
       try {
-        const [tRes, dRes] = await Promise.all([
-          fetch("/api/inventory/item-types"),
-          fetch("/api/create/defaults"),
-        ]);
+        const tRes = await fetch("/api/inventory/item-types");
         const t = await tRes.json().catch(() => ({ types: [] }));
-        const d = await dRes.json().catch(() => ({ defaults: { base_currency: "CNY" } }));
         const list = (t.types ?? t.rows ?? []) as ItemType[];
         setTypes(list);
         if (list.length > 0) setTypeId(list[0].id);
-        setCurrency(d.defaults?.base_currency ?? "CNY");
       } catch { /* ignore — bootstrap is best-effort */ }
     })();
   }, []);
@@ -140,7 +144,7 @@ export default function CreateInventoryItem() {
             <SmartInput type="number" step="0.01" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} placeholder="0.00" />
           </SmartField>
           <SmartField label="Currency" impact={["accounting"]}>
-            <SmartSelect value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            <SmartSelect value={currency} onChange={(e) => { setCurrency(e.target.value); setCurrencyTouched(true); }}>
               {["CNY", "USD", "EUR", "GBP", "AED", "SAR", "EGP"].map((c) => <option key={c} value={c}>{c}</option>)}
             </SmartSelect>
           </SmartField>

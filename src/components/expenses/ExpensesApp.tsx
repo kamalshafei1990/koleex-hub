@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import ExpensesHeader from "@/components/expenses/ExpensesHeader";
 import type { ExpensesTabKey } from "@/components/expenses/ExpensesTabs";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
@@ -110,21 +111,22 @@ export default function ExpensesApp() {
     return () => { cancelled = true; };
   }, []);
 
-  /* Currency fix — pick up the tenant base currency for new-expense
-     defaults and KPI labels. */
-  const [baseCurrency, setBaseCurrency] = useState("CNY");
+  /* Tenant base currency comes from the shared session-cached hook so
+     we don't refetch /api/create/defaults on every Finance/Expenses
+     mount. The hook returns `null` until resolved — every render below
+     guards against that so the UI never flashes a wrong code. */
+  const baseCurrencyResolved = useBaseCurrencyOptional();
+  const baseCurrency = baseCurrencyResolved ?? "";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eRes, cRes, dRes] = await Promise.all([
+      const [eRes, cRes] = await Promise.all([
         fetch("/api/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
         fetch("/api/expenses/categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
-        fetch("/api/create/defaults", { cache: "no-store" }).then((r) => r.json() as Promise<{ defaults?: { base_currency?: string } }>),
       ]);
       setExpenses(eRes.expenses ?? []);
       setCategories(cRes.categories ?? []);
-      if (dRes.defaults?.base_currency) setBaseCurrency(dRes.defaults.base_currency);
     } finally {
       setLoading(false);
     }

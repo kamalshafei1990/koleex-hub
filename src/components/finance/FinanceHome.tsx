@@ -24,6 +24,7 @@ import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { formatCompact } from "@/components/finance/FinanceUiX";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import type { DashboardKpi } from "@/lib/finance/types";
 
 interface PathTile {
@@ -81,19 +82,19 @@ interface Kpi {
 
 export default function FinanceHome() {
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
-  const [baseCurrency, setBaseCurrency] = useState("CNY");
+  /* Tenant currency comes from the shared cached hook — see
+     useBaseCurrencyOptional. Returns null until resolved; KPI labels
+     below render "—" until then so a USD/EUR tenant never flashes
+     "CNY" on first paint. */
+  const baseCurrency = useBaseCurrencyOptional() ?? "";
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [k, d] = await Promise.all([
-          fetch("/api/finance/dashboard?period=year", { cache: "no-store" }).then((r) => r.ok ? r.json() : null),
-          fetch("/api/create/defaults", { cache: "no-store" }).then((r) => r.ok ? r.json() : null),
-        ]);
+        const k = await fetch("/api/finance/dashboard?period=year", { cache: "no-store" }).then((r) => r.ok ? r.json() : null);
         if (k?.kpi) setKpi(k.kpi as DashboardKpi);
-        if (d?.defaults?.base_currency) setBaseCurrency(d.defaults.base_currency);
       } finally { setLoading(false); }
     })();
   }, []);

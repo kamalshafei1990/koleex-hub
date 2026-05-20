@@ -25,6 +25,7 @@ import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { BarChart, DonutChart, HeroKpiCard, MetricCard, formatCompact } from "@/components/finance/FinanceUiX";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
 import { fmtMoney, fmtPct } from "@/lib/finance/calc";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 import RrIcon from "@/components/ui/RrIcon";
 
@@ -32,22 +33,20 @@ export default function FinanceExpenseAnalytics() {
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  /* Currency fix — read the tenant base currency once and use it for
-     every KPI / summary label so a CNY tenant doesn't see "USD"
-     plastered everywhere. */
-  const [baseCurrency, setBaseCurrency] = useState("CNY");
+  /* Tenant base currency — shared session-cached hook, null until
+     resolved. fmtMoney() renders "—" when given an empty currency, so
+     a USD or EUR tenant never flashes "CNY" on first paint. */
+  const baseCurrency = useBaseCurrencyOptional() ?? "";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eRes, cRes, dRes] = await Promise.all([
+      const [eRes, cRes] = await Promise.all([
         fetch("/api/finance/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
         fetch("/api/finance/expense-categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
-        fetch("/api/create/defaults", { cache: "no-store" }).then((r) => r.json() as Promise<{ defaults?: { base_currency?: string } }>),
       ]);
       setExpenses(eRes.expenses ?? []);
       setCategories(cRes.categories ?? []);
-      if (dRes.defaults?.base_currency) setBaseCurrency(dRes.defaults.base_currency);
     } finally {
       setLoading(false);
     }

@@ -258,6 +258,11 @@ export function fmtMoney(
   currency: string = "USD",
   opts?: { compact?: boolean },
 ): string {
+  /* Empty currency means the caller is still resolving the tenant base
+     (see useBaseCurrencyOptional). Render a clean placeholder rather
+     than "12.00 " or — worse — silently labelling the value with a
+     wrong code. */
+  if (!currency) return "—";
   if (!Number.isFinite(n)) n = 0;
   if (opts?.compact && Math.abs(n) >= 10000) {
     const abs = Math.abs(n);

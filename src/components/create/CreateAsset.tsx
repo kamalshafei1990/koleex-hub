@@ -7,6 +7,7 @@ import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
 } from "@/components/ui/create/SmartCreate";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 
 const WORKFLOW = [
   { key: "buy",      label: "Purchase",     icon: "shipping-fast" as const,   state: "done" as const,    hint: "Money out" },
@@ -20,19 +21,20 @@ export default function CreateAsset() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [value, setValue] = useState("");
-  const [currency, setCurrency] = useState("CNY");
+  /* Currency hydrates from the shared cached base-currency hook so a
+     USD/EUR tenant never sees "CNY" pre-selected on this form. */
+  const resolvedBase = useBaseCurrencyOptional();
+  const [currency, setCurrency] = useState("USD");
+  const [currencyTouched, setCurrencyTouched] = useState(false);
+  useEffect(() => {
+    if (resolvedBase && !currencyTouched) setCurrency(resolvedBase);
+  }, [resolvedBase, currencyTouched]);
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<"straight_line" | "declining_balance" | "none">("straight_line");
   const [years, setYears] = useState("5");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/create/defaults").then((r) => r.json()).then((j) => {
-      if (j.defaults?.base_currency) setCurrency(j.defaults.base_currency);
-    }).catch(() => {});
-  }, []);
 
   async function save() {
     if (!name.trim()) { setError("Asset name is required."); return; }
@@ -97,7 +99,7 @@ export default function CreateAsset() {
             <SmartInput type="number" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />
           </SmartField>
           <SmartField label="Currency" required impact={["accounting"]}>
-            <SmartSelect value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            <SmartSelect value={currency} onChange={(e) => { setCurrency(e.target.value); setCurrencyTouched(true); }}>
               {["CNY", "USD", "EUR", "GBP", "AED", "SAR", "EGP"].map((c) => <option key={c} value={c}>{c}</option>)}
             </SmartSelect>
           </SmartField>

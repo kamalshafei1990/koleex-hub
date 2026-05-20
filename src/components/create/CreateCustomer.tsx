@@ -1,12 +1,13 @@
 "use client";
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   SmartCreatePage, SmartSection, SmartField, SmartHelpCard,
   SmartInput, SmartSelect, SmartTextarea,
 } from "@/components/ui/create/SmartCreate";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 
 const WORKFLOW = [
   { key: "customer", label: "Customer", icon: "users" as const,                 state: "current" as const, hint: "You are here" },
@@ -24,7 +25,16 @@ export default function CreateCustomer() {
   const [phone, setPhone]       = useState("");
   const [country, setCountry]   = useState("");
   const [terms, setTerms]       = useState("Net 30");
-  const [ccy, setCcy]           = useState("CNY");
+  /* Currency pre-select hydrates from the tenant base via the shared
+     cached hook. Until it resolves we leave the select on USD so the
+     form is always submittable; a useEffect below snaps it to the
+     resolved value unless the operator has already picked one. */
+  const resolvedBase = useBaseCurrencyOptional();
+  const [ccy, setCcy]           = useState("USD");
+  const [ccyTouched, setCcyTouched] = useState(false);
+  useEffect(() => {
+    if (resolvedBase && !ccyTouched) setCcy(resolvedBase);
+  }, [resolvedBase, ccyTouched]);
   const [type, setType]         = useState<"retail" | "wholesale" | "distributor">("wholesale");
   const [notes, setNotes]       = useState("");
   const [busy, setBusy]         = useState(false);
@@ -107,7 +117,7 @@ export default function CreateCustomer() {
       <SmartSection title="Commercial" subtitle="Defaults used on every new SO">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SmartField label="Default currency" impact={["accounting"]}>
-            <SmartSelect value={ccy} onChange={(e) => setCcy(e.target.value)}>
+            <SmartSelect value={ccy} onChange={(e) => { setCcy(e.target.value); setCcyTouched(true); }}>
               {["CNY", "USD", "EUR", "GBP", "AED", "SAR", "EGP"].map((c) => <option key={c} value={c}>{c}</option>)}
             </SmartSelect>
           </SmartField>

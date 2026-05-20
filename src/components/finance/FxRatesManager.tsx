@@ -18,6 +18,7 @@ import {
 import RrIcon from "@/components/ui/RrIcon";
 import { SmartField, SmartInput, SmartSelect } from "@/components/ui/create/SmartCreate";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 
 interface RateRow {
   id: string; from_currency: string; to_currency: string;
@@ -47,35 +48,40 @@ interface FxStatus {
 export default function FxRatesManager() {
   const [rates, setRates] = useState<RateRow[]>([]);
   const [status, setStatus] = useState<FxStatus | null>(null);
-  const [baseCurrency, setBaseCurrency] = useState("CNY");
+  /* Base currency comes from the shared cached hook. It feeds both the
+     display labels and the "To" select default — once it resolves, the
+     form auto-flips from "USD" → tenant base. */
+  const baseCurrencyResolved = useBaseCurrencyOptional();
+  const baseCurrency = baseCurrencyResolved ?? "";
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
   /* Form state */
   const [from, setFrom] = useState("USD");
-  const [to, setTo]     = useState("CNY");
+  const [to, setTo]     = useState<string>("USD");
   const [rate, setRate] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [toTouched, setToTouched] = useState(false);
+
+  /* As soon as the tenant base resolves, snap the "To" field to it —
+     unless the operator has already picked something else. */
+  useEffect(() => {
+    if (baseCurrencyResolved && !toTouched) setTo(baseCurrencyResolved);
+  }, [baseCurrencyResolved, toTouched]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [rRes, dRes, sRes] = await Promise.all([
+      const [rRes, sRes] = await Promise.all([
         fetch("/api/finance/fx/rates", { cache: "no-store" }),
-        fetch("/api/create/defaults", { cache: "no-store" }),
         fetch("/api/finance/fx/status", { cache: "no-store" }),
       ]);
       const rJ = await rRes.json();
-      const dJ = await dRes.json();
       const sJ = await sRes.json().catch(() => ({}));
-      if (!rRes.ok) throw new Error(rJ.error || `HTTP ${rRes.status}`);
+      if (!rRes.ok) throw new Error(humanizeError(rJ.error || `HTTP ${rRes.status}`));
       setRates(rJ.rates ?? []);
-      if (dJ.defaults?.base_currency) {
-        setBaseCurrency(dJ.defaults.base_currency);
-        setTo(dJ.defaults.base_currency);
-      }
       if (sJ.status) setStatus(sJ.status as FxStatus);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -274,7 +280,7 @@ export default function FxRatesManager() {
               </SmartSelect>
             </SmartField>
             <SmartField label="To">
-              <SmartSelect value={to} onChange={(e) => setTo(e.target.value)}>
+              <SmartSelect value={to} onChange={(e) => { setTo(e.target.value); setToTouched(true); }}>
                 {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </SmartSelect>
             </SmartField>

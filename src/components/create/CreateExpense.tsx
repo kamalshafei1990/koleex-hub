@@ -22,6 +22,7 @@ import {
   type PickerOption,
 } from "@/components/ui/create/SmartCreate";
 import { useDraftAutosave } from "@/lib/hooks/useDraftAutosave";
+import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface SmartDefaults {
@@ -50,10 +51,19 @@ export default function CreateExpense() {
   const [busy, setBusy]             = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
+  /* Currency hydrates from the shared cached base-currency hook. The
+     bootstrap useEffect below can still override it from the smart
+     defaults response (e.g. supplier-specific default), but we no
+     longer start from "CNY" baked in. */
+  const resolvedBase = useBaseCurrencyOptional();
   /* Form state */
   const [title, setTitle]                 = useState("");
   const [amount, setAmount]               = useState("");
-  const [currency, setCurrency]           = useState("CNY");
+  const [currency, setCurrency]           = useState("USD");
+  const [currencyTouched, setCurrencyTouched] = useState(false);
+  useEffect(() => {
+    if (resolvedBase && !currencyTouched) setCurrency(resolvedBase);
+  }, [resolvedBase, currencyTouched]);
   const [date, setDate]                   = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate]             = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"unpaid" | "paid">("unpaid");
@@ -93,7 +103,8 @@ export default function CreateExpense() {
         const sups = await supRes.json().catch(() => ({ contacts: [] }));
         const d = def.defaults as SmartDefaults;
         setDefaults(d);
-        setCurrency(d.base_currency);
+        /* Currency itself is handled by useBaseCurrencyOptional above —
+           we only consume the OTHER smart defaults (category id, etc.). */
         if (d.default_expense_category_id) setCategoryId(d.default_expense_category_id);
         setCategories(
           ((cats.categories ?? cats.rows ?? []) as Array<{ id: string; name: string }>)
@@ -229,7 +240,8 @@ export default function CreateExpense() {
               onClick={() => {
                 const v = draft.restore();
                 if (v) {
-                  setTitle(v.title); setAmount(v.amount); setCurrency(v.currency);
+                  setTitle(v.title); setAmount(v.amount);
+                  setCurrency(v.currency); setCurrencyTouched(true);
                   setDate(v.date); setDueDate(v.dueDate);
                   setPaymentStatus(v.paymentStatus); setCategoryId(v.categoryId);
                   setSupplierId(v.supplierId); setNotes(v.notes);
@@ -296,7 +308,7 @@ export default function CreateExpense() {
               </SmartField>
               <SmartField label="Currency" required impact={["accounting"]}
                           hint={defaults ? `Tenant base: ${defaults.base_currency}` : undefined}>
-                <SmartSelect value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <SmartSelect value={currency} onChange={(e) => { setCurrency(e.target.value); setCurrencyTouched(true); }}>
                   {["CNY", "USD", "EUR", "GBP", "AED", "SAR", "EGP"].map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
