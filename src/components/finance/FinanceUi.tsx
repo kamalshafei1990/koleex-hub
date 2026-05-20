@@ -1,12 +1,23 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   Finance App — shared visual primitives
+   Finance App — page-level visual primitives.
 
-   These are the small composable building blocks the rest of the Finance
-   pages reuse. They lean on the Koleex Hub theme tokens (--bg-secondary,
-   --border-subtle, etc.) so they automatically adapt to the dark/light
-   theme without any hardcoded colors.
+   This file owns the small composable building blocks used by every
+   Finance list / detail page: KpiCard, StatusBadge, EmptyState,
+   SectionCard, PageHeader, PeriodTabs, TrendChart, ProgressBar.
+
+   Where the boundary sits (Fix #3 / Fix #5):
+     · FinanceUi.tsx        — page-level primitives (this file).
+     · FinanceUiX.tsx       — analytics-heavy cards + aging + timeline.
+     · FinanceDashboardUi.tsx — typography + dashboard-specific
+                                 lockups (DisplayKpi, HealthRail, …).
+     · charts.tsx            — SVG chart primitives only.
+     · tone.ts               — shared Tone semantic tokens.
+
+   All five files lean on Koleex Hub theme tokens (--bg-secondary,
+   --border-subtle, etc.) so they auto-adapt to dark/light without
+   hardcoded colors.
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
