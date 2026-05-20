@@ -12,6 +12,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { TrialBalance } from "@/lib/accounting/types";
@@ -44,6 +46,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceTrialBalance() {
+  const { t } = useTranslation(financeT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time
@@ -85,8 +88,8 @@ export default function FinanceTrialBalance() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Trial Balance"
-          subtitle="Every account with its posted debit / credit totals. The ledger is balanced when the totals strip nets to zero."
+          title={t("accounting.tb.title", "Trial Balance")}
+          subtitle={t("accounting.tb.subtitle.long", "Every account with its posted debit / credit totals. The ledger is balanced when the totals strip nets to zero.")}
           action={
             <Link
               href="/finance/accounting/general-ledger"

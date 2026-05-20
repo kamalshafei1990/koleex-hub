@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import {
   EmptyState,
   ProgressBar,
@@ -30,6 +32,7 @@ const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
 };
 
 export default function FinanceOrders() {
+  const { t } = useTranslation(financeT);
   /* Currency: sales-side surface, so we keep USD as the form default
      per the brief — but the KPI cards use the tenant base so a Chinese
      tenant aggregating USD orders sees CNY-converted totals where the
@@ -169,8 +172,8 @@ export default function FinanceOrders() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Order Profitability"
-          subtitle="Track selling price, supplier costs, and realised profit on every order."
+          title={t("orders.title", "Order Profitability")}
+          subtitle={t("orders.subtitle.long", "Track selling price, supplier costs, and realised profit on every order.")}
           action={
             <button
               type="button"

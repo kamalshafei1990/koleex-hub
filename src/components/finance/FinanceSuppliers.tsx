@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, ProgressBar } from "@/components/finance/FinanceUi";
 import { formatCompact } from "@/components/finance/FinanceUiX";
 import {
@@ -13,6 +15,7 @@ import RrIcon from "@/components/ui/RrIcon";
 import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
 export default function FinanceSuppliers() {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<FinanceSupplierAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,8 +63,8 @@ export default function FinanceSuppliers() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Supplier Accounts"
-          subtitle="What you've bought from each supplier, what's paid, and what's still owed."
+          title={t("suppliers.title", "Supplier Accounts")}
+          subtitle={t("suppliers.subtitle", "What you've bought from each supplier, what's paid, and what's still owed.")}
         />
 
         {/* Phase UI.5 — sibling-page convergence — same hierarchy as

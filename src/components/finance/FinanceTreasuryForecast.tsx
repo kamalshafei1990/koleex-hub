@@ -22,6 +22,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -84,6 +86,7 @@ function zeroY(H: number, vMin: number, vMax: number, padY = 8): number {
 type ScenarioPreset = "base" | "delay7" | "delay15" | "delay30" | "accel7" | "accel15" | "fx5" | "fx10" | "cost10" | "combined" | "custom";
 
 export default function FinanceTreasuryForecast() {
+  const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

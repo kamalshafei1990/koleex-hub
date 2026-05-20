@@ -13,6 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { AccountingAccount, GeneralLedger } from "@/lib/accounting/types";
@@ -37,6 +39,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceGeneralLedger() {
+  const { t } = useTranslation(financeT);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -94,8 +97,8 @@ export default function FinanceGeneralLedger() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="General Ledger"
-          subtitle="Every posted journal line against a chosen account, with a running balance."
+          title={t("accounting.gl.title", "General Ledger")}
+          subtitle={t("accounting.gl.subtitle.long", "Every posted journal line against a chosen account, with a running balance.")}
           action={
             <Link
               href="/finance/accounting/trial-balance"

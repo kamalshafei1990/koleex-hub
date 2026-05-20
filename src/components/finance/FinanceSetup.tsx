@@ -17,6 +17,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -62,6 +64,7 @@ function StatusDot({ status }: { status: CardStatus }) {
 /* ─── Main page ───────────────────────────────────────────────── */
 
 export default function FinanceSetup() {
+  const { t } = useTranslation(financeT);
   const [snapshot, setSnapshot] = useState<SetupSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,8 +112,8 @@ export default function FinanceSetup() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Financial Setup"
-          subtitle="One-time onboarding. Fill the cards below in any order; the dashboard tracks progress."
+          title={t("setup.title.long", "Financial Setup")}
+          subtitle={t("setup.subtitle.long", "One-time onboarding. Fill the cards below in any order; the dashboard tracks progress.")}
         />
 
         {error && (

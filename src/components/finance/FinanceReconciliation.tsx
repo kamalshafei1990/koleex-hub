@@ -18,6 +18,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -33,6 +35,7 @@ import type {
 type FilterKey = "active" | "suggested" | "confirmed" | "rejected" | "all";
 
 export default function FinanceReconciliation() {
+  const { t } = useTranslation(financeT);
   const [candidates, setCandidates] = useState<FinanceReconciliationCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [rescanBusy, setRescanBusy] = useState(false);
@@ -135,8 +138,8 @@ export default function FinanceReconciliation() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Reconciliation Queue"
-          subtitle="Deterministic matches between payments and bank movements. You confirm; the engine never reconciles silently."
+          title={t("reconciliation.title", "Reconciliation Queue")}
+          subtitle={t("reconciliation.subtitle.long", "Deterministic matches between payments and bank movements. You confirm; the engine never reconciles silently.")}
           action={
             <button
               type="button"

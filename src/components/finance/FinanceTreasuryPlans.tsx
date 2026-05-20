@@ -18,6 +18,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
@@ -76,6 +78,7 @@ interface CompareResponse {
 }
 
 export default function FinanceTreasuryPlans() {
+  const { t } = useTranslation(financeT);
   const [plans, setPlans] = useState<TreasuryPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -194,8 +197,8 @@ export default function FinanceTreasuryPlans() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Treasury Plans"
-          subtitle="Saved forecasts under operational governance: review, approve, archive, and compare against current treasury state."
+          title={t("treasuryPlans.title", "Treasury Plans")}
+          subtitle={t("treasuryPlans.subtitle.long", "Saved forecasts under operational governance: review, approve, archive, and compare against current treasury state.")}
           action={
             <Link
               href="/finance/treasury-forecast"

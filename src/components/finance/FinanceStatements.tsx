@@ -25,6 +25,8 @@
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
 type Tab = "pl" | "bs" | "cf" | "ar" | "ap" | "inv" | "gp";
@@ -51,6 +53,7 @@ function fmtQty(n: number) {
 }
 
 export default function FinanceStatements() {
+  const { t } = useTranslation(financeT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const yearStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
 
@@ -62,8 +65,8 @@ export default function FinanceStatements() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Statements"
-          subtitle="Executive financial picture — P&L, Balance Sheet, Cash Flow, aging, valuation, gross profit."
+          title={t("statements.title", "Statements")}
+          subtitle={t("statements.subtitle.long", "Executive financial picture — P&L, Balance Sheet, Cash Flow, aging, valuation, gross profit.")}
           action={
             <button
               onClick={() => window.print()}

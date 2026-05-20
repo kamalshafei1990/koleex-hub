@@ -17,6 +17,8 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
@@ -61,6 +63,7 @@ function daysSince(iso: string | null): number | null {
    ──────────────────────────────────────────────────────────────────────── */
 
 export default function FinanceBankAccounts() {
+  const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const [accounts, setAccounts] = useState<BankAccountListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,8 +154,8 @@ export default function FinanceBankAccounts() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Bank Accounts"
-          subtitle="Manage treasury accounts, monitor balances, and hand statements to reconciliation."
+          title={t("bankAccounts.title", "Bank Accounts")}
+          subtitle={t("bankAccounts.subtitle.long", "Manage treasury accounts, monitor balances, and hand statements to reconciliation.")}
           action={
             <button
               onClick={startNew}

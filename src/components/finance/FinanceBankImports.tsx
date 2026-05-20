@@ -20,6 +20,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -35,6 +37,7 @@ import type {
 type StepKey = "pick" | "upload" | "preview" | "done";
 
 export default function FinanceBankImports() {
+  const { t } = useTranslation(financeT);
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedAccountId = searchParams.get("account");
@@ -226,8 +229,8 @@ export default function FinanceBankImports() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Bank Statement Import"
-          subtitle="Upload a CSV or XLSX statement, preview the parsed rows, and hand the new cash movements to the reconciliation queue."
+          title={t("bankImports.title", "Bank Statement Import")}
+          subtitle={t("bankImports.subtitle.long", "Upload a CSV or XLSX statement, preview the parsed rows, and hand the new cash movements to the reconciliation queue.")}
           action={
             step !== "pick" ? (
               <button

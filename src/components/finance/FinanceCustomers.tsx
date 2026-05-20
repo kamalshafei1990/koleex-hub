@@ -10,9 +10,12 @@ import {
 } from "@/components/finance/FinanceDashboardUi";
 import { fmtMoney } from "@/lib/finance/calc";
 import RrIcon from "@/components/ui/RrIcon";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
 
 export default function FinanceCustomers() {
+  const { t } = useTranslation(financeT);
   const [rows, setRows] = useState<FinanceCustomerAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,7 +46,7 @@ export default function FinanceCustomers() {
         body: JSON.stringify({ type: "customer_statement", filters: { customer_id: customerId } }),
       });
       const j = await res.json();
-      if (!res.ok) { alert(j.error ?? `Failed (${res.status})`); return; }
+      if (!res.ok) { alert(j.error ?? t("customers.exportFailed", "Failed ({n})").replace("{n}", String(res.status))); return; }
       window.open(`/finance/reports/${encodeURIComponent(j.export_id)}/print?auto=1`, "_blank");
     } finally {
       setGenerating(null);
@@ -62,29 +65,24 @@ export default function FinanceCustomers() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Customer Accounts"
-          subtitle="Revenue, money collected, and money still owed — for every customer you sell to."
+          title={t("customers.title", "Customer Accounts")}
+          subtitle={t("customers.subtitle", "Revenue, money collected, and money still owed — for every customer you sell to.")}
         />
 
-        {/* Phase UI.5 — sibling-page convergence.
-            HeroKpiCard + MetricCard grid replaced with the dashboard's
-            typographic hierarchy: a four-tile DisplayKpi row (L1) +
-            OperationalKpi supporting line (L2). Same numbers, no
-            chrome. */}
-        <DashboardSection eyebrow="Customer accounts" title="Total exposure across every customer">
+        <DashboardSection eyebrow={t("customers.section.eyebrow", "Customer accounts")} title={t("customers.section.title", "Total exposure across every customer")}>
           <div className="grid grid-cols-2 gap-x-8 gap-y-7 lg:grid-cols-4">
-            <DisplayKpi label="Total Revenue" value={formatCompact(kpi.revenue)} hint="USD · all customers" tone="positive" loading={loading} />
-            <DisplayKpi label="Outstanding"   value={formatCompact(kpi.outstanding)} hint="USD · still to collect" tone="warning" loading={loading} />
-            <DisplayKpi label="Collected"     value={formatCompact(kpi.collected)} hint="USD · banked" tone="info" loading={loading} />
-            <DisplayKpi label="Overdue"       value={formatCompact(kpi.overdue)} hint="USD · past due" tone={kpi.overdue > 0 ? "negative" : "info"} loading={loading} />
+            <DisplayKpi label={t("customers.kpi.revenue",     "Total Revenue")} value={formatCompact(kpi.revenue)}     hint={`USD · ${t("customers.kpi.allCustomers", "all customers")}`} tone="positive" loading={loading} />
+            <DisplayKpi label={t("customers.kpi.outstanding", "Outstanding")}   value={formatCompact(kpi.outstanding)} hint={`USD · ${t("customers.kpi.toCollect",    "still to collect")}`} tone="warning" loading={loading} />
+            <DisplayKpi label={t("customers.kpi.collected",   "Collected")}     value={formatCompact(kpi.collected)}   hint={`USD · ${t("customers.kpi.banked",       "banked")}`} tone="info" loading={loading} />
+            <DisplayKpi label={t("customers.kpi.overdue",     "Overdue")}       value={formatCompact(kpi.overdue)}     hint={`USD · ${t("customers.kpi.pastDue",      "past due")}`} tone={kpi.overdue > 0 ? "negative" : "info"} loading={loading} />
           </div>
         </DashboardSection>
 
         <div className="mt-6">
           {loading ? (
-            <div className="py-8 text-center text-sm text-gray-500">Loading customers…</div>
+            <div className="py-8 text-center text-sm text-gray-500">{t("customers.loading", "Loading customers…")}</div>
           ) : rows.length === 0 ? (
-            <EmptyState title="No customers yet" hint="Customers appear here as soon as you create an order for them on the Orders page." />
+            <EmptyState title={t("customers.emptyTitle", "No customers yet")} hint={t("customers.emptyHint", "Customers appear here as soon as you create an order for them on the Orders page.")} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {rows.map((r) => (
@@ -93,19 +91,19 @@ export default function FinanceCustomers() {
                     <div>
                       <div className="text-base font-semibold">{r.customer_name || "—"}</div>
                       <div className="mt-1 text-[11px] text-gray-500">
-                        {r.payment_terms ?? "No payment terms set"}
+                        {r.payment_terms ?? t("customers.noTerms", "No payment terms set")}
                       </div>
                     </div>
                     <StatusBadge status={r.credit_status} />
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
-                    <Mini label="Revenue" value={fmtMoney(r.total_revenue ?? 0, r.default_currency, { compact: true })} accent="emerald" />
-                    <Mini label="Collected" value={fmtMoney(r.paid_amount ?? 0, r.default_currency, { compact: true })} accent="emerald" />
-                    <Mini label="Outstanding" value={fmtMoney(r.outstanding_balance ?? 0, r.default_currency, { compact: true })} accent="amber" />
+                    <Mini label={t("customers.mini.revenue",     "Revenue")}     value={fmtMoney(r.total_revenue ?? 0,        r.default_currency, { compact: true })} accent="emerald" />
+                    <Mini label={t("customers.mini.collected",   "Collected")}   value={fmtMoney(r.paid_amount ?? 0,          r.default_currency, { compact: true })} accent="emerald" />
+                    <Mini label={t("customers.mini.outstanding", "Outstanding")} value={fmtMoney(r.outstanding_balance ?? 0, r.default_currency, { compact: true })} accent="amber" />
                   </div>
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-[10px] text-gray-500">
-                      <span>Collection progress</span>
+                      <span>{t("customers.collectionProgress", "Collection progress")}</span>
                       <span>{r.total_revenue ? (((r.paid_amount ?? 0) / r.total_revenue) * 100).toFixed(0) : 0}%</span>
                     </div>
                     <div className="mt-1">
@@ -114,7 +112,7 @@ export default function FinanceCustomers() {
                   </div>
                   {(r.overdue_amount ?? 0) > 0 && (
                     <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
-                      ⚠ {fmtMoney(r.overdue_amount ?? 0, r.default_currency, { compact: true })} overdue — past due date.
+                      ⚠ {t("customers.overdueAmount", "{amt} overdue — past due date.").replace("{amt}", fmtMoney(r.overdue_amount ?? 0, r.default_currency, { compact: true }))}
                     </div>
                   )}
                   <div className="mt-3">
@@ -125,7 +123,7 @@ export default function FinanceCustomers() {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/[0.10] bg-[var(--bg-primary)] px-3 py-1.5 text-[11px] font-semibold transition hover:border-white/[0.20] disabled:opacity-50"
                     >
                       <RrIcon name="file-invoice" size={12} />
-                      {generating === r.customer_id ? "Preparing…" : "Generate Account Statement"}
+                      {generating === r.customer_id ? t("customers.preparing", "Preparing…") : t("customers.generate", "Generate Account Statement")}
                     </button>
                   </div>
                 </div>

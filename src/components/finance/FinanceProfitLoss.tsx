@@ -11,6 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
 interface PLAccountLine { account_id: string; code: string; name: string; amount: number }
@@ -41,6 +43,7 @@ function pct(n: number): string {
 }
 
 export default function FinanceProfitLoss() {
+  const { t } = useTranslation(financeT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
@@ -78,8 +81,8 @@ export default function FinanceProfitLoss() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Profit & Loss"
-          subtitle="Revenue, costs, and net profit — calculated from posted journal lines only."
+          title={t("accounting.pl.title", "Profit & Loss")}
+          subtitle={t("accounting.pl.subtitle.long", "Revenue, costs, and net profit — calculated from posted journal lines only.")}
         />
 
         {/* Period filter */}

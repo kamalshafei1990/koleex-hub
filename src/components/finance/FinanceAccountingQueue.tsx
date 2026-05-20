@@ -24,6 +24,8 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import RrIcon from "@/components/ui/RrIcon";
 import { DashboardSection, Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
@@ -103,6 +105,7 @@ function relativeAge(iso: string): string {
 }
 
 export default function FinanceAccountingQueue() {
+  const { t } = useTranslation(financeT);
   const [active, setActive] = useState<QueueStatus>("pending");
   const [items, setItems] = useState<QueueItem[]>([]);
   const [counts, setCounts] = useState<Record<QueueStatus, number>>({
@@ -188,8 +191,8 @@ export default function FinanceAccountingQueue() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Accounting Queue"
-          subtitle="Operational events awaiting recognition. Create a draft, review, post."
+          title={t("accounting.queue.title", "Accounting Queue")}
+          subtitle={t("accounting.queue.subtitle.long", "Operational events awaiting recognition. Create a draft, review, post.")}
           action={
             <Link
               href="/finance/accounting/trial-balance"

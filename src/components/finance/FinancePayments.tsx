@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -14,6 +16,7 @@ import GuidanceTip from "@/components/ui/GuidanceTip";
 import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
+  const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const [rows, setRows] = useState<FinancePayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,8 +86,8 @@ export default function FinancePayments() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Payments"
-          subtitle="Money in from customers and money out to suppliers — partial, full, pending, all in one ledger."
+          title={t("payments.title", "Payments")}
+          subtitle={t("payments.subtitle", "Money in from customers and money out to suppliers — partial, full, pending, all in one ledger.")}
           action={
             <div className="flex gap-2">
               <button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">+ Customer Payment</button>

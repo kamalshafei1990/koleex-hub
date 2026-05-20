@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -49,6 +51,7 @@ const OFFSET_OPTIONS = [
 ];
 
 export default function FinanceNotifications() {
+  const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
   const [rows, setRows] = useState<FinanceNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,8 +104,8 @@ export default function FinanceNotifications() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Reminders"
-          subtitle="Command center for money to collect and money to pay — colour-coded by severity."
+          title={t("notifications.title", "Reminders")}
+          subtitle={t("notifications.subtitle.long", "Command center for money to collect and money to pay — colour-coded by severity.")}
         />
 
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">

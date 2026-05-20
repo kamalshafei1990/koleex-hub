@@ -7,6 +7,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
 interface CashFlowLine { label: string; amount: number; detail?: string }
@@ -30,6 +32,7 @@ function fmt(n: number): string {
 }
 
 export default function FinanceCashFlow() {
+  const { t } = useTranslation(financeT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
@@ -56,8 +59,8 @@ export default function FinanceCashFlow() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Cash Flow Statement"
-          subtitle="Direct-method statement built from posted journal lines that touch cash accounts."
+          title={t("accounting.cf.title", "Cash Flow Statement")}
+          subtitle={t("accounting.cf.subtitle.long", "Direct-method statement built from posted journal lines that touch cash accounts.")}
         />
 
         <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] p-4">

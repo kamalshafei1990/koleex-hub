@@ -17,6 +17,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import type {
@@ -35,6 +37,7 @@ export default function FinanceReports({
   initialType?: ReportType;
   initialFilters?: ReportFilters;
 }) {
+  const { t } = useTranslation(financeT);
   const [templates, setTemplates] = useState<ReportTemplateDescriptor[]>([]);
   const [activeType, setActiveType] = useState<ReportType | null>(initialType ?? null);
   const [filters, setFilters] = useState<ReportFilters>(initialFilters ?? defaultFilters());

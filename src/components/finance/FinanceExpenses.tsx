@@ -21,6 +21,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { BarChart, DonutChart, HeroKpiCard, MetricCard, formatCompact } from "@/components/finance/FinanceUiX";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
@@ -30,6 +32,7 @@ import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 import RrIcon from "@/components/ui/RrIcon";
 
 export default function FinanceExpenseAnalytics() {
+  const { t } = useTranslation(financeT);
   const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,8 +180,8 @@ export default function FinanceExpenseAnalytics() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
         <FinanceHeader
-          title="Expense Analytics"
-          subtitle="Where the money goes — by category, by order, by trend. Daily entry lives in the Expenses app."
+          title={t("expAnalytics.title", "Expense Analytics")}
+          subtitle={t("expAnalytics.subtitle.long", "Where the money goes — by category, by order, by trend. Daily entry lives in the Expenses app.")}
           action={
             <Link
               href="/expenses"
