@@ -134,7 +134,7 @@ export default function FinanceOrders() {
       body: JSON.stringify(body),
     });
     if (!r.ok) {
-      alert("Save failed — please try again.");
+      alert(t("orders.err.saveFailed", "Save failed — please try again."));
       return;
     }
     setDraft(null);
@@ -180,7 +180,7 @@ export default function FinanceOrders() {
               onClick={startNew}
               className="rounded-xl bg-[var(--bg-inverted)] px-4 py-2 text-sm font-medium text-[var(--text-inverted)] transition hover:opacity-90 active:scale-95"
             >
-              + New Order
+              + {t("orders.newOrder", "New Order")}
             </button>
           }
         />
@@ -194,7 +194,7 @@ export default function FinanceOrders() {
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
             <HeroKpiCard
-              label="Total Revenue"
+              label={t("orders.kpi.revenue", "Total Revenue")}
               helpId="finance.revenue"
               value={kpi.totalSelling}
               unit={baseCurrency}
@@ -205,7 +205,7 @@ export default function FinanceOrders() {
           </Link>
           <Link href="/finance/visual" className="block hover:opacity-95" aria-label="Open Income Statement">
             <HeroKpiCard
-              label="Net Profit"
+              label={t("orders.kpi.netProfit", "Net Profit")}
               helpId="finance.netProfit"
               value={kpi.totalNet}
               unit={baseCurrency}
@@ -222,23 +222,23 @@ export default function FinanceOrders() {
           <Link href="/reports/statements?tab=ar" className="block hover:opacity-95" aria-label="Open AR aging report">
             <MetricCard label="Outstanding (Money to Collect)" helpId="order.outstandingReceivable" value={kpi.totalOutstanding} unit={baseCurrency} tone="warning" hint="Still to collect · tap for AR aging" loading={loading} />
           </Link>
-          <MetricCard label="Orders" value={String(orders.length)} hint="In current view" loading={loading} />
+          <MetricCard label={t("orders.kpi.orders", "Orders")} value={String(orders.length)} hint={t("orders.kpi.ordersHint", "In current view")} loading={loading} />
         </div>
 
         <div className="mt-6">
           {loading ? (
-            <SectionCard><div className="py-8 text-center text-sm text-gray-500">Loading orders…</div></SectionCard>
+            <SectionCard><div className="py-8 text-center text-sm text-gray-500">{t("orders.loading", "Loading orders…")}</div></SectionCard>
           ) : orders.length === 0 ? (
             <EmptyState
-              title="No orders yet"
-              hint="Create your first order to track revenue, supplier costs, and net profit."
+              title={t("orders.emptyTitle", "No orders yet")}
+              hint={t("orders.emptyHint", "Create your first order to track revenue, supplier costs, and net profit.")}
               action={
                 <button
                   type="button"
                   onClick={startNew}
                   className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 transition hover:bg-emerald-500/30"
                 >
-                  + Create First Order
+                  + {t("orders.emptyCta", "Create First Order")}
                 </button>
               }
             />
