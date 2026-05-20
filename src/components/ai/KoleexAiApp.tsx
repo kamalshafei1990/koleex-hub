@@ -811,6 +811,37 @@ export default function KoleexAiApp() {
     return false;
   }, []);
 
+  /** Per-message TTS replay — stops whatever is currently speaking,
+   *  then queues this message via the existing speakText helper.
+   *  Same engine the auto-playback for voice turns uses, so the
+   *  selected output voice + language are consistent. */
+  const handleSpeak = useCallback((text: string) => {
+    if (!text) return;
+    /* Stop any in-flight playback (voice-turn auto-read or a previous
+       Speak click) before starting the new one. */
+    ttsHandleRef.current?.cancel?.();
+    setAiSpeaking(true);
+    ttsHandleRef.current = speakText(text, {
+      lang,
+      onEnd: () => setAiSpeaking(false),
+      onError: () => setAiSpeaking(false),
+    });
+  }, [lang]);
+
+  /** Per-message 👍 / 👎 feedback. Fire-and-forget — the server
+   *  endpoint is a stub today (it accepts the row and ack-200s);
+   *  the value is logged client-side so we can see signal flowing
+   *  even before the backend rolls. Failure is silent so the UX
+   *  never penalises the user for telemetry being down. */
+  const handleFeedback = useCallback((messageId: string, value: "up" | "down") => {
+    void fetch("/api/ai/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_id: messageId, value }),
+      keepalive: true,
+    }).catch(() => { /* telemetry — silent on failure */ });
+  }, []);
+
   /** Phase 13: edit-and-retry on a user message. Given the index of
    *  the user message and its new text, trim the client view back
    *  to just before that message and re-send with the edited text.
@@ -1169,6 +1200,43 @@ export default function KoleexAiApp() {
             ))
           )}
         </div>
+
+        {/* Profile chip pinned at the foot of the sidebar — same affordance
+            ChatGPT / Claude.ai use. Acts as a Hub-link back to the home
+            launcher (long-press / right-click destinations can come in a
+            follow-up; today this is a fast way to see who you're chatting
+            as without scrolling to find the global header). */}
+        {account && (
+          <Link
+            href="/"
+            title={account.username || account.person?.full_name || ""}
+            className="flex items-center gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5 hover:bg-[var(--bg-surface-subtle)] transition-colors shrink-0"
+          >
+            <span className="h-7 w-7 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              {(account.avatar_url || account.person?.avatar_url) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={account.avatar_url || account.person?.avatar_url || ""}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-[10px] font-bold text-[var(--text-primary)]">
+                  {(account.username || account.person?.full_name || "U")
+                    .trim().charAt(0).toUpperCase()}
+                </span>
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12.5px] font-semibold text-[var(--text-primary)]">
+                {account.person?.full_name || account.username || ""}
+              </div>
+              <div className="truncate text-[10.5px] text-[var(--text-dim)]">
+                {account.username}
+              </div>
+            </div>
+          </Link>
+        )}
       </aside>
 
       {/* ── Main pane ── */}
@@ -1290,6 +1358,9 @@ export default function KoleexAiApp() {
                   onCopy={handleCopy}
                   onRegenerate={handleRegenerate}
                   onEdit={(newText) => handleEditAndRetry(i, newText)}
+                  onSpeak={handleSpeak}
+                  onFeedback={handleFeedback}
+                  lang={lang}
                 />
               ))
             )}
@@ -1624,22 +1695,27 @@ function Bubble({
   onCopy,
   onRegenerate,
   onEdit,
+  onSpeak,
+  onFeedback,
+  lang,
 }: {
   msg: ChatMsg;
   userAvatar?: string | null;
   userInitial: string;
-  /** Is this the final message in the conversation right now?
-   *  Regenerate only offers on the last assistant reply. */
   isLast?: boolean;
-  /** Disable Regenerate while another send is in-flight. */
   canRegenerate?: boolean;
-  /** Disable Edit while a send is in-flight. */
   canEdit?: boolean;
   onCopy?: (text: string) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
-  /** Phase 13: edit-and-retry — called with the new text once the
-   *  user saves their edit. Re-runs the turn with the new content. */
   onEdit?: (newText: string) => void;
+  /** Per-message TTS replay — gets the bubble's text and the chosen
+   *  language; returns a handle the bubble can use to stop playback. */
+  onSpeak?: (text: string) => void;
+  /** Per-message 👍 / 👎 feedback. Fire-and-forget — the bubble shows
+   *  a brief confirmation chip; the parent decides where the signal
+   *  goes (server endpoint, local telemetry, …). */
+  onFeedback?: (msgId: string, value: "up" | "down") => void;
+  lang: Lang;
 }) {
   const isUser = msg.role === "user";
   const rtl = isRtl(msg.content);
@@ -1838,27 +1914,17 @@ function Bubble({
             the bubble div so it doesn't inherit the bubble's padding /
             background. */}
         {showActions && (
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
-            <button
-              type="button"
-              onClick={handleCopyClick}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label={copied ? "Copied" : "Copy message"}
-            >
-              {copied ? "✓ Copied" : "⎘ Copy"}
-            </button>
-            {isLast && onRegenerate && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                disabled={!canRegenerate}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Regenerate response"
-              >
-                ↻ Regenerate
-              </button>
-            )}
-          </div>
+          <BubbleActions
+            msg={msg}
+            isLast={!!isLast}
+            canRegenerate={!!canRegenerate}
+            copied={copied}
+            onCopy={handleCopyClick}
+            onRegenerate={onRegenerate}
+            onSpeak={onSpeak}
+            onFeedback={onFeedback}
+            lang={lang}
+          />
         )}
       </div>
       {isUser && (
@@ -1875,6 +1941,109 @@ function Bubble({
             </span>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Bubble action row ──
+   Per-message actions under each assistant bubble. Copy + (last only)
+   Regenerate were already here; Phase polish adds:
+
+     · 🔊 Speak — replay this specific reply aloud via TTS. Useful when
+       the user wants to re-hear a long answer or didn't catch the
+       voice-turn auto-playback.
+     · 👍 / 👎 — operator feedback. Fire-and-forget; the parent picks
+       where the signal goes (today: console.info + analytics ping
+       endpoint stub, tomorrow: server-side feedback table).
+   ──────────────────────────────────────────────────────────────────── */
+
+function BubbleActions({
+  msg, isLast, canRegenerate, copied, onCopy, onRegenerate, onSpeak, onFeedback, lang,
+}: {
+  msg: ChatMsg;
+  isLast: boolean;
+  canRegenerate: boolean;
+  copied: boolean;
+  onCopy: () => void;
+  onRegenerate?: () => void;
+  onSpeak?: (text: string) => void;
+  onFeedback?: (msgId: string, value: "up" | "down") => void;
+  lang: Lang;
+}) {
+  void lang;
+  const [vote, setVote] = useState<"up" | "down" | null>(null);
+  const sendVote = (v: "up" | "down") => {
+    setVote(v);
+    onFeedback?.(msg.id, v);
+  };
+  const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  return (
+    <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+      <button
+        type="button"
+        onClick={onCopy}
+        className={btnCls}
+        aria-label={copied ? "Copied" : "Copy message"}
+        title={copied ? "Copied" : "Copy"}
+      >
+        {copied ? (
+          <span aria-hidden className="text-[12px]">✓</span>
+        ) : (
+          <span aria-hidden className="text-[12px]">⎘</span>
+        )}
+      </button>
+      {onSpeak && msg.content && (
+        <button
+          type="button"
+          onClick={() => onSpeak(msg.content)}
+          className={btnCls}
+          aria-label="Read aloud"
+          title="Read aloud"
+        >
+          <svg aria-hidden viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06c2.89 0 5.25 2.36 5.25 5.25S16.89 15.79 14 15.79v2.06c4.02 0 7.31-3.29 7.31-7.31S18.02 3.23 14 3.23z" />
+          </svg>
+        </button>
+      )}
+      {isLast && onRegenerate && (
+        <button
+          type="button"
+          onClick={onRegenerate}
+          disabled={!canRegenerate}
+          className={btnCls}
+          aria-label="Regenerate response"
+          title="Regenerate"
+        >
+          <span aria-hidden className="text-[12px]">↻</span>
+        </button>
+      )}
+      {onFeedback && (
+        <>
+          <span aria-hidden className="mx-1 h-3 w-px bg-[var(--border-subtle)]" />
+          <button
+            type="button"
+            onClick={() => sendVote("up")}
+            className={`${btnCls} ${vote === "up" ? "text-emerald-300" : ""}`}
+            aria-label="Good response"
+            title="Good response"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" width="13" height="13" fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => sendVote("down")}
+            className={`${btnCls} ${vote === "down" ? "text-rose-300" : ""}`}
+            aria-label="Bad response"
+            title="Bad response"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" width="13" height="13" fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+            </svg>
+          </button>
+        </>
       )}
     </div>
   );
