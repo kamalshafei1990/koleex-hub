@@ -1036,41 +1036,14 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="text-[var(--text-primary)] flex overflow-hidden w-full relative koleex-ai-stage"
+      className="text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       style={{ height: stageHeight }}
     >
-      {/* Full-app Gemini-style background — pure black with one soft
-          dark-blue glow anchored to the bottom-center. Lives on the
-          outermost shell so both the sidebar and the main pane share it
-          rather than sitting on a hard flat panel. */}
-      <style>{`
-        @keyframes koleex-glow-breathe {
-          0%, 100% { opacity: 0.85; transform: translate(-50%, 0) scale(1); }
-          50%      { opacity: 1;    transform: translate(-50%, -2%) scale(1.05); }
-        }
-        .koleex-ai-stage { background: #050510; }
-        html[data-theme="light"] .koleex-ai-stage { background: var(--bg-primary); }
-        .koleex-ai-stage::before {
-          content: "";
-          position: absolute;
-          left: 50%;
-          bottom: -30%;
-          width: 140%;
-          height: 85%;
-          transform: translate(-50%, 0);
-          pointer-events: none;
-          z-index: 0;
-          background:
-            radial-gradient(50% 60% at 50% 50%, rgba(32, 64, 160, 0.50), rgba(18, 30, 90, 0.22) 45%, transparent 75%);
-          animation: koleex-glow-breathe 10s ease-in-out infinite;
-          filter: blur(48px);
-          will-change: transform, opacity;
-        }
-        html[data-theme="light"] .koleex-ai-stage::before {
-          background:
-            radial-gradient(50% 60% at 50% 50%, rgba(120, 150, 255, 0.22), rgba(150, 170, 230, 0.06) 45%, transparent 75%);
-        }
-      `}</style>
+      {/* Hub design system: solid bg-primary surface, no animated halo.
+          Matches FinanceHome / InvoicesApp / Sales etc. The previous
+          Gemini-style breathing radial-gradient lived here and was
+          removed during the polish pass — Hub apps are calm, dense, and
+          monochrome by default; the chat content carries the page. */}
 
       {/* ── Sidebar ──
           Desktop: inline flex sibling; width morphs between 280px
@@ -1097,7 +1070,7 @@ export default function KoleexAiApp() {
       <aside
         className={`${
           sidebarOpen ? "flex" : "hidden"
-        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)]/95 md:bg-[var(--bg-secondary)]/60 backdrop-blur-xl border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
+        } md:flex flex-col shrink-0 bg-[var(--bg-secondary)] border-e border-[var(--border-subtle)] overflow-hidden fixed md:relative inset-y-0 start-0 z-[40] md:z-[1]`}
         style={{
           /* On mobile we ignore sidebarCollapsed (desktop-only concept).
              On desktop, width morphs 0 ↔ 280 based on collapsed state. */
@@ -1165,14 +1138,7 @@ export default function KoleexAiApp() {
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="p-8 flex flex-col items-center text-center gap-2 text-[var(--text-dim)]">
-              <div
-                className="h-10 w-10 rounded-full flex items-center justify-center"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(0,212,255,0.12), rgba(123,97,255,0.12) 50%, rgba(255,110,199,0.08))",
-                  border: "1px solid rgba(123,97,255,0.2)",
-                }}
-              >
+              <div className="h-10 w-10 rounded-full flex items-center justify-center border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
                 <AiFaceIcon size={20} animated />
               </div>
               <div className="text-[12px]">{copy.noChats}</div>
@@ -1207,40 +1173,86 @@ export default function KoleexAiApp() {
 
       {/* ── Main pane ── */}
       <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Mobile top bar — translucent so the full-app backdrop shows. */}
-        <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 flex items-center gap-2 bg-[var(--bg-primary)]/40 backdrop-blur-md relative z-[2]">
+        {/* Mobile top bar — Hub-native pattern.
+            Solid bg-secondary panel + hairline border, matching the
+            FinanceHeader / InvoicesApp top bars rather than a glass
+            blur over a glow. */}
+        <div className="md:hidden shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center gap-2 relative z-[2]">
           <button
+            type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] flex items-center justify-center"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             {sidebarOpen ? <CrossIcon size={14} /> : <MenuBurgerIcon size={14} />}
           </button>
-          <div className="text-[13px] font-semibold truncate flex-1">
-            {active?.title ?? "Koleex AI"}
+          {/* AI icon mark — same family as the Finance / Inventory app
+              icons in the Hub header, but uses the live AI face. */}
+          <div className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            <AiFaceIcon size={16} animated />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
+              {active?.title ?? "Koleex AI"}
+            </div>
           </div>
           <button
+            type="button"
             onClick={startNewChat}
-            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center"
+            className="h-8 w-8 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90"
+            aria-label={copy.newChat}
+            title={copy.newChat}
           >
             <PlusIcon size={14} />
           </button>
         </div>
 
-        {/* Desktop expand-sidebar button — only shown when the sidebar
-            is collapsed, so the user always has a way back. Floats in the
-            top-left corner of the main pane, styled like the rest of the
-            Hub iconography. */}
-        {sidebarCollapsed && (
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed(false)}
-            className="hidden md:flex absolute top-3 start-3 z-[3] h-9 w-9 rounded-xl bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shadow-lg"
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
+        {/* Desktop top bar — Hub-native page header (back arrow + AI icon
+            + h1 + subtitle on the left, expand-sidebar control + new-chat
+            on the right when collapsed). Mirrors FinanceHeader so an
+            operator moving Finance → AI doesn't see a foreign UI. */}
+        <div className="hidden md:flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 lg:px-6 py-3 relative z-[2]">
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <MenuBurgerIcon size={14} />
+            </button>
+          )}
+          <Link
+            href="/"
+            aria-label="Back to Hub"
+            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
           >
-            <MenuBurgerIcon size={14} />
-          </button>
-        )}
+            <ArrowLeftIcon className="h-4 w-4" />
+          </Link>
+          <div className="h-8 w-8 shrink-0 flex items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+            <AiFaceIcon size={16} animated />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
+              {active?.title || "Koleex AI"}
+            </h1>
+            {!active && (
+              <p className="text-[11.5px] text-[var(--text-dim)] truncate">{copy.welcomeSub}</p>
+            )}
+          </div>
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={startNewChat}
+              className="h-8 px-3 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14] inline-flex items-center gap-1.5"
+              title={copy.newChat}
+            >
+              <PlusIcon size={12} />
+              {copy.newChat}
+            </button>
+          )}
+        </div>
 
         {/* Messages — transparent; shared backdrop lives on outer shell. */}
         <div
@@ -1309,7 +1321,7 @@ export default function KoleexAiApp() {
                 setShowJumpToBottom(false);
               }}
               aria-label="Jump to latest"
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-9 px-3 rounded-full bg-[var(--bg-surface)]/90 backdrop-blur-md border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] shadow-lg hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[2] h-8 px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5"
             >
               ↓ Latest
             </button>
@@ -1350,7 +1362,7 @@ export default function KoleexAiApp() {
               className="relative"
             >
               <div
-                className="relative flex items-end rounded-[26px] bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-subtle)] shadow-[0_8px_30px_rgba(0,0,0,0.25)] focus-within:border-[var(--border-focus)] transition-colors"
+                className="relative flex items-end rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors"
               >
                 {/* Phase 14.1: emoji picker lives on the LEFT of the
                     composer. Popover anchors to its left edge so the
@@ -1691,14 +1703,7 @@ function Bubble({
       className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
     >
       {!isUser && (
-        <div
-          className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(123,97,255,0.18) 50%, rgba(255,110,199,0.12))",
-            border: "1px solid rgba(123,97,255,0.25)",
-          }}
-        >
+        <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
           <AiFaceIcon size={18} animated />
         </div>
       )}
@@ -1734,14 +1739,14 @@ function Bubble({
                bubbles render markdown via MessageMarkdown for bullets,
                headings, code blocks, tables, links. */
             dir="auto"
-            className={`rounded-2xl px-4 py-2.5 leading-relaxed backdrop-blur-md ${
+            className={`rounded-2xl px-4 py-2.5 leading-relaxed ${
               isUser ? "whitespace-pre-wrap" : ""
             } ${
               rtl ? "text-[15px]" : "text-[14px]"
             } ${
               isUser
                 ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                : "bg-[var(--bg-secondary)]/85 border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                : "bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
             style={{
               unicodeBidi: "plaintext",
@@ -1937,38 +1942,36 @@ function WelcomeCard({
   onPick: (prompt: string) => void;
   firstName: string;
 }) {
-  /* Gemini-style hero: large personalised greeting centered in the
-     available space, a compact AI mark above, and the suggested
-     prompts tucked underneath in a minimal single-row strip so they
-     feel like chips not cards — matches the less-is-more direction
-     Kamal asked for. */
+  /* Hub-native welcome — same layout vocabulary as FinanceHome.
+     Small icon mark in a Hub-themed tile, a tight h2 + caption pair,
+     then suggestion tiles in a 2-column grid (matching the
+     "What do you want to do?" pattern on /finance). No drop-shadow
+     halos, no glass blur, no centered-pill chips. */
   const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <div
-        className="inline-flex items-center justify-center mb-6"
-        style={{
-          filter:
-            "drop-shadow(0 0 12px rgba(0,145,255,0.40)) drop-shadow(0 0 28px rgba(123,97,255,0.30))",
-        }}
-      >
-        <AiFaceIcon size={64} animated />
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-8">
+      <div className="h-14 w-14 inline-flex items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] mb-4">
+        <AiFaceIcon size={32} animated />
       </div>
-      <h2 className="text-[28px] md:text-[36px] font-semibold tracking-tight text-[var(--text-primary)] mb-3 leading-tight">
+      <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2 leading-tight">
         {greeting}
       </h2>
-      <p className="text-[14px] text-[var(--text-dim)] mb-10 max-w-lg">
+      <p className="text-[12.5px] text-[var(--text-dim)] mb-8 max-w-md">
         {copy.welcomeSub}
       </p>
 
-      <div className="flex flex-wrap gap-2 justify-center max-w-2xl">
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
         {copy.prompts.map((p, i) => (
           <button
             key={i}
+            type="button"
             onClick={() => onPick(p)}
-            className="px-3.5 py-2 rounded-full bg-[var(--bg-secondary)]/70 backdrop-blur-md border border-[var(--border-subtle)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] text-[12.5px] text-[var(--text-muted)] transition-all"
+            className="group flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
-            {p}
+            <span className="mt-0.5 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] group-hover:text-[var(--text-primary)]">
+              <AiFaceIcon size={11} animated={false} />
+            </span>
+            <span className="flex-1 leading-snug">{p}</span>
           </button>
         ))}
       </div>
