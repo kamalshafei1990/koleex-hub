@@ -297,6 +297,10 @@ export default function MicButton({
   ]);
 
   const sizePx = `${size}px`;
+  /* Icon-size harmonised with the rest of the AI composer row
+     (attach / emoji / web-search all render an 18 px SVG). The
+     listening / speaking states keep a slightly smaller stop icon
+     so its square geometry doesn't crowd the circle. */
   const icon =
     computedState === "processing" ? (
       <SpinnerIcon className="h-4 w-4 animate-spin" />
@@ -305,9 +309,14 @@ export default function MicButton({
     ) : computedState === "listening" ? (
       <StopIcon size={14} />
     ) : (
-      <MicrophoneIcon size={16} />
+      <MicrophoneIcon size={18} />
     );
 
+  /* Idle styling matches the other ghost buttons in the composer —
+     transparent background, no border, hover surface lifts it. The
+     persistent border + bg-surface that used to live here made the
+     mic look like a chip while the other buttons read as plain
+     icons; the row now scans uniformly. */
   const color =
     computedState === "listening"
       ? "bg-rose-500 text-white"
@@ -315,7 +324,7 @@ export default function MicButton({
         ? "bg-[var(--bg-surface)] text-[var(--text-dim)]"
         : computedState === "speaking"
           ? "bg-sky-500 text-white"
-          : "bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]";
+          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]";
 
   const ariaLabel =
     computedState === "listening"

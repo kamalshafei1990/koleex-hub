@@ -1328,10 +1328,10 @@ export default function KoleexAiApp() {
             <button
               type="button"
               onClick={startNewChat}
-              className="h-8 px-3 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14] inline-flex items-center gap-1.5"
+              className="h-8 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
               title={copy.newChat}
             >
-              <PlusIcon size={12} />
+              <PlusIcon size={14} />
               {copy.newChat}
             </button>
           )}
@@ -1512,14 +1512,21 @@ export default function KoleexAiApp() {
                   style={{ minHeight: "44px" }}
                 />
 
-                {/* Action row — secondary on the left, primary on the right. */}
-                <div className="flex items-center justify-between gap-1 px-2 pb-2">
-                  <div className="flex items-center gap-0.5">
+                {/* Action row — secondary on the left, primary on the right.
+                    Uniform sizing rules:
+                      · Every button: 36×36 (h-9 w-9), rounded-full.
+                      · Every glyph inside a button: 18×18 SVG.
+                      · Spacing: gap-1 within each side; the parent flex
+                        gives the two clusters opposite alignment.
+                    Web-search becomes icon-only (its toggled state is
+                    enough signal; the tooltip explains it). */}
+                <div className="flex items-center justify-between px-2 pb-2">
+                  <div className="flex items-center gap-1">
                     {/* + Attachment */}
                     <button
                       type="button"
                       onClick={openFilePicker}
-                      className="h-9 w-9 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                       aria-label="Attach file"
                       title="Attach file"
                     >
@@ -1538,36 +1545,35 @@ export default function KoleexAiApp() {
                       tabIndex={-1}
                     />
 
-                    {/* Emoji picker (iOS-style) */}
+                    {/* Emoji picker (iOS-style) — icon-only, identical to siblings. */}
                     <EmojiButton
                       onSelect={insertEmoji}
-                      className="h-9 w-9 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     />
 
-                    {/* Web search toggle — green ring when on. */}
+                    {/* Web search toggle — icon-only; emerald ring when on. */}
                     <button
                       type="button"
                       onClick={() => setWebSearch((v) => !v)}
                       aria-pressed={webSearch}
                       aria-label="Search the web"
                       title={webSearch ? "Web search: on" : "Web search: off"}
-                      className={`h-9 px-2.5 rounded-full inline-flex items-center gap-1.5 text-[12px] transition-colors ${
+                      className={`h-9 w-9 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
-                          ? "bg-emerald-300/[0.10] text-emerald-200 border border-emerald-300/40"
+                          ? "bg-emerald-300/[0.12] text-emerald-200 ring-1 ring-emerald-300/40"
                           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                       }`}
                     >
-                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="2" y1="12" x2="22" y2="12" />
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                       </svg>
-                      <span className="hidden sm:inline">Search</span>
                     </button>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {/* Mic — voice in. */}
+                    {/* Mic — voice in. 36 matches the secondary cluster on the left. */}
                     <MicButton
                       size={36}
                       onTranscript={(t) => send(t, true)}
@@ -1578,12 +1584,14 @@ export default function KoleexAiApp() {
                       lang={lang}
                     />
 
-                    {/* Send / Stop. */}
+                    {/* Send / Stop — primary action, inverted bg. Identical
+                        36×36 footprint as every other composer button so
+                        the row reads as a single visual rhythm. */}
                     {sending ? (
                       <button
                         type="button"
                         onClick={handleStop}
-                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
                         aria-label="Stop generating"
                         title="Stop generating"
                       >
@@ -1593,7 +1601,7 @@ export default function KoleexAiApp() {
                       <button
                         type="submit"
                         disabled={!input.trim() && attachments.length === 0}
-                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
                         aria-label="Send"
                       >
                         <PaperPlaneIcon className="h-4 w-4" />
