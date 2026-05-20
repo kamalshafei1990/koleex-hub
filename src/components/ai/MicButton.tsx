@@ -149,14 +149,17 @@ export default function MicButton({
   }, [state]);
 
   /* Cleanup on unmount — abort any live recognition so the mic
-     indicator in the browser tab turns off. */
+     indicator in the browser tab turns off.
+     Audit P0 #12 — flip an alive flag so the recognition's onend /
+     onresult / onerror handlers, which may fire AFTER the unmount
+     (the browser's speech engine doesn't always cancel synchronously),
+     don't call setState on a dead component. */
+  const aliveRef = useRef(true);
   useEffect(() => {
+    aliveRef.current = true;
     return () => {
-      try {
-        recognitionRef.current?.abort();
-      } catch {
-        // ignore
-      }
+      aliveRef.current = false;
+      try { recognitionRef.current?.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     };
   }, []);
@@ -239,10 +242,12 @@ export default function MicButton({
         const text = finalTextRef.current.trim();
         finalTextRef.current = "";
         recognitionRef.current = null;
+        if (!aliveRef.current) return;
         setState("idle");
         if (text) onTranscript(text);
       };
       recognition.onstart = () => {
+        if (!aliveRef.current) return;
         setState("listening");
       };
       recognition.start();
@@ -449,20 +454,27 @@ export function speakText(
   }
   u.rate = 1;
   u.pitch = 1;
-  u.onend = () => opts.onEnd?.();
+  /* Audit P0 #14 — guard `onEnd` so it only fires once. The browser
+     dispatches `end` after `cancel()` per spec, and the returned
+     handle's cancel() also calls onEnd. Without the guard a single
+     cancel produces TWO setAiSpeaking(false) calls (and any other
+     parent-side effects fire twice). */
+  let ended = false;
+  const fireEnd = () => {
+    if (ended) return;
+    ended = true;
+    opts.onEnd?.();
+  };
+  u.onend = fireEnd;
   u.onerror = () => {
     opts.onError?.();
-    opts.onEnd?.();
+    fireEnd();
   };
   synth.speak(u);
   return {
     cancel: () => {
-      try {
-        synth.cancel();
-      } catch {
-        // ignore
-      }
-      opts.onEnd?.();
+      try { synth.cancel(); } catch { /* ignore */ }
+      fireEnd();
     },
   };
 }

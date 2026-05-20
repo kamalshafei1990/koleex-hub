@@ -308,6 +308,11 @@ export async function POST(req: Request) {
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        /* Audit P1 #4 — lifted out of try{} so the finally{} block at
+           the bottom can always clearInterval(), even when an early
+           load step throws before the original `const keepalive` line. */
+        let alive = true;
+        let keepalive: ReturnType<typeof setInterval> | null = null;
         try {
           controller.enqueue(send({ type: "start", conversationId }));
 
@@ -342,8 +347,7 @@ export async function POST(req: Request) {
           /* Keepalive comments while orchestrate / fast-path runs.
              SSE treats lines starting with ":" as comments — they
              keep the connection warm without triggering client events. */
-          let alive = true;
-          const keepalive = setInterval(() => {
+          keepalive = setInterval(() => {
             if (!alive) return;
             try {
               controller.enqueue(encoder.encode(": ping\n\n"));
@@ -526,7 +530,7 @@ export async function POST(req: Request) {
           }
 
           alive = false;
-          clearInterval(keepalive);
+          if (keepalive) clearInterval(keepalive);
 
           /* ── Phase 11 L2 + Phase 16: response polish ──────────────
              Apply the Egyptian dialect builder for EGY / FRANCO users
@@ -611,6 +615,14 @@ export async function POST(req: Request) {
             }),
           );
         } finally {
+          /* Audit P1 #4 — keepalive must be cleared on every exit
+             path, not just the happy one. If orchestrate() throws
+             above, the original code skipped clearInterval and the
+             server kept emitting ": ping" until TCP died on its own.
+             Setting `alive = false` is belt-and-braces in case the
+             interval callback already fired after clear. */
+          alive = false;
+          if (keepalive) clearInterval(keepalive);
           controller.close();
         }
       },

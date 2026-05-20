@@ -39,6 +39,7 @@ import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
+import { humanizeError } from "@/lib/ui/humanize-error";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
@@ -190,9 +191,11 @@ export default function KoleexAiApp() {
   const activeIdKey = account?.id ? `koleex-ai-active-chat:${account.id}` : null;
   useEffect(() => {
     if (!activeIdKey) return;
-    if (activeId) {
-      window.localStorage.setItem(activeIdKey, activeId);
-    }
+    if (!activeId) return;
+    /* Safari private mode + quota-exceeded throw on setItem; the
+       conversation persistence is best-effort, so swallow the error
+       instead of crashing the whole component. Audit P0 #4. */
+    try { window.localStorage.setItem(activeIdKey, activeId); } catch { /* ignore */ }
   }, [activeId, activeIdKey]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -232,12 +235,17 @@ export default function KoleexAiApp() {
      that so an explicit collapse sticks between refreshes. */
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    const stored = window.localStorage.getItem("koleex-ai-sidebar-collapsed");
-    return stored === "1";
+    try {
+      return window.localStorage.getItem("koleex-ai-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
   });
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem("koleex-ai-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    try {
+      window.localStorage.setItem("koleex-ai-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    } catch { /* private mode / quota — best-effort */ }
   }, [sidebarCollapsed]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -334,14 +342,16 @@ export default function KoleexAiApp() {
     if (restoredRef.current) return;
     if (!activeIdKey) return;
     if (conversations.length === 0) return;
-    const stored = window.localStorage.getItem(activeIdKey);
+    let stored: string | null;
+    try { stored = window.localStorage.getItem(activeIdKey); }
+    catch { stored = null; }
     if (!stored) { restoredRef.current = true; return; }
     const exists = conversations.some((c) => c.id === stored);
     if (exists) {
       restoredRef.current = true;
       void openConversation(stored);
     } else {
-      window.localStorage.removeItem(activeIdKey);
+      try { window.localStorage.removeItem(activeIdKey); } catch { /* ignore */ }
       restoredRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,6 +360,12 @@ export default function KoleexAiApp() {
   /* ── Load a conversation's messages ── */
   const openConversation = useCallback(
     async (id: string) => {
+      /* Audit P0 #1 — abort any in-flight send before switching
+         conversations. Without this, the SSE reader keeps consuming
+         deltas into a placeholder that no longer exists in the
+         currently-visible thread (silent dropped reply) and the
+         server's keepalive timer keeps pinging until TCP drops. */
+      abortRef.current?.abort();
       setActiveId(id);
       setMessages([]);
       setSidebarOpen(false);
@@ -358,9 +374,16 @@ export default function KoleexAiApp() {
         const res = await fetch(`/api/ai/conversations/${id}`, {
           credentials: "include",
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          /* Audit P1 #9 — surface a load error instead of silently
+             showing the welcome card on an existing chat. */
+          setError(humanizeError(`HTTP ${res.status}`));
+          return;
+        }
         const { messages: rows } = (await res.json()) as { messages: ChatMsg[] };
         setMessages(rows ?? []);
+      } catch (e) {
+        setError(humanizeError(e));
       } finally {
         setLoadingConv(false);
       }
@@ -370,6 +393,8 @@ export default function KoleexAiApp() {
 
   /* ── New chat — create row, become active, reset messages ── */
   const startNewChat = useCallback(async () => {
+    /* Same abort as openConversation — audit P0 #1. */
+    abortRef.current?.abort();
     const res = await fetch("/api/ai/conversations", {
       method: "POST",
       credentials: "include",
@@ -553,6 +578,11 @@ export default function KoleexAiApp() {
             if (json?.conversation) {
               const bumpId = json.conversation.id;
               const bumpTitle = json.conversation.title;
+              /* Audit P0 #5 — capture the timestamp BEFORE the updater
+                 so the setState callback stays pure (no Date.now() /
+                 new Date() inside the function React calls during
+                 commit-replay). */
+              const bumpNow = new Date().toISOString();
               setConversations((prev) => {
                 const next = prev.map((c) =>
                   c.id === bumpId
@@ -561,7 +591,7 @@ export default function KoleexAiApp() {
                         title: bumpTitle,
                         last_preview: fallbackReply.slice(0, 180),
                         message_count: c.message_count + 2,
-                        updated_at: new Date().toISOString(),
+                        updated_at: bumpNow,
                       }
                     : c,
                 );
@@ -585,7 +615,7 @@ export default function KoleexAiApp() {
           const msg =
             res.status === 503
               ? "AI is not configured yet."
-              : `Failed to get a reply. (${res.status})`;
+              : humanizeError(`HTTP ${res.status}`);
           setError(msg);
           /* Drop the placeholder so the UI doesn't show an empty bubble. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
@@ -693,6 +723,8 @@ export default function KoleexAiApp() {
             const previewText = finalMessage.content;
             const bumpId = convUpdateId;
             const bumpTitle = convUpdateTitle;
+            /* Audit P0 #5 — capture timestamp outside the updater. */
+            const bumpNow = new Date().toISOString();
             setConversations((prev) => {
               const next = prev.map((c) =>
                 c.id === bumpId
@@ -701,7 +733,7 @@ export default function KoleexAiApp() {
                       title: bumpTitle,
                       last_preview: previewText.slice(0, 180),
                       message_count: c.message_count + 2,
-                      updated_at: new Date().toISOString(),
+                      updated_at: bumpNow,
                     }
                   : c,
               );
@@ -880,14 +912,11 @@ export default function KoleexAiApp() {
     }
     if (lastUserIdx < 0) return;
     const lastUserText = messages[lastUserIdx].content;
-    /* Trim trailing assistant messages so the visual history
-       doesn't show the old + placeholder + new stacked in the same
-       turn. The server still has both in ai_messages (audit
-       preserved) — we just shorten the client view. */
-    setMessages((prev) => prev.slice(0, lastUserIdx + 1));
-    /* send() appends a new optimistic user bubble — but we already
-       have one. Pass the text as an override AND remove the last
-       user bubble so send can re-add it cleanly. */
+    /* Audit P0 #8 — collapse the previous two setMessages into one
+       (send() re-adds the user bubble itself, so we just trim back
+       to BEFORE the last user message). Keeps the rebase atomic and
+       removes the off-by-one risk if a new turn lands between the
+       two updates. */
     setMessages((prev) => prev.slice(0, lastUserIdx));
     void send(lastUserText, false);
   }, [messages, send]);
@@ -915,7 +944,9 @@ export default function KoleexAiApp() {
       setMessages([]);
       /* Keep the persisted "last opened" key in sync so a refresh
          after a delete doesn't try to reopen the now-gone chat. */
-      if (activeIdKey) window.localStorage.removeItem(activeIdKey);
+      if (activeIdKey) {
+        try { window.localStorage.removeItem(activeIdKey); } catch { /* ignore */ }
+      }
     }
   }, [activeId, pendingDeleteId, activeIdKey]);
 
@@ -1200,43 +1231,6 @@ export default function KoleexAiApp() {
             ))
           )}
         </div>
-
-        {/* Profile chip pinned at the foot of the sidebar — same affordance
-            ChatGPT / Claude.ai use. Acts as a Hub-link back to the home
-            launcher (long-press / right-click destinations can come in a
-            follow-up; today this is a fast way to see who you're chatting
-            as without scrolling to find the global header). */}
-        {account && (
-          <Link
-            href="/"
-            title={account.username || account.person?.full_name || ""}
-            className="flex items-center gap-2.5 border-t border-[var(--border-subtle)] px-3 py-2.5 hover:bg-[var(--bg-surface-subtle)] transition-colors shrink-0"
-          >
-            <span className="h-7 w-7 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-              {(account.avatar_url || account.person?.avatar_url) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={account.avatar_url || account.person?.avatar_url || ""}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span className="text-[10px] font-bold text-[var(--text-primary)]">
-                  {(account.username || account.person?.full_name || "U")
-                    .trim().charAt(0).toUpperCase()}
-                </span>
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12.5px] font-semibold text-[var(--text-primary)]">
-                {account.person?.full_name || account.username || ""}
-              </div>
-              <div className="truncate text-[10.5px] text-[var(--text-dim)]">
-                {account.username}
-              </div>
-            </div>
-          </Link>
-        )}
       </aside>
 
       {/* ── Main pane ── */}
@@ -1977,7 +1971,13 @@ function BubbleActions({
     setVote(v);
     onFeedback?.(msg.id, v);
   };
+  /* All five action buttons share the same 28×28 hit target and a
+     fixed 14×14 icon glyph so the row reads as a uniform strip
+     instead of "copy and regenerate are smaller than the speaker".
+     Earlier draft mixed 12 / 13 / 14 px icons which the user spotted
+     as a visible alignment bug. */
   const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  const ICON = 14;
   return (
     <div className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
       <button
@@ -1988,9 +1988,14 @@ function BubbleActions({
         title={copied ? "Copied" : "Copy"}
       >
         {copied ? (
-          <span aria-hidden className="text-[12px]">✓</span>
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 13l4 4L19 7" />
+          </svg>
         ) : (
-          <span aria-hidden className="text-[12px]">⎘</span>
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+          </svg>
         )}
       </button>
       {onSpeak && msg.content && (
@@ -2001,7 +2006,7 @@ function BubbleActions({
           aria-label="Read aloud"
           title="Read aloud"
         >
-          <svg aria-hidden viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="currentColor">
             <path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06c2.89 0 5.25 2.36 5.25 5.25S16.89 15.79 14 15.79v2.06c4.02 0 7.31-3.29 7.31-7.31S18.02 3.23 14 3.23z" />
           </svg>
         </button>
@@ -2015,7 +2020,12 @@ function BubbleActions({
           aria-label="Regenerate response"
           title="Regenerate"
         >
-          <span aria-hidden className="text-[12px]">↻</span>
+          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
+            <path d="M3 21v-5h5" />
+          </svg>
         </button>
       )}
       {onFeedback && (
@@ -2028,7 +2038,7 @@ function BubbleActions({
             aria-label="Good response"
             title="Good response"
           >
-            <svg aria-hidden viewBox="0 0 24 24" width="13" height="13" fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
             </svg>
           </button>
@@ -2039,7 +2049,7 @@ function BubbleActions({
             aria-label="Bad response"
             title="Bad response"
           >
-            <svg aria-hidden viewBox="0 0 24 24" width="13" height="13" fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
             </svg>
           </button>
