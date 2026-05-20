@@ -27,6 +27,7 @@ import type {
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
 import { brandKnowledgeFor } from "./brand-knowledge";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
+import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 /* Default to Llama 3.1 8B Instant for the agent path — 30k tokens /
@@ -425,12 +426,29 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   const tStart = Date.now();
   const { ctx, history, userMessage, userLang, conversationId } = input;
   const key = process.env.GROQ_API_KEY;
+
+  /* Graceful Groq-missing fallback. The orchestrator's tool-calling
+     features genuinely need Groq's OpenAI-style tool schema (and the
+     dispatchTool loop below), so we can't run the agent loop without
+     it. But if ANY other provider is configured (Gemini / Anthropic /
+     OpenAI), routing the turn through the simpler chat completion
+     path lets the user still get a conversational reply instead of a
+     dead "configure GROQ_API_KEY" wall.
+
+     Tools-affirming queries (those that would have triggered tool
+     calls under Groq) will still produce a best-effort natural-
+     language answer; they just won't read live data. The reply also
+     includes a one-line note so the operator knows tools are off
+     until Groq is wired up. */
   if (!key) {
-    return fallback(
-      "Koleex AI isn't configured. Ask an admin to add GROQ_API_KEY.",
-      conversationId,
-      userMessage,
-    );
+    if (!aiProviderConfigured()) {
+      return fallback(
+        "Koleex AI isn't configured. Ask an admin to add an AI provider key (Groq, Gemini, Anthropic, or OpenAI) in the Vercel env vars.",
+        conversationId,
+        userMessage,
+      );
+    }
+    return orchestrateNoGroq(input, tStart);
   }
 
   /* Canned fast-reply — narrow EN/AR/ZH exact-match triggers for
@@ -2231,6 +2249,67 @@ function preToolGuard(
          still the enforcement point for unknown-tool and permission
          checks. We only gate the specific arg shapes we know about. */
       return { ok: true };
+  }
+}
+
+/* ── Provider-agnostic fallback ──
+   Runs when GROQ_API_KEY is missing but another provider IS configured.
+   We skip the tool-calling loop entirely and just produce a chat reply
+   via the shared aiChat() abstraction (which already supports Gemini /
+   Anthropic / OpenAI). The reply gets a one-line "Tools are off" tail
+   so operators know live-data answers aren't available until Groq is
+   wired. Same AgentResponse shape so the caller doesn't care which
+   path was taken. */
+async function orchestrateNoGroq(
+  input: OrchestrateInput,
+  tStart: number,
+): Promise<AgentResponse> {
+  const { history, userMessage, userLang, conversationId } = input;
+  /* Lightweight system prompt — no tool schemas; the model is just
+     answering naturally. Keeps the same language-anchoring as the
+     full agent path. */
+  const systemPrompt =
+    "You are Koleex AI, the assistant inside the Koleex Hub ERP. " +
+    `Reply concisely in the user's language (${userLang ?? "en"}). ` +
+    "You currently do NOT have access to the company's live data (tool calls are disabled). " +
+    "Be helpful for general questions and conversational turns. If asked to look up live data, " +
+    "explain that the tool-calling layer needs a Groq API key and offer to help with anything else.";
+
+  /* Trim history to the last few turns so the wire payload stays
+     small — matches the Groq path which also caps history. */
+  const trimmed = history.slice(-10).map((m) => ({
+    role: m.role as "user" | "assistant" | "system",
+    content: m.content,
+  }));
+  const messages = [
+    { role: "system" as const, content: systemPrompt },
+    ...trimmed,
+    { role: "user" as const, content: userMessage },
+  ];
+
+  try {
+    const result = await aiChat(messages);
+    const reply =
+      result?.reply?.trim() ||
+      "I couldn't reach the AI provider just now. Try again in a moment.";
+    const steps: AgentStep[] = [{ kind: "answer", text: reply }];
+    const safeReply = sealFinalReply(reply, steps, userMessage);
+    console.log(
+      `[ai.agent.timing] fast=no-groq provider=${result?.provider ?? "none"} total=${Date.now() - tStart}ms`,
+    );
+    return {
+      steps,
+      finalReply: safeReply,
+      provider: result?.provider ?? "fallback",
+      conversationId,
+    };
+  } catch (e) {
+    console.error("[ai.agent.no-groq]", e);
+    return fallback(
+      "Something went wrong reaching the AI provider. Please try again.",
+      conversationId,
+      userMessage,
+    );
   }
 }
 
