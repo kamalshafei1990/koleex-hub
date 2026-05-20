@@ -1,57 +1,42 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   EmojiButton — small emoji picker for the composer.
+   EmojiButton — iOS-style emoji picker.
 
-   Design notes:
-     · No third-party library. A ~60-emoji curated grid handles 95% of
-       business-chat needs without shipping emoji-mart's 200 KB bundle
-       or hitting a CDN for font data.
-     · Categories in one flat grid (no tabs) — fewer clicks for the
-       common case. Users who want obscure emojis can use their OS
-       keyboard (✔ on mobile, ctrl+cmd+space on macOS).
-     · Deterministic layout: 6 columns × 10 rows = 60 slots, works on
-       a 320 px mobile screen without overflow.
-     · Focus/keyboard: Escape closes, clicking outside closes, Tab
-       cycles through emojis. Cursor goes back to the textarea after
-       an insert so the user can keep typing.
-     · No animation — instant open/close. Small popovers don't need
-       motion to feel responsive.
+   Replaces the previous 48-emoji curated grid with a comprehensive
+   picker matching the iOS / macOS Emoji popover:
+
+     · 8 category tabs along the bottom (Smileys, Animals, Food,
+       Activity, Travel, Objects, Symbols, Flags).
+     · Search bar at the top — filters across ALL emojis by keyword.
+     · ~700 emojis total. Hand-curated rather than the full Unicode
+       set because we want to ship calm, common ones without a
+       2-megabyte font payload.
+     · Categories scroll vertically; tapping a tab jumps to that
+       category's anchor.
+     · Selection keeps the popover open so users can insert several
+       in a row.
+
+   Behaviour preserved from the v1 picker:
+     · Portal into document.body to escape the composer's stacking
+       context.
+     · Outside-click + Escape close it; focus returns to the trigger.
+     · Position computed from the trigger's bounding rect on layout.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
-
-/** Curated 48-emoji grid (6 × 8). Trimmed from the original 60 so
- *  the popover fits on a 568 px iPhone SE viewport without needing
- *  internal scroll — the scrollbar was hiding the top row (smileys)
- *  in the wild. Still covers ~95% of business-chat reactions. */
-const EMOJIS: string[] = [
-  // Row 1-2: smileys (12)
-  "😀", "😊", "🙂", "😉", "😎", "😁",
-  "😍", "😂", "🤣", "🤔", "😅", "🙃",
-  // Row 3-4: gestures (12)
-  "👍", "👎", "👌", "🙏", "👋", "💪",
-  "🤝", "👏", "🙌", "✋", "🤷", "👉",
-  // Row 5-6: hearts + celebrations (12)
-  "❤️", "💙", "💚", "🧡", "💯", "🔥",
-  "✨", "⭐", "🎉", "🏆", "💡", "🚀",
-  // Row 7-8: office + objects (12)
-  "✅", "❌", "⚠️", "📌", "📎", "📝",
-  "💼", "📊", "📈", "📅", "🕐", "☕",
-];
+import { EMOJI_CATEGORIES, ALL_EMOJIS, type EmojiEntry } from "@/components/ai/emojiData";
 
 interface Props {
-  /** Called with the emoji character when the user picks one. The
-   *  parent is responsible for inserting at the cursor position. */
   onSelect: (emoji: string) => void;
-  /** Accessible label for the trigger button. */
   label?: string;
-  /** Optional className for the trigger button so the host can match
-   *  other composer buttons. */
   className?: string;
 }
+
+const POPOVER_W = 340;
+const POPOVER_H = 420;
 
 export default function EmojiButton({
   onSelect,
@@ -59,16 +44,27 @@ export default function EmojiButton({
   className,
 }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeCat, setActiveCat] = useState<string>(EMOJI_CATEGORIES[0].id);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  /* Phase 14.3: ref on the portal-rendered popover. Since the
-     popover lives in document.body (outside wrapperRef) we need to
-     check it separately in the outside-click handler. */
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
-  /* Close on outside click. Using mousedown (not click) so that
-     clicking inside an emoji cell still fires the cell's onClick
-     before the outside-close handler strips it. */
+  /* Search filter — case-insensitive keyword OR character match,
+     applied across all categories so the user can type "fire" or
+     "🇪🇬" and find it without picking a tab first. */
+  const searched: EmojiEntry[] | null = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return null;
+    return ALL_EMOJIS.filter((e) =>
+      e.k.toLowerCase().includes(q) || e.c.includes(q),
+    ).slice(0, 200);
+  }, [query]);
+
+  /* Outside-click + Escape — same pattern as v1, both must close. */
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -81,14 +77,11 @@ export default function EmojiButton({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  /* Close on Escape. */
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpen(false);
-        /* Return focus to the trigger so keyboard users aren't
-           orphaned. */
         triggerRef.current?.focus();
       }
     };
@@ -96,33 +89,63 @@ export default function EmojiButton({
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
+  /* When the popover opens, auto-focus the search input — matches
+     iOS where the keyboard pops up ready to type. */
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
+    } else {
+      setQuery("");
+      setActiveCat(EMOJI_CATEGORIES[0].id);
+    }
+  }, [open]);
+
   const handlePick = useCallback(
     (emoji: string) => {
       onSelect(emoji);
-      /* Keep the popover open so users can insert multiple reactions
-         in a row without re-opening. Close happens on outside click
-         or on Escape. */
+      /* Keep popover open so multi-emoji insertion works. */
     },
     [onSelect],
   );
 
-  /* Phase 14.3: render the popover via a React Portal into document.body
-     instead of inline. The composer pill has `backdrop-blur-xl` which
-     creates a new stacking context — any z-index on an absolute-
-     positioned descendant is trapped in that context, so the popover
-     appeared BEHIND the message bubbles above. A portal escapes the
-     ancestor stacking context entirely; combined with position:fixed
-     and rect-based coordinates, the popover lives in the viewport's
-     top-level stacking context and always renders above everything. */
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const popoverW = 252;
+  /* Scroll-to-category when a tab is clicked. The section anchors
+     live in the scrollable grid below; jumping is instant (no
+     smooth) so the picker feels snappy. */
+  const jumpToCategory = useCallback((id: string) => {
+    setActiveCat(id);
+    setQuery("");
+    const target = sectionRefs.current[id];
+    if (target && scrollRef.current) {
+      scrollRef.current.scrollTop = target.offsetTop;
+    }
+  }, []);
 
+  /* Track which category is in view as the user scrolls, so the
+     tab strip highlights the current section. */
+  useEffect(() => {
+    if (!open) return;
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const onScroll = () => {
+      if (query) return;
+      const top = sc.scrollTop;
+      let current = EMOJI_CATEGORIES[0].id;
+      for (const cat of EMOJI_CATEGORIES) {
+        const el = sectionRefs.current[cat.id];
+        if (el && el.offsetTop <= top + 12) current = cat.id;
+      }
+      setActiveCat(current);
+    };
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    return () => sc.removeEventListener("scroll", onScroll);
+  }, [open, query]);
+
+  /* Position the portal-rendered popover above the trigger. */
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   useLayoutEffect(() => {
     if (!open) return;
     const update = () => {
-      if (triggerRef.current) {
-        setAnchorRect(triggerRef.current.getBoundingClientRect());
-      }
+      if (triggerRef.current) setAnchorRect(triggerRef.current.getBoundingClientRect());
     };
     update();
     window.addEventListener("resize", update);
@@ -133,10 +156,6 @@ export default function EmojiButton({
     };
   }, [open]);
 
-  /* Position computed from the trigger rect. Anchors the popover's
-     BOTTOM just above the trigger's TOP (with 8 px gap). Clamps the
-     left edge to stay within the viewport so opening on a narrow
-     screen doesn't push the grid off-screen. */
   const popoverStyle: React.CSSProperties | null = anchorRect
     ? {
         position: "fixed" as const,
@@ -146,10 +165,11 @@ export default function EmojiButton({
         left: typeof window !== "undefined"
           ? Math.min(
               Math.max(8, anchorRect.left),
-              window.innerWidth - popoverW - 8,
+              window.innerWidth - POPOVER_W - 8,
             )
           : anchorRect.left,
-        width: popoverW,
+        width: POPOVER_W,
+        height: POPOVER_H,
         zIndex: 9999,
       }
     : null;
@@ -160,33 +180,82 @@ export default function EmojiButton({
         ref={popoverRef}
         role="dialog"
         aria-label="Emoji picker"
-        /* Phase 14.4: make the popover fully opaque.
-           --bg-surface in the Koleex dark theme is semi-transparent
-           (it's used over the aurora backdrop throughout the hub),
-           so the popover rendered "see-through". Layering an opaque
-           --bg-primary behind a --bg-surface tint + backdrop-blur
-           gives us a solid panel that still matches the theme in
-           both light and dark modes. */
-        style={{
-          ...popoverStyle,
-          backgroundColor: "var(--bg-primary)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}
-        className="rounded-xl border border-[var(--border-subtle)] shadow-2xl p-2"
+        style={{ ...popoverStyle, backgroundColor: "var(--bg-primary)" }}
+        className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] shadow-2xl"
       >
-        <div className="grid grid-cols-6 gap-1">
-          {EMOJIS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              onClick={() => handlePick(e)}
-              className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
-              aria-label={`Insert ${e}`}
-            >
-              <span aria-hidden>{e}</span>
-            </button>
-          ))}
+        {/* Search */}
+        <div className="p-2 border-b border-[var(--border-subtle)]">
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search emoji"
+            aria-label="Search emoji"
+            className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            /* 16px font on iOS prevents the zoom-on-focus, but the
+               picker lives over a fixed-position panel and 12.5 here
+               is consistent with the rest of the Hub composer. */
+          />
+        </div>
+
+        {/* Scrollable emoji grid */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-1.5 py-1.5">
+          {searched ? (
+            searched.length === 0 ? (
+              <div className="py-8 text-center text-[12px] text-[var(--text-dim)]">
+                No emoji match &ldquo;{query}&rdquo;
+              </div>
+            ) : (
+              <div className="grid grid-cols-8 gap-0.5">
+                {searched.map((e, i) => (
+                  <EmojiCell key={`search-${i}-${e.c}`} entry={e} onPick={handlePick} />
+                ))}
+              </div>
+            )
+          ) : (
+            EMOJI_CATEGORIES.map((cat) => (
+              <div
+                key={cat.id}
+                ref={(el) => {
+                  sectionRefs.current[cat.id] = el;
+                }}
+                className="pb-2"
+              >
+                <div className="px-1 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                  {cat.label}
+                </div>
+                <div className="grid grid-cols-8 gap-0.5">
+                  {cat.emojis.map((e, i) => (
+                    <EmojiCell key={`${cat.id}-${i}-${e.c}`} entry={e} onPick={handlePick} />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Category tab strip — iOS pattern. */}
+        <div className="flex items-center justify-around border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1 py-1">
+          {EMOJI_CATEGORIES.map((cat) => {
+            const isActive = !query && activeCat === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => jumpToCategory(cat.id)}
+                aria-label={cat.label}
+                title={cat.label}
+                className={`h-7 w-7 flex items-center justify-center rounded-md text-[16px] transition-colors ${
+                  isActive
+                    ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                    : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+                }`}
+              >
+                <span aria-hidden>{cat.icon}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     ) : null;
@@ -205,13 +274,32 @@ export default function EmojiButton({
           "h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
         }
       >
-        {/* Monochrome SmileIcon (Koleex Hub UI style), size 24 matches
-            the mic / send icon weight. */}
         <SmileIcon size={24} className="text-current" />
       </button>
       {popoverNode && typeof document !== "undefined"
         ? createPortal(popoverNode, document.body)
         : null}
     </div>
+  );
+}
+
+/* ── Single emoji cell ─────────────────────────────────────────────── */
+
+function EmojiCell({
+  entry, onPick,
+}: {
+  entry: EmojiEntry;
+  onPick: (emoji: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(entry.c)}
+      className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
+      aria-label={`Insert ${entry.c}`}
+      title={entry.k.split(" ").slice(0, 3).join(" ")}
+    >
+      <span aria-hidden>{entry.c}</span>
+    </button>
   );
 }

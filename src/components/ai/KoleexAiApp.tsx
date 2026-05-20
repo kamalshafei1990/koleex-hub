@@ -202,6 +202,27 @@ export default function KoleexAiApp() {
   /* Ref for the composer textarea so autosize can reset height after
      send clears the value (onChange doesn't fire on programmatic clear). */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  /* New-composer state — attachments + web-search toggle.
+     The UI for both is wired today; the actual upload + web grounding
+     hooks come in follow-up phases. Keeping the affordance visible
+     teaches users the model is becoming multimodal soon. */
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [webSearch, setWebSearch] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
+    const list = ev.target.files;
+    if (!list || list.length === 0) return;
+    const picked = Array.from(list).slice(0, 6 - attachments.length);
+    setAttachments((prev) => [...prev, ...picked]);
+    /* Allow re-picking the same file twice in a row. */
+    ev.target.value = "";
+  }, [attachments.length]);
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
   /* Phase 12: AbortController for the in-flight send. Lets the user
      cancel a streaming reply mid-answer. Reset per-turn in send(). */
   const abortRef = useRef<AbortController | null>(null);
@@ -1426,31 +1447,43 @@ export default function KoleexAiApp() {
               }}
               className="relative"
             >
-              <div
-                className="relative flex items-end rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors"
-              >
-                {/* Phase 14.1: emoji picker lives on the LEFT of the
-                    composer. Popover anchors to its left edge so the
-                    grid opens rightward into empty space above the
-                    pill instead of clipping off the right edge.
-                    Using m-2 + self-end to match the mic / send
-                    buttons on the right — so all three composer
-                    buttons bottom-align at the exact same y-pixel
-                    regardless of textarea height. */}
-                <EmojiButton
-                  onSelect={insertEmoji}
-                  className="m-2 self-end h-10 w-10 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                />
+              {/* Two-row composer (ChatGPT-style):
+                  Row 1 — attachment chips (if any) + textarea.
+                  Row 2 — secondary actions (attach / emoji / web search)
+                          on the left, primary actions (mic / send) on
+                          the right. Same hairline border + bg-secondary
+                          fill the Hub uses for every input surface. */}
+              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+                {/* Attachment chip row — only renders when there are files. */}
+                {attachments.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2.5">
+                    {attachments.map((file, i) => (
+                      <span
+                        key={`${file.name}-${i}`}
+                        className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+                        title={file.name}
+                      >
+                        <span aria-hidden>📎</span>
+                        <span className="truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(i)}
+                          className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <CrossIcon size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Textarea — no inline icons, gets the full width. */}
                 <textarea
                   ref={composerRef}
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
-                    /* Autosize: reset first so shrinking works, then
-                       grow to fit up to maxHeight (enforced via the
-                       Tailwind max-h-40 cap = 160 px). Happens on every
-                       keystroke but is effectively free — scrollHeight
-                       read is ~0.1 ms. */
                     const ta = e.currentTarget;
                     ta.style.height = "auto";
                     const next = Math.min(ta.scrollHeight, 160);
@@ -1459,11 +1492,6 @@ export default function KoleexAiApp() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      /* On mobile, Enter should send AND dismiss the
-                         on-screen keyboard so the chat is visible
-                         again. Blur the textarea on narrow viewports —
-                         desktop keeps focus like ChatGPT/Gemini so you
-                         can keep typing without re-clicking. */
                       if (
                         typeof window !== "undefined" &&
                         window.matchMedia("(max-width: 767px)").matches
@@ -1472,72 +1500,107 @@ export default function KoleexAiApp() {
                       }
                       send();
                     }
-                    /* Shift+Enter inserts a newline via the browser's
-                       default textarea behaviour — no handler needed. */
                   }}
                   placeholder={copy.placeholder}
                   rows={1}
                   dir={isRtl(input) ? "rtl" : "auto"}
-                  /* `enterKeyHint="send"` tells iOS Safari / Android
-                     Chrome to render the return key as a coloured Send
-                     button instead of an ambiguous arrow — pairs with
-                     the preventDefault+send handler above. */
                   enterKeyHint="send"
                   inputMode="text"
                   autoComplete="off"
                   autoCorrect="on"
-                  className="flex-1 px-5 py-4 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
-                  /* 16px font-size prevents iOS Safari from zooming in
-                     on focus — a <16px input triggers the zoom. */
-                  style={{ minHeight: "54px" }}
-                />
-                {/* Phase 14.1: emoji button moved to the LEFT of the
-                    composer above. Mic stays adjacent to Send so the
-                    right-edge action group remains "speak | send". */}
-                {/* Mic button — always mounted now that Chat and Agent
-                    are unified. Voice turns route through the same
-                    orchestrator as typed turns. On transcript we call
-                    send(text, viaVoice=true) which both sends the
-                    message and reads the reply aloud. */}
-                <MicButton
-                  className="m-2"
-                  size={40}
-                  onTranscript={(t) => send(t, true)}
-                  onError={(msg) => setError(msg)}
-                  speaking={aiSpeaking}
-                  onStopSpeaking={stopTts}
-                  disabled={sending}
-                  lang={lang}
+                  className="block w-full px-4 pt-3 pb-1 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  style={{ minHeight: "44px" }}
                 />
 
-                {/* Phase 12: swap Send → Stop during streaming. The
-                    Stop button aborts the in-flight fetch; partial
-                    content that already streamed in is kept. Using
-                    type="button" so the form doesn't try to submit
-                    (submit path is disabled + different handler). */}
-                {sending ? (
-                  <button
-                    type="button"
-                    onClick={handleStop}
-                    className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
-                    aria-label="Stop generating"
-                    title="Stop generating"
-                  >
-                    <span
+                {/* Action row — secondary on the left, primary on the right. */}
+                <div className="flex items-center justify-between gap-1 px-2 pb-2">
+                  <div className="flex items-center gap-0.5">
+                    {/* + Attachment */}
+                    <button
+                      type="button"
+                      onClick={openFilePicker}
+                      className="h-9 w-9 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      aria-label="Attach file"
+                      title="Attach file"
+                    >
+                      <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={onFilesPicked}
+                      className="hidden"
                       aria-hidden
-                      className="block h-3 w-3 rounded-[2px] bg-[var(--text-inverted)]"
+                      tabIndex={-1}
                     />
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={!input.trim()}
-                    className="m-2 h-10 w-10 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
-                    aria-label="Send"
-                  >
-                    <PaperPlaneIcon className="h-4 w-4" />
-                  </button>
-                )}
+
+                    {/* Emoji picker (iOS-style) */}
+                    <EmojiButton
+                      onSelect={insertEmoji}
+                      className="h-9 w-9 rounded-full flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                    />
+
+                    {/* Web search toggle — green ring when on. */}
+                    <button
+                      type="button"
+                      onClick={() => setWebSearch((v) => !v)}
+                      aria-pressed={webSearch}
+                      aria-label="Search the web"
+                      title={webSearch ? "Web search: on" : "Web search: off"}
+                      className={`h-9 px-2.5 rounded-full inline-flex items-center gap-1.5 text-[12px] transition-colors ${
+                        webSearch
+                          ? "bg-emerald-300/[0.10] text-emerald-200 border border-emerald-300/40"
+                          : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+                      }`}
+                    >
+                      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                      <span className="hidden sm:inline">Search</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {/* Mic — voice in. */}
+                    <MicButton
+                      size={36}
+                      onTranscript={(t) => send(t, true)}
+                      onError={(msg) => setError(msg)}
+                      speaking={aiSpeaking}
+                      onStopSpeaking={stopTts}
+                      disabled={sending}
+                      lang={lang}
+                    />
+
+                    {/* Send / Stop. */}
+                    {sending ? (
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 shrink-0 transition-opacity"
+                        aria-label="Stop generating"
+                        title="Stop generating"
+                      >
+                        <span aria-hidden className="block h-2.5 w-2.5 rounded-[2px] bg-[var(--text-inverted)]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={!input.trim() && attachments.length === 0}
+                        className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] flex items-center justify-center hover:opacity-90 disabled:opacity-30 shrink-0 transition-opacity"
+                        aria-label="Send"
+                      >
+                        <PaperPlaneIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </form>
             <div className="text-[10px] text-[var(--text-dim)] mt-2.5 text-center">

@@ -456,11 +456,14 @@ export default function FloatingPanel() {
   const hoverBg = dk ? "hover:bg-white/[0.04]" : "hover:bg-black/[0.03]";
 
   /* ── Position offset ──
-     Inside the AI app on mobile the FAB sits right on top of the
-     composer Send button. Lift it up so both remain tappable. On
-     desktop and elsewhere the default 24px is fine. */
+     Inside the AI app the FAB overlaps the composer Send button on
+     mobile AND nudges into the composer pill on desktop (the
+     rounded send button sits in the bottom-right corner of the
+     pane). Lift it well clear on both — 96 px on mobile, 28 px on
+     desktop (the AI composer's bottom margin already pushes the
+     Send button up by ~14 px, so 28 keeps a clean ~14 px gap). */
   const fabBottomClass = isAiApp
-    ? "bottom-24 md:bottom-6"
+    ? "bottom-24 md:bottom-28"
     : "bottom-6";
 
   return (
