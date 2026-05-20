@@ -21,6 +21,8 @@ import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { FocusBoundary, FocusToggle } from "@/components/ui/focus/FocusMode";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 interface PendingItem {
   kind: "expense" | "payment" | "bill" | "journal";
@@ -59,12 +61,17 @@ const KIND_ICON: Record<RecentItem["kind"], RrIconName> = {
   expense: "receipt", payment: "money", invoice: "file-invoice-dollar",
   bill: "file-invoice", fx: "balance-scale-left", journal: "books",
 };
-const KIND_LABEL: Record<RecentItem["kind"], string> = {
-  expense: "Expense", payment: "Payment", invoice: "Invoice",
-  bill: "Bill", fx: "FX", journal: "Journal",
+const KIND_LABEL_KEY: Record<RecentItem["kind"], { key: string; en: string }> = {
+  expense: { key: "kind.expense", en: "Expense" },
+  payment: { key: "kind.payment", en: "Payment" },
+  invoice: { key: "kind.invoice", en: "Invoice" },
+  bill:    { key: "kind.bill",    en: "Bill" },
+  fx:      { key: "kind.fx",      en: "FX" },
+  journal: { key: "kind.journal", en: "Journal" },
 };
 
 export default function FinanceWorkspace() {
+  const { t } = useTranslation(financeT);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [vis, setVis]   = useState<{ can_see_bank_balances: boolean; can_see_profit: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,43 +96,38 @@ export default function FinanceWorkspace() {
 
   return (
     <ErpPage
-      title="Finance Workspace"
-      subtitle="Enter · review · approve"
+      title={t("workspace.title", "Finance Workspace")}
+      subtitle={t("workspace.subtitle", "Enter · review · approve")}
       icon="bank"
       backHref="/"
       action={
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => openSmartCreate()}
                   className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
-                  title="Create (c)">
-            <RrIcon name="plus" size={12} /> Create
+                  title={t("header.createTitle", "Create (c)")}>
+            <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
           </button>
           <FocusToggle />
           <Link href="/reports" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
-            <RrIcon name="newspaper" size={12} /> Reports
+            <RrIcon name="newspaper" size={12} /> {t("workspace.reports", "Reports")}
           </Link>
         </div>
       }
     >
-      {loading && <div className="text-sm text-gray-500">Loading…</div>}
+      {loading && <div className="text-sm text-gray-500">{t("workspace.loading", "Loading…")}</div>}
       {error && <div className="text-sm text-rose-300">{error}</div>}
       {snap && (
         <>
-          {/* Top actions — three highest-value finance routes.
-              "+ Create" lives in the header and opens the SmartCreateDrawer
-              for everything else (expense, payment, invoice, journal,
-              FX exchange, asset, vendor bill, bank account), so the
-              workspace itself stays lean. */}
           <section>
             <div className="mb-2 flex items-baseline justify-between">
-              <ErpEyebrow>Top actions</ErpEyebrow>
-              <Link href="/finance/data-entry" className="text-[11px] text-emerald-200 hover:text-emerald-100">How do I enter data? →</Link>
+              <ErpEyebrow>{t("workspace.topActions", "Top actions")}</ErpEyebrow>
+              <Link href="/finance/data-entry" className="text-[11px] text-emerald-200 hover:text-emerald-100">{t("workspace.howToEnter", "How do I enter data? →")}</Link>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-              <ErpQuickAction href="/finance/data-entry" icon="pencil"             label="Data Entry"  hint="Assets · balances · all manual entry" />
-              <ErpQuickAction href="/finance/visual"     icon="balance-scale-left" label="Statements"  hint="Income · Balance · Cash flow" />
-              <ErpQuickAction href="/finance/fx-rates"   icon="balance-scale-left" label="FX Rates"    hint="USD → CNY · stale + missing" />
-              <ErpQuickAction href="/finance/approvals"  icon="badge-check"        label="Approvals"   hint="Review pending" />
+              <ErpQuickAction href="/finance/data-entry" icon="pencil"             label={t("workspace.qa.dataEntry",  "Data Entry")}  hint={t("workspace.qa.dataEntryHint",  "Assets · balances · all manual entry")} />
+              <ErpQuickAction href="/finance/visual"     icon="balance-scale-left" label={t("workspace.qa.statements", "Statements")}  hint={t("workspace.qa.statementsHint", "Income · Balance · Cash flow")} />
+              <ErpQuickAction href="/finance/fx-rates"   icon="balance-scale-left" label={t("workspace.qa.fx",         "FX Rates")}    hint={t("workspace.qa.fxHint",         "USD → CNY · stale + missing")} />
+              <ErpQuickAction href="/finance/approvals"  icon="badge-check"        label={t("workspace.qa.approvals",  "Approvals")}   hint={t("workspace.qa.approvalsHint",  "Review pending")} />
             </div>
           </section>
 
@@ -133,19 +135,19 @@ export default function FinanceWorkspace() {
           <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <div className="mb-2 flex items-baseline justify-between">
-                <ErpEyebrow>Pending Queue</ErpEyebrow>
+                <ErpEyebrow>{t("workspace.pendingQueue", "Pending Queue")}</ErpEyebrow>
                 <Link href="/finance/approvals" className="text-[11px] text-gray-400 hover:text-gray-200">
-                  View all{totalPending > 0 ? ` (${totalPending})` : ""} →
+                  {t("workspace.viewAll", "View all")}{totalPending > 0 ? ` (${totalPending})` : ""} →
                 </Link>
               </div>
               <ErpPanel>
                 {snap.pending.length === 0 ? (
                   <EmptyState
                     icon="badge-check"
-                    title="No pending items"
-                    body="Submit an expense or journal to get started."
+                    title={t("workspace.empty.pending", "No pending items")}
+                    body={t("workspace.empty.pendingBody", "Submit an expense or journal to get started.")}
                     actionHref="/finance/expenses?new=1"
-                    actionLabel="New expense"
+                    actionLabel={t("workspace.empty.newExpense", "New expense")}
                   />
                 ) : (
                   <ul>
@@ -157,7 +159,7 @@ export default function FinanceWorkspace() {
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-[12.5px] font-medium">{p.ref}</div>
                             <div className="text-[10.5px] text-gray-500">
-                              {KIND_LABEL[p.kind]} · {p.party_name ?? "Unspecified"} · {fmtDay(p.submitted_at)}
+                              {t(KIND_LABEL_KEY[p.kind].key, KIND_LABEL_KEY[p.kind].en)} · {p.party_name ?? t("workspace.unspecified", "Unspecified")} · {fmtDay(p.submitted_at)}
                             </div>
                           </div>
                           <div className="font-mono text-[12px] tabular-nums">
@@ -172,15 +174,15 @@ export default function FinanceWorkspace() {
             </div>
             <div>
               <div className="mb-2 flex items-baseline justify-between">
-                <ErpEyebrow>Bank Accounts</ErpEyebrow>
-                <Link href="/finance/bank-accounts" className="text-[11px] text-gray-400 hover:text-gray-200">Manage →</Link>
+                <ErpEyebrow>{t("workspace.banks", "Bank Accounts")}</ErpEyebrow>
+                <Link href="/finance/bank-accounts" className="text-[11px] text-gray-400 hover:text-gray-200">{t("workspace.manage", "Manage →")}</Link>
               </div>
               <ErpPanel>
                 {snap.banks.length === 0 ? (
                   <EmptyState
-                    icon="bank" title="No bank accounts added yet"
-                    body="Add one to start tracking balances."
-                    actionHref="/finance/bank-accounts?new=1" actionLabel="Add Bank Account"
+                    icon="bank" title={t("workspace.empty.noBanks", "No bank accounts added yet")}
+                    body={t("workspace.empty.noBanksBody", "Add one to start tracking balances.")}
+                    actionHref="/finance/bank-accounts?new=1" actionLabel={t("workspace.empty.addBank", "Add Bank Account")}
                   />
                 ) : (
                   <ul>
@@ -208,14 +210,14 @@ export default function FinanceWorkspace() {
           <FocusBoundary>
           <section>
             <div className="mb-2 flex items-baseline justify-between">
-              <ErpEyebrow>Recent Activity</ErpEyebrow>
-              <span className="text-[10.5px] text-gray-500">Last {snap.recent.length} events</span>
+              <ErpEyebrow>{t("workspace.recent", "Recent Activity")}</ErpEyebrow>
+              <span className="text-[10.5px] text-gray-500">{t("workspace.lastEvents", "Last {n} events").replace("{n}", String(snap.recent.length))}</span>
             </div>
             <ErpPanel>
               {snap.recent.length === 0 ? (
                 <EmptyState
-                  icon="clock" title="No activity yet"
-                  body="When you create transactions they'll show up here."
+                  icon="clock" title={t("workspace.empty.noActivity", "No activity yet")}
+                  body={t("workspace.empty.noActivityBody", "When you create transactions they'll show up here.")}
                 />
               ) : (
                 <ol className="relative">
@@ -228,7 +230,7 @@ export default function FinanceWorkspace() {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12.5px] font-medium">{r.ref}</div>
                           <div className="text-[10.5px] text-gray-500">
-                            {KIND_LABEL[r.kind]} · {r.party_name ?? r.occurred_at}
+                            {t(KIND_LABEL_KEY[r.kind].key, KIND_LABEL_KEY[r.kind].en)} · {r.party_name ?? r.occurred_at}
                           </div>
                         </div>
                         <div className="font-mono text-[12px] tabular-nums">{fmtAmt(r.amount, r.currency)}</div>
@@ -244,10 +246,10 @@ export default function FinanceWorkspace() {
 
           {/* Navigation cards */}
           <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <NavCard href="/finance/expenses"   icon="receipt"             label="Expenses"  count={snap.counts.expenses_open} />
-            <NavCard href="/finance/accounting" icon="books"               label="Journals"   count={snap.counts.journals_draft} />
-            <NavCard href="/reports"            icon="newspaper"           label="Reports"    count={null} />
-            <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label="FX Activity" count={snap.counts.fx_30d} />
+            <NavCard href="/finance/expenses"   icon="receipt"             label={t("workspace.nav.expenses",  "Expenses")}  count={snap.counts.expenses_open} />
+            <NavCard href="/finance/accounting" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
+            <NavCard href="/reports"            icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
+            <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label={t("workspace.nav.fxActivity", "FX Activity")} count={snap.counts.fx_30d} />
           </section>
           </FocusBoundary>
         </>
@@ -290,6 +292,7 @@ function EmptyState({ icon, title, body, actionHref, actionLabel }: {
 function NavCard({ href, icon, label, count }: {
   href: string; icon: RrIconName; label: string; count: number | null;
 }) {
+  const { t } = useTranslation(financeT);
   return (
     <Link href={href} className="block">
       <ErpPanel className="px-3 py-3.5 transition-colors hover:bg-white/[0.025]">
@@ -299,7 +302,7 @@ function NavCard({ href, icon, label, count }: {
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-[12.5px] font-medium">{label}</div>
-            {count !== null && <div className="text-[10.5px] text-gray-500">{count} open</div>}
+            {count !== null && <div className="text-[10.5px] text-gray-500">{t("workspace.openLabel", "{n} open").replace("{n}", String(count))}</div>}
           </div>
           <ErpHairline className="hidden" />
         </div>
