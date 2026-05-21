@@ -15,6 +15,8 @@ import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel,
 } from "@/components/ui/erp/ErpUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 type Entity = "expense" | "payment" | "bill" | "journal";
 type Status = "draft" | "submitted" | "pending" | "approved" | "rejected";
@@ -30,9 +32,6 @@ interface ActivityRow {
 
 const KIND_ICON: Record<Entity, RrIconName> = {
   expense: "receipt", payment: "money", bill: "file-invoice", journal: "books",
-};
-const KIND_LABEL: Record<Entity, string> = {
-  expense: "Expense", payment: "Payment", bill: "Bill", journal: "Journal",
 };
 const STATUS_BADGE: Record<Status, string> = {
   draft:     "bg-white/[0.06] text-gray-300 border-white/[0.08]",
@@ -51,12 +50,23 @@ function fmtTime(iso: string | null) {
 }
 
 export default function FinanceApprovals() {
+  const { t } = useTranslation(financeT);
   const [items, setItems] = useState<PendingItem[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [canApprove, setCanApprove] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [busyId, setBusyId]   = useState<string | null>(null);
+
+  const kindLabel = (k: Entity) => {
+    switch (k) {
+      case "expense": return t("approvals.kind.expense", "Expense");
+      case "payment": return t("approvals.kind.payment", "Payment");
+      case "bill":    return t("approvals.kind.bill", "Bill");
+      case "journal": return t("approvals.kind.journal", "Journal");
+    }
+  };
+  const statusLabel = (s: Status) => t(`approvals.status.${s}`, s);
 
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
@@ -82,7 +92,7 @@ export default function FinanceApprovals() {
   async function transition(it: PendingItem, action: "submit" | "approve" | "reject") {
     let reason: string | undefined;
     if (action === "reject") {
-      const v = window.prompt("Reason for rejection (min 3 chars):");
+      const v = window.prompt(t("approvals.rejectPrompt", "Reason for rejection (min 3 chars):"));
       if (!v || v.trim().length < 3) return;
       reason = v.trim();
     }
@@ -105,33 +115,33 @@ export default function FinanceApprovals() {
 
   return (
     <ErpPage
-      title="Approvals"
-      subtitle="Review and approve pending work"
+      title={t("approvals.title", "Approvals")}
+      subtitle={t("approvals.subtitleQueue", "Review and approve pending work")}
       icon="badge-check"
       backHref="/finance/workspace"
       action={
         <Link href="/finance/workspace"
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
           <RrIcon name="arrow-left" size={12} />
-          Workspace
+          {t("approvals.workspace", "Workspace")}
         </Link>
       }
     >
-      {loading && <div className="text-sm text-gray-500">Loading…</div>}
+      {loading && <div className="text-sm text-gray-500">{t("common.loading", "Loading…")}</div>}
       {error && <div className="text-sm text-rose-300">{error}</div>}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {/* Pending list */}
         <div className="lg:col-span-2">
           <div className="mb-2 flex items-baseline justify-between">
-            <ErpEyebrow>Pending ({items.length})</ErpEyebrow>
+            <ErpEyebrow>{t("approvals.pendingCount", "Pending ({n})").replace("{n}", String(items.length))}</ErpEyebrow>
             {!canApprove && (
-              <span className="text-[10.5px] text-gray-500">Read-only · approver permission required</span>
+              <span className="text-[10.5px] text-gray-500">{t("approvals.readOnly", "Read-only · approver permission required")}</span>
             )}
           </div>
           <ErpPanel>
             {items.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">No items awaiting action.</div>
+              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">{t("approvals.empty", "No items awaiting action.")}</div>
             ) : (
               <ul>
                 {items.map((it) => {
@@ -144,25 +154,25 @@ export default function FinanceApprovals() {
                         <Link href={it.href} className="min-w-0 flex-1 hover:underline">
                           <div className="truncate text-[12.5px] font-medium">{it.ref}</div>
                           <div className="text-[10.5px] text-gray-500">
-                            {KIND_LABEL[it.kind]} · {it.party_name ?? "—"} · {fmtTime(it.submitted_at)}
+                            {kindLabel(it.kind)} · {it.party_name ?? "—"} · {fmtTime(it.submitted_at)}
                           </div>
                         </Link>
                         <div className="font-mono text-[12px] tabular-nums text-gray-300">
                           {it.amount === 0 && it.kind === "journal" ? "—" : fmtAmt(it.amount, it.currency)}
                         </div>
                         <span className={`rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.10em] ${STATUS_BADGE[it.status]}`}>
-                          {it.status}
+                          {statusLabel(it.status)}
                         </span>
                         <div className="flex gap-1.5">
                           {it.status === "draft" && (
-                            <ActionBtn label="Submit" disabled={busy}
+                            <ActionBtn label={t("approvals.btn.submit", "Submit")} disabled={busy}
                                        onClick={() => transition(it, "submit")} tone="neutral" />
                           )}
                           {(it.status === "submitted" || it.status === "pending") && canApprove && (
                             <>
-                              <ActionBtn label="Approve" disabled={busy}
+                              <ActionBtn label={t("approvals.btn.approve", "Approve")} disabled={busy}
                                          onClick={() => transition(it, "approve")} tone="positive" />
-                              <ActionBtn label="Reject" disabled={busy}
+                              <ActionBtn label={t("approvals.btn.reject", "Reject")} disabled={busy}
                                          onClick={() => transition(it, "reject")} tone="warning" />
                             </>
                           )}
@@ -179,24 +189,24 @@ export default function FinanceApprovals() {
         {/* Activity */}
         <div>
           <div className="mb-2 flex items-baseline justify-between">
-            <ErpEyebrow>Activity</ErpEyebrow>
-            <span className="text-[10.5px] text-gray-500">Last {activity.length} events</span>
+            <ErpEyebrow>{t("approvals.activity", "Activity")}</ErpEyebrow>
+            <span className="text-[10.5px] text-gray-500">{t("approvals.lastEvents", "Last {n} events").replace("{n}", String(activity.length))}</span>
           </div>
           <ErpPanel>
             {activity.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">No activity yet.</div>
+              <div className="px-4 py-8 text-center text-[11.5px] text-gray-500">{t("approvals.activityEmpty", "No activity yet.")}</div>
             ) : (
               <ul>
                 {activity.map((a) => (
                   <li key={a.id} className="border-b border-white/[0.025] last:border-b-0 px-3 py-2">
                     <div className="flex items-baseline justify-between text-[11.5px]">
                       <span className="font-medium">
-                        {a.actor_label ?? "system"} <span className="text-gray-500">· {a.action}</span>
+                        {a.actor_label ?? t("approvals.system", "system")} <span className="text-gray-500">· {a.action}</span>
                       </span>
                       <span className="text-[10px] text-gray-500">{fmtTime(a.created_at)}</span>
                     </div>
                     <div className="text-[10.5px] text-gray-500">
-                      {KIND_LABEL[a.entity_kind]} · {a.entity_id.slice(0, 8)}
+                      {kindLabel(a.entity_kind)} · {a.entity_id.slice(0, 8)}
                       {a.note ? ` · ${a.note}` : ""}
                     </div>
                   </li>

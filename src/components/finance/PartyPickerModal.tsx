@@ -22,6 +22,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import RrIcon from "@/components/ui/RrIcon";
 import { COUNTRIES } from "@/lib/commercial-policy/countries";
 import type { FinancePartyRow } from "@/app/api/finance/parties/route";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 export type { FinancePartyRow };
 
@@ -51,6 +53,7 @@ export default function PartyPickerModal({
   onClose: () => void;
   onPick: (row: FinancePartyRow) => void;
 }) {
+  const { t } = useTranslation(financeT);
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<FinancePartyRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,15 +65,15 @@ export default function PartyPickerModal({
     setQuery("");
     setRows([]);
     setError(null);
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    return () => clearTimeout(t);
+    const handle = setTimeout(() => inputRef.current?.focus(), 40);
+    return () => clearTimeout(handle);
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     const controller = new AbortController();
-    const t = setTimeout(async () => {
+    const handle = setTimeout(async () => {
       try {
         const res = await fetch(
           `/api/finance/parties?type=${type}&q=${encodeURIComponent(query)}&limit=250`,
@@ -95,7 +98,7 @@ export default function PartyPickerModal({
     }, 200);
     return () => {
       controller.abort();
-      clearTimeout(t);
+      clearTimeout(handle);
     };
   }, [open, query, type]);
 
@@ -121,12 +124,12 @@ export default function PartyPickerModal({
         <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-              {type === "customer" ? "Pick a customer" : "Pick a supplier"}
+              {type === "customer" ? t("party.pickCustomer", "Pick a customer") : t("party.pickSupplier", "Pick a supplier")}
             </h2>
             <p className="mt-0.5 text-[11px] text-gray-500">
               {type === "customer"
-                ? "Linked from the Contacts app. Type to filter."
-                : "Linked from the Contacts app — suppliers only."}
+                ? t("party.customerHint", "Linked from the Contacts app. Type to filter.")
+                : t("party.supplierHint", "Linked from the Contacts app — suppliers only.")}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-white/5 hover:text-gray-200">
@@ -140,7 +143,7 @@ export default function PartyPickerModal({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={type === "customer" ? "Search by name, company, or email…" : "Search by supplier name or company…"}
+            placeholder={type === "customer" ? t("party.searchCustomer", "Search by name, company, or email…") : t("party.searchSupplier", "Search by supplier name or company…")}
             className="w-full rounded-lg border border-white/[0.06] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:border-emerald-500/50 focus:outline-none"
           />
         </div>
@@ -150,17 +153,17 @@ export default function PartyPickerModal({
           {loading && rows.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-gray-500">
               <RrIcon name="loading" size={14} className="animate-spin" />
-              <span className="ml-2 text-sm">Searching contacts…</span>
+              <span className="ml-2 text-sm">{t("party.searching", "Searching contacts…")}</span>
             </div>
           ) : error ? (
             <div className="px-3 py-6 text-sm text-rose-400">{error}</div>
           ) : sorted.length === 0 ? (
             <div className="px-3 py-10 text-center text-sm text-gray-500">
               {query
-                ? "No matches. Try a different search."
+                ? t("party.noMatches", "No matches. Try a different search.")
                 : type === "customer"
-                  ? "No customers in Contacts yet. Add one in the Contacts app, then come back here."
-                  : "No suppliers in Contacts yet. Add one in the Contacts app, then come back here."}
+                  ? t("party.noCustomers", "No customers in Contacts yet. Add one in the Contacts app, then come back here.")
+                  : t("party.noSuppliers", "No suppliers in Contacts yet. Add one in the Contacts app, then come back here.")}
             </div>
           ) : (
             <ul className="space-y-1">
@@ -186,7 +189,7 @@ export default function PartyPickerModal({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 truncate">
                           <span className="truncate text-sm font-medium text-[var(--text-primary)]">
-                            {row.display_name || row.company || "Unnamed"}
+                            {row.display_name || row.company || t("party.unnamed", "Unnamed")}
                           </span>
                           {row.customer_tier && row.customer_tier !== "end_user" && (
                             <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${TIER_COLORS[row.customer_tier]}`}>

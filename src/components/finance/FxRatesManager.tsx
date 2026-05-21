@@ -19,6 +19,8 @@ import RrIcon from "@/components/ui/RrIcon";
 import { SmartField, SmartInput, SmartSelect } from "@/components/ui/create/SmartCreate";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 interface RateRow {
   id: string; from_currency: string; to_currency: string;
@@ -46,6 +48,7 @@ interface FxStatus {
 }
 
 export default function FxRatesManager() {
+  const { t } = useTranslation(financeT);
   const [rates, setRates] = useState<RateRow[]>([]);
   const [status, setStatus] = useState<FxStatus | null>(null);
   /* Base currency comes from the shared cached hook. It feeds both the
@@ -91,8 +94,8 @@ export default function FxRatesManager() {
   useEffect(() => { load(); }, [load]);
 
   async function addRate() {
-    if (!rate || Number(rate) <= 0) { setError("Rate must be > 0."); return; }
-    if (from.toUpperCase() === to.toUpperCase()) { setError("From and To must differ."); return; }
+    if (!rate || Number(rate) <= 0) { setError(t("fx.err.ratePositive", "Rate must be > 0.")); return; }
+    if (from.toUpperCase() === to.toUpperCase()) { setError(t("fx.err.fromToDiffer", "From and To must differ.")); return; }
     setError(null); setBusy(true);
     try {
       const r = await fetch("/api/finance/fx/rates", {
@@ -112,7 +115,7 @@ export default function FxRatesManager() {
   }
 
   async function deleteRate(id: string) {
-    if (!window.confirm("Delete this FX rate?")) return;
+    if (!window.confirm(t("fx.deleteConfirm", "Delete this FX rate?"))) return;
     setBusy(true);
     try {
       const r = await fetch(`/api/finance/fx/rates?id=${id}`, { method: "DELETE" });
@@ -137,28 +140,28 @@ export default function FxRatesManager() {
   }, [rates]);
 
   const columns: Array<ErpColumn<RateRow>> = [
-    { key: "pair", header: "Pair", render: (r) => <span className="font-mono">{r.from_currency} → {r.to_currency}</span> },
-    { key: "rate", header: "Rate", align: "right", render: (r) => fmtRate(r.rate) },
-    { key: "eff",  header: "Effective", render: (r) => fmtDay(r.effective_date) },
-    { key: "notes", header: "Notes", render: (r) => r.notes ?? "—" },
+    { key: "pair", header: t("fx.col.pair", "Pair"), render: (r) => <span className="font-mono">{r.from_currency} → {r.to_currency}</span> },
+    { key: "rate", header: t("fx.col.rate", "Rate"), align: "right", render: (r) => fmtRate(r.rate) },
+    { key: "eff",  header: t("fx.col.effective", "Effective"), render: (r) => fmtDay(r.effective_date) },
+    { key: "notes", header: t("fx.col.notes", "Notes"), render: (r) => r.notes ?? "—" },
     { key: "act",  header: "", align: "right", render: (r) => (
       <button type="button" onClick={() => deleteRate(r.id)}
               className="rounded-md border border-rose-300/30 bg-rose-300/[0.06] px-2 py-0.5 text-[10.5px] text-rose-200 hover:bg-rose-300/[0.10]">
-        Delete
+        {t("fx.delete", "Delete")}
       </button>
     ) },
   ];
 
   return (
     <ErpPage
-      title="Exchange Rates"
-      subtitle={`Main operating currency: ${baseCurrency}`}
+      title={t("fx.pageTitle", "Exchange Rates")}
+      subtitle={t("fx.pageSubtitle", "Main operating currency: {ccy}").replace("{ccy}", baseCurrency)}
       icon="balance-scale-left"
       backHref="/finance/workspace"
       action={
         <Link href="/finance/setup?card=fx-rates"
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
-          <RrIcon name="info" size={12} /> About FX
+          <RrIcon name="info" size={12} /> {t("fx.aboutFx", "About FX")}
         </Link>
       }
     >
@@ -167,35 +170,39 @@ export default function FxRatesManager() {
       {/* Status — pairs in use + missing + stale */}
       {status && (status.missing_pairs.length > 0 || status.stale_pairs.length > 0 || status.pairs.length > 0) && (
         <section>
-          <ErpEyebrow>FX coverage status</ErpEyebrow>
+          <ErpEyebrow>{t("fx.coverageStatus", "FX coverage status")}</ErpEyebrow>
           <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-3">
             {/* Missing required pairs */}
             {status.missing_pairs.length > 0 ? (
               <ErpPanel className="border-rose-300/40 bg-rose-300/[0.05] px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-rose-200">
-                  <RrIcon name="cross-circle" size={12} /> Missing rates
+                  <RrIcon name="cross-circle" size={12} /> {t("fx.missingRates", "Missing rates")}
                 </div>
                 <div className="mt-2 space-y-1.5">
-                  {status.missing_pairs.map((p) => (
-                    <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
-                      <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
-                      <span className="text-[10.5px] text-gray-400">
-                        used by {p.open_invoice_count + p.open_bill_count} open doc{p.open_invoice_count + p.open_bill_count === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  ))}
+                  {status.missing_pairs.map((p) => {
+                    const n = p.open_invoice_count + p.open_bill_count;
+                    const usageText = n === 1
+                      ? t("fx.usedByDocs.one", "used by {n} open doc").replace("{n}", String(n))
+                      : t("fx.usedByDocs.many", "used by {n} open docs").replace("{n}", String(n));
+                    return (
+                      <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
+                        <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
+                        <span className="text-[10.5px] text-gray-400">{usageText}</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="mt-2 text-[10px] text-rose-200/80">
-                  Add a rate row below — without it, base-amount conversions fall back to 1:1.
+                  {t("fx.missingHint", "Add a rate row below — without it, base-amount conversions fall back to 1:1.")}
                 </div>
               </ErpPanel>
             ) : (
               <ErpPanel className="px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
-                  <RrIcon name="check" size={12} /> All exposed pairs configured
+                  <RrIcon name="check" size={12} /> {t("fx.allConfigured", "All exposed pairs configured")}
                 </div>
                 <div className="mt-2 text-[10.5px] text-gray-500">
-                  Every non-base currency in use has a rate row.
+                  {t("fx.allConfiguredHint", "Every non-base currency in use has a rate row.")}
                 </div>
               </ErpPanel>
             )}
@@ -203,43 +210,45 @@ export default function FxRatesManager() {
             {status.stale_pairs.length > 0 ? (
               <ErpPanel className="border-amber-300/40 bg-amber-300/[0.05] px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-amber-200">
-                  <RrIcon name="clock" size={12} /> Stale rates (&gt;14d)
+                  <RrIcon name="clock" size={12} /> {t("fx.stale", "Stale rates (>14d)")}
                 </div>
                 <div className="mt-2 space-y-1.5">
                   {status.stale_pairs.map((p) => (
                     <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
                       <span className="font-mono">{p.from_currency} → {p.to_currency}</span>
-                      <span className="text-[10.5px] text-gray-400">{p.stale_days}d ago</span>
+                      <span className="text-[10.5px] text-gray-400">{t("fx.daysAgo", "{n}d ago").replace("{n}", String(p.stale_days))}</span>
                     </div>
                   ))}
                 </div>
                 <div className="mt-2 text-[10px] text-amber-200/80">
-                  Update with the latest mid-market rate to keep conversions accurate.
+                  {t("fx.staleHint", "Update with the latest mid-market rate to keep conversions accurate.")}
                 </div>
               </ErpPanel>
             ) : (
               <ErpPanel className="px-4 py-3">
                 <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
-                  <RrIcon name="check" size={12} /> Rates fresh
+                  <RrIcon name="check" size={12} /> {t("fx.ratesFresh", "Rates fresh")}
                 </div>
                 <div className="mt-2 text-[10.5px] text-gray-500">
-                  Every configured rate is within 14 days.
+                  {t("fx.ratesFreshHint", "Every configured rate is within 14 days.")}
                 </div>
               </ErpPanel>
             )}
             {/* Used by open documents */}
             <ErpPanel className="px-4 py-3">
               <div className="flex items-center gap-2 text-[11.5px] text-gray-300">
-                <RrIcon name="signal-stream" size={12} /> Open exposure
+                <RrIcon name="signal-stream" size={12} /> {t("fx.openExposure", "Open exposure")}
               </div>
               <div className="mt-2 space-y-1.5">
                 {status.pairs.length === 0 ? (
-                  <div className="text-[10.5px] text-gray-500">No non-base currency open documents.</div>
+                  <div className="text-[10.5px] text-gray-500">{t("fx.noOpenDocs", "No non-base currency open documents.")}</div>
                 ) : status.pairs.slice(0, 5).map((p) => (
                   <div key={p.pair} className="flex items-baseline justify-between text-[11.5px]">
                     <span className="font-mono">{p.from_currency}</span>
                     <span className="text-[10.5px] text-gray-400">
-                      {p.open_invoice_count} inv · {p.open_bill_count} bill
+                      {t("fx.invBill", "{inv} inv · {bill} bill")
+                        .replace("{inv}", String(p.open_invoice_count))
+                        .replace("{bill}", String(p.open_bill_count))}
                     </span>
                   </div>
                 ))}
@@ -251,10 +260,10 @@ export default function FxRatesManager() {
 
       {/* Hero — latest rate per pair */}
       <section>
-        <ErpEyebrow>Latest rate per pair</ErpEyebrow>
+        <ErpEyebrow>{t("fx.latestPerPair", "Latest rate per pair")}</ErpEyebrow>
         {latestByPair.length === 0 ? (
           <ErpPanel className="mt-2 px-4 py-6 text-center text-[12px] text-gray-500">
-            No rates configured yet. Add one below — a Chinese tenant typically wants <span className="font-mono">USD → CNY</span>.
+            {t("fx.noneYet", "No rates configured yet. Add one below.")}
           </ErpPanel>
         ) : (
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -262,7 +271,7 @@ export default function FxRatesManager() {
               <ErpPanel key={r.id} className="px-3 py-3">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{r.from_currency} → {r.to_currency}</div>
                 <div className="mt-1 font-mono text-[20px] leading-none tabular-nums">{fmtRate(r.rate)}</div>
-                <div className="mt-1 text-[10px] text-gray-500">eff {fmtDay(r.effective_date)}</div>
+                <div className="mt-1 text-[10px] text-gray-500">{t("fx.eff", "eff {date}").replace("{date}", fmtDay(r.effective_date))}</div>
               </ErpPanel>
             ))}
           </div>
@@ -271,55 +280,54 @@ export default function FxRatesManager() {
 
       {/* Add new rate */}
       <section>
-        <ErpEyebrow>Add rate</ErpEyebrow>
+        <ErpEyebrow>{t("fx.addRateSection", "Add rate")}</ErpEyebrow>
         <ErpPanel className="mt-2 px-4 py-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <SmartField label="From">
+            <SmartField label={t("fx.field.from", "From")}>
               <SmartSelect value={from} onChange={(e) => setFrom(e.target.value)}>
                 {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </SmartSelect>
             </SmartField>
-            <SmartField label="To">
+            <SmartField label={t("fx.field.to", "To")}>
               <SmartSelect value={to} onChange={(e) => { setTo(e.target.value); setToTouched(true); }}>
                 {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </SmartSelect>
             </SmartField>
-            <SmartField label="Rate" required hint="1 unit of From = ? units of To">
+            <SmartField label={t("fx.field.rate", "Rate")} required hint={t("fx.field.rateHint", "1 unit of From = ? units of To")}>
               <SmartInput type="number" step="0.0001" min="0" value={rate}
                           onChange={(e) => setRate(e.target.value)} placeholder="7.25" />
             </SmartField>
-            <SmartField label="Effective" required>
+            <SmartField label={t("fx.field.effective", "Effective")} required>
               <SmartInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </SmartField>
-            <SmartField label="Notes">
-              <SmartInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="(optional)" />
+            <SmartField label={t("fx.field.notes", "Notes")}>
+              <SmartInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("fx.optional", "(optional)")} />
             </SmartField>
           </div>
           <div className="mt-3 flex items-center justify-end">
             <button type="button" disabled={busy} onClick={addRate}
                     className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14] disabled:opacity-50">
               <RrIcon name={busy ? "loading" : "plus"} size={12} />
-              {busy ? "Saving…" : "Save rate"}
+              {busy ? t("fx.saving", "Saving…") : t("fx.saveRate", "Save rate")}
             </button>
           </div>
           <div className="mt-2 text-[10.5px] text-gray-500">
-            Tip: as a Chinese tenant your base is <span className="font-mono">CNY</span>.
-            Add <span className="font-mono">USD → CNY</span> so customer payments in USD convert correctly when posted.
+            {t("fx.tipCny", "Tip: as a Chinese tenant your base is CNY. Add USD → CNY so customer payments in USD convert correctly when posted.")}
           </div>
         </ErpPanel>
       </section>
 
       {/* Full table */}
       <section>
-        <ErpEyebrow>All rates</ErpEyebrow>
+        <ErpEyebrow>{t("fx.allRates", "All rates")}</ErpEyebrow>
         {loading ? (
-          <div className="px-1 py-3 text-[12px] text-gray-500">Loading…</div>
+          <div className="px-1 py-3 text-[12px] text-gray-500">{t("common.loading", "Loading…")}</div>
         ) : (
           <ErpTable<RateRow>
             rows={rates}
             columns={columns}
             rowKey={(r) => r.id}
-            empty="No rates yet."
+            empty={t("fx.noneYetTable", "No rates yet.")}
           />
         )}
       </section>

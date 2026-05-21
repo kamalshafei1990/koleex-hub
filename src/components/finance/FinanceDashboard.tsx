@@ -108,16 +108,18 @@ import {
   saveMemory,
   type MemoryState,
 } from "@/lib/intelligence";
-
-const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
-  { value: "week",    label: "Week" },
-  { value: "quarter", label: "Quarter" },
-  { value: "year",    label: "Year" },
-];
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 const MODE_STORAGE_KEY = "koleex-finance-mode";
 
 export default function FinanceDashboard() {
+  const { t } = useTranslation(financeT);
+  const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
+    { value: "week",    label: t("dashboard.period.week", "Week") },
+    { value: "quarter", label: t("dashboard.period.quarter", "Quarter") },
+    { value: "year",    label: t("dashboard.period.year", "Year") },
+  ];
   const [period, setPeriod] = useState<DashboardPeriod>("quarter");
   const [mode, setMode] = useState<FinanceMode>("operational");
   const [kpi, setKpi] = useState<DashboardKpi | null>(null);
@@ -212,7 +214,7 @@ export default function FinanceDashboard() {
   }, [kpi]);
 
   /* Intelligence layer */
-  const intelligence    = useMemo(() => buildIntelligence(kpi, period, currency), [kpi, period, currency]);
+  const intelligence    = useMemo(() => buildIntelligence(kpi, period, currency, t), [kpi, period, currency, t]);
   const arAging         = useMemo(() => computeArAging(orders), [orders]);
   const apAging         = useMemo(() => computeApAging(orders), [orders]);
   const incomingTimeline = useMemo(() => buildIncomingTimeline(orders), [orders]);
@@ -228,8 +230,8 @@ export default function FinanceDashboard() {
 
   /* Dynamic workflow rail — sorted by current pressure */
   const workflowItems   = useMemo(
-    () => buildWorkflowItems(kpi, prioritiseWorkflow(kpi)),
-    [kpi],
+    () => buildWorkflowItems(kpi, prioritiseWorkflow(kpi), t),
+    [kpi, t],
   );
 
   /* ── Phase 2.0 cross-module operational intelligence.
@@ -283,8 +285,8 @@ export default function FinanceDashboard() {
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <FinanceHeader
-          title="Financial Intelligence"
-          subtitle={pressureHeadline(pressure, intelligence.headline)}
+          title={t("dashboard.title", "Financial Intelligence")}
+          subtitle={pressureHeadline(pressure, intelligence.headline, t)}
           health={kpi?.health_status}
           controls={
             <div className="flex flex-wrap items-center gap-2.5">
@@ -300,9 +302,9 @@ export default function FinanceDashboard() {
             calm. */}
         <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-500">
           <RrIcon name="arrow-left" size={10} />
-          <Link href="/finance" className="hover:text-gray-300">Back to Finance Home</Link>
+          <Link href="/finance" className="hover:text-gray-300">{t("dash.backHome", "Back to Finance Home")}</Link>
           <span className="text-gray-700">·</span>
-          <span>You're in the deep analytics view; every section below is preserved.</span>
+          <span>{t("dash.backHint", "You're in the deep analytics view; every section below is preserved.")}</span>
         </div>
 
         {/* ── Phase UI.1 — System Health rail.
@@ -310,7 +312,7 @@ export default function FinanceDashboard() {
            Treasury panels. One typographic strip carrying the composite
            health number, the dimension bars, and the headline narrative.
            No box, no border — spacing + a single hairline rule above. */}
-        <SystemHealth intel={businessIntelligence} />
+        <SystemHealth intel={businessIntelligence} t={t} />
 
         {mode === "operational" ? (
           <OperationalView
@@ -327,6 +329,7 @@ export default function FinanceDashboard() {
             incomingTimeline={incomingTimeline}
             outgoingTimeline={outgoingTimeline}
             liquidity={liquidity}
+            t={t}
           />
         ) : (
           <ExecutiveView
@@ -342,6 +345,7 @@ export default function FinanceDashboard() {
             concentration={concentration}
             ccc={ccc}
             pressure={pressure}
+            t={t}
           />
         )}
       </div>
@@ -365,7 +369,7 @@ export default function FinanceDashboard() {
    No box, no card — just typography on a hairline-separated band.
    ========================================================================== */
 
-function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelligence> }) {
+function SystemHealth({ intel, t }: { intel: ReturnType<typeof buildBusinessIntelligence>; t: (key: string, fallback?: string) => string }) {
   const { health, approval, payment, treasury, correlations, digest } = intel;
 
   /* Quiet state — nothing to say, calm pressure, no events. */
@@ -382,7 +386,7 @@ function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelli
   const pills: OpsPillData[] = [];
   if (approval.pressure !== "calm" || approval.backlog.count >= 3) {
     pills.push({
-      label: "Approvals",
+      label: t("approvals.title", "Approvals"),
       score: approval.healthScore,
       pressure: approval.pressure,
       hint: approval.backlog.count > 0 ? `${approval.backlog.count} pending · ${approval.backlog.oldestDays}d oldest` : undefined,
@@ -390,7 +394,7 @@ function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelli
   }
   if (payment.pressure !== "calm") {
     pills.push({
-      label: "Payments",
+      label: t("subtab.payments", "Payments"),
       score: payment.healthScore,
       pressure: payment.pressure,
       hint: payment.read,
@@ -398,7 +402,7 @@ function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelli
   }
   if (treasury.pressure !== "calm") {
     pills.push({
-      label: "Treasury",
+      label: t("treasury.label", "Treasury"),
       score: treasury.healthScore,
       pressure: treasury.pressure,
       hint: treasury.read,
@@ -439,7 +443,7 @@ function SystemHealth({ intel }: { intel: ReturnType<typeof buildBusinessIntelli
 
 function OperationalView({
   kpi, loading, currency, sparklines, period, intelligence, anomalies,
-  workflowItems, arAging, apAging, incomingTimeline, outgoingTimeline, liquidity,
+  workflowItems, arAging, apAging, incomingTimeline, outgoingTimeline, liquidity, t,
 }: {
   kpi: DashboardKpi | null;
   loading: boolean;
@@ -454,6 +458,7 @@ function OperationalView({
   incomingTimeline: ReturnType<typeof buildIncomingTimeline>;
   outgoingTimeline: ReturnType<typeof buildOutgoingTimeline>;
   liquidity: ReturnType<typeof projectLiquidity>;
+  t: (key: string, fallback?: string) => string;
 }) {
   /* Pressure-anomaly chips were duplicated by the HealthPill in the
      header and the SystemHealth rail above — Phase UI.1 removes the
@@ -483,38 +488,38 @@ function OperationalView({
             beneath. No card chrome — typography only with a tonal
             accent rule on top of each L1 number. */}
       <DashboardSection
-        eyebrow="Financial performance"
-        title="Where the business stands this period"
+        eyebrow={t("dash.section.performance", "Financial performance")}
+        title={t("dash.section.performanceTitle", "Where the business stands this period")}
         helpId="finance.section.atGlance"
       >
         <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
           <DisplayKpi
-            label="Net Profit"
+            label={t("dash.kpi.netProfit", "Net Profit")}
             value={formatCompact(kpi?.net_profit ?? 0)}
-            hint={`${currency} · ${fmtPct(kpi?.delta.net_profit_pct ?? null, 1)} vs prior`}
+            hint={`${currency} · ${fmtPct(kpi?.delta.net_profit_pct ?? null, 1)} ${t("home.kpi.deltaVs", "vs. last period")}`}
             tone={netProfitTone}
             helpId="finance.netProfit"
             loading={loading}
           />
           <DisplayKpi
-            label="Revenue"
+            label={t("dash.kpi.revenue", "Revenue")}
             value={formatCompact(kpi?.total_revenue ?? 0)}
-            hint={`${currency} · ${fmtPct(kpi?.delta.revenue_pct ?? null, 1)} vs prior`}
+            hint={`${currency} · ${fmtPct(kpi?.delta.revenue_pct ?? null, 1)} ${t("home.kpi.deltaVs", "vs. last period")}`}
             tone="positive"
             helpId="finance.revenue"
             loading={loading}
           />
           <DisplayKpi
-            label="Cash position"
+            label={t("dash.kpi.cashPos", "Cash position")}
             value={formatCompact(cashPosition)}
-            hint={cashPosition >= 0 ? "Inflow heavy" : "Outflow heavy"}
+            hint={cashPosition >= 0 ? t("dash.kpi.inflowHeavy", "Inflow heavy") : t("dash.kpi.outflowHeavy", "Outflow heavy")}
             tone={cashPositionTone}
             loading={loading}
           />
           <DisplayKpi
-            label="Gross margin"
+            label={t("dash.kpi.grossMargin", "Gross margin")}
             value={marginValue}
-            hint="Gross profit ÷ revenue"
+            hint={t("dash.kpi.grossMarginHint", "Gross profit ÷ revenue")}
             tone={marginTone}
             helpId="finance.grossMargin"
             loading={loading}
@@ -524,9 +529,9 @@ function OperationalView({
         {/* L2 supporting metrics row — calmer, smaller, no chrome. */}
         <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4">
           <OperationalKpi
-            label="Cash in"
+            label={t("dash.kpi.cashIn", "Cash in")}
             value={formatCompact(kpi?.cash_in ?? 0)}
-            hint={`${currency} · tap for bank movements`}
+            hint={t("dash.kpi.cashTap", "{ccy} · tap for bank movements").replace("{ccy}", currency)}
             tone="positive"
             helpId="finance.cashIn"
             loading={loading}
@@ -534,9 +539,9 @@ function OperationalView({
             href="/finance/payments?direction=in"
           />
           <OperationalKpi
-            label="Cash out"
+            label={t("dash.kpi.cashOut", "Cash out")}
             value={formatCompact(kpi?.cash_out ?? 0)}
-            hint={`${currency} · tap for bank movements`}
+            hint={t("dash.kpi.cashTap", "{ccy} · tap for bank movements").replace("{ccy}", currency)}
             tone="negative"
             helpId="finance.cashOut"
             loading={loading}
@@ -544,18 +549,18 @@ function OperationalView({
             href="/finance/payments?direction=out"
           />
           <OperationalKpi
-            label="Money to Collect"
+            label={t("dash.kpi.moneyCollect", "Money to Collect")}
             value={formatCompact(kpi?.accounts_receivable ?? 0)}
-            hint="Outstanding AR · tap for aging"
+            hint={t("dash.kpi.arTap", "Outstanding AR · tap for aging")}
             tone="warning"
             helpId="finance.accountsReceivable"
             loading={loading}
             href="/reports/statements?tab=ar"
           />
           <OperationalKpi
-            label="Money to Pay"
+            label={t("dash.kpi.moneyPay", "Money to Pay")}
             value={formatCompact(kpi?.accounts_payable ?? 0)}
-            hint="Suppliers + bills · tap for aging"
+            hint={t("dash.kpi.apTap", "Suppliers + bills · tap for aging")}
             tone="warning"
             helpId="finance.accountsPayable"
             loading={loading}
@@ -568,20 +573,20 @@ function OperationalView({
             The three existing widgets share a row; the section heading
             replaces the in-card title each carries. */}
       <DashboardSection
-        eyebrow="Liquidity"
-        title="What's moving in the next 45 days"
-        description="Incoming collections, supplier dues, and forward liquidity."
+        eyebrow={t("dash.section.liquidity", "Liquidity")}
+        title={t("dash.section.liquidityTitle", "What's moving in the next 45 days")}
+        description={t("dash.section.liquidityDesc", "Incoming collections, supplier dues, and forward liquidity.")}
         helpId="finance.section.cashRadar"
       >
         <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
           <TimelineStrip
-            title="Incoming cash"
+            title={t("dash.timeline.incoming", "Incoming cash")}
             direction="incoming"
             currency={currency}
             events={incomingTimeline}
           />
           <TimelineStrip
-            title="Supplier dues"
+            title={t("dash.timeline.supplierDues", "Supplier dues")}
             direction="outgoing"
             currency={currency}
             events={outgoingTimeline}
@@ -601,14 +606,14 @@ function OperationalView({
             inside the Intelligence section below to avoid duplication
             with the SystemHealth narrative. */}
       <DashboardSection
-        eyebrow="Risks"
-        title="Receivables and payables by age"
-        description="Anything past 30 days is silently flagged."
+        eyebrow={t("dash.section.risks", "Risks")}
+        title={t("dash.section.risksTitle", "Receivables and payables by age")}
+        description={t("dash.section.risksDesc", "Anything past 30 days is silently flagged.")}
         helpId="finance.section.aging"
       >
         <div className="grid gap-x-6 gap-y-5 lg:grid-cols-2">
-          <AgingTable title="AR aging" buckets={arAging} currency={currency} totalLabel="Customer side" />
-          <AgingTable title="AP aging" buckets={apAging} currency={currency} totalLabel="Supplier side" />
+          <AgingTable title={t("dash.aging.ar", "AR aging")} buckets={arAging} currency={currency} totalLabel={t("dash.aging.customerSide", "Customer side")} />
+          <AgingTable title={t("dash.aging.ap", "AP aging")} buckets={apAging} currency={currency} totalLabel={t("dash.aging.supplierSide", "Supplier side")} />
         </div>
       </DashboardSection>
 
@@ -616,18 +621,18 @@ function OperationalView({
             The action queue lives here in the narrative (after the
             user has read the company's condition + risks). */}
       <DashboardSection
-        eyebrow="Actions"
-        title="Operational queue, prioritised"
-        description="Items most likely to need a decision this week, ordered by current pressure."
+        eyebrow={t("dash.section.actions", "Actions")}
+        title={t("dash.section.actionsTitle", "Operational queue, prioritised")}
+        description={t("dash.section.actionsDesc", "Items most likely to need a decision this week, ordered by current pressure.")}
       >
         <WorkflowRail items={workflowItems} />
       </DashboardSection>
 
       {/* ── 5. INTELLIGENCE — interpretations + meaningful anomalies. */}
       <DashboardSection
-        eyebrow="Intelligence"
-        title="What the numbers mean"
-        description="Automatic interpretation of this period's signal."
+        eyebrow={t("dash.section.intelligence", "Intelligence")}
+        title={t("dash.section.intelTitle", "What the numbers mean")}
+        description={t("dash.section.intelDesc", "Automatic interpretation of this period's signal.")}
         helpId="finance.section.intelligence"
       >
         {/* Anomaly call-outs collapsed into a single quiet stack —
@@ -664,32 +669,32 @@ function OperationalView({
             The most data-dense surfaces live at the end of the page,
             after the operator has absorbed the narrative above. */}
       <DashboardSection
-        eyebrow="Analytics"
-        title="Cash flow over time"
+        eyebrow={t("dash.section.analytics", "Analytics")}
+        title={t("dash.section.analyticsTitle", "Cash flow over time")}
         description={
-          period === "week"      ? "Daily breakdown — last 7 days"
-          : period === "quarter" ? "Weekly breakdown — last 90 days"
-          :                        "Monthly breakdown — last 12 months"
+          period === "week"      ? t("dash.section.analyticsWeek", "Daily breakdown — last 7 days")
+          : period === "quarter" ? t("dash.section.analyticsQuarter", "Weekly breakdown — last 90 days")
+          :                        t("dash.section.analyticsYear", "Monthly breakdown — last 12 months")
         }
       >
-        <ChartCard title="Revenue · costs · net profit" subtitle="Revenue is the inflow line; costs + expenses combine into the outflow line.">
+        <ChartCard title={t("dash.chart.rcnp", "Revenue · costs · net profit")} subtitle={t("dash.chart.rcnpSub1", "Revenue is the inflow line; costs + expenses combine into the outflow line.")}>
           <AreaChart
             currency={currency}
             labels={sparklines.labels}
             height={280}
             series={[
-              { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
-              { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
-              { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+              { name: t("dash.series.revenue", "Revenue"),          values: sparklines.revenue,    tone: "positive" },
+              { name: t("dash.series.costs", "Costs + Expenses"),   values: sparklines.expenses,   tone: "negative" },
+              { name: t("dash.series.netProfit", "Net profit"),     values: sparklines.net_profit, tone: "info" },
             ]}
           />
         </ChartCard>
       </DashboardSection>
 
       <DashboardSection
-        eyebrow="Profit flow"
-        title="From revenue to net profit"
-        description="Gross profit excludes tax refund; refund is added back separately before net profit."
+        eyebrow={t("dash.section.profitFlow", "Profit flow")}
+        title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
+        description={t("dash.section.profitFlowDesc", "Gross profit excludes tax refund; refund is added back separately before net profit.")}
         helpId="finance.section.profitFlow"
         tight
       >
@@ -706,8 +711,8 @@ function OperationalView({
       </DashboardSection>
 
       <DashboardSection
-        eyebrow="Detail"
-        title="Where profit is being made — and where it's leaking"
+        eyebrow={t("dash.section.detail", "Detail")}
+        title={t("dash.section.detailTitle", "Where profit is being made — and where it's leaking")}
         helpId="finance.section.topInsights"
         tight
       >
@@ -727,7 +732,7 @@ function OperationalView({
 
 function ExecutiveView({
   kpi, loading, currency, sparklines, period,
-  anomalies, arAging, apAging, liquidity, concentration, ccc, pressure,
+  anomalies, arAging, apAging, liquidity, concentration, ccc, pressure, t,
 }: {
   kpi: DashboardKpi | null;
   loading: boolean;
@@ -741,7 +746,9 @@ function ExecutiveView({
   concentration: ReturnType<typeof computeConcentration>;
   ccc: ReturnType<typeof computeCCC>;
   pressure: Pressure;
+  t: (key: string, fallback?: string) => string;
 }) {
+  const periodLabel = period === "week" ? t("dashboard.period.week", "Week") : period === "quarter" ? t("dashboard.period.quarter", "Quarter") : t("dashboard.period.year", "Year");
   /* Phase UI.1 — ExecutiveView mirrors the Operational narrative
      order (Financial performance → Liquidity → Risks → Intelligence
      → Analytics) but stays calmer: no WorkflowRail, no anomaly chips.
@@ -762,44 +769,44 @@ function ExecutiveView({
             SystemHealth rail. No box; just typography. */}
       <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <p className="max-w-[820px] text-[13px] leading-[1.55] text-gray-300">{liquidity.narrative}</p>
-        <PressurePill pressure={pressure} />
+        <PressurePill pressure={pressure} t={t} />
       </div>
 
       {/* ── 2. FINANCIAL PERFORMANCE — L1 quartet. */}
       <DashboardSection
-        eyebrow="Financial performance"
-        title={`Executive read · ${currency} · ${period}`}
+        eyebrow={t("dash.section.performance", "Financial performance")}
+        title={t("dash.exec.read", "Executive read · {ccy} · {period}").replace("{ccy}", currency).replace("{period}", periodLabel)}
         helpId="finance.section.atGlance"
       >
         <div className="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
           <DisplayKpi
-            label="Net profit"
+            label={t("dash.kpi.netProfit", "Net profit")}
             value={formatCompact(kpi?.net_profit ?? 0)}
-            hint={`Margin ${marginValue}`}
+            hint={t("dash.kpi.marginShort", "Margin {pct}").replace("{pct}", marginValue)}
             tone={netProfitTone}
             helpId="finance.netProfit"
             loading={loading}
           />
           <DisplayKpi
-            label="Revenue"
+            label={t("dash.kpi.revenue", "Revenue")}
             value={formatCompact(kpi?.total_revenue ?? 0)}
-            hint={`${currency} · ${period}`}
+            hint={`${currency} · ${periodLabel}`}
             tone="positive"
             helpId="finance.revenue"
             loading={loading}
           />
           <DisplayKpi
-            label="Money to Collect"
+            label={t("dash.kpi.moneyCollect", "Money to Collect")}
             value={formatCompact(kpi?.accounts_receivable ?? 0)}
-            hint={`${arOpen} open AR`}
+            hint={t("dash.kpi.openAr", "{n} open AR").replace("{n}", String(arOpen))}
             tone="warning"
             helpId="finance.accountsReceivable"
             loading={loading}
           />
           <DisplayKpi
-            label="Money to Pay"
+            label={t("dash.kpi.moneyPay", "Money to Pay")}
             value={formatCompact(kpi?.accounts_payable ?? 0)}
-            hint={`${apOpen} open AP`}
+            hint={t("dash.kpi.openAp", "{n} open AP").replace("{n}", String(apOpen))}
             tone="warning"
             helpId="finance.accountsPayable"
             loading={loading}
@@ -809,25 +816,25 @@ function ExecutiveView({
         {/* L2 supporting row — DSO · CCC · margin · cash position. */}
         <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4">
           <OperationalKpi
-            label="DSO"
+            label={t("dash.kpi.dso", "DSO")}
             value={`${ccc.dso.toFixed(0)} d`}
-            hint="Days sales outstanding"
+            hint={t("dash.kpi.dsoHint", "Days sales outstanding")}
             tone="info"
             helpId="finance.dso"
             loading={loading}
           />
           <OperationalKpi
-            label="CCC"
+            label={t("dash.kpi.ccc", "CCC")}
             value={`${ccc.ccc.toFixed(0)} d`}
-            hint={ccc.ccc >= 0 ? "Cash cycle gap" : "Cash cycle surplus"}
+            hint={ccc.ccc >= 0 ? t("dash.kpi.cccGap", "Cash cycle gap") : t("dash.kpi.cccSurplus", "Cash cycle surplus")}
             tone={cccTone}
             helpId="finance.ccc"
             loading={loading}
           />
           <OperationalKpi
-            label="Gross margin"
+            label={t("dash.kpi.grossMargin", "Gross margin")}
             value={marginValue}
-            hint="Profit ÷ revenue"
+            hint={t("dash.kpi.grossMarginHint2", "Profit ÷ revenue")}
             tone={
               (kpi?.gross_margin_pct ?? 0) >= 30 ? "positive"
               : (kpi?.gross_margin_pct ?? 0) >= 15 ? "warning"
@@ -838,9 +845,9 @@ function ExecutiveView({
             loading={loading}
           />
           <OperationalKpi
-            label="Cash position"
+            label={t("dash.kpi.cashPos", "Cash position")}
             value={formatCompact(cashPosition)}
-            hint={cashPosition >= 0 ? "Inflow heavy" : "Outflow heavy"}
+            hint={cashPosition >= 0 ? t("dash.kpi.inflowHeavy", "Inflow heavy") : t("dash.kpi.outflowHeavy", "Outflow heavy")}
             tone={cashPosition >= 0 ? "positive" : "negative"}
             loading={loading}
           />
@@ -849,9 +856,9 @@ function ExecutiveView({
 
       {/* ── 3. LIQUIDITY & TREASURY. */}
       <DashboardSection
-        eyebrow="Liquidity"
-        title="Forward cash window + aging exposure"
-        description="Projection blends steady-state trajectory with scheduled AR/AP."
+        eyebrow={t("dash.section.liquidity", "Liquidity")}
+        title={t("dash.section.liquidityTitle", "Forward cash window + aging exposure")}
+        description={t("dash.section.liquidityDesc", "Incoming collections, supplier dues, and forward liquidity.")}
         helpId="finance.liquidity"
       >
         <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
@@ -861,38 +868,38 @@ function ExecutiveView({
             d60={liquidity.d60}
             inflowShare={liquidity.inflowShare}
           />
-          <AgingTable title="AR aging" buckets={arAging} currency={currency} />
-          <AgingTable title="AP aging" buckets={apAging} currency={currency} />
+          <AgingTable title={t("dash.aging.ar", "AR aging")} buckets={arAging} currency={currency} />
+          <AgingTable title={t("dash.aging.ap", "AP aging")} buckets={apAging} currency={currency} />
         </div>
       </DashboardSection>
 
       {/* ── 4. RISKS — concentration. */}
       <DashboardSection
-        eyebrow="Risks"
-        title="Counterparty concentration"
-        description="How exposed the business is to a single counterparty."
+        eyebrow={t("dash.section.risks", "Risks")}
+        title={t("dash.risks.concTitle", "Counterparty concentration")}
+        description={t("dash.risks.concDesc", "How exposed the business is to a single counterparty.")}
         helpId="finance.concentration"
       >
         <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
           <ConcentrationBar
-            label="Top customer share"
+            label={t("dash.risks.topCustomer", "Top customer share")}
             party={concentration.topCustomer?.name ?? "—"}
             share={concentration.topCustomer?.share ?? 0}
             hint={
-              (concentration.topCustomer?.share ?? 0) >= 60 ? "Critical concentration — single counterparty risk."
-              : (concentration.topCustomer?.share ?? 0) >= 40 ? "Material concentration."
-              : "Healthy distribution."
+              (concentration.topCustomer?.share ?? 0) >= 60 ? t("dash.risks.customerCrit", "Critical concentration — single counterparty risk.")
+              : (concentration.topCustomer?.share ?? 0) >= 40 ? t("dash.risks.customerMat", "Material concentration.")
+              : t("dash.risks.customerHealthy", "Healthy distribution.")
             }
             severity={(concentration.topCustomer?.share ?? 0) >= 60 ? "risk" : (concentration.topCustomer?.share ?? 0) >= 40 ? "watch" : "info"}
           />
           <ConcentrationBar
-            label="Top supplier share"
+            label={t("dash.risks.topSupplier", "Top supplier share")}
             party={concentration.topSupplier?.name ?? "—"}
             share={concentration.topSupplier?.share ?? 0}
             hint={
-              (concentration.topSupplier?.share ?? 0) >= 70 ? "Critical dependency — single source of goods."
-              : (concentration.topSupplier?.share ?? 0) >= 50 ? "Significant supplier dependency."
-              : "Diversified supplier base."
+              (concentration.topSupplier?.share ?? 0) >= 70 ? t("dash.risks.supplierCrit", "Critical dependency — single source of goods.")
+              : (concentration.topSupplier?.share ?? 0) >= 50 ? t("dash.risks.supplierSig", "Significant supplier dependency.")
+              : t("dash.risks.supplierDiv", "Diversified supplier base.")
             }
             severity={(concentration.topSupplier?.share ?? 0) >= 70 ? "risk" : (concentration.topSupplier?.share ?? 0) >= 50 ? "watch" : "info"}
           />
@@ -902,9 +909,9 @@ function ExecutiveView({
       {/* ── 5. INTELLIGENCE — anomaly digest as InsightCards. */}
       {anomalies.length > 0 && (
         <DashboardSection
-          eyebrow="Intelligence"
-          title="Period-over-period deviations"
-          description="Material movements worth a second look."
+          eyebrow={t("dash.section.intelligence", "Intelligence")}
+          title={t("dash.intel.devTitle", "Period-over-period deviations")}
+          description={t("dash.intel.devDesc", "Material movements worth a second look.")}
         >
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             {anomalies.slice(0, 6).map((a) => (
@@ -921,26 +928,26 @@ function ExecutiveView({
 
       {/* ── 6. DEEP ANALYTICS — Trend + Profit flow. */}
       <DashboardSection
-        eyebrow="Analytics"
-        title="Cash flow over time"
+        eyebrow={t("dash.section.analytics", "Analytics")}
+        title={t("dash.section.analyticsTitle", "Cash flow over time")}
       >
-        <ChartCard title="Revenue · costs · net profit" subtitle="Compressed for adaptive readability when spikes dominate.">
+        <ChartCard title={t("dash.chart.rcnp", "Revenue · costs · net profit")} subtitle={t("dash.chart.rcnpSub2", "Compressed for adaptive readability when spikes dominate.")}>
           <AreaChart
             currency={currency}
             labels={sparklines.labels}
             height={240}
             series={[
-              { name: "Revenue",          values: sparklines.revenue,    tone: "positive" },
-              { name: "Costs + Expenses", values: sparklines.expenses,   tone: "negative" },
-              { name: "Net profit",       values: sparklines.net_profit, tone: "info" },
+              { name: t("dash.series.revenue", "Revenue"),          values: sparklines.revenue,    tone: "positive" },
+              { name: t("dash.series.costs", "Costs + Expenses"),   values: sparklines.expenses,   tone: "negative" },
+              { name: t("dash.series.netProfit", "Net profit"),     values: sparklines.net_profit, tone: "info" },
             ]}
           />
         </ChartCard>
       </DashboardSection>
 
       <DashboardSection
-        eyebrow="Profit flow"
-        title="From revenue to net profit"
+        eyebrow={t("dash.section.profitFlow", "Profit flow")}
+        title={t("dash.section.profitFlowTitle", "From revenue to net profit")}
         tight
       >
         <ProfitFlow
@@ -958,17 +965,17 @@ function ExecutiveView({
   );
 }
 
-function PressurePill({ pressure }: { pressure: Pressure }) {
+function PressurePill({ pressure, t }: { pressure: Pressure; t: (key: string, fallback?: string) => string }) {
   const cls =
     pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
   : pressure === "risk"     ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
   : pressure === "watch"    ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
   :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
   const label =
-    pressure === "critical" ? "Critical pressure"
-  : pressure === "risk"     ? "Elevated pressure"
-  : pressure === "watch"    ? "Mild pressure"
-  :                           "Calm";
+    pressure === "critical" ? t("dash.pressure.critical", "Critical pressure")
+  : pressure === "risk"     ? t("dash.pressure.risk", "Elevated pressure")
+  : pressure === "watch"    ? t("dash.pressure.watch", "Mild pressure")
+  :                           t("dash.pressure.calm", "Calm");
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${cls}`}>
       <span aria-hidden className={"h-1.5 w-1.5 rounded-full " + (
@@ -982,10 +989,10 @@ function PressurePill({ pressure }: { pressure: Pressure }) {
   );
 }
 
-function pressureHeadline(pressure: Pressure, fallback: string): string {
-  if (pressure === "critical") return "Critical pressure across multiple dimensions — collection and payment cadence need attention.";
-  if (pressure === "risk")     return "Elevated pressure on cash and exposure. " + fallback;
-  if (pressure === "watch")    return "Mixed signals — minor pressure on at least one financial dimension. " + fallback;
+function pressureHeadline(pressure: Pressure, fallback: string, t: (key: string, fallback?: string) => string): string {
+  if (pressure === "critical") return t("dash.pressureHeadline.critical", "Critical pressure across multiple dimensions — collection and payment cadence need attention.");
+  if (pressure === "risk")     return t("dash.pressureHeadline.risk", "Elevated pressure on cash and exposure. {fallback}").replace("{fallback}", fallback);
+  if (pressure === "watch")    return t("dash.pressureHeadline.watch", "Mixed signals — minor pressure on at least one financial dimension. {fallback}").replace("{fallback}", fallback);
   return fallback;
 }
 
@@ -1000,26 +1007,34 @@ type IntelligenceCard = {
   icon: React.ReactNode;
 };
 
-function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, currency: string) {
+function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, currency: string, t: (key: string, fallback?: string) => string) {
   if (!kpi) {
     return {
-      headline: "Loading executive view…",
+      headline: t("dash.intel.loading", "Loading executive view…"),
       cards: [] as IntelligenceCard[],
     };
   }
-  const periodLabel = period === "week" ? "this week" : period === "quarter" ? "this quarter" : "this year";
+  const periodLabel = period === "week" ? t("dash.intel.thisWeek", "this week") : period === "quarter" ? t("dash.intel.thisQuarter", "this quarter") : t("dash.intel.thisYear", "this year");
   const hasActivity = (kpi.total_revenue ?? 0) > 0 || (kpi.total_expenses ?? 0) > 0;
 
   let headline: string;
   if (!hasActivity) {
-    headline = "No financial activity recorded yet — start logging orders, expenses, and payments to see the executive view.";
+    headline = t("dash.intel.noActivity", "No financial activity recorded yet — start logging orders, expenses, and payments to see the executive view.");
   } else if (kpi.health_status === "stress") {
-    headline = `Business is under stress ${periodLabel}. ${kpi.health_reasons[0] ?? ""}`.trim();
+    headline = t("dash.intel.stress", "Business is under stress {period}. {reason}")
+      .replace("{period}", periodLabel)
+      .replace("{reason}", kpi.health_reasons[0] ?? "").trim();
   } else if (kpi.health_status === "watch") {
-    headline = `Mixed signals ${periodLabel}. ${kpi.health_reasons[0] ?? ""}`.trim();
+    headline = t("dash.intel.mixed", "Mixed signals {period}. {reason}")
+      .replace("{period}", periodLabel)
+      .replace("{reason}", kpi.health_reasons[0] ?? "").trim();
   } else {
     const margin = kpi.gross_margin_pct ?? 0;
-    headline = `Healthy ${periodLabel} · Net profit ${formatCompact(kpi.net_profit)} ${currency} · Gross margin ${margin.toFixed(1)}%.`;
+    headline = t("dash.intel.healthy", "Healthy {period} · Net profit {value} {ccy} · Gross margin {pct}%.")
+      .replace("{period}", periodLabel)
+      .replace("{value}", formatCompact(kpi.net_profit))
+      .replace("{ccy}", currency)
+      .replace("{pct}", margin.toFixed(1));
   }
 
   const cards: IntelligenceCard[] = [];
@@ -1028,23 +1043,29 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
 
   cards.push({
     icon: <RrIcon name="wallet" size={16} />,
-    title: "Cash velocity",
+    title: t("dash.card.cashVelocity", "Cash velocity"),
     description:
       cashNet >= 0
-        ? `Cash in exceeds cash out by ${fmtMoney(cashNet, currency, { compact: true })} ${periodLabel}.`
-        : `Cash out exceeds cash in by ${fmtMoney(Math.abs(cashNet), currency, { compact: true })} ${periodLabel} — watch the bank balance.`,
-    chip: cashNet >= 0 ? "Positive" : "Negative",
+        ? t("dash.card.cashVelocityPos", "Cash in exceeds cash out by {amount} {period}.")
+            .replace("{amount}", fmtMoney(cashNet, currency, { compact: true }))
+            .replace("{period}", periodLabel)
+        : t("dash.card.cashVelocityNeg", "Cash out exceeds cash in by {amount} {period} — watch the bank balance.")
+            .replace("{amount}", fmtMoney(Math.abs(cashNet), currency, { compact: true }))
+            .replace("{period}", periodLabel),
+    chip: cashNet >= 0 ? t("dash.card.positive", "Positive") : t("dash.card.negative", "Negative"),
     severity: cashNet >= 0 ? "positive" : "risk",
   });
 
   if (kpi.accounts_receivable > 0 || kpi.total_revenue > 0) {
     cards.push({
       icon: <RrIcon name="arrow-down-left" size={16} />,
-      title: "Collections on track",
+      title: t("dash.card.collections", "Collections on track"),
       description: kpi.accounts_receivable > 0
-        ? `${fmtMoney(kpi.accounts_receivable, currency, { compact: true })} still to collect from customers. Customer payments cover ${collectionPct.toFixed(0)}% of revenue so far.`
-        : "All issued orders have been fully collected.",
-      chip: kpi.accounts_receivable === 0 ? "Clear" : collectionPct >= 70 ? "On track" : "Lagging",
+        ? t("dash.card.collectionsBody", "{amount} still to collect from customers. Customer payments cover {pct}% of revenue so far.")
+            .replace("{amount}", fmtMoney(kpi.accounts_receivable, currency, { compact: true }))
+            .replace("{pct}", collectionPct.toFixed(0))
+        : t("dash.card.collectionsClear", "All issued orders have been fully collected."),
+      chip: kpi.accounts_receivable === 0 ? t("dash.card.clear", "Clear") : collectionPct >= 70 ? t("dash.card.onTrack", "On track") : t("dash.card.lagging", "Lagging"),
       severity: kpi.accounts_receivable === 0
         ? "positive"
         : collectionPct >= 70 ? "neutral"
@@ -1058,11 +1079,13 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
     const apSevere = kpi.accounts_receivable > 0 && kpi.accounts_payable > kpi.accounts_receivable * 2;
     cards.push({
       icon: <RrIcon name="arrow-up-right" size={16} />,
-      title: "Supplier liabilities",
+      title: t("dash.card.supplierLiab", "Supplier liabilities"),
       description: apHeavy
-        ? `${fmtMoney(kpi.accounts_payable, currency, { compact: true })} owed to suppliers — exceeds outstanding receivables.`
-        : `${fmtMoney(kpi.accounts_payable, currency, { compact: true })} owed to suppliers + unpaid bills.`,
-      chip: apSevere ? "Critical" : apHeavy ? "Heavy" : "Manageable",
+        ? t("dash.card.supplierLiabHeavy", "{amount} owed to suppliers — exceeds outstanding receivables.")
+            .replace("{amount}", fmtMoney(kpi.accounts_payable, currency, { compact: true }))
+        : t("dash.card.supplierLiabNorm", "{amount} owed to suppliers + unpaid bills.")
+            .replace("{amount}", fmtMoney(kpi.accounts_payable, currency, { compact: true })),
+      chip: apSevere ? t("dash.card.critical", "Critical") : apHeavy ? t("dash.card.heavy", "Heavy") : t("dash.card.manageable", "Manageable"),
       severity: apSevere ? "critical" : apHeavy ? "watch" : "neutral",
     });
   }
@@ -1070,13 +1093,13 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
   const margin = kpi.gross_margin_pct ?? 0;
   cards.push({
     icon: <RrIcon name="shield-check" size={16} />,
-    title: "Margin",
+    title: t("dash.card.margin", "Margin"),
     description:
-      margin >= 30 ? `Gross margin of ${margin.toFixed(1)}% is comfortably above the 30% benchmark.`
-      : margin >= 15 ? `Gross margin of ${margin.toFixed(1)}% is healthy but leaves room to improve.`
-      : margin > 0 ? `Gross margin compressed to ${margin.toFixed(1)}% — review supplier costs.`
-      : `Gross margin is negative this period — revenue isn't covering supplier costs.`,
-    chip: margin >= 30 ? "Strong" : margin >= 15 ? "Healthy" : margin > 0 ? "Compressed" : "Loss",
+      margin >= 30 ? t("dash.card.marginStrong", "Gross margin of {pct}% is comfortably above the 30% benchmark.").replace("{pct}", margin.toFixed(1))
+      : margin >= 15 ? t("dash.card.marginHealthy", "Gross margin of {pct}% is healthy but leaves room to improve.").replace("{pct}", margin.toFixed(1))
+      : margin > 0 ? t("dash.card.marginCompressed", "Gross margin compressed to {pct}% — review supplier costs.").replace("{pct}", margin.toFixed(1))
+      : t("dash.card.marginNeg", "Gross margin is negative this period — revenue isn't covering supplier costs."),
+    chip: margin >= 30 ? t("dash.card.strong", "Strong") : margin >= 15 ? t("dash.card.healthy", "Healthy") : margin > 0 ? t("dash.card.compressed", "Compressed") : t("dash.card.loss", "Loss"),
     severity: margin >= 30 ? "positive" : margin >= 15 ? "neutral" : margin > 0 ? "watch" : "risk",
   });
 
@@ -1086,9 +1109,12 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
     if (share >= 40) {
       cards.push({
         icon: <RrIcon name="info" size={16} />,
-        title: "Revenue concentration",
-        description: `${topOrder.customer_name || "Top customer"} accounts for ${share.toFixed(0)}% of revenue ${periodLabel}.`,
-        chip: share >= 60 ? "Critical concentration" : "Concentration risk",
+        title: t("dash.card.revConc", "Revenue concentration"),
+        description: t("dash.card.revConcBody", "{name} accounts for {pct}% of revenue {period}.")
+          .replace("{name}", topOrder.customer_name || t("dash.card.topCustomer", "Top customer"))
+          .replace("{pct}", share.toFixed(0))
+          .replace("{period}", periodLabel),
+        chip: share >= 60 ? t("dash.card.concCrit", "Critical concentration") : t("dash.card.concRisk", "Concentration risk"),
         severity: share >= 60 ? "risk" : "watch",
       });
     }
@@ -1098,9 +1124,12 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
   if (topCat && topCat.share_pct >= 50) {
     cards.push({
       icon: <RrIcon name="receipt" size={16} />,
-      title: "Expense concentration",
-      description: `${topCat.name} is ${topCat.share_pct.toFixed(0)}% of all operating spend ${periodLabel}.`,
-      chip: "Watch",
+      title: t("dash.card.expConc", "Expense concentration"),
+      description: t("dash.card.expConcBody", "{name} is {pct}% of all operating spend {period}.")
+        .replace("{name}", topCat.name)
+        .replace("{pct}", topCat.share_pct.toFixed(0))
+        .replace("{period}", periodLabel),
+      chip: t("dash.card.watch", "Watch"),
       severity: "watch",
     });
   }
@@ -1118,6 +1147,7 @@ function buildIntelligence(kpi: DashboardKpi | null, period: DashboardPeriod, cu
 function buildWorkflowItems(
   kpi: DashboardKpi | null,
   priorities: ReturnType<typeof prioritiseWorkflow>,
+  t: (key: string, fallback?: string) => string,
 ): WorkflowItem[] {
   const arAmount = kpi?.accounts_receivable ?? 0;
   const apAmount = kpi?.accounts_payable ?? 0;
@@ -1132,13 +1162,13 @@ function buildWorkflowItems(
           : "warning";
         return {
           key,
-          label: "Follow up collection",
+          label: t("workflow.followUp", "Follow up collection"),
           hint: pressureLabel,
           icon: <RrIcon name="arrow-down-left" size={13} />,
           href: "/finance/customers",
           badge: arAmount > 0
             ? { text: formatCompact(arAmount), tone: pressureTone }
-            : { text: "Clear", tone: "positive" },
+            : { text: t("workflow.clear", "Clear"), tone: "positive" },
         };
       }
       case "pay-suppliers": {
@@ -1149,33 +1179,33 @@ function buildWorkflowItems(
           : "warning";
         return {
           key,
-          label: "Pay suppliers",
+          label: t("workflow.paySuppliers", "Pay suppliers"),
           hint: pressureLabel,
           icon: <RrIcon name="arrow-up-right" size={13} />,
           href: "/finance/suppliers",
           badge: apAmount > 0
             ? { text: formatCompact(apAmount), tone: pressureTone }
-            : { text: "Clear", tone: "positive" },
+            : { text: t("workflow.clear", "Clear"), tone: "positive" },
         };
       }
       case "record-payment":
         return {
-          key, label: "Record payment", hint: pressureLabel,
+          key, label: t("workflow.recordPayment", "Record payment"), hint: pressureLabel,
           icon: <RrIcon name="wallet" size={13} />, href: "/finance/payments",
         };
       case "add-expense":
         return {
-          key, label: "Add expense", hint: pressureLabel,
+          key, label: t("workflow.addExpense", "Add expense"), hint: pressureLabel,
           icon: <RrIcon name="receipt" size={13} />, href: "/expenses",
         };
       case "new-order":
         return {
-          key, label: "New order", hint: pressureLabel,
+          key, label: t("workflow.newOrder", "New order"), hint: pressureLabel,
           icon: <RrIcon name="plus" size={13} />, href: "/finance/orders",
         };
       case "reminders":
         return {
-          key, label: "Reminders", hint: pressureLabel,
+          key, label: t("workflow.reminders", "Reminders"), hint: pressureLabel,
           icon: <RrIcon name="clock" size={13} />, href: "/finance/notifications",
         };
     }

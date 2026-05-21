@@ -19,6 +19,8 @@ import { fmtPct } from "@/lib/finance/calc";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 import RrIcon from "@/components/ui/RrIcon";
 import type { DashboardKpi } from "@/lib/finance/types";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 export function ProfitFlow({
   revenue, supplierCost, expenses, taxRefund, finCharges, gross, net, currency,
@@ -26,14 +28,15 @@ export function ProfitFlow({
   revenue: number; supplierCost: number; expenses: number; taxRefund: number;
   finCharges: number; gross: number; net: number; currency: string;
 }) {
+  const { t } = useTranslation(financeT);
   const steps: { label: string; value: number; sign: 1 | -1; total?: boolean; tone: Tone; helpId: string }[] = [
-    { label: "Revenue",        helpId: "finance.revenue",        value: revenue,      sign: 1,  tone: "positive" },
-    { label: "Supplier cost",  helpId: "finance.supplierCost",   value: supplierCost, sign: -1, tone: "neutral" },
-    { label: "Gross profit",   helpId: "finance.grossProfit",    value: gross,        sign: 1,  total: true, tone: gross >= 0 ? "info" : "negative" },
-    { label: "Order expenses", helpId: "finance.orderExpenses",  value: expenses,     sign: -1, tone: "neutral" },
-    { label: "Tax refund",     helpId: "finance.taxRefund",      value: taxRefund,    sign: 1,  tone: "neutral" },
-    { label: "Bank charges",   helpId: "finance.bankCharges",    value: finCharges,   sign: -1, tone: "neutral" },
-    { label: "Net profit",     helpId: "finance.netProfit",      value: net,          sign: 1,  total: true, tone: net >= 0 ? "info" : "negative" },
+    { label: t("profitFlow.revenue", "Revenue"),        helpId: "finance.revenue",        value: revenue,      sign: 1,  tone: "positive" },
+    { label: t("profitFlow.supplierCost", "Supplier cost"),  helpId: "finance.supplierCost",   value: supplierCost, sign: -1, tone: "neutral" },
+    { label: t("profitFlow.grossProfit", "Gross profit"),   helpId: "finance.grossProfit",    value: gross,        sign: 1,  total: true, tone: gross >= 0 ? "info" : "negative" },
+    { label: t("profitFlow.orderExpenses", "Order expenses"), helpId: "finance.orderExpenses",  value: expenses,     sign: -1, tone: "neutral" },
+    { label: t("profitFlow.taxRefund", "Tax refund"),     helpId: "finance.taxRefund",      value: taxRefund,    sign: 1,  tone: "neutral" },
+    { label: t("profitFlow.bankCharges", "Bank charges"),   helpId: "finance.bankCharges",    value: finCharges,   sign: -1, tone: "neutral" },
+    { label: t("profitFlow.netProfit", "Net profit"),     helpId: "finance.netProfit",      value: net,          sign: 1,  total: true, tone: net >= 0 ? "info" : "negative" },
   ];
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -70,11 +73,12 @@ export function ProfitFlow({
 }
 
 export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
+  const { t } = useTranslation(financeT);
   const rows = kpi?.top_orders ?? [];
   return (
-    <ChartCard title="Top profitable orders" subtitle="Ranked by net profit this period." helpId="finance.topOrders">
+    <ChartCard title={t("topOrders.title", "Top profitable orders")} subtitle={t("topOrders.subtitle", "Ranked by net profit this period.")} helpId="finance.topOrders">
       {rows.length === 0 ? (
-        <div className="py-6 text-center text-sm text-gray-500">No orders yet for this period.</div>
+        <div className="py-6 text-center text-sm text-gray-500">{t("topOrders.empty", "No orders yet for this period.")}</div>
       ) : (
         <ol className="space-y-1.5">
           {rows.map((o, idx) => (
@@ -105,11 +109,12 @@ export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; cur
 }
 
 export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null; currency: string }) {
+  const { t } = useTranslation(financeT);
   const rows = kpi?.top_expense_categories ?? [];
   return (
-    <ChartCard title="Top expense categories" subtitle="Biggest spend buckets this period." helpId="finance.topCategories">
+    <ChartCard title={t("topCategories.title", "Top expense categories")} subtitle={t("topCategories.subtitle", "Biggest spend buckets this period.")} helpId="finance.topCategories">
       {rows.length === 0 ? (
-        <div className="py-6 text-center text-sm text-gray-500">No expenses recorded for this period.</div>
+        <div className="py-6 text-center text-sm text-gray-500">{t("topCategories.empty", "No expenses recorded for this period.")}</div>
       ) : (
         <ul className="space-y-1.5">
           {rows.map((c) => {
@@ -123,7 +128,7 @@ export function TopCategoriesCard({ kpi, currency }: { kpi: DashboardKpi | null;
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium tabular-nums">{formatCompact(c.total)} {currency}</div>
-                    <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? "item" : "items"}</div>
+                    <div className="text-[10px] text-gray-500">{c.share_pct.toFixed(0)}% · {c.count} {c.count === 1 ? t("topCategories.itemOne", "item") : t("topCategories.itemMany", "items")}</div>
                   </div>
                 </div>
                 <div className="mt-2 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">

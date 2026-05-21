@@ -33,6 +33,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { useTranslation, type Lang } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 
 type Tab = "income" | "balance" | "cashflow";
 type Granularity = "week" | "quarter" | "year";
@@ -80,18 +82,22 @@ function fmtSigned(n: number) {
   const abs = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
   return n < 0 ? `(${abs})` : abs;
 }
-function fmtPeriodLabel(iso: string): string {
-  /* "2026-08-13" → "Aug 13" */
+function localeOf(lang: Lang): string {
+  return lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en-US";
+}
+function fmtPeriodLabel(iso: string, lang: Lang): string {
+  /* "2026-08-13" → "Aug 13" (localized). */
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return d.toLocaleDateString(localeOf(lang), { month: "short", day: "numeric" });
   } catch { return iso; }
 }
 
 /* ── Chromeless body — used by FinanceHome (/finance) ────────────────── */
 
 export function StatementsDashboard() {
+  const { t, lang } = useTranslation(financeT);
   const [tab, setTab] = useState<Tab>("income");
   const [granularity, setGranularity] = useState<Granularity>("year");
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -122,8 +128,8 @@ export function StatementsDashboard() {
   const niDelta  = priorNet !== 0 ? (netIncome - priorNet) : null;
   const niPct    = priorNet !== 0 ? ((netIncome - priorNet) / Math.abs(priorNet)) * 100 : null;
 
-  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to)       : "";
-  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to) : "";
+  const curLabel   = snap ? fmtPeriodLabel(snap.income.period.to, lang)       : "";
+  const priorLabel = snap ? fmtPeriodLabel(snap.income_prior.period.to, lang) : "";
 
   return (
     <div className="space-y-5">
@@ -137,9 +143,9 @@ export function StatementsDashboard() {
       {snap && (
         <ErpPanel className="px-5 py-6 sm:px-8 sm:py-8">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-            <KpiHero label="TOTAL REVENUE" ccy={ccy} value={totalRevenue}
+            <KpiHero label={t("visual.totalRevenue", "TOTAL REVENUE")} ccy={ccy} value={totalRevenue}
                      delta={revDelta} pct={revPct} tone="neutral" />
-            <KpiHero label="NET INCOME"    ccy={ccy} value={netIncome}
+            <KpiHero label={t("visual.netIncome", "NET INCOME")}    ccy={ccy} value={netIncome}
                      delta={niDelta}  pct={niPct}  tone={netIncome >= 0 ? "positive" : "warning"} />
           </div>
           <TrendChart trend={snap.trend} />
@@ -150,9 +156,9 @@ export function StatementsDashboard() {
       <div className="flex flex-wrap items-center justify-center gap-3">
         <PillToggle
           options={[
-            { k: "income"  , label: "Income" },
-            { k: "balance" , label: "Balance Sheet" },
-            { k: "cashflow", label: "Cash Flow" },
+            { k: "income"  , label: t("visual.tab.income", "Income") },
+            { k: "balance" , label: t("visual.tab.balance", "Balance Sheet") },
+            { k: "cashflow", label: t("visual.tab.cashflow", "Cash Flow") },
           ]}
           value={tab}
           onChange={(v) => setTab(v as Tab)}
@@ -160,9 +166,9 @@ export function StatementsDashboard() {
         <PillToggle
           size="sm"
           options={[
-            { k: "week",    label: "Week" },
-            { k: "quarter", label: "Quarter" },
-            { k: "year",    label: "Year" },
+            { k: "week",    label: t("visual.gran.week", "Week") },
+            { k: "quarter", label: t("visual.gran.quarter", "Quarter") },
+            { k: "year",    label: t("visual.gran.year", "Year") },
           ]}
           value={granularity}
           onChange={(v) => setGranularity(v as Granularity)}
@@ -170,7 +176,7 @@ export function StatementsDashboard() {
       </div>
 
       {loading && (
-        <div className="text-center text-[12px] text-gray-500">Loading statements…</div>
+        <div className="text-center text-[12px] text-gray-500">{t("visual.loading", "Loading statements…")}</div>
       )}
 
       {/* ── Statement body ──────────────────────────────────────────── */}
@@ -188,15 +194,16 @@ export function StatementsDashboard() {
 /* ── Full page wrapper — used by /finance/visual + /finance/overview ── */
 
 export default function VisualStatements() {
+  const { t } = useTranslation(financeT);
   return (
     <ErpPage
-      title="Overview"
-      subtitle="Income · Balance Sheet · Cash Flow"
+      title={t("visual.pageTitle", "Overview")}
+      subtitle={t("visual.pageSubtitle", "Income · Balance Sheet · Cash Flow")}
       icon="balance-scale-left"
       backHref="/finance"
       action={
         <Link href="/reports/statements" className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
-          <RrIcon name="newspaper" size={12} /> Print version
+          <RrIcon name="newspaper" size={12} /> {t("visual.printVersion", "Print version")}
         </Link>
       }
     >
@@ -240,30 +247,32 @@ function KpiHero({
 /* ───── Trend chart (twin bars) ───── */
 
 function TrendChart({ trend }: { trend: TrendBucket[] }) {
+  const { t } = useTranslation(financeT);
   const buckets = trend.slice(-5);
   const w = 920; const h = 170; const padL = 16; const padR = 16; const padT = 8; const padB = 26;
   const innerW = w - padL - padR; const innerH = h - padT - padB;
-  const maxY = Math.max(1, ...buckets.flatMap((t) => [Math.abs(t.revenue), Math.abs(t.net_income)]));
+  const maxY = Math.max(1, ...buckets.flatMap((tt) => [Math.abs(tt.revenue), Math.abs(tt.net_income)]));
   const gap = 14;
   const slot = innerW / Math.max(1, buckets.length);
   const barW = Math.max(8, (slot - gap) / 2);
+  const ariaLabel = `${t("visual.totalRevenue", "TOTAL REVENUE")} · ${t("visual.netIncome", "NET INCOME")}`;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-6 w-full" role="img" aria-label="Revenue and net income trend">
+    <svg viewBox={`0 0 ${w} ${h}`} className="mt-6 w-full" role="img" aria-label={ariaLabel}>
       <line x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH} stroke="rgba(255,255,255,0.08)" />
-      {buckets.map((t, i) => {
+      {buckets.map((tt, i) => {
         const xSlot = padL + i * slot;
         const xRev = xSlot + slot / 2 - barW - 2;
         const xNi  = xSlot + slot / 2 + 2;
-        const hRev = Math.max(2, (Math.abs(t.revenue)    / maxY) * innerH);
-        const hNi  = Math.max(2, (Math.abs(t.net_income) / maxY) * innerH);
-        const niColor = t.net_income >= 0 ? "rgba(180, 92, 60, 0.9)" : "rgba(229, 115, 115, 0.7)";
+        const hRev = Math.max(2, (Math.abs(tt.revenue)    / maxY) * innerH);
+        const hNi  = Math.max(2, (Math.abs(tt.net_income) / maxY) * innerH);
+        const niColor = tt.net_income >= 0 ? "rgba(180, 92, 60, 0.9)" : "rgba(229, 115, 115, 0.7)";
         return (
-          <g key={`${t.label}-${i}`}>
+          <g key={`${tt.label}-${i}`}>
             <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.88)" rx={2} />
             <rect x={xNi}  y={padT + innerH - hNi}  width={barW} height={hNi}  fill={niColor} rx={2} />
             <text x={xSlot + slot / 2} y={h - 6} fill="rgba(255,255,255,0.55)"
-                  fontSize={11} textAnchor="middle">{t.label}</text>
+                  fontSize={11} textAnchor="middle">{tt.label}</text>
           </g>
         );
       })}
@@ -305,20 +314,22 @@ function PillToggle<T extends string>({
 /* ───── Two-period table primitives (with column headers) ───── */
 
 function PeriodHeaders({ curLabel, priorLabel }: { curLabel: string; priorLabel: string }) {
+  const { t } = useTranslation(financeT);
   return (
     <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
       <span />
-      <span className="text-right">{priorLabel || "Prior"}</span>
-      <span className="text-right">{curLabel || "Current"}</span>
+      <span className="text-right">{priorLabel || t("visual.prior", "Prior")}</span>
+      <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
     </div>
   );
 }
 
 function SingleColHeader({ curLabel }: { curLabel: string }) {
+  const { t } = useTranslation(financeT);
   return (
     <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-8 border-b border-white/[0.08] pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-500">
       <span />
-      <span className="text-right">{curLabel || "Current"}</span>
+      <span className="text-right">{curLabel || t("visual.current", "Current")}</span>
     </div>
   );
 }
@@ -389,19 +400,20 @@ function MutedRow({ label }: { label: string }) {
 /* ───── Income view ───── */
 
 function IncomeView({ pl, prior, ccy, curLabel, priorLabel }: { pl: ProfitLoss; prior: ProfitLoss; ccy: string; curLabel: string; priorLabel: string }) {
+  const { t } = useTranslation(financeT);
   void ccy;
   return (
     <div>
       <PeriodHeaders curLabel={curLabel} priorLabel={priorLabel} />
 
-      <SectionTitle label="Revenues" />
-      {pl.revenue.accounts.length === 0 && <MutedRow label="No revenue posted yet." />}
+      <SectionTitle label={t("visual.section.revenues", "Revenues")} />
+      {pl.revenue.accounts.length === 0 && <MutedRow label={t("visual.emptyRev", "No revenue posted yet.")} />}
       {pl.revenue.accounts.map((a) => (
         <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.revenue, a.code)} cur={a.amount} />
       ))}
-      <TotalRow label="Total Revenues" prior={prior.revenue.amount} cur={pl.revenue.amount} strength="subtotal" />
+      <TotalRow label={t("visual.row.totalRev", "Total Revenues")} prior={prior.revenue.amount} cur={pl.revenue.amount} strength="subtotal" />
 
-      <SectionTitle label="Expenses" />
+      <SectionTitle label={t("visual.section.expenses", "Expenses")} />
       {pl.cost_of_sales.accounts.map((a) => (
         <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.cost_of_sales, a.code)} cur={a.amount} />
       ))}
@@ -409,19 +421,19 @@ function IncomeView({ pl, prior, ccy, curLabel, priorLabel }: { pl: ProfitLoss; 
         <TwoColRow key={a.account_id} label={a.name} prior={priorAccount(prior.operating_expenses, a.code)} cur={a.amount} />
       ))}
       <TotalRow
-        label="Total Expenses"
+        label={t("visual.row.totalExp", "Total Expenses")}
         prior={prior.cost_of_sales.amount + prior.operating_expenses.amount}
         cur={pl.cost_of_sales.amount + pl.operating_expenses.amount}
         strength="subtotal"
       />
 
-      <TotalRow label="Operating Income"
+      <TotalRow label={t("visual.row.opIncome", "Operating Income")}
                 prior={prior.operating_profit} cur={pl.operating_profit}
                 strength="total"
                 tone={pl.operating_profit >= 0 ? "positive" : "warning"} />
 
       <div className="mt-4" />
-      <TotalRow label="Net Income"
+      <TotalRow label={t("visual.row.netIncome", "Net Income")}
                 prior={prior.net_profit} cur={pl.net_profit}
                 strength="headline"
                 tone={pl.net_profit >= 0 ? "positive" : "warning"} />
@@ -435,37 +447,38 @@ function priorAccount(section: PLSection, code: string) {
 /* ───── Balance sheet ───── */
 
 function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; curLabel: string }) {
+  const { t } = useTranslation(financeT);
   void ccy;
   return (
     <div>
       <SingleColHeader curLabel={curLabel || bs.as_of} />
 
-      <SectionTitle label="Assets" />
+      <SectionTitle label={t("visual.section.assets", "Assets")} />
       {bs.assets.accounts.map((a) => (
         <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Assets" cur={bs.total_assets} strength="total" showPrior={false} />
+      <TotalRow label={t("visual.row.totalAssets", "Total Assets")} cur={bs.total_assets} strength="total" showPrior={false} />
 
-      <SectionTitle label="Liabilities" />
-      {bs.liabilities.accounts.length === 0 && <MutedRow label="No liabilities posted." />}
+      <SectionTitle label={t("visual.section.liabilities", "Liabilities")} />
+      {bs.liabilities.accounts.length === 0 && <MutedRow label={t("visual.emptyLiab", "No liabilities posted.")} />}
       {bs.liabilities.accounts.map((a) => (
         <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Liabilities" cur={bs.liabilities.amount} strength="subtotal" showPrior={false} />
+      <TotalRow label={t("visual.row.totalLiab", "Total Liabilities")} cur={bs.liabilities.amount} strength="subtotal" showPrior={false} />
 
-      <SectionTitle label="Equity" />
+      <SectionTitle label={t("visual.section.equity", "Equity")} />
       {bs.equity.accounts.map((a) => (
         <SingleRow key={a.code} label={a.name} amount={a.amount} />
       ))}
-      <TotalRow label="Total Equity" cur={bs.equity.amount} strength="subtotal" showPrior={false} />
+      <TotalRow label={t("visual.row.totalEquity", "Total Equity")} cur={bs.equity.amount} strength="subtotal" showPrior={false} />
 
       <div className="mt-4" />
-      <TotalRow label="Total Liabilities & Equity" cur={bs.total_liab_eq}
+      <TotalRow label={t("visual.row.totalLiabEq", "Total Liabilities & Equity")} cur={bs.total_liab_eq}
                 strength="headline"
                 tone={bs.reconciled ? "positive" : "warning"}
                 showPrior={false} />
       {!bs.reconciled && (
-        <div className="mt-2 text-[11px] text-rose-300">⚠ Balance sheet does not reconcile.</div>
+        <div className="mt-2 text-[11px] text-rose-300">{t("visual.bsMismatch", "⚠ Balance sheet does not reconcile.")}</div>
       )}
     </div>
   );
@@ -474,12 +487,13 @@ function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; cur
 /* ───── Cash flow ───── */
 
 function CashFlowView({ cf, ccy, curLabel }: { cf: CashFlow; ccy: string; curLabel: string }) {
+  const { t } = useTranslation(financeT);
   void ccy;
   return (
     <div>
       <SingleColHeader curLabel={curLabel} />
 
-      <SingleRow label="Opening cash" amount={cf.opening_cash} />
+      <SingleRow label={t("visual.row.openingCash", "Opening cash")} amount={cf.opening_cash} />
 
       {[cf.operating, cf.investing, cf.financing].map((s) => (
         <div key={s.label}>
@@ -488,14 +502,14 @@ function CashFlowView({ cf, ccy, curLabel }: { cf: CashFlow; ccy: string; curLab
           {s.lines.map((l, i) => (
             <SingleRow key={`${s.label}-${i}`} label={l.label} amount={l.amount} />
           ))}
-          <TotalRow label={`${s.label} subtotal`} cur={s.amount} strength="subtotal" showPrior={false} />
+          <TotalRow label={t("visual.row.subtotal", "{name} subtotal").replace("{name}", s.label)} cur={s.amount} strength="subtotal" showPrior={false} />
         </div>
       ))}
 
-      <TotalRow label="Net change in cash" cur={cf.net_change} strength="total" showPrior={false} />
+      <TotalRow label={t("visual.row.netChange", "Net change in cash")} cur={cf.net_change} strength="total" showPrior={false} />
 
       <div className="mt-4" />
-      <TotalRow label="Closing cash" cur={cf.closing_cash}
+      <TotalRow label={t("visual.row.closingCash", "Closing cash")} cur={cf.closing_cash}
                 strength="headline"
                 tone={cf.reconciled ? "positive" : "warning"}
                 showPrior={false} />

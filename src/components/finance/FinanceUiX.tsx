@@ -22,6 +22,8 @@ import { fmtMoney, fmtPct } from "@/lib/finance/calc";
 import GuidanceTip from "@/components/ui/GuidanceTip";
 import RrIcon from "@/components/ui/RrIcon";
 import { type Tone, TONE_TEXT, TONE_CHIP_BG } from "@/components/finance/tone";
+import { useTranslation } from "@/lib/i18n";
+import { financeT } from "@/lib/translations/finance";
 /* Phase Fix #3 — chart primitives + formatCompact extracted to
    ./charts.tsx so this file no longer drags 540 lines of SVG math
    along with its card / aging / timeline components. The
@@ -577,14 +579,15 @@ export function ModeToggle({
   value: FinanceMode;
   onChange: (v: FinanceMode) => void;
 }) {
+  const { t } = useTranslation(financeT);
   const opts: { key: FinanceMode; label: string; hint: string }[] = [
-    { key: "operational", label: "Operational", hint: "Daily ops" },
-    { key: "executive",   label: "Executive",   hint: "Strategy"  },
+    { key: "operational", label: t("uix.mode.operational", "Operational"), hint: t("uix.mode.dailyOps", "Daily ops") },
+    { key: "executive",   label: t("uix.mode.executive", "Executive"),     hint: t("uix.mode.strategy", "Strategy")  },
   ];
   return (
     <div
       role="tablist"
-      aria-label="Finance view mode"
+      aria-label={t("uix.mode.aria", "Finance view mode")}
       className="relative inline-flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1 backdrop-blur-md"
     >
       {opts.map((o) => {
@@ -660,6 +663,7 @@ export function LiquidityMeter({
   d60: number;
   inflowShare: number;     // 0..1 — share of inflow vs outflow
 }) {
+  const { t } = useTranslation(financeT);
   const inflowPct = Math.max(4, Math.min(96, inflowShare * 100));
   /* Tone per window */
   const tone = (v: number): string =>
@@ -667,8 +671,8 @@ export function LiquidityMeter({
   return (
     <div className="rounded-2xl border border-white/[0.05] bg-white/[0.018] p-4">
       <div className="flex items-baseline justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Liquidity pressure</div>
-        <div className="text-[10px] text-gray-500">Inflow {inflowPct.toFixed(0)}%</div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{t("uix.liquidity.pressure", "Liquidity pressure")}</div>
+        <div className="text-[10px] text-gray-500">{t("uix.liquidity.inflow", "Inflow {pct}%").replace("{pct}", inflowPct.toFixed(0))}</div>
       </div>
       {/* Inflow-vs-outflow ratio bar */}
       <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-rose-500/[0.18]">
@@ -719,6 +723,7 @@ export function AgingTable({
   buckets: AgingBucketView[];
   currency?: string;
 }) {
+  const { t } = useTranslation(financeT);
   const total = buckets.reduce((s, b) => s + b.amount, 0);
   const totalCount = buckets.reduce((s, b) => s + b.count, 0);
   const max = Math.max(1, ...buckets.map((b) => b.amount));
@@ -732,7 +737,7 @@ export function AgingTable({
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
             <span className="text-[20px] font-medium tabular-nums tracking-tight text-[var(--text-primary)]">{formatCompact(total)}</span>
-            <span className="text-[11px] text-gray-500">{currency} · {totalCount} {totalCount === 1 ? "line" : "lines"}</span>
+            <span className="text-[11px] text-gray-500">{currency} · {totalCount} {totalCount === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")}</span>
           </div>
         </div>
         {totalLabel && <span className="text-[10px] text-gray-600">{totalLabel}</span>}
@@ -750,7 +755,7 @@ export function AgingTable({
             <div key={b.key} className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-2 py-2">
               <div className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{b.label}</div>
               <div className={`mt-1 text-[13px] font-medium tabular-nums tracking-tight ${valueCls}`}>{formatCompact(b.amount)}</div>
-              <div className="mt-1 text-[9px] text-gray-600">{b.count} {b.count === 1 ? "line" : "lines"} · {share.toFixed(0)}%</div>
+              <div className="mt-1 text-[9px] text-gray-600">{b.count} {b.count === 1 ? t("uix.aging.line", "line") : t("uix.aging.lines", "lines")} · {share.toFixed(0)}%</div>
               <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
                 <div className={`h-full ${barCls}`} style={{ width: `${Math.max(3, (b.amount / max) * 100)}%` }} />
               </div>
@@ -791,6 +796,7 @@ export function TimelineStrip({
   currency?: string;
   max?: number;
 }) {
+  const { t } = useTranslation(financeT);
   const top = events.slice(0, max);
   const overdueCount = events.filter((e) => e.state === "overdue").length;
   const dueSoonCount = events.filter((e) => e.state === "due_soon").length;
@@ -801,28 +807,30 @@ export function TimelineStrip({
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{title}</div>
           <div className="mt-0.5 text-[11px] text-gray-500">
             {overdueCount > 0 && (
-              <span className="mr-2 text-rose-300/90">{overdueCount} overdue</span>
+              <span className="mr-2 text-rose-300/90">{t("uix.timeline.overdueN", "{n} overdue").replace("{n}", String(overdueCount))}</span>
             )}
             {dueSoonCount > 0 && (
-              <span className="mr-2 text-amber-300/90">{dueSoonCount} due ≤ 7d</span>
+              <span className="mr-2 text-amber-300/90">{t("uix.timeline.dueSoonN", "{n} due ≤ 7d").replace("{n}", String(dueSoonCount))}</span>
             )}
-            <span className="text-gray-600">{events.length} {events.length === 1 ? "line" : "lines"} on radar</span>
+            <span className="text-gray-600">{(events.length === 1
+              ? t("uix.timeline.onRadarOne", "{n} line on radar")
+              : t("uix.timeline.onRadar", "{n} lines on radar")).replace("{n}", String(events.length))}</span>
           </div>
         </div>
         <span className="text-[10px] text-gray-600">{direction === "incoming" ? "AR" : "AP"}</span>
       </div>
       {top.length === 0 ? (
         <div className="mt-3 flex h-20 items-center justify-center text-[11px] text-gray-500">
-          Nothing scheduled on this horizon.
+          {t("uix.timeline.nothingHere", "Nothing scheduled on this horizon.")}
         </div>
       ) : (
         <ul className="mt-2.5 divide-y divide-white/[0.04]">
           {top.map((e) => {
             const stateCls =
-              e.state === "overdue"  ? { dot: "bg-rose-400",  text: "text-rose-300/90",  label: "Overdue" }
-            : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-200/90", label: "≤ 7 d"   }
-            : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-gray-400",     label: "Settled" }
-            :                          { dot: "bg-white/50",  text: "text-gray-300",     label: e.daysFromNow >= 9_000 ? "Unscheduled" : `${e.daysFromNow}d` };
+              e.state === "overdue"  ? { dot: "bg-rose-400",  text: "text-rose-300/90",  label: t("uix.event.overdue", "Overdue") }
+            : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-200/90", label: t("uix.timeline.dueShort", "≤ 7 d") }
+            : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-gray-400",     label: t("uix.event.settled", "Settled") }
+            :                          { dot: "bg-white/50",  text: "text-gray-300",     label: e.daysFromNow >= 9_000 ? t("uix.event.unscheduled", "Unscheduled") : `${e.daysFromNow}d` };
             return (
               <li key={e.key} className="flex items-center gap-3 py-2 transition-colors hover:bg-white/[0.02]">
                 <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${stateCls.dot}`} />
