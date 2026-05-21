@@ -500,88 +500,49 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
 
 /* Headline — Net Income / Closing cash.
 
-   Uses the Hub's canonical "DisplayKpi" pattern from
-   FinanceDashboardUi (the L1 dominant-number treatment used on the
-   Finance Dashboard for Net Profit, Revenue, Cash Position, etc.):
+   Stays inside the parent statement grid so columns line up exactly
+   with the table above. Each of the three cells (label / prior /
+   current) carries its share of a tonal border so together they
+   read as one bordered row — the visual cue that says "this is the
+   bottom line" without breaking the column structure.
 
-     · Tonal hairline accent rule at the top-left (h-px w-10, the
-       Hub's "this is a dominant metric" cue).
-     · Eyebrow label below the rule (TYPE.eyebrow tokens).
-     · Display value rendered at 40 px font-medium tabular-nums
-       (TYPE.display) in the tonal text colour (TONE_TEXT.positive /
-       negative). This is the SAME treatment used for the four lead
-       KPIs on /finance/intelligence, so the bottom line of the
-       statement feels native to the rest of the Hub.
-     · Optional prior-vs-current delta line as a caption.
+       ┌─────────────────────────────────────────────────────┐
+       │  NET INCOME                47,550        (5,850)    │
+       └─────────────────────────────────────────────────────┘
 
-   The headline spans the FULL grid width (col-span) instead of
-   sharing three column cells with the rest of the table — at this
-   typographic scale the value doesn't need to align with the
-   smaller numbers above (those are summed into this figure anyway).
-   Visually breaks the bottom line out as the page's primary stat. */
+   Border colour follows the value tone (emerald positive / rose
+   negative). Slightly bumped type (15 px label, 18 px value) so the
+   row clearly outranks the regular table rows without overwhelming
+   the page. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
-  /* Hub DisplayKpi tokens — copied verbatim from FinanceDashboardUi
-     so any future refactor of the Hub design language picks this up
-     too. */
-  const TYPE_DISPLAY = "text-[40px] font-medium leading-[1.05] tracking-[-0.02em] tabular-nums font-mono";
-  const TYPE_EYEBROW = "text-[10px] font-semibold leading-none uppercase tracking-[0.18em] text-[var(--text-dim)]";
-
-  const toneText =
+  const valueTone =
     tone === "positive" ? "text-emerald-200" :
     tone === "warning"  ? "text-rose-200"    :
                           "text-[var(--text-primary)]";
-  const toneAccent =
-    tone === "positive" ? "bg-emerald-300/55" :
-    tone === "warning"  ? "bg-rose-300/55"    :
-                          "bg-white/30";
+  /* Border colour — kept calm (around 30% alpha) so it frames the
+     row without competing with the rest of the statement. */
+  const borderTone =
+    tone === "positive" ? "border-emerald-300/35" :
+    tone === "warning"  ? "border-rose-300/35"    :
+                          "border-[var(--border-color)]";
 
-  /* Delta — period-over-period change vs prior. Only rendered when
-     comparing periods AND the prior has enough magnitude to make a
-     percentage meaningful. */
-  const deltaValue = showPrior && prior !== undefined ? cur - prior : null;
-  const deltaPct   = showPrior && prior !== undefined && Math.abs(prior) > 0.5
-    ? ((cur - prior) / Math.abs(prior)) * 100
-    : null;
-  const deltaUp   = (deltaValue ?? 0) >= 0;
-  const deltaCls  = deltaValue == null
-    ? "text-[var(--text-dim)]"
-    : deltaUp ? "text-emerald-300/85" : "text-rose-300/85";
-
-  const span = showPrior ? "col-span-3" : "col-span-2";
+  /* Each cell has top + bottom border. Leading cell adds the left
+     border + leading rounded corners; trailing cell adds the right
+     border + trailing rounded corners. Together they look like ONE
+     bordered row surrounding all three columns. */
+  const baseCls = `py-4 text-[15px] font-bold uppercase tracking-[0.05em] border-y ${borderTone}`;
+  const labelCls = `${baseCls} ps-5 border-s rounded-s-md text-[var(--text-primary)]`;
+  const priorCls = `${baseCls} text-right font-mono tabular-nums text-[var(--text-secondary)] pe-4 text-[16px] font-bold`;
+  const curCls   = `${baseCls} pe-5 border-e rounded-e-md text-right font-mono tabular-nums ${valueTone} text-[18px] font-bold`;
 
   return (
     <>
-      {/* Strong divider above — gives the headline room to breathe */}
-      <Divider showPrior={showPrior} weight="color" className="mt-6" />
+      {/* Breathing space above the bordered row */}
+      <div aria-hidden className={`${showPrior ? "col-span-3" : "col-span-2"} h-5`} />
 
-      {/* DisplayKpi-style headline block — full grid width */}
-      <div className={`${span} relative pt-4`}>
-        {/* Tonal hairline accent — the Hub L1 KPI signature */}
-        <div aria-hidden className={`absolute left-0 top-0 h-px w-10 ${toneAccent}`} />
-
-        <div className="flex items-end justify-between gap-6 flex-wrap">
-          <div className="min-w-0">
-            <div className={TYPE_EYEBROW}>{label}</div>
-            {deltaValue !== null && (
-              <div className={`mt-2 text-[12px] font-medium tabular-nums ${deltaCls}`}>
-                {deltaUp ? "▲" : "▼"} {fmtSigned(Math.abs(deltaValue))}
-                {deltaPct !== null && ` · ${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}%`}
-                <span className="text-[var(--text-dim)]"> vs prior</span>
-              </div>
-            )}
-          </div>
-
-          <div className="text-right">
-            <div className={`${TYPE_DISPLAY} ${toneText}`}>{fmtSigned(cur)}</div>
-            {showPrior && (
-              <div className="mt-1.5 text-[11px] tabular-nums text-[var(--text-dim)]">
-                <span className="font-semibold text-[var(--text-secondary)]">{fmtSigned(prior ?? 0)}</span>
-                <span className="ms-1.5">prior</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <div className={labelCls}>{label}</div>
+      {showPrior && <div className={priorCls}>{fmtSigned(prior ?? 0)}</div>}
+      <div className={curCls}>{fmtSigned(cur)}</div>
     </>
   );
 }
