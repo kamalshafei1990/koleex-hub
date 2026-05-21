@@ -37,7 +37,7 @@ import { useTranslation, type Lang } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 
 type Tab = "income" | "balance" | "cashflow";
-type Granularity = "week" | "quarter" | "year";
+type Granularity = "week" | "month" | "quarter" | "year";
 
 interface PLAccountLine { account_id: string; code: string; name: string; amount: number }
 interface PLSection { label: string; amount: number; accounts: PLAccountLine[] }
@@ -166,9 +166,10 @@ export function StatementsDashboard() {
         <PillToggle
           size="sm"
           options={[
-            { k: "week",    label: t("visual.gran.week", "Week") },
+            { k: "week",    label: t("visual.gran.week",    "Week") },
+            { k: "month",   label: t("visual.gran.month",   "Month") },
             { k: "quarter", label: t("visual.gran.quarter", "Quarter") },
-            { k: "year",    label: t("visual.gran.year", "Year") },
+            { k: "year",    label: t("visual.gran.year",    "Year") },
           ]}
           value={granularity}
           onChange={(v) => setGranularity(v as Granularity)}

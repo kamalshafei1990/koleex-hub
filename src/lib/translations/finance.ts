@@ -965,6 +965,7 @@ export const financeT: Translations = {
   "visual.tab.balance":        { en: "Balance Sheet",                   zh: "资产负债表",              ar: "الميزانية" },
   "visual.tab.cashflow":       { en: "Cash Flow",                       zh: "现金流量表",              ar: "التدفقات النقدية" },
   "visual.gran.week":          { en: "Week",                            zh: "周",                      ar: "أسبوع" },
+  "visual.gran.month":         { en: "Month",                           zh: "月",                      ar: "شهر" },
   "visual.gran.quarter":       { en: "Quarter",                         zh: "季度",                    ar: "ربع" },
   "visual.gran.year":          { en: "Year",                            zh: "年",                      ar: "سنة" },
   "visual.loading":            { en: "Loading statements…",             zh: "正在加载报表…",            ar: "جارٍ تحميل القوائم…" },

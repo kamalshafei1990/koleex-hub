@@ -12,8 +12,8 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const granularity = (url.searchParams.get("granularity") ?? "year") as Granularity;
-  if (!["week", "quarter", "year"].includes(granularity)) {
-    return NextResponse.json({ error: "granularity must be week | quarter | year" }, { status: 400 });
+  if (!["week", "month", "quarter", "year"].includes(granularity)) {
+    return NextResponse.json({ error: "granularity must be week | month | quarter | year" }, { status: 400 });
   }
   try {
     const snapshot = await buildVisualSnapshot(auth.tenant_id, granularity);

@@ -115,7 +115,6 @@ async function aggregatePostedLines(tenantId: string, period?: Period): Promise<
     });
     throw new Error(`aggregatePostedLines failed: ${error.message}`);
   }
-  console.log("[aggregatePostedLines]", { tenantId, period, rowCount: (data ?? []).length });
 
   const aggMap = new Map<string, AggRow>();
   for (const a of accounts) {

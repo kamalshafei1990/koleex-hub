@@ -12,7 +12,7 @@ import { buildProfitLoss, buildCashFlow, type Period, type ProfitLoss, type Cash
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import { getSupabaseServer } from "@/lib/server/supabase-server";
 
-export type Granularity = "week" | "quarter" | "year";
+export type Granularity = "week" | "month" | "quarter" | "year";
 
 export interface TrendBucket {
   label: string;       // "Q1 2026" / "Apr 2" / "2026"
@@ -52,6 +52,8 @@ export interface VisualSnapshot {
 function endOfDay(d: Date) { d.setUTCHours(23, 59, 59, 999); return d; }
 function todayIso() { return new Date().toISOString().slice(0, 10); }
 
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function periodFor(granularity: Granularity, base: Date): { from: string; to: string; label: string } {
   const d = new Date(base);
   if (granularity === "week") {
@@ -59,6 +61,18 @@ function periodFor(granularity: Granularity, base: Date): { from: string; to: st
     const to = d.toISOString().slice(0, 10);
     const start = new Date(d); start.setUTCDate(start.getUTCDate() - 6);
     return { from: start.toISOString().slice(0, 10), to, label: to.slice(5) };
+  }
+  if (granularity === "month") {
+    /* Whole calendar month containing `base`. */
+    const m = d.getUTCMonth();
+    const y = d.getUTCFullYear();
+    const start = new Date(Date.UTC(y, m, 1));
+    const end   = new Date(Date.UTC(y, m + 1, 0));
+    return {
+      from: start.toISOString().slice(0, 10),
+      to: end.toISOString().slice(0, 10),
+      label: `${MONTH_SHORT[m]} ${y}`,
+    };
   }
   if (granularity === "quarter") {
     const m = d.getUTCMonth();
@@ -86,6 +100,7 @@ function periodFor(granularity: Granularity, base: Date): { from: string; to: st
 function priorBase(granularity: Granularity, base: Date): Date {
   const d = new Date(base);
   if (granularity === "week")    d.setUTCDate(d.getUTCDate() - 7);
+  if (granularity === "month")   d.setUTCMonth(d.getUTCMonth() - 1);
   if (granularity === "quarter") d.setUTCMonth(d.getUTCMonth() - 3);
   if (granularity === "year")    d.setUTCFullYear(d.getUTCFullYear() - 1);
   return d;
@@ -184,21 +199,29 @@ export async function buildVisualSnapshot(tenantId: string, granularity: Granula
     } as CashFlowStatement)),
   ]);
 
-  /* Trend — last 5 buckets of the chosen granularity (oldest first). */
-  const trend: TrendBucket[] = [];
-  const d = new Date(today);
-  for (let i = 4; i >= 0; i -= 1) {
-    const b = new Date(d);
+  /* Trend — last 5 buckets of the chosen granularity (oldest first).
+     Previously sequential (5× serial round-trips ≈ 1s+ overhead).
+     Now fully parallel via Promise.all so the slowest single bucket
+     bounds total wait. */
+  const trendPeriods = Array.from({ length: 5 }, (_, idx) => {
+    const i = 4 - idx;  /* 4..0 → oldest first */
+    const b = new Date(today);
     if (granularity === "week")    b.setUTCDate(b.getUTCDate() - i * 7);
+    if (granularity === "month")   b.setUTCMonth(b.getUTCMonth() - i);
     if (granularity === "quarter") b.setUTCMonth(b.getUTCMonth() - i * 3);
     if (granularity === "year")    b.setUTCFullYear(b.getUTCFullYear() - i);
-    const p = periodFor(granularity, b);
-    const pl = await buildProfitLoss(tenantId, { from: p.from, to: p.to }, { currency: baseCurrency });
-    trend.push({
-      label: p.label, from: p.from, to: p.to,
-      revenue: pl.revenue.amount, net_income: pl.net_profit,
-    });
-  }
+    return periodFor(granularity, b);
+  });
+  const trendPLs = await Promise.all(
+    trendPeriods.map((p) =>
+      buildProfitLoss(tenantId, { from: p.from, to: p.to }, { currency: baseCurrency }),
+    ),
+  );
+  const trend: TrendBucket[] = trendPeriods.map((p, idx) => ({
+    label: p.label, from: p.from, to: p.to,
+    revenue: trendPLs[idx].revenue.amount,
+    net_income: trendPLs[idx].net_profit,
+  }));
   void endOfDay;
 
   return {
