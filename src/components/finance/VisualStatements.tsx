@@ -277,31 +277,50 @@ function TrendChart({ trend }: { trend: TrendBucket[] }) {
   const barW = Math.max(8, (slot - gap) / 2);
   const ariaLabel = `${t("visual.totalRevenue", "TOTAL REVENUE")} · ${t("visual.netIncome", "NET INCOME")}`;
 
+  /* SVG fills can't read CSS variables directly, so we use Tailwind
+     `fill-*` / `stroke-*` utilities with dark: variants. Light mode
+     gets dark grays (visible on white); dark mode keeps the existing
+     white-on-black palette. */
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-6 w-full" role="img" aria-label={ariaLabel}>
-      <line x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH} stroke="rgba(255,255,255,0.08)" />
+      <line
+        x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH}
+        className="stroke-black/[0.10] dark:stroke-white/[0.08]"
+      />
       {buckets.map((tt, i) => {
         const xSlot = padL + i * slot;
         const xRev = xSlot + slot / 2 - barW - 2;
         const xNi  = xSlot + slot / 2 + 2;
-        /* Zero-data buckets render nothing so an empty tenant doesn't show
-           5 phantom hairlines along the baseline. */
         const showRev = Math.abs(tt.revenue)    > 0;
         const showNi  = Math.abs(tt.net_income) > 0;
         const hRev = Math.max(2, (Math.abs(tt.revenue)    / maxY) * innerH);
         const hNi  = Math.max(2, (Math.abs(tt.net_income) / maxY) * innerH);
-        /* Monochrome palette: white = revenue, dim white = net income.
-           Negative net income is hinted with a slightly warmer dim — but
-           still neutral so the chart matches the rest of the Hub's
-           grayscale chrome. Positive vs negative is read from the KPI
-           tone above, not from the bar colour. */
-        const niColor = tt.net_income >= 0 ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.30)";
+        /* Net-income shade differs by sign — slightly muted for
+           negative, slightly stronger for positive — and adapts to
+           theme. */
+        const niCls = tt.net_income >= 0
+          ? "fill-gray-500/85 dark:fill-white/45"
+          : "fill-gray-400/75 dark:fill-white/30";
         return (
           <g key={`${tt.label}-${i}`}>
-            {showRev && <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.85)" rx={2} />}
-            {showNi  && <rect x={xNi}  y={padT + innerH - hNi}  width={barW} height={hNi}  fill={niColor}              rx={2} />}
-            <text x={xSlot + slot / 2} y={h - 6} fill="rgba(255,255,255,0.45)"
-                  fontSize={11} textAnchor="middle">{tt.label}</text>
+            {showRev && (
+              <rect
+                x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} rx={2}
+                className="fill-gray-800/85 dark:fill-white/85"
+              />
+            )}
+            {showNi && (
+              <rect
+                x={xNi} y={padT + innerH - hNi} width={barW} height={hNi} rx={2}
+                className={niCls}
+              />
+            )}
+            <text
+              x={xSlot + slot / 2} y={h - 6} fontSize={11} textAnchor="middle"
+              className="fill-gray-600 dark:fill-white/45"
+            >
+              {tt.label}
+            </text>
           </g>
         );
       })}
