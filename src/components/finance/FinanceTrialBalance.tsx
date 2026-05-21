@@ -130,7 +130,7 @@ export default function FinanceTrialBalance() {
 
         {error && (
           <Card>
-            <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+            <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
           </Card>
         )}
 
@@ -194,11 +194,11 @@ export default function FinanceTrialBalance() {
                 <span className="text-[10px] text-[var(--text-dim)]">{t("tb.col.credit", "Credit")}</span>
                 <span className="font-mono text-[14px] font-bold">{fmt(data.totals.credit)}</span>
                 <span className="text-[10px] text-[var(--text-dim)]">{t("tb.diff", "Difference")}</span>
-                <span className={`font-mono text-[14px] font-bold ${balanced ? "text-emerald-300" : "text-rose-300"}`}>{fmt(data.totals.difference)}</span>
+                <span className={`font-mono text-[14px] font-bold ${balanced ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"}`}>{fmt(data.totals.difference)}</span>
               </div>
             </div>
             {!balanced && (
-              <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
+              <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">
                 {t("tb.outOfBalance", "Ledger is out of balance — investigate before relying on this trial balance.")}
               </div>
             )}

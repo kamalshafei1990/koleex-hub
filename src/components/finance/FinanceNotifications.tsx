@@ -37,9 +37,9 @@ function severityOf(due: string): Severity {
 
 const SEVERITY_STYLE: Record<Severity, { ring: string; chip: string; label: string }> = {
   normal:   { ring: "border-[var(--border-subtle)]",       chip: "bg-gray-500/15 text-[var(--text-highlight)]",   label: "Normal" },
-  warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-300", label: "Warning" },
-  urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-300",   label: "Urgent" },
-  critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-200", label: "Critical" },
+  warning:  { ring: "border-amber-500/30",       chip: "bg-amber-500/20 text-amber-600 dark:text-amber-300", label: "Warning" },
+  urgent:   { ring: "border-rose-500/40",        chip: "bg-rose-500/20 text-rose-600 dark:text-rose-300",   label: "Urgent" },
+  critical: { ring: "border-rose-500/60 ring-1 ring-rose-500/30", chip: "bg-rose-500/30 text-rose-700 dark:text-rose-200", label: "Critical" },
 };
 
 const OFFSET_OPTIONS = [
@@ -166,7 +166,7 @@ export default function FinanceNotifications() {
                       <div className="truncate font-medium">{n.party_name || "—"}</div>
                       <div className="text-[10px] text-[var(--text-dim)]">{n.due_date} · {n.type === "collect" ? "Collected" : "Paid"}</div>
                     </div>
-                    <span className={`tabular-nums font-semibold ${n.type === "collect" ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className={`tabular-nums font-semibold ${n.type === "collect" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                       {fmtMoney(Number(n.amount), n.currency, { compact: true })}
                     </span>
                   </div>
@@ -183,11 +183,11 @@ export default function FinanceNotifications() {
           >
             <div className="grid gap-3 sm:grid-cols-3 text-sm text-[var(--text-highlight)]">
               <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
-                <div className="font-semibold text-emerald-400">1. Set a due date</div>
+                <div className="font-semibold text-emerald-600 dark:text-emerald-400">1. Set a due date</div>
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">On any order or expense, set the payment due date.</p>
               </div>
               <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
-                <div className="font-semibold text-amber-400">2. Pick lead time</div>
+                <div className="font-semibold text-amber-600 dark:text-amber-400">2. Pick lead time</div>
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">Same day, 1 / 3 / 7 / 14 days before — or a custom number.</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {OFFSET_OPTIONS.map((o) => (
@@ -196,7 +196,7 @@ export default function FinanceNotifications() {
                 </div>
               </div>
               <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-3">
-                <div className="font-semibold text-sky-400">3. Act when prompted</div>
+                <div className="font-semibold text-sky-600 dark:text-sky-400">3. Act when prompted</div>
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">Reminders appear here. Mark Done, Snooze, or Cancel.</p>
               </div>
             </div>
@@ -232,7 +232,7 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
               {sevStyle.label}
             </span>
             {isOverdue && sev !== "critical" && (
-              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-400">Overdue</span>
+              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-600 dark:text-rose-400">Overdue</span>
             )}
           </div>
           <div className="mt-1.5 truncate text-sm font-medium">{n.party_name || "—"}</div>
@@ -241,24 +241,24 @@ function ReminderRow({ n, onAction }: { n: FinanceNotification; onAction: (id: s
             {n.reference_type && <span> · {n.reference_type.replace(/_/g, " ")}</span>}
           </div>
         </div>
-        <div className={`text-sm font-semibold tabular-nums ${n.type === "collect" ? "text-emerald-400" : "text-rose-400"}`}>
+        <div className={`text-sm font-semibold tabular-nums ${n.type === "collect" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
           {fmtMoney(Number(n.amount), n.currency, { compact: true })}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <button onClick={() => onAction(n.id, "done")} className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/15">
+        <button onClick={() => onAction(n.id, "done")} className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15">
           {n.type === "collect" ? "Mark Collected" : "Mark Paid"}
         </button>
-        <button onClick={() => onAction(n.id, "snooze", 1)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">Snooze 1d</button>
-        <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">3d</button>
-        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10">7d</button>
+        <button onClick={() => onAction(n.id, "snooze", 1)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">Snooze 1d</button>
+        <button onClick={() => onAction(n.id, "snooze", 3)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">3d</button>
+        <button onClick={() => onAction(n.id, "snooze", 7)} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">7d</button>
         <button
           onClick={() => {
             const v = prompt("Snooze how many days?");
             const n_days = v ? parseInt(v, 10) : NaN;
             if (Number.isFinite(n_days) && n_days > 0) onAction(n.id, "snooze", n_days);
           }}
-          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
+          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
         >
           Custom…
         </button>

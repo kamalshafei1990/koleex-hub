@@ -86,16 +86,16 @@ export default function DataEntryHub() {
       backHref="/"
       action={
         <Link href="/finance/setup"
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]">
+              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]">
           <RrIcon name="shield-check" size={12} /> {t("dataEntry.setupProgress", "Setup progress")}
         </Link>
       }
     >
-      <div className="rounded-xl border border-emerald-300/30 bg-emerald-300/[0.04] px-4 py-3 text-[12.5px] text-emerald-100">
+      <div className="rounded-xl border border-emerald-500/50 dark:border-emerald-300/30 bg-emerald-500/10 dark:bg-emerald-300/[0.04] px-4 py-3 text-[12.5px] text-emerald-800 dark:text-emerald-100">
         {t("dataEntry.lead", "Yes — every finance number can be entered manually. Two routes below: ")}
-        <span className="ml-1 text-emerald-200">{t("dataEntry.lead.starting", "starting data")}</span>
+        <span className="ml-1 text-emerald-700 dark:text-emerald-200">{t("dataEntry.lead.starting", "starting data")}</span>
         {t("dataEntry.lead.and", " for first-time loading, and ")}
-        <span className="text-emerald-200">{t("dataEntry.lead.daily", "day-to-day entries")}</span>
+        <span className="text-emerald-700 dark:text-emerald-200">{t("dataEntry.lead.daily", "day-to-day entries")}</span>
         {t("dataEntry.lead.tail", " for ongoing transactions. Click any row to open the form.")}
       </div>
 
@@ -139,8 +139,8 @@ export default function DataEntryHub() {
 function EntryRowItem({ row }: { row: EntryRow }) {
   const { t } = useTranslation(financeT);
   const tagCls =
-    row.tag === "required"    ? "border-rose-300/40 bg-rose-300/[0.08] text-rose-100" :
-    row.tag === "recommended" ? "border-amber-300/40 bg-amber-300/[0.08] text-amber-100" :
+    row.tag === "required"    ? "border-rose-500/60 dark:border-rose-300/40 bg-rose-500/15 dark:bg-rose-300/[0.08] text-rose-800 dark:text-rose-100" :
+    row.tag === "recommended" ? "border-amber-500/60 dark:border-amber-300/40 bg-amber-500/15 dark:bg-amber-300/[0.08] text-amber-800 dark:text-amber-100" :
                                 "border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-highlight)]";
   const tagLabel =
     row.tag === "required"    ? t("dataEntry.tier.required",    "Required") :

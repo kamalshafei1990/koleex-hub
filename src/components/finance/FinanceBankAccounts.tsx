@@ -175,7 +175,7 @@ export default function FinanceBankAccounts() {
         </div>
 
         {error && (
-          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300">
+          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-600 dark:text-rose-300">
             {error}
           </div>
         )}
@@ -317,10 +317,10 @@ function AccountCard({
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-bold uppercase tracking-wider text-[var(--text-primary)]">{account.bank_name}</span>
             {account.is_primary && (
-              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">{t("bankAccounts.badge.primary", "Primary")}</span>
+              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">{t("bankAccounts.badge.primary", "Primary")}</span>
             )}
             {status === "frozen" && (
-              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">{t("bankAccounts.badge.frozen", "Frozen")}</span>
+              <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300">{t("bankAccounts.badge.frozen", "Frozen")}</span>
             )}
             {(status === "archived" || status === "closed") && (
               <span className="rounded-full bg-gray-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-highlight)]">{status}</span>
@@ -351,13 +351,13 @@ function AccountCard({
       {/* Operational counters */}
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         {account.unreconciled_count > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-600 dark:text-amber-300">
             <RrIcon name="info" size={9} />
             {t("bankAccounts.unrec.n", "{n} unreconciled").replace("{n}", String(account.unreconciled_count))}
           </span>
         )}
         {lowCash && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-600 dark:text-rose-300">
             <RrIcon name="info" size={9} />
             {t("bankAccounts.lowCash", "Low cash")}
           </span>
@@ -403,7 +403,7 @@ function AccountCard({
         {!account.is_primary && status === "active" && (
           <button
             onClick={onSetPrimary}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-emerald-500/30 hover:text-emerald-300"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-300"
           >
             <RrIcon name="check" size={9} />
             {t("bankAccounts.action.makePrimary", "Make primary")}
@@ -412,7 +412,7 @@ function AccountCard({
         {status === "active" && (
           <button
             onClick={onArchive}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-300"
           >
             <RrIcon name="trash" size={9} />
             {t("bankAccounts.action.archive", "Archive")}
@@ -424,7 +424,7 @@ function AccountCard({
 }
 
 function BalanceCell({ label, value, ccy, tone }: { label: string; value: number; ccy: string; tone: "neutral" | "warning" }) {
-  const cls = tone === "warning" ? "text-amber-300" : "text-[var(--text-primary)]";
+  const cls = tone === "warning" ? "text-amber-600 dark:text-amber-300" : "text-[var(--text-primary)]";
   return (
     <div className="min-w-0">
       <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
@@ -489,7 +489,7 @@ function AccountDetail({
           </button>
           <button
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2.5 py-2 text-xs text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-300"
             aria-label={t("bankAccounts.detail.closeAria", "Close detail")}
           >
             <RrIcon name="cross" size={11} />
@@ -508,22 +508,22 @@ function AccountDetail({
       {/* Risk + activity strip */}
       <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
         {lowCash && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-rose-600 dark:text-rose-300">
             <RrIcon name="info" size={9} /> {t("bankAccounts.risk.lowCash", "Low available cash")}
           </span>
         )}
         {idleCash && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-600 dark:text-sky-300">
             <RrIcon name="info" size={9} /> {t("bankAccounts.risk.idle", "Idle cash")}
           </span>
         )}
         {reconciliation.unreconciled >= 3 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-600 dark:text-amber-300">
             <RrIcon name="info" size={9} /> {t("bankAccounts.risk.unrecN", "{n} unreconciled movements").replace("{n}", String(reconciliation.unreconciled))}
           </span>
         )}
         {a.currency !== "USD" && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-violet-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-violet-600 dark:text-violet-300">
             <RrIcon name="coins" size={9} /> {t("bankAccounts.risk.fx", "FX exposure ({ccy})").replace("{ccy}", a.currency)}
           </span>
         )}
@@ -595,7 +595,7 @@ function AccountDetail({
 }
 
 function ReconStat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
-  const cls = tone === "emerald" ? "text-emerald-300" : tone === "amber" ? "text-amber-300" : "text-rose-300";
+  const cls = tone === "emerald" ? "text-emerald-600 dark:text-emerald-300" : tone === "amber" ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-2">
       <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
@@ -608,7 +608,7 @@ function MovementRow({ movement, accountCurrency }: { movement: CashMovement; ac
   const { t } = useTranslation(financeT);
   const ccy = movement.currency ?? accountCurrency;
   const dirLabel = movement.direction === "inflow" ? t("bankAccounts.row.moneyIn", "Money in") : t("bankAccounts.row.moneyOut", "Money out");
-  const dirTone = movement.direction === "inflow" ? "text-emerald-300" : "text-rose-300";
+  const dirTone = movement.direction === "inflow" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   const sign = movement.direction === "inflow" ? "+" : "−";
   return (
     <li className="flex items-start gap-3 py-2.5">
@@ -660,9 +660,9 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
 function ImportStatusChip({ status }: { status: BankStatementImport["status"] }) {
   const { t } = useTranslation(financeT);
   const cls =
-    status === "confirmed" ? "bg-emerald-500/15 text-emerald-300" :
-    status === "parsed"    ? "bg-amber-500/15 text-amber-300" :
-    status === "failed"    ? "bg-rose-500/15 text-rose-300" :
+    status === "confirmed" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
+    status === "parsed"    ? "bg-amber-500/15 text-amber-600 dark:text-amber-300" :
+    status === "failed"    ? "bg-rose-500/15 text-rose-600 dark:text-rose-300" :
     status === "cancelled" ? "bg-gray-500/15 text-[var(--text-highlight)]" :
                               "bg-gray-500/15 text-[var(--text-highlight)]";
   const label =

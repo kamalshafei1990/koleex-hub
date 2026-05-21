@@ -214,7 +214,7 @@ export default function FinanceTreasuryPlans() {
         />
 
         {error && (
-          <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300">{error}</div>
+          <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-600 dark:text-rose-300">{error}</div>
         )}
 
         {loading ? (
@@ -335,7 +335,7 @@ const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: Treasu
 
       <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-dim)]">
         {m.firstNegativeDate && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-600 dark:text-rose-300">
             <RrIcon name="info" size={9} />
             {t("treasuryPlans.card.negative", "Negative {date}").replace("{date}", m.firstNegativeDate)}
           </span>
@@ -350,7 +350,7 @@ const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: Treasu
 });
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "rose" | "amber" | "neutral" }) {
-  const cls = tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-300" : "text-[var(--text-primary)]";
+  const cls = tone === "rose" ? "text-rose-600 dark:text-rose-300" : tone === "amber" ? "text-amber-600 dark:text-amber-300" : "text-[var(--text-primary)]";
   return (
     <div>
       <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
@@ -361,9 +361,9 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "ro
 
 function StatusDot({ status }: { status: TreasuryPlanStatus }) {
   const cls =
-    status === "approved"     ? "bg-emerald-400" :
-    status === "under_review" ? "bg-amber-300"   :
-    status === "draft"        ? "bg-sky-300"     :
+    status === "approved"     ? "bg-emerald-600 dark:bg-emerald-400" :
+    status === "under_review" ? "bg-amber-600 dark:bg-amber-300"   :
+    status === "draft"        ? "bg-sky-600 dark:bg-sky-300"     :
                                  "bg-gray-400";
   return <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${cls}`} />;
 }
@@ -418,7 +418,7 @@ function PlanDetail({
             <button
               onClick={onApprove}
               disabled={actionBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-50"
             >
               {actionBusy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
               {t("treasuryPlans.detail.approve", "Approve")}
@@ -428,7 +428,7 @@ function PlanDetail({
             <button
               onClick={onRequestChanges}
               disabled={actionBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-amber-500/30 hover:text-amber-300 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-amber-500/30 hover:text-amber-600 dark:hover:text-amber-300 disabled:opacity-50"
             >
               <RrIcon name="pencil" size={11} />
               {t("treasuryPlans.detail.requestChanges", "Request changes")}
@@ -438,7 +438,7 @@ function PlanDetail({
             <button
               onClick={onArchive}
               disabled={actionBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-xs font-medium text-[var(--text-highlight)] hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-300 disabled:opacity-50"
             >
               <RrIcon name="trash" size={11} />
               {t("treasuryPlans.detail.archive", "Archive")}
@@ -498,7 +498,7 @@ function PlanDetail({
               <Diff label="d90" value={comparison.diff.d90Delta} />
               <Diff label={t("treasuryPlans.diff.lowest", "Lowest projected")} value={comparison.diff.lowestDelta} />
               {comparison.diff.firstNegativeDateChange && (
-                <div className="col-span-full rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-200">
+                <div className="col-span-full rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-700 dark:text-rose-200">
                   {t("treasuryPlans.compare.negativeMoved", "Negative-cash date moved: {from} → {to}")
                     .replace("{from}", comparison.diff.firstNegativeDateChange.from ?? t("treasuryPlans.compare.never", "never"))
                     .replace("{to}", comparison.diff.firstNegativeDateChange.to ?? t("treasuryPlans.compare.never", "never"))}
@@ -563,9 +563,9 @@ function PlanDetail({
                 <li key={rev.id} className="py-2.5 text-[11px]">
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                      rev.decision === "approve"          ? "bg-emerald-500/15 text-emerald-300" :
-                      rev.decision === "request_changes"  ? "bg-amber-500/15 text-amber-300"   :
-                                                            "bg-rose-500/15 text-rose-300"
+                      rev.decision === "approve"          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
+                      rev.decision === "request_changes"  ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"   :
+                                                            "bg-rose-500/15 text-rose-600 dark:text-rose-300"
                     }`}>
                       {rev.decision.replace("_", " ")}
                     </span>
@@ -608,7 +608,7 @@ function PlanDetail({
 
 function Diff({ label, value }: { label: string; value: number }) {
   const sign = value > 0 ? "+" : "";
-  const tone = Math.abs(value) < 1 ? "text-[var(--text-secondary)]" : value < 0 ? "text-rose-300" : "text-emerald-300";
+  const tone = Math.abs(value) < 1 ? "text-[var(--text-secondary)]" : value < 0 ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300";
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-2.5 py-2">
       <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">{label}</div>
@@ -625,7 +625,7 @@ function DriverList({
   tone: "positive" | "negative";
 }) {
   const { t } = useTranslation(financeT);
-  const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
+  const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>
       <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>

@@ -395,21 +395,21 @@ export function legacyGlyph(style: CategoryStyle): string {
 
 export function accentBgClass(accent: CategoryAccent): string {
   switch (accent) {
-    case "emerald": return "bg-emerald-500/12 border-emerald-500/25 text-emerald-300";
-    case "sky":     return "bg-sky-500/12 border-sky-500/25 text-sky-300";
-    case "amber":   return "bg-amber-500/12 border-amber-500/25 text-amber-300";
-    case "rose":    return "bg-rose-500/12 border-rose-500/25 text-rose-300";
-    case "violet":  return "bg-violet-500/12 border-violet-500/25 text-violet-300";
-    case "blue":    return "bg-blue-500/12 border-blue-500/25 text-blue-300";
-    case "fuchsia": return "bg-fuchsia-500/12 border-fuchsia-500/25 text-fuchsia-300";
+    case "emerald": return "bg-emerald-500/12 border-emerald-500/25 text-emerald-600 dark:text-emerald-300";
+    case "sky":     return "bg-sky-500/12 border-sky-500/25 text-sky-600 dark:text-sky-300";
+    case "amber":   return "bg-amber-500/12 border-amber-500/25 text-amber-600 dark:text-amber-300";
+    case "rose":    return "bg-rose-500/12 border-rose-500/25 text-rose-600 dark:text-rose-300";
+    case "violet":  return "bg-violet-500/12 border-violet-500/25 text-violet-600 dark:text-violet-300";
+    case "blue":    return "bg-blue-500/12 border-blue-500/25 text-blue-600 dark:text-blue-300";
+    case "fuchsia": return "bg-fuchsia-500/12 border-fuchsia-500/25 text-fuchsia-600 dark:text-fuchsia-300";
     case "lime":    return "bg-lime-500/12 border-lime-500/25 text-lime-300";
-    case "orange":  return "bg-orange-500/12 border-orange-500/25 text-orange-300";
-    case "teal":    return "bg-teal-500/12 border-teal-500/25 text-teal-300";
+    case "orange":  return "bg-orange-500/12 border-orange-500/25 text-orange-600 dark:text-orange-300";
+    case "teal":    return "bg-teal-500/12 border-teal-500/25 text-teal-600 dark:text-teal-300";
     case "slate":   return "bg-slate-500/15 border-slate-500/30 text-slate-200";
-    case "indigo":  return "bg-indigo-500/12 border-indigo-500/25 text-indigo-300";
-    case "yellow":  return "bg-yellow-500/12 border-yellow-500/30 text-yellow-200";
-    case "red":     return "bg-red-500/12 border-red-500/25 text-red-300";
-    case "pink":    return "bg-pink-500/12 border-pink-500/25 text-pink-300";
+    case "indigo":  return "bg-indigo-500/12 border-indigo-500/25 text-indigo-600 dark:text-indigo-300";
+    case "yellow":  return "bg-yellow-500/12 border-yellow-500/30 text-yellow-700 dark:text-yellow-200";
+    case "red":     return "bg-red-500/12 border-red-500/25 text-red-600 dark:text-red-300";
+    case "pink":    return "bg-pink-500/12 border-pink-500/25 text-pink-600 dark:text-pink-300";
     default:        return "bg-gray-500/12 border-gray-500/25 text-[var(--text-highlight)]";
   }
 }
@@ -438,21 +438,21 @@ export function accentSolidBg(accent: CategoryAccent): string {
 /** Active (selected) ring style for the picker tiles. */
 export function accentActiveClass(accent: CategoryAccent): string {
   switch (accent) {
-    case "emerald": return "border-emerald-500/60 bg-emerald-500/20 text-emerald-200";
-    case "sky":     return "border-sky-500/60 bg-sky-500/20 text-sky-200";
-    case "amber":   return "border-amber-500/60 bg-amber-500/20 text-amber-200";
-    case "rose":    return "border-rose-500/60 bg-rose-500/20 text-rose-200";
-    case "violet":  return "border-violet-500/60 bg-violet-500/20 text-violet-200";
-    case "blue":    return "border-blue-500/60 bg-blue-500/20 text-blue-200";
-    case "fuchsia": return "border-fuchsia-500/60 bg-fuchsia-500/20 text-fuchsia-200";
+    case "emerald": return "border-emerald-500/60 bg-emerald-500/20 text-emerald-700 dark:text-emerald-200";
+    case "sky":     return "border-sky-500/60 bg-sky-500/20 text-sky-700 dark:text-sky-200";
+    case "amber":   return "border-amber-500/60 bg-amber-500/20 text-amber-700 dark:text-amber-200";
+    case "rose":    return "border-rose-500/60 bg-rose-500/20 text-rose-700 dark:text-rose-200";
+    case "violet":  return "border-violet-500/60 bg-violet-500/20 text-violet-700 dark:text-violet-200";
+    case "blue":    return "border-blue-500/60 bg-blue-500/20 text-blue-700 dark:text-blue-200";
+    case "fuchsia": return "border-fuchsia-500/60 bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-200";
     case "lime":    return "border-lime-500/60 bg-lime-500/20 text-lime-200";
-    case "orange":  return "border-orange-500/60 bg-orange-500/20 text-orange-200";
-    case "teal":    return "border-teal-500/60 bg-teal-500/20 text-teal-200";
+    case "orange":  return "border-orange-500/60 bg-orange-500/20 text-orange-700 dark:text-orange-200";
+    case "teal":    return "border-teal-500/60 bg-teal-500/20 text-teal-700 dark:text-teal-200";
     case "slate":   return "border-slate-400/60 bg-slate-500/25 text-slate-100";
-    case "indigo":  return "border-indigo-500/60 bg-indigo-500/20 text-indigo-200";
-    case "yellow":  return "border-yellow-500/60 bg-yellow-500/20 text-yellow-100";
-    case "red":     return "border-red-500/60 bg-red-500/20 text-red-200";
-    case "pink":    return "border-pink-500/60 bg-pink-500/20 text-pink-200";
+    case "indigo":  return "border-indigo-500/60 bg-indigo-500/20 text-indigo-700 dark:text-indigo-200";
+    case "yellow":  return "border-yellow-500/60 bg-yellow-500/20 text-yellow-800 dark:text-yellow-100";
+    case "red":     return "border-red-500/60 bg-red-500/20 text-red-700 dark:text-red-200";
+    case "pink":    return "border-pink-500/60 bg-pink-500/20 text-pink-700 dark:text-pink-200";
     default:        return "border-[var(--border-strong)] bg-[var(--bg-surface-hover)] text-[var(--text-primary)]";
   }
 }

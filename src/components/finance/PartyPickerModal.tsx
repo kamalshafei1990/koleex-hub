@@ -30,9 +30,9 @@ export type { FinancePartyRow };
 const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
   end_user: "bg-gray-500/15 text-[var(--text-highlight)]",
   silver:   "bg-zinc-400/15 text-zinc-200",
-  gold:     "bg-amber-500/15 text-amber-300",
-  platinum: "bg-sky-500/15 text-sky-300",
-  diamond:  "bg-violet-500/15 text-violet-300",
+  gold:     "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  platinum: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+  diamond:  "bg-violet-500/15 text-violet-600 dark:text-violet-300",
 };
 
 function countryFlag(code: string | null | undefined): string | null {
@@ -156,7 +156,7 @@ export default function PartyPickerModal({
               <span className="ml-2 text-sm">{t("party.searching", "Searching contacts…")}</span>
             </div>
           ) : error ? (
-            <div className="px-3 py-6 text-sm text-rose-400">{error}</div>
+            <div className="px-3 py-6 text-sm text-rose-600 dark:text-rose-400">{error}</div>
           ) : sorted.length === 0 ? (
             <div className="px-3 py-10 text-center text-sm text-[var(--text-dim)]">
               {query
@@ -197,7 +197,7 @@ export default function PartyPickerModal({
                             </span>
                           )}
                           {row.credit_status && row.credit_status !== "good" && (
-                            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-400">
+                            <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
                               {row.credit_status}
                             </span>
                           )}

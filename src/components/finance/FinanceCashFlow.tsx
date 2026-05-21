@@ -82,7 +82,7 @@ export default function FinanceCashFlow() {
           </div>
         </div>
 
-        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
+        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
 
         {data && (
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
@@ -106,7 +106,7 @@ export default function FinanceCashFlow() {
               </tbody>
             </table>
             {!data.reconciled && (
-              <div className="rounded-b-xl border-t border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[11px] text-rose-300">
+              <div className="rounded-b-xl border-t border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[11px] text-rose-600 dark:text-rose-300">
                 {t("cf.notReconciled", "Cash flow does not reconcile to the trial balance. Investigate posted lines that touch a cash account but aren't classified.")}
               </div>
             )}

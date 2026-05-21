@@ -16,9 +16,9 @@ import { financeT } from "@/lib/translations/finance";
 const TIER_COLORS: Record<NonNullable<FinancePartyRow["customer_tier"]>, string> = {
   end_user: "bg-gray-500/15 text-[var(--text-highlight)]",
   silver:   "bg-zinc-400/15 text-zinc-200",
-  gold:     "bg-amber-500/15 text-amber-300",
-  platinum: "bg-sky-500/15 text-sky-300",
-  diamond:  "bg-violet-500/15 text-violet-300",
+  gold:     "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  platinum: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+  diamond:  "bg-violet-500/15 text-violet-600 dark:text-violet-300",
 };
 
 export interface PartyChipData {
@@ -110,7 +110,7 @@ export default function PartyChip({
           <button
             type="button"
             onClick={onClear}
-            className="inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-medium text-rose-400 hover:bg-rose-500/10"
+            className="inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
             title={t("party.clear", "Clear")}
           >
             <RrIcon name="cross" size={10} />

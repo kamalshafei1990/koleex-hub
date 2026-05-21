@@ -48,18 +48,18 @@ export type KpiAccent =
   | "default";
 
 const ACCENT_TEXT: Record<KpiAccent, string> = {
-  emerald: "text-emerald-400",
-  rose:    "text-rose-400",
-  amber:   "text-amber-400",
-  sky:     "text-sky-400",
-  violet:  "text-violet-400",
-  blue:    "text-blue-400",
-  teal:    "text-teal-400",
-  orange:  "text-orange-400",
-  fuchsia: "text-fuchsia-400",
-  lime:    "text-lime-400",
-  cyan:    "text-cyan-400",
-  indigo:  "text-indigo-400",
+  emerald: "text-emerald-600 dark:text-emerald-400",
+  rose:    "text-rose-600 dark:text-rose-400",
+  amber:   "text-amber-600 dark:text-amber-400",
+  sky:     "text-sky-600 dark:text-sky-400",
+  violet:  "text-violet-600 dark:text-violet-400",
+  blue:    "text-blue-600 dark:text-blue-400",
+  teal:    "text-teal-600 dark:text-teal-400",
+  orange:  "text-orange-600 dark:text-orange-400",
+  fuchsia: "text-fuchsia-600 dark:text-fuchsia-400",
+  lime:    "text-lime-600 dark:text-lime-400",
+  cyan:    "text-cyan-600 dark:text-cyan-400",
+  indigo:  "text-indigo-600 dark:text-indigo-400",
   default: "text-[var(--text-primary)]",
 };
 const ACCENT_BAR: Record<KpiAccent, string> = {
@@ -134,8 +134,8 @@ export function KpiCard({
                   (neutralDelta
                     ? "bg-white/5 text-[var(--text-secondary)]"
                     : goodDirection
-                      ? "bg-emerald-500/15 text-emerald-400"
-                      : "bg-rose-500/15 text-rose-400")
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      : "bg-rose-500/15 text-rose-600 dark:text-rose-400")
                 }
                 title={
                   deltaValue != null && currency
@@ -199,29 +199,29 @@ function Sparkline({ data, accent }: { data: number[]; accent: KpiAccent }) {
 
 /* ── StatusBadge ─────────────────────────────────────────────────── */
 const STATUS_PALETTE: Record<string, { bg: string; text: string; label?: string }> = {
-  paid:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  partial:        { bg: "bg-amber-500/15",   text: "text-amber-400" },
+  paid:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
+  partial:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
   unpaid:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
-  overdue:        { bg: "bg-rose-500/15",    text: "text-rose-400" },
-  open:           { bg: "bg-sky-500/15",     text: "text-sky-400" },
-  in_production:  { bg: "bg-violet-500/15",  text: "text-violet-400", label: "In production" },
-  shipped:        { bg: "bg-blue-500/15",    text: "text-blue-400" },
-  delivered:      { bg: "bg-emerald-500/15", text: "text-emerald-400" },
+  overdue:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
+  open:           { bg: "bg-sky-500/15",     text: "text-sky-600 dark:text-sky-400" },
+  in_production:  { bg: "bg-violet-500/15",  text: "text-violet-600 dark:text-violet-400", label: "In production" },
+  shipped:        { bg: "bg-blue-500/15",    text: "text-blue-600 dark:text-blue-400" },
+  delivered:      { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
   closed:         { bg: "bg-gray-500/15",    text: "text-[var(--text-secondary)]" },
-  cancelled:      { bg: "bg-rose-500/15",    text: "text-rose-400" },
-  good:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  watch:          { bg: "bg-amber-500/15",   text: "text-amber-400" },
-  hold:           { bg: "bg-orange-500/15",  text: "text-orange-400" },
-  blocked:        { bg: "bg-rose-500/15",    text: "text-rose-400" },
-  scheduled:      { bg: "bg-sky-500/15",     text: "text-sky-400" },
-  sent:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  done:           { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  snoozed:        { bg: "bg-amber-500/15",   text: "text-amber-400" },
-  completed:      { bg: "bg-emerald-500/15", text: "text-emerald-400" },
-  pending:        { bg: "bg-amber-500/15",   text: "text-amber-400" },
-  bounced:        { bg: "bg-rose-500/15",    text: "text-rose-400" },
-  collect:        { bg: "bg-emerald-500/15", text: "text-emerald-400", label: "Money to collect" },
-  pay:            { bg: "bg-rose-500/15",    text: "text-rose-400",    label: "Money to pay" },
+  cancelled:      { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
+  good:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
+  watch:          { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
+  hold:           { bg: "bg-orange-500/15",  text: "text-orange-600 dark:text-orange-400" },
+  blocked:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
+  scheduled:      { bg: "bg-sky-500/15",     text: "text-sky-600 dark:text-sky-400" },
+  sent:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
+  done:           { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
+  snoozed:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
+  completed:      { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400" },
+  pending:        { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400" },
+  bounced:        { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400" },
+  collect:        { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", label: "Money to collect" },
+  pay:            { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400",    label: "Money to pay" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

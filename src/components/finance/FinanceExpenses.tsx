@@ -312,7 +312,7 @@ export default function FinanceExpenseAnalytics() {
                       <div className="mt-2 flex items-center justify-between text-[10px]">
                         <span className="text-[var(--text-dim)]">{t("expAnalytics.byCategory.ofTotal", "{n}% of total").replace("{n}", c.share.toFixed(0))}</span>
                         {c.delta_pct != null && (
-                          <span className={`rounded-full px-1.5 py-0.5 font-semibold ${c.delta_pct >= 0 ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/20 text-emerald-300"}`}>
+                          <span className={`rounded-full px-1.5 py-0.5 font-semibold ${c.delta_pct >= 0 ? "bg-rose-500/20 text-rose-600 dark:text-rose-300" : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300"}`}>
                             {c.delta_pct >= 0 ? "▲" : "▼"} {fmtPct(c.delta_pct)}
                           </span>
                         )}
@@ -345,7 +345,7 @@ export default function FinanceExpenseAnalytics() {
                             <div className="text-[10px] text-[var(--text-dim)]">{t("expAnalytics.recent.thisLast", "This month {tm} · last month {lm}").replace("{tm}", fmtMoney(c.thisMonth, baseCurrency, { compact: true })).replace("{lm}", fmtMoney(c.lastMonth, baseCurrency, { compact: true }))}</div>
                           </div>
                         </div>
-                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
+                        <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-300">▲ {fmtPct(c.delta_pct ?? 0)}</span>
                       </li>
                     );
                   })}
@@ -361,7 +361,7 @@ export default function FinanceExpenseAnalytics() {
                         <div className="truncate text-sm font-medium">{e.title}</div>
                         <div className="text-[10px] text-[var(--text-dim)]">{e.expense_date} · {e.category_name ?? t("expAnalytics.other", "Other")}</div>
                       </div>
-                      <span className="font-semibold tabular-nums text-amber-300">{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</span>
+                      <span className="font-semibold tabular-nums text-amber-600 dark:text-amber-300">{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</span>
                     </li>
                   ))}
                 </ul>
@@ -373,13 +373,13 @@ export default function FinanceExpenseAnalytics() {
                   {orderImpact.map((o, idx) => (
                     <li key={o.order_id} className="flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] px-3 py-2">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-300">{idx + 1}</span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-semibold text-violet-600 dark:text-violet-300">{idx + 1}</span>
                         <div className="min-w-0">
                           <div className="font-mono text-[11px] font-medium">{o.order_id.slice(0, 8)}…</div>
                           <div className="text-[10px] text-[var(--text-dim)]">{t("expAnalytics.orderImpact.linked", "{n} {label} linked").replace("{n}", String(o.count)).replace("{label}", o.count === 1 ? t("expAnalytics.vendors.expense", "expense") : t("expAnalytics.vendors.expenses", "expenses"))}</div>
                         </div>
                       </div>
-                      <span className="font-semibold tabular-nums text-rose-300">−{fmtMoney(o.total, baseCurrency, { compact: true })}</span>
+                      <span className="font-semibold tabular-nums text-rose-600 dark:text-rose-300">−{fmtMoney(o.total, baseCurrency, { compact: true })}</span>
                     </li>
                   ))}
                 </ul>
@@ -395,7 +395,7 @@ export default function FinanceExpenseAnalytics() {
               title={t("expAnalytics.empty.title", "No expenses recorded yet")}
               hint={t("expAnalytics.empty.hint", "Daily expense entry happens in the Expenses app — open it from the sidebar or the button above.")}
               action={
-                <Link href="/expenses" className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">
+                <Link href="/expenses" className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">
                   <span className="inline-flex items-center gap-1.5">{t("expAnalytics.openApp", "Open Expenses App")} <RrIcon name="arrow-up-right-from-square" size={12} /></span>
                 </Link>
               }

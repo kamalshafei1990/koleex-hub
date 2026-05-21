@@ -223,7 +223,7 @@ export default function FinanceReports({
               {previewLoading && <span className="text-[10px] text-[var(--text-dim)]">{t("reports.preview.updating", "Updating…")}</span>}
             </div>
             {previewError ? (
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{previewError}</div>
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{previewError}</div>
             ) : previewHtml ? (
               <div className="overflow-hidden rounded-md border border-[var(--border-faint)] bg-white" style={{ aspectRatio: "210 / 297" }}>
                 <iframe
@@ -365,7 +365,7 @@ function FiltersPanel({
           type="button"
           onClick={onDownload}
           disabled={busy !== null}
-          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[12px] font-semibold text-emerald-600 dark:text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
         >
           {busy === "pdf" ? t("reports.btn.building", "Building…") : t("reports.btn.download", "Download PDF")}
         </button>
@@ -384,7 +384,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   return (
     <label className="block">
       <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-        {label} {required && <span className="text-rose-400">*</span>}
+        {label} {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
       </div>
       {children}
     </label>

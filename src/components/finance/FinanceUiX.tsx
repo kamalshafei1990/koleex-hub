@@ -214,7 +214,7 @@ const SEVERITY_FRAME: Record<InsightSeverity, { border: string; bg: string; rail
   positive: {
     border: "border-[var(--border-subtle)]",
     bg:     "bg-[var(--bg-secondary)]",
-    rail:   "bg-emerald-300/55",
+    rail:   "bg-emerald-500/60 dark:bg-emerald-300/55",
   },
   neutral: {
     border: "border-[var(--border-faint)]",
@@ -224,17 +224,17 @@ const SEVERITY_FRAME: Record<InsightSeverity, { border: string; bg: string; rail
   watch: {
     border: "border-amber-500/[0.18]",
     bg:     "bg-[var(--bg-secondary)]",
-    rail:   "bg-amber-300/65",
+    rail:   "bg-amber-500/65 dark:bg-amber-300/65",
   },
   risk: {
     border: "border-rose-500/[0.22]",
     bg:     "bg-[var(--bg-secondary)]",
-    rail:   "bg-rose-300/65",
+    rail:   "bg-rose-500/65 dark:bg-rose-300/65",
   },
   critical: {
     border: "border-rose-500/[0.30]",
     bg:     "bg-[var(--bg-secondary)]",
-    rail:   "bg-rose-300/80",
+    rail:   "bg-rose-500/80 dark:bg-rose-300/80",
   },
 };
 
@@ -294,7 +294,7 @@ export function InsightCard({
           <button
             type="button"
             onClick={onCta}
-            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-sky-300 hover:text-sky-200"
+            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200"
           >
             {cta} <RrIcon name="arrow-up-right" size={10} />
           </button>
@@ -633,8 +633,8 @@ export function AnomalyChip({
   direction?: "up" | "down";
 }) {
   const cls =
-    severity === "risk"  ? "bg-rose-500/[0.12] text-rose-300 border border-rose-500/[0.18]"
-  : severity === "watch" ? "bg-amber-500/[0.12] text-amber-300 border border-amber-500/[0.18]"
+    severity === "risk"  ? "bg-rose-500/[0.12] text-rose-600 dark:text-rose-300 border border-rose-500/[0.18]"
+  : severity === "watch" ? "bg-amber-500/[0.12] text-amber-600 dark:text-amber-300 border border-amber-500/[0.18]"
   :                        "bg-[var(--bg-surface)] text-[var(--text-highlight)] border border-[var(--border-subtle)]";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${cls}`}>
@@ -667,7 +667,7 @@ export function LiquidityMeter({
   const inflowPct = Math.max(4, Math.min(96, inflowShare * 100));
   /* Tone per window */
   const tone = (v: number): string =>
-    v >= 0 ? "text-emerald-300" : "text-rose-300";
+    v >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
       <div className="flex items-baseline justify-between">
@@ -676,7 +676,7 @@ export function LiquidityMeter({
       </div>
       {/* Inflow-vs-outflow ratio bar */}
       <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-rose-500/[0.18]">
-        <div className="h-full rounded-full bg-emerald-400/70" style={{ width: `${inflowPct}%` }} />
+        <div className="h-full rounded-full bg-emerald-600/70 dark:bg-emerald-400/70" style={{ width: `${inflowPct}%` }} />
       </div>
       {/* 7/30/60 windows */}
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -745,11 +745,11 @@ export function AgingTable({
       <div className="mt-3 grid grid-cols-5 gap-2">
         {buckets.map((b) => {
           const share = total > 0 ? (b.amount / total) * 100 : 0;
-          const barCls = critical(b.key) ? "bg-rose-300/60"
-                       : watch(b.key)    ? "bg-amber-300/60"
+          const barCls = critical(b.key) ? "bg-rose-500/65 dark:bg-rose-300/60"
+                       : watch(b.key)    ? "bg-amber-500/65 dark:bg-amber-300/60"
                        : "bg-white/40";
-          const valueCls = critical(b.key) ? "text-rose-300"
-                         : watch(b.key)    ? "text-amber-200"
+          const valueCls = critical(b.key) ? "text-rose-600 dark:text-rose-300"
+                         : watch(b.key)    ? "text-amber-700 dark:text-amber-200"
                          : "text-[var(--text-highlight)]";
           return (
             <div key={b.key} className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-2 py-2">
@@ -807,10 +807,10 @@ export function TimelineStrip({
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>
           <div className="mt-0.5 text-[11px] text-[var(--text-dim)]">
             {overdueCount > 0 && (
-              <span className="mr-2 text-rose-300/90">{t("uix.timeline.overdueN", "{n} overdue").replace("{n}", String(overdueCount))}</span>
+              <span className="mr-2 text-rose-700/90 dark:text-rose-300/90">{t("uix.timeline.overdueN", "{n} overdue").replace("{n}", String(overdueCount))}</span>
             )}
             {dueSoonCount > 0 && (
-              <span className="mr-2 text-amber-300/90">{t("uix.timeline.dueSoonN", "{n} due ≤ 7d").replace("{n}", String(dueSoonCount))}</span>
+              <span className="mr-2 text-amber-700/90 dark:text-amber-300/90">{t("uix.timeline.dueSoonN", "{n} due ≤ 7d").replace("{n}", String(dueSoonCount))}</span>
             )}
             <span className="text-[var(--text-ghost)]">{(events.length === 1
               ? t("uix.timeline.onRadarOne", "{n} line on radar")
@@ -827,8 +827,8 @@ export function TimelineStrip({
         <ul className="mt-2.5 divide-y divide-white/[0.04]">
           {top.map((e) => {
             const stateCls =
-              e.state === "overdue"  ? { dot: "bg-rose-400",  text: "text-rose-300/90",  label: t("uix.event.overdue", "Overdue") }
-            : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-200/90", label: t("uix.timeline.dueShort", "≤ 7 d") }
+              e.state === "overdue"  ? { dot: "bg-rose-600 dark:bg-rose-400",  text: "text-rose-700/90 dark:text-rose-300/90",  label: t("uix.event.overdue", "Overdue") }
+            : e.state === "due_soon" ? { dot: "bg-amber-300", text: "text-amber-700/90 dark:text-amber-200/90", label: t("uix.timeline.dueShort", "≤ 7 d") }
             : e.state === "settled"  ? { dot: "bg-white/30",  text: "text-[var(--text-secondary)]",     label: t("uix.event.settled", "Settled") }
             :                          { dot: "bg-white/50",  text: "text-[var(--text-highlight)]",     label: e.daysFromNow >= 9_000 ? t("uix.event.unscheduled", "Unscheduled") : `${e.daysFromNow}d` };
             return (
@@ -839,7 +839,7 @@ export function TimelineStrip({
                   <span className="block truncate text-[12px] text-[var(--text-highlight)]">{e.party}</span>
                   {e.reference && <span className="block truncate font-mono text-[9px] text-[var(--text-ghost)]">{e.reference}</span>}
                 </span>
-                <span className={`shrink-0 text-[12px] font-medium tabular-nums ${direction === "incoming" ? "text-emerald-300/90" : "text-rose-300/90"}`}>
+                <span className={`shrink-0 text-[12px] font-medium tabular-nums ${direction === "incoming" ? "text-emerald-700/90 dark:text-emerald-300/90" : "text-rose-700/90 dark:text-rose-300/90"}`}>
                   {direction === "incoming" ? "+" : "−"}{formatCompact(e.amount)}
                   <span className="ml-1 text-[9px] text-[var(--text-ghost)]">{currency}</span>
                 </span>
@@ -873,8 +873,8 @@ export function ConcentrationBar({
   severity?: "info" | "watch" | "risk";
 }) {
   const fillCls =
-    severity === "risk"  ? "bg-rose-300/65"
-  : severity === "watch" ? "bg-amber-300/65"
+    severity === "risk"  ? "bg-rose-500/65 dark:bg-rose-300/65"
+  : severity === "watch" ? "bg-amber-500/65 dark:bg-amber-300/65"
   :                        "bg-white/45";
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
@@ -882,7 +882,7 @@ export function ConcentrationBar({
         <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">{label}</div>
         <div className={
           "text-[10px] tabular-nums " +
-          (severity === "risk" ? "text-rose-300" : severity === "watch" ? "text-amber-300" : "text-[var(--text-dim)]")
+          (severity === "risk" ? "text-rose-600 dark:text-rose-300" : severity === "watch" ? "text-amber-600 dark:text-amber-300" : "text-[var(--text-dim)]")
         }>{share.toFixed(0)}%</div>
       </div>
       <div className="mt-2 truncate text-[13px] font-medium text-[var(--text-primary)]">{party}</div>

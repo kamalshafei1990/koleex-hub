@@ -185,16 +185,16 @@ function ProfitLossPanel({ from, to }: { from: string; to: string }) {
   );
   const s = data?.statement;
   if (loading && !s) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={t("statements.pl.title", "Profit & Loss")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!s) return null;
   return (
     <Panel title={t("statements.pl.title", "Profit & Loss")}>
       <table className="min-w-full text-[12.5px]">
         <tbody>
-          <SectionRow label={t("statements.pl.revenue", "Revenue")} s={s.revenue} accent="text-emerald-200" />
-          <SectionRow label={t("statements.pl.cos", "Cost of Sales")} s={s.cost_of_sales} accent="text-rose-200" />
+          <SectionRow label={t("statements.pl.revenue", "Revenue")} s={s.revenue} accent="text-emerald-700 dark:text-emerald-200" />
+          <SectionRow label={t("statements.pl.cos", "Cost of Sales")} s={s.cost_of_sales} accent="text-rose-700 dark:text-rose-200" />
           <SubtotalRow label={t("statements.pl.gp", "Gross Profit")} value={s.gross_profit} />
-          <SectionRow label={t("statements.pl.opex", "Operating Expenses")} s={s.operating_expenses} accent="text-rose-200" />
+          <SectionRow label={t("statements.pl.opex", "Operating Expenses")} s={s.operating_expenses} accent="text-rose-700 dark:text-rose-200" />
           <tr className="border-t-2 border-white/20">
             <td className="px-4 py-2.5 text-[14px] font-bold">{t("statements.pl.np", "Net Profit")}</td>
             <td className="px-4 py-2.5 text-right tabular-nums font-mono text-[14px] font-bold">{fmtMoney(s.net_profit)}</td>
@@ -255,7 +255,7 @@ function BalanceSheetPanel({ asOf }: { asOf: string }) {
   );
   const s = data?.summary;
   if (loading && !s) return <Panel title={t("statements.tab.bs", "Balance Sheet")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={t("statements.tab.bs", "Balance Sheet")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.bs", "Balance Sheet")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!s) return null;
   const lAndE = s.total_liabilities + s.total_equity + s.current_year_earnings;
   const reconciled = Math.abs(s.balanced_difference) < 0.05;
@@ -284,7 +284,7 @@ function BalanceSheetPanel({ asOf }: { asOf: string }) {
             <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(lAndE)}</td>
           </tr>
           {!reconciled && (
-            <tr><td colSpan={2} className="px-4 py-2 text-[11px] text-rose-300 bg-rose-500/[0.06]">
+            <tr><td colSpan={2} className="px-4 py-2 text-[11px] text-rose-600 dark:text-rose-300 bg-rose-500/[0.06]">
               {t("statements.bs.notReconciled", "Assets do not reconcile (Δ {value}). Run a trial balance check.").replace("{value}", fmtMoney(s.balanced_difference))}
             </td></tr>
           )}
@@ -307,14 +307,14 @@ function CashFlowPanel({ from, to }: { from: string; to: string }) {
   );
   const r = data?.report;
   if (loading && !r) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={t("statements.cf.title", "Cash Flow Summary")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
     <Panel title={t("statements.cf.title", "Cash Flow Summary")}>
       <table className="min-w-full text-[12.5px]">
         <tbody>
-          <tr className="border-b border-[var(--border-subtle)]"><td className="px-4 py-2 text-[var(--text-highlight)]">{t("statements.cf.in", "Cash in")} <span className="text-[var(--text-dim)]">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.in))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(r.cash_in)}</td></tr>
-          <tr className="border-b border-[var(--border-subtle)]"><td className="px-4 py-2 text-[var(--text-highlight)]">{t("statements.cf.out", "Cash out")} <span className="text-[var(--text-dim)]">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.out))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-rose-200">{fmtMoney(r.cash_out)}</td></tr>
+          <tr className="border-b border-[var(--border-subtle)]"><td className="px-4 py-2 text-[var(--text-highlight)]">{t("statements.cf.in", "Cash in")} <span className="text-[var(--text-dim)]">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.in))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-200">{fmtMoney(r.cash_in)}</td></tr>
+          <tr className="border-b border-[var(--border-subtle)]"><td className="px-4 py-2 text-[var(--text-highlight)]">{t("statements.cf.out", "Cash out")} <span className="text-[var(--text-dim)]">{t("statements.cf.payments", "({n} payments)").replace("{n}", String(r.counts.out))}</span></td><td className="px-4 py-2 text-right tabular-nums font-mono text-rose-700 dark:text-rose-200">{fmtMoney(r.cash_out)}</td></tr>
           <tr className="border-t-2 border-white/20"><td className="px-4 py-2.5 text-[14px] font-bold">{t("statements.cf.net", "Net cash change")}</td><td className="px-4 py-2.5 text-right tabular-nums font-mono text-[14px] font-bold">{fmtMoney(r.net_change)}</td></tr>
         </tbody>
       </table>
@@ -332,7 +332,7 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
   const { data, loading, error } = useJson<{ report: AgingReport }>(url);
   const r = data?.report;
   if (loading && !r) return <Panel title={title}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={title}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={title}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
     <Panel title={t("statements.aging.title", "{title} · as of {date}").replace("{title}", title).replace("{date}", r.as_of)}>
@@ -357,7 +357,7 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
                 <td key={b} className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-secondary)]">{fmtMoney(p.buckets[b] ?? 0)}</td>
               ))}
               <td className="px-4 py-1.5 text-right tabular-nums font-mono">{fmtMoney(p.total_open)}</td>
-              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-rose-200">{fmtMoney(p.total_overdue)}</td>
+              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-rose-700 dark:text-rose-200">{fmtMoney(p.total_overdue)}</td>
             </tr>
           ))}
         </tbody>
@@ -369,7 +369,7 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
                 <td key={b} className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.by_bucket[b] ?? 0)}</td>
               ))}
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.total_open)}</td>
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-200">{fmtMoney(r.totals.total_overdue)}</td>
+              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-700 dark:text-rose-200">{fmtMoney(r.totals.total_overdue)}</td>
             </tr>
           </tfoot>
         )}
@@ -396,7 +396,7 @@ function InventoryValuePanel() {
   const { data, loading, error } = useJson<{ report: InvReport }>("/api/accounting/statements/inventory-valuation");
   const r = data?.report;
   if (loading && !r) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
     <Panel title={t("statements.inv.title", "Inventory Valuation · as of {date}").replace("{date}", r.as_of)}>
@@ -431,7 +431,7 @@ function InventoryValuePanel() {
               <td colSpan={3} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">{t("statements.aging.totals", "Totals")}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtQty(r.totals.total_qty)}</td>
               <td className="px-4 py-2"></td>
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-200">{fmtMoney(r.totals.total_value)}</td>
+              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-700 dark:text-emerald-200">{fmtMoney(r.totals.total_value)}</td>
             </tr>
           </tfoot>
         )}
@@ -452,7 +452,7 @@ function GrossProfitPanel({ from, to }: { from: string; to: string }) {
   );
   const r = data?.report;
   if (loading && !r) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
-  if (error) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[11px] text-rose-300">{error}</div></Panel>;
+  if (error) return <Panel title={t("statements.tab.gp", "Gross Profit")}><div className="px-4 py-6 text-[11px] text-rose-600 dark:text-rose-300">{error}</div></Panel>;
   if (!r) return null;
   return (
     <Panel title={t("statements.gp.title", "Gross Profit per Invoice")}>
@@ -475,8 +475,8 @@ function GrossProfitPanel({ from, to }: { from: string; to: string }) {
             <tr key={row.invoice_id} className="border-b border-[var(--border-faint)] hover:bg-[var(--bg-secondary)]">
               <td className="px-4 py-1.5 font-mono text-[11.5px] text-[var(--text-highlight)]">{row.invoice_no ?? "—"}</td>
               <td className="px-4 py-1.5 text-[var(--text-highlight)]">{row.customer_name ?? "—"}</td>
-              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-emerald-200">{fmtMoney(row.revenue)}</td>
-              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-rose-200">{fmtMoney(row.cogs)}</td>
+              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-200">{fmtMoney(row.revenue)}</td>
+              <td className="px-4 py-1.5 text-right tabular-nums font-mono text-rose-700 dark:text-rose-200">{fmtMoney(row.cogs)}</td>
               <td className="px-4 py-1.5 text-right tabular-nums font-mono">{fmtMoney(row.gross_profit)}</td>
               <td className="px-4 py-1.5 text-right tabular-nums font-mono text-[var(--text-secondary)]">{row.revenue > 0 ? `${row.margin_pct.toFixed(1)}%` : "—"}</td>
               <td className="px-4 py-1.5 text-[10.5px] text-[var(--text-dim)]">{t("statements.gp.statusLine", "rev · {rev} / cogs · {cogs}").replace("{rev}", row.revenue_status).replace("{cogs}", row.cogs_status)}</td>
@@ -487,8 +487,8 @@ function GrossProfitPanel({ from, to }: { from: string; to: string }) {
           <tfoot>
             <tr className="border-t-2 border-white/20">
               <td colSpan={2} className="px-4 py-2 text-[13px] font-bold text-right uppercase tracking-[0.08em]">{t("statements.aging.totals", "Totals")}</td>
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-200">{fmtMoney(r.totals.revenue)}</td>
-              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-200">{fmtMoney(r.totals.cogs)}</td>
+              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-emerald-700 dark:text-emerald-200">{fmtMoney(r.totals.revenue)}</td>
+              <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold text-rose-700 dark:text-rose-200">{fmtMoney(r.totals.cogs)}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{fmtMoney(r.totals.gross_profit)}</td>
               <td className="px-4 py-2 text-right tabular-nums font-mono text-[13px] font-bold">{r.totals.revenue > 0 ? `${r.totals.margin_pct.toFixed(1)}%` : "—"}</td>
               <td className="px-4 py-2"></td>

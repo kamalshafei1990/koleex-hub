@@ -967,10 +967,10 @@ function ExecutiveView({
 
 function PressurePill({ pressure, t }: { pressure: Pressure; t: (key: string, fallback?: string) => string }) {
   const cls =
-    pressure === "critical" ? "bg-rose-500/[0.14] text-rose-300 border-rose-500/[0.25]"
-  : pressure === "risk"     ? "bg-rose-500/[0.10] text-rose-300/90 border-rose-500/[0.18]"
-  : pressure === "watch"    ? "bg-amber-500/[0.10] text-amber-300 border-amber-500/[0.18]"
-  :                           "bg-emerald-500/[0.08] text-emerald-300 border-emerald-500/[0.16]";
+    pressure === "critical" ? "bg-rose-500/[0.14] text-rose-700 dark:text-rose-300 border-rose-500/[0.25]"
+  : pressure === "risk"     ? "bg-rose-500/[0.10] text-rose-700/90 dark:text-rose-300/90 border-rose-500/[0.18]"
+  : pressure === "watch"    ? "bg-amber-500/[0.10] text-amber-700 dark:text-amber-300 border-amber-500/[0.18]"
+  :                           "bg-emerald-500/[0.08] text-emerald-700 dark:text-emerald-300 border-emerald-500/[0.16]";
   const label =
     pressure === "critical" ? t("dash.pressure.critical", "Critical pressure")
   : pressure === "risk"     ? t("dash.pressure.risk", "Elevated pressure")
@@ -979,10 +979,10 @@ function PressurePill({ pressure, t }: { pressure: Pressure; t: (key: string, fa
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${cls}`}>
       <span aria-hidden className={"h-1.5 w-1.5 rounded-full " + (
-        pressure === "critical" ? "bg-rose-400"
-      : pressure === "risk"     ? "bg-rose-400"
-      : pressure === "watch"    ? "bg-amber-300"
-      :                           "bg-emerald-400"
+        pressure === "critical" ? "bg-rose-600 dark:bg-rose-400"
+      : pressure === "risk"     ? "bg-rose-600 dark:bg-rose-400"
+      : pressure === "watch"    ? "bg-amber-600 dark:bg-amber-300"
+      :                           "bg-emerald-600 dark:bg-emerald-400"
       )} />
       {label}
     </span>

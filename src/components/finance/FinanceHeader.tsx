@@ -29,17 +29,17 @@ interface HealthStyle { dot: string; labelKey: string; labelFallback: string; hi
 
 const HEALTH_STYLE: Record<HealthStatus, HealthStyle> = {
   healthy: {
-    dot: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]",
+    dot: "bg-emerald-600 dark:bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.55)]",
     labelKey: "header.healthHealthy",    labelFallback: "Healthy",
     hintKey:  "header.healthHealthyHint",hintFallback:  "Profit positive, cash flowing, nothing overdue.",
   },
   watch: {
-    dot: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.55)]",
+    dot: "bg-amber-600 dark:bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.55)]",
     labelKey: "header.healthWatch",       labelFallback: "Watch",
     hintKey:  "header.healthWatchHint",   hintFallback:  "Some overdue items or tight cash position.",
   },
   stress: {
-    dot: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.65)]",
+    dot: "bg-rose-600 dark:bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.65)]",
     labelKey: "header.healthStress",      labelFallback: "Stress",
     hintKey:  "header.healthStressHint",  hintFallback:  "Negative net profit or major overdue exposure.",
   },

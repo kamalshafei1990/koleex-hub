@@ -90,8 +90,8 @@ export default function FinancePayments() {
           subtitle={t("payments.subtitle", "Money in from customers and money out to suppliers — partial, full, pending, all in one ledger.")}
           action={
             <div className="flex gap-2">
-              <button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.action.in", "+ Customer Payment")}</button>
-              <button onClick={() => startNew("out")} className="rounded-xl bg-rose-500/20 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-500/30">{t("payments.action.out", "+ Supplier Payment")}</button>
+              <button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("payments.action.in", "+ Customer Payment")}</button>
+              <button onClick={() => startNew("out")} className="rounded-xl bg-rose-500/20 px-4 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/30">{t("payments.action.out", "+ Supplier Payment")}</button>
             </div>
           }
         />
@@ -128,7 +128,7 @@ export default function FinancePayments() {
               action={
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(null)} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("payments.editor.cancel", "Cancel")}</button>
-                  <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.editor.save", "Save Payment")}</button>
+                  <button onClick={save} className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("payments.editor.save", "Save Payment")}</button>
                 </div>
               }
             >
@@ -175,7 +175,7 @@ export default function FinancePayments() {
             <EmptyState
               title={t("payments.emptyTitle", "No payments recorded yet")}
               hint={t("payments.emptyHint", "Log every money movement — customer payments, supplier payments, banking fees.")}
-              action={<button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("payments.emptyAction", "+ Record First Payment")}</button>}
+              action={<button onClick={() => startNew("in")} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("payments.emptyAction", "+ Record First Payment")}</button>}
             />
           ) : (
             <SectionCard>
@@ -220,13 +220,13 @@ export default function FinancePayments() {
                       >
                         <td className="py-3 pr-3 text-[var(--text-secondary)] tabular-nums">{p.payment_date}</td>
                         <td className="py-3 pr-3">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${p.direction === "in" ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${p.direction === "in" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
                             {p.direction === "in" ? t("payments.row.in", "Money in") : t("payments.row.out", "Money out")}
                           </span>
                         </td>
                         <td className="py-3 pr-3 font-medium">{p.party_name || "—"}</td>
                         <td className="py-3 pr-3 text-[var(--text-secondary)]">{p.payment_method ?? "—"}</td>
-                        <td className={`py-3 pr-3 text-right tabular-nums font-semibold ${p.direction === "in" ? "text-emerald-400" : "text-rose-400"}`}>
+                        <td className={`py-3 pr-3 text-right tabular-nums font-semibold ${p.direction === "in" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                           {p.direction === "in" ? "+" : "−"}{fmtMoney(Number(p.amount) || 0, p.currency, { compact: true })}
                         </td>
                         <td className="py-3 pr-3">

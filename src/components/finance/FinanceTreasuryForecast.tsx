@@ -328,7 +328,7 @@ export default function FinanceTreasuryForecast() {
         )}
 
         {error && (
-          <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300">{error}</div>
+          <div className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-600 dark:text-rose-300">{error}</div>
         )}
 
         {/* Safety disclaimer */}
@@ -377,8 +377,8 @@ export default function FinanceTreasuryForecast() {
                 action={
                   diff ? (
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      diff.direction === "deteriorates" ? "bg-rose-500/15 text-rose-300" :
-                      diff.direction === "improves"     ? "bg-emerald-500/15 text-emerald-300" :
+                      diff.direction === "deteriorates" ? "bg-rose-500/15 text-rose-600 dark:text-rose-300" :
+                      diff.direction === "improves"     ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
                       "bg-gray-500/15 text-[var(--text-highlight)]"
                     }`}>
                       {t("forecast.chart.impact", "Impact at 90d: {value} USD").replace("{value}", fmtCompactUsd(diff.d90Delta))}
@@ -428,7 +428,7 @@ export default function FinanceTreasuryForecast() {
                         return (
                           <div
                             key={it.label}
-                            className="absolute top-2 inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-200"
+                            className="absolute top-2 inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:text-rose-200"
                             style={{ left: `${xPct}%`, transform: "translateX(-50%)" }}
                           >
                             <RrIcon name="info" size={9} />
@@ -458,7 +458,7 @@ export default function FinanceTreasuryForecast() {
                         disabled={loading}
                         className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition disabled:opacity-50 ${
                           active
-                            ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+                            ? "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-200"
                             : "border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-highlight)] hover:border-[var(--border-strong)]"
                         }`}
                       >
@@ -483,7 +483,7 @@ export default function FinanceTreasuryForecast() {
                     {risks.slice(0, 6).map((r) => (
                       <li key={r.key} className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
                         <span className={`mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full ${
-                          r.severity === "risk" ? "bg-rose-400" : r.severity === "watch" ? "bg-amber-300" : "bg-gray-400"
+                          r.severity === "risk" ? "bg-rose-600 dark:bg-rose-400" : r.severity === "watch" ? "bg-amber-300" : "bg-gray-400"
                         }`} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{r.label}</div>
@@ -554,7 +554,7 @@ export default function FinanceTreasuryForecast() {
                       <li key={e.key} className="flex items-center gap-3 py-2 text-[11px]">
                         <span className="text-[var(--text-dim)] tabular-nums w-14">d+{e.daysFromNow}</span>
                         <span className="text-[var(--text-dim)] tabular-nums">{e.date}</span>
-                        <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider ${e.direction === "inflow" ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>
+                        <span className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider ${e.direction === "inflow" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" : "bg-rose-500/15 text-rose-600 dark:text-rose-300"}`}>
                           {e.direction === "inflow" ? t("forecast.events.in", "In") : t("forecast.events.out", "Out")}
                         </span>
                         <span className="text-[var(--text-secondary)]">{e.source.replace(/_/g, " ")}</span>
@@ -596,7 +596,7 @@ function DriverList({
   tone: "positive" | "negative";
 }) {
   const { t } = useTranslation(financeT);
-  const accent = tone === "positive" ? "text-emerald-300" : "text-rose-300";
+  const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>
       <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-dim)]">{title}</div>

@@ -230,7 +230,7 @@ export default function FinanceAccountingQueue() {
         </div>
 
         {error && (
-          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
         )}
 
         {/* Table + drawer */}
@@ -414,7 +414,7 @@ function InventoryCogsSection() {
   return (
     <div>
       {error && (
-        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
       )}
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
@@ -452,9 +452,9 @@ function InventoryCogsSection() {
                   </td>
                   <td className="px-4 py-2">
                     <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
-                      r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+                      r.status === "posted" ? "border-emerald-600/40 dark:border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200" :
                       r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-[var(--text-secondary)]" :
-                                              "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                                              "border-amber-600/40 dark:border-amber-400/30 bg-amber-500/10 text-amber-700 dark:text-amber-200"
                     }`}>{r.status}</span>
                   </td>
                   <td className="px-4 py-2 text-right">
@@ -463,7 +463,7 @@ function InventoryCogsSection() {
                         <button
                           onClick={() => post(r.id)}
                           disabled={busy === r.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50"
                         >
                           {t("accounting.queue.btn.post", "Post")}
                         </button>
@@ -472,7 +472,7 @@ function InventoryCogsSection() {
                         <button
                           onClick={() => voidEntry(r.id)}
                           disabled={busy === r.id}
-                          className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50"
+                          className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200 disabled:opacity-50"
                         >
                           {t("accounting.queue.btn.void", "Void")}
                         </button>
@@ -514,7 +514,7 @@ function ActionButtons({
   if (item.accounting_status === "drafted") {
     return (
       <button type="button" onClick={(e) => { stop(e); onPost(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
         {t("accounting.queue.btn.post", "Post")}
       </button>
     );
@@ -522,7 +522,7 @@ function ActionButtons({
   if (item.accounting_status === "failed") {
     return (
       <button type="button" onClick={(e) => { stop(e); onRetry(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
         {t("accounting.queue.btn.retry", "Retry")}
       </button>
     );
@@ -530,7 +530,7 @@ function ActionButtons({
   if (item.accounting_status === "posted") {
     return (
       <button type="button" onClick={(e) => { stop(e); onVoid(); }} disabled={isBusy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-rose-500/30 hover:text-rose-200 disabled:opacity-50">
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-rose-500/30 hover:text-rose-700 dark:hover:text-rose-200 disabled:opacity-50">
         {t("accounting.queue.btn.void", "Void")}
       </button>
     );
@@ -592,7 +592,7 @@ function ReviewDrawer({
       </div>
 
       {item.accounting_last_error && (
-        <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
+        <div className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">
           {item.accounting_last_error}
         </div>
       )}
@@ -637,7 +637,7 @@ function ReviewDrawer({
                 </tr>
               </tfoot>
             </table>
-            <div className={`text-[10px] ${balanced ? "text-emerald-300" : "text-rose-300"}`}>
+            <div className={`text-[10px] ${balanced ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"}`}>
               {balanced ? t("accounting.queue.review.balanced", "Balanced") : t("accounting.queue.review.imbalance", "Out of balance by {value}").replace("{value}", (totalDr - totalCr).toFixed(2))}
             </div>
           </div>
@@ -657,14 +657,14 @@ function ReviewDrawer({
         {item.accounting_status === "drafted" && item.accounting_entry_id && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("post-draft", { entry_id: item.accounting_entry_id })) await onAction(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[11px] text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
             {t("accounting.queue.review.postEntry", "Post entry")}
           </button>
         )}
         {item.accounting_status === "failed" && (
           <button type="button" disabled={busy !== null}
             onClick={async () => { if (await callAction("retry", { kind: item.kind, source_id: item.source_id })) await onAction(); }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-200 hover:bg-amber-500/15 disabled:opacity-50">
             {t("accounting.queue.review.retryRec", "Retry recognition")}
           </button>
         )}
@@ -760,7 +760,7 @@ function SalesRevenueSection() {
   return (
     <div>
       {error && (
-        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+        <div className="mb-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
       )}
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
         <table className="min-w-full text-[12.5px]">
@@ -794,22 +794,22 @@ function SalesRevenueSection() {
                   </td>
                   <td className="px-4 py-2">
                     <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.10em] ${
-                      r.status === "posted" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" :
+                      r.status === "posted" ? "border-emerald-600/40 dark:border-emerald-400/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200" :
                       r.status === "voided" ? "border-gray-500/30 bg-gray-500/10 text-[var(--text-secondary)]" :
-                                              "border-amber-400/30 bg-amber-500/10 text-amber-200"
+                                              "border-amber-600/40 dark:border-amber-400/30 bg-amber-500/10 text-amber-700 dark:text-amber-200"
                     }`}>{r.status}</span>
                   </td>
                   <td className="px-4 py-2 text-right">
                     <div className="inline-flex items-center gap-1">
                       {r.status === "draft" && (
                         <button onClick={() => post(r.id)} disabled={busy === r.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/15 disabled:opacity-50">
                           {t("accounting.queue.btn.post", "Post")}
                         </button>
                       )}
                       {r.status === "posted" && (
                         <button onClick={() => voidEntry(r.id)} disabled={busy === r.id}
-                          className="text-[11px] text-rose-300 hover:text-rose-200 disabled:opacity-50">
+                          className="text-[11px] text-rose-600 dark:text-rose-300 hover:text-rose-700 dark:hover:text-rose-200 disabled:opacity-50">
                           {t("accounting.queue.btn.void", "Void")}
                         </button>
                       )}

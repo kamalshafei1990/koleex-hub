@@ -89,7 +89,7 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-300/70" />
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500/80 dark:bg-amber-300/70" />
             {t("home.banner.kicker", "Finance setup · {pct}% complete").replace("{pct}", String(pct))}
           </div>
           <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">

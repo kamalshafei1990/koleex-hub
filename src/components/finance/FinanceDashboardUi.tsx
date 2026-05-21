@@ -43,18 +43,18 @@ export const TYPE = {
 type Tone = "positive" | "negative" | "warning" | "neutral" | "info";
 
 const TONE_TEXT: Record<Tone, string> = {
-  positive: "text-emerald-200",
-  negative: "text-rose-200",
-  warning:  "text-amber-200",
+  positive: "text-emerald-700 dark:text-emerald-200",
+  negative: "text-rose-700 dark:text-rose-200",
+  warning:  "text-amber-700 dark:text-amber-200",
   info:     "text-[var(--text-primary)]",
   neutral:  "text-[var(--text-primary)]",
 };
 const TONE_ACCENT: Record<Tone, string> = {
-  positive: "bg-emerald-300/55",
-  negative: "bg-rose-300/55",
-  warning:  "bg-amber-300/55",
-  info:     "bg-white/30",
-  neutral:  "bg-white/20",
+  positive: "bg-emerald-500/60 dark:bg-emerald-300/55",
+  negative: "bg-rose-500/60 dark:bg-rose-300/55",
+  warning:  "bg-amber-500/60 dark:bg-amber-300/55",
+  info:     "bg-black/20 dark:bg-white/30",
+  neutral:  "bg-black/15 dark:bg-white/20",
 };
 
 /* ─── Eyebrow ────────────────────────────────────────────────────── */
@@ -182,9 +182,9 @@ export function OperationalKpi({
   const delta = deltaPct ?? null;
   const deltaSign = delta == null ? null : delta > 0 ? "▲" : delta < 0 ? "▼" : "·";
   const deltaCls = delta == null ? "text-[var(--text-dim)]"
-    : tone === "warning" ? "text-amber-300/80"
-    : (tone === "positive" && delta >= 0) || (tone === "negative" && delta < 0) ? "text-emerald-300/80"
-    : (tone === "positive" && delta < 0) || (tone === "negative" && delta >= 0) ? "text-rose-300/80"
+    : tone === "warning" ? "text-amber-700/80 dark:text-amber-300/80"
+    : (tone === "positive" && delta >= 0) || (tone === "negative" && delta < 0) ? "text-emerald-700/80 dark:text-emerald-300/80"
+    : (tone === "positive" && delta < 0) || (tone === "negative" && delta >= 0) ? "text-rose-700/80 dark:text-rose-300/80"
     : "text-[var(--text-secondary)]";
   const body = (
     <>
@@ -230,9 +230,9 @@ export function IntelligenceLine({
   prefix?: string;
 }) {
   const dotCls =
-    severity === "risk"    ? "bg-rose-400"
-    : severity === "watch" ? "bg-amber-300"
-    : severity === "positive" ? "bg-emerald-400"
+    severity === "risk"    ? "bg-rose-600 dark:bg-rose-400"
+    : severity === "watch" ? "bg-amber-600 dark:bg-amber-300"
+    : severity === "positive" ? "bg-emerald-600 dark:bg-emerald-400"
     : "bg-gray-500";
   return (
     <div className="flex items-baseline gap-2.5">
@@ -287,10 +287,10 @@ export function HealthRail({
         <div className="grid w-full max-w-[560px] grid-cols-5 gap-x-3 gap-y-1.5">
           {modules.map((m) => {
             const fillCls =
-              m.pressure === "critical" ? "bg-rose-300/70"
-              : m.pressure === "risk"   ? "bg-rose-300/55"
-              : m.pressure === "watch"  ? "bg-amber-300/65"
-              :                            "bg-emerald-300/65";
+              m.pressure === "critical" ? "bg-rose-500/70 dark:bg-rose-300/70"
+              : m.pressure === "risk"   ? "bg-rose-500/60 dark:bg-rose-300/55"
+              : m.pressure === "watch"  ? "bg-amber-500/65 dark:bg-amber-300/65"
+              :                            "bg-emerald-500/65 dark:bg-emerald-300/65";
             const pct = Math.max(4, Math.min(100, m.score));
             return (
               <div key={m.key} className="flex flex-col gap-1.5">
@@ -336,10 +336,10 @@ export function OperationsDigest({
             : p.pressure === "watch" ? "warning"
             : "positive";
           const dot =
-            p.pressure === "critical" ? "bg-rose-400"
-            : p.pressure === "risk"   ? "bg-rose-400/80"
-            : p.pressure === "watch"  ? "bg-amber-300"
-            :                            "bg-emerald-400";
+            p.pressure === "critical" ? "bg-rose-600 dark:bg-rose-400"
+            : p.pressure === "risk"   ? "bg-rose-600/80 dark:bg-rose-400/80"
+            : p.pressure === "watch"  ? "bg-amber-600 dark:bg-amber-300"
+            :                            "bg-emerald-600 dark:bg-emerald-400";
           return (
             <div key={p.label} className="min-w-[120px]">
               <div className="flex items-center gap-1.5">
@@ -366,8 +366,8 @@ export function CalmTag({
   text: string;
   tone?: "positive" | "warning" | "neutral";
 }) {
-  const dot = tone === "positive" ? "bg-emerald-400"
-    : tone === "warning" ? "bg-amber-300"
+  const dot = tone === "positive" ? "bg-emerald-600 dark:bg-emerald-400"
+    : tone === "warning" ? "bg-amber-600 dark:bg-amber-300"
     : "bg-gray-500";
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">

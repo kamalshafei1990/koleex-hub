@@ -103,7 +103,7 @@ export default function FinanceWorkspace() {
       action={
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => openSmartCreate()}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14]"
                   title={t("header.createTitle", "Create (c)")}>
             <RrIcon name="plus" size={12} /> {t("header.create", "Create")}
           </button>
@@ -115,13 +115,13 @@ export default function FinanceWorkspace() {
       }
     >
       {loading && <div className="text-sm text-[var(--text-dim)]">{t("workspace.loading", "Loading…")}</div>}
-      {error && <div className="text-sm text-rose-300">{error}</div>}
+      {error && <div className="text-sm text-rose-600 dark:text-rose-300">{error}</div>}
       {snap && (
         <>
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <ErpEyebrow>{t("workspace.topActions", "Top actions")}</ErpEyebrow>
-              <Link href="/finance/data-entry" className="text-[11px] text-emerald-200 hover:text-emerald-100">{t("workspace.howToEnter", "How do I enter data? →")}</Link>
+              <Link href="/finance/data-entry" className="text-[11px] text-emerald-700 dark:text-emerald-200 hover:text-emerald-800 dark:hover:text-emerald-100">{t("workspace.howToEnter", "How do I enter data? →")}</Link>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
               <ErpQuickAction href="/finance/data-entry" icon="pencil"             label={t("workspace.qa.dataEntry",  "Data Entry")}  hint={t("workspace.qa.dataEntryHint",  "Assets · balances · all manual entry")} />
@@ -236,7 +236,7 @@ export default function FinanceWorkspace() {
                         <div className="font-mono text-[12px] tabular-nums">{fmtAmt(r.amount, r.currency)}</div>
                         <div className="text-[10.5px] text-[var(--text-dim)]">{fmtDay(r.occurred_at)}</div>
                       </Link>
-                      {idx === 0 && <span aria-hidden className="absolute left-[15px] top-0 h-2 w-px bg-emerald-400/40" />}
+                      {idx === 0 && <span aria-hidden className="absolute left-[15px] top-0 h-2 w-px bg-emerald-600/50 dark:bg-emerald-400/40" />}
                     </li>
                   ))}
                 </ol>

@@ -111,7 +111,7 @@ export default function FinanceCustomers() {
                     </div>
                   </div>
                   {(r.overdue_amount ?? 0) > 0 && (
-                    <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">
+                    <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">
                       ⚠ {t("customers.overdueAmount", "{amt} overdue — past due date.").replace("{amt}", fmtMoney(r.overdue_amount ?? 0, r.default_currency, { compact: true }))}
                     </div>
                   )}
@@ -137,7 +137,7 @@ export default function FinanceCustomers() {
 }
 
 function Mini({ label, value, accent }: { label: string; value: string; accent: "emerald" | "rose" | "amber" }) {
-  const color = accent === "emerald" ? "text-emerald-400" : accent === "rose" ? "text-rose-400" : "text-amber-400";
+  const color = accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : accent === "rose" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400";
   return (
     <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
       <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">{label}</div>

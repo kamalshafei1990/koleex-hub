@@ -192,7 +192,7 @@ export default function FinanceReconciliation() {
         </div>
 
         {error && (
-          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-300">
+          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-600 dark:text-rose-300">
             {error}
           </div>
         )}
@@ -296,8 +296,8 @@ const CandidateRow = memo(function CandidateRow({
         <span className="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">{typeLabel}</span>
         {candidate.status !== "suggested" && (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-            candidate.status === "confirmed" ? "bg-emerald-500/15 text-emerald-300"
-            : candidate.status === "rejected" ? "bg-rose-500/15 text-rose-300"
+            candidate.status === "confirmed" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+            : candidate.status === "rejected" ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"
             : "bg-gray-500/15 text-[var(--text-highlight)]"
           }`}>{candidate.status}</span>
         )}
@@ -334,7 +334,7 @@ const CandidateRow = memo(function CandidateRow({
       {Math.abs(diff) > 0.005 && (
         <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)]/40 px-3 py-2 text-[11px]">
           <span className="text-[var(--text-dim)]">{t("reconciliation.diff", "Difference")}</span>
-          <span className={`tabular-nums font-semibold ${diff > 0 ? "text-amber-300" : "text-rose-300"}`}>
+          <span className={`tabular-nums font-semibold ${diff > 0 ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300"}`}>
             {diff > 0 ? "+" : "−"}{fmtMoney(Math.abs(diff), m?.currency ?? p?.currency ?? "USD", { compact: true })}
           </span>
         </div>
@@ -344,7 +344,7 @@ const CandidateRow = memo(function CandidateRow({
       {(candidate.matched_factors.length > 0 || candidate.warnings.length > 0) && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {candidate.matched_factors.map((f) => (
-            <span key={f.key} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
+            <span key={f.key} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-300">
               <RrIcon name="check" size={9} />
               {f.label}
             </span>
@@ -353,8 +353,8 @@ const CandidateRow = memo(function CandidateRow({
             <span
               key={w.key}
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
-                w.severity === "risk"  ? "border-rose-500/25 bg-rose-500/10 text-rose-300" :
-                w.severity === "watch" ? "border-amber-500/25 bg-amber-500/10 text-amber-300" :
+                w.severity === "risk"  ? "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300" :
+                w.severity === "watch" ? "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-300" :
                                           "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
               }`}
               title={w.message}
@@ -373,7 +373,7 @@ const CandidateRow = memo(function CandidateRow({
             type="button"
             onClick={() => onConfirm(candidate.id)}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/25 px-3 py-1.5 text-[12px] font-semibold text-emerald-700 dark:text-emerald-200 transition hover:bg-emerald-500/35 disabled:opacity-60"
           >
             {busy ? <RrIcon name="loading" size={11} className="animate-spin" /> : <RrIcon name="check" size={11} />}
             {t("reconciliation.confirm", "Confirm match")}
@@ -382,7 +382,7 @@ const CandidateRow = memo(function CandidateRow({
             type="button"
             onClick={() => onReject(candidate.id)}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-highlight)] transition hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-highlight)] transition hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-300 disabled:opacity-60"
           >
             <RrIcon name="cross" size={11} />
             {t("reconciliation.reject", "Reject")}
@@ -410,8 +410,8 @@ const CandidateRow = memo(function CandidateRow({
 
 function ConfidencePill({ level, pct }: { level: ReconciliationConfidenceLevel; pct: number }) {
   const cls =
-    level === "high"   ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" :
-    level === "medium" ? "bg-amber-500/20 text-amber-200 border-amber-500/30"      :
+    level === "high"   ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 border-emerald-500/30" :
+    level === "medium" ? "bg-amber-500/20 text-amber-700 dark:text-amber-200 border-amber-500/30"      :
                           "bg-slate-500/25 text-slate-100 border-slate-400/40";
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${cls}`}>
@@ -423,12 +423,12 @@ function ConfidencePill({ level, pct }: { level: ReconciliationConfidenceLevel; 
 function TypeChip({ type }: { type: ReconciliationCandidateType }) {
   const { t } = useTranslation(financeT);
   const cls =
-    type === "exact"          ? "bg-emerald-500/15 text-emerald-300" :
-    type === "partial"        ? "bg-amber-500/15 text-amber-300"      :
-    type === "underpayment"   ? "bg-rose-500/15 text-rose-300"        :
-    type === "overpayment"    ? "bg-sky-500/15 text-sky-300"          :
-    type === "fee_adjusted"   ? "bg-violet-500/15 text-violet-300"    :
-    type === "duplicate_risk" ? "bg-rose-500/15 text-rose-300"        :
+    type === "exact"          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
+    type === "partial"        ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"      :
+    type === "underpayment"   ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"        :
+    type === "overpayment"    ? "bg-sky-500/15 text-sky-600 dark:text-sky-300"          :
+    type === "fee_adjusted"   ? "bg-violet-500/15 text-violet-600 dark:text-violet-300"    :
+    type === "duplicate_risk" ? "bg-rose-500/15 text-rose-600 dark:text-rose-300"        :
                                 "bg-gray-500/15 text-[var(--text-highlight)]";
   const label =
     type === "duplicate_risk" ? t("reconciliation.typeChip.dup", "duplicate risk") :
@@ -452,7 +452,7 @@ function SideCard({
   href?: string;
 }) {
   const { t } = useTranslation(financeT);
-  const accent = accentTone === "positive" ? "text-emerald-300" : "text-rose-300";
+  const accent = accentTone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">

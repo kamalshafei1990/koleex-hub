@@ -154,7 +154,7 @@ export function StatementsDashboard() {
     <div className="space-y-5">
       {error && (
         <ErpPanel className="px-5 py-3">
-          <div className="text-[13px] text-rose-300">{error}</div>
+          <div className="text-[13px] text-rose-600 dark:text-rose-300">{error}</div>
         </ErpPanel>
       )}
 
@@ -242,11 +242,11 @@ function KpiHero({
   tone: "neutral" | "positive" | "warning";
 }) {
   const main =
-    tone === "positive" ? "text-emerald-200" :
-    tone === "warning"  ? "text-amber-200"   :
+    tone === "positive" ? "text-emerald-700 dark:text-emerald-200" :
+    tone === "warning"  ? "text-amber-700 dark:text-amber-200"   :
                           "text-[var(--text-primary)]";
   const deltaUp = (delta ?? 0) >= 0;
-  const deltaTone = deltaUp ? "text-emerald-300" : "text-rose-300";
+  const deltaTone = deltaUp ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
 
   return (
     <div className="text-center">
@@ -482,8 +482,8 @@ function SubtotalCells({ label, prior, cur, showPrior }: { label: string; prior?
 /* Total — bold uppercase, stronger top divider, tonal value. */
 function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
-    tone === "positive" ? "text-emerald-200" :
-    tone === "warning"  ? "text-rose-200"    :
+    tone === "positive" ? "text-emerald-700 dark:text-emerald-200" :
+    tone === "warning"  ? "text-rose-700 dark:text-rose-200"    :
                           "text-[var(--text-primary)]";
   const baseCls = "pt-3 pb-2 text-[14px] font-bold uppercase tracking-[0.06em]";
   return (
@@ -515,12 +515,12 @@ function TotalCells({ label, prior, cur, showPrior, tone }: { label: string; pri
    distinct callout, not just a heavier table row. */
 function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; prior?: number; cur: number; showPrior: boolean; tone: StatementTone }) {
   const valueTone =
-    tone === "positive" ? "text-emerald-200" :
-    tone === "warning"  ? "text-rose-200"    :
+    tone === "positive" ? "text-emerald-700 dark:text-emerald-200" :
+    tone === "warning"  ? "text-rose-700 dark:text-rose-200"    :
                           "text-[var(--text-primary)]";
   const borderTone =
-    tone === "positive" ? "border-emerald-300/40" :
-    tone === "warning"  ? "border-rose-300/40"    :
+    tone === "positive" ? "border-emerald-500/60 dark:border-emerald-300/40" :
+    tone === "warning"  ? "border-rose-500/60 dark:border-rose-300/40"    :
                           "border-[var(--border-color)]";
 
   const span = showPrior ? "col-span-3" : "col-span-2";
@@ -635,7 +635,7 @@ function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; cur
                      showPrior={false}
                      tone={bs.reconciled ? "positive" : "warning"} />
       {!bs.reconciled && (
-        <div className="col-span-2 mt-2 text-[11px] text-rose-300">{t("visual.bsMismatch", "⚠ Balance sheet does not reconcile.")}</div>
+        <div className="col-span-2 mt-2 text-[11px] text-rose-600 dark:text-rose-300">{t("visual.bsMismatch", "⚠ Balance sheet does not reconcile.")}</div>
       )}
     </div>
   );

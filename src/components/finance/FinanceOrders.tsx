@@ -237,7 +237,7 @@ export default function FinanceOrders() {
                 <button
                   type="button"
                   onClick={startNew}
-                  className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 transition hover:bg-emerald-500/30"
+                  className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 transition hover:bg-emerald-500/30"
                 >
                   + {t("orders.emptyCta", "Create First Order")}
                 </button>
@@ -302,9 +302,9 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
     : lowMargin || heavyAP ? "watch"
     : "ok";
   const riskChip =
-    risk === "alert" ? "border-rose-500/40 bg-rose-500/[0.08] text-rose-300"
-    : risk === "watch" ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-300"
-    : "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-300";
+    risk === "alert" ? "border-rose-500/40 bg-rose-500/[0.08] text-rose-600 dark:text-rose-300"
+    : risk === "watch" ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-600 dark:text-amber-300"
+    : "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-600 dark:text-emerald-300";
   const riskLabel =
     risk === "alert" ? (overdue ? t("orders.risk.overdue", "Overdue") : t("orders.risk.negative", "Negative margin"))
     : risk === "watch" ? (lowMargin ? t("orders.risk.low", "Low margin") : t("orders.risk.heavyAp", "Heavy AP"))
@@ -336,17 +336,17 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">{t("orders.netProfit.label", "Net profit")}</div>
-            <div className={`text-[22px] font-medium leading-none tabular-nums ${netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-300"}`}>
+            <div className={`text-[22px] font-medium leading-none tabular-nums ${netProfit >= 0 ? "text-[var(--text-primary)]" : "text-rose-600 dark:text-rose-300"}`}>
               {fmtMoney(netProfit, ccy, { compact: true })}
             </div>
-            <div className={`mt-1 text-[11px] ${netPct >= 15 ? "text-emerald-300" : netPct >= 0 ? "text-amber-300" : "text-rose-300"}`}>
+            <div className={`mt-1 text-[11px] ${netPct >= 15 ? "text-emerald-600 dark:text-emerald-300" : netPct >= 0 ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300"}`}>
               {fmtPct(netPct)} {t("orders.margin.suffix", "margin")}
             </div>
           </div>
           <ProgressRing pct={collectionPct} label={`${collectionPct.toFixed(0)}%`} sub={t("orders.collected.label", "collected")} />
           <div className="flex items-center gap-2">
             <button type="button" onClick={onEdit} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--text-highlight)] transition hover:border-[var(--border-color)]">{t("common.edit", "Edit")}</button>
-            <button type="button" onClick={onDelete} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
+            <button type="button" onClick={onDelete} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 transition hover:border-rose-500/40">{t("common.delete", "Delete")}</button>
           </div>
         </div>
       </div>
@@ -383,9 +383,9 @@ function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit
           <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-faint)] bg-[var(--bg-secondary)] px-3 py-2">
             <span className="text-[11px] text-[var(--text-secondary)]">{t("orders.risk.level", "Risk level")}</span>
             <span className={`text-[11px] font-medium uppercase tracking-wide ${
-              risk === "alert" ? "text-rose-300"
-              : risk === "watch" ? "text-amber-300"
-              : "text-emerald-300"
+              risk === "alert" ? "text-rose-600 dark:text-rose-300"
+              : risk === "watch" ? "text-amber-600 dark:text-amber-300"
+              : "text-emerald-600 dark:text-emerald-300"
             }`}>{riskLabel}</span>
           </div>
         </Zone>
@@ -451,9 +451,9 @@ function ZoneRow({
   const text =
     display ?? (v != null ? `${v < 0 ? "−" : ""}${fmtMoney(Math.abs(v), ccy, { compact: true })}` : "—");
   const cls =
-    positive ? "text-emerald-300"
-    : negative ? "text-rose-300/90"
-    : warning  ? "text-amber-300"
+    positive ? "text-emerald-600 dark:text-emerald-300"
+    : negative ? "text-rose-700/90 dark:text-rose-300/90"
+    : warning  ? "text-amber-600 dark:text-amber-300"
     : "text-[var(--text-highlight)]";
   return (
     <div className="flex items-baseline justify-between gap-3 text-[12px]">
@@ -464,7 +464,7 @@ function ZoneRow({
 }
 
 function ZoneTotal({ label, v, ccy, tone }: { label: string; v: number; ccy: string; tone: "info" | "negative" }) {
-  const cls = tone === "info" ? "text-sky-300" : "text-rose-300";
+  const cls = tone === "info" ? "text-sky-600 dark:text-sky-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-[var(--border-faint)] pt-2">
       <span className="text-[11px] font-medium text-[var(--text-highlight)]">{label}</span>
@@ -512,11 +512,11 @@ function ProgressRing({ pct, label, sub }: { pct: number; label: string; sub: st
 
 function Stat({ label, value, negative, accent }: { label: string; value: string; negative?: boolean; accent?: "emerald" | "rose" | "amber" | "sky" | "violet" }) {
   const color =
-    accent === "emerald" ? "text-emerald-400"
-    : accent === "rose"  ? "text-rose-400"
-    : accent === "amber" ? "text-amber-400"
-    : accent === "sky"   ? "text-sky-400"
-    : accent === "violet"? "text-violet-400"
+    accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
+    : accent === "rose"  ? "text-rose-600 dark:text-rose-400"
+    : accent === "amber" ? "text-amber-600 dark:text-amber-400"
+    : accent === "sky"   ? "text-sky-600 dark:text-sky-400"
+    : accent === "violet"? "text-violet-600 dark:text-violet-400"
     : negative ? "text-[var(--text-highlight)]" : "text-[var(--text-primary)]";
   return (
     <div>
@@ -680,7 +680,7 @@ function OrderEditor({
           action={
             <div className="flex gap-2">
               <button type="button" onClick={onCancel} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-2 text-sm font-medium text-[var(--text-highlight)] hover:border-[var(--border-color)]">{t("orders.editor.cancel", "Cancel")}</button>
-              <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("orders.editor.save", "Save Order")}</button>
+              <button type="button" onClick={onSave} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("orders.editor.save", "Save Order")}</button>
             </div>
           }
         />
@@ -693,7 +693,7 @@ function OrderEditor({
             { n: 3, label: t("orders.step.tax", "Tax & Charges"),       done: !!draft.order.tax_refund_pct || !!draft.order.tax_refund_value,                            active: false },
             { n: 4, label: t("orders.step.save", "Save & Track"),       done: !!draft.order.id,                                                                          active: false },
           ].map((s) => (
-            <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-300" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]"}`}>
+            <div key={s.n} className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${s.done ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : s.active ? "border-sky-500/40 bg-sky-500/10 text-sky-600 dark:text-sky-300" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]"}`}>
               <span className={`flex h-5 w-5 items-center justify-center rounded-full ${s.done ? "bg-emerald-500/30" : "bg-white/5"}`}>
                 {s.done ? <RrIcon name="check" size={10} /> : s.n}
               </span>
@@ -756,7 +756,7 @@ function OrderEditor({
                 <input type="date" value={draft.order.payment_due_date} onChange={(e) => updateOrder("payment_due_date", e.target.value)} className={INPUT} />
               </Field>
             </div>
-            <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-[11px] text-sky-200">
+            <p className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] px-3 py-2 text-[11px] text-sky-700 dark:text-sky-200">
               {t("orders.editor.taxNote", "Gross profit excludes tax refund. Tax refund is calculated separately and added back before net profit.")}
             </p>
           </SectionCard>
@@ -830,7 +830,7 @@ function OrderEditor({
                         </Field>
                       </div>
                       <div className="mt-2 flex justify-end">
-                        <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-400 hover:text-rose-300">{t("orders.editor.removeSupplier", "Remove supplier")}</button>
+                        <button type="button" onClick={() => removeSupplier(i)} className="text-[11px] text-rose-600 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300">{t("orders.editor.removeSupplier", "Remove supplier")}</button>
                       </div>
                     </div>
                   );
@@ -869,11 +869,11 @@ function Field({ label, children, wide }: { label: string; children: React.React
 
 function PreviewRow({ label, value, currency, accent, negative, percent }: { label: string; value: number; currency: string; accent: "emerald" | "rose" | "sky" | "violet" | "amber"; negative?: boolean; percent?: boolean }) {
   const color =
-    accent === "emerald" ? "text-emerald-400"
-    : accent === "rose"  ? "text-rose-400"
-    : accent === "sky"   ? "text-sky-400"
-    : accent === "violet"? "text-violet-400"
-    : "text-amber-400";
+    accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
+    : accent === "rose"  ? "text-rose-600 dark:text-rose-400"
+    : accent === "sky"   ? "text-sky-600 dark:text-sky-400"
+    : accent === "violet"? "text-violet-600 dark:text-violet-400"
+    : "text-amber-600 dark:text-amber-400";
   const display = percent ? `${value.toFixed(1)}%` : fmtMoney(value, currency, { compact: true });
   return (
     <div className="flex items-center justify-between py-1 text-sm">

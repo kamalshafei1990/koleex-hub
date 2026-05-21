@@ -122,7 +122,7 @@ export default function FinanceSuppliers() {
 }
 
 function Mini({ label, value, accent }: { label: string; value: string; accent: "emerald" | "amber" | "default" }) {
-  const color = accent === "emerald" ? "text-emerald-400" : accent === "amber" ? "text-amber-400" : "text-[var(--text-primary)]";
+  const color = accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : accent === "amber" ? "text-amber-600 dark:text-amber-400" : "text-[var(--text-primary)]";
   return (
     <div className="rounded-lg border border-[var(--border-faint)] bg-[var(--bg-primary)] p-2">
       <div className="text-[9px] uppercase tracking-wider text-[var(--text-dim)]">{label}</div>

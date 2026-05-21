@@ -146,7 +146,7 @@ export default function FxRatesManager() {
     { key: "notes", header: t("fx.col.notes", "Notes"), render: (r) => r.notes ?? "—" },
     { key: "act",  header: "", align: "right", render: (r) => (
       <button type="button" onClick={() => deleteRate(r.id)}
-              className="rounded-md border border-rose-300/30 bg-rose-300/[0.06] px-2 py-0.5 text-[10.5px] text-rose-200 hover:bg-rose-300/[0.10]">
+              className="rounded-md border border-rose-500/50 dark:border-rose-300/30 bg-rose-500/12 dark:bg-rose-300/[0.06] px-2 py-0.5 text-[10.5px] text-rose-700 dark:text-rose-200 hover:bg-rose-500/15 dark:hover:bg-rose-300/[0.10]">
         {t("fx.delete", "Delete")}
       </button>
     ) },
@@ -165,7 +165,7 @@ export default function FxRatesManager() {
         </Link>
       }
     >
-      {error && <div className="rounded-md border border-rose-300/40 bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-200">{error}</div>}
+      {error && <div className="rounded-md border border-rose-500/60 dark:border-rose-300/40 bg-rose-500/12 dark:bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-700 dark:text-rose-200">{error}</div>}
 
       {/* Status — pairs in use + missing + stale */}
       {status && (status.missing_pairs.length > 0 || status.stale_pairs.length > 0 || status.pairs.length > 0) && (
@@ -174,8 +174,8 @@ export default function FxRatesManager() {
           <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-3">
             {/* Missing required pairs */}
             {status.missing_pairs.length > 0 ? (
-              <ErpPanel className="border-rose-300/40 bg-rose-300/[0.05] px-4 py-3">
-                <div className="flex items-center gap-2 text-[11.5px] text-rose-200">
+              <ErpPanel className="border-rose-500/60 dark:border-rose-300/40 bg-rose-500/12 dark:bg-rose-300/[0.05] px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-rose-700 dark:text-rose-200">
                   <RrIcon name="cross-circle" size={12} /> {t("fx.missingRates", "Missing rates")}
                 </div>
                 <div className="mt-2 space-y-1.5">
@@ -192,13 +192,13 @@ export default function FxRatesManager() {
                     );
                   })}
                 </div>
-                <div className="mt-2 text-[10px] text-rose-200/80">
+                <div className="mt-2 text-[10px] text-rose-700/80 dark:text-rose-200/80">
                   {t("fx.missingHint", "Add a rate row below — without it, base-amount conversions fall back to 1:1.")}
                 </div>
               </ErpPanel>
             ) : (
               <ErpPanel className="px-4 py-3">
-                <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
+                <div className="flex items-center gap-2 text-[11.5px] text-emerald-700 dark:text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.allConfigured", "All exposed pairs configured")}
                 </div>
                 <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
@@ -208,8 +208,8 @@ export default function FxRatesManager() {
             )}
             {/* Stale rates */}
             {status.stale_pairs.length > 0 ? (
-              <ErpPanel className="border-amber-300/40 bg-amber-300/[0.05] px-4 py-3">
-                <div className="flex items-center gap-2 text-[11.5px] text-amber-200">
+              <ErpPanel className="border-amber-500/60 dark:border-amber-300/40 bg-amber-500/12 dark:bg-amber-300/[0.05] px-4 py-3">
+                <div className="flex items-center gap-2 text-[11.5px] text-amber-700 dark:text-amber-200">
                   <RrIcon name="clock" size={12} /> {t("fx.stale", "Stale rates (>14d)")}
                 </div>
                 <div className="mt-2 space-y-1.5">
@@ -220,13 +220,13 @@ export default function FxRatesManager() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 text-[10px] text-amber-200/80">
+                <div className="mt-2 text-[10px] text-amber-700/80 dark:text-amber-200/80">
                   {t("fx.staleHint", "Update with the latest mid-market rate to keep conversions accurate.")}
                 </div>
               </ErpPanel>
             ) : (
               <ErpPanel className="px-4 py-3">
-                <div className="flex items-center gap-2 text-[11.5px] text-emerald-200">
+                <div className="flex items-center gap-2 text-[11.5px] text-emerald-700 dark:text-emerald-200">
                   <RrIcon name="check" size={12} /> {t("fx.ratesFresh", "Rates fresh")}
                 </div>
                 <div className="mt-2 text-[10.5px] text-[var(--text-dim)]">
@@ -306,7 +306,7 @@ export default function FxRatesManager() {
           </div>
           <div className="mt-3 flex items-center justify-end">
             <button type="button" disabled={busy} onClick={addRate}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14] disabled:opacity-50">
+                    className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/60 dark:border-emerald-300/40 bg-emerald-500/15 dark:bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-800 dark:text-emerald-100 hover:bg-emerald-500/20 dark:hover:bg-emerald-300/[0.14] disabled:opacity-50">
               <RrIcon name={busy ? "loading" : "plus"} size={12} />
               {busy ? t("fx.saving", "Saving…") : t("fx.saveRate", "Save rate")}
             </button>

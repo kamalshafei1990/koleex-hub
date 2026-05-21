@@ -301,7 +301,7 @@ export default function ExpensesApp() {
             <button
               type="button"
               onClick={() => setCategoryFilter("")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-400 hover:border-rose-500/40"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-xs text-rose-600 dark:text-rose-400 hover:border-rose-500/40"
               title={t("filter.clearTitle", "Clear category filter")}
             >
               {t("filter.clear", "Clear filter")}
@@ -323,7 +323,7 @@ export default function ExpensesApp() {
                   : t(`list.empty.${tab}`, `No ${tab} expenses`)}
               hint={tab === "all" ? t("list.empty.hint", "Click + Add Expense to log your first one.") : undefined}
               action={tab === "all" ? (
-                <button onClick={startNew} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30">{t("header.addExpense", "+ Add Expense")}</button>
+                <button onClick={startNew} className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30">{t("header.addExpense", "+ Add Expense")}</button>
               ) : undefined}
             />
           ) : (
@@ -469,7 +469,7 @@ function ExpenseRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-sm font-medium">{e.title || t("list.untitled", "Untitled expense")}</span>
             <StatusBadge status={e.payment_status} />
-            {isOverdue && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-300">{t("badge.overdue", "Overdue")}</span>}
+            {isOverdue && <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-600 dark:text-rose-300">{t("badge.overdue", "Overdue")}</span>}
             <button
               type="button"
               onClick={onEvidence}
@@ -499,7 +499,7 @@ function ExpenseRow({
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-base font-semibold tabular-nums text-rose-300">−{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</div>
+            <div className="text-base font-semibold tabular-nums text-rose-600 dark:text-rose-300">−{fmtMoney(Number(e.amount) || 0, e.currency, { compact: true })}</div>
           </div>
           {/* UX-validation pass: hover-only actions are invisible on
               touch devices. We now keep an always-visible Edit + kebab
@@ -558,7 +558,7 @@ function RowKebab({
         >
           <button onClick={() => { setOpen(false); onReview(); }} className="block w-full px-3 py-2 text-left text-[12px] text-[var(--text-highlight)] hover:bg-[var(--bg-surface)]">{t("row.openReview", "Open review")}</button>
           <button onClick={() => { setOpen(false); onEvidence(); }} className="block w-full px-3 py-2 text-left text-[12px] text-[var(--text-highlight)] hover:bg-[var(--bg-surface)]">{t("row.openEvidence", "Open evidence")}</button>
-          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-[var(--border-subtle)] px-3 py-2 text-left text-[12px] text-rose-300 hover:bg-rose-500/[0.06]">{t("row.deleteExpense", "Delete expense")}</button>
+          <button onClick={() => { setOpen(false); onDelete(); }} className="block w-full border-t border-[var(--border-subtle)] px-3 py-2 text-left text-[12px] text-rose-600 dark:text-rose-300 hover:bg-rose-500/[0.06]">{t("row.deleteExpense", "Delete expense")}</button>
         </div>
       )}
     </div>
@@ -842,7 +842,7 @@ function ExpenseEditor({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               {error ? (
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-300">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-600 dark:text-rose-300">
                   <RrIcon name="info" size={10} />
                   {error}
                 </span>
@@ -932,7 +932,7 @@ function FieldLabel({
     <label className="block">
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-dim)]">
         <span>{label}</span>
-        {required && <span className="text-rose-400">*</span>}
+        {required && <span className="text-rose-600 dark:text-rose-400">*</span>}
         {helpId && <GuidanceTip guidanceId={helpId} />}
       </span>
       <span className="mt-1 block">{children}</span>
@@ -1084,7 +1084,7 @@ function CategoryPicker({
                 <button
                   type="button"
                   onClick={() => onChange("")}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-rose-500/30 hover:text-rose-300"
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-rose-500/30 hover:text-rose-600 dark:hover:text-rose-300"
                 >
                   <RrIcon name="cross" size={9} />
                   {t("picker.clear", "Clear")}

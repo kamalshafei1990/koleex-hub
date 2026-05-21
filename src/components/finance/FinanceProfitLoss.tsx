@@ -106,7 +106,7 @@ export default function FinanceProfitLoss() {
         </div>
 
         {error && (
-          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>
+          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>
         )}
 
         {data && (

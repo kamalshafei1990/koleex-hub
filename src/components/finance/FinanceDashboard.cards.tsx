@@ -43,8 +43,8 @@ export function ProfitFlow({
       {steps.map((s, i) => {
         const isTotal = !!s.total;
         const valueCls =
-          isTotal && s.tone === "info"     ? "text-sky-300"
-          : isTotal && s.tone === "negative" ? "text-rose-300"
+          isTotal && s.tone === "info"     ? "text-sky-600 dark:text-sky-300"
+          : isTotal && s.tone === "negative" ? "text-rose-600 dark:text-rose-300"
           : "text-[var(--text-highlight)]";
         const surface =
           isTotal
@@ -93,10 +93,10 @@ export function TopOrdersCard({ kpi, currency }: { kpi: DashboardKpi | null; cur
                 </div>
               </div>
               <div className="text-right">
-                <div className={`text-sm font-medium tabular-nums ${o.net_profit >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                <div className={`text-sm font-medium tabular-nums ${o.net_profit >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"}`}>
                   {formatCompact(o.net_profit)} {currency}
                 </div>
-                <div className={`text-[10px] ${o.net_profit_pct >= 15 ? "text-emerald-400" : o.net_profit_pct >= 0 ? "text-amber-400" : "text-rose-400"}`}>
+                <div className={`text-[10px] ${o.net_profit_pct >= 15 ? "text-emerald-600 dark:text-emerald-400" : o.net_profit_pct >= 0 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"}`}>
                   {fmtPct(o.net_profit_pct)}
                 </div>
               </div>

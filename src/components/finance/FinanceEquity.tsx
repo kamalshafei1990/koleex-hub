@@ -71,7 +71,7 @@ export default function FinanceEquity() {
           </div>
         </div>
 
-        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-300">{error}</div>}
+        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
 
         {data && (
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">

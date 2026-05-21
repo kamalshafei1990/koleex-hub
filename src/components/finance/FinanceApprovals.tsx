@@ -35,10 +35,10 @@ const KIND_ICON: Record<Entity, RrIconName> = {
 };
 const STATUS_BADGE: Record<Status, string> = {
   draft:     "bg-[var(--bg-surface-hover)] text-[var(--text-highlight)] border-[var(--border-subtle)]",
-  submitted: "bg-amber-400/[0.10] text-amber-200/90 border-amber-400/30",
-  pending:   "bg-amber-400/[0.10] text-amber-200/90 border-amber-400/30",
-  approved:  "bg-emerald-400/[0.10] text-emerald-200/90 border-emerald-400/30",
-  rejected:  "bg-rose-400/[0.10] text-rose-200/90 border-rose-400/30",
+  submitted: "bg-amber-400/[0.10] text-amber-700/90 dark:text-amber-200/90 border-amber-600/40 dark:border-amber-400/30",
+  pending:   "bg-amber-400/[0.10] text-amber-700/90 dark:text-amber-200/90 border-amber-600/40 dark:border-amber-400/30",
+  approved:  "bg-emerald-400/[0.10] text-emerald-200/90 border-emerald-600/40 dark:border-emerald-400/30",
+  rejected:  "bg-rose-400/[0.10] text-rose-700/90 dark:text-rose-200/90 border-rose-600/40 dark:border-rose-400/30",
 };
 
 function fmtAmt(n: number, ccy: string) {
@@ -128,7 +128,7 @@ export default function FinanceApprovals() {
       }
     >
       {loading && <div className="text-sm text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>}
-      {error && <div className="text-sm text-rose-300">{error}</div>}
+      {error && <div className="text-sm text-rose-600 dark:text-rose-300">{error}</div>}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {/* Pending list */}
@@ -225,8 +225,8 @@ function ActionBtn({ label, onClick, tone, disabled }: {
   label: string; onClick: () => void; tone: "positive" | "warning" | "neutral"; disabled?: boolean;
 }) {
   const cls =
-    tone === "positive" ? "border-emerald-300/40 hover:bg-emerald-300/[0.06] text-emerald-200" :
-    tone === "warning"  ? "border-rose-300/40 hover:bg-rose-300/[0.06] text-rose-200" :
+    tone === "positive" ? "border-emerald-500/60 dark:border-emerald-300/40 hover:bg-emerald-500/12 dark:hover:bg-emerald-300/[0.06] text-emerald-700 dark:text-emerald-200" :
+    tone === "warning"  ? "border-rose-500/60 dark:border-rose-300/40 hover:bg-rose-500/12 dark:hover:bg-rose-300/[0.06] text-rose-700 dark:text-rose-200" :
                           "border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-highlight)]";
   return (
     <button type="button" onClick={onClick} disabled={disabled}
