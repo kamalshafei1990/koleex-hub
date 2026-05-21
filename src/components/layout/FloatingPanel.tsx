@@ -483,9 +483,10 @@ export default function FloatingPanel() {
 
   /* ── Minimised handle ──
      When the operator collapses the FAB, render only a small chevron
-     tab in the corner. Single click re-expands the full pill. We keep
-     the same end-6 offset so the visual anchor doesn't jump when the
-     state changes — only the size shrinks. */
+     tab in the corner. Single click/tap re-expands the full pill. We
+     keep the same end-6 offset so the visual anchor doesn't jump.
+     Sized 32 px on mobile (thumb-friendly tap target) and 28 px on
+     desktop where a precise cursor doesn't need the extra surface. */
   if (minimized) {
     return (
       <button
@@ -493,11 +494,12 @@ export default function FloatingPanel() {
         onClick={() => setMinimized(false)}
         aria-label="Show AI / Discuss"
         title="Show AI / Discuss"
-        className={`fixed ${fabBottomClass} end-6 z-[90] flex h-7 w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
+        className={`fixed ${fabBottomClass} end-6 z-[90] flex h-8 w-8 md:h-7 md:w-7 items-center justify-center rounded-full border ${border} ${bg} shadow-lg transition-colors ${hoverBg}`}
         style={{
           boxShadow: dk
             ? "0 4px 14px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04)"
             : "0 4px 14px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         {totalUnread > 0 && (
@@ -508,7 +510,7 @@ export default function FloatingPanel() {
             {totalUnread > 9 ? "9+" : totalUnread}
           </span>
         )}
-        <AngleLeftIcon size={11} className={dk ? "text-white/55" : "text-black/55"} />
+        <AngleLeftIcon size={12} className={dk ? "text-white/65" : "text-black/65"} />
       </button>
     );
   }
@@ -884,33 +886,54 @@ export default function FloatingPanel() {
           background: ${dk ? "#111" : "#fff"};
         }
         /* Minimise handle — small chevron tab that appears above the
-           pill on hover. Lets the operator collapse the FAB so it
-           stops covering content (Finance Overview last-row issue). */
+           pill. Lets the operator collapse the FAB so it stops
+           covering content (Finance Overview last-row issue).
+
+           Behaviour split by input modality:
+             · Desktop (hover-capable):   hidden by default, fade in on
+                                           hover so it doesn't add visual noise.
+             · Touch (no hover, e.g. iOS/
+               Android Safari/Chrome):   ALWAYS visible since there's no
+                                           hover state to trigger reveal.
+                                           Tap target bumped to 22 px so
+                                           it's reachable with a thumb. */
         .fab-minimize {
           position: absolute;
           top: -10px;
           inset-inline-end: -4px;
-          width: 18px;
-          height: 18px;
+          width: 22px;
+          height: 22px;
           border-radius: 999px;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)"};
-          color: ${dk ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.65)"};
+          background: ${dk ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)"};
+          color: ${dk ? "rgba(255,255,255,0.80)" : "rgba(0,0,0,0.70)"};
           border: 1px solid ${dk ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)"};
-          opacity: 0;
-          transform: translateY(2px) scale(0.85);
-          transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-          pointer-events: none;
-          z-index: 5;
-          cursor: pointer;
-        }
-        .fab-wrap:hover .fab-minimize,
-        .fab-minimize:focus-visible {
           opacity: 1;
           transform: translateY(0) scale(1);
-          pointer-events: auto;
+          transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+          z-index: 5;
+          cursor: pointer;
+          /* Touch — keep the hit area generous even though the visual
+             button is 22 px. */
+          -webkit-tap-highlight-color: transparent;
+        }
+        /* Desktop (hover-capable pointer) — fade out, reveal on hover. */
+        @media (hover: hover) and (pointer: fine) {
+          .fab-minimize {
+            width: 18px;
+            height: 18px;
+            opacity: 0;
+            transform: translateY(2px) scale(0.85);
+            pointer-events: none;
+          }
+          .fab-wrap:hover .fab-minimize,
+          .fab-minimize:focus-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+          }
         }
       `}</style>
       <div className="fab-wrap relative">
