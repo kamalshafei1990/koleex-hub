@@ -264,14 +264,23 @@ function TrendChart({ trend }: { trend: TrendBucket[] }) {
         const xSlot = padL + i * slot;
         const xRev = xSlot + slot / 2 - barW - 2;
         const xNi  = xSlot + slot / 2 + 2;
+        /* Zero-data buckets render nothing so an empty tenant doesn't show
+           5 phantom hairlines along the baseline. */
+        const showRev = Math.abs(tt.revenue)    > 0;
+        const showNi  = Math.abs(tt.net_income) > 0;
         const hRev = Math.max(2, (Math.abs(tt.revenue)    / maxY) * innerH);
         const hNi  = Math.max(2, (Math.abs(tt.net_income) / maxY) * innerH);
-        const niColor = tt.net_income >= 0 ? "rgba(180, 92, 60, 0.9)" : "rgba(229, 115, 115, 0.7)";
+        /* Monochrome palette: white = revenue, dim white = net income.
+           Negative net income is hinted with a slightly warmer dim — but
+           still neutral so the chart matches the rest of the Hub's
+           grayscale chrome. Positive vs negative is read from the KPI
+           tone above, not from the bar colour. */
+        const niColor = tt.net_income >= 0 ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.30)";
         return (
           <g key={`${tt.label}-${i}`}>
-            <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.88)" rx={2} />
-            <rect x={xNi}  y={padT + innerH - hNi}  width={barW} height={hNi}  fill={niColor} rx={2} />
-            <text x={xSlot + slot / 2} y={h - 6} fill="rgba(255,255,255,0.55)"
+            {showRev && <rect x={xRev} y={padT + innerH - hRev} width={barW} height={hRev} fill="rgba(255,255,255,0.85)" rx={2} />}
+            {showNi  && <rect x={xNi}  y={padT + innerH - hNi}  width={barW} height={hNi}  fill={niColor}              rx={2} />}
+            <text x={xSlot + slot / 2} y={h - 6} fill="rgba(255,255,255,0.45)"
                   fontSize={11} textAnchor="middle">{tt.label}</text>
           </g>
         );

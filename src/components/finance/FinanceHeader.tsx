@@ -97,7 +97,7 @@ export default function FinanceHeader({
           <button
             type="button"
             onClick={() => openSmartCreate()}
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
             title={t("header.createTitle", "Create (c)")}
             aria-label={t("header.createAria", "Open Smart Create drawer (shortcut: c)")}
           >

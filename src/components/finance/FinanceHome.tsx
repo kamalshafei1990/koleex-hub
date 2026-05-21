@@ -82,13 +82,14 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
     <section className="mt-5">
       <Link
         href="/finance/setup"
-        className="group relative flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] px-4 py-3 transition-colors hover:bg-amber-300/[0.07]"
+        className="group relative flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 transition-colors hover:border-[var(--border-color)]"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-300/15 text-amber-200">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)]">
           <RrIcon name="shield-check" size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-amber-300/80">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-300/70" />
             {t("home.banner.kicker", "Finance setup · {pct}% complete").replace("{pct}", String(pct))}
           </div>
           <div className="mt-0.5 text-[13px] font-semibold text-[var(--text-primary)]">
@@ -98,7 +99,7 @@ function SetupHealthBanner({ health }: { health: SetupHealth }) {
           </div>
           <div className="mt-1 truncate text-[11px] text-[var(--text-secondary)]">{items}{more}</div>
         </div>
-        <RrIcon name="arrow-up-right" size={11} className="mt-1 text-amber-300/70 transition-colors group-hover:text-amber-200" />
+        <RrIcon name="arrow-up-right" size={11} className="mt-1 text-[var(--text-dim)] transition-colors group-hover:text-[var(--text-primary)]" />
       </Link>
     </section>
   );

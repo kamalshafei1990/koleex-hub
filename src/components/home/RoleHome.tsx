@@ -86,10 +86,12 @@ export default function RoleHome() {
       icon="coins"
       action={
         <div className="flex items-center gap-2">
-          {/* Universal Smart-Create launcher — opens the drawer everywhere. */}
+          {/* Universal Smart-Create launcher — opens the drawer everywhere.
+              Uses the Hub's canonical primary CTA style (inverted) to match
+              quotations/invoices/sales. */}
           <button
             type="button" onClick={() => openSmartCreate()}
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300/40 bg-emerald-300/[0.08] px-3 py-1.5 text-[12px] text-emerald-100 hover:bg-emerald-300/[0.14]"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90"
             aria-label="Open Smart Create drawer (shortcut: c)"
             title="Create (c)"
           >
@@ -99,7 +101,7 @@ export default function RoleHome() {
           {/* "Data Entry" — answer to "how do I put data in manually". */}
           <Link
             href="/finance/data-entry"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.08]"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
             title="Where to put finance data manually"
           >
             <RrIcon name="pencil" size={12} />
